@@ -49,6 +49,14 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'ellipse':
+      shape = (
+        <>
+          <ellipse cx="12" cy="12" rx="9" ry="5" transform="rotate(-35 12 12)" />
+          <circle cx="12" cy="12" r=".8" fill="currentColor" />
+        </>
+      );
+      break;
     case 'circle':
       shape = (
         <>
@@ -280,6 +288,8 @@ function ToolHint({ label, children }: { label: string; children: ReactNode }) {
 
 export function SketchToolbar({
   tools,
+  searchHighlight,
+  onSearch,
   tool,
   construction,
   constraintMode,
@@ -298,6 +308,8 @@ export function SketchToolbar({
   onReturnToCanvas,
 }: {
   tools: readonly SketchToolDefinition[];
+  searchHighlight?: string | null;
+  onSearch?: () => void;
   tool: SketchTool;
   construction: boolean;
   constraintMode: ConstraintCommandTool | null;
@@ -316,6 +328,7 @@ export function SketchToolbar({
   onReturnToCanvas: () => void;
 }) {
   const toolbar = useRef<HTMLElement>(null);
+  const hasSearch = !!onSearch;
   const [compact, setCompact] = useState(false);
   const [preferred, setPreferred] = useState(() => ({ ...rememberedTools }));
   useEffect(() => {
@@ -324,6 +337,7 @@ export function SketchToolbar({
     // Changing the actual menu structure avoids duplicate tab stops and stale portals on resize.
     const familyWidth =
       640 +
+      (hasSearch ? 190 : 0) +
       (tools.some(tool => tool.id === 'offset') ? 32 : 0) +
       (tools.some(tool => tool.id === 'mirror') ? 32 : 0) +
       (tools.some(tool => tool.id === 'extend') ? 16 : 0);
@@ -332,7 +346,7 @@ export function SketchToolbar({
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [tools]);
+  }, [tools, hasSearch]);
   useEffect(() => {
     const groups = [...sketchToolGroups, ...sketchToolFamilies].filter(group => (group.tools as readonly string[]).includes(tool));
     if (!groups.length) return;
@@ -349,6 +363,7 @@ export function SketchToolbar({
         type="button"
         className="cad-icon-button"
         aria-label={sketchToolLabel(item)}
+        data-command-highlight={searchHighlight === item.id || undefined}
         aria-pressed={tool === item.id && !constraintMode}
         onClick={() => onTool(item.id)}>
         <SketchToolGlyph kind={item.id} />
@@ -378,7 +393,11 @@ export function SketchToolbar({
           const chosen =
             choices.find(choice => choice.id === tool) ?? choices.find(choice => choice.id === preferred[group.id]) ?? choices[0]!;
           return (
-            <div key={group.id} className="cad-tool-family" data-tool-group={group.id}>
+            <div
+              key={group.id}
+              className="cad-tool-family"
+              data-tool-group={group.id}
+              data-command-highlight={choices.some(choice => choice.id === searchHighlight) || undefined}>
               {toolButton(chosen)}
               {choices.length > 1 && (
                 <DropdownMenu modal={false}>
@@ -429,6 +448,7 @@ export function SketchToolbar({
             type="button"
             className="cad-icon-button"
             aria-label="Construction Q"
+            data-command-highlight={searchHighlight === 'construction' || undefined}
             aria-pressed={construction}
             onClick={onConstruction}>
             <SketchToolGlyph kind="construction" />
@@ -438,7 +458,12 @@ export function SketchToolbar({
         <DropdownMenu modal={false}>
           <ToolHint label={constraintMode ? `${constraints.find(c => c.id === constraintMode)?.label} constraint` : 'Constraints'}>
             <DropdownMenuTrigger asChild>
-              <button type="button" className="cad-icon-button" aria-label="Constraints" aria-pressed={!!constraintMode}>
+              <button
+                type="button"
+                className="cad-icon-button"
+                aria-label="Constraints"
+                data-command-highlight={constraints.some(c => c.id === searchHighlight) || searchHighlight === 'fix' || undefined}
+                aria-pressed={!!constraintMode}>
                 <SketchToolGlyph kind={constraintMode ?? 'constraints'} />
               </button>
             </DropdownMenuTrigger>
@@ -468,6 +493,11 @@ export function SketchToolbar({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {onSearch && (
+        <button type="button" className="cad-search-trigger" disabled={busy} onClick={onSearch} aria-keyshortcuts="Alt+C">
+          Search tools… <kbd>alt/⌥ C</kbd>
+        </button>
+      )}
       <div className="cad-tool-group cad-session-actions" aria-label="Sketch actions" role="group">
         <ToolHint label="Undo (Ctrl or Command Z)">
           <button

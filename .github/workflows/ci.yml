@@ -21,6 +21,10 @@ jobs:
   checks:
     name: Format, lint and types
     runs-on: ubuntu-24.04
+    # Optional shared task cache; without configuration the existing local cache still works.
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -57,6 +61,9 @@ jobs:
 
   test:
     name: Tests (${{ matrix.suite }})
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     # CAD/WASM, the app browser suite, and OpenCV must not compete for one runner's CPUs.
     strategy:
       fail-fast: false
@@ -141,6 +148,9 @@ jobs:
 
   specs:
     name: Behaviour specs (${{ matrix.shard }})
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     strategy:
       fail-fast: false
       matrix:

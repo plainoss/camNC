@@ -9,9 +9,9 @@ export interface RationalCurveData {
 type Homogeneous = [number, number, number];
 const tau = 2 * Math.PI;
 const wrap = (angle: number) => ((angle % tau) + tau) % tau;
-export const isNurbsCurve = (entity: CadEntity): entity is CadNurbsEntity => ['conic', 'bezier', 'spline'].includes(entity.type);
+export const isNurbsCurve = (entity: CadEntity): entity is CadNurbsEntity => ['conic', 'bezier', 'spline', 'ellipse'].includes(entity.type);
 export function curveEndpointIds(entity: CadEntity): string[] {
-  return entity.type === 'point' || entity.type === 'circle' || (entity.type === 'spline' && entity.closed)
+  return entity.type === 'point' || entity.type === 'circle' || entity.type === 'ellipse' || (entity.type === 'spline' && entity.closed)
     ? []
     : [entity.startId, entity.endId];
 }
@@ -22,6 +22,32 @@ export function rationalCurveData(entity: CadNurbsEntity, points: ReadonlyMap<st
     if (!p) throw new Error('Curve references a missing point.');
     return p;
   };
+  if (entity.type === 'ellipse') {
+    const c = point(entity.centerId),
+      f = point(entity.focusId);
+    const angle = Math.atan2(f.y - c.y, f.x - c.x);
+    const a = Math.hypot(f.x - c.x, f.y - c.y, entity.radius),
+      b = entity.radius;
+    const cos = Math.cos(angle),
+      sin = Math.sin(angle);
+    const controls = [
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [-1, 1],
+      [-1, 0],
+      [-1, -1],
+      [0, -1],
+      [1, -1],
+      [1, 0],
+    ];
+    return {
+      poles: controls.map(([x, y]) => ({ x: c.x + a * x! * cos - b * y! * sin, y: c.y + a * x! * sin + b * y! * cos })),
+      weights: [1, Math.SQRT1_2, 1, Math.SQRT1_2, 1, Math.SQRT1_2, 1, Math.SQRT1_2, 1],
+      knots: [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4],
+      degree: 2,
+    };
+  }
   if (entity.type === 'conic')
     return {
       poles: [point(entity.startId), point(entity.controlId), point(entity.endId)],

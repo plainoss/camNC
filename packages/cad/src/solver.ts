@@ -13,7 +13,15 @@ import type {
   CadPointEntity,
   CadSolveResult,
 } from './types';
-import { curveEndpointIds, evaluateCurvePoint, evaluateCurveTangent, isNurbsCurve, rationalCurveData, splineNativePoleIds } from './curves';
+import {
+  closestCurvePoint,
+  curveEndpointIds,
+  evaluateCurvePoint,
+  evaluateCurveTangent,
+  isNurbsCurve,
+  rationalCurveData,
+  splineNativePoleIds,
+} from './curves';
 import bundledWasmUrl from './wasmAsset';
 import { fixedConstraintConflicts } from './fixedConstraints';
 import { pointEquivalence, type CadPointEquivalence } from './pointEquivalence';
@@ -22,6 +30,7 @@ import { refreshDimensionMeasurement } from './dimensions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
 import { isFatalSolverError } from './solverFailure';
 import { invalidOffsetBranches, offsetNativePrimitives, offsetNativeSeed } from './offsetConstraint';
+import { entityPointIds } from './document';
 import { withSplineHandleSegments } from './splineHandles';
 
 let modulePromise: Promise<ModuleStatic> | undefined;
@@ -121,7 +130,7 @@ export interface CadDragTarget {
   y: number;
 }
 
-function nativeCurveData(e: CadNurbsEntity, points: Map<string, CadPointEntity>) {
+function nativeCurveData(e: Exclude<CadNurbsEntity, { type: 'ellipse' }>, points: Map<string, CadPointEntity>) {
   const data = rationalCurveData(e, points),
     lo = data.knots[data.degree]!,
     hi = data.knots[data.poles.length]!;
@@ -138,6 +147,8 @@ function solverGeometry(e: CadEntity, points: Map<string, CadPointEntity>): Sket
       return { id: e.id, type: 'point', x: e.x, y: e.y, fixed: e.fixed ?? false };
     case 'line':
       return { id: e.id, type: 'line', p1_id: e.startId, p2_id: e.endId };
+    case 'ellipse':
+      return { id: e.id, type: 'ellipse', c_id: e.centerId, focus1_id: e.focusId, radmin: e.radius };
     case 'circle':
       return { id: e.id, type: 'circle', c_id: e.centerId, radius: e.radius };
     case 'arc':
@@ -191,6 +202,7 @@ function solverConstraint(
         : { id, type: 'point_on_circle', p_id: c.pointId, c_id: c.entityId };
     case 'pointOnCurve': {
       const curve = entities.get(c.entityId) as CadNurbsEntity;
+      if (curve.type === 'ellipse') return { id, type: 'point_on_ellipse', p_id: c.pointId, e_id: curve.id };
       const points = new Map([...entities].filter((entry): entry is [string, CadPointEntity] => entry[1].type === 'point'));
       const data = rationalCurveData(curve, points),
         lo = data.knots[data.degree]!,
@@ -378,6 +390,8 @@ function applySolvedGeometry(part: CadPart, wrapper: GcsWrapper): void {
     if (entity.type === 'point' && solved?.type === 'point') {
       entity.x = solved.x;
       entity.y = solved.y;
+    } else if (entity.type === 'ellipse' && solved?.type === 'ellipse') {
+      entity.radius = solved.radmin;
     } else if ((entity.type === 'circle' || entity.type === 'arc') && (solved?.type === 'circle' || solved?.type === 'arc')) {
       entity.radius = solved.radius;
       if (entity.type === 'arc' && solved.type === 'arc') {
@@ -390,6 +404,10 @@ function applySolvedGeometry(part: CadPart, wrapper: GcsWrapper): void {
   for (const constraint of part.sketch.constraints)
     if (constraint.type === 'pointOnCurve' && !constraint.parameterFixed) {
       const curve = part.sketch.entities.find(e => e.id === constraint.entityId) as CadNurbsEntity;
+      if (curve.type === 'ellipse') {
+        constraint.parameter = closestCurvePoint(curve, points, points.get(constraint.pointId)!).parameter;
+        continue;
+      }
       const data = rationalCurveData(curve, points),
         lo = data.knots[data.degree]!,
         hi = data.knots[data.poles.length]!;
@@ -408,8 +426,14 @@ function solvedCurveEquationsHold(part: CadPart): boolean {
       expected = evaluateCurvePoint(curve, points, t);
     return Math.hypot(actual.x - expected.x, actual.y - expected.y) <= CAD_GEOMETRY_TOLERANCE;
   };
-  for (const curve of part.sketch.entities)
+  for (const curve of part.sketch.entities) {
+    if (curve.type === 'ellipse') {
+      const diameter = (a: string, b: string, t: number) =>
+        (matches(curve, a, t) && matches(curve, b, t + 0.5)) || (matches(curve, b, t) && matches(curve, a, t + 0.5));
+      if (!diameter(curve.majorStartId, curve.majorEndId, 0) || !diameter(curve.minorStartId, curve.minorEndId, 0.25)) return false;
+    }
     if (curve.type === 'spline' && !curve.fitPointIds.every((id, i) => matches(curve, id, curve.fitParameters[i]!))) return false;
+  }
   for (const c of part.sketch.constraints)
     if (c.type === 'pointOnCurve' && !matches(entities.get(c.entityId) as CadNurbsEntity, c.pointId, c.parameter)) return false;
   return true;
@@ -534,6 +558,37 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             });
           }
         for (const e of ordered)
+          if (e.type === 'ellipse') {
+            if (entityPointIds(e).every(id => points.get(id)?.fixed)) {
+              // Fixed endpoints already determine the shape. Eight alignment equations
+              // would overconstrain the sole remaining native radius parameter.
+              const a = points.get(e.minorStartId)!,
+                b = points.get(e.minorEndId)!;
+              primitives.push({
+                id: `${e.id}:fixed-radius`,
+                type: 'equal',
+                param1: { o_id: e.id, prop: 'radmin' },
+                param2: Math.hypot(a.x - b.x, a.y - b.y) / 2,
+              });
+            } else
+              primitives.push(
+                {
+                  id: `${e.id}:major`,
+                  type: 'internal_alignment_ellipse_major_diameter',
+                  e_id: e.id,
+                  p1_id: e.majorStartId,
+                  p2_id: e.majorEndId,
+                },
+                {
+                  id: `${e.id}:minor`,
+                  type: 'internal_alignment_ellipse_minor_diameter',
+                  e_id: e.id,
+                  p1_id: e.minorStartId,
+                  p2_id: e.minorEndId,
+                }
+              );
+          }
+        for (const e of ordered)
           if (e.type === 'arc') {
             // With all three points fixed, four arc rules overconstrain three native arc parameters.
             // Keep one native radius equation so contradictory user dimensions remain detectable.
@@ -578,7 +633,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
         const populate = (target: GcsWrapper) => {
           target.push_primitives_and_params(structuredClone(geometry));
           for (const entity of ordered)
-            if (isNurbsCurve(entity)) {
+            if (isNurbsCurve(entity) && entity.type !== 'ellipse') {
               const data = nativeCurveData(entity, points),
                 ids = data.poleIds;
               const addr = (id: string) => {
@@ -622,7 +677,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
               }
             }
           for (const c of part.sketch.constraints)
-            if (c.type === 'pointOnCurve' && !c.parameterFixed) {
+            if (c.type === 'pointOnCurve' && !c.parameterFixed && entities.get(c.entityId)?.type !== 'ellipse') {
               const data = rationalCurveData(entities.get(c.entityId) as CadNurbsEntity, points),
                 lo = data.knots[data.degree]!,
                 hi = data.knots[data.poles.length]!;
