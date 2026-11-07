@@ -1,4 +1,5 @@
 import {
+  inscribedPolygonFromPoints,
   centerPointArcFromPoints,
   ellipseFromPoints,
   circleThroughThreePoints,
@@ -17,6 +18,7 @@ export interface SketchToolPreviewInput {
   tangent?: CadPoint;
   pixelScale: number;
   construction?: boolean;
+  polygonSides?: number;
   sweepIntent?: number;
 }
 
@@ -27,7 +29,7 @@ interface PreviewValue {
 }
 
 /** Native measurements use source millimetres; annotation offsets and markers use CSS pixels. */
-export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelScale, sweepIntent }: SketchToolPreviewInput) {
+export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelScale, sweepIntent, polygonSides }: SketchToolPreviewInput) {
   const start = pending[0],
     scale = Number.isFinite(pixelScale) && pixelScale > 0 ? pixelScale : 1;
   const values: PreviewValue[] = [],
@@ -60,6 +62,15 @@ export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelSca
       const text = formatCadValue(top - bottom);
       values.push({ kind: 'height', text, at: { x: left - (text.length * 3.5 + 12) / scale, y: (top + bottom) / 2 } });
     }
+  } else if (tool === 'inscribedPolygon') {
+    const shape = inscribedPolygonFromPoints(start, pending[1] ?? cursor, polygonSides ?? 6);
+    markers.push(start);
+    if (shape)
+      values.push({
+        kind: 'diameter',
+        text: `⌀${formatCadValue(shape.apothem * 2)}`,
+        at: { x: start.x, y: start.y + shape.apothem + 20 / scale },
+      });
   } else if (tool === 'alignedRectangle') {
     const shape = pending[1] ? alignedRectangleFromPoints(start, pending[1], cursor) : null;
     markers.push(...(shape ? shape.corners : [...pending, cursor]));

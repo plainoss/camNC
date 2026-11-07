@@ -1,6 +1,7 @@
 import {
   CAD_GEOMETRY_TOLERANCE,
   addArc,
+  addInscribedPolygon,
   addCenterPointArc,
   centerPointArcFromPoints,
   addBezier,
@@ -286,6 +287,15 @@ export function CadEditor({
   const [hoveredConstraintEntities, setHoveredConstraintEntities] = useState<string[]>([]);
   const [conflictedConstraints, setConflictedConstraints] = useState<string[]>([]);
   const [pending, setPending] = useState<Point[]>([]);
+  const [polygonSides, setPolygonSides] = useState('6');
+  const polygonInput = useRef<HTMLInputElement>(null);
+  const polygonCountGesture = useRef<{ sides: number; radius: number } | null>(null);
+  useLayoutEffect(() => {
+    if (tool === 'inscribedPolygon' && pending.length === 2) {
+      polygonInput.current?.focus();
+      polygonInput.current?.select();
+    }
+  }, [tool, pending.length]);
   // A completed line leaves a continuation anchor, not an uncommitted new segment.
   const [lineContinuation, setLineContinuation] = useState(false);
   const [chain, setChain] = useState<ChainAnchor | null>(null);
@@ -864,33 +874,35 @@ export function CadEditor({
               ? 'Click geometry to select. Drag to move. Shift-click adds to selection.'
               : next === 'rectangle' || next === 'centerRectangle'
                 ? `Click or drag from the ${next === 'centerRectangle' ? 'center' : 'first corner'} to the opposite corner. Or enter sizes below.`
-                : next === 'alignedRectangle'
-                  ? 'Click the first edge start and end, then the perpendicular extent.'
-                  : next === 'ellipse'
-                    ? 'Click the center, then the first axis radius, then the second axis radius.'
-                    : next === 'threePointCircle'
-                      ? 'Click three points along the circle circumference.'
-                      : next === 'circle'
-                        ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
-                        : next === 'centerPointArc'
-                          ? 'Click the arc center, start, then end. Move around the center to choose its sweep.'
-                          : next === 'arc'
-                            ? 'Click the start, end, then a point on the arc.'
-                            : next === 'point'
-                              ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
-                              : next === 'line'
-                                ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
-                                : next === 'trim'
-                                  ? 'Click an interval to trim between intersections or placed points.'
-                                  : next === 'fillet'
-                                    ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
-                                    : next === 'conic'
-                                      ? 'Click the start, end, then control point. Enter rho to shape the conic.'
-                                      : next === 'spline' || next === 'bezier'
-                                        ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
-                                        : next === 'curveControlPoint'
-                                          ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                          : 'Select a line, circle, point pair or existing dimension.'
+                : next === 'inscribedPolygon'
+                  ? 'Click the center, set the inscribed circle, then choose 3–50 sides and click or press Enter.'
+                  : next === 'alignedRectangle'
+                    ? 'Click the first edge start and end, then the perpendicular extent.'
+                    : next === 'ellipse'
+                      ? 'Click the center, then the first axis radius, then the second axis radius.'
+                      : next === 'threePointCircle'
+                        ? 'Click three points along the circle circumference.'
+                        : next === 'circle'
+                          ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
+                          : next === 'centerPointArc'
+                            ? 'Click the arc center, start, then end. Move around the center to choose its sweep.'
+                            : next === 'arc'
+                              ? 'Click the start, end, then a point on the arc.'
+                              : next === 'point'
+                                ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
+                                : next === 'line'
+                                  ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
+                                  : next === 'trim'
+                                    ? 'Click an interval to trim between intersections or placed points.'
+                                    : next === 'fillet'
+                                      ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                                      : next === 'conic'
+                                        ? 'Click the start, end, then control point. Enter rho to shape the conic.'
+                                        : next === 'spline' || next === 'bezier'
+                                          ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
+                                          : next === 'curveControlPoint'
+                                            ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
+                                            : 'Select a line, circle, point pair or existing dimension.'
     );
     svg.current?.focus();
   };
@@ -957,6 +969,7 @@ export function CadEditor({
       'arc',
       'tangentArc',
       'centerPointArc',
+      'inscribedPolygon',
       'point',
       'conic',
       'spline',
@@ -1039,6 +1052,10 @@ export function CadEditor({
     const createdCurve = source.entities.find(
       e => (e.type === 'circle' || e.type === 'arc') && !sketch?.entities.some(before => before.id === e.id)
     );
+    const polygonEdge =
+      tool === 'inscribedPolygon'
+        ? source.entities.find(e => e.type === 'line' && !sketch?.entities.some(before => before.id === e.id))
+        : undefined;
     const rectangleTop =
       tool === 'alignedRectangle'
         ? source.entities.filter(e => e.type === 'line' && !sketch?.entities.some(before => before.id === e.id))[2]
@@ -1061,6 +1078,13 @@ export function CadEditor({
         const pointId = point?.id;
         if (pointId && !next.constraints.some(c => c.type === 'pointOnCircle' && c.pointId === pointId && c.entityId === createdCurve.id))
           next = addConstraint(next, { type: 'pointOnCircle', pointId, entityId: createdCurve.id });
+      }
+      if (index === 1 && polygonEdge?.type === 'line') {
+        if (!point) {
+          next = addPoint(next, { ...inference.point, construction: true, standalone: false });
+          point = next.entities.at(-1) as SketchPoint;
+        }
+        next = addConstraint(next, { type: 'midpoint', pointId: point.id, entityId: polygonEdge.id });
       }
       if (index === 2 && rectangleTop?.type === 'line') {
         if (!point) {
@@ -1115,7 +1139,13 @@ export function CadEditor({
     const sizeExpressions: Record<string, string | undefined> = {};
     let continued: ChainAnchor | null = null;
     let actualEnd = end;
-    if (tool === 'rectangle' || tool === 'centerRectangle') {
+    if (tool === 'inscribedPolygon' && pending[1]) {
+      try {
+        next = addInscribedPolygon(sketch, { center: start, point: pending[1], sides: Number(polygonSides), construction });
+      } catch (error) {
+        return setMessage(error instanceof Error ? error.message : String(error));
+      }
+    } else if (tool === 'rectangle' || tool === 'centerRectangle') {
       const centered = tool === 'centerRectangle';
       const widthValue = end ? null : parseCadValue(width, { unit: 'mm' });
       const heightValue = end ? null : parseCadValue(height, { unit: 'mm' });
@@ -1236,7 +1266,12 @@ export function CadEditor({
             : c
         ),
       };
-    const hints = end ? [...pendingSnaps.current, lastDrawingHint.current] : pendingSnaps.current;
+    const hints =
+      tool === 'inscribedPolygon'
+        ? pendingSnaps.current.slice(0, 2)
+        : end
+          ? [...pendingSnaps.current, lastDrawingHint.current]
+          : pendingSnaps.current;
     if (tool === 'centerPointArc' && end && pending[1] && hints[2]) {
       const arc = centerPointArcFromPoints(start, pending[1], end, centerArcSweep.current?.sweep);
       if (arc) {
@@ -1264,6 +1299,8 @@ export function CadEditor({
         setRho(String(curve.rho));
       }
     }
+    if (tool === 'inscribedPolygon')
+      setMessage('Click the center, set the inscribed circle, then choose 3–50 sides and click or press Enter.');
     if (tool === 'threePointCircle') setMessage('Click three points along the circle circumference.');
     if (tool === 'centerPointArc') setMessage('Click the arc center, start, then end. Move around the center to choose its sweep.');
     if (tool === 'alignedRectangle') setMessage('Click the first edge start and end, then the perpendicular extent.');
@@ -1670,6 +1707,19 @@ export function CadEditor({
     }
     if (editable(event.target)) return;
     const key = event.key.toLowerCase();
+    if (tool === 'inscribedPolygon' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (key === 'enter' && pending.length === 2) {
+        event.preventDefault();
+        addShape(pending[1]);
+        return;
+      }
+      if (/^[0-9]$/.test(key)) {
+        event.preventDefault();
+        setPolygonSides(key);
+        polygonInput.current?.focus();
+        return;
+      }
+    }
     // A checkbox does not own drawing letters, but retains its native keyboard
     // activation and focus. Text fields remain isolated by the guard above.
     if (event.target instanceof HTMLInputElement && event.target.type === 'checkbox' && (key === ' ' || key === 'enter')) return;
@@ -2172,29 +2222,40 @@ export function CadEditor({
         tool === 'ellipse' ||
         tool === 'threePointCircle' ||
         tool === 'alignedRectangle' ||
-        tool === 'centerPointArc') &&
+        tool === 'centerPointArc' ||
+        tool === 'inscribedPolygon') &&
       pending.length === 1
     ) {
       if (
-        (tool === 'ellipse' || tool === 'threePointCircle' || tool === 'alignedRectangle' || tool === 'centerPointArc') &&
+        (tool === 'ellipse' ||
+          tool === 'threePointCircle' ||
+          tool === 'alignedRectangle' ||
+          tool === 'centerPointArc' ||
+          tool === 'inscribedPolygon') &&
         Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) < 0.1
       )
         return;
+      if (tool === 'inscribedPolygon') {
+        event.preventDefault();
+        polygonCountGesture.current = { sides: Number(polygonSides), radius: Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) };
+      }
       setPending([...pending, p]);
       if (tool === 'centerPointArc') centerArcSweep.current = { last: Math.atan2(p.y - pending[0]!.y, p.x - pending[0]!.x), sweep: 0 };
       pendingSnaps.current.push(lastDrawingHint.current);
       setMessage(
-        tool === 'centerPointArc'
-          ? 'Move clockwise or counterclockwise around the center, then click the arc end.'
-          : tool === 'alignedRectangle'
-            ? 'Click to set the perpendicular extent of the rectangle.'
-            : tool === 'threePointCircle'
-              ? 'Click the third point on the circle circumference.'
-              : tool === 'ellipse'
-                ? 'Click to set the second axis radius, perpendicular to the first.'
-                : tool === 'arc'
-                  ? 'Move to shape the arc, then click a point on it.'
-                  : 'Click the conic control point.'
+        tool === 'inscribedPolygon'
+          ? 'Enter the number of sides, or move toward/away from the center to adjust it. Click or press Enter to finish.'
+          : tool === 'centerPointArc'
+            ? 'Move clockwise or counterclockwise around the center, then click the arc end.'
+            : tool === 'alignedRectangle'
+              ? 'Click to set the perpendicular extent of the rectangle.'
+              : tool === 'threePointCircle'
+                ? 'Click the third point on the circle circumference.'
+                : tool === 'ellipse'
+                  ? 'Click to set the second axis radius, perpendicular to the first.'
+                  : tool === 'arc'
+                    ? 'Move to shape the arc, then click a point on it.'
+                    : 'Click the conic control point.'
       );
     } else {
       // Rho opens during this pointerdown. Suppress the browser's following mousedown
@@ -2302,6 +2363,19 @@ export function CadEditor({
         previous.sweep += Math.atan2(Math.sin(angle - previous.last), Math.cos(angle - previous.last));
         previous.last = angle;
       }
+    }
+    if (tool === 'inscribedPolygon' && pending.length === 2 && polygonCountGesture.current) {
+      const anchor = polygonCountGesture.current,
+        center = pending[0]!;
+      if (Number.isInteger(anchor.sides))
+        setPolygonSides(
+          String(
+            Math.max(
+              3,
+              Math.min(50, Math.round(anchor.sides + ((Math.hypot(p.x - center.x, p.y - center.y) - anchor.radius) * markerScale) / 12))
+            )
+          )
+        );
     }
     setCursor(drop?.point ?? p);
     setDrawingCue(movingPoint?.snapPointId ? (snap && !event.shiftKey ? drop : null) : lastDrawingHint.current);
@@ -3089,6 +3163,7 @@ export function CadEditor({
               cursor={cursor}
               curvePreview={curvePreview}
               tangent={chainPreview?.tangent}
+              polygonSides={Number(polygonSides)}
               sweepIntent={centerArcSweep.current?.sweep}
               pixelScale={markerScale}
               construction={construction}
@@ -3192,15 +3267,17 @@ export function CadEditor({
                 ...tools.map(t => ({
                   ...t,
                   description:
-                    t.id === 'centerPointArc'
-                      ? 'Sketch an arc by defining its center, start, and end points.'
-                      : t.id === 'ellipse'
-                        ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.'
-                        : t.id === 'threePointCircle'
-                          ? 'Sketch a circle by defining three points along its circumference.'
-                          : t.id === 'alignedRectangle'
-                            ? 'Sketch a rectangle from an oriented first edge and its perpendicular extent.'
-                            : undefined,
+                    t.id === 'inscribedPolygon'
+                      ? 'Sketch a regular polygon around an inscribed construction circle.'
+                      : t.id === 'centerPointArc'
+                        ? 'Sketch an arc by defining its center, start, and end points.'
+                        : t.id === 'ellipse'
+                          ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.'
+                          : t.id === 'threePointCircle'
+                            ? 'Sketch a circle by defining three points along its circumference.'
+                            : t.id === 'alignedRectangle'
+                              ? 'Sketch a rectangle from an oriented first edge and its perpendicular extent.'
+                              : undefined,
                 })),
                 ...(
                   [
@@ -3236,6 +3313,44 @@ export function CadEditor({
                 svg.current?.focus();
               }}
             />
+          )}
+          {tool === 'inscribedPolygon' && (
+            <form
+              className="cad-create-size"
+              onSubmit={event => {
+                event.preventDefault();
+                if (pending[1]) addShape(pending[1]);
+              }}>
+              <label>
+                Polygon sides{' '}
+                <input
+                  ref={polygonInput}
+                  aria-label="Polygon sides"
+                  type="number"
+                  min={3}
+                  max={50}
+                  step={1}
+                  value={polygonSides}
+                  onChange={event => {
+                    setPolygonSides(event.target.value);
+                    if (pending[0])
+                      polygonCountGesture.current = {
+                        sides: Number(event.target.value),
+                        radius: Math.hypot(cursor.x - pending[0].x, cursor.y - pending[0].y),
+                      };
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      chooseTool('select');
+                    }
+                  }}
+                />
+              </label>
+              <button type="submit" disabled={!pending[1]}>
+                Create polygon
+              </button>
+            </form>
           )}
           {tool === 'fillet' && selected.length > 0 && (
             <form

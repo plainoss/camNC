@@ -149,6 +149,7 @@ export function constraintEntityIds(constraint: CadConstraint): string[] {
     return Array.isArray(constraint.members)
       ? [...new Set(constraint.members.flatMap(member => (member ? [member.sourceId, member.targetId] : [])))]
       : [];
+  if (constraint.type === 'regularPolygon') return [constraint.circleId, ...constraint.edgeIds];
   if (constraint.type === 'symmetricPoints') return [constraint.pointAId, constraint.pointBId, constraint.lineId];
   if ('sourceEntityId' in constraint && constraint.sourceEntityId !== undefined)
     return [constraint.pointAId, constraint.pointBId, constraint.sourceEntityId];
@@ -699,6 +700,7 @@ export function parseCadDocument(input: unknown): CadDocument {
             'vertical',
             'coincident',
             'symmetricPoints',
+            'regularPolygon',
             'horizontalPoints',
             'verticalPoints',
             'pointOnLine',
@@ -727,6 +729,18 @@ export function parseCadDocument(input: unknown): CadDocument {
         )
           throw new Error('Unknown CAD constraint');
         if (c.label !== undefined && typeof c.label !== 'string') throw new Error('Invalid constraint label');
+        if (c.type === 'regularPolygon') {
+          if (
+            c.mode !== 'inscribed' ||
+            !Array.isArray(c.edgeIds) ||
+            c.edgeIds.length < 3 ||
+            c.edgeIds.length > 50 ||
+            new Set(c.edgeIds).size !== c.edgeIds.length
+          )
+            throw new Error('Invalid regular polygon relation.');
+          reference(c.circleId);
+          c.edgeIds.forEach(reference);
+        }
         if (c.type === 'offset') {
           if (!Array.isArray(c.members) || c.members.length === 0) throw new Error('An offset needs copied geometry.');
           for (const member of c.members) {

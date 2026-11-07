@@ -135,6 +135,10 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
         error('invalid-reference', 'An offset needs source and copied geometry.', undefined, [c.id]);
         continue;
       }
+      if (c.type === 'regularPolygon' && !Array.isArray(c.edgeIds)) {
+        error('invalid-reference', 'A regular polygon needs its edge list.', undefined, [c.id]);
+        continue;
+      }
       const dependencies = constraintEntityIds(c);
       if (dependencies.some(id => !entities.has(id))) {
         error('missing-reference', 'A constraint references deleted geometry.', undefined, [c.id]);
@@ -169,6 +173,18 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
           entities.get(c.lineId)?.type !== 'line'
         )
           error('invalid-reference', 'Point symmetry needs two points and a mirror line.', undefined, [c.id]);
+      }
+      if (c.type === 'regularPolygon') {
+        if (
+          c.mode !== 'inscribed' ||
+          !Array.isArray(c.edgeIds) ||
+          c.edgeIds.length < 3 ||
+          c.edgeIds.length > 50 ||
+          new Set(c.edgeIds).size !== c.edgeIds.length ||
+          entities.get(c.circleId)?.type !== 'circle' ||
+          c.edgeIds.some(id => entities.get(id)?.type !== 'line')
+        )
+          error('invalid-reference', 'A regular polygon needs a circle and three to fifty distinct edges.', undefined, [c.id]);
       }
       if (c.type === 'offset') {
         const sources = new Set(c.members.map(member => member.sourceId));

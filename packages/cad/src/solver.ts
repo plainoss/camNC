@@ -181,6 +181,21 @@ function solverConstraint(
 ): SketchPrimitive | SketchPrimitive[] {
   const id = c.id;
   switch (c.type) {
+    case 'regularPolygon':
+      return c.edgeIds.flatMap((edgeId, index): SketchPrimitive[] => [
+        { id: `${id}:side:${index}`, type: 'tangent_lc', l_id: edgeId, c_id: c.circleId },
+        ...(index < c.edgeIds.length - 1
+          ? [
+              {
+                id: `${id}:turn:${index}`,
+                type: 'l2l_angle_ll' as const,
+                l1_id: edgeId,
+                l2_id: c.edgeIds[index + 1]!,
+                angle: (2 * Math.PI) / c.edgeIds.length,
+              },
+            ]
+          : []),
+      ]);
     case 'offset':
       return offsetNativePrimitives(c, offsetSeed, constraints);
     case 'symmetricPoints':
@@ -784,6 +799,8 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             break;
           }
         }
+        const sourceConstraintId = (nativeId: string) =>
+          part.sketch.constraints.find(c => c.type === 'regularPolygon' && nativeId.startsWith(`${c.id}:`))?.id ?? nativeId;
         const status = conflicts.length ? 'conflict' : candidate ? 'solved' : 'invalid';
         sketches.push({ partId: part.id, dof: wrapper.gcs.dof(), status });
         if (status !== 'solved') {
@@ -799,7 +816,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             constraintIds:
               invalidOffsets.length && !conflicts.length
                 ? invalidOffsets
-                : conflicts.filter(id => part.sketch.constraints.some(c => c.id === id)),
+                : [...new Set(conflicts.map(sourceConstraintId).filter(id => part.sketch.constraints.some(c => c.id === id)))],
             entityIds: conflicts.flatMap(id => {
               const suffix = [':arc-rules', ':fixed-radius'].find(suffix => id.endsWith(suffix));
               return suffix ? [id.slice(0, -suffix.length)] : [];
@@ -818,7 +835,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             message: 'Some constraints repeat relationships that are already defined.',
             severity: 'warning',
             partId: part.id,
-            constraintIds: redundant,
+            constraintIds: [...new Set(redundant.map(sourceConstraintId))],
           });
         if (wrapper.gcs.dof() > 0)
           diagnostics.push({

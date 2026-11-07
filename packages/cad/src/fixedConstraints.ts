@@ -34,6 +34,17 @@ export function fixedConstraintConflicts(part: CadPart): CadDiagnostic[] {
     if ('value' in constraint && constraint.driven) continue;
     let error: number | undefined;
     switch (constraint.type) {
+      case 'regularPolygon': {
+        for (let i = 0; i < constraint.edgeIds.length - 1; i++) {
+          const a = line(constraint.edgeIds[i]!),
+            b = line(constraint.edgeIds[i + 1]!);
+          if (!a || !b || !a.length || !b.length) continue;
+          const turn = Math.atan2(a.dx * b.dy - a.dy * b.dx, a.dx * b.dx + a.dy * b.dy);
+          const delta = turn - (2 * Math.PI) / constraint.edgeIds.length;
+          error = Math.max(error ?? 0, Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))));
+        }
+        break;
+      }
       case 'symmetricPoints': {
         const a = point(constraint.pointAId),
           b = point(constraint.pointBId),
