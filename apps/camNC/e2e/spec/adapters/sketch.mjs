@@ -545,14 +545,15 @@ export async function createAdapter(page, url) {
     }
     if (expect.noFalseGrid && /\bgrid\b/i.test(scene.footer) && !scene.gridLines) fail('grid label', 'no label without a drawn grid', scene.footer);
     if ('pageText' in expect) {
-      // A new stage can still be rendering on a busy machine, so give the text time to arrive.
-      const arrived = await page
-        .waitForFunction(source => new RegExp(source, 'i').test(document.body.innerText), expect.pageText, { timeout: 5000 })
-        .then(
-          () => true,
-          () => false
-        );
-      if (!arrived) fail('pageText', expect.pageText, (await page.locator('body').innerText()).slice(0, 800));
+      // Route banners can update after the sketch solve and its persisted snapshot.
+      // Wait for the observable result instead of sampling one frame after Finish.
+      await page.waitForFunction(
+        pattern => new RegExp(pattern, 'i').test(document.body.innerText),
+        expect.pageText,
+        { timeout: 5000 }
+      ).catch(() => {});
+      const text = await page.locator('body').innerText();
+      if (!new RegExp(expect.pageText, 'i').test(text)) fail('pageText', expect.pageText, text.slice(0, 800));
     }
     if ('pageTextOnce' in expect) {
       const banner = await page.locator('[role=alert]').allInnerTexts();
