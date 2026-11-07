@@ -21,10 +21,9 @@ jobs:
   checks:
     name: Format, lint and types
     runs-on: ubuntu-24.04
-    # Optional shared task cache; without configuration the existing local cache still works.
-    env:
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -43,6 +42,14 @@ jobs:
       - name: Check CI configuration
         run: pnpm run test:ci
       # Turborepo's local cache, so packages whose inputs did not change replay their result.
+      # Fork PRs keep local snapshots; only trusted repository jobs may exchange an identity token.
+      - name: Authenticate remote cache
+        if: vars.TURBO_TEAM != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10 # v1.0.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+          audience: https://vercel.com/camnc-ci-cache
+          policy: ${{ vars.TURBO_POLICY_ID }}
       - name: Cache Turborepo
         uses: actions/cache@v6
         with:
@@ -61,9 +68,9 @@ jobs:
 
   test:
     name: Tests (${{ matrix.suite }})
-    env:
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    permissions:
+      contents: read
+      id-token: write
     # CAD/WASM, the app browser suite, and OpenCV must not compete for one runner's CPUs.
     strategy:
       fail-fast: false
@@ -120,6 +127,14 @@ jobs:
       # Turborepo's local cache, so packages whose inputs did not change replay their result.
       # Git refuses this container's checkout, so scripts/turbo-shared-cache.mjs can't find the git dir. Name the
       # directory here, or the cache action saves a path turbo never wrote.
+      # Fork PRs keep local snapshots; only trusted repository jobs may exchange an identity token.
+      - name: Authenticate remote cache
+        if: vars.TURBO_TEAM != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10 # v1.0.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+          audience: https://vercel.com/camnc-ci-cache
+          policy: ${{ vars.TURBO_POLICY_ID }}
       - name: Cache Turborepo
         uses: actions/cache@v6
         with:
@@ -148,9 +163,9 @@ jobs:
 
   specs:
     name: Behaviour specs (${{ matrix.shard }})
-    env:
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -178,6 +193,14 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # Fork PRs keep local snapshots; only trusted repository jobs may exchange an identity token.
+      - name: Authenticate remote cache
+        if: vars.TURBO_TEAM != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10 # v1.0.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+          audience: https://vercel.com/camnc-ci-cache
+          policy: ${{ vars.TURBO_POLICY_ID }}
       - name: Cache Turborepo
         uses: actions/cache@v6
         with:
