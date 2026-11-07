@@ -30,6 +30,10 @@ wrong.
 - `CadEditor` is a large SVG editor with many tests. To sketch on a face, the
   camera faces the surface and that editor is aligned on top of the 3D view. It is
   not rewritten in 3D.
+- CAM holds a part by one outline, so a through cut can't reach the edge or leave a
+  loose piece. Those are refused, and the fix is to change the profile or use a
+  separate part. Depths that don't fit are refused too, so a pocket never quietly
+  becomes a through cut.
 - Floors, walls and top faces come straight from the stacked slabs, so each
   triangle can be tagged with its face for picking. No general boolean code is
   needed.
