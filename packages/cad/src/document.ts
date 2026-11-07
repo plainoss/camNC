@@ -731,7 +731,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (c.label !== undefined && typeof c.label !== 'string') throw new Error('Invalid constraint label');
         if (c.type === 'regularPolygon') {
           if (
-            c.mode !== 'inscribed' ||
+            !['inscribed', 'circumscribed'].includes(c.mode) ||
             !Array.isArray(c.edgeIds) ||
             c.edgeIds.length < 3 ||
             c.edgeIds.length > 50 ||

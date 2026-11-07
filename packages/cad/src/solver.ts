@@ -182,6 +182,24 @@ function solverConstraint(
   const id = c.id;
   switch (c.type) {
     case 'regularPolygon':
+      if (c.mode === 'circumscribed') {
+        const circle = entities.get(c.circleId) as import('./types').CadCircleEntity;
+        return c.edgeIds.flatMap((edgeId, index): SketchPrimitive[] => [
+          { id: `${id}:spoke:${index}`, type: 'line', p1_id: circle.centerId, p2_id: (entities.get(edgeId) as CadLineEntity).startId },
+          { id: `${id}:vertex:${index}`, type: 'point_on_circle', p_id: (entities.get(edgeId) as CadLineEntity).startId, c_id: circle.id },
+          ...(index > 0
+            ? [
+                {
+                  id: `${id}:turn:${index}`,
+                  type: 'l2l_angle_ll' as const,
+                  l1_id: `${id}:spoke:${index - 1}`,
+                  l2_id: `${id}:spoke:${index}`,
+                  angle: (2 * Math.PI) / c.edgeIds.length,
+                },
+              ]
+            : []),
+        ]);
+      }
       return c.edgeIds.flatMap((edgeId, index): SketchPrimitive[] => [
         { id: `${id}:side:${index}`, type: 'tangent_lc', l_id: edgeId, c_id: c.circleId },
         ...(index < c.edgeIds.length - 1

@@ -58,7 +58,7 @@ export function beginCreationValues(
         }
       );
     }
-  } else if (tool === 'inscribedPolygon') {
+  } else if (tool === 'inscribedPolygon' || tool === 'circumscribedPolygon') {
     const circle = entities.find(e => e.type === 'circle');
     if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Polygon diameter' });
   } else if (tool === 'centerPointArc') {

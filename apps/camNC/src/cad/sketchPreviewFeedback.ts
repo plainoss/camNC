@@ -1,5 +1,6 @@
 import {
   inscribedPolygonFromPoints,
+  circumscribedPolygonFromPoints,
   centerPointArcFromPoints,
   ellipseFromPoints,
   circleThroughThreePoints,
@@ -62,14 +63,18 @@ export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelSca
       const text = formatCadValue(top - bottom);
       values.push({ kind: 'height', text, at: { x: left - (text.length * 3.5 + 12) / scale, y: (top + bottom) / 2 } });
     }
-  } else if (tool === 'inscribedPolygon') {
-    const shape = inscribedPolygonFromPoints(start, pending[1] ?? cursor, polygonSides ?? 6);
+  } else if (tool === 'inscribedPolygon' || tool === 'circumscribedPolygon') {
+    const shape = (tool === 'inscribedPolygon' ? inscribedPolygonFromPoints : circumscribedPolygonFromPoints)(
+      start,
+      pending[1] ?? cursor,
+      polygonSides ?? 6
+    );
     markers.push(start);
     if (shape)
       values.push({
         kind: 'diameter',
-        text: `⌀${formatCadValue(shape.apothem * 2)}`,
-        at: { x: start.x, y: start.y + shape.apothem + 20 / scale },
+        text: `⌀${formatCadValue((tool === 'inscribedPolygon' ? shape.apothem : shape.radius) * 2)}`,
+        at: { x: start.x, y: start.y + (tool === 'inscribedPolygon' ? shape.apothem : shape.radius) + 20 / scale },
       });
   } else if (tool === 'alignedRectangle') {
     const shape = pending[1] ? alignedRectangleFromPoints(start, pending[1], cursor) : null;

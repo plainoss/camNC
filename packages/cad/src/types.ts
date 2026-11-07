@@ -119,7 +119,7 @@ export type CadOffsetMember =
   | { kind: 'circle'; sourceId: string; targetId: string; side: 1 | -1 };
 
 export type CadConstraint =
-  | (ConstraintBase & { type: 'regularPolygon'; circleId: string; edgeIds: string[]; mode: 'inscribed' })
+  | (ConstraintBase & { type: 'regularPolygon'; circleId: string; edgeIds: string[]; mode: 'inscribed' | 'circumscribed' })
   | (ConstraintBase & { type: 'horizontal' | 'vertical'; entityId: string })
   | (ConstraintBase & { type: 'horizontalPoints' | 'verticalPoints'; pointAId: string; pointBId: string })
   | (ConstraintBase & { type: 'coincident'; pointAId: string; pointBId: string })
