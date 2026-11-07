@@ -8,11 +8,14 @@ import {
   createCadPart,
   createPlateDocument,
   setCutDepth,
+  solveCadDocument,
   type CadDocument,
 } from '@wbcnc/cad';
+import type { HoleChoice } from '@wbcnc/cam';
 import { describe, expect, it } from 'vitest';
 import { camWorker } from './camQueries';
 import { nativeCadModel } from './nativeCadModel';
+import { missingNativeHoleChoices } from './holeChoices';
 import { kDefaultPlan, toCamSettings } from './planSettings';
 
 describe('native CAD to CAM', () => {
@@ -119,19 +122,27 @@ describe('native CAD to CAM', () => {
       expect(model.parts[0].size).toEqual([100, 60, 12]);
     });
 
-    it('resizes and re-zeroes a part whose edge a through cut removes', async () => {
+    it('names a through cut’s hole after the cut, keeps hole choices on it, and refuses a through cut at the edge', async () => {
       const base = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
-        partId = base.parts[0].id,
-        added = addFaceSketch(base, partId, 'top'),
+        partId = base.parts[0].id;
+      base.parts[0].sketch = addCircle(base.parts[0].sketch, { x: 20, y: 30, radius: 8 });
+      const added = addFaceSketch(base, partId, 'top'),
         face = added.document.parts[0].features![0]!;
       if (face.type !== 'sketch') throw new Error('Expected a sketch');
-      face.sketch = addLine(face.sketch, { x1: 20, y1: 0, x2: 20, y2: 60 });
-      const edge = regionAt(added.document, added.sketchId, 10, 30),
-        { model, entries } = await nativeCadModel(setCutDepth(added.document, partId, added.sketchId, edge.id, 'through')),
-        features = entries.get(partId)!.features;
-      expect(model.parts[0].size).toEqual([80, 60, 12]);
-      expect(model.parts[0].sourceOrigin).toEqual([20, 0]);
-      expect(Math.min(...features.outlines.flat().map(p => p.x))).toBeCloseTo(0, 3);
+      face.sketch = addCircle(face.sketch, { x: 60, y: 30, radius: 10 });
+      const document = setCutDepth(added.document, partId, added.sketchId, regionAt(added.document, added.sketchId, 60, 30).id, 'through'),
+        cutId = document.parts[0].features!.at(-1)!.id,
+        { model } = await nativeCadModel(document),
+        holeIds = model.parts[0].holeIds!;
+      expect(holeIds).toHaveLength(2);
+      expect(holeIds[1]).toBe(cutId);
+      expect(model.parts[0].size).toEqual([100, 60, 12]);
+      const solved = await solveCadDocument(document);
+      expect(missingNativeHoleChoices(solved.parts, { [partId]: { [cutId]: { clear: true } as unknown as HoleChoice } })).toEqual([]);
+
+      face.sketch = addLine(face.sketch, { x1: 90, y1: -5, x2: 90, y2: 65 });
+      const edge = regionAt(added.document, added.sketchId, 95, 30);
+      await expect(nativeCadModel(setCutDepth(added.document, partId, added.sketchId, edge.id, 'through'))).rejects.toThrow('edge');
     });
 
     it('refuses underside cuts until CAM can machine them, so they’re never silently dropped', async () => {

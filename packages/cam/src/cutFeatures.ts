@@ -57,7 +57,7 @@ export function featuresFromCuts(
     }
     if (cut.through) {
       footprint = difference(footprint, shape);
-      holeCuts.push({ id: cut.id, region: shape });
+      holeCuts.push({ id: cut.id, region: difference([cut.outline], cut.islands) });
     } else heights.set(floor, union(heights.get(floor) ?? [], removed));
   }
 
@@ -65,16 +65,17 @@ export function featuresFromCuts(
   let throughHoles = holes,
     holeSources: HoleSource[] = holes.map((_, hole) => ({ hole }));
   if (holeCuts.length) {
-    // Holes a cut didn't touch keep their place and their exact points, because saved hole choices refer to them.
-    const left = footprint.filter(path => areaD(path) < 0).map(path => [...path].reverse()),
-      same = (a: PathD, b: PathD) => Math.abs(polyArea([a]) - polyArea([b])) < 1e-3 && polyArea(intersect([a], [b])) > polyArea([a]) - 1e-3,
-      kept = holes.flatMap((path, hole) => (left.some(other => same(path, other)) ? [{ path, source: { hole } as HoleSource }] : [])),
-      added = left
-        .filter(path => !holes.some(other => same(other, path)))
-        .map(path => ({
-          path,
-          source: { cut: holeCuts.find(({ region }) => polyArea(intersect([path], region)) > 0)?.id ?? holeCuts[0]!.id } as HoleSource,
-        }));
+    // Holes no through cut overlaps keep their place and exact points, because saved hole choices refer to them. What
+    // Clipper hands back is rounded, so it can't be matched to them by comparing shapes.
+    const overlaps = (path: PathD) => holeCuts.find(({ region }) => polyArea(intersect([path], region)) > 0),
+      kept = holes.flatMap((path, hole) => (overlaps(path) ? [] : [{ path, source: { hole } as HoleSource }])),
+      added = footprint
+        .filter(path => areaD(path) < 0)
+        .map(path => [...path].reverse())
+        .flatMap(path => {
+          const from = overlaps(path);
+          return from ? [{ path, source: { cut: from.id } as HoleSource }] : [];
+        });
     throughHoles = [...kept, ...added].map(entry => entry.path);
     holeSources = [...kept, ...added].map(entry => entry.source);
   }
@@ -86,10 +87,10 @@ export function featuresFromCuts(
       return { z, region: cleaned, area: polyArea(cleaned) };
     })
     .filter(level => level.area > 0.5);
-  const top = levels[0]?.z ?? thickness;
+  // Measured from the thickness, not the highest level: cuts can cover the whole top, and each one starts at the surface.
   const pockets: PocketFeature[] = [];
   for (const level of levels) {
-    if (level.z >= top - Z_TOL || level.z <= Z_TOL) continue;
+    if (level.z >= thickness - Z_TOL || level.z <= Z_TOL) continue;
     const above = union(
       levels.filter(other => other.z > level.z + Z_TOL).flatMap(other => other.region),
       []
