@@ -213,7 +213,12 @@ export async function inspectCadDocument(
     let cam: CadReportPart['cam'];
     if (evaluated) {
       if (evaluated.cuts?.some(cut => cut.side === 'underside'))
-        warnings.push({ code: 'cam-underside', message: 'Cuts on the underside can’t be machined yet.', part: part.name });
+        warnings.push({
+          code: 'cam-underside',
+          message:
+            'Cuts on the underside are cut from a second side, after turning the board over. This report covers the first side only.',
+          part: part.name,
+        });
       else {
         const features = camFeatures(evaluated);
         cam = { pockets: features.pockets, throughHoles: features.throughHoles };
