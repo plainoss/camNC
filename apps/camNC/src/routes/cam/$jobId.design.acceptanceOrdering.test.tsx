@@ -166,6 +166,8 @@ it.each(['toolbar', 'Boards stage'] as const)(
     );
     const view = render(app());
     await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
+    // Existing designs open on the part in 3D, and this test edits the drawing.
+    await userEvent.click(screen.getByRole('button', { name: '3D' }));
     await userEvent.dblClick(screen.getByRole('button', { name: 'Edit Width: 120 mm' }));
     await userEvent.fill(screen.getByRole('textbox', { name: 'Width mm' }), '140');
     if (action === 'toolbar') await userEvent.click(screen.getByRole('button', { name: /Finish sketch/ }));
@@ -208,6 +210,8 @@ it.each(['toolbar', 'Boards stage'] as const)(
     client.setQueryData(camKeys.job(job.id), saved);
     render(app());
     await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
+    // Existing designs open on the part in 3D, and this test edits the drawing.
+    await userEvent.click(screen.getByRole('button', { name: '3D' }));
     expect(screen.getByRole('button', { name: 'Edit Width: 140 mm' })).toBeDefined();
     await userEvent.click(screen.getByRole('button', { name: 'Undo (Ctrl or Command Z)' }));
     await waitFor(async () => {

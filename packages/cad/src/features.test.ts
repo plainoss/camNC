@@ -24,6 +24,7 @@ import {
   type CadSketchRegion,
   cadCuts,
   setCutSuppressed,
+  moveFaceSketch,
 } from './index';
 
 const inside = (point: CadPoint, loop: CadPoint[]) => {
@@ -392,6 +393,21 @@ describe('CAD feature format', () => {
     const added = addFaceSketch(document, part.id, 'top'),
       copy = withFaceSketch(added.document, added.sketchId, { ...part.sketch, id: added.sketchId });
     expect(evaluated(copy).errors).toContain('duplicate-id');
+  });
+});
+
+describe('moving a face sketch', () => {
+  it('rescues a sketch that lost its pocket floor', () => {
+    const start = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+      part = start.parts[0]!;
+    part.sketch = addCircle(part.sketch, { x: 50, y: 30, radius: 20 });
+    const region = cadSketchRegions(part, part.sketch.id).find(candidate => candidate.curveIds.length === 1)!,
+      pocket = setCutDepth(start, part.id, part.sketch.id, region.id, 4),
+      cut = cadCuts(pocket.parts[0]!)[0]!,
+      { document, sketchId } = addFaceSketch(pocket, part.id, { floorOf: cut.id }),
+      lost = removeCadFeature(document, part.id, cut.id);
+    expect(evaluateCadDocument(lost).diagnostics.map(d => d.code)).toContain('cut-face-lost');
+    expect(evaluateCadDocument(moveFaceSketch(lost, part.id, sketchId, 'top')).diagnostics.map(d => d.code)).not.toContain('cut-face-lost');
   });
 });
 

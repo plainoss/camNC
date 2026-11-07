@@ -364,6 +364,28 @@
   min-height: 0;
   background: linear-gradient(#f4f6f9, #e3e8ef);
 }
+.cad-part-view:focus {
+  outline: none;
+}
+.cad-part-view-tools {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  left: 12px;
+}
+.cad-part-view-tools button {
+  padding: 5px 10px;
+  border: 1px solid #b9c4cd;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+}
+.cad-part-view-tools button:not(:disabled):hover {
+  background: #f1f4f8;
+}
+.cad-part-view-tools button:disabled {
+  color: #8d9aa8;
+}
 .cad-part-view > p {
   position: absolute;
   bottom: 8px;
@@ -815,6 +837,9 @@
 .cad-feature-list li > span {
   flex: 1;
   min-width: 0;
+}
+.cad-cut-depth {
+  width: 42px;
 }
 .cad-feature-list ul {
   display: grid;
