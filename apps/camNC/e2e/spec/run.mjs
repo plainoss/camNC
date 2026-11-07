@@ -78,6 +78,7 @@ async function compareFrame(scenario, name, svg, options, outDir) {
 }
 
 async function runScenario(browser, scenario, options, outDir) {
+  const started = performance.now();
   const { createAdapter } = await import(`./adapters/${scenario.id.split('/')[0]}.mjs`);
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' });
   const page = await context.newPage();
@@ -90,7 +91,6 @@ async function runScenario(browser, scenario, options, outDir) {
   });
   const failures = [];
   let phase = 'bootstrap';
-  const started = performance.now();
   let bootstrapMs = 0;
   try {
     const adapter = await createAdapter(page, options.url);
@@ -125,7 +125,7 @@ if (options.list) {
   for (const scenario of scenarios) console.log(`${scenario.id}  ${scenario.title}`);
   process.exit(0);
 }
-const outDir = fileURLToPath(new URL('../../../../output/playwright/spec/', import.meta.url));
+const outDir = fileURLToPath(new URL('../../test-results/spec/', import.meta.url));
 await mkdir(outDir, { recursive: true });
 let server = null;
 if (!options.url) {

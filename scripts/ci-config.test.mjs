@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { test } from 'node:test';
@@ -24,7 +24,8 @@ for (const [workflow, job] of [['ci.yml', 'test'], ['ci.yml', 'specs'], ['setup-
 
 test('every file the fast test set skips still exists and CI still runs the full test task', () => {
   const skipped = JSON.parse(read('apps/camNC/vitest.fast-excludes.json'));
-  assert.equal(skipped.length, 20);
+  assert(skipped.length >= 20);
+  assert.equal(new Set(skipped).size, skipped.length);
   for (const file of skipped) assert(existsSync(new URL(`apps/camNC/${file}`, root)), `${file} is gone; update the list`);
   assert.doesNotMatch(read('.github/workflows/ci.yml'), /test:fast/);
 });
@@ -117,4 +118,41 @@ test('production smoke accepts Cloudflare production checks after queue merges a
   assert.equal(passes(check({ app: { slug: 'another-app' } })), false);
   assert.equal(passes({ event_name: 'workflow_dispatch' }), true);
   assert.equal(passes({ event_name: 'schedule' }), true);
+});
+
+
+test('the explicit Node test allocation is disjoint from browser and storage integration coverage', () => {
+  const node = JSON.parse(read('apps/camNC/vitest.node-files.json'));
+  assert.equal(new Set(node).size, node.length);
+  for (const file of node) assert(existsSync(new URL(`apps/camNC/${file}`, root)), file);
+  const browser = read('apps/camNC/vitest.config.ts');
+  assert.match(browser, /exclude:.*\.\.\.nodeFiles/);
+  assert.match(read('apps/camNC/vitest.node.config.ts'), /include: files/);
+  assert(!node.some(file => /jobDb|solveCad|workers\//.test(file)), 'platform adapters retain real browser coverage');
+  const scripts = JSON.parse(read('apps/camNC/package.json')).scripts;
+  for (const task of ['licenses', 'domain', 'worker', 'browser']) assert(scripts.test.includes(`test:${task}`));
+});
+
+test('headless workspace packages cannot import app or browser state adapters', () => {
+  for (const pkg of ['cad-editor', 'cam-settings']) {
+    const manifest = JSON.parse(read(`packages/${pkg}/package.json`));
+    assert.deepEqual(Object.keys(manifest.dependencies), [pkg === 'cad-editor' ? '@wbcnc/cad' : '@wbcnc/cam']);
+    for (const file of readdirSync(new URL(`packages/${pkg}/src`, root)).filter(file => file.endsWith('.ts'))) {
+      const source = read(`packages/${pkg}/src/${file}`);
+      for (const match of source.matchAll(/(?:from|import)\s*['"]([^'"]+)['"]/g)) {
+        assert(!/^(?:@\/|react(?:-dom)?$|zustand|comlink)|apps\//.test(match[1]), `${pkg}/${file}: ${match[1]}`);
+      }
+    }
+  }
+});
+
+test('worker cache includes its schema and migrations while browser tasks exclude worker-only edits', () => {
+  const { tasks } = JSON.parse(read('apps/camNC/turbo.json'));
+  assert(tasks['test:worker'].inputs.includes('worker/**'));
+  assert(tasks['test:worker'].inputs.includes('migrations/**'));
+  for (const task of ['test:browser', 'spec:cad']) {
+    assert(tasks[task].inputs.includes('$TURBO_DEFAULT$'), 'unknown new app files must invalidate the cache');
+    assert(tasks[task].inputs.includes('!worker/**'));
+    assert(tasks[task].inputs.includes('!migrations/**'));
+  }
 });

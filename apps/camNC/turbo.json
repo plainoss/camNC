@@ -1,0 +1,41 @@
+{
+  "extends": [
+    "//"
+  ],
+  "tasks": {
+    "test:worker": {
+      "inputs": [
+        "worker/**",
+        "migrations/**",
+        "vitest.worker.config.ts",
+        "package.json",
+        "tsconfig.json",
+        "tsconfig.*.json",
+        "$TURBO_ROOT$/scripts/test-timings.mjs"
+      ]
+    },
+    "test:licenses": {
+      "inputs": [
+        "e2e/cad/licenses.node.mjs",
+        "public/licenses/**",
+        "package.json"
+      ]
+    },
+    "test:browser": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!worker/**",
+        "!migrations/**",
+        "$TURBO_ROOT$/scripts/test-timings.mjs"
+      ]
+    },
+    "spec:cad": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!worker/**",
+        "!migrations/**",
+        "$TURBO_ROOT$/scripts/test-timings.mjs"
+      ]
+    }
+  }
+}

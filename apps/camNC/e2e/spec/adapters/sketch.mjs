@@ -218,8 +218,7 @@ export async function createAdapter(page, url) {
       .waitForFunction(() => {
         const status = document.querySelector('.cad-status')?.textContent ?? '';
         return !/Checking|Saving/.test(status) && document.querySelector('.cad-editor')?.getAttribute('aria-busy') !== 'true';
-      }, undefined, { timeout: 5000 })
-      .catch(() => {});
+      }, undefined, { timeout: 5000 });
     await page.waitForTimeout(60);
   };
   const leaveTool = async () => {
