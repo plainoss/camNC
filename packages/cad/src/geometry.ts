@@ -94,7 +94,8 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
             e.degree > 3 ||
             (e.closed && e.degree !== 3) ||
             count <= e.degree ||
-            e.controlPointIds.length > 128 ||
+            // Exact subdivision repeats span knots and may retain every original fit plus two cut endpoints.
+            e.controlPointIds.length > 384 ||
             new Set(e.controlPointIds).size !== e.controlPointIds.length ||
             e.weights.length !== e.controlPointIds.length ||
             e.weights.some(w => !Number.isFinite(w) || w <= 0) ||
@@ -102,7 +103,7 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
             e.knots.some((k, i) => !Number.isFinite(k) || (i > 0 && k < e.knots[i - 1]!)) ||
             !(e.knots[count]! > e.knots[e.degree]!) ||
             e.fitPointIds.length < (e.closed ? 3 : 2) ||
-            e.fitPointIds.length > 64 ||
+            e.fitPointIds.length > 66 ||
             e.fitPointIds.length !== e.fitParameters.length ||
             e.fitParameters.some((t, i) => !Number.isFinite(t) || t < 0 || t > 1 || (i > 0 && t <= e.fitParameters[i - 1]!)) ||
             e.startId !== e.fitPointIds[0] ||

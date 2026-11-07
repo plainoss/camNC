@@ -4,6 +4,7 @@ export * from './geometry';
 export * from './solver';
 export * from './fillet';
 export * from './chamfer';
+export * from './split';
 export * from './curves';
 export * from './pointEquivalence';
 export * from './curveContacts';

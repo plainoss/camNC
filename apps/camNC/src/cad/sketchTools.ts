@@ -13,6 +13,7 @@ export type SketchTool =
   | 'point'
   | 'inscribedPolygon'
   | 'circumscribedPolygon'
+  | 'split'
   | 'trim'
   | 'extend'
   | 'offset'
@@ -53,6 +54,7 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'point', label: 'Point', key: 'Shift+S' },
   { id: 'chamfer', label: 'Sketch chamfer' },
   { id: 'fillet', label: 'Sketch fillet', key: 'Shift+F' },
+  { id: 'split', label: 'Split' },
   { id: 'trim', label: 'Trim', key: 'M' },
   { id: 'extend', label: 'Extend', key: 'X' },
   { id: 'offset', label: 'Offset', key: 'O' },
@@ -60,7 +62,11 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'dimension', label: 'Dimension', key: 'D' },
 ];
 
-const modifyTools = { id: 'modify', label: 'Modify tools', tools: ['fillet', 'chamfer', 'trim', 'extend', 'offset', 'mirror'] } as const;
+const modifyTools = {
+  id: 'modify',
+  label: 'Modify tools',
+  tools: ['fillet', 'chamfer', 'split', 'trim', 'extend', 'offset', 'mirror'],
+} as const;
 
 /** Only the compact layout combines drawing commands; wide layouts retain their native families. */
 export const sketchToolGroups = [
@@ -96,7 +102,7 @@ export const sketchToolFamilies = [
   { id: 'rectangle', label: 'Rectangle tools', tools: ['rectangle', 'centerRectangle', 'alignedRectangle'] },
   { id: 'arc', label: 'Arc tools', tools: ['arc', 'tangentArc', 'centerPointArc', 'conic'] },
   { id: 'spline', label: 'Spline tools', tools: ['spline', 'bezier', 'curveControlPoint'] },
-  { id: 'trim', label: 'Trim tools', tools: ['trim', 'extend'] },
+  { id: 'trim', label: 'Trim tools', tools: ['trim', 'extend', 'split'] },
 ] as const;
 
 export const sketchToolLabel = (tool: SketchToolDefinition) => (tool.key ? `${tool.label} (${tool.key})` : tool.label);
@@ -109,6 +115,8 @@ export const sketchToolSection = (tool: SketchTool) =>
         ? 'rectangle'
         : tool === 'tangentArc' || tool === 'centerPointArc'
           ? 'arc'
-          : tool === 'bezier' || tool === 'curveControlPoint'
-            ? 'spline'
-            : tool;
+          : tool === 'split'
+            ? 'trim'
+            : tool === 'bezier' || tool === 'curveControlPoint'
+              ? 'spline'
+              : tool;
