@@ -650,7 +650,8 @@ export function parseCadDocument(input: unknown): CadDocument {
       for (const e of sketch.entities) {
         if (!e || typeof e !== 'object') throw new Error('Invalid CAD entity');
         addId(e.id);
-        if (!['point', 'line', 'circle', 'ellipse', 'arc', 'conic', 'bezier', 'spline'].includes(e.type)) throw new Error('Unknown CAD entity');
+        if (!['point', 'line', 'circle', 'ellipse', 'arc', 'conic', 'bezier', 'spline'].includes(e.type))
+          throw new Error('Unknown CAD entity');
         if (e.construction !== undefined && typeof e.construction !== 'boolean') throw new Error('Invalid construction flag');
         if (e.type === 'point') {
           number(e.x);
