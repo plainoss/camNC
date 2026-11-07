@@ -23,3 +23,5 @@ export * from './extend';
 export * from './splineHandles';
 export * from './offset';
 export * from './rectangleCorners';
+
+export * from './ellipse';

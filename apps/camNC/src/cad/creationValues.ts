@@ -10,6 +10,7 @@ import type { SketchTool } from './sketchTools';
 
 export interface CreationValueStep {
   entityId: string;
+  pointIds?: [string, string];
   mode: CadDimensionMode;
   label: string;
 }
@@ -37,6 +38,26 @@ export function beginCreationValues(
   if (tool === 'line') {
     const line = entities.find(entity => entity.type === 'line');
     if (line) steps.push({ entityId: line.id, mode: 'distance', label: 'Line length' });
+  } else if (tool === 'ellipse') {
+    const ellipse = entities.find(e => e.type === 'ellipse');
+    if (ellipse) {
+      const major: [string, string] = [ellipse.majorStartId, ellipse.majorEndId];
+      const minor: [string, string] = [ellipse.minorStartId, ellipse.minorEndId];
+      steps.push(
+        {
+          entityId: ellipse.id,
+          pointIds: ellipse.primaryAxis === 'major' ? major : minor,
+          mode: 'distance',
+          label: 'Primary axis diameter',
+        },
+        {
+          entityId: ellipse.id,
+          pointIds: ellipse.primaryAxis === 'major' ? minor : major,
+          mode: 'distance',
+          label: 'Secondary axis diameter',
+        }
+      );
+    }
   } else if (tool === 'circle') {
     const circle = entities.find(entity => entity.type === 'circle');
     if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Circle diameter' });
@@ -70,7 +91,7 @@ export function creationValueAt(
 ): { constraint: NewCadDimension; existingConstraintId?: string } | null {
   const step = state.steps[index];
   if (!step || !sketch.entities.some(entity => entity.id === step.entityId)) return null;
-  const result = dimensionForSelection(sketch, [step.entityId], { mode: step.mode });
+  const result = dimensionForSelection(sketch, step.pointIds ?? [step.entityId], { mode: step.mode });
   if (!('constraint' in result)) return null;
   const c = result.constraint;
   // Creation asks for positive width/height, independently of the boundary line's traversal direction.
@@ -94,9 +115,19 @@ export function creationValueAnchor(state: CreationValues, sketch: CadSketch, in
       mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     if (step.mode === 'distanceX') return { x: mid.x, y: Math.max(a.y, b.y) + offset };
     if (step.mode === 'distanceY') return { x: Math.min(a.x, b.x) - offset, y: mid.y };
+    const ellipse = step.pointIds ? sketch.entities.find(e => e.id === step.entityId && e.type === 'ellipse') : undefined;
+    let normalOffset = offset;
+    if (ellipse?.type === 'ellipse') {
+      const otherIds = step.pointIds!.includes(ellipse.majorStartId)
+        ? [ellipse.minorStartId, ellipse.minorEndId]
+        : [ellipse.majorStartId, ellipse.majorEndId];
+      const other = otherIds.map(id => sketch.entities.find(e => e.id === id));
+      if (other[0]?.type === 'point' && other[1]?.type === 'point')
+        normalOffset += Math.hypot(other[0].x - other[1].x, other[0].y - other[1].y) / 2;
+    }
     const length = Math.hypot(b.x - a.x, b.y - a.y),
       sign = b.x - a.x < 0 || (b.x === a.x && b.y > a.y) ? -1 : 1;
-    return { x: mid.x - (sign * (b.y - a.y) * offset) / length, y: mid.y + (sign * (b.x - a.x) * offset) / length };
+    return { x: mid.x - (sign * (b.y - a.y) * normalOffset) / length, y: mid.y + (sign * (b.x - a.x) * normalOffset) / length };
   }
   const entity = sketch.entities.find(entity => entity.id === step.entityId);
   if (entity?.type !== 'circle') return null;

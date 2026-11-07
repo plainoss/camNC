@@ -40,7 +40,7 @@ export function CreationValueControls({
         if (index === state.index && state.editing)
           return (
             <form
-              key={step.entityId}
+              key={`${step.entityId}:${index}`}
               className="cad-creation-value cad-creation-value-edit"
               style={positions[index]}
               onSubmit={event => {
@@ -71,7 +71,7 @@ export function CreationValueControls({
           );
         return (
           <button
-            key={step.entityId}
+            key={`${step.entityId}:${index}`}
             type="button"
             className="cad-creation-value"
             style={positions[index]}

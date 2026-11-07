@@ -2,6 +2,8 @@
 
 Run `pnpm run test:fast` for local feedback, plus any slow browser files changed by the work. Run `pnpm run test:ci` after changing task allocation, cache inputs, or workflows. CI runs the complete corpus and isolated performance gates; the fast subset never counts as a full result.
 
+During an edit, run focused test files directly. Both root broad commands (`test` and `test:fast`) acquire the same local worktree lock; CI skips that lock because each suite has its own runner. Waiting for a broad suite does not prevent focused checks. This avoids concurrent agents repeatedly timing out otherwise passing browser tests.
+
 | Boundary                                         | Owner                          | Runtime                 | Coverage                                                                               |
 | ------------------------------------------------ | ------------------------------ | ----------------------- | -------------------------------------------------------------------------------------- |
 | Cutting recipes and hardware defaults            | `packages/cam-settings`        | Node                    | Pure resolution and identity rules; browser persistence remains tested in the app      |
@@ -26,6 +28,12 @@ The required check stays named **Run tests**. It waits for all test/spec matrix 
 Domain, worker, license, browser and behaviour tasks have independent Turbo entries. The root full/fast commands use these entries rather than the combined app script. The app's `pnpm test` remains a complete standalone command. Source dependencies flow through Turbo transit nodes; package/lockfile changes invalidate relevant work. Worker tasks hash worker sources and migrations. Browser/spec tasks default to all app inputs, excluding only worker sources and migrations. New app files invalidate them automatically. The new headless workspace packages provide genuinely independent source/cache boundaries.
 
 Use the cached `spec:cad` task for local-source validation. Run production/external-URL smoke scripts directly; external deployment state is not a source cache input. Browser correctness shards cache independently because their CLI arguments are part of the Turbo task hash. Performance gates execute directly and are never replayed from the functional cache.
+
+### Shared CI cache setup
+
+The static/build, test and behaviour jobs accept a repository secret `TURBO_TOKEN` and repository variable `TURBO_TEAM` for Vercel Remote Cache. Configure both for the same cache scope to reuse identical task inputs across PR, merge queue and main runs. The token must belong to a dedicated cache account with only the access it needs. Fork PRs receive no token and continue using the existing local cache. Do not expose write credentials through `pull_request_target` or execute untrusted fork code with cache credentials.
+
+Without those settings, remote caching is not enabled and there is no cross-event speedup to claim. Existing per-suite GitHub cache snapshots remain available. Keep main-push validation, which warms the default-branch snapshots, until remote reuse is verified. Before changing that policy, compare task hashes and actual hit rates on representative PR and merge-group runs, and confirm that dependency edits invalidate the affected tasks. Never cache performance-gate execution.
 
 ## Measuring changes
 

@@ -129,6 +129,8 @@ export function entityPointIds(entity: CadEntity): string[] {
       return [];
     case 'line':
       return [entity.startId, entity.endId];
+    case 'ellipse':
+      return [entity.centerId, entity.focusId, entity.majorStartId, entity.majorEndId, entity.minorStartId, entity.minorEndId];
     case 'circle':
       return [entity.centerId];
     case 'arc':
@@ -374,6 +376,7 @@ export function visibleSketchPointIds(sketch: CadSketch, selectedEntityIds: read
   const hidden = new Set<string>(),
     visible = new Set<string>();
   for (const entity of sketch.entities) {
+    if (entity.type === 'ellipse') hidden.add(entity.focusId);
     if (entity.type === 'conic') visible.add(entity.controlId);
     if (entity.type === 'bezier') entity.controlPointIds.forEach(id => visible.add(id));
     if (entity.type === 'spline') {
@@ -385,7 +388,9 @@ export function visibleSketchPointIds(sketch: CadSketch, selectedEntityIds: read
       }
     }
     if (entity.type !== 'point' && entity.type !== 'spline' && selectedEntityIds.includes(entity.id))
-      entityPointIds(entity).forEach(id => visible.add(id));
+      entityPointIds(entity)
+        .filter(id => entity.type !== 'ellipse' || id !== entity.focusId)
+        .forEach(id => visible.add(id));
   }
   return new Set(
     sketch.entities
@@ -645,7 +650,8 @@ export function parseCadDocument(input: unknown): CadDocument {
       for (const e of sketch.entities) {
         if (!e || typeof e !== 'object') throw new Error('Invalid CAD entity');
         addId(e.id);
-        if (!['point', 'line', 'circle', 'arc', 'conic', 'bezier', 'spline'].includes(e.type)) throw new Error('Unknown CAD entity');
+        if (!['point', 'line', 'circle', 'ellipse', 'arc', 'conic', 'bezier', 'spline'].includes(e.type))
+          throw new Error('Unknown CAD entity');
         if (e.construction !== undefined && typeof e.construction !== 'boolean') throw new Error('Invalid construction flag');
         if (e.type === 'point') {
           number(e.x);
@@ -664,6 +670,10 @@ export function parseCadDocument(input: unknown): CadDocument {
             e.weights.forEach(number);
             number(e.degree);
             if (e.closed !== undefined && typeof e.closed !== 'boolean') throw new Error('Invalid closed spline flag');
+          }
+          if (e.type === 'ellipse') {
+            number(e.radius);
+            if (!['major', 'minor'].includes(e.primaryAxis)) throw new Error('Invalid ellipse primary axis');
           }
           if (e.type === 'conic') number(e.rho);
           entityPointIds(e).forEach(reference);

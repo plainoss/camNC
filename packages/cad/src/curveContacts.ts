@@ -126,7 +126,11 @@ export function rationalCurveContacts(a: Curve, b: Curve, points: ReadonlyMap<st
       const ids = new Set([
         line.startId,
         line.endId,
-        ...(rational.type === 'conic' ? [rational.startId, rational.controlId, rational.endId] : rational.controlPointIds),
+        ...(rational.type === 'conic'
+          ? [rational.startId, rational.controlId, rational.endId]
+          : rational.type === 'ellipse'
+            ? [rational.centerId, rational.focusId]
+            : rational.controlPointIds),
       ]);
       // A diagonal line's axis-aligned boxes overlap a near-tangent prefix at every
       // subdivision. The same rigid line frame avoids that artificial explosion.

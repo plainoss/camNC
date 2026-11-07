@@ -285,6 +285,11 @@ export async function createAdapter(page, url) {
         await page.waitForTimeout(40);
         return;
       case 'type':
+        // A value field opens just after the click that asks for it, so typing straight away can lose the keys. Not every
+        // step types into a field, so this only waits so long.
+        await page
+          .waitForFunction(() => /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? ''), undefined, { timeout: 1000 })
+          .catch(() => {});
         await page.keyboard.type(rest);
         return;
       case 'click':
@@ -549,7 +554,7 @@ export async function createAdapter(page, url) {
         { timeout: 5000 }
       ).catch(() => {});
       const text = await page.locator('body').innerText();
-      if (!new RegExp(expect.pageText, 'i').test(text)) fail('pageText', expect.pageText, text.slice(0, 200));
+      if (!new RegExp(expect.pageText, 'i').test(text)) fail('pageText', expect.pageText, text.slice(0, 800));
     }
     if ('pageTextOnce' in expect) {
       const banner = await page.locator('[role=alert]').allInnerTexts();

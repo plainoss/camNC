@@ -139,12 +139,12 @@ describe('setting a cut depth on the drawing', () => {
   it('opens a new face sketch through its host', async () => {
     const open = vi.fn();
     setup(plate(), { onEditFaceSketch: open });
-    await waitFor(() => expect(screen.getByRole('button', { name: '✓ Finish sketch' })).toHaveProperty('disabled', false));
-    // The editor rightly refuses while a sketch check is running, so keep asking until it's free.
-    await waitFor(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'New sketch on top' }));
-      expect(open).toHaveBeenCalledOnce();
+    // The first sketch check can take a while on a busy machine.
+    await waitFor(() => expect(screen.getByRole('button', { name: '✓ Finish sketch' })).toHaveProperty('disabled', false), {
+      timeout: 15_000,
     });
+    fireEvent.click(screen.getByRole('button', { name: 'New sketch on top' }));
+    await waitFor(() => expect(open).toHaveBeenCalledOnce());
     const [document, partId, sketchId] = open.mock.lastCall as [CadDocument, string, string];
     expect(document.parts.find(p => p.id === partId)!.features!.some(f => f.type === 'sketch' && f.sketch.id === sketchId)).toBe(true);
   });

@@ -29,13 +29,21 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - Run `pnpm turbo run test --filter <project_name>` to execute checks for a single package.
 - `pnpm run test` replays packages whose files (and workspace dependencies) didn't change from a cache shared by every worktree of the checkout, so a full run after a small change only tests what it touched. Run it from the repo root rather than calling `turbo run test` directly, which uses a per-worktree cache.
 - On a local machine, agents run `pnpm run test:fast` plus any test files for the code they changed, and leave the full run to CI. It runs the headless packages, app domain and worker tests, and skips camNC's slow browser files (`apps/camNC/vitest.fast-excludes.json`) and the performance gates; name a skipped file to run it, e.g. `pnpm vitest run boards` in `apps/camNC`.
-- `pnpm run test` takes a lock in the git common dir, so full runs from different worktrees wait for each other.
+- `pnpm run test` and `pnpm run test:fast` share a lock in the git common dir, so broad runs from different worktrees wait for each other instead of competing into timeouts. Do not bypass the lock or start another broad suite while waiting; run the changed test files directly for immediate feedback.
 - From within a package you can run `pnpm test`.
 - Focus on one test with `pnpm vitest run -t "<test name>"`.
 - Tests run in headless Chromium (Vitest browser mode); install it once with `pnpm exec playwright install chromium`.
 - Fix failing tests or type errors until the suite passes.
 - After moving files or changing imports, run `pnpm lint --filter <project_name>`.
 - Always add or update tests for the code you change.
+
+## Iteration and CI failures
+
+- During development, run the changed tests and relevant package lint/type checks first. Run the local fast suite once the change is ready, plus affected files excluded from it. After rebasing or resolving conflicts, rerun affected checks and `pnpm run check-format` before pushing; a previous green run validates the previous tree.
+- Push coherent, validated milestones. Superseded PR commits cancel their CI, so avoid repeated pushes of incomplete fixes that discard useful validation.
+- Before repairing a shared test driver or CI failure, inspect open PRs and current main for an existing fix. Coordinate one shared repair rather than independently patching it into several feature branches.
+- Read the failing assertion and its artifacts before classifying a failure as transient. A local pass does not establish that CI is flaky. Retry failed jobs only on the same candidate when there is evidence of a transient failure; if the same assertion fails again, investigate and repair its cause instead of repeatedly requeuing unchanged code.
+- For asynchronous UI tests, wait for the specific observable readiness condition before acting or asserting. Preserve the expected result; do not replace assertions with fixed sleeps or blanket retries.
 
 ## Commit Messages
 
@@ -45,6 +53,9 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 ## Pull Requests
 
 - Title format: `feat/fix/chore/docs(<project_name>) <Title>`
+- Open reviewable dependent PRs as soon as their work is ready; distinguish a dependency blocking merge from one blocking review or initial validation. State the dependency and base explicitly, and account for the workflow's target-branch triggers when deciding which checks can run before retargeting.
+- When asked to merge, enable auto-merge once ready and continue monitoring until it merges or a concrete blocker needs action. After a queue rejection, inspect the reason and current candidate, address it, and restore auto-merge when appropriate; a retry of an obsolete candidate does not validate a new one.
+- Do not routinely rebase a healthy queued PR just because main advanced; the queue validates the combined candidate. Update the branch when resolving an actual conflict or incorporating a required fix, then validate the changed tree.
 
 ## Code Style
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Runs a command while holding a lock in the git common dir, so full test suites from different worktrees of this
+// Runs a command while holding a lock in the git common dir, so broad test suites from different worktrees of this
 // checkout take turns instead of slowing each other into timeouts. CI runners hold one suite each and skip the lock.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -55,7 +55,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (file) {
     let told = false;
     while (!tryLock(file)) {
-      if (!told) console.log(`Another full test run holds ${file}; waiting for it to finish.`);
+      if (!told) console.log(`Another test suite holds ${file}; waiting for it to finish. Run focused tests directly for immediate feedback.`);
       told = true;
       sleep(2000);
     }
