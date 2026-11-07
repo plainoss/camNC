@@ -1,4 +1,4 @@
-import { ellipseFromPoints, circleThroughThreePoints } from '@wbcnc/cad';
+import { ellipseFromPoints, circleThroughThreePoints, alignedRectangleFromPoints } from '@wbcnc/cad';
 import { ArcPreview } from './ArcPreview';
 import { SketchPreview } from './SketchGeometry';
 import { SKETCH_APPEARANCE } from './sketchAppearance';
@@ -15,6 +15,7 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
   const feedback = sketchPreviewFeedback(props);
   const ellipse = tool === 'ellipse' && pending[1] ? ellipseFromPoints(start, pending[1], cursor) : null;
   const threePointCircle = tool === 'threePointCircle' && pending[1] ? circleThroughThreePoints(start, pending[1], cursor) : null;
+  const aligned = tool === 'alignedRectangle' && pending[1] ? alignedRectangleFromPoints(start, pending[1], cursor) : null;
   return (
     <g data-sketch-tool-preview={tool} pointerEvents="none">
       {curvePreview ? (
@@ -45,7 +46,9 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
         />
       ) : (
         <SketchPreview construction={construction}>
-          {tool === 'rectangle' || tool === 'centerRectangle' ? (
+          {aligned ? (
+            <polygon points={aligned.corners.map(p => `${p.x},${-p.y}`).join(' ')} />
+          ) : tool === 'rectangle' || tool === 'centerRectangle' ? (
             <rect
               x={tool === 'centerRectangle' ? start.x - Math.abs(cursor.x - start.x) : Math.min(start.x, cursor.x)}
               y={tool === 'centerRectangle' ? -start.y - Math.abs(cursor.y - start.y) : -Math.max(start.y, cursor.y)}

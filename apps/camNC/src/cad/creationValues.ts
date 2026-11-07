@@ -61,6 +61,10 @@ export function beginCreationValues(
   } else if (tool === 'circle' || tool === 'threePointCircle') {
     const circle = entities.find(entity => entity.type === 'circle');
     if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Circle diameter' });
+  } else if (tool === 'alignedRectangle') {
+    const lines = entities.filter(e => e.type === 'line');
+    if (lines[0]) steps.push({ entityId: lines[0].id, mode: 'distance', label: 'Rectangle width' });
+    if (lines[1]) steps.push({ entityId: lines[1].id, mode: 'distance', label: 'Rectangle height' });
   } else if (tool === 'rectangle' || tool === 'centerRectangle') {
     const points = new Map(sketch.entities.flatMap(entity => (entity.type === 'point' ? [[entity.id, entity] as const] : [])));
     const lines = entities.filter(entity => entity.type === 'line');

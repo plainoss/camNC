@@ -40,6 +40,9 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
     case 'rectangle':
       shape = <rect x="4" y="6" width="16" height="12" />;
       break;
+    case 'alignedRectangle':
+      shape = <path d="m3 14 12-9 6 8-12 9z" />;
+      break;
     case 'centerRectangle':
       shape = (
         <>
