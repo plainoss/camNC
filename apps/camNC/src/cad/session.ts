@@ -74,6 +74,21 @@ export function commitCadSession(session: CadSession, document: CadDocument): Ca
   return session.document;
 }
 
+/**
+ * Takes a face sketch's result as one undo step. It keeps the document's own revision, because the face sketch's edits
+ * have already been saved with it, and saving next compares against exactly what was saved.
+ */
+export function replaceCadSession(session: CadSession, document: CadDocument, previous: CadDocument | null): CadDocument {
+  if (previous) {
+    session.past.push(copy(previous));
+    if (session.past.length > 100) session.past.shift();
+  }
+  session.future = [];
+  session.document = copy(document);
+  session.resumeAccepted = false;
+  return session.document;
+}
+
 export interface CadCommandCheckpoint {
   documentId: string;
   revision: number;

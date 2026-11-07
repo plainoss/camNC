@@ -314,6 +314,8 @@ export function CadEditor({
   const [rho, setRho] = useState('0.5');
   const [selectionBox, setSelectionBox] = useState<CadSelectionBox | null>(null);
   const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
+  // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
+  useEffect(() => setRegionField(null), [part?.id, doc.revision]);
   const [contextMenu, setContextMenu] = useState<SketchContext | null>(null);
   const contextPress = useRef<SketchContextPress>({ phase: 'idle' });
   const [thicknessValid, setThicknessValid] = useState(true);

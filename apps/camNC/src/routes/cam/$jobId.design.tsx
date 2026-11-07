@@ -11,7 +11,7 @@ import { camKeys, useCamJob } from '@/cam/camQueries';
 import { acceptDesign, saveDesignDraft } from '@/cam/cadDesign';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { CadEditor, type CadEditorController } from '@/cad/CadEditor';
-import { acknowledgeCadSession, cadSession, commitCadSession, endCadSession } from '@/cad/session';
+import { acknowledgeCadSession, cadSession, endCadSession, replaceCadSession } from '@/cad/session';
 import { openAtMachine } from '@/cam/machine/openAtMachine';
 
 const designContextSchema = z.object({
@@ -208,18 +208,20 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     }
   };
   const leaveFaceSketch = (document: CadDocument) => {
-    const { partId, sketchId } = faceEdit!,
-      face = document.parts.find(part => part.id === partId)?.features?.find(f => f.type === 'sketch' && f.sketch.id === sketchId);
-    // A sketch left empty with no cuts leaves nothing behind.
-    const empty =
-      face?.type === 'sketch' &&
-      !face.sketch.entities.some(entity => entity.type !== 'point') &&
-      !document.parts.some(part => part.features?.some(f => f.type === 'cut' && f.sketchId === sketchId));
-    const next = empty ? removeCadFeature(document, partId, face.id) : document;
+    const { base, partId, sketchId } = faceEdit!,
+      isEmpty = (source: CadDocument) => {
+        const face = source.parts.find(part => part.id === partId)?.features?.find(f => f.type === 'sketch' && f.sketch.id === sketchId);
+        return face?.type === 'sketch' && !face.sketch.entities.some(entity => entity.type !== 'point') ? face : null;
+      },
+      empty = isEmpty(document),
+      // Adding a new sketch was already one undo step, so finishing it isn't another.
+      isNew = !!isEmpty(base);
+    // A sketch left empty leaves nothing behind.
+    const next = empty ? { ...removeCadFeature(document, partId, empty.id), revision: document.revision + 1 } : document;
     if (next !== document) draft(next);
-    endCadSession(faceSketchDocument(faceEdit!.base, partId, sketchId).id);
-    // The whole face sketch is one step in the design's undo history.
-    commitCadSession(session, next);
+    if (empty && isNew) session.past.pop();
+    replaceCadSession(session, next, isNew ? null : base);
+    endCadSession(faceSketchDocument(base, partId, sketchId).id);
     setEditorDocument(session.document);
     setEditorEpoch(epoch => epoch + 1);
     setFaceEdit(null);

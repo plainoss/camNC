@@ -531,6 +531,8 @@
       },
       "button New sketch on top",
       "line 150,10 150,130",
+      "line 40,10 40,130",
+      "line 40,10 150,10",
       "button Finish sketch",
       "click 165,70",
       "field Depth in mm 3",

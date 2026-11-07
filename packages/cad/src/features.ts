@@ -1,7 +1,6 @@
 import { newCadId, originId } from './document';
 import { cadFaceSketches } from './featureModel';
-import { CAD_CHORD_TOLERANCE, evaluateCadPart, validateCadDocument } from './geometry';
-import { CAD_GEOMETRY_TOLERANCE } from './tolerances';
+import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type {
   CadCutDepth,
@@ -104,6 +103,10 @@ export function cadSketchRegions(part: CadPart, sketchId: string, outline?: CadP
   return points ? sketchRegions(face.sketch, CAD_CHORD_TOLERANCE, { boundary: { id: `${part.id}:outline`, points } }) : [];
 }
 
+/** CAM drops anything smaller, so these are refused up front and never vanish without a word. */
+const MIN_CUT_DEPTH = 0.01;
+const MIN_CUT_AREA = 1;
+
 const sameIds = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
 
 /**
@@ -131,17 +134,17 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
   };
   const uncut = profile.loops.filter(loop => loop.kind === 'hole');
   for (const feature of part.features) {
-    if (feature.type !== 'cut') continue;
+    if (feature.type === 'sketch') {
+      if (!start(feature.on)) error('cut-face-lost', 'A sketch lost the pocket floor it sat on. Move it to another face, or remove it.');
+      continue;
+    }
     const region = regions.get(feature.sketchId)?.find(candidate => candidate.id === feature.regionId);
     if (!region) {
       error('cut-region-missing', 'A cut lost its sketch region. Pick the region again, or remove the cut.');
       continue;
     }
     const at = start(faces.get(feature.sketchId));
-    if (!at) {
-      error('cut-face-lost', 'A sketch lost the pocket floor it sat on. Move it to another face, or remove it.', region.curveIds);
-      continue;
-    }
+    if (!at) continue;
     const fromProfile = feature.sketchId === part.sketch.id,
       hole = fromProfile ? uncut.find(loop => sameIds(loop.entityIds, region.curveIds)) : undefined;
     if (hole && feature.depth === 'through') {
@@ -149,20 +152,50 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
       continue;
     }
     if (hole) uncut.splice(uncut.indexOf(hole), 1);
-    if (fromProfile && !hole && feature.depth === 'through') {
-      error('cut-whole-part', 'The whole part can’t be cut through. Pick a region inside it.', region.curveIds);
+    if (feature.depth === 0) continue;
+    if (feature.depth === 'through') {
+      // A through cut mustn't change the part's outline or leave a loose piece: CAM holds each part by its one outline.
+      if (fromProfile) {
+        error('cut-whole-part', 'The whole part can’t be cut through. Pick a region inside it.', region.curveIds);
+        continue;
+      }
+      if (region.curveIds.includes(`${part.id}:outline`)) {
+        error('cut-through-edge', 'A through cut can’t reach the part’s edge. Change the profile instead, or use a separate part.');
+        continue;
+      }
+      if (region.holes.length) {
+        error('cut-through-island', 'A through cut can’t leave a loose piece inside it. Use a separate part for that piece.');
+        continue;
+      }
+    } else {
+      const left = part.thickness - at.from;
+      // Thickness can change after the depth was set, so a pocket must never quietly become a through cut.
+      if (feature.depth > left - MIN_CUT_DEPTH) {
+        error(
+          'cut-too-deep',
+          `A ${feature.depth} mm cut doesn’t fit in the ${+left.toFixed(3)} mm of material left. Make it shallower, or cut through.`
+        );
+        continue;
+      }
+      if (feature.depth < MIN_CUT_DEPTH) {
+        error('cut-too-shallow', `A cut needs to be at least ${MIN_CUT_DEPTH} mm deep. Make it deeper, or leave the region uncut.`);
+        continue;
+      }
+    }
+    const outline = hole ? [...hole.points].reverse() : region.points;
+    if (Math.abs(polygonArea(outline)) - region.holes.reduce((sum, island) => sum + Math.abs(polygonArea(island)), 0) < MIN_CUT_AREA) {
+      error('cut-too-small', `A cut needs at least ${MIN_CUT_AREA} mm² of area to be machined.`);
       continue;
     }
-    if (feature.depth === 0) continue;
-    const to = feature.depth === 'through' ? part.thickness : Math.min(part.thickness, at.from + feature.depth);
+    const to = feature.depth === 'through' ? part.thickness : at.from + feature.depth;
     cuts.push({
       id: feature.id,
       regionId: region.id,
       side: at.side,
       from: at.from,
       to,
-      through: to >= part.thickness - CAD_GEOMETRY_TOLERANCE,
-      outline: hole ? [...hole.points].reverse() : region.points,
+      through: feature.depth === 'through',
+      outline,
       islands: region.holes,
     });
   }

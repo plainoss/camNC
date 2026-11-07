@@ -12,17 +12,8 @@ export interface NativeCadEntry {
 /** Native curves are tessellated once by CAD, then go straight to CAM's polygon feature seam. */
 function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: CamPartInfo; mesh: BodyMesh } {
   if (source.cuts?.some(cut => cut.side === 'underside')) throw new Error(`${source.name}: cuts on the underside can’t be machined yet.`);
-  // A through cut can move the part's edge, and every part starts at 0,0 on its board.
-  const cutOutlines = source.cuts?.length
-    ? featuresFromCuts({
-        thickness: source.thickness,
-        outline: source.outline,
-        holes: source.holes,
-        cuts: source.cuts,
-      }).features.outlines.flat()
-    : source.outline;
-  const x0 = Math.min(...cutOutlines.map(p => p.x));
-  const y0 = Math.min(...cutOutlines.map(p => p.y));
+  const x0 = Math.min(...source.outline.map(p => p.x));
+  const y0 = Math.min(...source.outline.map(p => p.y));
   const point = (p: { x: number; y: number }) => ({ x: p.x - x0, y: p.y - y0 });
   const outline = source.outline.map(point);
   const holes = source.holes.map(h => h.map(point));
@@ -44,6 +35,9 @@ function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: Ca
         cuts: source.cuts.map(c => ({ ...c, outline: c.outline.map(point), islands: c.islands.map(island => island.map(point)) })),
       })
     : null;
+  // CAD refuses a through cut that reaches the edge, but cuts from separate sketches can still add up to a split.
+  if (cut && cut.features.outlines.length !== 1)
+    throw new Error(`${source.name}: these through cuts split the part. Use a separate part for each piece.`);
   const features: PartFeatures = cut?.features ?? {
     thickness: source.thickness,
     footprint,
@@ -64,8 +58,7 @@ function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: Ca
     indices = geometry.index ? Uint32Array.from(geometry.index.array) : Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
     geometry.dispose();
   }
-  const edge = features.outlines.flat();
-  const size: [number, number, number] = [Math.max(...edge.map(p => p.x)), Math.max(...edge.map(p => p.y)), source.thickness];
+  const size: [number, number, number] = [Math.max(...outer.map(p => p.x)), Math.max(...outer.map(p => p.y)), source.thickness];
   const part: FlatPart = {
     name: source.name,
     size,

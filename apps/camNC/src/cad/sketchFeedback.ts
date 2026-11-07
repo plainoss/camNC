@@ -12,7 +12,9 @@ export function sketchFeedback(result: CadSolveResult) {
   const issues = result.diagnostics.filter(d => d.severity === 'error');
   const nativeSolved = result.sketches.length > 0 && result.sketches.every(s => s.status === 'solved');
   const inProgress = nativeSolved && issues.length > 0 && issues.every(d => d.code === 'open-profile' || d.code === 'empty-sketch');
-  const free = result.sketches.reduce((sum, s) => sum + s.dof, 0);
+  // Each part's profile comes first. Its face sketches are hidden here, so their freedom isn't reported as the profile's.
+  const profiles = result.sketches.filter((s, i, all) => all.findIndex(other => other.partId === s.partId) === i);
+  const free = profiles.reduce((sum, s) => sum + s.dof, 0);
   const empty = !result.document.parts.some(p => p.sketch.entities.some(e => e.type !== 'point' && !e.construction));
   const status = issues.some(issue => issue.code === 'solver-restarted')
     ? 'Sketch solver reset'

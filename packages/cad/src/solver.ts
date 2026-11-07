@@ -718,9 +718,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
           // Open profiles are intentionally excluded: they remain normal editable sketch geometry.
           if (
             solvedCurveEquationsHold(solvedPart) &&
-            !validateCadDocument({ ...next, version: solvedPart.features?.length ? 2 : 1, parts: [solvedPart] }).some(
-              diagnostic => diagnostic.severity === 'error'
-            )
+            !validateCadDocument({ ...next, parts: [solvedPart] }).some(diagnostic => diagnostic.severity === 'error')
           ) {
             candidate = solvedPart;
             break;

@@ -1,4 +1,4 @@
-import { addCircle, addFaceSketch, addLine, createPlateDocument, type CadDocument } from '@wbcnc/cad';
+import { addCircle, addFaceSketch, addLine, addRectangle, createCadPart, createPlateDocument, type CadDocument } from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
@@ -121,6 +121,19 @@ describe('setting a cut depth on the drawing', () => {
     fireEvent.keyDown(await depthField(), { key: 'Enter' });
     await waitFor(() => expect(container.querySelector('[data-cut-depth="4"]')).not.toBeNull());
     expect(lastDocument(change).parts[0]!.features!.filter(f => f.type === 'cut')).toHaveLength(1);
+  });
+
+  it('closes the depth field when the part changes, so it can’t write a stale cut', async () => {
+    const document = plate(),
+      other = createCadPart('Other');
+    other.sketch = addRectangle(other.sketch, { x: 0, y: 0, width: 50, height: 50 });
+    document.parts.push(other);
+    const { change } = setup(document);
+    clickWorld(60, 45);
+    await depthField();
+    fireEvent.click(screen.getByRole('button', { name: /Other/ }));
+    await waitFor(() => expect(screen.queryByLabelText('Depth in mm')).toBeNull());
+    expect(change.mock.calls.every(([next]) => next.parts.every(part => !part.features))).toBe(true);
   });
 
   it('opens a new face sketch through its host', async () => {

@@ -36,7 +36,7 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   if ((document.version !== 1 && document.version !== 2) || !Number.isSafeInteger(document.revision) || document.revision < 0)
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   if (!document.parts.length) diagnostics.push({ code: 'no-parts', message: 'Add a part before preparing a cut.', severity: 'error' });
-  if ((document.version === 2) !== document.parts.some(part => part.features?.length))
+  if (document.version === 1 && document.parts.some(part => part.features?.length))
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   for (const owner of document.parts) {
     addId(owner.id, owner.id);

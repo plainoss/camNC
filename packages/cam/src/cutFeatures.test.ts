@@ -96,6 +96,32 @@ describe('features from cuts', () => {
     expect(features.levels).toHaveLength(1);
   });
 
+  it('makes a pocket of every region when cuts cover the whole top', () => {
+    const { features } = featuresFromCuts(profile([cut('a', rect(0, 0, 100, 120), 5), cut('b', rect(100, 0, 100, 120), 7)]));
+    expect(features.pockets.map(pocket => pocket.floorZ)).toEqual([13, 11]);
+    const same = featuresFromCuts(profile([cut('a', rect(0, 0, 100, 120), 5), cut('b', rect(100, 0, 100, 120), 5)])).features;
+    expect(same.pockets.map(pocket => pocket.floorZ)).toEqual([13]);
+    expect(same.pockets[0]!.area).toBeCloseTo(24000, 0);
+    const cam = camPart(same, { tabs: false, cutThrough: true });
+    const pockets = cam.operations.filter(op => op.feature === 'pocket');
+    expect(pockets.length).toBeGreaterThan(0);
+    const zs = pockets.flatMap(op => op.passes.flatMap(pass => pass.pts.map(point => point[2])));
+    expect(Math.min(...zs)).toBeCloseTo(13, 1);
+  });
+
+  it('keeps every untouched hole’s identity, whatever Clipper does to its points', () => {
+    for (const radius of [5, 20, 100]) {
+      const round = Array.from({ length: 120 }, (_, i) => ({
+          x: 100 + 0.37 + radius * Math.cos((i * Math.PI) / 60),
+          y: 60 + 0.11 + radius * 0.5 * Math.sin((i * Math.PI) / 60),
+        })),
+        small = rect(180, 100, 10, 10),
+        { features, holeSources } = featuresFromCuts(profile([cut('slot', rect(5, 5, 8, 8), 18)], [round, small]));
+      expect(holeSources).toEqual([{ hole: 0 }, { hole: 1 }, { cut: 'slot' }]);
+      expect(features.throughHoles[0]).toEqual(round);
+    }
+  });
+
   it('gives CAM pockets at the right depths', () => {
     const { features } = featuresFromCuts(profile([cut('a', rect(20, 20, 70, 60), 6), cut('b', rect(176, 0, 24, 120), 3)]));
     const cam = camPart(features, { tabs: false, cutThrough: true });

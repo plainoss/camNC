@@ -12,10 +12,12 @@ import {
   evaluateCadDocument,
   parseCadDocument,
   polygonArea,
+  prepareDimensionCreation,
   removeCadFeature,
   setCutDepth,
   sketchRegions,
   solveCadDocument,
+  type CadDimension,
   type CadDocument,
   type CadPoint,
   type CadSketch,
@@ -111,10 +113,23 @@ describe('CAD cuts on the profile sketch', () => {
     expect(none.cuts).toBeUndefined();
   });
 
-  it('treats a depth at the full thickness as a cut all the way through', () => {
-    const cut = evaluated(depth(plate(), 30)).part!.cuts![0]!;
-    expect(cut.to).toBe(18);
-    expect(cut.through).toBe(true);
+  it('refuses a depth that no longer fits, so a pocket never quietly becomes a through cut', () => {
+    expect(evaluated(depth(plate(), 18)).errors).toEqual(['cut-too-deep']);
+    expect(evaluated(depth(plate(), 17.995)).errors).toEqual(['cut-too-deep']);
+    const thinner = depth(plate(), 12);
+    expect(evaluated(thinner).errors).toEqual([]);
+    thinner.parts[0]!.thickness = 10;
+    expect(evaluated(thinner).errors).toEqual(['cut-too-deep']);
+  });
+
+  it('refuses cuts too shallow or too small to machine, so they never silently vanish', () => {
+    expect(evaluated(depth(plate(), 0.005)).errors).toEqual(['cut-too-shallow']);
+    const document = plate();
+    document.parts[0]!.sketch = addCircle(document.parts[0]!.sketch, { x: 100, y: 20, radius: 0.35 });
+    const tiny = regionAt(document.parts[0]!.sketch, { x: 100, y: 20 });
+    expect(evaluated(setCutDepth(document, document.parts[0]!.id, document.parts[0]!.sketch.id, tiny.id, 3)).errors).toEqual([
+      'cut-too-small',
+    ]);
   });
 
   it('updates a region’s cut instead of adding a second one', () => {
@@ -164,6 +179,37 @@ describe('CAD face sketches', () => {
     const result = solved.parts[0]!.cuts![0]!;
     expect(result.to).toBe(6);
     expect(polygonArea(result.outline)).toBeCloseTo(24 * 120, 3);
+  });
+
+  it('refuses a through cut that reaches the edge or leaves a loose piece, because CAM holds a part by one outline', () => {
+    const document = plate(),
+      partId = document.parts[0]!.id,
+      added = addFaceSketch(document, partId, 'top'),
+      edge = withFaceSketch(
+        added.document,
+        added.sketchId,
+        addLine(faceSketch(added.document, added.sketchId), { x1: 176, y1: -5, x2: 176, y2: 125 })
+      );
+    expect(
+      evaluated(setCutDepth(edge, partId, added.sketchId, faceRegionAt(edge, added.sketchId, { x: 190, y: 60 }).id, 'through')).errors
+    ).toEqual(['cut-through-edge']);
+    let rings = addCircle(faceSketch(added.document, added.sketchId), { x: 100, y: 60, radius: 30 });
+    rings = addCircle(rings, { x: 100, y: 60, radius: 10 });
+    const ring = withFaceSketch(added.document, added.sketchId, rings);
+    expect(
+      evaluated(setCutDepth(ring, partId, added.sketchId, faceRegionAt(ring, added.sketchId, { x: 120, y: 60 }).id, 'through')).errors
+    ).toEqual(['cut-through-island']);
+    // Inside the part with nothing left loose, it's a plain hole.
+    const hole = withFaceSketch(
+      added.document,
+      added.sketchId,
+      addCircle(faceSketch(added.document, added.sketchId), { x: 100, y: 60, radius: 10 })
+    );
+    const result = evaluated(
+      setCutDepth(hole, partId, added.sketchId, faceRegionAt(hole, added.sketchId, { x: 100, y: 60 }).id, 'through')
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.part!.cuts![0]!.through).toBe(true);
   });
 
   it('returns only regions inside the part', () => {
@@ -234,7 +280,7 @@ describe('CAD face sketches', () => {
       disc = regionAt(document.parts[0]!.sketch, { x: 50, y: 60 });
     expect(evaluated(setCutDepth(document, partId, document.parts[0]!.sketch.id, disc.id, 'through')).errors).toEqual(['cut-face-lost']);
     expect(evaluated(setCutDepth(document, partId, document.parts[0]!.sketch.id, disc.id, 0)).errors).toEqual(['cut-face-lost']);
-    expect(evaluated(removeCadFeature(document, partId, cutId)).errors).toContain('invalid-face');
+    expect(evaluated(removeCadFeature(document, partId, cutId)).errors).toEqual(['cut-face-lost']);
   });
 
   it('removes a sketch’s cuts with it', () => {
@@ -267,6 +313,37 @@ describe('CAD face sketches', () => {
   });
 });
 
+describe('CAD features in other operations', () => {
+  it('adds a dimension to a part with features', async () => {
+    const document = plate(),
+      part = document.parts[0]!,
+      region = regionAt(part.sketch, { x: 50, y: 60 }),
+      cut = setCutDepth(document, part.id, part.sketch.id, region.id, 6).parts[0]!;
+    const line = cut.sketch.entities.find(e => e.type === 'line')!;
+    if (line.type !== 'line') throw new Error('Missing line');
+    const result = await prepareDimensionCreation(cut, {
+      id: 'd',
+      type: 'distance',
+      pointAId: line.startId,
+      pointBId: line.endId,
+      value: 200,
+    } as CadDimension);
+    expect(result.ok).toBe(true);
+  });
+
+  it('solves one plain part of a design whose other part has cuts, as a drag does', async () => {
+    const document = plate(),
+      part = document.parts[0]!,
+      other = createCadPart('Other');
+    other.sketch = addRectangle(other.sketch, { x: 0, y: 0, width: 30, height: 30 });
+    const region = regionAt(part.sketch, { x: 50, y: 60 }),
+      cut = setCutDepth({ ...document, parts: [part, other] }, part.id, part.sketch.id, region.id, 6),
+      result = await solveCadDocument({ ...cut, parts: [cut.parts[1]!] });
+    expect(result.status).toBe('solved');
+    expect(result.sketches.map(s => s.status)).toEqual(['solved']);
+  });
+});
+
 describe('CAD feature format', () => {
   const featured = () => {
     const document = plate(),
@@ -285,7 +362,6 @@ describe('CAD feature format', () => {
     expect(() => parseCadDocument({ ...featured(), version: 3 })).toThrow();
     expect(() => parseCadDocument({ ...plate(), version: 2 })).toThrow();
     expect(evaluated({ ...featured(), version: 1 }).errors).toContain('invalid-document');
-    expect(evaluated({ ...plate(), version: 2 }).errors).toContain('invalid-document');
     const brokenDepth = featured();
     (brokenDepth.parts[0]!.features![0] as { depth: unknown }).depth = 'deep';
     expect(() => parseCadDocument(brokenDepth)).toThrow();
