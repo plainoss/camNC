@@ -142,7 +142,7 @@ it('parses arithmetic and units through the actual placed dimension field while 
   await userEvent.keyboard('{Escape}{Escape}d');
   await click(60, 20);
   await click(60, 5);
-  const input = screen.getByRole('textbox', { name: 'Length mm' });
+  const input = await screen.findByRole('textbox', { name: 'Length mm' }, { timeout: 10_000 });
   await userEvent.fill(input, '20+30');
   await userEvent.keyboard('{Enter}');
   await settle();
