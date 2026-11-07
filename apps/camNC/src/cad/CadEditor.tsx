@@ -1621,8 +1621,8 @@ export function CadEditor({
       return;
     }
     const result = buildConstraintForSelection(sketch, type, references);
-    if (result.constraint) {
-      changeSketch(addConstraint(sketch, result.constraint));
+    if (result.constraint || result.constraints?.length) {
+      changeSketch((result.constraints ?? [result.constraint!]).reduce((next, c) => addConstraint(next, c), sketch));
       setConstraintMode(null);
       setMessage(result.message);
     } else if (result.alreadyApplied) {
@@ -1773,13 +1773,18 @@ export function CadEditor({
       return;
     }
     const constraintKey =
-      event.shiftKey && key === 'l'
-        ? 'perpendicular'
-        : !event.shiftKey
-          ? (
-              { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<string, ConstraintTool>
-            )[key]
-          : undefined;
+      event.shiftKey && key === 'o'
+        ? 'concentric'
+        : event.shiftKey && key === 'l'
+          ? 'perpendicular'
+          : !event.shiftKey
+            ? (
+                { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<
+                  string,
+                  ConstraintTool
+                >
+              )[key]
+            : undefined;
     if (constraintKey) {
       event.preventDefault();
       constrain(constraintKey);
@@ -2018,8 +2023,8 @@ export function CadEditor({
       if (!id) return;
       const next = selected.includes(id) ? selected : [...selected, id];
       const result = buildConstraintForSelection(sketch, constraintMode, next);
-      if (result.constraint) {
-        changeSketch(addConstraint(sketch, result.constraint));
+      if (result.constraint || result.constraints?.length) {
+        changeSketch((result.constraints ?? [result.constraint!]).reduce((next, c) => addConstraint(next, c), sketch));
         setSelected([]);
         setMessage(`${result.message} ${constraintPrompt(constraintMode)}`);
       } else if (result.alreadyApplied) {
@@ -3197,9 +3202,19 @@ export function CadEditor({
                             ? 'Sketch a rectangle from an oriented first edge and its perpendicular extent.'
                             : undefined,
                 })),
-                ...(['horizontal', 'vertical', 'coincident', 'midpoint', 'parallel', 'perpendicular', 'equal', 'tangent'] as const).map(
-                  id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })
-                ),
+                ...(
+                  [
+                    'horizontal',
+                    'vertical',
+                    'coincident',
+                    'concentric',
+                    'midpoint',
+                    'parallel',
+                    'perpendicular',
+                    'equal',
+                    'tangent',
+                  ] as const
+                ).map(id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })),
                 { id: 'construction', label: 'Construction geometry', key: 'Q' },
                 { id: 'fix', label: 'Fix / unfix', key: 'Shift+J' },
                 { id: 'fit', label: 'Zoom to fit', key: 'F' },

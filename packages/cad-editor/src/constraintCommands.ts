@@ -2,6 +2,7 @@ import {
   pointEquivalence,
   closestCurvePoint,
   curveEndpointIds,
+  entityPointIds,
   isNurbsCurve,
   type CadConstraint,
   type CadEntity,
@@ -14,6 +15,7 @@ export type ConstraintCommandTool =
   | 'horizontal'
   | 'vertical'
   | 'coincident'
+  | 'concentric'
   | 'midpoint'
   | 'parallel'
   | 'perpendicular'
@@ -21,6 +23,7 @@ export type ConstraintCommandTool =
   | 'tangent';
 export interface ConstraintSelectionResult {
   constraint?: NewCadConstraint;
+  constraints?: NewCadConstraint[];
   needsMore: boolean;
   message: string;
   alreadyApplied?: boolean;
@@ -29,11 +32,13 @@ export interface ConstraintSelectionResult {
 export const constraintPrompt = (tool: ConstraintCommandTool) =>
   tool === 'horizontal' || tool === 'vertical'
     ? `Select a line or two points to make them ${tool}.`
-    : tool === 'coincident'
-      ? 'Select two points, or a point and a curve, to make them coincident.'
-      : tool === 'midpoint'
-        ? 'Select a point and a line to place the point at its midpoint.'
-        : `Select two ${tool === 'parallel' || tool === 'perpendicular' ? 'lines' : 'curves'} to make them ${tool}.`;
+    : tool === 'concentric'
+      ? 'Select circles, arcs, ellipses, or a point and a curve to share a center.'
+      : tool === 'coincident'
+        ? 'Select two points, or a point and a curve, to make them coincident.'
+        : tool === 'midpoint'
+          ? 'Select a point and a line to place the point at its midpoint.'
+          : `Select two ${tool === 'parallel' || tool === 'perpendicular' ? 'lines' : 'curves'} to make them ${tool}.`;
 
 function relationshipKey(c: CadConstraint | NewCadConstraint): string {
   if ('pointId' in c && 'entityId' in c) return `${c.type}:${c.pointId}:${c.entityId}`;
@@ -64,6 +69,33 @@ export function buildConstraintForSelection(
     return { constraint, needsMore: false, message: `${tool[0]!.toUpperCase()}${tool.slice(1)} constraint added.` };
   };
   if (!selected.length) return { needsMore: true, message: prompt };
+  if (tool === 'concentric') {
+    const curves = selected.filter(
+      (e): e is Extract<CadEntity, { type: 'circle' | 'arc' | 'ellipse' }> =>
+        e.type === 'circle' || e.type === 'arc' || e.type === 'ellipse'
+    );
+    const points = selected.filter(e => e.type === 'point');
+    if (curves.length + points.length !== selected.length) return invalid(prompt);
+    if (selected.length === 1) return { needsMore: true, message: 'Select the next point or circular/elliptical curve.' };
+    if (!curves.length) return invalid(prompt);
+    if (
+      points.some(point =>
+        curves.some(
+          curve => !equivalent.equivalent(point.id, curve.centerId) && entityPointIds(curve).some(id => equivalent.equivalent(point.id, id))
+        )
+      )
+    )
+      return invalid('A curve cannot be concentric with its own rim or axis point.');
+    const ids = [...curves.map(curve => curve.centerId), ...points.map(point => point.id)];
+    const centers = [...new Map(ids.map(id => [equivalent.canonical(id), id])).values()];
+    if (centers.length < 2) return { needsMore: false, alreadyApplied: true, message: 'These curves already share a center.' };
+    const constraints: NewCadConstraint[] = centers
+      .slice(1)
+      .map(centerId => ({ type: 'coincident', pointAId: centers[0]!, pointBId: centerId, label: 'Concentric' }));
+    return constraints.length === 1
+      ? { constraint: constraints[0], needsMore: false, message: 'Concentric constraint added.' }
+      : { constraints, needsMore: false, message: 'Concentric constraints added.' };
+  }
   const [a, b] = selected;
   if (tool === 'horizontal' || tool === 'vertical') {
     if (selected.length === 1 && a!.type === 'line') return done({ type: tool, entityId: a!.id });
