@@ -21,7 +21,17 @@ it.each([3, 4, 6, 50])('keeps %s sides regular around an inscribed circle and pr
     circle = sketch.entities.find(e => e.type === 'circle')!;
   expect(circle.construction).toBe(true);
   expect(circle.radius).toBeCloseTo(20);
-  expect(sketch.entities.filter(e => e.type === 'line')).toHaveLength(sides);
+  const points = new Map(sketch.entities.filter(e => e.type === 'point').map(e => [e.id, e]));
+  const center = points.get(circle.centerId)!;
+  const edges = sketch.entities.filter(e => e.type === 'line');
+  expect(edges).toHaveLength(sides);
+  for (const edge of edges) {
+    const a = points.get(edge.startId)!,
+      b = points.get(edge.endId)!;
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    expect(Math.abs((b.x - a.x) * (center.y - a.y) - (b.y - a.y) * (center.x - a.x)) / length).toBeCloseTo(20, 5);
+    expect(length).toBeCloseTo(40 * Math.tan(Math.PI / sides), 5);
+  }
   expect(parseCadDocument(JSON.parse(JSON.stringify(solved.document)))).toEqual(solved.document);
   expect(evaluateCadDocument(solved.document).parts).toHaveLength(1);
 });

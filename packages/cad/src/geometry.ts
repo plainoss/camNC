@@ -176,7 +176,7 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
       }
       if (c.type === 'regularPolygon') {
         if (
-          c.mode !== 'inscribed' ||
+          !['inscribed', 'circumscribed'].includes(c.mode) ||
           !Array.isArray(c.edgeIds) ||
           c.edgeIds.length < 3 ||
           c.edgeIds.length > 50 ||

@@ -12,6 +12,7 @@ export type SketchTool =
   | 'centerPointArc'
   | 'point'
   | 'inscribedPolygon'
+  | 'circumscribedPolygon'
   | 'trim'
   | 'extend'
   | 'offset'
@@ -47,6 +48,7 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'bezier', label: 'Bezier' },
   { id: 'curveControlPoint', label: 'Spline control point' },
   { id: 'inscribedPolygon', label: 'Inscribed polygon' },
+  { id: 'circumscribedPolygon', label: 'Circumscribed polygon' },
   { id: 'point', label: 'Point', key: 'Shift+S' },
   { id: 'fillet', label: 'Sketch fillet', key: 'Shift+F' },
   { id: 'trim', label: 'Trim', key: 'M' },
@@ -79,6 +81,7 @@ export const sketchToolGroups = [
       'bezier',
       'curveControlPoint',
       'inscribedPolygon',
+      'circumscribedPolygon',
       'point',
     ],
   },
@@ -86,7 +89,7 @@ export const sketchToolGroups = [
 ] as const;
 
 export const sketchToolFamilies = [
-  { id: 'polygon', label: 'Polygon tools', tools: ['inscribedPolygon'] },
+  { id: 'polygon', label: 'Polygon tools', tools: ['inscribedPolygon', 'circumscribedPolygon'] },
   { id: 'circle', label: 'Circle tools', tools: ['circle', 'threePointCircle', 'ellipse'] },
   { id: 'rectangle', label: 'Rectangle tools', tools: ['rectangle', 'centerRectangle', 'alignedRectangle'] },
   { id: 'arc', label: 'Arc tools', tools: ['arc', 'tangentArc', 'centerPointArc', 'conic'] },
@@ -96,7 +99,7 @@ export const sketchToolFamilies = [
 
 export const sketchToolLabel = (tool: SketchToolDefinition) => (tool.key ? `${tool.label} (${tool.key})` : tool.label);
 export const sketchToolSection = (tool: SketchTool) =>
-  tool === 'inscribedPolygon'
+  tool === 'inscribedPolygon' || tool === 'circumscribedPolygon'
     ? 'polygon'
     : tool === 'ellipse' || tool === 'threePointCircle'
       ? 'circle'

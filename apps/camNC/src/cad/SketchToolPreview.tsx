@@ -1,5 +1,6 @@
 import {
   inscribedPolygonFromPoints,
+  circumscribedPolygonFromPoints,
   centerPointArcFromPoints,
   ellipseFromPoints,
   circleThroughThreePoints,
@@ -24,7 +25,14 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
   const threePointCircle = tool === 'threePointCircle' && pending[1] ? circleThroughThreePoints(start, pending[1], cursor) : null;
   const aligned = tool === 'alignedRectangle' && pending[1] ? alignedRectangleFromPoints(start, pending[1], cursor) : null;
   const centerArc = tool === 'centerPointArc' && pending[1] ? centerPointArcFromPoints(start, pending[1], cursor, props.sweepIntent) : null;
-  const polygon = tool === 'inscribedPolygon' ? inscribedPolygonFromPoints(start, pending[1] ?? cursor, props.polygonSides ?? 6) : null;
+  const polygon =
+    tool === 'inscribedPolygon' || tool === 'circumscribedPolygon'
+      ? (tool === 'inscribedPolygon' ? inscribedPolygonFromPoints : circumscribedPolygonFromPoints)(
+          start,
+          pending[1] ?? cursor,
+          props.polygonSides ?? 6
+        )
+      : null;
   return (
     <g data-sketch-tool-preview={tool} pointerEvents="none">
       {curvePreview ? (
@@ -57,7 +65,7 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
         <SketchPreview construction={construction}>
           {polygon ? (
             <g>
-              <circle cx={start.x} cy={-start.y} r={polygon.apothem} strokeDasharray="4 4" />
+              <circle cx={start.x} cy={-start.y} r={tool === 'inscribedPolygon' ? polygon.apothem : polygon.radius} strokeDasharray="4 4" />
               <polygon points={polygon.corners.map(p => `${p.x},${-p.y}`).join(' ')} />
             </g>
           ) : centerArc ? (

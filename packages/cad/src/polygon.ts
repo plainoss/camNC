@@ -15,13 +15,35 @@ export function inscribedPolygonFromPoints(center: CadPoint, point: CadPoint, si
   }));
   return corners.every(p => Number.isFinite(p.x) && Number.isFinite(p.y)) ? { center, apothem, radius, corners } : null;
 }
-export function addInscribedPolygon(
-  sketch: CadSketch,
-  options: { center: CadPoint; point: CadPoint; sides: number; construction?: boolean }
-): CadSketch {
-  const shape = inscribedPolygonFromPoints(options.center, options.point, options.sides);
+/** The construction circle circumscribes this polygon; the radius point is a vertex. */
+export function circumscribedPolygonFromPoints(center: CadPoint, point: CadPoint, sides: number) {
+  if (!Number.isInteger(sides) || sides < 3 || sides > 50 || ![center.x, center.y, point.x, point.y].every(Number.isFinite)) return null;
+  const radius = Math.hypot(point.x - center.x, point.y - center.y),
+    angle = Math.atan2(point.y - center.y, point.x - center.x);
+  if (!Number.isFinite(radius) || radius <= CAD_GEOMETRY_TOLERANCE) return null;
+  const corners = Array.from({ length: sides }, (_, i) => ({
+    x: center.x + radius * Math.cos(angle + (2 * i * Math.PI) / sides),
+    y: center.y + radius * Math.sin(angle + (2 * i * Math.PI) / sides),
+  }));
+  return corners.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+    ? { center, apothem: radius * Math.cos(Math.PI / sides), radius, corners }
+    : null;
+}
+type PolygonOptions = { center: CadPoint; point: CadPoint; sides: number; construction?: boolean };
+export function addInscribedPolygon(sketch: CadSketch, options: PolygonOptions): CadSketch {
+  return addPolygon(sketch, options, 'inscribed');
+}
+export function addCircumscribedPolygon(sketch: CadSketch, options: PolygonOptions): CadSketch {
+  return addPolygon(sketch, options, 'circumscribed');
+}
+function addPolygon(sketch: CadSketch, options: PolygonOptions, mode: 'inscribed' | 'circumscribed'): CadSketch {
+  const shape = (mode === 'inscribed' ? inscribedPolygonFromPoints : circumscribedPolygonFromPoints)(
+    options.center,
+    options.point,
+    options.sides
+  );
   if (!shape) throw new Error('Choose a nonzero polygon radius and an integer side count from 3 to 50.');
-  const base = addCircle(sketch, { ...options.center, radius: shape.apothem, construction: true });
+  const base = addCircle(sketch, { ...options.center, radius: mode === 'inscribed' ? shape.apothem : shape.radius, construction: true });
   const circle = base.entities.at(-1)!;
   const entities: CadEntity[] = [],
     edges: CadLineEntity[] = [];
@@ -50,7 +72,7 @@ export function addInscribedPolygon(
     constraints: [
       ...base.constraints,
       ...joins,
-      { id: newCadId(), type: 'regularPolygon', circleId: circle.id, edgeIds: edges.map(e => e.id), mode: 'inscribed' },
+      { id: newCadId(), type: 'regularPolygon', circleId: circle.id, edgeIds: edges.map(e => e.id), mode },
     ],
   };
 }
