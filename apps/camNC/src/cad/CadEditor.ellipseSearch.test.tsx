@@ -91,16 +91,28 @@ it('accepts primary then secondary diameters when the first placed axis is small
   await checked();
   await userEvent.click(screen.getByRole('button', { name: /Primary axis diameter: 20 mm/ }));
   const first = screen.getByRole('textbox', { name: 'Primary axis diameter value' });
-  fireEvent.change(first, { target: { value: '30' } });
+  fireEvent.change(first, { target: { value: '60' } });
   fireEvent.click(screen.getByRole('button', { name: 'Apply primary axis diameter' }));
   await checked();
   await userEvent.click(screen.getByRole('button', { name: /^Secondary axis diameter:/ }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'Secondary axis diameter value' }), { target: { value: '70' } });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Secondary axis diameter value' }), { target: { value: '40' } });
   fireEvent.click(screen.getByRole('button', { name: 'Apply secondary axis diameter' }));
   await checked();
   const ellipse = latest().entities.find(e => e.type === 'ellipse')!;
-  expect(ellipse.radius).toBeCloseTo(15, 5);
-  expect(latest().constraints.flatMap(c => (c.type === 'distance' ? [c.value] : []))).toEqual([30, 70]);
+  expect(ellipse.radius).toBeCloseTo(20, 5);
+  expect(ellipse.primaryAxis).toBe('major');
+  expect(latest().constraints.flatMap(c => (c.type === 'distance' ? [c.value] : []))).toEqual([60, 40]);
+  key('z', { ctrlKey: true });
+  await checked();
+  key('z', { ctrlKey: true });
+  await checked();
+  expect(latest().entities.find(e => e.type === 'ellipse')!.primaryAxis).toBe('minor');
+  key('z', { ctrlKey: true, shiftKey: true });
+  await checked();
+  key('z', { ctrlKey: true, shiftKey: true });
+  await checked();
+  expect(latest().entities.find(e => e.type === 'ellipse')!.primaryAxis).toBe('major');
+  expect(latest().constraints.flatMap(c => (c.type === 'distance' ? [c.value] : []))).toEqual([60, 40]);
 });
 it('light-dismisses search without taking focus from the clicked part-name field', async () => {
   await setup();
@@ -109,4 +121,20 @@ it('light-dismisses search without taking focus from the clicked part-name field
   await userEvent.click(field, { position: { x: 2, y: 10 } });
   await waitFor(() => expect(screen.queryByRole('combobox')).toBeNull());
   expect(document.activeElement).toBe(field);
+});
+
+it('keeps result focus and highlighted keyboard selection together', async () => {
+  await setup();
+  key('c', { altKey: true, code: 'KeyC' });
+  const input = screen.getByRole('combobox');
+  fireEvent.change(input, { target: { value: 'rectangle' } });
+  const corner = screen.getByRole('option', { name: /Corner rectangle/ });
+  corner.focus();
+  await userEvent.keyboard('{ArrowDown}');
+  const center = screen.getByRole('option', { name: /Center rectangle/ });
+  expect(document.activeElement).toBe(center);
+  expect(center.getAttribute('aria-selected')).toBe('true');
+  await userEvent.keyboard('{Enter}');
+  expect(screen.queryByRole('combobox')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Center rectangle (R)' }).getAttribute('aria-pressed')).toBe('true');
 });

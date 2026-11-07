@@ -1,12 +1,20 @@
-import { entityPointIds, type CadDocument, type CadPoint, type CadSketch } from '@wbcnc/cad';
+import { entityPointIds, pointEquivalence, type CadDocument, type CadPoint, type CadSketch } from '@wbcnc/cad';
 
 /** Pointer intent targets selected geometry; shared vertices and constraints propagate the edit. */
 export function dragTargets(sketch: CadSketch, selectedIds: string[], delta: CadPoint) {
+  const equivalent = pointEquivalence(sketch.constraints);
+  const fixed = new Set(sketch.entities.filter(e => e.type === 'point' && e.fixed).map(e => equivalent.canonical(e.id)));
   const ids = new Set(
     selectedIds.flatMap(id => {
       const entity = sketch.entities.find(e => e.id === id);
       if (!entity) return [];
-      if (entity.type === 'point') return [entity.id];
+      if (entity.type === 'point') {
+        if (entity.fixed) return [];
+        const owners = sketch.entities.filter(
+          e => e.type === 'ellipse' && equivalent.equivalent(e.centerId, entity.id) && !fixed.has(equivalent.canonical(e.centerId))
+        );
+        return [entity.id, ...owners.flatMap(entityPointIds)];
+      }
       return entityPointIds(entity);
     })
   );

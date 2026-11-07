@@ -31,6 +31,7 @@ import { migrateDimensionPlacements } from './dimensionPlacement';
 import { isFatalSolverError } from './solverFailure';
 import { invalidOffsetBranches, offsetNativePrimitives, offsetNativeSeed } from './offsetConstraint';
 import { entityPointIds } from './document';
+import { conditionEllipseAxes } from './ellipse';
 import { withSplineHandleSegments } from './splineHandles';
 
 let modulePromise: Promise<ModuleStatic> | undefined;
@@ -491,6 +492,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
       }
       let wrapper = new GcsWrapper(new module.GcsSystem(), module);
       try {
+        conditionEllipseAxes(part.sketch);
         const entities = new Map(part.sketch.entities.map(e => [e.id, e]));
         const fixedArcs: CadArcEntity[] = [];
         for (const entity of part.sketch.entities) {
