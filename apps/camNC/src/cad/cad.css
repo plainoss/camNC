@@ -852,3 +852,6 @@
 .cad-quick-tools { top: 60px; left: 24px; right: auto; width: 230px; z-index: 4; }
 .cad-quick-tools button {display: flex; width: 100%; justify-content: space-between; text-align: left;}
 @media (max-width: 600px) { .cad-search-trigger kbd {display: none;} }
+
+.cad-transform-editor { max-width: calc(100% - 30px); }
+.cad-transform-editor input[type='checkbox'] { width: auto; }

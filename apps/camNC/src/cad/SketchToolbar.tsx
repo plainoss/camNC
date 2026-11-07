@@ -136,6 +136,13 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'transform':
+      shape = (
+        <>
+          <path d="M5 19V4m-3 3 3-3 3 3M5 19h15m-3-3 3 3-3 3M8 13a7 7 0 0 1 10-7l-1-3m1 3-3 1" />
+        </>
+      );
+      break;
     case 'split':
       shape = (
         <>

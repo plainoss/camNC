@@ -24,6 +24,7 @@ import {
   filletLineCorners,
   chamferLineCorners,
   splitSketchCurve,
+  transformSketchEntities,
   isClosedSketchCurve,
   evaluateCurvePoint,
   resolveChamferCorners,
@@ -100,6 +101,14 @@ import { idleDrawingGesture, transitionDrawingGesture, type DrawingGesture } fro
 import { advanceCreationValue, beginCreationValues, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
 import { CadValueInput } from './CadValueInput';
+import { SketchTransformControls, SketchTransformManipulator } from './SketchTransformControls';
+import {
+  initialTransformParameters,
+  parseTransformParameters,
+  repositionTransformPivot,
+  type TransformParameters,
+  type TransformDragKind,
+} from './transformParameters';
 import { parseCadValue } from './valueExpressions';
 import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
@@ -344,6 +353,9 @@ export function CadEditor({
   const [width, setWidth] = useState('100');
   const [height, setHeight] = useState('60');
   const [radius, setRadius] = useState('10');
+  const [transformParameters, setTransformParameters] = useState(initialTransformParameters);
+  const [transformNotice, setTransformNotice] = useState('');
+  const transformDrag = useRef<{ kind: TransformDragKind; start: CadPoint; parameters: TransformParameters } | null>(null);
   const [splitNotice, setSplitNotice] = useState('');
   const [splitFirst, setSplitFirst] = useState<{ entityId: string; parameter: number; point: CadPoint } | null>(null);
   const chamferDrag = useRef<{ side: number; origin: CadPoint; direction: CadPoint; previous: string[] } | null>(null);
@@ -457,7 +469,13 @@ export function CadEditor({
         });
   }, [sketch, chamferSelection, chamferDistances, selected]);
   const cornerPreview = tool === 'chamfer' ? chamferPreview : filletPreview;
-  const shownSketch = cornerPreview?.ok ? cornerPreview.sketch : sketch;
+  const parsedTransform = useMemo(() => parseTransformParameters(transformParameters), [transformParameters]);
+  const transformPreview = useMemo(() => {
+    if (!sketch || tool !== 'transform' || !selected.length) return null;
+    return parsedTransform.ok ? transformSketchEntities(sketch, { ...parsedTransform, entityIds: selected }) : parsedTransform;
+  }, [sketch, tool, selected, parsedTransform]);
+  const shownSketch = transformPreview?.ok ? transformPreview.sketch : cornerPreview?.ok ? cornerPreview.sketch : sketch;
+  const annotationSketch = transformPreview?.ok ? transformPreview.sketch : sketch;
   const offsetPreview = useMemo(() => {
     if (!sketch || modification.phase !== 'offset' || !modification.entityIds.length) return null;
     const parsed = parseCadValue(modification.text, { unit: 'mm' });
@@ -805,8 +823,23 @@ export function CadEditor({
     event.currentTarget.setPointerCapture(event.pointerId);
     svg.current?.focus();
   };
+  const transformSelectionCenter = (ids: readonly string[]) => {
+    const wanted = new Set(
+      ids.flatMap(id => {
+        const e = sketch?.entities.find(e => e.id === id);
+        return !e ? [] : e.type === 'point' ? [e.id] : curvePointIds(e);
+      })
+    );
+    const points = sketch?.entities.filter(e => e.type === 'point' && wanted.has(e.id)) ?? [];
+    const xs = points.flatMap(e => (e.type === 'point' ? [e.x] : [])),
+      ys = points.flatMap(e => (e.type === 'point' ? [e.y] : []));
+    return xs.length ? { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 } : { x: 0, y: 0 };
+  };
   const chooseTool = (next: Tool) => {
     setContextMenu(null);
+    transformDrag.current = null;
+    setTransformNotice('');
+    if (next === 'transform') setTransformParameters(initialTransformParameters(transformSelectionCenter(selected)));
     contextPress.current = { phase: 'idle' };
     setCreationValues(null);
     drawingGesture.current = idleDrawingGesture();
@@ -924,21 +957,23 @@ export function CadEditor({
                                 ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
                                 : next === 'line'
                                   ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
-                                  : next === 'split'
-                                    ? 'Click a curve to split it. Closed curves require two distinct split points.'
-                                    : next === 'trim'
-                                      ? 'Click an interval to trim between intersections or placed points.'
-                                      : next === 'chamfer'
-                                        ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
-                                        : next === 'fillet'
-                                          ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
-                                          : next === 'conic'
-                                            ? 'Click the start, end, then control point. Enter rho to shape the conic.'
-                                            : next === 'spline' || next === 'bezier'
-                                              ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
-                                              : next === 'curveControlPoint'
-                                                ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                                : 'Select a line, circle, point pair or existing dimension.'
+                                  : next === 'transform'
+                                    ? 'Select geometry, then drag the manipulator or enter translation, rotation and scale. Enter or click empty space applies; Escape cancels.'
+                                    : next === 'split'
+                                      ? 'Click a curve to split it. Closed curves require two distinct split points.'
+                                      : next === 'trim'
+                                        ? 'Click an interval to trim between intersections or placed points.'
+                                        : next === 'chamfer'
+                                          ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
+                                          : next === 'fillet'
+                                            ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                                            : next === 'conic'
+                                              ? 'Click the start, end, then control point. Enter rho to shape the conic.'
+                                              : next === 'spline' || next === 'bezier'
+                                                ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
+                                                : next === 'curveControlPoint'
+                                                  ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
+                                                  : 'Select a line, circle, point pair or existing dimension.'
     );
     svg.current?.focus();
   };
@@ -1440,6 +1475,16 @@ export function CadEditor({
       setMessage(error instanceof Error ? error.message : String(error));
     }
   };
+  const acceptTransform = () => {
+    if (!transformPreview?.ok) return setMessage(transformPreview?.message ?? 'Select geometry to transform.');
+    if (transformPreview.changed) changeSketch(transformPreview.sketch);
+    const ids = transformPreview.entityIds,
+      released = transformPreview.releasedConstraintIds.length;
+    chooseTool('select');
+    setSelected(ids);
+    if (released) setTransformNotice(`${released} external or directed relations were released by the transform.`);
+    setMessage(transformPreview.changed ? 'Transform applied.' : 'Transform closed without changes.');
+  };
   const acceptChamfer = () => {
     if (!chamferPreview?.ok)
       return setMessage(
@@ -1808,7 +1853,9 @@ export function CadEditor({
     }
     if ((event.ctrlKey || event.metaKey) && key === 'a') {
       event.preventDefault();
-      setSelected(sketch?.entities.filter(e => e.type !== 'point').map(e => e.id) ?? []);
+      const ids = sketch?.entities.filter(e => e.type !== 'point').map(e => e.id) ?? [];
+      if (tool === 'transform' && !selected.length) setTransformParameters(initialTransformParameters(transformSelectionCenter(ids)));
+      setSelected(ids);
       return;
     }
     if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
@@ -1921,6 +1968,9 @@ export function CadEditor({
         chooseTool('select');
         setSelected([]);
       }
+    } else if (key === 'enter' && tool === 'transform') {
+      event.preventDefault();
+      acceptTransform();
     } else if (key === 'enter' && tool === 'fillet') {
       event.preventDefault();
       if (filletPreview?.ok) setFilletEditing(true);
@@ -2158,6 +2208,21 @@ export function CadEditor({
       svg.current?.focus();
       return;
     }
+    if (tool === 'transform') {
+      const hit = pickSketchSnap(
+        sketch,
+        { x: event.clientX, y: event.clientY },
+        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
+      );
+      const selectedId =
+        directEntityId && sketch.entities.some(e => e.id === directEntityId) ? directEntityId : (hit?.entityId ?? pointHit?.targetPointId);
+      if (selectedId) {
+        const next = selected.includes(selectedId) ? selected.filter(id => id !== selectedId) : [...selected, selectedId];
+        if (!selected.length) setTransformParameters(initialTransformParameters(transformSelectionCenter(next)));
+        setSelected(next);
+      } else if (selected.length) acceptTransform();
+      return;
+    }
     if (tool === 'split') {
       const hit = pickSketchSnap(
         sketch,
@@ -2362,6 +2427,57 @@ export function CadEditor({
     }
   };
   const pointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    if (transformDrag.current) {
+      const matrix = svg.current?.getScreenCTM();
+      if (!matrix) return;
+      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+      let point = { x: raw.x, y: -raw.y };
+      const { kind, start, parameters } = transformDrag.current,
+        parsed = parseTransformParameters(parameters);
+      if (!parsed.ok) return;
+      const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
+      const center = { x: parsed.pivot.x + parsed.translation.x, y: parsed.pivot.y + parsed.translation.y };
+      if (kind === 'translate')
+        setTransformParameters({
+          ...parameters,
+          dx: text(parsed.translation.x + point.x - start.x),
+          dy: text(parsed.translation.y + point.y - start.y),
+        });
+      if (kind === 'rotate') {
+        const delta = Math.atan2(point.y - center.y, point.x - center.x) - Math.atan2(start.y - center.y, start.x - center.x);
+        setTransformParameters({ ...parameters, angle: text(parsed.angle + (delta * 180) / Math.PI) });
+      }
+      if (kind === 'scale') {
+        const initial = Math.hypot(start.x - center.x, start.y - center.y);
+        if (initial > CAD_GEOMETRY_TOLERANCE)
+          setTransformParameters({
+            ...parameters,
+            scale: text(Math.max(0.001, (parsed.scale * Math.hypot(point.x - center.x, point.y - center.y)) / initial)),
+          });
+      }
+      if (kind === 'pivot') {
+        const snap = pickSketchPoint(shownSketch!, { x: event.clientX, y: event.clientY }, { project: projectPoint });
+        if (snap) point = snap.point;
+        const r = (parsed.angle * Math.PI) / 180,
+          worldDx = point.x - start.x,
+          worldDy = point.y - start.y;
+        const x = parsed.pivot.x + (Math.cos(r) * worldDx + Math.sin(r) * worldDy) / parsed.scale,
+          y = parsed.pivot.y + (-Math.sin(r) * worldDx + Math.cos(r) * worldDy) / parsed.scale;
+        const dx = parsed.pivot.x - x,
+          dy = parsed.pivot.y - y,
+          c = parsed.scale * Math.cos(r),
+          s = parsed.scale * Math.sin(r);
+        setTransformParameters({
+          ...parameters,
+          pivotX: text(x),
+          pivotY: text(y),
+          dx: text(parsed.translation.x + (1 - c) * dx + s * dy),
+          dy: text(parsed.translation.y - s * dx + (1 - c) * dy),
+        });
+      }
+      return;
+    }
+
     if (chamferDrag.current) {
       const matrix = svg.current?.getScreenCTM();
       if (!matrix) return;
@@ -2527,6 +2643,12 @@ export function CadEditor({
     void solveDrag(moving);
   };
   const pointerEnd = (cancel = false, event?: PointerEvent<SVGSVGElement>) => {
+    if (transformDrag.current) {
+      if (cancel) setTransformParameters(transformDrag.current.parameters);
+      transformDrag.current = null;
+      return;
+    }
+
     if (chamferDrag.current) {
       if (cancel) setChamferDistances(chamferDrag.current.previous);
       chamferDrag.current = null;
@@ -2625,17 +2747,19 @@ export function CadEditor({
     if (busy || solving || finishing.current || preparingDimension.current) return blocked('Wait for the current sketch check to finish.');
     const reason = !thicknessValid
       ? 'Enter a valid part thickness before finishing the sketch.'
-      : splitFirst
-        ? 'Choose the second split point or press Escape before finishing the sketch.'
-        : (tool === 'fillet' || tool === 'chamfer') && selected.length
-          ? 'Apply the corner preview or press Escape before finishing the sketch.'
-          : modification.phase === 'mirror' && modification.entityIds.length
-            ? 'Choose the mirror line or press Escape before finishing the sketch.'
-            : modification.phase === 'extend' && modification.entityId
-              ? 'Place the extended endpoint or press Escape before finishing the sketch.'
-              : pending.length && !lineContinuation
-                ? 'Complete the current shape or press Escape before finishing the sketch.'
-                : null;
+      : tool === 'transform' && selected.length
+        ? 'Apply the transform or press Escape before finishing the sketch.'
+        : splitFirst
+          ? 'Choose the second split point or press Escape before finishing the sketch.'
+          : (tool === 'fillet' || tool === 'chamfer') && selected.length
+            ? 'Apply the corner preview or press Escape before finishing the sketch.'
+            : modification.phase === 'mirror' && modification.entityIds.length
+              ? 'Choose the mirror line or press Escape before finishing the sketch.'
+              : modification.phase === 'extend' && modification.entityId
+                ? 'Place the extended endpoint or press Escape before finishing the sketch.'
+                : pending.length && !lineContinuation
+                  ? 'Complete the current shape or press Escape before finishing the sketch.'
+                  : null;
     if (reason) {
       return blocked(reason);
     }
@@ -2751,7 +2875,7 @@ export function CadEditor({
   const currentSolverResult = !solving && lastCheckedRevision.current === `${doc.id}:${doc.revision}`;
   const colorNotice = currentSolverResult ? constraintColorNotice(activeSketchStatus) : undefined;
   const entityStatus =
-    currentSolverResult && !drag.current && !cornerPreview?.ok && activeSketchStatus?.status === 'solved'
+    currentSolverResult && !drag.current && !cornerPreview?.ok && !transformPreview?.ok && activeSketchStatus?.status === 'solved'
       ? activeSketchStatus.entityStatus
       : undefined;
   const stroke =
@@ -2787,12 +2911,13 @@ export function CadEditor({
         canRedo={session.future.length > 0}
         canFinish={
           faceSketch
-            ? !solving && !problems.length && !splitFirst
+            ? !solving && !problems.length && !splitFirst && !(tool === 'transform' && selected.length)
             : thicknessValid &&
               !solving &&
               !problems.length &&
               numberOfShapes > 0 &&
               !splitFirst &&
+              !(tool === 'transform' && selected.length) &&
               !((tool === 'fillet' || tool === 'chamfer') && selected.length)
         }
         onTool={next => {
@@ -3069,7 +3194,8 @@ export function CadEditor({
               verified={
                 !solving &&
                 !splitFirst &&
-                !((tool === 'fillet' || tool === 'chamfer') && selected.length) &&
+                !(tool === 'transform' && selected.length) &&
+                !((tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
                 activeSketchStatus?.status === 'solved' &&
                 lastCheckedRevision.current === `${doc.id}:${doc.revision}`
               }
@@ -3120,7 +3246,7 @@ export function CadEditor({
                   ...hoveredConstraintEntities,
                   ...selectedConstraints.flatMap(id => associatedEntityIds(sketch, id)),
                 ]}
-                stroke={cornerPreview?.ok ? '#858d96' : stroke}
+                stroke={cornerPreview?.ok || transformPreview?.ok ? '#858d96' : stroke}
                 entityStatus={entityStatus}
                 pixelScale={markerScale}
                 hoveredPointId={hoveredPoint}
@@ -3131,6 +3257,22 @@ export function CadEditor({
                     setRho(String(curve.rho));
                     setConicEditing(id);
                   }
+                }}
+              />
+            )}
+            {tool === 'transform' && selected.length > 0 && parsedTransform.ok && (
+              <SketchTransformManipulator
+                pivot={{
+                  x: parsedTransform.pivot.x + parsedTransform.translation.x,
+                  y: parsedTransform.pivot.y + parsedTransform.translation.y,
+                }}
+                pixelScale={markerScale}
+                onStart={(kind, event) => {
+                  const matrix = svg.current?.getScreenCTM();
+                  if (!matrix) return;
+                  const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+                  transformDrag.current = { kind, start: { x: raw.x, y: -raw.y }, parameters: transformParameters };
+                  svg.current?.setPointerCapture(event.pointerId);
                 }}
               />
             )}
@@ -3199,9 +3341,9 @@ export function CadEditor({
                   />
                 ) : null;
               })}
-            {sketch && showConstraints && (
+            {annotationSketch && showConstraints && (
               <InlineConstraints
-                sketch={sketch}
+                sketch={annotationSketch}
                 scale={markerScale}
                 selectedConstraintIds={selectedConstraints}
                 conflictedConstraintIds={conflictedConstraints}
@@ -3218,14 +3360,14 @@ export function CadEditor({
                 onHover={(_id, ids) => setHoveredConstraintEntities(ids)}
               />
             )}
-            {sketch &&
-              sketch.constraints
+            {annotationSketch &&
+              annotationSketch.constraints
                 .filter(numeric)
                 .map(c => (
                   <DimensionGraphics
                     key={c.id}
                     constraint={c}
-                    sketch={sketch}
+                    sketch={annotationSketch}
                     pixelScale={markerScale}
                     selected={
                       selectedConstraints.includes(c.id) ||
@@ -3523,6 +3665,29 @@ export function CadEditor({
                 Create polygon
               </button>
             </form>
+          )}
+          {tool === 'transform' && selected.length > 0 && (
+            <SketchTransformControls
+              parameters={transformParameters}
+              onChange={next => {
+                if (next.pivotX !== transformParameters.pivotX || next.pivotY !== transformParameters.pivotY) {
+                  const parsed = parseTransformParameters(next);
+                  setTransformParameters(parsed.ok ? repositionTransformPivot(transformParameters, parsed.pivot) : next);
+                } else setTransformParameters(next);
+              }}
+              onApply={acceptTransform}
+              onCancel={() => {
+                chooseTool('select');
+                setSelected([]);
+              }}
+              error={transformPreview && !transformPreview.ok ? transformPreview.message : undefined}
+              releasedCount={transformPreview?.ok ? transformPreview.releasedConstraintIds.length : 0}
+            />
+          )}
+          {transformNotice && (
+            <div className="cad-create-size" role="status">
+              {transformNotice}
+            </div>
           )}
           {tool === 'split' && splitNotice && (
             <div className="cad-create-size" role="status">
