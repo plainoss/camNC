@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { balancedShards } from '../../../../scripts/balanced-shards.mjs';
+const weights = JSON.parse(readFileSync(new URL('./duration-weights.json', import.meta.url), 'utf8')).weightsMs;
+export const scenarioWeight = scenario => weights[scenario.id] ?? Math.max(10000, scenario.steps.length * 500);
 
 export function parseShard(value) {
   assert(/^[1-9]\d*\/[1-9]\d*$/.test(value), 'Shard must be index/count, for example 1/2');
@@ -7,16 +11,10 @@ export function parseShard(value) {
   return { index, count };
 }
 
-/** Long scenarios first, assigned by step count. Stable IDs break ties independently of filesystem order. */
+/** Measured long scenarios are separated across runners; new scenarios receive a conservative estimate. */
 export function selectShard(scenarios, shard) {
   if (!shard) return scenarios;
   assert(shard.count <= scenarios.length, 'Cannot create empty scenario shards');
-  const bins = Array.from({ length: shard.count }, () => ({ weight: 0, ids: new Set() }));
-  const ordered = [...scenarios].sort((a, b) => b.steps.length - a.steps.length || a.id.localeCompare(b.id, 'en'));
-  for (const scenario of ordered) {
-    const bin = bins.reduce((best, next) => next.weight < best.weight ? next : best);
-    bin.ids.add(scenario.id);
-    bin.weight += Math.max(1, scenario.steps.length);
-  }
-  return scenarios.filter(scenario => bins[shard.index - 1].ids.has(scenario.id));
+  const selected = new Set(balancedShards(scenarios, shard.count, scenario => scenario.id, scenarioWeight)[shard.index - 1].map(scenario => scenario.id));
+  return scenarios.filter(scenario => selected.has(scenario.id));
 }

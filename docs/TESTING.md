@@ -19,7 +19,7 @@ The board browser suite is divided into replacement/auto-fill, dragging, holds, 
 
 ## Scheduling and cache correctness
 
-CI runs the browser files across two Vitest shards and every behaviour scenario across two deterministic, step-weighted shards. Scenario IDs break assignment ties. Golden updates remain unsharded. Unit tests exercise the actual scenario corpus to prove complete, duplicate-free assignment. Runtime allocation and performance-gate wiring are checked by `test:ci`.
+CI runs the browser files across two Vitest shards and every behaviour scenario across four deterministic shards balanced by measured duration. Scenario IDs break assignment ties. Golden updates remain unsharded. Unit tests exercise the actual scenario corpus to prove complete, duplicate-free assignment. New files/scenarios receive a conservative fallback estimate and are always assigned. Long scenarios start immediately after the first warmup scenario. The duration weights record their source CI run and can be refreshed from timing artifacts; they only affect scheduling, never selection. Runtime allocation and performance-gate wiring are checked by `test:ci`.
 
 The required check stays named **Run tests**. It waits for all test/spec matrix entries, static validation, builds, and simulator integration, and fails on failed, cancelled, or unexpectedly skipped dependencies. No correctness tests were moved to a nightly-only lane.
 
@@ -32,6 +32,8 @@ Use the cached `spec:cad` task for local-source validation. Run production/exter
 CI always uploads test timing reports and behaviour results, including restored reports on cache hits. Vitest reports distinguish file collection, setup, preparation and test/hook time from wall time; summed file times are not parallel wall time. Behaviour results include bootstrap and complete scenario duration. Reports go under each package's ignored `test-results` directory.
 
 Compare cold and warm runs separately. Record source SHA, cache hits, slowest files/scenarios, per-job duration, queue delay, end-to-end required-check duration, and total runner-minutes. Compare representative UI-only, CAD, CAM, worker and documentation changes. Repeat timings before claiming a p95 or a fixed percentage improvement. Cache-hit reports describe the original execution; the current CI step duration shows replay cost.
+
+The first two-shard CI trial passed all 148 scenarios but still left the slower spec lane at about six minutes. The four-shard spec matrix and duration-based browser allocation address that measured tail.
 
 The initial targets are under one minute for ordinary local feedback and under five minutes for typical PR validation. These are acceptance targets, not guaranteed timings. Measure both browser lanes: shortening one does not help the required-check time if the other still dominates. More shards must justify their runner-minutes and setup overhead.
 

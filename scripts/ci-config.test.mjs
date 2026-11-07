@@ -84,7 +84,7 @@ test('CI covers every runtime task and both browser shards, without duplicating 
   const scripts = JSON.parse(read('package.json')).scripts;
   assert.deepEqual(suites.map(suite => suite.performance).filter(Boolean).sort(), scripts['test:performance'].split(' && ').sort());
   const specs = parse(read('.github/workflows/ci.yml')).jobs.specs;
-  assert.deepEqual(specs.strategy.matrix.shard, ['1/2', '2/2']);
+  assert.deepEqual(specs.strategy.matrix.shard, ['1/4', '2/4', '3/4', '4/4']);
   assert.match(specs.steps.find(step => step.name === 'Run sketch behaviour specs').run, /--shard=\$\{\{ matrix.shard \}\}/);
 });
 

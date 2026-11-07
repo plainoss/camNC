@@ -5,7 +5,7 @@ import { performance } from 'node:perf_hooks';
 /** File durations are summed CPU/page time, not the wall time of a parallel run. */
 export function summarizeFiles(files, root) {
   return files.map(file => ({
-    file: path.relative(root, file.filepath).replaceAll('\\', '/'),
+    file: path.relative(root, file.filepath).split(path.sep).join('/'),
     state: file.result?.state ?? 'not-run',
     testsMs: file.result?.duration ?? 0,
     collectMs: file.collectDuration ?? 0,

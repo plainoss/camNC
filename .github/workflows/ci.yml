@@ -144,7 +144,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1/2, 2/2]
+        shard: [1/4, 2/4, 3/4, 4/4]
     runs-on: ubuntu-latest
     container:
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.

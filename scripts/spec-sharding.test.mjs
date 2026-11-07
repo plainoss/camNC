@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readdirSync, readFileSync } from 'node:fs';
-import { parseShard, selectShard } from '../apps/camNC/e2e/spec/sharding.mjs';
+import { parseShard, selectShard, scenarioWeight } from '../apps/camNC/e2e/spec/sharding.mjs';
 
 const directory = new URL('../apps/camNC/e2e/spec/scenarios/sketch/', import.meta.url);
 const scenarios = readdirSync(directory).filter(file => file.endsWith('.json')).flatMap(file => JSON.parse(readFileSync(new URL(file, directory), 'utf8')));
@@ -13,8 +13,8 @@ test('every real behaviour scenario runs exactly once across deterministic balan
     for (let index = 1; index <= count; index++) {
       assert.deepEqual(selectShard([...scenarios].reverse(), { index, count }).map(s => s.id).sort(), shards[index - 1].map(s => s.id).sort());
     }
-    const weights = shards.map(list => list.reduce((sum, scenario) => sum + Math.max(1, scenario.steps.length), 0));
-    assert(Math.max(...weights) - Math.min(...weights) <= Math.max(...scenarios.map(s => s.steps.length)));
+    const weights = shards.map(list => list.reduce((sum, scenario) => sum + scenarioWeight(scenario), 0));
+    assert(Math.max(...weights) - Math.min(...weights) <= Math.max(...scenarios.map(scenarioWeight)));
   }
 });
 

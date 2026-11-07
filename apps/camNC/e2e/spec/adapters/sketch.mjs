@@ -195,7 +195,8 @@ export async function createAdapter(page, url) {
   page.setDefaultNavigationTimeout(45000);
   await page.goto(new URL('/demo?camera=off', url).href, { waitUntil: 'domcontentloaded' });
   await page.getByRole('region', { name: 'Demo mode', exact: true }).waitFor();
-  await page.goto(new URL('/cam', url).href, { waitUntil: 'domcontentloaded' });
+  // Stay in the freshly isolated application instead of booting it a second time.
+  await page.getByRole('link', { name: /^CAM\/CAD/ }).first().click();
   await page.getByRole('button', { name: /^New design/ }).click();
   const canvas = page.getByTestId('cad-canvas');
   await canvas.waitFor();

@@ -11,7 +11,8 @@
         "package.json",
         "tsconfig.json",
         "tsconfig.*.json",
-        "$TURBO_ROOT$/scripts/test-timings.mjs"
+        "$TURBO_ROOT$/scripts/test-timings.mjs",
+        "$TURBO_ROOT$/scripts/balanced-shards.mjs"
       ]
     },
     "test:licenses": {
@@ -26,7 +27,8 @@
         "$TURBO_DEFAULT$",
         "!worker/**",
         "!migrations/**",
-        "$TURBO_ROOT$/scripts/test-timings.mjs"
+        "$TURBO_ROOT$/scripts/test-timings.mjs",
+        "$TURBO_ROOT$/scripts/balanced-shards.mjs"
       ]
     },
     "spec:cad": {
@@ -34,7 +36,8 @@
         "$TURBO_DEFAULT$",
         "!worker/**",
         "!migrations/**",
-        "$TURBO_ROOT$/scripts/test-timings.mjs"
+        "$TURBO_ROOT$/scripts/test-timings.mjs",
+        "$TURBO_ROOT$/scripts/balanced-shards.mjs"
       ]
     }
   }

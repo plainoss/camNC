@@ -26,13 +26,14 @@
     },
     "test": {
       "dependsOn": ["^transit"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/test-timings.mjs"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/test-timings.mjs", "$TURBO_ROOT$/scripts/balanced-shards.mjs"],
       "outputs": ["test-results/**"],
       "env": ["CI", "FLUIDNC_SIM_HOST", "FLUIDNC_SIM_VARIANT"],
       "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH", "CAM_OUT_DIR"]
     },
     // Its own task, so a run without the slowest files can never replay as a passed "test".
     "test:fast": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/balanced-shards.mjs"],
       "dependsOn": ["^transit"],
       "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH"]
     },
@@ -42,7 +43,7 @@
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/scripts/test-timings.mjs"
+        "$TURBO_ROOT$/scripts/test-timings.mjs", "$TURBO_ROOT$/scripts/balanced-shards.mjs"
       ],
       "outputs": [
         "test-results/domain.json"
@@ -76,7 +77,7 @@
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/scripts/test-timings.mjs"
+        "$TURBO_ROOT$/scripts/test-timings.mjs", "$TURBO_ROOT$/scripts/balanced-shards.mjs"
       ],
       "outputs": [
         "test-results/browser*.json"
@@ -89,6 +90,7 @@
       ]
     },
     "spec:cad": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/balanced-shards.mjs"],
       "dependsOn": [
         "^transit"
       ],

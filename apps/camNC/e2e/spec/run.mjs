@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { parseShard, selectShard } from './sharding.mjs';
+import { parseShard, selectShard, scenarioWeight } from './sharding.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
@@ -172,6 +172,11 @@ const run = async (scenario, index) => {
 if (scenarios.length) await run(scenarios[0], 0);
 // Rewriting goldens stays serial, so a run can be compared with what it replaced in order.
 const workers = options.update ? 1 : options.workers;
+// Warm a normal scenario first, then start the long machine workflows before the short tail.
+if (!options.update && scenarios.length > 1) {
+  const tail = scenarios.splice(1).sort((a, b) => scenarioWeight(b) - scenarioWeight(a) || a.id.localeCompare(b.id, 'en'));
+  scenarios.push(...tail);
+}
 let next = 1;
 await Promise.all(
   Array.from({ length: workers }, async () => {
