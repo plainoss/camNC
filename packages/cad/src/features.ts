@@ -16,7 +16,7 @@ import type {
 } from './types';
 
 /** Features belong to the newer format, so an older build refuses the file instead of silently cutting without them. */
-function withFeatureVersion(document: CadDocument): CadDocument {
+export function withFeatureVersion(document: CadDocument): CadDocument {
   return { ...document, version: document.parts.some(part => part.features?.length) ? 2 : 1 };
 }
 function editPart(
@@ -51,6 +51,38 @@ export function setCutDepth(document: CadDocument, partId: string, sketchId: str
       ? features.map(f => (f.type === 'cut' && f.sketchId === sketchId && f.regionId === regionId ? { ...f, depth } : f))
       : [...features, { type: 'cut', id: newCadId(), sketchId, regionId, depth }]
   );
+}
+
+/** One face sketch as its own document, so the sketch editor can work on it like any other drawing. */
+export function faceSketchDocument(document: CadDocument, partId: string, sketchId: string): CadDocument {
+  const part = document.parts.find(candidate => candidate.id === partId),
+    face = part && cadFaceSketches(part).find(candidate => candidate.sketch.id === sketchId);
+  if (!part || !face) throw new Error('This face sketch no longer exists.');
+  return {
+    version: 1,
+    id: `${document.id}:face:${sketchId}`,
+    name: document.name,
+    revision: document.revision,
+    parts: [{ id: part.id, name: part.name, thickness: part.thickness, sketch: face.sketch }],
+  };
+}
+
+/** Puts an edited face sketch back into its document. */
+export function withFaceSketchDocument(document: CadDocument, partId: string, sketchId: string, edited: CadDocument): CadDocument {
+  return {
+    ...document,
+    revision: Math.max(document.revision, edited.revision),
+    parts: document.parts.map(part =>
+      part.id !== partId
+        ? part
+        : {
+            ...part,
+            features: part.features?.map(feature =>
+              feature.type === 'sketch' && feature.sketch.id === sketchId ? { ...feature, sketch: edited.parts[0]!.sketch } : feature
+            ),
+          }
+    ),
+  };
 }
 
 /** Removes a feature, and the cuts of a removed sketch. Sketches on a removed cut's floor report the lost face. */

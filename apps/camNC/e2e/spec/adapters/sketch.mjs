@@ -138,6 +138,7 @@ function readScene(cursor) {
     labels: texts.map(t => t.text),
     labelCentres: texts.map(t => ({ text: t.text, x: t.rect.left + t.rect.width / 2, y: t.rect.top + t.rect.height / 2 })),
     regions: svg.querySelectorAll('[data-sketch-region]').length,
+    cutDepths: [...svg.querySelectorAll('[data-cut-depth]')].map(el => el.getAttribute('data-cut-depth')).sort(),
     pressed,
     focusInput: !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'),
     status: document.querySelector('.cad-status')?.textContent ?? '',

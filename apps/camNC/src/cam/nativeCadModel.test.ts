@@ -122,6 +122,29 @@ describe('native CAD to CAM', () => {
       expect(model.parts[0].size).toEqual([100, 60, 12]);
     });
 
+    it('generates G-code for a recess, a through slot and a rabbet on one part', async () => {
+      const base = createPlateDocument({ width: 200, height: 120, thickness: 18 }),
+        partId = base.parts[0].id;
+      base.parts[0].sketch = addCircle(base.parts[0].sketch, { x: 50, y: 60, radius: 25 });
+      base.parts[0].sketch = addCircle(base.parts[0].sketch, { x: 120, y: 60, radius: 10 });
+      const recess = regionAt(base, base.parts[0].sketch.id, 50, 60),
+        withRecess = setCutDepth(base, partId, base.parts[0].sketch.id, recess.id, 6),
+        added = addFaceSketch(withRecess, partId, 'top'),
+        face = added.document.parts[0].features!.find(f => f.type === 'sketch')!;
+      if (face.type !== 'sketch') throw new Error('Expected a sketch');
+      face.sketch = addLine(face.sketch, { x1: 176, y1: -5, x2: 176, y2: 125 });
+      const document = setCutDepth(added.document, partId, added.sketchId, regionAt(added.document, added.sketchId, 190, 60).id, 3),
+        key = `${document.id}:native-mixed`,
+        model = await camWorker().importDesign(document, key),
+        result = await camWorker().generate(key, partId, toCamSettings(kDefaultPlan));
+      expect(model.parts[0].shape.pockets.map(pocket => pocket.depth).sort()).toEqual([3, 6]);
+      expect(model.parts[0].shape.holes).toHaveLength(1);
+      expect(result.safety).toEqual([]);
+      expect(result.ops.filter(op => op.kind === 'pocket').map(op => +op.zBottom.toFixed(2))).toEqual(expect.arrayContaining([12, 15]));
+      expect(result.gcode).toContain('Z12');
+      expect(result.gcode).toContain('Z15');
+    });
+
     it('names a through cut’s hole after the cut, keeps hole choices on it, and refuses a through cut at the edge', async () => {
       const base = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
         partId = base.parts[0].id;

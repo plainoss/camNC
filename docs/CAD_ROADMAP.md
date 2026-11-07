@@ -30,6 +30,10 @@ wrong.
 - `CadEditor` is a large SVG editor with many tests. To sketch on a face, the
   camera faces the surface and that editor is aligned on top of the 3D view. It is
   not rewritten in 3D.
+- CAM holds a part by one outline, so a through cut can't reach the edge or leave a
+  loose piece. Those are refused, and the fix is to change the profile or use a
+  separate part. Depths that don't fit are refused too, so a pocket never quietly
+  becomes a through cut.
 - Floors, walls and top faces come straight from the stacked slabs, so each
   triangle can be tagged with its face for picking. No general boolean code is
   needed.
@@ -46,7 +50,7 @@ Assembly:  7 → 8 → 9 → 10 → 11 → 12 → 13
 
 Pockets that can be designed and cut, from the existing sketch editor.
 
-### PR 1: Move sketch regions into the CAD package with stable IDs
+### PR 1: Move sketch regions into the CAD package with stable IDs (merged, #169)
 
 `refactor(camNC) Move sketch regions into the CAD package with stable IDs`
 
@@ -58,7 +62,7 @@ Pockets that can be designed and cut, from the existing sketch editor.
 - **Done when:** nothing visible changes, and IDs survive solving, dragging and
   reloading. Trimming a curve may change an ID, and PR 2 reports that.
 
-### PR 2: Save cuts and face sketches on parts
+### PR 2: Save cuts and face sketches on parts (merged, #174)
 
 `feat(cad) Save cuts and face sketches on parts`
 
@@ -70,7 +74,7 @@ Pockets that can be designed and cut, from the existing sketch editor.
   with features, so an older build refuses the file and doesn't drop pockets.
 - **Done when:** old documents round-trip byte for byte. There is no UI yet.
 
-### PR 3: Send native pockets to CAM from polygons
+### PR 3: Send native pockets to CAM from polygons (merged, #177)
 
 `feat(cam) Send native pockets to CAM from polygons`
 
@@ -81,7 +85,7 @@ Pockets that can be designed and cut, from the existing sketch editor.
 - **Done when:** results match `extractFeatures` on the same slab mesh, which is an
   independent check, and keys for parts without cuts are unchanged. Top side only.
 
-### PR 4: Set pocket depth on a sketch region
+### PR 4: Set pocket depth on a sketch region (merged, #178)
 
 `feat(camNC) Set pocket depth on a sketch region`
 

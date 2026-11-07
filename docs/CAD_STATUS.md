@@ -1,8 +1,14 @@
 # CAD status
 
 The sketch editor creates flat parts in millimetres. Closed profiles can proceed
-to board arrangement and through-cut machining. Construction geometry remains
+to board arrangement and machining. Construction geometry remains
 editable but is excluded from cut profiles.
+
+Clicking an inner loop or a face sketch's region sets how deep it's cut, or leaves
+it uncut. An inner loop stays a through-hole unless given a depth. A face sketch is
+a separate drawing on the top face, so it can cross the part's outline, which is how
+a rabbet is drawn. Its regions are bounded by its curves and the outline. Cuts reach
+CAM as exact polygons.
 
 Supported drawing tools include lines, corner and center rectangles, circles,
 three-point and tangent arcs, points, conics, fit splines, and Bezier curves.
@@ -32,7 +38,7 @@ after geometry changes.
 
 Current limits and deferred work:
 
-- Only through-cuts are supported; pockets and 3D editing are deferred.
+- Cuts are set on the drawing, on the top face only. Sketching in the 3D view, pocket floors and the underside are in [the roadmap](CAD_ROADMAP.md).
 - Partial or open multi-edge Offset chains and rational-curve Offset are unsupported.
 - Mirror rejects conics, fit splines, and Bezier curves.
 - Rational curves can bound Trim or Extend operations, but cannot themselves be interval-trimmed or extended.

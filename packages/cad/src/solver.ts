@@ -121,6 +121,8 @@ export interface CadSolveOptions {
   classifyEntities?: boolean;
   /** Optional analysis shares this measured budget with the primary native solve. Geometry solving is never truncated. */
   entityAnalysisBudgetMs?: number;
+  /** Solve the drawing only. A face sketch can be open or cross itself, because it's never a part's profile. */
+  sketchOnly?: boolean;
 }
 export interface CadDragTarget {
   pointId: string;
@@ -910,6 +912,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
       sketches,
     };
   }
+  if (options.sketchOnly) return { document: next, status: 'solved', diagnostics, parts: [], sketches };
   const evaluated = evaluateCadDocument(next);
   diagnostics.push(...evaluated.diagnostics);
   return {

@@ -1,15 +1,17 @@
+import type { CadDocument } from '@wbcnc/cad';
 import { createPlateDocument, updateDimension } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
 import { acquireCadKeyboard, isCadEditorActive } from './keyboardOwnership';
 import {
-  amendCadSession,
-  acknowledgeCadSession,
   acceptCadSession,
+  acknowledgeCadSession,
+  amendCadSession,
   cadCommandCheckpoint,
   cadSession,
   commitCadSession,
   endCadSession,
   redoCadSession,
+  replaceCadSession,
   undoCadSession,
 } from './session';
 
@@ -147,5 +149,40 @@ describe('CAD editing sessions', () => {
     expect(cadSession(document).document.parts[0]!.sketch.constraints.find(c => c.id === width.id)).toMatchObject({ value: 160 });
     expect(session.entry).toEqual(document);
     endCadSession(document.id);
+  });
+});
+
+describe('leaving a face sketch', () => {
+  const edited = (document: CadDocument, revision: number): CadDocument => ({ ...document, name: `v${revision}`, revision });
+
+  it('keeps the saved revision, however many edits the face sketch made, so the next save still matches', () => {
+    const start = createPlateDocument(),
+      session = cadSession(start),
+      saved = edited(start, start.revision + 3);
+    replaceCadSession(session, saved, start);
+    acknowledgeCadSession(session, saved);
+    expect(session.document.revision).toBe(saved.revision);
+    expect(cadSession(session.document).saved).toEqual(saved);
+    expect(session.conflict).toBeUndefined();
+    endCadSession(start.id);
+  });
+
+  it('makes the whole face sketch one undo step', () => {
+    const start = createPlateDocument(),
+      session = cadSession(start),
+      before = session.past.length;
+    replaceCadSession(session, edited(start, start.revision + 3), start);
+    expect(session.past).toHaveLength(before + 1);
+    expect(undoCadSession(session).name).toBe(start.name);
+    endCadSession(start.id);
+  });
+
+  it('adds no second step for a sketch that was just added', () => {
+    const start = createPlateDocument(),
+      session = cadSession(start),
+      before = session.past.length;
+    replaceCadSession(session, edited(start, start.revision + 3), null);
+    expect(session.past).toHaveLength(before);
+    endCadSession(start.id);
   });
 });

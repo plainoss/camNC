@@ -10,10 +10,7 @@
       "hover 40,30",
       {
         "expect": {
-          "cursor": [
-            40,
-            30
-          ]
+          "cursor": [40, 30]
         }
       }
     ]
@@ -384,10 +381,7 @@
           "entitiesInclude": [
             {
               "type": "circle",
-              "c": [
-                80,
-                60
-              ]
+              "c": [80, 60]
             }
           ]
         }
@@ -516,6 +510,42 @@
       {
         "expect": {
           "tool": "line"
+        }
+      }
+    ]
+  },
+  {
+    "id": "sketch/finish/pockets-reach-boards",
+    "title": "A recess, a through hole and a rabbet are set on the drawing and reach Boards",
+    "evidence": "manu 2026-11-07, the agreed CAD roadmap",
+    "steps": [
+      "rect 20,20 180,120",
+      "circle 60,70 20",
+      "circle 110,70 8",
+      "click 66,76",
+      "field Depth in mm 6",
+      {
+        "expect": {
+          "cutDepths": ["6", "through"]
+        }
+      },
+      "button New sketch on top",
+      "line 150,10 150,130",
+      "line 40,10 40,130",
+      "line 40,10 150,10",
+      "button Finish sketch",
+      "click 165,70",
+      "field Depth in mm 3",
+      {
+        "expect": {
+          "cutDepths": ["3", "6", "through"],
+          "canFinish": true
+        }
+      },
+      "finish",
+      {
+        "expect": {
+          "stage": "boards"
         }
       }
     ]
