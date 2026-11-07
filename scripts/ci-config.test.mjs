@@ -104,7 +104,8 @@ test('production smoke accepts Cloudflare production checks after queue merges a
     event: { check_run: {
       conclusion: 'success',
       name: 'Workers Builds: camnc',
-      check_suite: { head_branch: 'gh-readonly-queue/main/pr-166-example', app: { slug: 'cloudflare-workers-and-pages' } },
+      app: { slug: 'cloudflare-workers-and-pages' },
+      check_suite: { head_branch: 'gh-readonly-queue/main/pr-166-example' },
       ...overrides,
     } },
   });
@@ -113,7 +114,7 @@ test('production smoke accepts Cloudflare production checks after queue merges a
   assert.equal(passes(check({ name: 'Workers Builds: camnc-preview' })), false);
   assert.equal(passes(check({ name: 'Workers Builds: camnc-webrtc-cam' })), false);
   assert.equal(passes(check({ conclusion: 'failure' })), false);
-  assert.equal(passes(check({ check_suite: { app: { slug: 'another-app' } } })), false);
+  assert.equal(passes(check({ app: { slug: 'another-app' } })), false);
   assert.equal(passes({ event_name: 'workflow_dispatch' }), true);
   assert.equal(passes({ event_name: 'schedule' }), true);
 });

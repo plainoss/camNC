@@ -26,7 +26,7 @@ jobs:
     if: >-
       github.event_name != 'check_run' ||
       (github.event.check_run.conclusion == 'success' &&
-      github.event.check_run.check_suite.app.slug == 'cloudflare-workers-and-pages' &&
+      github.event.check_run.app.slug == 'cloudflare-workers-and-pages' &&
       github.event.check_run.name == 'Workers Builds: camnc')
     # Job level (not workflow level), so that skipped runs don't cancel a running smoke run.
     concurrency:
