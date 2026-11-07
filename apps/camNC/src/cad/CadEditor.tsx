@@ -2941,9 +2941,9 @@ export function CadEditor({
                 { id: 'fit', label: 'Zoom to fit', key: 'F' },
               ]}
               onHighlight={setSearchHighlight}
-              onClose={() => {
+              onClose={(restoreFocus = true) => {
                 setPalette(false);
-                svg.current?.focus();
+                if (restoreFocus) svg.current?.focus();
               }}
               onChoose={id => {
                 setPalette(false);

@@ -17,7 +17,7 @@ export function CommandSearch({
 }: {
   commands: readonly SearchCommand[];
   onChoose: (command: SearchCommand['id']) => void;
-  onClose: () => void;
+  onClose: (restoreFocus?: boolean) => void;
   onHighlight: (command: SearchCommand['id'] | null) => void;
 }) {
   const panel = useRef<HTMLDivElement>(null),
@@ -44,7 +44,7 @@ export function CommandSearch({
       className="cad-command-palette"
       aria-label="Search tools"
       onToggle={event => {
-        if (event.newState === 'closed') onClose();
+        if (event.newState === 'closed') onClose(false);
       }}
       onKeyDown={event => {
         event.stopPropagation();
@@ -74,14 +74,14 @@ export function CommandSearch({
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={matches.length > 0}
-          aria-controls={`${id}-results`}
+          aria-controls={matches.length ? `${id}-results` : undefined}
           aria-activedescendant={active ? `${id}-${active.id}` : undefined}
           onChange={event => {
             setQuery(event.target.value);
             setIndex(0);
           }}
         />
-        <button type="button" aria-label="Close search" onClick={onClose}>
+        <button type="button" aria-label="Close search" onClick={() => onClose()}>
           ×
         </button>
       </div>

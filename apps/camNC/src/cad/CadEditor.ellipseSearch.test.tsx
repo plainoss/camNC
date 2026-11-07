@@ -106,3 +106,11 @@ it('accepts primary then secondary diameters when the first placed axis is small
       .map(c => c.value)
   ).toEqual([30, 70]);
 });
+it('light-dismisses search without taking focus from the clicked part-name field', async () => {
+  await setup();
+  key('c', { altKey: true, code: 'KeyC' });
+  const field = screen.getByRole('textbox', { name: 'Part name' });
+  await userEvent.click(field);
+  await waitFor(() => expect(screen.queryByRole('combobox')).toBeNull());
+  expect(document.activeElement).toBe(field);
+});
