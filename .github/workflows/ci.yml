@@ -20,7 +20,7 @@ concurrency:
 jobs:
   checks:
     name: Format, lint and types
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -87,7 +87,7 @@ jobs:
             args: run
             filter: --filter=!@wbcnc/cam --filter=!@wbcnc/camNC --concurrency=1
             performance: ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.
       image: mcr.microsoft.com/playwright:v1.54.1-noble
@@ -145,7 +145,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1/4, 2/4, 3/4, 4/4]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.
       image: mcr.microsoft.com/playwright:v1.54.1-noble
@@ -191,7 +191,7 @@ jobs:
     name: Run tests
     if: always()
     needs: [checks, test, specs, fluidnc-sim]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require all validation jobs to pass
         env:
@@ -207,7 +207,7 @@ jobs:
 
   fluidnc-sim:
     name: FluidNC simulator integration
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

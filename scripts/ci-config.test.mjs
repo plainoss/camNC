@@ -210,6 +210,8 @@ test('all workflows use maintained Node.js 24 action releases', () => {
   };
   for (const file of readdirSync(new URL('.github/workflows/', root)).filter(file => /\.ya?ml$/.test(file))) {
     const workflow = parse(read(`.github/workflows/${file}`));
+    assert.doesNotMatch(JSON.stringify(workflow), /ubuntu-latest/,
+      `${file}: pin Linux runners to avoid unplanned OS migrations`);
     for (const [id, job] of Object.entries(workflow.jobs)) {
       for (const step of job.steps ?? []) {
         if (!step.uses) continue;

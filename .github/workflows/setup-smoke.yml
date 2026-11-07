@@ -32,7 +32,7 @@ jobs:
     concurrency:
       group: setup-smoke-${{ (github.event_name == 'check_run' || github.event_name == 'schedule') && 'production' || github.ref }}
       cancel-in-progress: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       # Keep this version in sync with the lockfile; CI's test:ci checks it.
       image: mcr.microsoft.com/playwright:v1.54.1-noble

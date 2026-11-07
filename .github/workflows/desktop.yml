@@ -41,7 +41,7 @@ jobs:
   platforms:
     # Adding any other label to a pull request does not rebuild it.
     if: github.event.action != 'labeled' || github.event.label.name == 'desktop-all-platforms'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       include: ${{ steps.pick.outputs.include }}
     steps:
@@ -177,7 +177,7 @@ jobs:
   release:
     needs: build
     if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Check for the signing key
