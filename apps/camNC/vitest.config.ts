@@ -40,6 +40,7 @@ export default defineConfig({
     // Root tests run these CPU-sensitive gates afterwards, without competing suites or packages.
     testNamePattern: /^(?!.*\[performance\]).*$/,
     globals: false,
+    reporters: ['default', ['../../scripts/test-timings.mjs', { suite: 'browser' }]],
     // CAD WASM workers and WebGL simulations share the GPU/process budget with each browser test page.
     // Keep parallel coverage without flooding the renderer with one page per available CPU thread.
     maxWorkers: 4,

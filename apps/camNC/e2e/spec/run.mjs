@@ -90,8 +90,11 @@ async function runScenario(browser, scenario, options, outDir) {
   });
   const failures = [];
   let phase = 'bootstrap';
+  const started = performance.now();
+  let bootstrapMs = 0;
   try {
     const adapter = await createAdapter(page, options.url);
+    bootstrapMs = performance.now() - started;
     page.setDefaultTimeout(8000);
     for (const [index, step] of scenario.steps.entries()) {
       phase = `step ${index + 1}`;
@@ -113,7 +116,7 @@ async function runScenario(browser, scenario, options, outDir) {
   failures.push(...runtime);
   if (failures.length) await page.screenshot({ path: path.join(outDir, `${scenario.id.replaceAll('/', '.')}.png`) }).catch(() => {});
   await context.close();
-  return failures;
+  return { failures, bootstrapMs, durationMs: performance.now() - started };
 }
 
 const options = parseArgs(process.argv.slice(2));
@@ -148,10 +151,10 @@ const browser = await chromium.launch({ headless: !options.headed });
 const counts = { PASS: 0, FAIL: 0, XFAIL: 0, XPASS: 0 };
 const results = [];
 const run = async (scenario, index) => {
-  const failures = await runScenario(browser, scenario, options, outDir);
+  const { failures, bootstrapMs, durationMs } = await runScenario(browser, scenario, options, outDir);
   const result = failures.length ? (scenario.known ? 'XFAIL' : 'FAIL') : scenario.known ? 'XPASS' : 'PASS';
   counts[result]++;
-  results[index] = { id: scenario.id, result, failures };
+  results[index] = { id: scenario.id, result, failures, bootstrapMs, durationMs };
   const lines = [`${result.padEnd(5)} ${scenario.id}`];
   if (result === 'FAIL') lines.push(...failures.map(failure => `        ${failure}`));
   if (result === 'XFAIL') lines.push(`        known: ${scenario.known}`);
