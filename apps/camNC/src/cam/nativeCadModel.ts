@@ -32,7 +32,17 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
     // A through cut is the same hole from either face, so it belongs to the first side, which cuts through.
     fromBelow = source.cuts?.filter(c => c.side === 'underside' && !c.through).map(flat) ?? [],
     fromAbove =
-      source.cuts?.filter(c => c.side !== 'underside' || c.through).map(c => ({ ...flat(c), from: c.through ? 0 : c.from })) ?? [],
+      source.cuts
+        ?.filter(c => c.side !== 'underside' || c.through)
+        .map(c => {
+          // A floor's through cut only reaches as far as its pocket does. From below, that would have to be worked out on
+          // side B first, which this doesn't do yet.
+          if (c.side === 'underside' && c.from > 0)
+            throw new Error(
+              `${source.name}: a through cut from an underside pocket's floor can't be machined yet. Cut it from the underside itself.`
+            );
+          return { ...flat(c), from: c.side === 'underside' ? 0 : c.from };
+        }) ?? [],
     profile = { thickness: source.thickness, outline: outer, holes: inner };
   const cut = fromAbove.length ? featuresFromCuts({ ...profile, cuts: fromAbove }) : null;
   // CAD refuses a through cut that reaches the edge, but cuts from separate sketches can still add up to a split.

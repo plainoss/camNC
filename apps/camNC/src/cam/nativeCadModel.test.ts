@@ -238,6 +238,27 @@ describe('native CAD to CAM', () => {
       expect(cam.operations.some(op => op.feature === 'outline')).toBe(false);
     });
 
+    it('keeps a through cut from a pocket floor inside that pocket', async () => {
+      const base = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+        partId = base.parts[0].id;
+      base.parts[0].sketch = addCircle(base.parts[0].sketch, { x: 30, y: 30, radius: 10 });
+      const pocket = regionAt(base, base.parts[0].sketch.id, 30, 30),
+        pocketed = setCutDepth(base, partId, base.parts[0].sketch.id, pocket.id, 4),
+        cutId = pocketed.parts[0].features!.find(f => f.type === 'cut')!.id,
+        added = addFaceSketch(pocketed, partId, { floorOf: cutId }),
+        face = added.document.parts[0].features!.find(f => f.type === 'sketch')!;
+      if (face.type !== 'sketch') throw new Error('Expected a sketch');
+      // Reaches well past the pocket, to x = 55.
+      face.sketch = addRectangle(face.sketch, { x: 30, y: 25, width: 25, height: 10 });
+      const slot = regionAt(added.document, added.sketchId, 45, 30),
+        { entries } = await nativeCadModel(setCutDepth(added.document, partId, added.sketchId, slot.id, 'through')),
+        xs = entries
+          .get(partId)!
+          .features.throughHoles.flat()
+          .map(p => p.x);
+      expect(Math.max(...xs)).toBeLessThanOrEqual(40 + 0.01);
+    });
+
     it('refuses cuts from the two faces that meet', async () => {
       const { document, partId } = bothSides(8),
         part = document.parts[0];
