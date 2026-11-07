@@ -44,12 +44,14 @@ import {
   addFaceSketch,
   evaluateCadPart,
   removeCadFeature,
-  setCutDepth,
+  setCutSuppressed,
   withFeatureVersion,
   type CadPoint,
 } from '@wbcnc/cad';
 import {
   useEffect,
+  Suspense,
+  lazy,
   useLayoutEffect,
   useImperativeHandle,
   useMemo,
@@ -114,7 +116,7 @@ import { constraintColorNotice, sketchDofStatus, sketchFeedback } from './sketch
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
-import { cutRegionAt, cutRegions, type CutRegion } from './cutRegions';
+import { cutRegionAt, cutRegions, withRegionDepth, type CutRegion } from './cutRegions';
 import { CutOverlay } from './CutOverlay';
 import { PartFeatureList } from './PartFeatureList';
 import { RegionDepthField } from './RegionDepthField';
@@ -195,6 +197,7 @@ const entityPointIds = (entity: CadEntity): string[] => {
   if (entity.type === 'point') return [entity.id];
   return curvePointIds(entity);
 };
+const PartView3D = lazy(() => import('./PartView3D'));
 /** A face sketch is drawn over the part's outline, so a part needs one first. */
 const hasOutline = (document: CadDocument, partId: string) => !!evaluateCadPart(document.parts.find(part => part.id === partId)!).part;
 function replacePart(document: CadDocument, partId: string, change: (part: CadPart) => CadPart): CadDocument {
@@ -321,9 +324,15 @@ export function CadEditor({
   const [rho, setRho] = useState('0.5');
   const [selectionBox, setSelectionBox] = useState<CadSelectionBox | null>(null);
   const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
+  const [show3D, setShow3D] = useState(false);
   const sketchOnly = !!faceSketch;
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
+  // Picking a drawing tool, by button or key, means going back to the drawing.
+  useEffect(() => {
+    if (tool !== 'select') setShow3D(false);
+  }, [tool]);
+  const partHasOutline = !!part && hasOutline(doc, part.id);
   const [contextMenu, setContextMenu] = useState<SketchContext | null>(null);
   const contextPress = useRef<SketchContextPress>({ phase: 'idle' });
   const [thicknessValid, setThicknessValid] = useState(true);
@@ -2567,6 +2576,7 @@ export function CadEditor({
                 <PartFeatureList
                   part={part}
                   onRemove={featureId => commit(removeCadFeature(documentRef.current, part.id, featureId))}
+                  onSwitchCut={(cutId, on) => commit(setCutSuppressed(documentRef.current, part.id, cutId, !on))}
                   onEdit={
                     onEditFaceSketch &&
                     (sketchId => {
@@ -2646,26 +2656,52 @@ export function CadEditor({
               <strong>TOP</strong> · {part?.name ?? 'Sketch'} <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
             </span>
             <div>
-              <button type="button" onClick={() => fit()}>
-                Fit <kbd>F</kbd>
-              </button>
-              <button
-                type="button"
-                aria-pressed={snap}
-                onClick={() => {
-                  setSnap(value => !value);
-                  setDrawingCue(null);
-                  setSnapCue(null);
-                  hoveredReferences.current = [];
-                  svg.current?.focus();
-                }}>
-                Snap {snap ? 'on' : 'off'}
-              </button>
+              {!faceSketch && (
+                <button
+                  type="button"
+                  aria-pressed={show3D}
+                  disabled={!partHasOutline}
+                  onClick={() => {
+                    if (!show3D) chooseTool('select');
+                    setShow3D(!show3D);
+                  }}>
+                  3D
+                </button>
+              )}
+              {!show3D && (
+                <>
+                  <button type="button" onClick={() => fit()}>
+                    Fit <kbd>F</kbd>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={snap}
+                    onClick={() => {
+                      setSnap(value => !value);
+                      setDrawingCue(null);
+                      setSnapCue(null);
+                      hoveredReferences.current = [];
+                      svg.current?.focus();
+                    }}>
+                    Snap {snap ? 'on' : 'off'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
+          {show3D && partHasOutline && part && (
+            <Suspense fallback={<div className="cad-part-view" />}>
+              <PartView3D
+                key={part.id}
+                part={part}
+                onChoose={(entry, depth) => commit(withRegionDepth(documentRef.current, part.id, entry, depth))}
+              />
+            </Suspense>
+          )}
           <svg
             ref={svg}
             className={`cad-canvas cad-tool-${tool}`}
+            style={show3D && partHasOutline ? { display: 'none' } : undefined}
             data-testid="cad-canvas"
             role="img"
             aria-label="2D sketch drawing canvas"
@@ -2990,20 +3026,15 @@ export function CadEditor({
             <RegionDepthField
               key={regionField.entry.region.id}
               style={valuePosition(regionField.anchor, 280)}
-              depth={regionField.entry.cut?.depth ?? (regionField.entry.inProfile ? 'through' : 0)}
+              depth={regionField.entry.depth}
               thickness={part.thickness}
               onClose={() => {
                 setRegionField(null);
                 svg.current?.focus();
               }}
               onChoose={depth => {
-                const { entry } = regionField,
-                  source = documentRef.current,
-                  // A loop that's cut through, or a face region left uncut, needs no feature: it's the default.
-                  isDefault = depth === (entry.inProfile ? 'through' : 0);
-                if (isDefault) {
-                  if (entry.cut) commit(removeCadFeature(source, part.id, entry.cut.id));
-                } else commit(setCutDepth(source, part.id, entry.sketchId, entry.region.id, depth));
+                const next = withRegionDepth(documentRef.current, part.id, regionField.entry, depth);
+                if (next !== documentRef.current) commit(next);
                 setRegionField(null);
                 svg.current?.focus();
               }}

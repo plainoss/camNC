@@ -6,11 +6,13 @@ const faceName = (face: CadFaceSketch) => (face.on === 'top' ? 'Top face' : face
 export function PartFeatureList({
   part,
   onRemove,
+  onSwitchCut,
   onEdit,
   onNew,
 }: {
   part: CadPart;
   onRemove: (featureId: string) => void;
+  onSwitchCut?: (cutId: string, on: boolean) => void;
   onEdit?: (sketchId: string) => void;
   onNew?: () => void;
 }) {
@@ -22,6 +24,7 @@ export function PartFeatureList({
   return (
     <div className="cad-feature-list">
       <h3>Sketches and cuts</h3>
+      {!!outline && !cadCuts(part).length && <small className="cad-muted">Click a closed region on the part to set its depth.</small>}
       <ul>
         {faces.map((face, i) => (
           <li key={face.id}>
@@ -40,7 +43,15 @@ export function PartFeatureList({
         ))}
         {cadCuts(part).map((cut, i) => (
           <li key={cut.id}>
-            <span>
+            {onSwitchCut && (
+              <input
+                type="checkbox"
+                aria-label={`Cut ${i + 1} on`}
+                checked={!cut.suppressed}
+                onChange={event => onSwitchCut(cut.id, event.target.checked)}
+              />
+            )}
+            <span className={cut.suppressed ? 'cad-muted' : undefined}>
               Cut {i + 1}{' '}
               <small className="cad-muted">
                 {!regionIds.has(cut.regionId)

@@ -48,8 +48,24 @@ export function addFaceSketch(document: CadDocument, partId: string, on: CadFace
 export function setCutDepth(document: CadDocument, partId: string, sketchId: string, regionId: string, depth: CadCutDepth): CadDocument {
   return editPart(document, partId, features =>
     features.some(f => f.type === 'cut' && f.sketchId === sketchId && f.regionId === regionId)
-      ? features.map(f => (f.type === 'cut' && f.sketchId === sketchId && f.regionId === regionId ? { ...f, depth } : f))
+      ? features.map(f => {
+          if (f.type !== 'cut' || f.sketchId !== sketchId || f.regionId !== regionId) return f;
+          // Setting a depth means the cut is wanted, so it comes back on.
+          const { suppressed: _suppressed, ...cut } = f;
+          return { ...cut, depth };
+        })
       : [...features, { type: 'cut', id: newCadId(), sketchId, regionId, depth }]
+  );
+}
+
+/** Switches a cut off or back on, keeping its depth. */
+export function setCutSuppressed(document: CadDocument, partId: string, cutId: string, suppressed: boolean): CadDocument {
+  return editPart(document, partId, features =>
+    features.map(f => {
+      if (f.type !== 'cut' || f.id !== cutId) return f;
+      const { suppressed: _suppressed, ...cut } = f;
+      return suppressed ? { ...cut, suppressed } : cut;
+    })
   );
 }
 
@@ -138,6 +154,7 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
       if (!start(feature.on)) error('cut-face-lost', 'A sketch lost the pocket floor it sat on. Move it to another face, or remove it.');
       continue;
     }
+    if (feature.suppressed) continue;
     const region = regions.get(feature.sketchId)?.find(candidate => candidate.id === feature.regionId);
     if (!region) {
       error('cut-region-missing', 'A cut lost its sketch region. Pick the region again, or remove the cut.');

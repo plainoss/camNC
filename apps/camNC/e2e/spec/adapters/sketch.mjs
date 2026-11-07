@@ -335,6 +335,16 @@ export async function createAdapter(page, url) {
         return;
       case 'tool':
         return chooseTool(rest);
+      case 'click3d': {
+        // The camera frames the part, so the middle of the view is the middle of the part.
+        const box = await page.getByTestId('part-3d').boundingBox();
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 3 });
+        await page.waitForTimeout(150);
+        await page.mouse.down();
+        await page.mouse.up();
+        await page.waitForTimeout(80);
+        return;
+      }
       case 'button':
         await page.getByRole('button', { name: new RegExp(rest, 'i') }).first().click();
         return;
@@ -351,6 +361,10 @@ export async function createAdapter(page, url) {
         await page.waitForTimeout(80);
         return;
       }
+      case 'check':
+        await page.getByLabel(rest, { exact: true }).check();
+        await page.waitForTimeout(80);
+        return;
       case 'uncheck':
         await page.getByLabel(rest, { exact: true }).uncheck();
         await page.waitForTimeout(80);

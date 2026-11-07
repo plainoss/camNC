@@ -42,7 +42,7 @@ function Body({
 }
 
 /** Point the camera at the box from the front-right, above (Z up), and orbit around its center. */
-function FitCamera({ box }: { box: THREE.Box3 }) {
+export function FitCamera({ box }: { box: THREE.Box3 }) {
   const camera = useThree(s => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree(s => s.controls) as OrbitControlsImpl | null;
   const aspect = useThree(s => s.size.width / s.size.height);

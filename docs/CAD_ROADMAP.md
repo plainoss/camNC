@@ -107,7 +107,8 @@ Fusion program for the same part, because no camNC program has been cut yet.
 - Add a 3D view to the Design step, with hover highlights, click-to-cut, a drag
   arrow, and a feature list with on/off and delete.
 - **Done when:** a recess and a through slot can be made without opening the sketch
-  editor.
+  editor. Regions still come from a sketch, so this is about setting depths, and PR 6
+  brings drawing them into the 3D view.
 
 ### PR 6: Sketch on the top face and pocket floors
 

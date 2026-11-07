@@ -210,6 +210,8 @@ export interface CadCut {
   sketchId: string;
   regionId: string;
   depth: CadCutDepth;
+  /** Switched off: the part evaluates as if the cut weren't there, and it keeps its depth for when it's back on. */
+  suppressed?: boolean;
 }
 export type CadFeature = CadFaceSketch | CadCut;
 export interface CadDocument {

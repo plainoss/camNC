@@ -4,8 +4,10 @@ The sketch editor creates flat parts in millimetres. Closed profiles can proceed
 to board arrangement and machining. Construction geometry remains
 editable but is excluded from cut profiles.
 
-Clicking an inner loop or a face sketch's region sets how deep it's cut, or leaves
-it uncut. An inner loop stays a through-hole unless given a depth. A face sketch is
+Clicking an inner loop or a face sketch's region, on the drawing or on the part in
+the 3D view, sets how deep it's cut, or leaves it uncut. The 3D view also has a drag
+arrow, and a cut can be switched off without losing its depth. An inner loop stays a
+through-hole unless given a depth. A face sketch is
 a separate drawing on the top face, so it can cross the part's outline, which is how
 a rabbet is drawn. Its regions are bounded by its curves and the outline. Cuts reach
 CAM as exact polygons.

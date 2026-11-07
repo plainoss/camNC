@@ -643,6 +643,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         reference(f.sketchId);
         reference(f.regionId);
         if (f.depth !== 'through') number(f.depth);
+        if (f.suppressed !== undefined && typeof f.suppressed !== 'boolean') throw new Error('Invalid CAD feature');
       } else throw new Error('Invalid CAD feature');
     }
     for (const sketch of sketches) {

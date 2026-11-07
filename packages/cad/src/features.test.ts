@@ -22,6 +22,8 @@ import {
   type CadPoint,
   type CadSketch,
   type CadSketchRegion,
+  cadCuts,
+  setCutSuppressed,
 } from './index';
 
 const inside = (point: CadPoint, loop: CadPoint[]) => {
@@ -390,5 +392,48 @@ describe('CAD feature format', () => {
     const added = addFaceSketch(document, part.id, 'top'),
       copy = withFaceSketch(added.document, added.sketchId, { ...part.sketch, id: added.sketchId });
     expect(evaluated(copy).errors).toContain('duplicate-id');
+  });
+});
+
+describe('switching cuts off', () => {
+  function pocketed() {
+    const document = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+      part = document.parts[0]!;
+    part.sketch = addCircle(part.sketch, { x: 50, y: 30, radius: 10 });
+    const region = cadSketchRegions(part, part.sketch.id).find(candidate => candidate.curveIds.length === 1)!;
+    return { document: setCutDepth(document, part.id, part.sketch.id, region.id, 4), partId: part.id, region, sketchId: part.sketch.id };
+  }
+  const cutId = (document: CadDocument) => cadCuts(document.parts[0]!)[0]!.id;
+
+  it('makes the part evaluate as if the cut weren’t there, keeping its depth', () => {
+    const { document, partId } = pocketed(),
+      off = setCutSuppressed(document, partId, cutId(document), true),
+      [evaluated] = evaluateCadDocument(off).parts;
+    expect(evaluated!.cuts).toBeUndefined();
+    expect(evaluated!.holes).toHaveLength(1);
+    expect(cadCuts(off.parts[0]!)[0]).toMatchObject({ depth: 4, suppressed: true });
+  });
+
+  it('round-trips, and turning back on removes the flag', () => {
+    const { document, partId } = pocketed(),
+      off = setCutSuppressed(document, partId, cutId(document), true);
+    expect(parseCadDocument(structuredClone(off))).toEqual(off);
+    expect(setCutSuppressed(off, partId, cutId(off), false)).toEqual(document);
+  });
+
+  it('comes back on when given a new depth', () => {
+    const { document, partId, region, sketchId } = pocketed(),
+      off = setCutSuppressed(document, partId, cutId(document), true),
+      again = setCutDepth(off, partId, sketchId, region.id, 6);
+    expect(cadCuts(again.parts[0]!)[0]).toMatchObject({ depth: 6 });
+    expect(cadCuts(again.parts[0]!)[0]!.suppressed).toBeUndefined();
+    expect(evaluateCadDocument(again).parts[0]!.cuts).toHaveLength(1);
+  });
+
+  it('refuses a flag that isn’t true or false', () => {
+    const { document } = pocketed(),
+      bad = structuredClone(document) as unknown as { parts: { features: { suppressed?: unknown }[] }[] };
+    bad.parts[0]!.features[0]!.suppressed = 'yes';
+    expect(() => parseCadDocument(bad)).toThrow('Invalid CAD feature');
   });
 });

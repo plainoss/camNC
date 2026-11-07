@@ -5,7 +5,11 @@ import {
   evaluateCadPart,
   pointInPolygon,
   polygonArea,
+  setCutDepth,
+  removeCadFeature,
   type CadCut,
+  type CadCutDepth,
+  type CadDocument,
   type CadPart,
   type CadPoint,
   type CadSketchRegion,
@@ -15,6 +19,8 @@ export interface CutRegion {
   sketchId: string;
   region: CadSketchRegion;
   cut?: CadCut;
+  /** What the region is cut to now. A cut that's switched off counts for nothing. */
+  depth: CadCutDepth;
   /** Inner loops of the profile are through-holes unless their cut says otherwise. */
   inProfile: boolean;
 }
@@ -27,12 +33,10 @@ export function cutRegions(part: CadPart): CutRegion[] {
   const cuts = cadCuts(part),
     outer = profile.loops.find(loop => loop.kind === 'outer')!,
     outlineId = `${part.id}:outline`,
-    entry = (sketchId: string, inProfile: boolean) => (region: CadSketchRegion) => ({
-      sketchId,
-      region,
-      inProfile,
-      cut: cuts.find(cut => cut.sketchId === sketchId && cut.regionId === region.id),
-    });
+    entry = (sketchId: string, inProfile: boolean) => (region: CadSketchRegion) => {
+      const cut = cuts.find(candidate => candidate.sketchId === sketchId && candidate.regionId === region.id);
+      return { sketchId, region, inProfile, cut, depth: cut && !cut.suppressed ? cut.depth : inProfile ? 'through' : 0 };
+    };
   return [
     ...cadSketchRegions(part, part.sketch.id, profile.outline)
       .filter(region => !sameIds(region.curveIds, outer.entityIds))
@@ -59,7 +63,24 @@ export function cutRegionAt(regions: CutRegion[], point: CadPoint): CutRegion | 
 export const cutRegionPath = (region: CadSketchRegion) =>
   [region.points, ...region.holes].map(loop => loop.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z').join(' ');
 
-export const depthLabel = (entry: CutRegion) => {
-  const depth = entry.cut?.depth ?? (entry.inProfile ? 'through' : null);
-  return depth === 'through' ? 'Through' : depth === 0 || depth === null ? 'No cut' : `${depth} mm`;
-};
+export const depthLabel = ({ depth }: CutRegion) => (depth === 'through' ? 'Through' : depth === 0 ? 'No cut' : `${depth} mm`);
+
+/** A loop that's cut through, or a face region left uncut, needs no feature: it's the default. */
+export function withRegionDepth(document: CadDocument, partId: string, entry: CutRegion, depth: CadCutDepth): CadDocument {
+  if (depth !== (entry.inProfile ? 'through' : 0)) return setCutDepth(document, partId, entry.sketchId, entry.region.id, depth);
+  return entry.cut ? removeCadFeature(document, partId, entry.cut.id) : document;
+}
+
+/** How high a region's visible surface sits above the part's underside. */
+export const regionSurfaceZ = (depth: CadCutDepth, thickness: number) => (depth === 'through' ? 0 : thickness - depth);
+
+/** How high the part really is at a point. Regions from separate sketches overlap, and the deepest cut there wins. */
+export function exposedHeightAt(regions: CutRegion[], thickness: number, point: CadPoint) {
+  return regions.reduce(
+    (height, { region, depth }) =>
+      pointInPolygon(point, region.points) && !region.holes.some(hole => pointInPolygon(point, hole))
+        ? Math.min(height, regionSurfaceZ(depth, thickness))
+        : height,
+    thickness
+  );
+}
