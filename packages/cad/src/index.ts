@@ -27,3 +27,4 @@ export * from './rectangleCorners';
 export * from './ellipse';
 
 export * from './threePointCircle';
+export * from './alignedRectangle';

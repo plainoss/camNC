@@ -1,4 +1,4 @@
-import { ellipseFromPoints, circleThroughThreePoints, type CadPoint } from '@wbcnc/cad';
+import { ellipseFromPoints, circleThroughThreePoints, alignedRectangleFromPoints, type CadPoint } from '@wbcnc/cad';
 import { buildArcPreview } from './arcPreviewGeometry';
 import type { SketchTool } from './sketchTools';
 import { formatCadValue } from './valueExpressions';
@@ -52,6 +52,16 @@ export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelSca
       values.push({ kind: 'width', text: formatCadValue(right - left), at: { x: (left + right) / 2, y: top + 16 / scale } });
       const text = formatCadValue(top - bottom);
       values.push({ kind: 'height', text, at: { x: left - (text.length * 3.5 + 12) / scale, y: (top + bottom) / 2 } });
+    }
+  } else if (tool === 'alignedRectangle') {
+    const shape = pending[1] ? alignedRectangleFromPoints(start, pending[1], cursor) : null;
+    markers.push(...(shape ? shape.corners : [...pending, cursor]));
+    if (shape) {
+      const [a, b, c] = shape.corners;
+      values.push(
+        { kind: 'width', text: formatCadValue(shape.width), at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + 20 / scale } },
+        { kind: 'height', text: formatCadValue(shape.height), at: { x: (b.x + c.x) / 2 + 20 / scale, y: (b.y + c.y) / 2 } }
+      );
     }
   } else if (tool === 'ellipse') {
     markers.push(...pending);
