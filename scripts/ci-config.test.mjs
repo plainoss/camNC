@@ -196,3 +196,34 @@ test('package and fast-task input overrides retain the shared timing reporter', 
     assert(Object.keys(task.inputs).some(file => file.endsWith('scripts/test-timings.mjs')), `${id} must hash its timing reporter`);
   }
 });
+
+test('all workflows use maintained Node.js 24 action releases', () => {
+  // Verified against each action's action.yml; cache subactions share the same release.
+  const minimumMajor = {
+    'actions/checkout': 7,
+    'actions/setup-node': 7,
+    'actions/cache': 6,
+    'pnpm/action-setup': 6,
+    'actions/setup-python': 7,
+    'actions/upload-artifact': 7,
+    'actions/download-artifact': 8,
+  };
+  for (const file of readdirSync(new URL('.github/workflows/', root)).filter(file => /\.ya?ml$/.test(file))) {
+    const workflow = parse(read(`.github/workflows/${file}`));
+    assert.doesNotMatch(JSON.stringify(workflow), /ubuntu-latest/,
+      `${file}: pin Linux runners to avoid unplanned OS migrations`);
+    for (const [id, job] of Object.entries(workflow.jobs)) {
+      for (const step of job.steps ?? []) {
+        if (!step.uses) continue;
+        assert(!step.uses.startsWith('seanmiddleditch/gha-setup-ninja@'),
+          `${file} ${id}: use hosted Ninja instead of the Node.js 20 installer`);
+        const [action, version] = step.uses.split('@');
+        const repository = action.split('/').slice(0, 2).join('/');
+        if (!(repository in minimumMajor)) continue;
+        const major = /^v(\d+)(?:\.|$)/.exec(version);
+        assert(major && Number(major[1]) >= minimumMajor[repository],
+          `${file} ${id}: ${step.uses} must use a maintained Node.js 24 release`);
+      }
+    }
+  }
+});
