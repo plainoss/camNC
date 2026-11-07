@@ -1,0 +1,22 @@
+{
+  "name": "@wbcnc/cam-settings",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wbcnc/cam": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@wbcnc/typescript-config": "workspace:*",
+    "vitest": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,3 +1,5 @@
+import nodeFiles from './vitest.node-files.json';
+import TimingReporter from '../../scripts/test-timings.mjs';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -40,12 +42,12 @@ export default defineConfig({
     // Root tests run these CPU-sensitive gates afterwards, without competing suites or packages.
     testNamePattern: /^(?!.*\[performance\]).*$/,
     globals: false,
-    reporters: ['default', ['../../scripts/test-timings.mjs', { suite: 'browser' }]],
+    reporters: ['default', new TimingReporter({ suite: 'browser' })],
     // CAD WASM workers and WebGL simulations share the GPU/process budget with each browser test page.
     // Keep parallel coverage without flooding the renderer with one page per available CPU thread.
     maxWorkers: 4,
     // Worker tests run in workerd, see vitest.worker.config.ts.
-    exclude: ['**/node_modules/**', 'worker/**'],
+    exclude: ['**/node_modules/**', 'worker/**', ...nodeFiles],
     setupFiles: ['src/test/isolateIndexedDb.ts'],
     // environment: 'jsdom',
     // opencv tests don't seem to work with jsdom as setup right now.
