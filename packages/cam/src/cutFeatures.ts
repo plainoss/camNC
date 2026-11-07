@@ -57,7 +57,7 @@ export function featuresFromCuts(
     }
     if (cut.through) {
       footprint = difference(footprint, shape);
-      holeCuts.push({ id: cut.id, region: difference([cut.outline], cut.islands) });
+      holeCuts.push({ id: cut.id, region: shape });
     } else heights.set(floor, union(heights.get(floor) ?? [], removed));
   }
 
@@ -67,15 +67,15 @@ export function featuresFromCuts(
   if (holeCuts.length) {
     // Holes no through cut overlaps keep their place and exact points, because saved hole choices refer to them. What
     // Clipper hands back is rounded, so it can't be matched to them by comparing shapes.
-    const overlaps = (path: PathD) => holeCuts.find(({ region }) => polyArea(intersect([path], region)) > 0),
-      kept = holes.flatMap((path, hole) => (overlaps(path) ? [] : [{ path, source: { hole } as HoleSource }])),
-      added = footprint
-        .filter(path => areaD(path) < 0)
-        .map(path => [...path].reverse())
-        .flatMap(path => {
-          const from = overlaps(path);
-          return from ? [{ path, source: { cut: from.id } as HoleSource }] : [];
-        });
+    const overlap = (a: PathD, b: PathsD) => polyArea(intersect([a], b)) > 0,
+      loops = footprint.filter(path => areaD(path) < 0).map(path => [...path].reverse()),
+      added = loops.flatMap(path => {
+        const from = holeCuts.find(({ region }) => overlap(path, region));
+        return from ? [{ path, source: { cut: from.id } as HoleSource }] : [];
+      }),
+      // A hole a cut merged into is gone. One still its own loop stays, even inside an island the cut went around.
+      untouched = loops.filter(path => !holeCuts.some(({ region }) => overlap(path, region))),
+      kept = holes.flatMap((path, hole) => (overlap(path, untouched) ? [{ path, source: { hole } as HoleSource }] : []));
     throughHoles = [...kept, ...added].map(entry => entry.path);
     holeSources = [...kept, ...added].map(entry => entry.source);
   }
@@ -91,8 +91,9 @@ export function featuresFromCuts(
   const pockets: PocketFeature[] = [];
   for (const level of levels) {
     if (level.z >= thickness - Z_TOL || level.z <= Z_TOL) continue;
+    // From the exact heights, because cleaning a level drops small islands that must not be machined away.
     const above = union(
-      levels.filter(other => other.z > level.z + Z_TOL).flatMap(other => other.region),
+      [...heights].filter(([z]) => z > level.z + Z_TOL).flatMap(([, region]) => region),
       []
     );
     const strictRegion = difference(cleanRegion(difference(footprint, above), 0.01, 0.5), above);
