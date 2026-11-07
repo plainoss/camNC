@@ -24,8 +24,8 @@ of this adds a second source of truth.
 1. Done: [interactive spec session](../apps/camNC/e2e/spec/README.md), so agents can
    try a UI feature without replaying a whole scenario.
 2. Done: `editCad`, the report, an SVG and the `check` command.
-3. Import a document file as a new job, marked as AI-authored, with Finish left to a
-   person.
+3. Done: open a design `.json` from CAM's Open model or by dropping it. It becomes a
+   new draft job marked as imported, and someone has to finish the sketch to use it.
 4. Done: board planning moved from `cam.worker.ts` to `planBoard` in `packages/cam`, and
    the report summarises each part's toolpaths with it. A summary only, never a program
    file.
