@@ -58,6 +58,9 @@ export function beginCreationValues(
         }
       );
     }
+  } else if (tool === 'inscribedPolygon') {
+    const circle = entities.find(e => e.type === 'circle');
+    if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Polygon diameter' });
   } else if (tool === 'centerPointArc') {
     const arc = entities.find(e => e.type === 'arc');
     if (arc) steps.push({ entityId: arc.id, mode: 'auto', label: 'Arc radius' });

@@ -11,6 +11,7 @@ export type SketchTool =
   | 'tangentArc'
   | 'centerPointArc'
   | 'point'
+  | 'inscribedPolygon'
   | 'trim'
   | 'extend'
   | 'offset'
@@ -45,6 +46,7 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'spline', label: 'Spline' },
   { id: 'bezier', label: 'Bezier' },
   { id: 'curveControlPoint', label: 'Spline control point' },
+  { id: 'inscribedPolygon', label: 'Inscribed polygon' },
   { id: 'point', label: 'Point', key: 'Shift+S' },
   { id: 'fillet', label: 'Sketch fillet', key: 'Shift+F' },
   { id: 'trim', label: 'Trim', key: 'M' },
@@ -76,6 +78,7 @@ export const sketchToolGroups = [
       'spline',
       'bezier',
       'curveControlPoint',
+      'inscribedPolygon',
       'point',
     ],
   },
@@ -83,6 +86,7 @@ export const sketchToolGroups = [
 ] as const;
 
 export const sketchToolFamilies = [
+  { id: 'polygon', label: 'Polygon tools', tools: ['inscribedPolygon'] },
   { id: 'circle', label: 'Circle tools', tools: ['circle', 'threePointCircle', 'ellipse'] },
   { id: 'rectangle', label: 'Rectangle tools', tools: ['rectangle', 'centerRectangle', 'alignedRectangle'] },
   { id: 'arc', label: 'Arc tools', tools: ['arc', 'tangentArc', 'centerPointArc', 'conic'] },
@@ -92,12 +96,14 @@ export const sketchToolFamilies = [
 
 export const sketchToolLabel = (tool: SketchToolDefinition) => (tool.key ? `${tool.label} (${tool.key})` : tool.label);
 export const sketchToolSection = (tool: SketchTool) =>
-  tool === 'ellipse' || tool === 'threePointCircle'
-    ? 'circle'
-    : tool === 'centerRectangle' || tool === 'alignedRectangle'
-      ? 'rectangle'
-      : tool === 'tangentArc' || tool === 'centerPointArc'
-        ? 'arc'
-        : tool === 'bezier' || tool === 'curveControlPoint'
-          ? 'spline'
-          : tool;
+  tool === 'inscribedPolygon'
+    ? 'polygon'
+    : tool === 'ellipse' || tool === 'threePointCircle'
+      ? 'circle'
+      : tool === 'centerRectangle' || tool === 'alignedRectangle'
+        ? 'rectangle'
+        : tool === 'tangentArc' || tool === 'centerPointArc'
+          ? 'arc'
+          : tool === 'bezier' || tool === 'curveControlPoint'
+            ? 'spline'
+            : tool;

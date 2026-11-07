@@ -103,6 +103,14 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'inscribedPolygon':
+      shape = (
+        <>
+          <path d="m12 2 9 5v10l-9 5-9-5V7z" />
+          <circle cx="12" cy="12" r="7.5" />
+        </>
+      );
+      break;
     case 'point':
       shape = (
         <>

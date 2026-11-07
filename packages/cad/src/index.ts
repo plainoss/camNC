@@ -30,3 +30,5 @@ export * from './threePointCircle';
 export * from './alignedRectangle';
 
 export * from './centerPointArc';
+
+export * from './polygon';
