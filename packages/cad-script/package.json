@@ -1,0 +1,26 @@
+{
+  "name": "@wbcnc/cad-script",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "vite-node --config vite.config.ts src/cli.ts",
+    "test": "vitest",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wbcnc/cad": "workspace:*",
+    "@wbcnc/cad-editor": "workspace:*",
+    "@wbcnc/cam": "workspace:*",
+    "typescript": "catalog:",
+    "vite-node": "3.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@wbcnc/typescript-config": "workspace:*",
+    "vitest": "catalog:"
+  }
+}
