@@ -4,6 +4,8 @@ import {
   cadSketchRegions,
   evaluateCadFeatures,
   evaluateCadPart,
+  faceIsUnderside,
+  flipUnderside,
   pointInPolygon,
   polygonArea,
   setCutDepth,
@@ -27,6 +29,8 @@ export interface CutRegion {
   from: number;
   /** The face its sketch sits on. */
   on: CadFaceRef;
+  /** Which face it's cut from. Its points are always in the part's own coordinates. */
+  side?: 'top' | 'underside';
   /** Inner loops of the profile are through-holes unless their cut says otherwise. */
   inProfile: boolean;
 }
@@ -60,9 +64,19 @@ export function cutRegions(part: CadPart): CutRegion[] {
       const from = typeof face.on === 'object' ? made.find(cut => cut.id === (face.on as { floorOf: string }).floorOf)?.to : 0;
       // A sketch that lost its floor has nowhere to cut until it's moved.
       if (from === undefined) return [];
+      const underside = faceIsUnderside(part, face.on);
       return cadSketchRegions(part, face.sketch.id, profile.outline)
         .filter(region => !(region.curveIds.length === 1 && region.curveIds[0] === outlineId))
-        .map(entry(face.sketch.id, false, face.on, from));
+        .map(entry(face.sketch.id, false, face.on, from))
+        .map(found =>
+          underside
+            ? {
+                ...found,
+                side: 'underside' as const,
+                region: { ...found.region, points: flipUnderside(found.region.points), holes: found.region.holes.map(flipUnderside) },
+              }
+            : found
+        );
     }),
   ];
 }
@@ -78,6 +92,9 @@ export function cutRegionAt(regions: CutRegion[], point: CadPoint): CutRegion | 
   );
 }
 
+/** What can be picked and shown on the drawing, which looks at the part from above. */
+export const topRegions = (regions: CutRegion[]) => regions.filter(entry => entry.side !== 'underside');
+
 export const cutRegionPath = (region: CadSketchRegion) =>
   [region.points, ...region.holes].map(loop => loop.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z').join(' ');
 
@@ -89,20 +106,25 @@ export function withRegionDepth(document: CadDocument, partId: string, entry: Cu
   return entry.cut ? removeCadFeature(document, partId, entry.cut.id) : document;
 }
 
-/** How high a region's visible surface sits above the part's underside. */
+/** How far a region's visible surface is from the far face, counting from the face it's cut from. */
 export const regionSurfaceZ = ({ depth, from }: Pick<CutRegion, 'depth' | 'from'>, thickness: number) =>
   depth === 'through' ? 0 : thickness - from - depth;
 
-const under = ({ region }: CutRegion, point: CadPoint) =>
+/** Where that surface is in the part: an underside region's depth counts up from the bottom. */
+export const regionWorldZ = (entry: CutRegion, thickness: number) =>
+  entry.side === 'underside' ? thickness - regionSurfaceZ(entry, thickness) : regionSurfaceZ(entry, thickness);
+
+const isUnder = ({ region }: CutRegion, point: CadPoint) =>
   pointInPolygon(point, region.points) && !region.holes.some(hole => pointInPolygon(point, hole));
 
 /**
- * How high the part really is at a point. Regions from separate sketches overlap, so this applies their cuts in order,
- * as CAM does: a cut only removes what's under its start, and an uncut region removes nothing.
+ * How high the part really is at a point, counted from the far face. Regions from separate sketches overlap, so this
+ * applies their cuts in order, as CAM does: a cut only removes what's under its start, and an uncut region removes
+ * nothing. Give it the regions of one face.
  */
 export function exposedHeightAt(regions: CutRegion[], thickness: number, point: CadPoint) {
   return regions.reduce((height, entry) => {
-    if (!entry.depth || !under(entry, point) || height > thickness - entry.from + 0.005) return height;
+    if (!entry.depth || !isUnder(entry, point) || height > thickness - entry.from + 0.005) return height;
     return Math.min(height, regionSurfaceZ(entry, thickness));
   }, thickness);
 }

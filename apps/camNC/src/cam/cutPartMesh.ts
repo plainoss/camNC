@@ -25,7 +25,7 @@ function shapes(region: Path[]) {
  * A watertight solid for a part with cuts, without the hidden faces stacked slabs would leave: one cap per height, the
  * bottom, and walls between heights. Each horizontal face is exactly a level, so `extractFeatures` reads it back.
  */
-export function cutPartMesh(features: PartFeatures): { positions: Float64Array; indices: Uint32Array } {
+export function cutPartMesh(features: PartFeatures, underside?: PartFeatures): { positions: Float64Array; indices: Uint32Array } {
   const positions: number[] = [];
   const triangle = (a: [number, number, number], b: [number, number, number], c: [number, number, number]) =>
     positions.push(...a, ...b, ...c);
@@ -46,7 +46,11 @@ export function cutPartMesh(features: PartFeatures): { positions: Float64Array; 
   };
   const levels = [...features.levels].sort((a, b) => b.z - a.z);
   for (const level of levels) cap(level.region, level.z, true);
-  cap(features.footprint, 0, false);
+  // The underside is the same stack seen from the other face, with its heights turned over.
+  const below = [...(underside?.levels ?? [])].sort((a, b) => b.z - a.z),
+    thickness = features.thickness;
+  if (below.length) for (const level of below) cap(level.region, thickness - level.z, false);
+  else cap(features.footprint, 0, false);
   const heights = [...levels.map(level => level.z), 0];
   levels.forEach((_, i) => {
     const high = heights[i]!,
@@ -60,6 +64,17 @@ export function cutPartMesh(features: PartFeatures): { positions: Float64Array; 
         triangle([p.x, p.y, low], [q.x, q.y, high], [p.x, p.y, high]);
       });
     }
+  });
+  below.slice(0, -1).forEach((_, i) => {
+    // The last step down is the part's own outside, which the walls above already cover.
+    const high = thickness - below[i]!.z,
+      low = thickness - below[i + 1]!.z;
+    for (const path of unionPaths(below.slice(0, i + 1).flatMap(level => level.region)))
+      path.forEach((p, n) => {
+        const q = path[(n + 1) % path.length]!;
+        triangle([q.x, q.y, high], [p.x, p.y, high], [p.x, p.y, low]);
+        triangle([q.x, q.y, high], [p.x, p.y, low], [q.x, q.y, low]);
+      });
   });
   return { positions: Float64Array.from(positions), indices: Uint32Array.from({ length: positions.length / 3 }, (_, i) => i) };
 }

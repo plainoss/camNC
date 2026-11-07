@@ -15,7 +15,16 @@ import { FitCamera } from '@/cam/model/ModelViewport';
 import { modelGeometry } from '@/cam/model/modelGeometry';
 import { nativePart } from '@/cam/nativeCadModel';
 import { kOrbitDamping } from '@/lib/orbitDamping';
-import { cutRegions, depthLabel, exposedHeightAt, regionFace, regionSurfaceZ, withRegionDepth, type CutRegion } from './cutRegions';
+import {
+  cutRegions,
+  depthLabel,
+  exposedHeightAt,
+  regionFace,
+  regionSurfaceZ,
+  regionWorldZ,
+  withRegionDepth,
+  type CutRegion,
+} from './cutRegions';
 import { draggedDepth, heightOnAxis } from './partViewDrag';
 import { RegionDepthField } from './RegionDepthField';
 
@@ -54,6 +63,7 @@ function partBox(part: CadPart) {
 function RegionSurface({
   entry,
   z,
+  surface,
   order,
   lit,
   heightAt,
@@ -62,6 +72,8 @@ function RegionSurface({
 }: {
   entry: CutRegion;
   z: number;
+  /** Its height counted from its own face, to compare with `heightAt`. */
+  surface: number;
   /** A later sketch's region lifts over an earlier one at the same height, such as a sketch on a pocket's floor. */
   order: number;
   lit: boolean;
@@ -76,16 +88,16 @@ function RegionSurface({
   }, [entry.region]);
   return (
     <mesh
-      position={[0, 0, z + kLift * (1 + order)]}
+      position={[0, 0, z + (entry.side === 'underside' ? -1 : 1) * kLift * (1 + order)]}
       onPointerMove={event => {
         // Where another sketch's cut goes deeper, this surface is only air, so what's below gets the event.
-        if (heightAt(event.point) < z) return onHover(false);
+        if (heightAt(event.point) < surface) return onHover(false);
         event.stopPropagation();
         onHover(true);
       }}
       onPointerOut={() => onHover(false)}
       onClick={event => {
-        if (heightAt(event.point) < z) return;
+        if (heightAt(event.point) < surface) return;
         event.stopPropagation();
         // A drag that started here was an orbit, not a pick.
         if (event.delta <= 4) onPick(event);
@@ -103,7 +115,7 @@ function RegionSurface({
 }
 
 /** Turns the camera to look straight at a face, then hands over to the sketch editor. */
-function FaceCamera({ box, onDone }: { box: THREE.Box3; onDone: () => void }) {
+function FaceCamera({ box, below, onDone }: { box: THREE.Box3; below: boolean; onDone: () => void }) {
   const start = useRef<{ from: THREE.Vector3; up: THREE.Vector3; at: number } | null>(null);
   const done = useRef(false);
   useFrame(({ camera, clock }) => {
@@ -114,7 +126,11 @@ function FaceCamera({ box, onDone }: { box: THREE.Box3; onDone: () => void }) {
       reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       t = reduced ? 1 : Math.min(1, (clock.elapsedTime - start.current.at) / kTurnSeconds),
       eased = t * t * (3 - 2 * t);
-    camera.position.lerpVectors(start.current.from, new THREE.Vector3(center.x, center.y, center.z + distance), eased);
+    camera.position.lerpVectors(
+      start.current.from,
+      new THREE.Vector3(center.x, center.y, center.z + (below ? -distance : distance)),
+      eased
+    );
     camera.up.lerpVectors(start.current.up, new THREE.Vector3(0, 1, 0), eased).normalize();
     camera.lookAt(center);
     if (t === 1) {
@@ -130,6 +146,7 @@ function DepthArrow({
   at,
   surface,
   thickness,
+  below,
   left,
   size,
   depth,
@@ -139,6 +156,7 @@ function DepthArrow({
   at: { x: number; y: number };
   surface: number;
   thickness: number;
+  below: boolean;
   /** Material left under where the cut starts. */
   left: number;
   size: number;
@@ -152,7 +170,9 @@ function DepthArrow({
   const shaft = shaftTop - surface;
   return (
     <group
-      position={[at.x, at.y, 0]}
+      // From below, the same arrow stands on the far side of the part, pointing down.
+      position={[at.x, at.y, below ? thickness : 0]}
+      scale={[1, 1, below ? -1 : 1]}
       onPointerDown={event => {
         event.stopPropagation();
         const start = height(event);
@@ -164,7 +184,7 @@ function DepthArrow({
       onPointerMove={event => {
         event.stopPropagation();
         const now = grab.current && height(event);
-        if (grab.current && now !== null) onDrag(draggedDepth(grab.current.depth, now - grab.current.height, left));
+        if (grab.current && now !== null) onDrag(draggedDepth(grab.current.depth, (now - grab.current.height) * (below ? -1 : 1), left));
       }}
       onPointerUp={event => {
         event.stopPropagation();
@@ -213,7 +233,7 @@ export default function PartView3D({
   const [hovered, setHovered] = useState<string | null>(null);
   const [picked, setPicked] = useState<{ id: string; at: { x: number; y: number }; screen: { x: number; y: number } } | null>(null);
   const [dragging, setDragging] = useState<CadCutDepth | null>(null);
-  const [topPicked, setTopPicked] = useState(false);
+  const [facePicked, setFacePicked] = useState<'top' | 'underside' | null>(null);
   const [turningTo, setTurningTo] = useState<CadFaceRef | null>(null);
   const regions = useMemo(() => cutRegions(part), [part]);
   const entry = regions.find(candidate => candidate.region.id === picked?.id) ?? null;
@@ -229,12 +249,12 @@ export default function PartView3D({
   const [box] = useState(() => partBox(part));
   const size = Math.max(box.max.x - box.min.x, box.max.y - box.min.y, part.thickness * 2) * 0.12;
   const depth = dragging ?? entry?.depth ?? 0;
-  const face = entry ? regionFace(entry) : topPicked ? ('top' as const) : null;
+  const face = entry ? regionFace(entry) : facePicked;
   // The editor's keys work from here as soon as the view opens.
   useEffect(() => frame.current?.focus(), []);
   const pick = (candidate: CutRegion, event: ThreeEvent<MouseEvent>) => {
     const rect = frame.current!.getBoundingClientRect();
-    setTopPicked(false);
+    setFacePicked(null);
     setPicked({
       id: candidate.region.id,
       at: regionCenter(candidate, event.point),
@@ -261,11 +281,13 @@ export default function PartView3D({
         dpr={[1, 2]}
         onPointerMissed={() => {
           setPicked(null);
-          setTopPicked(false);
+          setFacePicked(null);
         }}>
         <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
         <directionalLight position={[300, -500, 800]} intensity={1.8} />
         <directionalLight position={[-400, 300, 200]} intensity={0.4} />
+        {/* Enough light underneath to work on the underside. */}
+        <directionalLight position={[200, -300, -800]} intensity={1.1} />
         <FitCamera box={box} />
         {solid.geometry && (
           <mesh
@@ -279,16 +301,18 @@ export default function PartView3D({
               event.stopPropagation();
               if (event.delta > 4) return;
               setPicked(null);
-              // Clicking the part's top selects it, ready to sketch on. Its sides aren't faces to sketch on yet.
-              setTopPicked(event.point.z > part.thickness - kLift);
+              // Clicking the top or underside selects it, ready to sketch on. The sides aren't faces to sketch on yet.
+              setFacePicked(event.point.z > part.thickness - kLift ? 'top' : event.point.z < kLift ? 'underside' : null);
             }}>
             <meshStandardMaterial vertexColors color={kWood} roughness={0.8} />
             <Edges threshold={30} color="#5b4a36" />
           </mesh>
         )}
-        {topPicked && (
+        {facePicked && (
           <Line
-            points={[...outlineOf(part), outlineOf(part)[0]!].map(p => [p.x, p.y, part.thickness + kLift] as const)}
+            points={[...outlineOf(part), outlineOf(part)[0]!].map(
+              p => [p.x, p.y, facePicked === 'top' ? part.thickness + kLift : -kLift] as const
+            )}
             color={kPick}
             lineWidth={3}
           />
@@ -297,10 +321,17 @@ export default function PartView3D({
           <RegionSurface
             key={candidate.region.id}
             entry={candidate}
-            z={regionSurfaceZ(candidate, part.thickness)}
+            z={regionWorldZ(candidate, part.thickness)}
+            surface={regionSurfaceZ(candidate, part.thickness)}
             order={order}
             lit={candidate.region.id === picked?.id || candidate.region.id === hovered}
-            heightAt={point => exposedHeightAt(shownRegions, part.thickness, point)}
+            heightAt={point =>
+              exposedHeightAt(
+                shownRegions.filter(other => other.side === candidate.side),
+                part.thickness,
+                point
+              )
+            }
             onHover={over => setHovered(current => (over ? candidate.region.id : current === candidate.region.id ? null : current))}
             onPick={event => pick(candidate, event)}
           />
@@ -310,6 +341,7 @@ export default function PartView3D({
             at={picked.at}
             surface={regionSurfaceZ({ depth, from: entry.from }, part.thickness)}
             thickness={part.thickness}
+            below={entry.side === 'underside'}
             left={part.thickness - entry.from}
             size={size}
             depth={entry.depth}
@@ -320,7 +352,13 @@ export default function PartView3D({
             }}
           />
         )}
-        {turningTo && <FaceCamera box={box} onDone={() => onSketchFace?.(turningTo)} />}
+        {turningTo && (
+          <FaceCamera
+            box={box}
+            below={turningTo === 'underside' || (entry?.side === 'underside' && turningTo !== 'top')}
+            onDone={() => onSketchFace?.(turningTo)}
+          />
+        )}
         <OrbitControls makeDefault enabled={dragging === null && !turningTo} dampingFactor={kOrbitDamping} />
       </Canvas>
       {entry && picked && dragging === null && (

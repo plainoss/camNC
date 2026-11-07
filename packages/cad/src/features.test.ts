@@ -298,14 +298,15 @@ describe('CAD face sketches', () => {
     const document = plate(),
       partId = document.parts[0]!.id,
       added = addFaceSketch(document, partId, 'underside'),
-      sketch = addCircle(faceSketch(added.document, added.sketchId), { x: 100, y: 60, radius: 15 }),
+      // Seen from below, X runs the other way, so x = -100 is x = 100 on the part.
+      sketch = addCircle(faceSketch(added.document, added.sketchId), { x: -100, y: 60, radius: 15 }),
       drawn = withFaceSketch(added.document, added.sketchId, sketch),
-      region = faceRegionAt(drawn, added.sketchId, { x: 100, y: 60 });
-    expect(evaluated(setCutDepth(drawn, partId, added.sketchId, region.id, 5)).part!.cuts![0]).toMatchObject({
-      side: 'underside',
-      from: 0,
-      to: 5,
-    });
+      region = faceRegionAt(drawn, added.sketchId, { x: -100, y: 60 }),
+      cut = evaluated(setCutDepth(drawn, partId, added.sketchId, region.id, 5)).part!.cuts![0]!;
+    expect(cut).toMatchObject({ side: 'underside', from: 0, to: 5 });
+    const xs = cut.outline.map(p => p.x);
+    expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(100, 1);
+    expect(polygonArea(cut.outline)).toBeGreaterThan(0);
   });
 
   it('reports a cut whose region stopped existing', () => {

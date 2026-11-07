@@ -1,5 +1,5 @@
-import { solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
-import { featuresFromCuts, summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
+import { solveCadDocument, type CadDocument, type EvaluatedCadCut, type EvaluatedCadPart } from '@wbcnc/cad';
+import { cutsMeet, featuresFromCuts, flippedProfile, summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three';
 import type { BodyMesh, CamPartInfo, ModelImport, Outline2D } from './camTypes';
 import { cutPartMesh } from './cutPartMesh';
@@ -7,11 +7,12 @@ import { cutPartMesh } from './cutPartMesh';
 export interface NativeCadEntry {
   part: FlatPart;
   features: PartFeatures;
+  /** Side B's features for each way the part can turn over, when it has cuts from below. */
+  flipped?: { x?: PartFeatures; y?: PartFeatures };
 }
 
 /** Native curves are tessellated once by CAD, then go straight to CAM's polygon feature seam. */
 export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: CamPartInfo; mesh: BodyMesh } {
-  if (source.cuts?.some(cut => cut.side === 'underside')) throw new Error(`${source.name}: cuts on the underside can’t be machined yet.`);
   const x0 = Math.min(...source.outline.map(p => p.x));
   const y0 = Math.min(...source.outline.map(p => p.y));
   const point = (p: { x: number; y: number }) => ({ x: p.x - x0, y: p.y - y0 });
@@ -27,18 +28,17 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
   const inner = holes.map(positive);
   const footprint = [outer, ...inner.map(h => [...h].reverse())];
   const holeLoops = source.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id);
-  const cut = source.cuts?.length
-    ? featuresFromCuts({
-        thickness: source.thickness,
-        outline: outer,
-        holes: inner,
-        cuts: source.cuts.map(c => ({ ...c, outline: c.outline.map(point), islands: c.islands.map(island => island.map(point)) })),
-      })
-    : null;
+  const flat = (c: EvaluatedCadCut) => ({ ...c, outline: c.outline.map(point), islands: c.islands.map(island => island.map(point)) }),
+    // A through cut is the same hole from either face, so it belongs to the first side, which cuts through.
+    fromBelow = source.cuts?.filter(c => c.side === 'underside' && !c.through).map(flat) ?? [],
+    fromAbove =
+      source.cuts?.filter(c => c.side !== 'underside' || c.through).map(c => ({ ...flat(c), from: c.through ? 0 : c.from })) ?? [],
+    profile = { thickness: source.thickness, outline: outer, holes: inner };
+  const cut = fromAbove.length ? featuresFromCuts({ ...profile, cuts: fromAbove }) : null;
   // CAD refuses a through cut that reaches the edge, but cuts from separate sketches can still add up to a split.
   if (cut && cut.features.outlines.length !== 1)
     throw new Error(`${source.name}: these through cuts split the part. Use a separate part for each piece.`);
-  const features: PartFeatures = cut?.features ?? {
+  const plain: PartFeatures = cut?.features ?? {
     thickness: source.thickness,
     footprint,
     outlines: [outer],
@@ -48,8 +48,14 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
     bottomFaces: [],
     slopedArea: 0,
   };
+  const below = fromBelow.length ? featuresFromCuts({ ...profile, holes: plain.throughHoles, cuts: fromBelow }).features : null;
+  if (below && cutsMeet(plain, below))
+    throw new Error(`${source.name}: cuts from the two faces meet. Make them shallower, or cut through.`);
+  const features: PartFeatures = below
+    ? { ...plain, bottomFaces: below.pockets.map(pocket => ({ z: source.thickness - pocket.floorZ, area: pocket.area })) }
+    : plain;
   let positions: Float64Array, indices: Uint32Array;
-  if (cut) ({ positions, indices } = cutPartMesh(cut.features));
+  if (cut || below) ({ positions, indices } = cutPartMesh(features, below ?? undefined));
   else {
     const shape = new Shape(outer.map(p => new Vector2(p.x, p.y)));
     shape.holes.push(...inner.map(h => new Path(h.map(p => new Vector2(p.x, p.y)))));
@@ -59,6 +65,9 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
     geometry.dispose();
   }
   const size: [number, number, number] = [Math.max(...outer.map(p => p.x)), Math.max(...outer.map(p => p.y)), source.thickness];
+  // Side B reads these exact polygons, rather than extracting them from the mesh as it does for imported models.
+  const turned = (axis: 'x' | 'y') =>
+    featuresFromCuts(flippedProfile({ ...profile, holes: plain.throughHoles, cuts: fromBelow }, axis, [size[0], size[1]])).features;
   const part: FlatPart = {
     name: source.name,
     size,
@@ -71,7 +80,7 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
     ],
     origin: [0, 0, 0],
     topFeatureArea: features.pockets.reduce((sum, pocket) => sum + pocket.area, 0),
-    bottomFeatureArea: 0,
+    bottomFeatureArea: below ? below.pockets.reduce((sum, pocket) => sum + pocket.area, 0) : 0,
     flipped: false,
     prismaticRatio: 1,
     slopedShare: 0,
@@ -79,7 +88,7 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
   };
   const paths = (loops: { x: number; y: number }[][]): Outline2D => loops.map(loop => loop.map(p => [p.x, p.y]));
   return {
-    entry: { part, features },
+    entry: { part, features, ...(below && { flipped: { x: turned('x'), y: turned('y') } }) },
     info: {
       id: source.partId,
       holeIds: cut ? cut.holeSources.map(from => ('hole' in from ? holeLoops[from.hole]! : from.cut)) : holeLoops,
