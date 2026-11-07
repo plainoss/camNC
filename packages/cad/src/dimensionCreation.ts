@@ -10,7 +10,7 @@ export type CadDimensionCreationResult =
   | { ok: false; message: string; diagnostics: CadDiagnostic[] };
 
 const documentOf = (part: CadPart): CadDocument => ({
-  version: 1,
+  version: part.features?.length ? 2 : 1,
   id: `dimension-creation:${part.id}`,
   name: part.name,
   revision: 0,
