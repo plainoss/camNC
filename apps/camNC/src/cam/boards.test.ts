@@ -1,5 +1,5 @@
 import { fixtureBox, fixtureFree, type Fixture } from '@wbcnc/cam/settle';
-import { kDefaultHardware } from './holdHardware';
+import { kDefaultHardware } from '@wbcnc/cam-settings';
 import { describe, expect, it } from 'vitest';
 import {
   changesCutBoard,
@@ -42,7 +42,7 @@ import {
   setAsidePart,
   tightestSide,
 } from './boards';
-import { missingParts } from './useJobBoards';
+import { missingParts } from './boards';
 import type { NestObjective } from './autoNest';
 
 const inst = (id: string, w: number, h: number, t: number): PartInstance => ({ id, partId: id, name: id, size: [w, h, t], thickness: t });

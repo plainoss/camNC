@@ -4,7 +4,7 @@ import { addFaceSketch, addLine, cadFaceSketches, createPlateDocument, updateDim
 import { useImperativeHandle, useRef, type ComponentType, type Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
-import { acknowledgeCadSession, cadSession, commitCadSession } from '@/cad/session';
+import { acknowledgeCadSession, cadSession, commitCadSession, endCadSession } from '@/cad/session';
 import type { CadEditorController } from '@/cad/CadEditor';
 import type { CamStageDestination } from '@/cam/CamJobBar';
 import { Route } from './$jobId.design';
@@ -279,6 +279,22 @@ async function conflictingView() {
   state.save.mockImplementation(actual.saveDesignDraft);
   return { actual, savedB, local, width, session };
 }
+
+describe('leaving in the middle of a face sketch', () => {
+  it('shows its saved edits on coming back, instead of the design from before them', async () => {
+    const start = state.job!.design!.draft;
+    endCadSession(start.id);
+    const view = open();
+    fireEvent.click(screen.getByRole('button', { name: 'Open face sketch' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
+    await waitFor(() => expect(cadFaceSketches(state.save.mock.lastCall![1].parts[0]!)).toHaveLength(1));
+    const saved = state.save.mock.lastCall![1] as CadDocument;
+    view.unmount();
+    expect(cadFaceSketches(cadSession(saved).document.parts[0]!)).toHaveLength(1);
+    expect(cadSession(saved).conflict).toBeUndefined();
+    endCadSession(start.id);
+  });
+});
 
 describe('recovering a conflicting editor source', () => {
   it('rejects its first local edit despite refreshed route data, without replacing either sketch', async () => {

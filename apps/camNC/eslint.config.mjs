@@ -8,6 +8,10 @@ const machineConnection = { group: ['**/fluidnc/machine'], message: 'Import getE
 export default [
   ...baseConfig,
   {
+    files: ['src/cam/planSettings.ts'],
+    rules: { 'no-restricted-imports': ['error', { patterns: [{ group: ['**/cuttingData'], message: 'Import pure recipes from @wbcnc/cam-settings; persistence belongs in the browser adapter.' }] }] },
+  },
+  {
     files: ['src/lib/machine/jobRecovery.ts', 'src/lib/machine/executionFiles.ts'],
     rules: { 'no-restricted-imports': ['error', { patterns: [machineConnection] }] },
   },
