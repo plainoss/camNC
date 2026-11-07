@@ -27,7 +27,8 @@ each part's size, cuts, sketches with their free movement, and what CAM received
 exits non-zero if anything is wrong. Paths are relative to where you run it.
 
 Options: `--from <document.json>` edits an existing design, or reports on it if no
-script is given. `--out` writes the document, only if the check passed. `--svg` draws
+script is given. `--out` writes the document, only if the check passed. Open that
+file in camNC's CAM page to get it as a new job. `--svg` draws
 the parts. See `examples/` for more.
 
 ## Writing a script
