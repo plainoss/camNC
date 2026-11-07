@@ -70,7 +70,21 @@ export interface CadSplineEntity extends EntityBase {
   weights: number[];
   closed?: boolean;
 }
-export type CadNurbsEntity = CadConicEntity | CadBezierEntity | CadSplineEntity;
+/** Native ellipse with selectable diameter endpoints maintained by the solver. */
+export interface CadEllipseEntity extends EntityBase {
+  type: 'ellipse';
+  centerId: string;
+  focusId: string;
+  majorStartId: string;
+  majorEndId: string;
+  minorStartId: string;
+  minorEndId: string;
+  /** Semi-minor radius. */
+  radius: number;
+  /** Which diameter was placed first, for sequential creation values. */
+  primaryAxis: 'major' | 'minor';
+}
+export type CadNurbsEntity = CadConicEntity | CadBezierEntity | CadSplineEntity | CadEllipseEntity;
 export type CadEntity = CadPointEntity | CadLineEntity | CadCircleEntity | CadArcEntity | CadNurbsEntity;
 
 interface ConstraintBase {

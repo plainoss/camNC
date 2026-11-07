@@ -73,6 +73,8 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
         if (!isOwnedSplineHandle(e) && a?.type === 'point' && b?.type === 'point' && distance(a, b) < CAD_GEOMETRY_TOLERANCE)
           error('zero-length', 'Remove or redraw this zero-length line.', [e.id]);
       }
+      if (e.type === 'ellipse' && (!Number.isFinite(e.radius) || e.radius <= CAD_GEOMETRY_TOLERANCE))
+        error('invalid-ellipse', 'Ellipse radii must be greater than zero.', [e.id]);
       if (isNurbsCurve(e)) {
         if (e.type === 'conic' && (!Number.isFinite(e.rho) || e.rho <= 0 || e.rho >= 1))
           error('invalid-conic', 'Conic rho must be between zero and one.', [e.id]);
@@ -217,11 +219,16 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
           error('invalid-reference', 'This point constraint requires a circle or arc.', undefined, [c.id]);
         if (
           c.type === 'pointOnCurve' &&
-          (!curve || !isNurbsCurve(curve) || !Number.isFinite(c.parameter) || c.parameter < 0 || c.parameter > 1)
+          (!curve ||
+            !isNurbsCurve(curve) ||
+            (curve.type === 'ellipse' && c.parameterFixed) ||
+            !Number.isFinite(c.parameter) ||
+            c.parameter < 0 ||
+            c.parameter > 1)
         )
           error(
             'invalid-reference',
-            'This point constraint requires a spline, Bézier, or conic and a parameter between zero and one.',
+            'This point constraint requires a supported curve and a parameter between zero and one. Fixed parameters are unsupported on ellipses.',
             undefined,
             [c.id]
           );
@@ -380,7 +387,7 @@ export function evaluateCadPart(part: CadPart): { part?: EvaluatedCadPart; diagn
     } else if (isNurbsCurve(e)) {
       try {
         const path = tessellateCurve(e, points, CAD_CHORD_TOLERANCE);
-        if (e.type === 'spline' && e.closed) {
+        if (e.type === 'ellipse' || (e.type === 'spline' && e.closed)) {
           if (distance(path[0]!, path.at(-1)!) > CAD_GEOMETRY_TOLERANCE) {
             error('invalid-curve', 'A closed spline must meet its start.', [e.id]);
             continue;

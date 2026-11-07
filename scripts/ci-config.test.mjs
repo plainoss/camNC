@@ -102,6 +102,16 @@ test('merge queue runs all validation and isolates concurrent candidate builds',
   }
 });
 
+test('all cached validation jobs share optional remote cache configuration', () => {
+  const { jobs } = parse(read('.github/workflows/ci.yml'));
+  for (const id of ['checks', 'test', 'specs']) {
+    assert.equal(jobs[id].env.TURBO_TOKEN, '${{ secrets.TURBO_TOKEN }}');
+    assert.equal(jobs[id].env.TURBO_TEAM, '${{ vars.TURBO_TEAM }}');
+    assert(jobs[id].steps.some(step => step.uses === 'actions/cache@v6'), 'retain local snapshot warming until remote reuse is verified');
+  }
+  assert.equal(jobs.results.env, undefined, 'the aggregation job needs no cache credentials');
+});
+
 
 test('production smoke accepts Cloudflare production checks after queue merges and rejects previews', () => {
   const condition = parse(read('.github/workflows/setup-smoke.yml')).jobs['setup-smoke'].if;

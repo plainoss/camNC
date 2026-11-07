@@ -61,6 +61,7 @@ function selectCurves(sketch: CadSketch, options: CadOffsetOptions): Curve[] | s
         if (
           entity.type === 'point' ||
           entity.type === 'circle' ||
+          entity.type === 'ellipse' ||
           selected.has(entity.id) ||
           !!entity.construction !== !!curve.construction
         )
