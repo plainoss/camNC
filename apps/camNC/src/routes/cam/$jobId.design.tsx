@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { CadDocument } from '@wbcnc/cad';
+import { evaluateCadPart, faceSketchDocument, removeCadFeature, withFaceSketchDocument, type CadDocument } from '@wbcnc/cad';
 import { createFileRoute, Navigate, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { zodValidator } from '@tanstack/zod-adapter';
 import { z } from 'zod';
@@ -11,7 +11,7 @@ import { camKeys, useCamJob } from '@/cam/camQueries';
 import { acceptDesign, saveDesignDraft } from '@/cam/cadDesign';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { CadEditor, type CadEditorController } from '@/cad/CadEditor';
-import { acknowledgeCadSession, cadSession, endCadSession } from '@/cad/session';
+import { acknowledgeCadSession, cadSession, commitCadSession, endCadSession } from '@/cad/session';
 import { openAtMachine } from '@/cam/machine/openAtMachine';
 
 const designContextSchema = z.object({
@@ -58,6 +58,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   const [session, setSession] = useState(() => cadSession(initialJob.design!.draft));
   const [editorDocument, setEditorDocument] = useState(initialJob.design!.draft);
   const [editorEpoch, setEditorEpoch] = useState(0);
+  const [faceEdit, setFaceEdit] = useState<{ base: CadDocument; partId: string; sketchId: string } | null>(null);
   const [conflicted, setConflicted] = useState(!!session.conflict);
   const [recovering, setRecovering] = useState(false);
   const activeSession = useRef(session);
@@ -188,6 +189,10 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       setError('Finish the sketch before opening CAM in another tab.');
       return;
     }
+    if (faceEdit) {
+      setError('Finish or cancel this face sketch first.');
+      return;
+    }
     if (stageDestination.current || !editor.current) return;
     stageDestination.current = destination;
     setNavigationPending(true);
@@ -202,6 +207,24 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       setNavigationPending(false);
     }
   };
+  const leaveFaceSketch = (document: CadDocument) => {
+    const { partId, sketchId } = faceEdit!,
+      face = document.parts.find(part => part.id === partId)?.features?.find(f => f.type === 'sketch' && f.sketch.id === sketchId);
+    // A sketch left empty with no cuts leaves nothing behind.
+    const empty =
+      face?.type === 'sketch' &&
+      !face.sketch.entities.some(entity => entity.type !== 'point') &&
+      !document.parts.some(part => part.features?.some(f => f.type === 'cut' && f.sketchId === sketchId));
+    const next = empty ? removeCadFeature(document, partId, face.id) : document;
+    if (next !== document) draft(next);
+    endCadSession(faceSketchDocument(faceEdit!.base, partId, sketchId).id);
+    // The whole face sketch is one step in the design's undo history.
+    commitCadSession(session, next);
+    setEditorDocument(session.document);
+    setEditorEpoch(epoch => epoch + 1);
+    setFaceEdit(null);
+  };
+  const facePart = faceEdit && evaluateCadPart(faceEdit.base.parts.find(part => part.id === faceEdit.partId)!).part;
   return (
     <CamPage className="h-dvh">
       <CamJobBar job={initialJob} onStageNavigate={destination => void navigateStage(destination)} navigationPending={navigationPending} />
@@ -219,18 +242,35 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
             </Button>
           </div>
         )}
-        <CadEditor
-          key={editorEpoch}
-          document={editorDocument}
-          preferredPartId={context.part}
-          onDraftChange={draft}
-          onFinish={finish}
-          onCancel={cancel}
-          onFinishBlocked={reason => setError(draftKeptNotice(reason))}
-          saveStatus={status}
-          notice={conflicted ? null : error}
-          controller={editor}
-        />
+        {faceEdit && facePart ? (
+          <CadEditor
+            key={faceEdit.sketchId}
+            document={faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId)}
+            faceSketch={{ outline: facePart.outline, label: 'Top face' }}
+            onDraftChange={edited => draft(withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited))}
+            onFinish={edited => leaveFaceSketch(withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited))}
+            onCancel={() => leaveFaceSketch(faceEdit.base)}
+            saveStatus={status}
+            notice={conflicted ? null : error}
+          />
+        ) : (
+          <CadEditor
+            key={editorEpoch}
+            document={editorDocument}
+            onEditFaceSketch={(base, partId, sketchId) => {
+              draft(base);
+              setFaceEdit({ base, partId, sketchId });
+            }}
+            preferredPartId={context.part}
+            onDraftChange={draft}
+            onFinish={finish}
+            onCancel={cancel}
+            onFinishBlocked={reason => setError(draftKeptNotice(reason))}
+            saveStatus={status}
+            notice={conflicted ? null : error}
+            controller={editor}
+          />
+        )}
       </div>
     </CamPage>
   );

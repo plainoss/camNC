@@ -40,6 +40,11 @@ import {
   type CadSketch,
   type CadSketchSolveStatus,
   type CadSolveOptions,
+  addFaceSketch,
+  removeCadFeature,
+  setCutDepth,
+  withFeatureVersion,
+  type CadPoint,
 } from '@wbcnc/cad';
 import {
   useEffect,
@@ -106,6 +111,10 @@ import { boxSelectSketch, type CadSelectionBox } from './boxSelection';
 import { constraintColorNotice, sketchDofStatus, sketchFeedback } from './sketchFeedback';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { SketchToolbar, SketchToolGlyph } from './SketchToolbar';
+import { cutRegionAt, cutRegions, type CutRegion } from './cutRegions';
+import { CutOverlay } from './CutOverlay';
+import { PartFeatureList } from './PartFeatureList';
+import { RegionDepthField } from './RegionDepthField';
 import { sketchTools as tools, type SketchTool } from './sketchTools';
 import { SketchGeometry } from './SketchGeometry';
 import { SketchRegion } from './SketchRegion';
@@ -223,6 +232,10 @@ export interface CadEditorProps {
   notice?: string | null;
   preferredPartId?: string;
   controller?: Ref<CadEditorController>;
+  /** Hosts that can open a face sketch offer drawing on the part's top face. */
+  onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string) => void;
+  /** Editing one face sketch, with the part's outline shown behind it. It can be open, and it isn't a profile. */
+  faceSketch?: { outline: CadPoint[]; label: string };
 }
 
 /** Native editable source stays in one document while CAM remains a derived consumer of accepted revisions. */
@@ -236,6 +249,8 @@ export function CadEditor({
   notice,
   preferredPartId,
   controller,
+  onEditFaceSketch,
+  faceSketch,
 }: CadEditorProps) {
   const [session] = useState(() => cadSession(initialDocument));
   const [doc, setDocument] = useState(session.document);
@@ -298,6 +313,7 @@ export function CadEditor({
   const [conicEditing, setConicEditing] = useState<string | null>(null);
   const [rho, setRho] = useState('0.5');
   const [selectionBox, setSelectionBox] = useState<CadSelectionBox | null>(null);
+  const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
   const [contextMenu, setContextMenu] = useState<SketchContext | null>(null);
   const contextPress = useRef<SketchContextPress>({ phase: 'idle' });
   const [thicknessValid, setThicknessValid] = useState(true);
@@ -611,7 +627,7 @@ export function CadEditor({
     let cancelled = false;
     const sequence = ++solveSequence.current;
     setSolving(true);
-    void solveCadDocument(doc, { classifyEntities: true })
+    void solveCadDocument(doc, { classifyEntities: true, sketchOnly: !!faceSketch })
       .then(result => {
         if (cancelled || sequence !== solveSequence.current || drag.current || annotationDrag.current) return;
         lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
@@ -620,7 +636,8 @@ export function CadEditor({
         setProblems(feedback.problems);
         setConflictedConstraints(feedback.conflictedConstraintIds);
         setInProgress(feedback.inProgress);
-        setSketchStatuses(Object.fromEntries(result.sketches.map(state => [state.partId, state])));
+        // A part's profile comes first and is what the editor shows, whatever its face sketches report.
+        setSketchStatuses(Object.fromEntries([...result.sketches].reverse().map(state => [state.partId, state])));
         setStatus(feedback.status);
         // Solver normalization belongs to the same user command, never another undo entry.
         if (result.sketches.some(s => s.status === 'solved') && JSON.stringify(result.document) !== JSON.stringify(documentRef.current)) {
@@ -1720,6 +1737,7 @@ export function CadEditor({
     }
     if (event.button !== 0 || !sketch) return;
     setCreationValues(null);
+    setRegionField(null);
     if (conicEditing) {
       setConicEditing(null);
       newCurveCommand.current = null;
@@ -2199,6 +2217,9 @@ export function CadEditor({
         });
         setSelected(box.additive ? [...new Set([...box.selected, ...result.entityIds])] : result.entityIds);
         if (!box.additive) setSelectedConstraints([]);
+      } else if (!cancel && !box.moved && !box.additive && tool === 'select' && !faceSketch && part) {
+        const entry = cutRegionAt(cutRegions(part), box.start);
+        if (entry) setRegionField({ entry, anchor: box.start });
       }
       return;
     }
@@ -2385,7 +2406,11 @@ export function CadEditor({
         busy={busy}
         canUndo={session.past.length > 0}
         canRedo={session.future.length > 0}
-        canFinish={thicknessValid && !solving && !problems.length && numberOfShapes > 0 && !(tool === 'fillet' && selected.length)}
+        canFinish={
+          faceSketch
+            ? !solving && !problems.length
+            : thicknessValid && !solving && !problems.length && numberOfShapes > 0 && !(tool === 'fillet' && selected.length)
+        }
         onTool={next => {
           if (next === 'dimension') beginDimension();
           else chooseTool(next);
@@ -2401,7 +2426,15 @@ export function CadEditor({
       />
       <div className="cad-workspace" inert={busy}>
         <aside className="cad-sidebar" aria-label="Parts and sketch properties">
-          <div className="cad-panel-heading">
+          {faceSketch && (
+            <div className="cad-properties">
+              <h3>Sketch on the {faceSketch.label.toLowerCase()}</h3>
+              <p className="cad-muted">
+                Draw lines or shapes across the part to mark out regions. Finish the sketch, then click a region to set its depth.
+              </p>
+            </div>
+          )}
+          <div className="cad-panel-heading" hidden={!!faceSketch}>
             <h2>Parts</h2>
             <button
               type="button"
@@ -2416,7 +2449,7 @@ export function CadEditor({
               ＋
             </button>
           </div>
-          <ul className="cad-part-list">
+          <ul className="cad-part-list" hidden={!!faceSketch}>
             {doc.parts.map(p => (
               <li key={p.id}>
                 <button
@@ -2434,7 +2467,7 @@ export function CadEditor({
               </li>
             ))}
           </ul>
-          {part && (
+          {part && !faceSketch && (
             <div className="cad-properties">
               <h3>{part.name} · Sketch</h3>
               <label htmlFor="cad-part-name">Part name</label>
@@ -2471,13 +2504,37 @@ export function CadEditor({
                 className="cad-delete-part"
                 onClick={() => {
                   const parts = doc.parts.filter(p => p.id !== part.id);
-                  commit({ ...doc, parts });
+                  commit(withFeatureVersion({ ...doc, parts }));
                   setPartId(parts[0]?.id ?? '');
                   setSelected([]);
                   chooseTool('select');
                 }}>
                 Delete part
               </button>
+              {(!!part.features?.length || onEditFaceSketch) && (
+                <PartFeatureList
+                  part={part}
+                  onRemove={featureId => commit(removeCadFeature(documentRef.current, part.id, featureId))}
+                  onEdit={
+                    onEditFaceSketch &&
+                    (sketchId => {
+                      const prepared = prepareDocument();
+                      if (prepared) onEditFaceSketch(prepared, part.id, sketchId);
+                    })
+                  }
+                  onNew={
+                    onEditFaceSketch &&
+                    (() => {
+                      // Checked first: a blocked sketch command mustn't leave an empty face sketch behind.
+                      const prepared = prepareDocument();
+                      if (!prepared) return;
+                      const added = addFaceSketch(prepared, part.id, 'top');
+                      commit(added.document);
+                      onEditFaceSketch(documentRef.current, part.id, added.sketchId);
+                    })
+                  }
+                />
+              )}
               <div className="cad-divider" />
               <label className="cad-show-constraints">
                 <input
@@ -2534,7 +2591,7 @@ export function CadEditor({
           )}
           <div className="cad-canvas-bar">
             <span>
-              <strong>TOP</strong> · {part?.name ?? 'Sketch'} <span className="cad-muted">/ XY plane</span>
+              <strong>TOP</strong> · {part?.name ?? 'Sketch'} <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
             </span>
             <div>
               <button type="button" onClick={() => fit()}>
@@ -2609,6 +2666,15 @@ export function CadEditor({
                 lastCheckedRevision.current === `${doc.id}:${doc.revision}`
               }
             />
+            {faceSketch && (
+              <path
+                data-face-outline
+                className="cad-face-outline"
+                d={faceSketch.outline.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                pointerEvents="none"
+              />
+            )}
+            {!faceSketch && <CutOverlay part={part} millimetresPerPixel={1 / markerScale} />}
             <line
               x1={view.x - view.w}
               x2={view.x + view.w * 2}
@@ -2864,6 +2930,29 @@ export function CadEditor({
               onAccept={applyCreationValue}
               onCancel={() => {
                 setCreationValues(null);
+                svg.current?.focus();
+              }}
+            />
+          )}
+          {regionField && part && (
+            <RegionDepthField
+              key={regionField.entry.region.id}
+              style={valuePosition(regionField.anchor, 280)}
+              depth={regionField.entry.cut?.depth ?? (regionField.entry.inProfile ? 'through' : 0)}
+              thickness={part.thickness}
+              onClose={() => {
+                setRegionField(null);
+                svg.current?.focus();
+              }}
+              onChoose={depth => {
+                const { entry } = regionField,
+                  source = documentRef.current,
+                  // A loop that's cut through, or a face region left uncut, needs no feature: it's the default.
+                  isDefault = depth === (entry.inProfile ? 'through' : 0);
+                if (isDefault) {
+                  if (entry.cut) commit(removeCadFeature(source, part.id, entry.cut.id));
+                } else commit(setCutDepth(source, part.id, entry.sketchId, entry.region.id, depth));
+                setRegionField(null);
                 svg.current?.focus();
               }}
             />

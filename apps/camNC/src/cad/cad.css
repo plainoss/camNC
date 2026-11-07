@@ -760,3 +760,46 @@
   font: inherit;
 }
 .cad-modify-controls .cad-error { flex-basis: 100%; }
+.cad-face-outline {
+  fill: #eef1f3;
+  stroke: #7f8c96;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.cad-region-depth {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #b9c4cd;
+  border-radius: 6px;
+  background: #fff;
+  padding: 6px;
+  box-shadow: 0 2px 8px #0002;
+}
+.cad-region-depth input {
+  width: 64px;
+}
+.cad-feature-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+}
+.cad-feature-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cad-feature-list li > span {
+  flex: 1;
+  min-width: 0;
+}
+.cad-feature-list ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
