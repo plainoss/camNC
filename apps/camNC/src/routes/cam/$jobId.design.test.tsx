@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createPlateDocument, updateDimension, type CadDocument } from '@wbcnc/cad';
+import { addFaceSketch, addLine, cadFaceSketches, createPlateDocument, updateDimension, type CadDocument } from '@wbcnc/cad';
 import { useImperativeHandle, useRef, type ComponentType, type Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
@@ -64,6 +64,7 @@ vi.mock('@/cad/CadEditor', () => ({
     onFinish: (d: CadDocument) => Promise<void>;
     onCancel: () => Promise<void>;
     onFinishBlocked?: (reason: string) => void;
+    onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string) => void;
     controller?: Ref<CadEditorController>;
     notice?: string | null;
   }) => {
@@ -104,6 +105,16 @@ vi.mock('@/cad/CadEditor', () => ({
           }}>
           Cancel sketch
         </button>
+        {props.onEditFaceSketch && (
+          <button
+            onClick={() => {
+              const partId = current.current.parts[0]!.id,
+                added = addFaceSketch(current.current, partId, 'top');
+              props.onEditFaceSketch!(added.document, partId, added.sketchId);
+            }}>
+            Open face sketch
+          </button>
+        )}
       </>
     );
   },
@@ -312,6 +323,35 @@ describe('recovering a conflicting editor source', () => {
     expect(state.navigate).not.toHaveBeenCalled();
     expect((await getJob(f.savedB.id))!.design!.draft).toEqual(f.savedB.design!.draft);
     expect(f.session.document).toEqual(f.local);
+  });
+
+  it('copies the whole design, with the sketch being edited, from a face editor', async () => {
+    const f = await conflictingView();
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Open face sketch' }));
+    const focused = JSON.parse(screen.getByTestId('editor-document').textContent!) as CadDocument,
+      sketch = addLine(focused.parts[0]!.sketch, { x1: 10, y1: 0, x2: 10, y2: 50 });
+    state.prepared = { ...focused, parts: [{ ...focused.parts[0]!, sketch }] };
+    fireEvent.click(screen.getByRole('button', { name: 'Save sketch copy' }));
+    await waitFor(() => expect(state.navigate).toHaveBeenCalled());
+    const destination = state.navigate.mock.calls.at(-1)![0] as { params: { jobId: string } },
+      copy = (await getJob(destination.params.jobId))!.design!.draft;
+    expect(copy.parts[0]!.sketch).toEqual(f.local.parts[0]!.sketch);
+    expect(cadFaceSketches(copy.parts[0]!).map(face => face.sketch)).toEqual([sketch]);
+  });
+
+  it('leaves a face editor when restoring the saved sketch, so its edits can’t reach the restored design', async () => {
+    const f = await conflictingView();
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Open face sketch' }));
+    expect(screen.getByTestId('editor-document').textContent).toContain(':face:');
+    fireEvent.click(screen.getByRole('button', { name: 'Use saved sketch' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(JSON.parse(screen.getByTestId('editor-document').textContent!)).toEqual(f.savedB.design!.draft);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
+    await waitFor(() => expect(screen.getByText('Edit draft')).toBeTruthy());
+    await waitFor(async () => expect((await getJob(f.savedB.id))!.design!.draft.revision).toBe(f.savedB.design!.draft.revision + 1));
+    expect(cadFaceSketches((await getJob(f.savedB.id))!.design!.draft.parts[0]!)).toEqual([]);
   });
 
   it('explicitly reloads the freshest saved sketch and removes the old session history', async () => {

@@ -146,6 +146,23 @@ describe('setting a cut depth on the drawing', () => {
     expect(document.parts.find(p => p.id === partId)!.features!.some(f => f.type === 'sketch' && f.sketch.id === sketchId)).toBe(true);
   });
 
+  it('won’t open a face sketch until the part has an outline', async () => {
+    const open = vi.fn(),
+      document = createPlateDocument({ width: 120, height: 80, thickness: 18 }),
+      part = document.parts[0]!;
+    part.sketch = addLine(
+      { ...part.sketch, entities: part.sketch.entities.filter(e => e.type === 'point' && e.fixed), constraints: [] },
+      { x1: 90, y1: 0, x2: 90, y2: 80 }
+    );
+    const { change } = setup(document, { onEditFaceSketch: open }),
+      button = await screen.findByRole('button', { name: 'New sketch on top' });
+    expect(button).toHaveProperty('disabled', true);
+    expect(screen.getByText(/Close the outline/)).toBeTruthy();
+    fireEvent.click(button);
+    expect(open).not.toHaveBeenCalled();
+    expect(change.mock.calls.every(([next]) => next.parts.every(candidate => !candidate.features))).toBe(true);
+  });
+
   it('accepts an open drawing in a face sketch, with the outline behind it', async () => {
     const document = createPlateDocument({ width: 120, height: 80, thickness: 18 }),
       part = document.parts[0]!;

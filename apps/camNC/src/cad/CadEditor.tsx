@@ -41,6 +41,7 @@ import {
   type CadSketchSolveStatus,
   type CadSolveOptions,
   addFaceSketch,
+  evaluateCadPart,
   removeCadFeature,
   setCutDepth,
   withFeatureVersion,
@@ -192,6 +193,8 @@ const entityPointIds = (entity: CadEntity): string[] => {
   if (entity.type === 'point') return [entity.id];
   return curvePointIds(entity);
 };
+/** A face sketch is drawn over the part's outline, so a part needs one first. */
+const hasOutline = (document: CadDocument, partId: string) => !!evaluateCadPart(document.parts.find(part => part.id === partId)!).part;
 function replacePart(document: CadDocument, partId: string, change: (part: CadPart) => CadPart): CadDocument {
   return { ...document, parts: document.parts.map(p => (p.id === partId ? change(p) : p)) };
 }
@@ -2524,7 +2527,7 @@ export function CadEditor({
                     onEditFaceSketch &&
                     (sketchId => {
                       const prepared = prepareDocument();
-                      if (prepared) onEditFaceSketch(prepared, part.id, sketchId);
+                      if (prepared && hasOutline(prepared, part.id)) onEditFaceSketch(prepared, part.id, sketchId);
                     })
                   }
                   onNew={
@@ -2532,7 +2535,7 @@ export function CadEditor({
                     (() => {
                       // Checked first: a blocked sketch command mustn't leave an empty face sketch behind.
                       const prepared = prepareDocument();
-                      if (!prepared) return;
+                      if (!prepared || !hasOutline(prepared, part.id)) return;
                       const added = addFaceSketch(prepared, part.id, 'top');
                       commit(added.document);
                       onEditFaceSketch(documentRef.current, part.id, added.sketchId);

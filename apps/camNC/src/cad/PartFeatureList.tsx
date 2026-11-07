@@ -29,7 +29,7 @@ export function PartFeatureList({
               Sketch {i + 1} <small className="cad-muted">{faceName(face)}</small>
             </span>
             {onEdit && (
-              <button type="button" onClick={() => onEdit(face.sketch.id)}>
+              <button type="button" disabled={!outline} onClick={() => onEdit(face.sketch.id)}>
                 Edit
               </button>
             )}
@@ -59,10 +59,11 @@ export function PartFeatureList({
         ))}
       </ul>
       {onNew && (
-        <button type="button" onClick={onNew}>
+        <button type="button" disabled={!outline} onClick={onNew}>
           New sketch on top
         </button>
       )}
+      {(onNew || onEdit) && !outline && <small className="cad-muted">Close the outline before sketching on a face.</small>}
     </div>
   );
 }

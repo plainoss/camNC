@@ -135,8 +135,10 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     else await returnToContext(initialJob.id);
   };
   const recoverCopy = async () => {
-    const document = editor.current?.prepareDocument();
-    if (!document || recoveryInProgress.current) return;
+    const prepared = editor.current?.prepareDocument();
+    if (!prepared || recoveryInProgress.current) return;
+    // A face editor holds one sketch, so the copy needs the rest of the design around it.
+    const document = faceEdit ? withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, prepared) : prepared;
     recoveryInProgress.current = true;
     setRecovering(true);
     try {
@@ -166,6 +168,8 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       const current = await getJob(initialJob.id);
       if (!current?.design) throw new Error('This design no longer exists. Save your local sketch as a copy.');
       endCadSession(session.document.id);
+      if (faceEdit) endCadSession(faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId).id);
+      setFaceEdit(null);
       const nextSession = cadSession(current.design.draft);
       activeSession.current = nextSession;
       persisted.current = current;
@@ -254,6 +258,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
             onCancel={() => leaveFaceSketch(faceEdit.base)}
             saveStatus={status}
             notice={conflicted ? null : error}
+            controller={editor}
           />
         ) : (
           <CadEditor
