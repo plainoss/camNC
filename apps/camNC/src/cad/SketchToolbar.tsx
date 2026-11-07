@@ -87,6 +87,14 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'centerPointArc':
+      shape = (
+        <>
+          <path d="M20 12a8 8 0 0 0-8-8M12 4v8h8" />
+          <circle cx="12" cy="12" r="1" fill="currentColor" />
+        </>
+      );
+      break;
     case 'tangentArc':
       shape = (
         <>

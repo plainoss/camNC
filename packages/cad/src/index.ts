@@ -28,3 +28,5 @@ export * from './ellipse';
 
 export * from './threePointCircle';
 export * from './alignedRectangle';
+
+export * from './centerPointArc';

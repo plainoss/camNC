@@ -58,6 +58,9 @@ export function beginCreationValues(
         }
       );
     }
+  } else if (tool === 'centerPointArc') {
+    const arc = entities.find(e => e.type === 'arc');
+    if (arc) steps.push({ entityId: arc.id, mode: 'auto', label: 'Arc radius' });
   } else if (tool === 'circle' || tool === 'threePointCircle') {
     const circle = entities.find(entity => entity.type === 'circle');
     if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Circle diameter' });
@@ -134,7 +137,7 @@ export function creationValueAnchor(state: CreationValues, sketch: CadSketch, in
     return { x: mid.x - (sign * (b.y - a.y) * normalOffset) / length, y: mid.y + (sign * (b.x - a.x) * normalOffset) / length };
   }
   const entity = sketch.entities.find(entity => entity.id === step.entityId);
-  if (entity?.type !== 'circle') return null;
+  if (entity?.type !== 'circle' && entity?.type !== 'arc') return null;
   const center = sketch.entities.find(entityPoint => entityPoint.id === entity.centerId);
   if (center?.type !== 'point') return null;
   const angle = state.pointer ? Math.atan2(center.y - state.pointer.y, center.x - state.pointer.x) : Math.PI;
