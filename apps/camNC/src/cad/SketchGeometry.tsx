@@ -160,7 +160,7 @@ export function SketchGeometry({
       {entities
         .filter(e => isNurbsCurve(e) && (selectedIds.includes(e.id) || e.type === 'bezier'))
         .map(entity => {
-          if (!isNurbsCurve(entity)) return null;
+          if (!isNurbsCurve(entity) || entity.type === 'ellipse') return null;
           const ids = entity.type === 'conic' ? [entity.startId, entity.controlId, entity.endId] : entity.controlPointIds;
           return entity.type !== 'bezier' ? null : (
             <polyline

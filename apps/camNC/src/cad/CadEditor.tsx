@@ -2,6 +2,7 @@ import {
   addArc,
   addBezier,
   addCircle,
+  addEllipse,
   addConic,
   addCenterRectangle,
   addConstraint,
@@ -105,7 +106,8 @@ import { dragSnapConstraints, inferDragPoint } from './dragSnap';
 import { boxSelectSketch, type CadSelectionBox } from './boxSelection';
 import { constraintColorNotice, sketchDofStatus, sketchFeedback } from './sketchFeedback';
 import { isDemoMode } from '@/lib/demo/demo-mode';
-import { SketchToolbar, SketchToolGlyph } from './SketchToolbar';
+import { CommandSearch, type SearchCommand } from './CommandSearch';
+import { SketchToolbar } from './SketchToolbar';
 import { sketchTools as tools, type SketchTool } from './sketchTools';
 import { SketchGeometry } from './SketchGeometry';
 import { SketchRegion } from './SketchRegion';
@@ -278,6 +280,8 @@ export function CadEditor({
   const dimensionDraft = dimensionFlow.phase === 'placing' && !dimensionFlow.existingConstraintId ? dimensionFlow.preview : null;
   const dimensionSelection = dimensionFlow.phase === 'idle' ? selected : dimensionFlow.entityIds;
   const [palette, setPalette] = useState(false);
+  const [searchMode, setSearchMode] = useState(true);
+  const [searchHighlight, setSearchHighlight] = useState<SearchCommand['id'] | null>(null);
   const [status, setStatus] = useState('Checking sketch…');
   const [problems, setProblems] = useState<string[]>([]);
   const [inProgress, setInProgress] = useState(false);
@@ -816,25 +820,27 @@ export function CadEditor({
               ? 'Click geometry to select. Drag to move. Shift-click adds to selection.'
               : next === 'rectangle' || next === 'centerRectangle'
                 ? `Click or drag from the ${next === 'centerRectangle' ? 'center' : 'first corner'} to the opposite corner. Or enter sizes below.`
-                : next === 'circle'
-                  ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
-                  : next === 'arc'
-                    ? 'Click the start, end, then a point on the arc.'
-                    : next === 'point'
-                      ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
-                      : next === 'line'
-                        ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
-                        : next === 'trim'
-                          ? 'Click an interval to trim between intersections or placed points.'
-                          : next === 'fillet'
-                            ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
-                            : next === 'conic'
-                              ? 'Click the start, end, then control point. Enter rho to shape the conic.'
-                              : next === 'spline' || next === 'bezier'
-                                ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
-                                : next === 'curveControlPoint'
-                                  ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                  : 'Select a line, circle, point pair or existing dimension.'
+                : next === 'ellipse'
+                  ? 'Click the center, then the first axis radius, then the second axis radius.'
+                  : next === 'circle'
+                    ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
+                    : next === 'arc'
+                      ? 'Click the start, end, then a point on the arc.'
+                      : next === 'point'
+                        ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
+                        : next === 'line'
+                          ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
+                          : next === 'trim'
+                            ? 'Click an interval to trim between intersections or placed points.'
+                            : next === 'fillet'
+                              ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                              : next === 'conic'
+                                ? 'Click the start, end, then control point. Enter rho to shape the conic.'
+                                : next === 'spline' || next === 'bezier'
+                                  ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
+                                  : next === 'curveControlPoint'
+                                    ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
+                                    : 'Select a line, circle, point pair or existing dimension.'
     );
     svg.current?.focus();
   };
@@ -883,9 +889,19 @@ export function CadEditor({
     if (!matrix) return cursor;
     const converted = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
     const raw = { x: converted.x, y: -converted.y };
-    const drawing = ['line', 'rectangle', 'centerRectangle', 'circle', 'arc', 'tangentArc', 'point', 'conic', 'spline', 'bezier'].includes(
-      tool
-    );
+    const drawing = [
+      'line',
+      'rectangle',
+      'centerRectangle',
+      'circle',
+      'ellipse',
+      'arc',
+      'tangentArc',
+      'point',
+      'conic',
+      'spline',
+      'bezier',
+    ].includes(tool);
     if (!snap || !sketch || (drawing && event.shiftKey)) return raw;
     const hit = pickSketchSnap(
       sketch,
@@ -1048,6 +1064,12 @@ export function CadEditor({
       if (!end) {
         sizeExpressions.Width = widthValue?.expression;
         sizeExpressions.Height = heightValue?.expression;
+      }
+    } else if (tool === 'ellipse' && pending[1] && end) {
+      try {
+        next = addEllipse(sketch, { center: start, axis: pending[1], through: end, construction });
+      } catch (error) {
+        return setMessage(error instanceof Error ? error.message : String(error));
       }
     } else if (tool === 'circle') {
       const radiusValue = end ? null : parseCadValue(radius, { unit: 'mm' });
@@ -1521,7 +1543,16 @@ export function CadEditor({
   const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     // Keep native input and button events functional; prevent machine/global bubble handlers from seeing CAD keys.
     event.stopPropagation();
-    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229 || editable(event.target)) return;
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+    if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && (event.code === 'KeyC' || event.key.toLowerCase() === 'c')) {
+      event.preventDefault();
+      if (!event.repeat && !busy) {
+        setSearchMode(true);
+        setPalette(value => !value);
+      }
+      return;
+    }
+    if (editable(event.target)) return;
     const key = event.key.toLowerCase();
     // A checkbox does not own drawing letters, but retains its native keyboard
     // activation and focus. Text fields remain isolated by the guard above.
@@ -1687,6 +1718,7 @@ export function CadEditor({
       toggleConstruction();
     } else if (key === 's') {
       event.preventDefault();
+      setSearchMode(false);
       setPalette(value => !value);
     } else if (key === 'f') {
       event.preventDefault();
@@ -2011,10 +2043,17 @@ export function CadEditor({
         event.currentTarget.setPointerCapture(event.pointerId);
       }
       if (tool === 'arc') setMessage('Click the arc end, then move to shape the arc.');
-    } else if ((tool === 'arc' || tool === 'conic') && pending.length === 1) {
+    } else if ((tool === 'arc' || tool === 'conic' || tool === 'ellipse') && pending.length === 1) {
+      if (tool === 'ellipse' && Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) < 0.1) return;
       setPending([...pending, p]);
       pendingSnaps.current.push(lastDrawingHint.current);
-      setMessage(tool === 'arc' ? 'Move to shape the arc, then click a point on it.' : 'Click the conic control point.');
+      setMessage(
+        tool === 'ellipse'
+          ? 'Click to set the second axis radius, perpendicular to the first.'
+          : tool === 'arc'
+            ? 'Move to shape the arc, then click a point on it.'
+            : 'Click the conic control point.'
+      );
     } else {
       // Rho opens during this pointerdown. Suppress the browser's following mousedown
       // focus so the new input keeps ownership after the complete click sequence.
@@ -2381,6 +2420,11 @@ export function CadEditor({
       onKeyUp={event => event.stopPropagation()}>
       <SketchToolbar
         tools={tools}
+        searchHighlight={searchHighlight}
+        onSearch={() => {
+          setSearchMode(true);
+          setPalette(value => !value);
+        }}
         tool={tool}
         construction={construction}
         constraintMode={constraintMode}
@@ -2870,16 +2914,49 @@ export function CadEditor({
               }}
             />
           )}
-          {palette && (
-            <div className="cad-command-palette">
+          {palette && !searchMode && (
+            <div className="cad-command-palette cad-quick-tools">
               <h3>Sketch tools</h3>
               {tools.map(t => (
                 <button type="button" key={t.id} onClick={() => chooseTool(t.id)}>
-                  <SketchToolGlyph kind={t.id} /> {t.label}
+                  {t.label}
                   <kbd>{t.key}</kbd>
                 </button>
               ))}
             </div>
+          )}
+          {palette && searchMode && (
+            <CommandSearch
+              commands={[
+                ...tools.map(t => ({
+                  ...t,
+                  description:
+                    t.id === 'ellipse' ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.' : undefined,
+                })),
+                ...(['horizontal', 'vertical', 'coincident', 'midpoint', 'parallel', 'perpendicular', 'equal', 'tangent'] as const).map(
+                  id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })
+                ),
+                { id: 'construction', label: 'Construction geometry', key: 'Q' },
+                { id: 'fix', label: 'Fix / unfix', key: 'Shift+J' },
+                { id: 'fit', label: 'Zoom to fit', key: 'F' },
+              ]}
+              onHighlight={setSearchHighlight}
+              onClose={(restoreFocus = true) => {
+                setPalette(false);
+                if (restoreFocus) svg.current?.focus();
+              }}
+              onChoose={id => {
+                setPalette(false);
+                if (id === 'construction') toggleConstruction();
+                else if (id === 'fix') toggleFix();
+                else if (id === 'fit') fit();
+                else if (tools.some(t => t.id === id)) {
+                  if (id === 'dimension') beginDimension();
+                  else chooseTool(id as SketchTool);
+                } else constrain(id as ConstraintTool);
+                svg.current?.focus();
+              }}
+            />
           )}
           {tool === 'fillet' && selected.length > 0 && (
             <form

@@ -1,4 +1,4 @@
-import type { CadPoint } from '@wbcnc/cad';
+import { ellipseFromPoints, type CadPoint } from '@wbcnc/cad';
 import { buildArcPreview } from './arcPreviewGeometry';
 import type { SketchTool } from './sketchTools';
 import { formatCadValue } from './valueExpressions';
@@ -52,6 +52,15 @@ export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelSca
       values.push({ kind: 'width', text: formatCadValue(right - left), at: { x: (left + right) / 2, y: top + 16 / scale } });
       const text = formatCadValue(top - bottom);
       values.push({ kind: 'height', text, at: { x: left - (text.length * 3.5 + 12) / scale, y: (top + bottom) / 2 } });
+    }
+  } else if (tool === 'ellipse') {
+    markers.push(...pending);
+    const shape = pending[1] ? ellipseFromPoints(start, pending[1], cursor) : null;
+    if (shape) {
+      values.push(
+        { kind: 'primaryDiameter', text: formatCadValue(shape.primary * 2), at: { x: start.x, y: start.y + 20 / scale } },
+        { kind: 'secondaryDiameter', text: formatCadValue(shape.secondary * 2), at: { x: start.x, y: start.y - 20 / scale } }
+      );
     }
   } else if (tool === 'circle') {
     markers.push(start);
