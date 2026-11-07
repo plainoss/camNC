@@ -100,17 +100,13 @@ it('accepts primary then secondary diameters when the first placed axis is small
   await checked();
   const ellipse = latest().entities.find(e => e.type === 'ellipse')!;
   expect(ellipse.radius).toBeCloseTo(15, 5);
-  expect(
-    latest()
-      .constraints.filter(c => c.type === 'distance')
-      .map(c => c.value)
-  ).toEqual([30, 70]);
+  expect(latest().constraints.flatMap(c => (c.type === 'distance' ? [c.value] : []))).toEqual([30, 70]);
 });
 it('light-dismisses search without taking focus from the clicked part-name field', async () => {
   await setup();
   key('c', { altKey: true, code: 'KeyC' });
   const field = screen.getByRole('textbox', { name: 'Part name' });
-  await userEvent.click(field);
+  await userEvent.click(field, { position: { x: 2, y: 10 } });
   await waitFor(() => expect(screen.queryByRole('combobox')).toBeNull());
   expect(document.activeElement).toBe(field);
 });
