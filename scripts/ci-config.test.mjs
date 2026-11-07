@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { parse } from 'yaml';
 
@@ -9,6 +11,42 @@ const root = new URL('../', import.meta.url);
 const read = file => readFileSync(new URL(file, root), 'utf8');
 const lock = parse(read('pnpm-lock.yaml'));
 const require = createRequire(import.meta.url);
+
+test('desktop cache restores rediscover CMake tools while preserving compiled artifacts', t => {
+  const steps = parse(read('.github/workflows/desktop.yml')).jobs.build.steps;
+  const resetIndex = steps.findIndex(step => step.name === 'Reset restored CMake configuration');
+  assert(resetIndex > steps.findIndex(step => step.uses === 'Swatinem/rust-cache@v2'));
+  assert(resetIndex > steps.findIndex(step => step.name === 'Cache macOS CEF helper'));
+  assert(resetIndex < steps.findIndex(step => step.name === 'Build'));
+  const reset = steps[resetIndex];
+  assert.equal(reset.if, undefined, 'every platform must reset restored CMake configuration');
+
+  const cwd = mkdtempSync(join(tmpdir(), 'desktop-cmake-cache-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const run = () => {
+    const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', reset.run], { cwd, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  run(); // A first build has no target directory.
+  const target = join(cwd, 'apps/camnc-desktop/src-tauri/target');
+  const caches = [
+    'release/build/cef-dll-sys-123/out/build/CMakeCache.txt',
+    'tauri-cef-helper/target/release/build/cef-dll-sys-456/out/build/CMakeCache.txt',
+  ];
+  const retained = [
+    'release/deps/libcef.rlib',
+    'release/build/cef-dll-sys-123/out/build/CMakeFiles/wrapper.dir/wrapper.cc.o',
+    'tauri-cef-helper/target/release/tauri-cef-helper',
+  ];
+  for (const file of [...caches, ...retained]) {
+    const dest = join(target, file);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, 'cached');
+  }
+  run();
+  for (const file of caches) assert(!existsSync(join(target, file)), `${file} must be regenerated`);
+  for (const file of retained) assert.equal(readFileSync(join(target, file), 'utf8'), 'cached');
+});
 
 for (const [workflow, job] of [['ci.yml', 'test'], ['ci.yml', 'specs'], ['setup-smoke.yml', 'setup-smoke']]) {
   test(`${workflow} ${job}: preinstalled browsers match the locked and installed Playwright versions`, () => {
@@ -102,14 +140,30 @@ test('merge queue runs all validation and isolates concurrent candidate builds',
   }
 });
 
-test('all cached validation jobs share optional remote cache configuration', () => {
+test('remote caching uses short-lived tokens and skips untrusted fork PRs', () => {
   const { jobs } = parse(read('.github/workflows/ci.yml'));
   for (const id of ['checks', 'test', 'specs']) {
-    assert.equal(jobs[id].env.TURBO_TOKEN, '${{ secrets.TURBO_TOKEN }}');
-    assert.equal(jobs[id].env.TURBO_TEAM, '${{ vars.TURBO_TEAM }}');
+    assert.deepEqual(jobs[id].permissions, { contents: 'read', 'id-token': 'write' });
+    const auth = jobs[id].steps.find(step => step.name === 'Authenticate remote cache');
+    assert.equal(auth.uses, 'vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10');
+    assert.equal(auth.with.team, '${{ vars.TURBO_TEAM }}');
+    assert.equal(auth.with.audience, 'https://vercel.com/camnc-ci-cache');
+    assert.equal(auth.with.policy, '${{ vars.TURBO_POLICY_ID }}');
+    const enabled = new Function('github', 'vars', `return (${auth.if});`);
+    const event = (event_name, head = 'plainoss/camNC') => ({
+      event_name, repository: 'plainoss/camNC', event: { pull_request: { head: { repo: { full_name: head } } } },
+    });
+    for (const name of ['push', 'merge_group', 'pull_request']) {
+      assert.equal(enabled(event(name), { TURBO_TEAM: 'cache-team' }), true);
+      assert.equal(enabled(event(name), { TURBO_TEAM: '' }), false);
+    }
+    assert.equal(enabled(event('pull_request', 'contributor/camNC'), { TURBO_TEAM: 'cache-team' }), false);
     assert(jobs[id].steps.some(step => step.uses === 'actions/cache@v6'), 'retain local snapshot warming until remote reuse is verified');
   }
-  assert.equal(jobs.results.env, undefined, 'the aggregation job needs no cache credentials');
+  for (const id of ['results', 'fluidnc-sim']) {
+    assert.equal(jobs[id].permissions, undefined, 'non-Turbo jobs must not request identity tokens');
+  }
+  assert.doesNotMatch(read('.github/workflows/ci.yml'), /secrets\.TURBO_TOKEN|pull_request_target/);
 });
 
 
