@@ -10,10 +10,7 @@
       "hover 40,30",
       {
         "expect": {
-          "cursor": [
-            40,
-            30
-          ]
+          "cursor": [40, 30]
         }
       }
     ]
@@ -384,10 +381,7 @@
           "entitiesInclude": [
             {
               "type": "circle",
-              "c": [
-                80,
-                60
-              ]
+              "c": [80, 60]
             }
           ]
         }
