@@ -1,7 +1,6 @@
 import {
   cadFaceSketches,
   pointInPolygon,
-  polygonArea,
   solveCadDocument,
   type CadDocument,
   type CadPart,
@@ -9,7 +8,7 @@ import {
   type CadSketch,
   type EvaluatedCadPart,
 } from '@wbcnc/cad';
-import { featuresFromCuts } from '@wbcnc/cam';
+import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest } from '@wbcnc/cam';
 
 export interface CadExpectation {
   /** Width and height of the outline, in mm. */
@@ -52,8 +51,21 @@ export interface CadReportPart {
     entities: CadReportEntity[];
     constraints: number;
   }[];
-  /** Features CAM received. Toolpaths and G-code aren't checked here, and nothing here says a program is safe to run. */
+  /** Features CAM received. */
   cam?: { pockets: number; throughHoles: number };
+  /**
+   * The part planned alone on a board, as the app plans it, with the default bit and settings and tabs holding it. A
+   * summary for checking the design: no program comes out of it, and nothing here says one is safe to run.
+   */
+  toolpaths?: CadToolpathSummary;
+}
+export interface CadToolpathSummary {
+  bit: number;
+  minutes: number;
+  operations: { label: string; depth: number; steps: number }[];
+  warnings: string[];
+  /** What would stop the job in the app: broken safety rules, or something coming loose. */
+  blocked: string[];
 }
 export interface CadReport {
   ok: boolean;
@@ -113,17 +125,44 @@ function reportEntities(sketch: CadSketch): CadReportEntity[] {
   });
 }
 
-function camFeatures(source: EvaluatedCadPart) {
-  const positive = (loop: CadPoint[]) => (polygonArea(loop) < 0 ? [...loop].reverse() : loop);
-  const inner = source.holes.map(positive);
-  if (!source.cuts?.length) return { pockets: 0, throughHoles: inner.length, outlines: 1 };
-  const { features } = featuresFromCuts({
+/** Room around the part on its board, mm: enough for the bit and the tabs. */
+const BOARD_MARGIN = 20;
+
+function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof profileFeatures>): CadToolpathSummary {
+  const [w, h] = profile.size;
+  const board: BoardRequest = {
+    id: 'check',
+    name: source.name,
+    w: w + 2 * BOARD_MARGIN,
+    h: h + 2 * BOARD_MARGIN,
     thickness: source.thickness,
-    outline: positive(source.outline),
-    holes: inner,
-    cuts: source.cuts,
-  });
-  return { pockets: features.pockets.length, throughHoles: features.throughHoles.length, outlines: features.outlines.length };
+    stockTop: source.thickness,
+    holdDown: 'tabs',
+    clearHoles: true,
+    tabs: DEFAULT_TABS,
+    parts: [{ id: 'part', partId: source.partId, name: source.name, x: BOARD_MARGIN, y: BOARD_MARGIN, rotated: false }],
+  };
+  const plan = planBoard(
+    board,
+    {},
+    { part: () => ({ size: profile.size, features: profile.features }), underside: () => profile.features }
+  );
+  return {
+    bit: DEFAULT_SETTINGS.tools[0]!.diameter,
+    minutes: Math.round(plan.timeMin * 10) / 10,
+    operations: plan.ops.map(op => ({
+      label: op.label.replace(/^[^·]+ · /, ''),
+      depth: round(op.zTop - op.zBottom),
+      steps: op.depthSteps,
+    })),
+    warnings: plan.warnings,
+    blocked: [
+      ...plan.safety,
+      ...(plan.timeline ?? []).filter(event => event.block).map(event => event.message),
+      ...(plan.hold ?? []).filter(hold => !hold.ok).map(hold => `${hold.part} isn’t held by enough tabs.`),
+      ...(plan.holdClash?.length ? ['The bit would hit a hold-down.'] : []),
+    ],
+  };
 }
 
 function checkExpectation(want: CadExpectation, part: CadReportPart, freedom: number): string[] {
@@ -150,7 +189,8 @@ function checkExpectation(want: CadExpectation, part: CadReportPart, freedom: nu
 /** Solves a document and describes it without IDs longer than they need to be, so a script can act on it next. */
 export async function inspectCadDocument(
   input: CadDocument,
-  expectations: ReadonlyMap<string, readonly CadExpectation[]> = new Map()
+  expectations: ReadonlyMap<string, readonly CadExpectation[]> = new Map(),
+  options: { toolpaths?: boolean } = {}
 ): Promise<{ document: CadDocument; report: CadReport; parts: EvaluatedCadPart[] }> {
   const solved = await solveCadDocument(input);
   const nameOf = (partId?: string) => solved.document.parts.find(part => part.id === partId)?.name;
@@ -211,18 +251,28 @@ export async function inspectCadDocument(
         });
     }
     let cam: CadReportPart['cam'];
+    let toolpaths: CadToolpathSummary | undefined;
     if (evaluated) {
       if (evaluated.cuts?.some(cut => cut.side === 'underside'))
         warnings.push({ code: 'cam-underside', message: 'Cuts on the underside can’t be machined yet.', part: part.name });
       else {
-        const features = camFeatures(evaluated);
-        cam = { pockets: features.pockets, throughHoles: features.throughHoles };
-        if (features.outlines !== 1)
+        const profile = profileFeatures(evaluated);
+        cam = { pockets: profile.features.pockets.length, throughHoles: profile.features.throughHoles.length };
+        if (profile.split)
           errors.push({
             code: 'cam-split',
             message: 'These through cuts split the part. Use a separate part for each piece.',
             part: part.name,
           });
+        else if (options.toolpaths !== false) {
+          toolpaths = toolpathSummary(evaluated, profile);
+          if (toolpaths.blocked.length)
+            warnings.push({
+              code: 'toolpath-blocked',
+              message: `Planned alone with tabs, the job would be blocked: ${toolpaths.blocked[0]}`,
+              part: part.name,
+            });
+        }
       }
     }
     const box = evaluated && bounds(evaluated.outline);
@@ -234,6 +284,7 @@ export async function inspectCadDocument(
       cuts,
       sketches,
       ...(cam && { cam }),
+      ...(toolpaths && { toolpaths }),
     };
     const freedom = sketches.reduce((sum, sketch) => sum + (sketch.freedom ?? 0), 0);
     for (const want of expectations.get(part.id) ?? [])

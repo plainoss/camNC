@@ -38,6 +38,31 @@ describe('example parts', () => {
   });
 });
 
+describe('toolpath summary', () => {
+  it('plans each part as the app would, without handing out a program', async () => {
+    const { default: tray } = await import('../examples/tray.cad');
+    const { report } = await editCad(null, tray);
+    const toolpaths = report.parts[0]!.toolpaths!;
+    expect(toolpaths.bit).toBe(3.175);
+    expect(toolpaths.blocked).toEqual([]);
+    expect(toolpaths.minutes).toBeGreaterThan(0);
+    expect(toolpaths.operations.map(op => op.label)).toEqual([
+      '1 pocket 8 deep',
+      '1 pocket 14 deep, from 8',
+      'Outline: rough + final pass',
+    ]);
+    expect(JSON.stringify(report)).not.toMatch(/gcode|G0 |G1 /i);
+  });
+
+  it('can be left out', async () => {
+    const { default: plate } = await import('../examples/plate.cad');
+    const { document } = await editCad(null, plate);
+    const { report } = await inspectCadDocument(document, new Map(), { toolpaths: false });
+    expect(report.parts[0]!.toolpaths).toBeUndefined();
+    expect(report.parts[0]!.cam).toEqual({ pockets: 1, throughHoles: 4 });
+  });
+});
+
 describe('editing a design', () => {
   it('produces a document the app can load', async () => {
     const { default: tray } = await import('../examples/tray.cad');

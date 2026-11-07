@@ -23,7 +23,8 @@ pnpm --silent --filter @wbcnc/cad-script check path/to/part.cad.ts --svg part.sv
 ```
 
 This type-checks the file, runs it, solves and prints a JSON report: errors, warnings,
-each part's size, cuts, sketches with their free movement, and what CAM received. It
+each part's size, cuts, sketches with their free movement, what CAM received, and a
+toolpath summary. It
 exits non-zero if anything is wrong. Paths are relative to where you run it.
 
 Options: `--from <document.json>` edits an existing design, or reports on it if no
@@ -44,7 +45,13 @@ the parts. See `examples/` for more.
   revision of the design.
 - A script that stops with an error leaves the design as it was.
 
+## The toolpath summary
+
+Each part is planned alone on a board the way the app plans it, with the default 3.175 mm
+bit and settings and tabs holding it: its operations, time, CAM warnings, and anything
+that would block the job. Pass `{ toolpaths: false }` to `inspectCadDocument` to skip it.
+
 ## What the report doesn't cover
 
-It checks geometry and the features CAM receives, not toolpaths or G-code, and it
-doesn't say a program is safe to run.
+It never writes or prints G-code, and it doesn't say a program is safe to run. The app
+plans again with your bit, material and board, and that's the program that runs.

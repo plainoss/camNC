@@ -3,7 +3,7 @@ export type { StepBody, FlatPart, LoadStepOptions } from './import';
 export { maxOf, minOf } from './geom';
 export { extractFeatures } from './features';
 export type { PartFeatures, PocketFeature, Level } from './features';
-export { featuresFromCuts } from './cutFeatures';
+export { featuresFromCuts, profileFeatures } from './cutFeatures';
 export { union as unionPaths } from './geom';
 export type { FlatCut, FlatProfile, HoleSource } from './cutFeatures';
 export {
@@ -111,3 +111,5 @@ export {
 export type { BoardPart, BoardSpec, HoldDown } from './board';
 export { tabRemovalProgram } from './tabRemoval';
 export type { TabStop } from './tabRemoval';
+export { planBoard, summarize as summarizePlan } from './plan';
+export type { BoardPartSource, BoardRequest, OpSummary, PlanResult, ReleaseProgram } from './plan';

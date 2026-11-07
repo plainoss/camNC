@@ -1,5 +1,5 @@
 import { solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
-import { featuresFromCuts, summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
+import { profileFeatures, summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three';
 import type { BodyMesh, CamPartInfo, ModelImport, Outline2D } from './camTypes';
 import { cutPartMesh } from './cutPartMesh';
@@ -12,44 +12,14 @@ export interface NativeCadEntry {
 /** Native curves are tessellated once by CAD, then go straight to CAM's polygon feature seam. */
 export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: CamPartInfo; mesh: BodyMesh } {
   if (source.cuts?.some(cut => cut.side === 'underside')) throw new Error(`${source.name}: cuts on the underside can’t be machined yet.`);
-  const x0 = Math.min(...source.outline.map(p => p.x));
-  const y0 = Math.min(...source.outline.map(p => p.y));
-  const point = (p: { x: number; y: number }) => ({ x: p.x - x0, y: p.y - y0 });
-  const outline = source.outline.map(point);
-  const holes = source.holes.map(h => h.map(point));
-  const area = (loop: { x: number; y: number }[]) =>
-    loop.reduce((sum, p, i) => {
-      const q = loop[(i + 1) % loop.length];
-      return sum + p.x * q.y - q.x * p.y;
-    }, 0) / 2;
-  const positive = (loop: { x: number; y: number }[]) => (area(loop) < 0 ? [...loop].reverse() : loop);
-  const outer = positive(outline);
-  const inner = holes.map(positive);
-  const footprint = [outer, ...inner.map(h => [...h].reverse())];
-  const holeLoops = source.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id);
-  const cut = source.cuts?.length
-    ? featuresFromCuts({
-        thickness: source.thickness,
-        outline: outer,
-        holes: inner,
-        cuts: source.cuts.map(c => ({ ...c, outline: c.outline.map(point), islands: c.islands.map(island => island.map(point)) })),
-      })
-    : null;
+  const { features, holeSources, offset, size, split } = profileFeatures(source);
   // CAD refuses a through cut that reaches the edge, but cuts from separate sketches can still add up to a split.
-  if (cut && cut.features.outlines.length !== 1)
-    throw new Error(`${source.name}: these through cuts split the part. Use a separate part for each piece.`);
-  const features: PartFeatures = cut?.features ?? {
-    thickness: source.thickness,
-    footprint,
-    outlines: [outer],
-    throughHoles: inner,
-    levels: [{ z: source.thickness, region: footprint, area: area(outer) - inner.reduce((sum, h) => sum + area(h), 0) }],
-    pockets: [],
-    bottomFaces: [],
-    slopedArea: 0,
-  };
+  if (split) throw new Error(`${source.name}: these through cuts split the part. Use a separate part for each piece.`);
+  const outer = features.outlines[0]!;
+  const inner = features.throughHoles;
+  const holeLoops = source.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id);
   let positions: Float64Array, indices: Uint32Array;
-  if (cut) ({ positions, indices } = cutPartMesh(cut.features));
+  if (source.cuts?.length) ({ positions, indices } = cutPartMesh(features));
   else {
     const shape = new Shape(outer.map(p => new Vector2(p.x, p.y)));
     shape.holes.push(...inner.map(h => new Path(h.map(p => new Vector2(p.x, p.y)))));
@@ -58,7 +28,6 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
     indices = geometry.index ? Uint32Array.from(geometry.index.array) : Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
     geometry.dispose();
   }
-  const size: [number, number, number] = [Math.max(...outer.map(p => p.x)), Math.max(...outer.map(p => p.y)), source.thickness];
   const part: FlatPart = {
     name: source.name,
     size,
@@ -82,8 +51,8 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
     entry: { part, features },
     info: {
       id: source.partId,
-      holeIds: cut ? cut.holeSources.map(from => ('hole' in from ? holeLoops[from.hole]! : from.cut)) : holeLoops,
-      sourceOrigin: [x0, y0],
+      holeIds: holeSources ? holeSources.map(from => ('hole' in from ? holeLoops[from.hole]! : from.cut)) : holeLoops,
+      sourceOrigin: [offset.x, offset.y],
       name: source.name,
       modelName: source.name,
       names: [source.name],

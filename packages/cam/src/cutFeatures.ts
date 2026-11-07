@@ -106,3 +106,58 @@ export function featuresFromCuts(
     holeSources,
   };
 }
+
+type Point = { x: number; y: number };
+
+/**
+ * A flat part's features from its profile in any position, as CAM takes it: moved so its corner is at the origin, loops
+ * counterclockwise. `split` says the through cuts leave more than one piece, which CAM can't hold.
+ */
+export function profileFeatures(source: { thickness: number; outline: Point[]; holes: Point[][]; cuts?: FlatCut[] }): {
+  features: PartFeatures;
+  /** For each through hole, what made it, when there are cuts. */
+  holeSources?: HoleSource[];
+  offset: Point;
+  size: [number, number, number];
+  split: boolean;
+} {
+  const x0 = Math.min(...source.outline.map(p => p.x));
+  const y0 = Math.min(...source.outline.map(p => p.y));
+  const point = (p: Point) => ({ x: p.x - x0, y: p.y - y0 });
+  const area = (loop: Point[]) =>
+    loop.reduce((sum, p, i) => {
+      const q = loop[(i + 1) % loop.length]!;
+      return sum + p.x * q.y - q.x * p.y;
+    }, 0) / 2;
+  const positive = (loop: Point[]) => (area(loop) < 0 ? [...loop].reverse() : loop);
+  const outer = positive(source.outline.map(point));
+  const inner = source.holes.map(h => positive(h.map(point)));
+  const size: [number, number, number] = [Math.max(...outer.map(p => p.x)), Math.max(...outer.map(p => p.y)), source.thickness];
+  const footprint = [outer, ...inner.map(h => [...h].reverse())];
+  if (source.cuts?.length) {
+    const cut = featuresFromCuts({
+      thickness: source.thickness,
+      outline: outer,
+      holes: inner,
+      cuts: source.cuts.map(c => ({ ...c, outline: c.outline.map(point), islands: c.islands.map(island => island.map(point)) })),
+    });
+    return {
+      features: cut.features,
+      holeSources: cut.holeSources,
+      offset: { x: x0, y: y0 },
+      size,
+      split: cut.features.outlines.length !== 1,
+    };
+  }
+  const features: PartFeatures = {
+    thickness: source.thickness,
+    footprint,
+    outlines: [outer],
+    throughHoles: inner,
+    levels: [{ z: source.thickness, region: footprint, area: area(outer) - inner.reduce((sum, h) => sum + area(h), 0) }],
+    pockets: [],
+    bottomFaces: [],
+    slopedArea: 0,
+  };
+  return { features, offset: { x: x0, y: y0 }, size, split: false };
+}
