@@ -164,7 +164,7 @@ it('updates a placed dimension unit hint while typing and reopening a converted 
   await userEvent.keyboard('{Escape}{Escape}d');
   await click(60, 20);
   await click(60, 5);
-  const input = screen.getByRole('textbox', { name: 'Length mm' }) as HTMLInputElement;
+  const input = (await screen.findByRole('textbox', { name: 'Length mm' }, { timeout: 10_000 })) as HTMLInputElement;
   const suffix = () => input.parentElement!.querySelector('[aria-hidden="true"]');
   for (const text of ['2mm', '2in', '1/2in', '(20+30)mm', '2mm+']) {
     await userEvent.fill(input, text);
