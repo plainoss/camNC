@@ -314,6 +314,7 @@ export function CadEditor({
   const [rho, setRho] = useState('0.5');
   const [selectionBox, setSelectionBox] = useState<CadSelectionBox | null>(null);
   const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
+  const sketchOnly = !!faceSketch;
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
   const [contextMenu, setContextMenu] = useState<SketchContext | null>(null);
@@ -629,7 +630,7 @@ export function CadEditor({
     let cancelled = false;
     const sequence = ++solveSequence.current;
     setSolving(true);
-    void solveCadDocument(doc, { classifyEntities: true, sketchOnly: !!faceSketch })
+    void solveCadDocument(doc, { classifyEntities: true, sketchOnly })
       .then(result => {
         if (cancelled || sequence !== solveSequence.current || drag.current || annotationDrag.current) return;
         lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
@@ -660,7 +661,7 @@ export function CadEditor({
     return () => {
       cancelled = true;
     };
-  }, [doc, session, checkEpoch]);
+  }, [doc, session, checkEpoch, sketchOnly]);
 
   useEffect(() => {
     if (!dimension) return;
