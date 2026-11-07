@@ -58,7 +58,7 @@ export function beginCreationValues(
         }
       );
     }
-  } else if (tool === 'circle') {
+  } else if (tool === 'circle' || tool === 'threePointCircle') {
     const circle = entities.find(entity => entity.type === 'circle');
     if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Circle diameter' });
   } else if (tool === 'rectangle' || tool === 'centerRectangle') {

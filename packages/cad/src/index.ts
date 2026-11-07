@@ -25,3 +25,5 @@ export * from './offset';
 export * from './rectangleCorners';
 
 export * from './ellipse';
+
+export * from './threePointCircle';

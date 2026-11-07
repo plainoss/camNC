@@ -1,4 +1,4 @@
-import { ellipseFromPoints } from '@wbcnc/cad';
+import { ellipseFromPoints, circleThroughThreePoints } from '@wbcnc/cad';
 import { ArcPreview } from './ArcPreview';
 import { SketchPreview } from './SketchGeometry';
 import { SKETCH_APPEARANCE } from './sketchAppearance';
@@ -14,6 +14,7 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
   const scale = Number.isFinite(pixelScale) && pixelScale > 0 ? pixelScale : 1;
   const feedback = sketchPreviewFeedback(props);
   const ellipse = tool === 'ellipse' && pending[1] ? ellipseFromPoints(start, pending[1], cursor) : null;
+  const threePointCircle = tool === 'threePointCircle' && pending[1] ? circleThroughThreePoints(start, pending[1], cursor) : null;
   return (
     <g data-sketch-tool-preview={tool} pointerEvents="none">
       {curvePreview ? (
@@ -59,6 +60,8 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
               ry={ellipse.secondary}
               transform={`rotate(${(-ellipse.angle * 180) / Math.PI} ${start.x} ${-start.y})`}
             />
+          ) : threePointCircle ? (
+            <circle cx={threePointCircle.x} cy={-threePointCircle.y} r={threePointCircle.radius} />
           ) : tool === 'circle' ? (
             <circle cx={start.x} cy={-start.y} r={Math.hypot(cursor.x - start.x, cursor.y - start.y)} />
           ) : (
