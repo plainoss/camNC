@@ -126,3 +126,19 @@ it('serializes concurrent requests through the single Finish boundary', async ()
   release();
   expect(await first).toBe(true);
 });
+
+it('gives the canvas keyboard focus back when it stays mounted after finishing', async () => {
+  let release = () => {};
+  const finishing = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const { controller, canvas } = await setup(vi.fn(() => finishing));
+  const done = controller.current!.finish();
+  await waitFor(() => expect(canvas.closest('[inert]')).not.toBeNull());
+  // The inert workspace drops focus while the next page loads, then the host keeps this editor.
+  canvas.blur();
+  expect(document.activeElement).toBe(document.body);
+  release();
+  await done;
+  await waitFor(() => expect(document.activeElement).toBe(canvas));
+});
