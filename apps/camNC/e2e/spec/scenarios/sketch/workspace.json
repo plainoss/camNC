@@ -10,7 +10,10 @@
       "hover 40,30",
       {
         "expect": {
-          "cursor": [40, 30]
+          "cursor": [
+            40,
+            30
+          ]
         }
       }
     ]
@@ -381,7 +384,10 @@
           "entitiesInclude": [
             {
               "type": "circle",
-              "c": [80, 60]
+              "c": [
+                80,
+                60
+              ]
             }
           ]
         }
@@ -526,7 +532,10 @@
       "field Depth in mm 6",
       {
         "expect": {
-          "cutDepths": ["6", "through"]
+          "cutDepths": [
+            "6",
+            "through"
+          ]
         }
       },
       "button New sketch on top",
@@ -538,7 +547,79 @@
       "field Depth in mm 3",
       {
         "expect": {
-          "cutDepths": ["3", "6", "through"],
+          "cutDepths": [
+            "3",
+            "6",
+            "through"
+          ],
+          "canFinish": true
+        }
+      },
+      "finish",
+      {
+        "expect": {
+          "stage": "boards"
+        }
+      }
+    ]
+  },
+  {
+    "id": "sketch/finish/cuts-set-in-3d",
+    "title": "A recess and a through hole are set by clicking the part in 3D, then the cut is switched off and on",
+    "evidence": "manu 2026-11-07, the agreed CAD roadmap",
+    "steps": [
+      "rect 20,20 180,120",
+      "circle 100,70 20",
+      {
+        "expect": {
+          "cutDepths": [
+            "through"
+          ]
+        }
+      },
+      "button ^3D$",
+      "click3d",
+      "field Depth in mm 6",
+      {
+        "expect": {
+          "cutDepths": [
+            "6"
+          ]
+        }
+      },
+      "uncheck Cut 1 on",
+      {
+        "expect": {
+          "cutDepths": [
+            "through"
+          ]
+        }
+      },
+      "check Cut 1 on",
+      {
+        "expect": {
+          "cutDepths": [
+            "6"
+          ]
+        }
+      },
+      "click3d",
+      "button ^Through$",
+      {
+        "expect": {
+          "cutDepths": [
+            "through"
+          ],
+          "canFinish": true
+        }
+      },
+      "click3d",
+      "field Depth in mm 3",
+      {
+        "expect": {
+          "cutDepths": [
+            "3"
+          ],
           "canFinish": true
         }
       },

@@ -10,7 +10,7 @@ export interface NativeCadEntry {
 }
 
 /** Native curves are tessellated once by CAD, then go straight to CAM's polygon feature seam. */
-function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: CamPartInfo; mesh: BodyMesh } {
+export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: CamPartInfo; mesh: BodyMesh } {
   if (source.cuts?.some(cut => cut.side === 'underside')) throw new Error(`${source.name}: cuts on the underside can’t be machined yet.`);
   const x0 = Math.min(...source.outline.map(p => p.x));
   const y0 = Math.min(...source.outline.map(p => p.y));

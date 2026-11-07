@@ -14,9 +14,8 @@ export function CutOverlay({ part, millimetresPerPixel: scale }: { part: CadPart
           <line x1="0" y1="0" x2="0" y2={8 * scale} stroke="#7a5526" strokeWidth={1.2 * scale} />
         </pattern>
       </defs>
-      {entries.map(({ region, cut, inProfile }) => {
-        const depth = cut?.depth ?? (inProfile ? 'through' : 0),
-          center = region.points.reduce((sum, p) => ({ x: sum.x + p.x, y: sum.y + p.y }), { x: 0, y: 0 }),
+      {entries.map(({ region, depth }) => {
+        const center = region.points.reduce((sum, p) => ({ x: sum.x + p.x, y: sum.y + p.y }), { x: 0, y: 0 }),
           count = region.points.length;
         return (
           <g key={region.id} data-cut-region={region.id} data-cut-depth={depth}>
@@ -29,7 +28,7 @@ export function CutOverlay({ part, millimetresPerPixel: scale }: { part: CadPart
               strokeWidth={scale}
               strokeDasharray={depth === 0 ? `${4 * scale} ${3 * scale}` : undefined}
             />
-            {cut && depth !== 'through' && depth !== 0 && (
+            {depth !== 'through' && depth !== 0 && (
               <text
                 x={center.x / count}
                 y={-center.y / count + 14 * scale}

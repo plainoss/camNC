@@ -146,6 +146,30 @@ describe('setting a cut depth on the drawing', () => {
     expect(document.parts.find(p => p.id === partId)!.features!.some(f => f.type === 'sketch' && f.sketch.id === sketchId)).toBe(true);
   });
 
+  it('switches a cut off and back on from the list, keeping its depth', async () => {
+    const { change } = setup(plate());
+    clickWorld(60, 45);
+    fireEvent.change(await depthField(), { target: { value: '5' } });
+    fireEvent.keyDown(await depthField(), { key: 'Enter' });
+    const box = (await screen.findByRole('checkbox', { name: 'Cut 1 on' })) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    fireEvent.click(box);
+    await waitFor(() => expect(change.mock.lastCall![0].parts[0]!.features![0]).toMatchObject({ depth: 5, suppressed: true }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Cut 1 on' }));
+    await waitFor(() => expect(change.mock.lastCall![0].parts[0]!.features![0]).not.toHaveProperty('suppressed'));
+  });
+
+  it('offers 3D only once the part has an outline, and returns to the drawing when a tool is picked', async () => {
+    setup(plate());
+    const button = await screen.findByRole('button', { name: '3D' });
+    fireEvent.click(button);
+    await waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('true'));
+    expect(canvas().style.display).toBe('none');
+    fireEvent.click(screen.getByRole('button', { name: /^Line/ }));
+    await waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('false'));
+    expect(canvas().style.display).toBe('');
+  });
+
   it('won’t open a face sketch until the part has an outline', async () => {
     const open = vi.fn(),
       document = createPlateDocument({ width: 120, height: 80, thickness: 18 }),
