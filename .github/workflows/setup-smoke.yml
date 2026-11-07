@@ -21,12 +21,13 @@ permissions:
 
 jobs:
   setup-smoke:
+    # The queue SHA becomes main unchanged, so its check suite may still name the queue branch.
+    # Only the production app Worker emits this exact check; previews use camnc-preview.
     if: >-
       github.event_name != 'check_run' ||
       (github.event.check_run.conclusion == 'success' &&
-      github.event.check_run.check_suite.head_branch == 'main' &&
-      contains(github.event.check_run.name, 'camnc') &&
-      !contains(github.event.check_run.name, 'preview'))
+      github.event.check_run.app.slug == 'cloudflare-workers-and-pages' &&
+      github.event.check_run.name == 'Workers Builds: camnc')
     # Job level (not workflow level), so that skipped runs don't cancel a running smoke run.
     concurrency:
       group: setup-smoke-${{ (github.event_name == 'check_run' || github.event_name == 'schedule') && 'production' || github.ref }}
