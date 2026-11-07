@@ -2314,6 +2314,8 @@ export function CadEditor({
       // Acceptance owns normalization while it runs. Resume ordinary draft checks
       // if the editor stays mounted after a blocked acceptance or a host callback.
       requestSketchCheck();
+      // Going inert dropped keyboard focus, and the editor can stay mounted, so shortcuts need it back.
+      restoreCanvasKeyboard();
     }
   };
   useImperativeHandle(controller, () => ({ finish, prepareDocument }));
