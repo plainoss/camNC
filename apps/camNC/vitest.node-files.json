@@ -6,5 +6,6 @@
   "src/cam/boards.physicalSheet.test.ts",
   "src/cam/rebaseJob.test.ts",
   "src/cam/rebaseJob.physicalSheet.test.ts",
-  "src/cam/rebaseJob.sourceConflict.test.ts"
+  "src/cam/rebaseJob.sourceConflict.test.ts",
+  "src/cam/boards.test.ts"
 ]

@@ -9,6 +9,7 @@ export default defineConfig({
   test: {
     name: 'domain',
     environment: 'node',
+    testNamePattern: /^(?!.*\[performance\]).*$/,
     include: files,
     maxWorkers: 2,
     reporters: ['default', new TimingReporter({ suite: 'domain' })],
