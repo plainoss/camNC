@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
 import { parseShard, selectShard, scenarioWeight } from './sharding.mjs';
-import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { createServer } from 'node:net';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { openPage, startDevServer } from './harness.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,18 +26,6 @@ function parseArgs(args) {
     else throw new Error(`Unknown option: ${flag}`);
   }
   return options;
-}
-
-/** A port nothing is using, so runs from different worktrees don't collide. */
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once('error', reject);
-    probe.listen(0, '127.0.0.1', () => {
-      const { port } = probe.address();
-      probe.close(() => resolve(port));
-    });
-  });
 }
 
 async function loadScenarios(only) {
@@ -83,15 +70,7 @@ async function compareFrame(scenario, name, svg, options, outDir) {
 async function runScenario(browser, scenario, options, outDir) {
   const started = performance.now();
   const { createAdapter } = await import(`./adapters/${scenario.id.split('/')[0]}.mjs`);
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' });
-  const page = await context.newPage();
-  // A cold Vite server can still compile lazy editor modules after DOMContentLoaded.
-  page.setDefaultTimeout(45000);
-  const runtime = [];
-  page.on('pageerror', error => runtime.push(`page error: ${error.message}`));
-  page.on('console', message => {
-    if (message.type() === 'error') runtime.push(`console error: ${message.text()}`);
-  });
+  const { context, page, runtime } = await openPage(browser);
   const failures = [];
   let phase = 'bootstrap';
   let bootstrapMs = 0;
@@ -136,22 +115,8 @@ const outDir = fileURLToPath(new URL(`../../test-results/spec/${shardName}/`, im
 await mkdir(outDir, { recursive: true });
 let server = null;
 if (!options.url) {
-  // Own a server unless given one, so one command runs everything, locally and in CI.
-  const port = await freePort();
-  options.url = `http://127.0.0.1:${port}`;
-  server = spawn('pnpm', ['vite', '--port', String(port), '--host', '127.0.0.1', '--strictPort'], {
-    cwd: path.resolve(root, '../..'),
-    env: { ...process.env, CAMNC_SKIP_TYPECHECK: '1' },
-    stdio: 'ignore',
-    detached: true,
-  });
-  const started = Date.now();
-  for (;;) {
-    const ready = await fetch(options.url).then(response => response.ok).catch(() => false);
-    if (ready) break;
-    assert(Date.now() - started < 120_000, 'The dev server did not start');
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
+  server = await startDevServer();
+  options.url = server.url;
 }
 const { chromium } = createRequire(import.meta.url)('playwright');
 const browser = await chromium.launch({ headless: !options.headed });
@@ -187,7 +152,7 @@ await Promise.all(
   })
 );
 await browser.close();
-if (server) process.kill(-server.pid);
+server?.stop();
 await writeFile(path.join(outDir, 'results.json'), JSON.stringify(results, null, 2) + '\n');
 await writeFile(path.join(outDir, 'summary.json'), JSON.stringify({ shard: options.shard, workers, wallMs: performance.now() - runStarted, scenarios: scenarios.length, counts }, null, 2) + '\n');
 console.log(`\n${scenarios.length} scenarios: ${counts.PASS} pass, ${counts.FAIL} fail, ${counts.XFAIL} known gaps, ${counts.XPASS} newly passing`);

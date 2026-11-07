@@ -33,6 +33,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - From within a package you can run `pnpm test`.
 - Focus on one test with `pnpm vitest run -t "<test name>"`.
 - Tests run in headless Chromium (Vitest browser mode); install it once with `pnpm exec playwright install chromium`.
+- To try sketch editor behaviour in a real browser without replaying a whole scenario, use the interactive session in `apps/camNC/e2e/spec/README.md`.
 - Fix failing tests or type errors until the suite passes.
 - After moving files or changing imports, run `pnpm lint --filter <project_name>`.
 - Always add or update tests for the code you change.

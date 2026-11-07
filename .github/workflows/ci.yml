@@ -212,6 +212,10 @@ jobs:
         env:
           TURBO_CACHE_DIR: .turbo/cache
         run: node scripts/turbo-shared-cache.mjs run spec:cad --filter=@wbcnc/camNC --log-order=stream -- --shard=${{ matrix.shard }}
+      - name: Check the interactive spec session
+        if: matrix.shard == '1/4'
+        timeout-minutes: 5
+        run: printf 'rect 10,10 100,60\nexpect {"entityCount":4}\nframe smoke\n' | pnpm --silent --filter @wbcnc/camNC spec:session
       - name: Upload spec results
         if: always()
         uses: actions/upload-artifact@v7
