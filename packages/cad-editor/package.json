@@ -1,0 +1,41 @@
+{
+  "name": "@wbcnc/cad-editor",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./arcPreviewGeometry": "./src/arcPreviewGeometry.ts",
+    "./constraintCommands": "./src/constraintCommands.ts",
+    "./dimensionGeometry": "./src/dimensionGeometry.ts",
+    "./dimensionWorkflow": "./src/dimensionWorkflow.ts",
+    "./drag": "./src/drag.ts",
+    "./dragSnap": "./src/dragSnap.ts",
+    "./drawingGesture": "./src/drawingGesture.ts",
+    "./drawingInference": "./src/drawingInference.ts",
+    "./geometry": "./src/geometry.ts",
+    "./inlineConstraintLayout": "./src/inlineConstraintLayout.ts",
+    "./keyboardOwnership": "./src/keyboardOwnership.ts",
+    "./modificationWorkflow": "./src/modificationWorkflow.ts",
+    "./picking": "./src/picking.ts",
+    "./selectionMeasurements": "./src/selectionMeasurements.ts",
+    "./session": "./src/session.ts",
+    "./sketchContext": "./src/sketchContext.ts",
+    "./sketchFeedback": "./src/sketchFeedback.ts",
+    "./trimCurves": "./src/trimCurves.ts",
+    "./valueExpressions": "./src/valueExpressions.ts",
+    "./viewState": "./src/viewState.ts"
+  },
+  "scripts": {
+    "test": "vitest",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wbcnc/cad": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@wbcnc/typescript-config": "workspace:*",
+    "vitest": "catalog:",
+    "typescript": "catalog:"
+  }
+}

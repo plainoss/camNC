@@ -18,5 +18,8 @@
   "src/routes/cam/$jobId.plan.view3d.test.tsx",
   "src/start/CamJobRehearsal.test.tsx",
   "src/workers/cam.worker.hold.test.ts",
-  "src/workers/cam.worker.test.ts"
+  "src/workers/cam.worker.test.ts",
+  "src/routes/cam/$jobId.boards.drag.test.tsx",
+  "src/routes/cam/$jobId.boards.holds.test.tsx",
+  "src/routes/cam/$jobId.boards.settings.test.tsx"
 ]

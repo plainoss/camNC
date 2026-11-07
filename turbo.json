@@ -1,10 +1,12 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalDependencies": [".nvmrc"],
   "tasks": {
     "build": {
       "dependsOn": [
-        "^build"
+        "^build",
+        "^transit"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -23,21 +25,92 @@
       "dependsOn": ["^transit"]
     },
     "test": {
-      "dependsOn": ["transit"],
-      "env": ["FLUIDNC_SIM_HOST", "FLUIDNC_SIM_VARIANT"],
+      "dependsOn": ["^transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/test-timings.mjs", "$TURBO_ROOT$/scripts/balanced-shards.mjs"],
+      "outputs": ["test-results/**"],
+      "env": ["CI", "FLUIDNC_SIM_HOST", "FLUIDNC_SIM_VARIANT"],
       "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH", "CAM_OUT_DIR"]
     },
     // Its own task, so a run without the slowest files can never replay as a passed "test".
     "test:fast": {
-      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/balanced-shards.mjs", "$TURBO_ROOT$/scripts/test-timings.mjs"],
+      "dependsOn": ["^transit"],
       "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH"]
+    },
+    "test:domain": {
+      "dependsOn": [
+        "^transit"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/test-timings.mjs", "$TURBO_ROOT$/scripts/balanced-shards.mjs"
+      ],
+      "outputs": [
+        "test-results/domain.json"
+      ],
+      "env": [
+        "CI"
+      ]
+    },
+    "test:worker": {
+      "dependsOn": [
+        "^transit"
+      ],
+      "outputs": [
+        "test-results/worker.json"
+      ],
+      "env": [
+        "CI"
+      ]
+    },
+    "test:licenses": {
+      "dependsOn": [
+        "^transit"
+      ],
+      "env": [
+        "CI"
+      ]
+    },
+    "test:browser": {
+      "dependsOn": [
+        "^transit"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/test-timings.mjs", "$TURBO_ROOT$/scripts/balanced-shards.mjs"
+      ],
+      "outputs": [
+        "test-results/browser*.json"
+      ],
+      "env": [
+        "CI"
+      ],
+      "passThroughEnv": [
+        "PLAYWRIGHT_BROWSERS_PATH"
+      ]
+    },
+    "spec:cad": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/balanced-shards.mjs", "$TURBO_ROOT$/scripts/test-timings.mjs"],
+      "dependsOn": [
+        "^transit"
+      ],
+      "outputs": [
+        "test-results/spec/**"
+      ],
+      "env": [
+        "CI",
+        "VITE_CLERK_PUBLISHABLE_KEY"
+      ],
+      "passThroughEnv": [
+        "PLAYWRIGHT_BROWSERS_PATH"
+      ]
     },
     "smoke:setup": {
       "cache": false,
       "env": ["CAMNC_SMOKE_URL", "CAMNC_SMOKE_HEADED", "CAMNC_SMOKE_OUTPUT"]
     },
-    "lint": {},
-    "check-types": {},
+    "lint": { "dependsOn": ["^transit"] },
+    "check-types": { "dependsOn": ["^transit"] },
     "dev": {
       "cache": false,
       "persistent": true,

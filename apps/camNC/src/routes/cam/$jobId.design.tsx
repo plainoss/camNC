@@ -11,7 +11,7 @@ import { camKeys, useCamJob } from '@/cam/camQueries';
 import { acceptDesign, saveDesignDraft } from '@/cam/cadDesign';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { CadEditor, type CadEditorController } from '@/cad/CadEditor';
-import { acknowledgeCadSession, cadSession, endCadSession, replaceCadSession } from '@/cad/session';
+import { acknowledgeCadSession, cadSession, endCadSession, replaceCadSession, syncCadSession } from '@/cad/session';
 import { openAtMachine } from '@/cam/machine/openAtMachine';
 
 const designContextSchema = z.object({
@@ -253,7 +253,11 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
             key={faceEdit.sketchId}
             document={faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId)}
             faceSketch={{ outline: facePart.outline, label: 'Top face' }}
-            onDraftChange={edited => draft(withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited))}
+            onDraftChange={edited => {
+              const merged = withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited);
+              if (activeSession.current === session) syncCadSession(session, merged);
+              draft(merged);
+            }}
             onFinish={edited => leaveFaceSketch(withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited))}
             onCancel={() => leaveFaceSketch(faceEdit.base)}
             saveStatus={status}

@@ -1,6 +1,6 @@
 import type { CamSettings, HoleChoice, LibraryTool } from '@wbcnc/cam';
 import { DEFAULT_TABS, MATERIALS } from '@wbcnc/cam/settings';
-import { savedCuttingFor, resolveCutting, type CuttingData } from './cuttingData';
+import { savedCuttingFor, resolveCutting, type CuttingData } from '@wbcnc/cam-settings';
 import type { HoleChoices } from './holeChoices';
 
 export type MaterialKey = keyof typeof MATERIALS;

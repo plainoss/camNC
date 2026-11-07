@@ -1,0 +1,53 @@
+{
+  "extends": [
+    "//"
+  ],
+  "tasks": {
+    "test:worker": {
+      "inputs": [
+        "worker/**",
+        "migrations/**",
+        "vitest.worker.config.ts",
+        "package.json",
+        "tsconfig.json",
+        "tsconfig.*.json",
+        "$TURBO_ROOT$/scripts/test-timings.mjs",
+        "$TURBO_ROOT$/scripts/balanced-shards.mjs"
+      ]
+    },
+    "test:licenses": {
+      "inputs": [
+        "e2e/cad/licenses.node.mjs",
+        "public/licenses/**",
+        "package.json",
+        "e2e/cad/check-distribution.mjs",
+        "$TURBO_ROOT$/LICENSE"
+      ]
+    },
+    "test:browser": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!worker/**",
+        "!migrations/**",
+        "$TURBO_ROOT$/scripts/test-timings.mjs",
+        "$TURBO_ROOT$/scripts/balanced-shards.mjs"
+      ]
+    },
+    "spec:cad": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!worker/**",
+        "!migrations/**",
+        "$TURBO_ROOT$/scripts/test-timings.mjs",
+        "$TURBO_ROOT$/scripts/balanced-shards.mjs"
+      ]
+    },
+    "build": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "$TURBO_ROOT$/LICENSE"
+      ]
+    }
+  }
+}
