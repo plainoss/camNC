@@ -53,3 +53,6 @@ __screenshots__
 /docs/CAD_PARITY.md
 /apps/camNC/e2e/cad/reports/
 /apps/camNC/e2e/cad/reference/
+
+# Machine-readable test timing and failure reports
+**/test-results/

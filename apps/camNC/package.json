@@ -7,9 +7,9 @@
     "build": "vite build && node e2e/cad/check-distribution.mjs",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
-    "test": "node --test e2e/cad/licenses.node.mjs && vitest run --config vitest.worker.config.ts && vitest",
+    "test": "pnpm run test:licenses && pnpm run test:domain && pnpm run test:worker && pnpm run test:browser",
     "test:fast": "vitest run --config vitest.fast.config.ts",
-    "test:performance": "vitest run --config vitest.performance.config.ts",
+    "test:performance": "vitest run --config vitest.domain-performance.config.ts && vitest run --config vitest.performance.config.ts",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "smoke:setup": "node e2e/setup-smoke.mjs",
@@ -20,7 +20,10 @@
     "dev:api": "mkdir -p dist && wrangler d1 migrations apply DB --local && wrangler dev --port 8787",
     "test:licenses": "node --test e2e/cad/licenses.node.mjs",
     "smoke:cad": "node e2e/cad/run.mjs",
-    "spec:cad": "node e2e/spec/run.mjs"
+    "spec:cad": "node e2e/spec/run.mjs",
+    "test:domain": "vitest run --config vitest.node.config.ts",
+    "test:worker": "vitest run --config vitest.worker.config.ts",
+    "test:browser": "vitest run"
   },
   "dependencies": {
     "@clerk/backend": "^2.33.8",
@@ -100,7 +103,9 @@
     "webgpu-utils": "^1.11.0",
     "yaml": "catalog:",
     "zod": "catalog:",
-    "zustand": "catalog:"
+    "zustand": "catalog:",
+    "@wbcnc/cam-settings": "workspace:*",
+    "@wbcnc/cad-editor": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.12.21",

@@ -497,9 +497,15 @@ importers:
       '@wbcnc/cad':
         specifier: workspace:*
         version: link:../../packages/cad
+      '@wbcnc/cad-editor':
+        specifier: workspace:*
+        version: link:../../packages/cad-editor
       '@wbcnc/cam':
         specifier: workspace:*
         version: link:../../packages/cam
+      '@wbcnc/cam-settings':
+        specifier: workspace:*
+        version: link:../../packages/cam-settings
       '@wbcnc/camera-calibration':
         specifier: workspace:*
         version: link:../../packages/camera-calibration
@@ -1083,6 +1089,46 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.15)(@vitest/browser@3.2.4)(@vitest/ui@3.2.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.33.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.1)
+
+  packages/cad-editor:
+    dependencies:
+      '@wbcnc/cad':
+        specifier: workspace:*
+        version: link:../cad
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.0.15
+      '@wbcnc/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: 'catalog:'
+        version: 5.8.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.15)(@vitest/browser@3.2.4)(@vitest/ui@3.2.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.33.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.1)
+
+
+  packages/cam-settings:
+    dependencies:
+      '@wbcnc/cam':
+        specifier: workspace:*
+        version: link:../cam
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.0.15
+      '@wbcnc/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: 'catalog:'
+        version: 5.8.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.15)(@vitest/browser@3.2.4)(@vitest/ui@3.2.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.33.0)(terser@5.43.1)(tsx@4.20.3)(yaml@2.8.1)
+
 
   packages/camera-calibration:
     dependencies:

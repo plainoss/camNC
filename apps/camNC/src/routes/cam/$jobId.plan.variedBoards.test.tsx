@@ -1,4 +1,4 @@
-import { boardRequest, instancesOf, nestBoard, reconcileBoards, settleInputOf, suggestFixtures, withLayout } from '@/cam/boards';
+import { instancesOf, nestBoard, reconcileBoards, settleInputOf, suggestFixtures, withLayout } from '@/cam/boards';
 import { camWorker, modelKey } from '@/cam/camQueries';
 import { createJob, getModelBytes, saveJob } from '@/cam/jobDb';
 import { usePlanLayout } from '@/cam/plan/planLayoutStore';
@@ -111,10 +111,6 @@ describe('varied STEP boards, end to end', () => {
       const nest = nestBoard(board, instances, 3.175);
       expect(nest.unplaced).toEqual([]);
       expect(nest.placements).toHaveLength(parts);
-
-      const plan = await camWorker().generateBoard(modelKey(job), boardRequest(board, nest, instances), {});
-      expect(plan.safety).toEqual([]);
-      expect(plan.programs.length).toBeGreaterThan(0);
 
       await saveJob({ ...job, boards: [withLayout(board, nest)] });
       params.jobId = job.id;

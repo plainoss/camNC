@@ -22,7 +22,7 @@ import {
 } from '@wbcnc/cam/settle';
 import { autoNest, type NestObjective, type SheetPacker } from './autoNest';
 import type { BoardRequest, CamPartInfo } from './camTypes';
-import { kDefaultHardware, type HoldHardware } from './holdHardware';
+import { kDefaultHardware, type HoldHardware } from '@wbcnc/cam-settings';
 import type { MaterialKey } from './planSettings';
 import { holeChoicesForPart, type HoleChoices } from './holeChoices';
 
@@ -1461,4 +1461,16 @@ export function layoutSummary(boards: { nest: Pick<BoardNest, 'board' | 'yield' 
   const area = used.reduce((a, b) => a + b.nest.board.w * b.nest.board.h, 0);
   const parts = used.reduce((a, b) => a + b.nest.yield * b.nest.board.w * b.nest.board.h, 0);
   return `${used.length} ${used.length === 1 ? 'board' : 'boards'}, ${Math.round((100 * parts) / Math.max(area, 1e-9))} % yield`;
+}
+
+export interface MissingPart {
+  id: string;
+  name: string;
+  board: string;
+}
+
+/** Parts on a board that don't fit on it: they would silently not be cut. */
+export function missingParts<B extends { board: BoardV1; nest: BoardNest }>(boards: B[], instances: PartInstance[]): MissingPart[] {
+  const byId = new Map(instances.map(i => [i.id, i]));
+  return boards.flatMap(b => b.nest.unplaced.map(id => ({ id, name: byId.get(id)?.name ?? id, board: b.board.name })));
 }

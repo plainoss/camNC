@@ -63,12 +63,28 @@ jobs:
       matrix:
         include:
           - suite: cam
+            tasks: test
+            args: run
             filter: --filter=@wbcnc/cam
             performance: pnpm --filter @wbcnc/cam test:performance
-          - suite: app
+          - suite: app-core
+            tasks: test:domain test:worker test:licenses
+            args: ''
             filter: --filter=@wbcnc/camNC
             performance: pnpm --filter @wbcnc/camNC test:performance
+          - suite: app-browser-1
+            tasks: test:browser
+            args: --shard=1/2
+            filter: --filter=@wbcnc/camNC
+            performance: ''
+          - suite: app-browser-2
+            tasks: test:browser
+            args: --shard=2/2
+            filter: --filter=@wbcnc/camNC
+            performance: ''
           - suite: packages
+            tasks: test
+            args: run
             filter: --filter=!@wbcnc/cam --filter=!@wbcnc/camNC --concurrency=1
             performance: ''
     runs-on: ubuntu-latest
@@ -109,14 +125,26 @@ jobs:
         timeout-minutes: 20
         env:
           TURBO_CACHE_DIR: .turbo/cache
-        run: node scripts/turbo-shared-cache.mjs run test --log-order=stream ${{ matrix.filter }} -- run
+        run: node scripts/turbo-shared-cache.mjs run ${{ matrix.tasks }} --log-order=stream ${{ matrix.filter }} -- ${{ matrix.args }}
       # Each gate gets an otherwise idle runner, just as in the root test script.
       - name: Performance gates
         if: matrix.performance != ''
         run: ${{ matrix.performance }}
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-timings-${{ matrix.suite }}-${{ github.run_attempt }}
+          path: |
+            apps/camNC/test-results
+            packages/*/test-results
 
   specs:
-    name: Behaviour specs
+    name: Behaviour specs (${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/4, 2/4, 3/4, 4/4]
     runs-on: ubuntu-latest
     container:
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.
@@ -140,15 +168,23 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-specs-${{ strategy.job-index }}-${{ github.sha }}
+          restore-keys: turbo-specs-${{ strategy.job-index }}-
       - name: Run sketch behaviour specs
         timeout-minutes: 15
-        run: pnpm --filter @wbcnc/camNC spec:cad
+        env:
+          TURBO_CACHE_DIR: .turbo/cache
+        run: node scripts/turbo-shared-cache.mjs run spec:cad --filter=@wbcnc/camNC --log-order=stream -- --shard=${{ matrix.shard }}
       - name: Upload spec results
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: behaviour-specs
-          path: output/playwright/spec
+          name: behaviour-specs-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: apps/camNC/test-results/spec
 
   results:
     # Keep the check required by main's ruleset, including builds now running in checks.
