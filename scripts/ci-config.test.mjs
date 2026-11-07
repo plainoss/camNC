@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { test } from 'node:test';
@@ -21,6 +21,13 @@ for (const [workflow, job] of [['ci.yml', 'test'], ['ci.yml', 'specs'], ['setup-
     assert.equal(appRequire('playwright/package.json').version, version);
   });
 }
+
+test('every file the fast test set skips still exists and CI still runs the full test task', () => {
+  const skipped = JSON.parse(read('apps/camNC/vitest.fast-excludes.json'));
+  assert.equal(skipped.length, 20);
+  for (const file of skipped) assert(existsSync(new URL(`apps/camNC/${file}`, root)), `${file} is gone; update the list`);
+  assert.doesNotMatch(read('.github/workflows/ci.yml'), /test:fast/);
+});
 
 test('browser test steps are bounded and the turbo cache action saves the directory turbo writes', () => {
   const { jobs } = parse(read('.github/workflows/ci.yml'));
@@ -71,4 +78,43 @@ test('the CI suites cover every package test exactly once and retain every perfo
   assert.deepEqual(assigned.sort(), selected([]).sort(), 'no test task may be omitted or duplicated across runners');
   const scripts = JSON.parse(read('package.json')).scripts;
   assert.deepEqual(suites.map(suite => suite.performance).filter(Boolean).sort(), scripts['test:performance'].split(' && ').sort());
+});
+
+
+test('merge queue runs all validation and isolates concurrent candidate builds', () => {
+  const workflow = parse(read('.github/workflows/ci.yml'));
+  assert.deepEqual(workflow.on.merge_group.types, ['checks_requested']);
+  assert(workflow.on.pull_request, 'ordinary PR checks must still run');
+  assert(workflow.on.push, 'main checks must still run');
+  assert.equal(workflow.concurrency.group, 'ci-${{ github.event.pull_request.number || github.run_id }}');
+  assert.equal(workflow.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
+  for (const [id, job] of Object.entries(workflow.jobs)) {
+    assert.equal(job.if, id === 'results' ? 'always()' : undefined,
+      `${id} must not skip validation on merge_group events`);
+  }
+});
+
+
+test('production smoke accepts Cloudflare production checks after queue merges and rejects previews', () => {
+  const condition = parse(read('.github/workflows/setup-smoke.yml')).jobs['setup-smoke'].if;
+  // Exercise the configured expression against event payloads, including GitHub's retained queue branch name.
+  const evaluate = new Function('github', 'contains', `return (${condition});`);
+  const check = (overrides = {}) => ({
+    event_name: 'check_run',
+    event: { check_run: {
+      conclusion: 'success',
+      name: 'Workers Builds: camnc',
+      app: { slug: 'cloudflare-workers-and-pages' },
+      check_suite: { head_branch: 'gh-readonly-queue/main/pr-166-example' },
+      ...overrides,
+    } },
+  });
+  const passes = event => evaluate(event, (value, part) => value.includes(part));
+  assert.equal(passes(check()), true, 'production checks must work when the queue branch name is retained');
+  assert.equal(passes(check({ name: 'Workers Builds: camnc-preview' })), false);
+  assert.equal(passes(check({ name: 'Workers Builds: camnc-webrtc-cam' })), false);
+  assert.equal(passes(check({ conclusion: 'failure' })), false);
+  assert.equal(passes(check({ app: { slug: 'another-app' } })), false);
+  assert.equal(passes({ event_name: 'workflow_dispatch' }), true);
+  assert.equal(passes({ event_name: 'schedule' }), true);
 });
