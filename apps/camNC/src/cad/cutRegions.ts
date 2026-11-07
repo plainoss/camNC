@@ -73,3 +73,14 @@ export function withRegionDepth(document: CadDocument, partId: string, entry: Cu
 
 /** How high a region's visible surface sits above the part's underside. */
 export const regionSurfaceZ = (depth: CadCutDepth, thickness: number) => (depth === 'through' ? 0 : thickness - depth);
+
+/** How high the part really is at a point. Regions from separate sketches overlap, and the deepest cut there wins. */
+export function exposedHeightAt(regions: CutRegion[], thickness: number, point: CadPoint) {
+  return regions.reduce(
+    (height, { region, depth }) =>
+      pointInPolygon(point, region.points) && !region.holes.some(hole => pointInPolygon(point, hole))
+        ? Math.min(height, regionSurfaceZ(depth, thickness))
+        : height,
+    thickness
+  );
+}

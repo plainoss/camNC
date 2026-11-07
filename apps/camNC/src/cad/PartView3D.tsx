@@ -7,7 +7,7 @@ import { FitCamera } from '@/cam/model/ModelViewport';
 import { modelGeometry } from '@/cam/model/modelGeometry';
 import { nativePart } from '@/cam/nativeCadModel';
 import { kOrbitDamping } from '@/lib/orbitDamping';
-import { cutRegions, depthLabel, regionSurfaceZ, withRegionDepth, type CutRegion } from './cutRegions';
+import { cutRegions, depthLabel, exposedHeightAt, regionSurfaceZ, withRegionDepth, type CutRegion } from './cutRegions';
 import { draggedDepth, heightOnAxis } from './partViewDrag';
 import { RegionDepthField } from './RegionDepthField';
 
@@ -42,12 +42,14 @@ function RegionSurface({
   entry,
   z,
   lit,
+  heightAt,
   onHover,
   onPick,
 }: {
   entry: CutRegion;
   z: number;
   lit: boolean;
+  heightAt: (point: { x: number; y: number }) => number;
   onHover: (over: boolean) => void;
   onPick: (event: ThreeEvent<MouseEvent>) => void;
 }) {
@@ -60,11 +62,14 @@ function RegionSurface({
     <mesh
       position={[0, 0, z + kLift]}
       onPointerMove={event => {
+        // Where another sketch's cut goes deeper, this surface is only air, so what's below gets the event.
+        if (heightAt(event.point) < z) return onHover(false);
         event.stopPropagation();
         onHover(true);
       }}
       onPointerOut={() => onHover(false)}
       onClick={event => {
+        if (heightAt(event.point) < z) return;
         event.stopPropagation();
         // A drag that started here was an orbit, not a pick.
         if (event.delta <= 4) onPick(event);
@@ -195,6 +200,7 @@ export default function PartView3D({ part, onChoose }: { part: CadPart; onChoose
             entry={candidate}
             z={regionSurfaceZ(candidate.depth, part.thickness)}
             lit={candidate.region.id === picked?.id || candidate.region.id === hovered}
+            heightAt={point => exposedHeightAt(shownRegions, part.thickness, point)}
             onHover={over => setHovered(current => (over ? candidate.region.id : current === candidate.region.id ? null : current))}
             onPick={event => pick(candidate, event)}
           />
