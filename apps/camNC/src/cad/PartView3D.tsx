@@ -21,8 +21,9 @@ import { RegionDepthField } from './RegionDepthField';
 
 const kWood = '#c9a477';
 const kPick = '#8b5cf6';
+const kSketch = '#3f5f8a';
 /** A region's pick surface sits just over the face it stands for, so it wins against that face. */
-const kLift = 0.02;
+const kLift = 0.01;
 const kTurnSeconds = 0.35;
 const faceLabel = (face: CadFaceRef) => (face === 'top' ? 'top' : face === 'underside' ? 'underside' : 'pocket floor');
 const alone = (part: CadPart): CadDocument => ({ version: 2, id: 'part-view', name: part.name, revision: 0, parts: [part] });
@@ -53,6 +54,7 @@ function partBox(part: CadPart) {
 function RegionSurface({
   entry,
   z,
+  order,
   lit,
   heightAt,
   onHover,
@@ -60,6 +62,8 @@ function RegionSurface({
 }: {
   entry: CutRegion;
   z: number;
+  /** A later sketch's region lifts over an earlier one at the same height, such as a sketch on a pocket's floor. */
+  order: number;
   lit: boolean;
   heightAt: (point: { x: number; y: number }) => number;
   onHover: (over: boolean) => void;
@@ -72,7 +76,7 @@ function RegionSurface({
   }, [entry.region]);
   return (
     <mesh
-      position={[0, 0, z + kLift]}
+      position={[0, 0, z + kLift * (1 + order)]}
       onPointerMove={event => {
         // Where another sketch's cut goes deeper, this surface is only air, so what's below gets the event.
         if (heightAt(event.point) < z) return onHover(false);
@@ -88,9 +92,12 @@ function RegionSurface({
       }}>
       <shapeGeometry args={[shape]} />
       <meshBasicMaterial color={kPick} transparent opacity={lit ? 0.4 : 0} depthWrite={false} side={THREE.DoubleSide} />
-      {lit && (
-        <Line points={[...entry.region.points, entry.region.points[0]!].map(p => [p.x, p.y, 0.01] as const)} color={kPick} lineWidth={2} />
-      )}
+      {/* Always drawn, so a finished sketch can be seen on the part, and it's clear what there is to click. */}
+      <Line
+        points={[...entry.region.points, entry.region.points[0]!].map(p => [p.x, p.y, 0.01] as const)}
+        color={lit ? kPick : kSketch}
+        lineWidth={lit ? 2 : 1}
+      />
     </mesh>
   );
 }
@@ -286,11 +293,12 @@ export default function PartView3D({
             lineWidth={3}
           />
         )}
-        {shownRegions.map(candidate => (
+        {shownRegions.map((candidate, order) => (
           <RegionSurface
             key={candidate.region.id}
             entry={candidate}
             z={regionSurfaceZ(candidate, part.thickness)}
+            order={order}
             lit={candidate.region.id === picked?.id || candidate.region.id === hovered}
             heightAt={point => exposedHeightAt(shownRegions, part.thickness, point)}
             onHover={over => setHovered(current => (over ? candidate.region.id : current === candidate.region.id ? null : current))}

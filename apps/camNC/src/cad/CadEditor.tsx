@@ -45,6 +45,7 @@ import {
   moveFaceSketch,
   removeCadFeature,
   type CadFaceRef,
+  setCutDepth,
   setCutSuppressed,
   withFeatureVersion,
   type CadPoint,
@@ -2554,6 +2555,7 @@ export function CadEditor({
                       if (prepared && hasOutline(prepared, part.id)) onEditFaceSketch(prepared, part.id, sketchId);
                     })
                   }
+                  onCutDepth={(cut, depth) => commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth))}
                   onMoveToTop={sketchId => commit(moveFaceSketch(documentRef.current, part.id, sketchId, 'top'))}
                   onNew={onEditFaceSketch && (() => sketchOnFace('top'))}
                 />

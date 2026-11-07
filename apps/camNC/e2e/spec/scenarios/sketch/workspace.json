@@ -662,6 +662,22 @@
       "field Depth in mm 3",
       {
         "expect": {
+          "cutDepths": [
+            "0",
+            "3",
+            "6"
+          ],
+          "canFinish": true
+        }
+      },
+      "field Cut 1 depth 8",
+      {
+        "expect": {
+          "cutDepths": [
+            "0",
+            "3",
+            "8"
+          ],
           "canFinish": true
         }
       },

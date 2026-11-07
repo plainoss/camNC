@@ -1,14 +1,42 @@
+import { useState } from 'react';
 import {
   cadCuts,
   cadFaceSketches,
   cadSketchRegions,
   evaluateCadFeatures,
   evaluateCadPart,
+  type CadCut,
   type CadFaceSketch,
   type CadPart,
 } from '@wbcnc/cad';
 
 const faceName = (face: CadFaceSketch) => (face.on === 'top' ? 'Top face' : face.on === 'underside' ? 'Underside' : 'Pocket floor');
+
+function CutDepthInput({ label, depth, onChange }: { label: string; depth: number; onChange: (depth: number) => void }) {
+  const [text, setText] = useState(String(depth));
+  const apply = () => {
+    const value = Number(text);
+    if (text.trim() !== '' && Number.isFinite(value) && value > 0 && value !== depth) onChange(value);
+    else setText(String(depth));
+  };
+  return (
+    <small className="cad-muted">
+      <input
+        className="cad-cut-depth"
+        aria-label={label}
+        inputMode="decimal"
+        value={text}
+        onChange={event => setText(event.target.value)}
+        onBlur={apply}
+        onKeyDown={event => {
+          event.stopPropagation();
+          if (event.key === 'Enter') apply();
+        }}
+      />{' '}
+      mm
+    </small>
+  );
+}
 
 /** The part's sketches and cuts, where a cut that lost its region can be seen and removed. */
 export function PartFeatureList({
@@ -16,6 +44,7 @@ export function PartFeatureList({
   onRemove,
   onSwitchCut,
   onMoveToTop,
+  onCutDepth,
   onEdit,
   onNew,
 }: {
@@ -23,6 +52,8 @@ export function PartFeatureList({
   onRemove: (featureId: string) => void;
   onSwitchCut?: (cutId: string, on: boolean) => void;
   onMoveToTop?: (sketchId: string) => void;
+  /** A cut's region can end up covered by a sketch on its floor, so its depth can be set from here too. */
+  onCutDepth?: (cut: CadCut, depth: number) => void;
   onEdit?: (sketchId: string) => void;
   onNew?: () => void;
 }) {
@@ -71,15 +102,24 @@ export function PartFeatureList({
             )}
             <span className={cut.suppressed ? 'cad-muted' : undefined}>
               Cut {i + 1}{' '}
-              <small className="cad-muted">
-                {!regionIds.has(cut.regionId)
-                  ? 'Region lost'
-                  : cut.depth === 'through'
-                    ? 'Through'
-                    : cut.depth === 0
-                      ? 'No cut'
-                      : `${cut.depth} mm`}
-              </small>
+              {onCutDepth && regionIds.has(cut.regionId) && typeof cut.depth === 'number' && cut.depth > 0 ? (
+                <CutDepthInput
+                  key={`${cut.id}:${cut.depth}`}
+                  label={`Cut ${i + 1} depth`}
+                  depth={cut.depth}
+                  onChange={depth => onCutDepth(cut, depth)}
+                />
+              ) : (
+                <small className="cad-muted">
+                  {!regionIds.has(cut.regionId)
+                    ? 'Region lost'
+                    : cut.depth === 'through'
+                      ? 'Through'
+                      : cut.depth === 0
+                        ? 'No cut'
+                        : `${cut.depth} mm`}
+                </small>
+              )}
             </span>
             <button type="button" aria-label={`Remove cut ${i + 1}`} onClick={() => onRemove(cut.id)}>
               ×
