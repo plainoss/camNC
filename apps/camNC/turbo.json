@@ -19,7 +19,9 @@
       "inputs": [
         "e2e/cad/licenses.node.mjs",
         "public/licenses/**",
-        "package.json"
+        "package.json",
+        "e2e/cad/check-distribution.mjs",
+        "$TURBO_ROOT$/LICENSE"
       ]
     },
     "test:browser": {
@@ -38,6 +40,13 @@
         "!migrations/**",
         "$TURBO_ROOT$/scripts/test-timings.mjs",
         "$TURBO_ROOT$/scripts/balanced-shards.mjs"
+      ]
+    },
+    "build": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "$TURBO_ROOT$/LICENSE"
       ]
     }
   }

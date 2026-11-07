@@ -33,7 +33,7 @@
     },
     // Its own task, so a run without the slowest files can never replay as a passed "test".
     "test:fast": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/balanced-shards.mjs"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/balanced-shards.mjs", "$TURBO_ROOT$/scripts/test-timings.mjs"],
       "dependsOn": ["^transit"],
       "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH"]
     },
@@ -90,7 +90,7 @@
       ]
     },
     "spec:cad": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/balanced-shards.mjs"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/balanced-shards.mjs", "$TURBO_ROOT$/scripts/test-timings.mjs"],
       "dependsOn": [
         "^transit"
       ],

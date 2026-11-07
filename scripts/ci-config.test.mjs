@@ -176,3 +176,23 @@ test('scoped app task caches do not inherit the entire app through a same-packag
     assert(task.dependencies.includes('@wbcnc/cad-editor#transit'), 'workspace source dependencies must still invalidate results');
   }
 });
+
+
+test('license validation and distribution builds hash their verifier and canonical application license', () => {
+  const plan = JSON.parse(execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', 'test:licenses', 'build', '--filter=@wbcnc/camNC', '--dry=json'], { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }));
+  for (const name of ['test:licenses', 'build']) {
+    const task = plan.tasks.find(task => task.taskId === `@wbcnc/camNC#${name}`);
+    const inputs = Object.keys(task.inputs);
+    assert(inputs.some(file => file.endsWith('e2e/cad/check-distribution.mjs')), `${name} must hash its verifier`);
+    assert(inputs.some(file => /(?:^|\/)LICENSE$/.test(file)), `${name} must hash the root license`);
+  }
+});
+
+
+test('package and fast-task input overrides retain the shared timing reporter', () => {
+  const plan = JSON.parse(execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', 'test', 'test:fast', '--filter=@wbcnc/cam', '--filter=@wbcnc/camNC', '--dry=json'], { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }));
+  for (const id of ['@wbcnc/cam#test', '@wbcnc/camNC#test:fast']) {
+    const task = plan.tasks.find(task => task.taskId === id);
+    assert(Object.keys(task.inputs).some(file => file.endsWith('scripts/test-timings.mjs')), `${id} must hash its timing reporter`);
+  }
+});

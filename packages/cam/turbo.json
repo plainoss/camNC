@@ -7,6 +7,7 @@
       // three) are camNC's, not ours: the lockfile stands in for them.
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/test-timings.mjs",
         "$TURBO_ROOT$/apps/camNC/src/visualize/gcodeParsing.ts",
         "$TURBO_ROOT$/apps/camNC/src/visualize/gcodeChecks.ts",
         "$TURBO_ROOT$/apps/camNC/src/visualize/guess-tools.tsx",
