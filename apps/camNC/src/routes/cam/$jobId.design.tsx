@@ -273,7 +273,12 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
               draft(merged);
             }}
             onFinish={edited => leaveFaceSketch(withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited))}
-            onCancel={() => leaveFaceSketch(faceEdit.base)}
+            onCancel={() => {
+              const { base } = faceEdit;
+              // Cancel first saves the sketch as it was. Carrying on from that saved draft, rather than the copy taken on
+              // entry, keeps the next save's checkpoint in step with what's stored.
+              void queue.current.then(() => leaveFaceSketch(failure.current ? base : persisted.current.design!.draft));
+            }}
             saveStatus={status}
             notice={conflicted ? null : error}
             controller={editor}

@@ -296,6 +296,30 @@ describe('leaving in the middle of a face sketch', () => {
   });
 });
 
+describe('cancelling a face sketch', () => {
+  it('keeps saving without a conflict after cancelling saved face edits', async () => {
+    const actual = await vi.importActual<typeof import('@/cam/cadDesign')>('@/cam/cadDesign'),
+      empty = await createDesignJob('Cancelled face'),
+      start = { ...createPlateDocument(), id: empty.design!.draft.id },
+      saved = await actual.saveDesignDraft(empty, start);
+    state.job = saved;
+    state.save.mockImplementation(actual.saveDesignDraft);
+    endCadSession(start.id);
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Open face sketch' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
+    await waitFor(async () => expect(cadFaceSketches((await getJob(saved.id))!.design!.draft.parts[0]!)).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel sketch' }));
+    await waitFor(() => expect(screen.getByTestId('editor-document').textContent).not.toContain(':face:'));
+    const before = (await getJob(saved.id))!.design!.draft.revision;
+    // A conflict would refuse this save, and leave the stored draft where it was.
+    fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
+    await waitFor(async () => expect((await getJob(saved.id))!.design!.draft.revision).toBeGreaterThan(before));
+    expect(screen.queryByRole('alert')).toBeNull();
+    endCadSession(start.id);
+  });
+});
+
 describe('recovering a conflicting editor source', () => {
   it('rejects its first local edit despite refreshed route data, without replacing either sketch', async () => {
     const f = await conflictingView();

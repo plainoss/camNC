@@ -2670,6 +2670,8 @@ export function CadEditor({
                   disabled={!partHasOutline}
                   onClick={() => {
                     if (!show3D) chooseTool('select');
+                    // Back on the drawing, its keys work straight away.
+                    else requestAnimationFrame(() => svg.current?.focus());
                     setShow3D(!show3D);
                   }}>
                   3D
