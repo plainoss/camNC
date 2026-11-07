@@ -1059,7 +1059,8 @@ export function pocketOperation(
       }
     }
     remaining.delete(ci);
-    if (solid && walls && offsetPaths(comps[ci], -r).some(l => rotateToWaste(l, solid))) {
+    // With no walls, such as when a pocket covers the whole top, there's nothing to follow: clear it in rings below.
+    if (solid && walls?.length && offsetPaths(comps[ci], -r).some(l => rotateToWaste(l, solid))) {
       const open = openPocketPasses(comps[ci], walls, solid, topZ, floorZ, tool, s);
       if (open.length) {
         roughWallAllowance = Math.max(
@@ -1500,7 +1501,7 @@ export function throughCuts(features: PartFeatures, settings: Partial<CamSetting
   };
   validateCamSettings(s);
   validateFeatures(features);
-  const top = Math.max(s.stockTop ?? 0, features.levels[0]?.z ?? features.thickness);
+  const top = Math.max(s.stockTop ?? 0, features.levels[0]?.z ?? 0, features.thickness);
   const tools = [...s.tools].sort((a, b) => b.diameter - a.diameter);
   const fits = (region: PathsD) => (t: Tool) => offset(region, -t.diameter / 2, offsetToleranceFor(s)).length > 0;
   return [
@@ -1608,7 +1609,7 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
   const s: CamSettings = { ...DEFAULT_SETTINGS, ...settings };
   validateCamSettings(s);
   validateFeatures(features);
-  const top = Math.max(s.stockTop ?? 0, features.levels[0]?.z ?? features.thickness);
+  const top = Math.max(s.stockTop ?? 0, features.levels[0]?.z ?? 0, features.thickness);
   const tools = [...s.tools].sort((a, b) => b.diameter - a.diameter);
   const warnings: string[] = [];
   const ops: Operation[] = [];

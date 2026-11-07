@@ -1,7 +1,21 @@
-import { addCircle, createPlateDocument } from '@wbcnc/cad';
+import {
+  addCircle,
+  addFaceSketch,
+  addLine,
+  addRectangle,
+  cadSketchRegions,
+  createCadDocument,
+  createCadPart,
+  createPlateDocument,
+  setCutDepth,
+  solveCadDocument,
+  type CadDocument,
+} from '@wbcnc/cad';
+import type { HoleChoice } from '@wbcnc/cam';
 import { describe, expect, it } from 'vitest';
 import { camWorker } from './camQueries';
 import { nativeCadModel } from './nativeCadModel';
+import { missingNativeHoleChoices } from './holeChoices';
 import { kDefaultPlan, toCamSettings } from './planSettings';
 
 describe('native CAD to CAM', () => {
@@ -32,5 +46,114 @@ describe('native CAD to CAM', () => {
     expect(result.ops.some(op => op.kind === 'profile')).toBe(true);
     expect(result.safety).toEqual([]);
     expect(result.path.length).toBeGreaterThan(0);
+  });
+
+  describe('with cuts', () => {
+    function plate() {
+      const document = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+        part = document.parts[0];
+      part.sketch = addCircle(part.sketch, { x: 30, y: 30, radius: 12 });
+      part.sketch = addCircle(part.sketch, { x: 75, y: 30, radius: 5 });
+      return document;
+    }
+    const regionAt = (document: CadDocument, sketchId: string, x: number, y: number) =>
+      cadSketchRegions(document.parts[0], sketchId).find(region => {
+        const xs = region.points.map(p => p.x),
+          ys = region.points.map(p => p.y);
+        return !region.holes.length && Math.min(...xs) < x && x < Math.max(...xs) && Math.min(...ys) < y && y < Math.max(...ys);
+      })!;
+    const pocketed = (depth: number | 'through', document = plate()) => {
+      const sketchId = document.parts[0].sketch.id;
+      return setCutDepth(document, document.parts[0].id, sketchId, regionAt(document, sketchId, 30, 30).id, depth);
+    };
+
+    it('turns a loop with a depth into a pocket, and keeps the other hole’s identity', async () => {
+      const original = plate(),
+        before = await nativeCadModel(original),
+        document = pocketed(5, original),
+        { model, entries } = await nativeCadModel(document),
+        part = model.parts[0],
+        features = entries.get(part.id)!.features;
+      expect(features.pockets.map(pocket => pocket.floorZ)).toEqual([7]);
+      expect(features.throughHoles).toHaveLength(1);
+      expect(part.shape.holes).toHaveLength(1);
+      expect(part.holeIds).toEqual([before.model.parts[0].holeIds![1]]);
+      expect(part.shape.pockets.map(pocket => pocket.depth)).toEqual([5]);
+      expect(part.summary.needsFlip).toBe(false);
+    });
+
+    it('leaves a part unchanged when its loop is cut through', async () => {
+      const original = plate(),
+        plain = await nativeCadModel(original),
+        through = await nativeCadModel(pocketed('through', original));
+      expect(through.model.parts[0].holeIds).toEqual(plain.model.parts[0].holeIds);
+      expect(through.model.parts[0].shape).toEqual(plain.model.parts[0].shape);
+      expect(through.entries.get(through.model.parts[0].id)!.features).toEqual(plain.entries.get(plain.model.parts[0].id)!.features);
+    });
+
+    it('generates a program that reaches the pocket floor in the CAM worker', async () => {
+      const document = pocketed(5),
+        key = `${document.id}:native-pocket`,
+        model = await camWorker().importDesign(document, key),
+        result = await camWorker().generate(key, model.parts[0].id, toCamSettings(kDefaultPlan));
+      expect(result.programs.length).toBeGreaterThan(0);
+      expect(result.safety).toEqual([]);
+      expect(result.ops.some(op => op.kind === 'pocket' && Math.abs(op.zBottom - 7) < 0.01)).toBe(true);
+    });
+
+    it('cuts a rabbet from a face sketch, in part coordinates for a sketch away from the origin', async () => {
+      const base = createCadDocument(),
+        plateAway = createCadPart('Plate', 12),
+        partId = plateAway.id;
+      plateAway.sketch = addRectangle(plateAway.sketch, { x: 40, y: 10, width: 100, height: 60 });
+      base.parts.push(plateAway);
+      const added = addFaceSketch(base, partId, 'top'),
+        face = added.document.parts[0].features![0]!;
+      if (face.type !== 'sketch') throw new Error('Expected a sketch');
+      face.sketch = addLine(face.sketch, { x1: 120, y1: 0, x2: 120, y2: 80 });
+      const rabbet = regionAt(added.document, added.sketchId, 130, 40),
+        { model, entries } = await nativeCadModel(setCutDepth(added.document, partId, added.sketchId, rabbet.id, 4)),
+        pocket = entries.get(partId)!.features.pockets[0]!,
+        strict = pocket.strictRegion.flat();
+      expect(pocket.floorZ).toBe(8);
+      expect(Math.min(...strict.map(p => p.x))).toBeCloseTo(80, 3);
+      expect(Math.max(...strict.map(p => p.x))).toBeCloseTo(100, 3);
+      expect(model.parts[0].sourceOrigin).toEqual([40, 10]);
+      expect(model.parts[0].size).toEqual([100, 60, 12]);
+    });
+
+    it('names a through cut’s hole after the cut, keeps hole choices on it, and refuses a through cut at the edge', async () => {
+      const base = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+        partId = base.parts[0].id;
+      base.parts[0].sketch = addCircle(base.parts[0].sketch, { x: 20, y: 30, radius: 8 });
+      const added = addFaceSketch(base, partId, 'top'),
+        face = added.document.parts[0].features![0]!;
+      if (face.type !== 'sketch') throw new Error('Expected a sketch');
+      face.sketch = addCircle(face.sketch, { x: 60, y: 30, radius: 10 });
+      const document = setCutDepth(added.document, partId, added.sketchId, regionAt(added.document, added.sketchId, 60, 30).id, 'through'),
+        cutId = document.parts[0].features!.at(-1)!.id,
+        { model } = await nativeCadModel(document),
+        holeIds = model.parts[0].holeIds!;
+      expect(holeIds).toHaveLength(2);
+      expect(holeIds[1]).toBe(cutId);
+      expect(model.parts[0].size).toEqual([100, 60, 12]);
+      const solved = await solveCadDocument(document);
+      expect(missingNativeHoleChoices(solved.parts, { [partId]: { [cutId]: { clear: true } as unknown as HoleChoice } })).toEqual([]);
+
+      face.sketch = addLine(face.sketch, { x1: 90, y1: -5, x2: 90, y2: 65 });
+      const edge = regionAt(added.document, added.sketchId, 95, 30);
+      await expect(nativeCadModel(setCutDepth(added.document, partId, added.sketchId, edge.id, 'through'))).rejects.toThrow('edge');
+    });
+
+    it('refuses underside cuts until CAM can machine them, so they’re never silently dropped', async () => {
+      const base = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+        partId = base.parts[0].id,
+        added = addFaceSketch(base, partId, 'underside'),
+        face = added.document.parts[0].features![0]!;
+      if (face.type !== 'sketch') throw new Error('Expected a sketch');
+      face.sketch = addCircle(face.sketch, { x: 50, y: 30, radius: 10 });
+      const region = regionAt(added.document, added.sketchId, 50, 30);
+      await expect(nativeCadModel(setCutDepth(added.document, partId, added.sketchId, region.id, 4))).rejects.toThrow('underside');
+    });
   });
 });

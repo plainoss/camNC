@@ -31,7 +31,15 @@ export function holeChoicesForPart(
 
 /** Retain removed references for Undo/reentry, and make their non-application explicit. */
 export function missingNativeHoleChoices(parts: readonly EvaluatedCadPart[], choices: HoleChoices | undefined): MissingHoleChoice[] {
-  const current = new Map(parts.map(part => [part.partId, new Set(part.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id))]));
+  const current = new Map(
+    parts.map(part => [
+      part.partId,
+      new Set([
+        ...part.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id),
+        ...(part.cuts ?? []).filter(cut => cut.through).map(cut => cut.id),
+      ]),
+    ])
+  );
   return Object.entries(choices ?? {}).flatMap(([partId, holes]) =>
     Object.entries(holes).flatMap(([holeId, choice]) => (current.get(partId)?.has(holeId) ? [] : [{ partId, holeId, choice }]))
   );
