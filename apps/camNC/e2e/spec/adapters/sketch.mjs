@@ -150,6 +150,7 @@ function readScene(cursor) {
 /* Runs in the page. A reviewable drawing: real shapes in screen pixels, effective strokes, no names or IDs. */
 function readFrame() {
   const svg = document.querySelector('[data-testid="cad-canvas"]');
+  if (!svg) return null;
   const box = svg.getBoundingClientRect();
   const n = value => Math.round(value * 100) / 100;
   const lines = [];
@@ -569,5 +570,33 @@ export async function createAdapter(page, url) {
     return failures;
   };
 
-  return { step, check, settle, frame: () => page.evaluate(readFrame) };
+  /** What an agent exploring through spec:session reads after each step: the same facts `check` compares, ID-free. */
+  const state = async () => {
+    const scene = await page.evaluate(readScene, cursor);
+    const enabled = async name => {
+      const button = page.getByRole('button', { name }).first();
+      return (await button.isVisible()) ? button.isEnabled() : null;
+    };
+    const design = await readDesign();
+    const rounded = (_, value) => (typeof value === 'number' ? Math.round(value * 1000) / 1000 : value);
+    return {
+      stage: scene.stage,
+      canvas: !scene.noCanvas,
+      pressed: scene.pressed,
+      status: scene.status.slice(0, 240),
+      readout: scene.footer.slice(0, 240),
+      focus: scene.focusInput ? 'input' : 'canvas',
+      labels: scene.labels,
+      regions: scene.regions ?? 0,
+      previewCount: scene.previewCount ?? 0,
+      canFinish: await enabled(/Finish sketch/),
+      canUndo: await enabled(/^Undo/),
+      canRedo: await enabled(/^Redo/),
+      parts: JSON.parse(JSON.stringify((design?.parts ?? []).map(part => ({ name: part.name, ...canonical(part) })), rounded)),
+    };
+  };
+  /** Only the simulated controller may ever be driven, so tools that keep a page open check before each input. */
+  const inDemo = () => page.evaluate(() => sessionStorage.getItem('camnc-demo') === '1');
+
+  return { step, check, settle, state, inDemo, frame: () => page.evaluate(readFrame) };
 }

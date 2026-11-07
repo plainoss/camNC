@@ -31,6 +31,39 @@ Results are one of `PASS`, `FAIL`, `XFAIL` (a listed known gap still fails) and
 `XPASS` (a known gap now passes, so remove its `known` field). The run fails on
 `FAIL` and `XPASS`, so a fix can't go unrecorded and a known gap can't be forgotten.
 
+## Interactive session
+
+A session keeps one page open and takes scenario steps a line at a time, so an agent
+or developer can try a feature and read the result without replaying from the start.
+It uses the same adapter, so everything is real input in demo mode, and it only
+accepts a local server. Each line returns one JSON object with `ok`, the state after
+the step, any new page errors and `ms`.
+
+```sh
+# A pipe. The exit code is non-zero if any line failed.
+printf 'rect 10,10 100,60\nexpect {"entityCount":4}\n' | pnpm --silent --filter @wbcnc/camNC spec:session
+
+# Long-lived, for callers that can't hold stdin open. Stops on `quit` or after 30 idle minutes.
+pnpm --silent --filter @wbcnc/camNC spec:session --listen
+pnpm --silent --filter @wbcnc/camNC spec:session send 'rect 10,10 100,60' 'key d' 'frame after-dim'
+```
+
+Options: `--listen`, `--url <running dev server>`, `--headed`. Each checkout runs one
+listening session.
+
+Besides the steps below, a line can be:
+
+| Line            | Meaning                                                       |
+| --------------- | ------------------------------------------------------------- |
+| `state`         | The state now, without doing anything                         |
+| `expect <json>` | Check any expectation from a scenario; failures fail the line |
+| `frame [name]`  | Write the normalized SVG to `output/playwright/spec-session/` |
+| `shot [name]`   | Write a screenshot to the same folder                         |
+| `reset`         | Start again on a fresh page with nothing saved                |
+| `quit`          | Stop                                                          |
+
+Once a behaviour works, write the steps that showed it as a scenario.
+
 ## Scenario format
 
 ```json

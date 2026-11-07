@@ -143,6 +143,9 @@ jobs:
       - name: Run sketch behaviour specs
         timeout-minutes: 15
         run: pnpm --filter @wbcnc/camNC spec:cad
+      - name: Check the interactive spec session
+        timeout-minutes: 5
+        run: printf 'rect 10,10 100,60\nexpect {"entityCount":4}\nframe smoke\n' | pnpm --silent --filter @wbcnc/camNC spec:session
       - name: Upload spec results
         if: failure()
         uses: actions/upload-artifact@v4
