@@ -5,6 +5,7 @@ import { saveDesignDraft } from './cadDesign';
 import {
   createDesignJob,
   createJob,
+  importDesignJob,
   deleteJob,
   getJob,
   getModelBytes,
@@ -97,6 +98,17 @@ describe.each([false, true])('committed CAM document storage (demo: %s)', demo =
     expect(await getJob(job.id)).toEqual(saved);
     expect(await getModelBytes(job.id)).toBeNull();
   });
+});
+
+it('imports a design as a new draft job and leaves the document untouched', async () => {
+  const document = createPlateDocument({ name: 'Imported plate' });
+  const first = await importDesignJob(document, 'plate.json');
+  const second = await importDesignJob(document, 'plate.json');
+  expect(second.name).toBe(`${first.name} (2)`);
+  expect(first).toMatchObject({ origin: { kind: 'designFile', fileName: 'plate.json' }, fileName: 'plate.json', parts: [] });
+  expect(first.design).toEqual({ draft: { ...document, name: first.name }, acceptedRevision: 0, partRevisions: {} });
+  expect(await getJob(first.id)).toEqual(first);
+  expect(document.name).toBe('Imported plate');
 });
 
 it('isolates demo records and bytes even when a normal project has the same id', async () => {

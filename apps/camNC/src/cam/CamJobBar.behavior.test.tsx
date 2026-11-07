@@ -42,6 +42,15 @@ beforeEach(() => {
   };
 });
 
+it('says an imported design came from a file and needs checking', () => {
+  state.job.origin = { kind: 'designFile', fileName: 'plate.json' };
+  render(<CamJobBar job={state.job as CamJobV1} />);
+  // The bar is narrow, so the warning comes first and the file name is in the tooltip.
+  expect(screen.getByText('Imported · check before cutting').getAttribute('title')).toBe(
+    'Imported from plate.json. Check it before cutting.'
+  );
+});
+
 it('explains orphaned hole settings and discards only their explicit source keys', () => {
   state.job.plan = { ...kDefaultPlan, holes: { part: { retained: 'leave', removed: 'clear' } } };
   state.job.design = { ...state.job.design!, holeChoiceIssues: [{ partId: 'part', holeId: 'removed', choice: 'clear' }] };

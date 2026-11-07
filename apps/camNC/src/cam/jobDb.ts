@@ -22,7 +22,7 @@ export interface CamJobPartV1 {
 export interface CamJobV1 {
   v: 1;
   /** Where a new job started; it remains a normal editable document. */
-  origin?: { kind: 'sample'; id: string; revision: number };
+  origin?: { kind: 'sample'; id: string; revision: number } | { kind: 'designFile'; fileName: string };
   id: string;
   name: string;
   fileName: string;
@@ -132,6 +132,8 @@ async function tx(
 }
 
 export const kModelFile = /\.(step|stp|stl)$/i;
+/** A CAD document saved as JSON, as `@wbcnc/cad-script` writes it. */
+export const kDesignFile = /\.json$/i;
 
 /** `name`, or "name (2)", "name (3)", … if a job of that name exists: opening the same file twice. */
 export function uniqueJobName(name: string, taken: string[]): string {
@@ -193,6 +195,30 @@ export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV
     updatedAt: now,
     parts: [],
     design: { draft, acceptedRevision: 0, partRevisions: {} },
+  });
+}
+
+/**
+ * Start a job from a design made outside the app, such as by a script. It's only ever a new job and a draft: new part
+ * IDs in an existing job would mark its physical sheets out of date, and someone has to finish the sketch to use it.
+ */
+export async function importDesignJob(document: CadDocument, fileName: string): Promise<CamJobV1> {
+  const context = captureStorageContext();
+  const now = Date.now();
+  const title = uniqueJobName(
+    document.name.trim() || fileName.replace(kDesignFile, ''),
+    (await listJobsIn(context)).map(j => j.name)
+  );
+  return saveJobIn(context, {
+    v: 1,
+    origin: { kind: 'designFile', fileName },
+    id: crypto.randomUUID(),
+    name: title,
+    fileName,
+    createdAt: now,
+    updatedAt: now,
+    parts: [],
+    design: { draft: { ...structuredClone(document), name: title }, acceptedRevision: 0, partRevisions: {} },
   });
 }
 
