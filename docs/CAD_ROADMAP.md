@@ -100,7 +100,7 @@ Fusion program for the same part, because no camNC program has been cut yet.
 
 ## Milestone 2: one 3D view
 
-### PR 5: Edit cuts directly on the 3D part
+### PR 5: Edit cuts directly on the 3D part (merged, #181)
 
 `feat(camNC) Edit cuts directly on the 3D part`
 
@@ -110,7 +110,7 @@ Fusion program for the same part, because no camNC program has been cut yet.
   editor. Regions still come from a sketch, so this is about setting depths, and PR 6
   brings drawing them into the 3D view.
 
-### PR 6: Sketch on the top face and pocket floors
+### PR 6: Sketch on the top face and pocket floors (merged, #188)
 
 `feat(camNC) Sketch on the top face and pocket floors`
 
@@ -124,7 +124,7 @@ Fusion program for the same part, because no camNC program has been cut yet.
 - **Done when:** a pocket inside a pocket works end to end, and 3D is the default
   view for parts.
 
-### PR 7: Add underside sketches and cuts
+### PR 7: Add underside sketches and cuts (merged, #191)
 
 `feat(camNC) Add underside sketches and cuts`
 
