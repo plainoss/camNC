@@ -458,6 +458,8 @@ export async function createAdapter(page, url) {
       case 'design':
         await page.getByRole('link', { name: /Design/ }).first().click();
         await canvas.waitFor();
+        // The canvas takes focus a moment after it appears, and shortcuts pressed before then are lost.
+        await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'cad-canvas');
         await page.waitForTimeout(250);
         return;
       default:
