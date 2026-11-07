@@ -92,6 +92,40 @@ async function setup(source = createPlateDocument()) {
 }
 
 describe('integrated real-pointer sketch context commands', () => {
+  it('creates an editable driving gap between nested circles and converts it back from reference', async () => {
+    const source = createCadDocument(),
+      part = createCadPart();
+    part.sketch = addCircle(part.sketch, { x: 40, y: 30, radius: 50 });
+    part.sketch = addCircle(part.sketch, { x: 40, y: 30, radius: 20 });
+    source.parts.push(part);
+    const { canvas, latest, settled, click, rightClick } = await setup(source);
+    await userEvent.click(canvas);
+    await userEvent.keyboard('d');
+    await click(90, 30);
+    await click(60, 30);
+    await click(110, -35);
+    await settled();
+    const input = await screen.findByRole('textbox', { name: 'Distance mm' });
+    await userEvent.fill(input, '35');
+    await userEvent.keyboard('{Enter}');
+    await settled();
+    const gap = () => latest().parts[0]!.sketch.constraints.find((c): c is CadDimension => c.type === 'circleCircleDistance')!;
+    expect(gap().value).toBeCloseTo(35, 6);
+    expect(gap().driven).not.toBe(true);
+    const label = () => canvas.querySelector(`[data-dimension="${gap().id}"]`)!;
+    await rightClick(label());
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Change to driven dimension' }));
+    await settled();
+    expect(gap().driven).toBe(true);
+    await rightClick(label());
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Change to driving dimension' }));
+    await settled();
+    expect(gap().value).toBeCloseTo(35, 6);
+    expect(gap().driven).not.toBe(true);
+    await userEvent.dblClick(label());
+    expect(await screen.findByRole('textbox', { name: 'Distance mm' })).toBeDefined();
+  });
+
   it.each(['body', 'input'] as const)('restores drag keyboard ownership with animation frames paused and %s focused', async focusTarget => {
     const source = createCadDocument(),
       part = createCadPart();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addConstraint,
+  addCircle,
   addLine,
   addRectangle,
   createCadDocument,
@@ -32,6 +33,48 @@ async function prepare(part: CadPart, dimension: CadDimension) {
 const sourceDimension = (part: CadPart, id: string) => part.sketch.constraints.find(constraint => constraint.id === id)! as CadDimension;
 
 describe('fresh dimension creation with native constraint rank', () => {
+  it.each(['shared', 'coincident'] as const)('creates a driving gap with %s centers and restores a reference to driving', async centers => {
+    const part = createCadPart();
+    part.sketch = addCircle(part.sketch, { x: 40, y: 30, radius: 50 });
+    part.sketch = addCircle(part.sketch, { x: centers === 'shared' ? 40 : 45, y: 30, radius: 20 });
+    const circles = part.sketch.entities.filter(entity => entity.type === 'circle');
+    if (centers === 'coincident') {
+      part.sketch = {
+        ...part.sketch,
+        entities: part.sketch.entities.map(entity => (entity.id === circles[1]!.centerId ? { ...entity, x: 40 } : entity)),
+      };
+      part.sketch = addConstraint(part.sketch, {
+        type: 'coincident',
+        pointAId: circles[0]!.centerId,
+        pointBId: circles[1]!.centerId,
+      });
+    }
+    const result = dimensionForSelection(
+      part.sketch,
+      circles.map(circle => circle.id),
+      {
+        picks: { [circles[0]!.id]: { x: 90, y: 30 }, [circles[1]!.id]: { x: 60, y: 30 } },
+      }
+    );
+    if (!('constraint' in result)) throw new Error(result.message);
+    const dimension = { ...result.constraint, id: 'nested-gap' };
+    expect(dimension).toMatchObject({ type: 'circleCircleDistance', value: 30 });
+    const created = await prepare(part, dimension);
+    expect(created.driven).toBe(false);
+    const baseline = await solveCadDocument(documentOf(part));
+    const solved = await solveCadDocument(documentOf(created.part));
+    expect(solved.sketches[0]!.dof).toBe(baseline.sketches[0]!.dof - 1);
+    const reference = setDimensionDriven(documentOf(created.part), dimension.id, true);
+    const restored = setDimensionDriven(reference, dimension.id, false);
+    const edited = await solveCadDocument(updateDimension(restored, dimension.id, 35));
+    expect(edited.sketches[0]!.status, JSON.stringify(edited.diagnostics)).toBe('solved');
+    const output = edited.document.parts[0]!;
+    const radii = output.sketch.entities.filter(entity => entity.type === 'circle').map(circle => circle.radius);
+    expect(Math.abs(radii[0]! - radii[1]!)).toBeCloseTo(35, 6);
+    expect(sourceDimension(output, dimension.id).driven).not.toBe(true);
+    expect(parseCadDocument(JSON.parse(JSON.stringify(edited.document)))).toEqual(edited.document);
+  });
+
   it('makes only a redundant new rectangle size driven and preserves source identities, drivers and portable history', async () => {
     const original = createCadPart();
     original.sketch = addRectangle(original.sketch, { x: 40, y: 20, width: 60, height: 40 });
