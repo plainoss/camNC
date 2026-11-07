@@ -284,6 +284,11 @@ export async function createAdapter(page, url) {
         await page.waitForTimeout(40);
         return;
       case 'type':
+        // A value field opens just after the click that asks for it, so typing straight away can lose the keys. Not every
+        // step types into a field, so this only waits so long.
+        await page
+          .waitForFunction(() => /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? ''), undefined, { timeout: 1000 })
+          .catch(() => {});
         await page.keyboard.type(rest);
         return;
       case 'click':
