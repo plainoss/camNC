@@ -1,3 +1,4 @@
+import { reflectAcrossLine } from './symmetry';
 import { constraintEntityIds, entityPointIds } from './document';
 import { curveEndpointIds, evaluateCurvePoint, evaluateCurveTangent, isNurbsCurve } from './curves';
 import { CAD_GEOMETRY_TOLERANCE } from './geometry';
@@ -34,6 +35,39 @@ export function fixedConstraintConflicts(part: CadPart): CadDiagnostic[] {
     if ('value' in constraint && constraint.driven) continue;
     let error: number | undefined;
     switch (constraint.type) {
+      case 'symmetricCurves': {
+        const axis = line(constraint.lineId);
+        if (!axis) break;
+        const a = entities.get(constraint.entityAId)!,
+          b = entities.get(constraint.entityBId)!;
+        const reflected = (id: string) => {
+          const p = point(id);
+          return p ? reflectAcrossLine(p, axis.a, axis.b) : null;
+        };
+        if (a.type === 'line' && b.type === 'line') {
+          const target = line(b.id),
+            start = reflected(a.startId),
+            end = reflected(a.endId);
+          if (target && target.length && start && end)
+            error = Math.max(
+              ...[start, end].map(p => Math.abs(target.dx * (p.y - target.a.y) - target.dy * (p.x - target.a.x)) / target.length)
+            );
+        } else if ('centerId' in a && 'centerId' in b) {
+          const mirror = reflected(a.centerId),
+            target = point(b.centerId);
+          if (mirror && target) error = Math.hypot(mirror.x - target.x, mirror.y - target.y);
+          if (a.type === 'ellipse' && b.type === 'ellipse') {
+            const mirror = reflected(a.focusId),
+              focus = point(b.focusId),
+              center = point(b.centerId);
+            if (mirror && focus && (constraint.focusSign !== -1 || center)) {
+              const target = constraint.focusSign === -1 ? { x: 2 * center!.x - focus.x, y: 2 * center!.y - focus.y } : focus;
+              error = Math.max(error ?? 0, Math.hypot(mirror.x - target.x, mirror.y - target.y));
+            }
+          }
+        }
+        break;
+      }
       case 'regularPolygon': {
         for (let i = 0; i < constraint.edgeIds.length - 1; i++) {
           const a = line(constraint.edgeIds[i]!),

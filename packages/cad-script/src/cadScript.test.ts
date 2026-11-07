@@ -333,3 +333,15 @@ it('applies a multi-curve concentric relation through the script API', async () 
   expect(result.scriptError).toBeUndefined();
   expect(cadFaceSketches(result.document.parts[0]!)[0]!.sketch.constraints.filter(c => c.label === 'Concentric')).toHaveLength(2);
 });
+
+it('applies a general curve symmetry relation through the script API', async () => {
+  const result = await editCad(null, d => {
+    const part = d.part('Plate');
+    part.profile.rect({ at: [0, 0], w: 120, h: 100 });
+    const sketch = part.sketchOn('top');
+    const axis = sketch.line([60, 10], [60, 90]);
+    sketch.relate('symmetric', axis, sketch.line([80, 30], [100, 50]), sketch.line([20, 30], [40, 50]));
+  });
+  expect(result.scriptError).toBeUndefined();
+  expect(cadFaceSketches(result.document.parts[0]!)[0]!.sketch.constraints.filter(c => c.type === 'symmetricCurves')).toHaveLength(1);
+});

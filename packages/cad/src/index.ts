@@ -32,3 +32,5 @@ export * from './alignedRectangle';
 export * from './centerPointArc';
 
 export * from './polygon';
+
+export { reflectAcrossLine } from './symmetry';

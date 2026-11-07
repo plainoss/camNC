@@ -166,6 +166,22 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
         const message = dimensionValueError(c, c.value);
         if (message) error('invalid-dimension', message, undefined, [c.id]);
       }
+      if (c.type === 'symmetricCurves') {
+        const a = entities.get(c.entityAId),
+          b = entities.get(c.entityBId);
+        const compatible =
+          (a?.type === 'line' && b?.type === 'line') ||
+          (['circle', 'arc'].includes(a?.type ?? '') && ['circle', 'arc'].includes(b?.type ?? '')) ||
+          (a?.type === 'ellipse' && b?.type === 'ellipse');
+        if (
+          !compatible ||
+          entities.get(c.lineId)?.type !== 'line' ||
+          c.entityAId === c.entityBId ||
+          [c.entityAId, c.entityBId].includes(c.lineId) ||
+          (c.focusSign !== undefined && c.focusSign !== 1 && c.focusSign !== -1)
+        )
+          error('invalid-reference', 'Curve symmetry needs a separate line and compatible curves.', undefined, [c.id]);
+      }
       if (c.type === 'symmetricPoints') {
         if (
           entities.get(c.pointAId)?.type !== 'point' ||

@@ -31,6 +31,7 @@ import { migrateDimensionPlacements } from './dimensionPlacement';
 import { isFatalSolverError } from './solverFailure';
 import { invalidOffsetBranches, offsetNativePrimitives, offsetNativeSeed } from './offsetConstraint';
 import { entityPointIds } from './document';
+import { curveSymmetryPrimitives } from './symmetry';
 import { conditionEllipseAxes } from './ellipse';
 import { withSplineHandleSegments } from './splineHandles';
 
@@ -181,6 +182,8 @@ function solverConstraint(
 ): SketchPrimitive | SketchPrimitive[] {
   const id = c.id;
   switch (c.type) {
+    case 'symmetricCurves':
+      return curveSymmetryPrimitives(c, entities);
     case 'regularPolygon':
       if (c.mode === 'circumscribed') {
         const circle = entities.get(c.circleId) as import('./types').CadCircleEntity;
@@ -818,7 +821,9 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
           }
         }
         const sourceConstraintId = (nativeId: string) =>
-          part.sketch.constraints.find(c => c.type === 'regularPolygon' && nativeId.startsWith(`${c.id}:`))?.id ?? nativeId;
+          part.sketch.constraints.find(
+            c => (c.type === 'regularPolygon' || c.type === 'symmetricCurves') && nativeId.startsWith(`${c.id}:`)
+          )?.id ?? nativeId;
         const status = conflicts.length ? 'conflict' : candidate ? 'solved' : 'invalid';
         sketches.push({ partId: part.id, dof: wrapper.gcs.dof(), status });
         if (status !== 'solved') {

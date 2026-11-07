@@ -1829,18 +1829,20 @@ export function CadEditor({
       return;
     }
     const constraintKey =
-      event.shiftKey && key === 'o'
-        ? 'concentric'
-        : event.shiftKey && key === 'l'
-          ? 'perpendicular'
-          : !event.shiftKey
-            ? (
-                { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<
-                  string,
-                  ConstraintTool
-                >
-              )[key]
-            : undefined;
+      event.shiftKey && key === 'q'
+        ? 'symmetric'
+        : event.shiftKey && key === 'o'
+          ? 'concentric'
+          : event.shiftKey && key === 'l'
+            ? 'perpendicular'
+            : !event.shiftKey
+              ? (
+                  { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<
+                    string,
+                    ConstraintTool
+                  >
+                )[key]
+              : undefined;
     if (constraintKey) {
       event.preventDefault();
       constrain(constraintKey);
@@ -2078,16 +2080,20 @@ export function CadEditor({
     if (constraintMode) {
       if (!id) return;
       const next = selected.includes(id) ? selected : [...selected, id];
+      const axisIds =
+        constraintMode === 'symmetric' && sketch.entities.some(e => e.id === next[0] && e.type === 'line') ? next.slice(0, 1) : [];
       const result = buildConstraintForSelection(sketch, constraintMode, next);
       if (result.constraint || result.constraints?.length) {
         changeSketch((result.constraints ?? [result.constraint!]).reduce((next, c) => addConstraint(next, c), sketch));
-        setSelected([]);
-        setMessage(`${result.message} ${constraintPrompt(constraintMode)}`);
+        setSelected(constraintMode === 'symmetric' ? axisIds : []);
+        setMessage(
+          `${result.message} ${constraintMode === 'symmetric' ? 'Select the next pair relative to this symmetry line.' : constraintPrompt(constraintMode)}`
+        );
       } else if (result.alreadyApplied) {
-        setSelected([]);
+        setSelected(constraintMode === 'symmetric' ? axisIds : []);
         setMessage(result.message);
       } else {
-        setSelected(result.needsMore ? next : [id]);
+        setSelected(result.needsMore ? next : constraintMode === 'symmetric' ? axisIds : [id]);
         setMessage(result.message);
       }
       return;
@@ -3289,6 +3295,7 @@ export function CadEditor({
                     'vertical',
                     'coincident',
                     'concentric',
+                    'symmetric',
                     'midpoint',
                     'parallel',
                     'perpendicular',

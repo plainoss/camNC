@@ -222,6 +222,14 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
     case 'vertical':
       shape = <path d="M12 4v16m-3-16h6m-6 16h6" />;
       break;
+    case 'symmetric':
+      shape = (
+        <>
+          <path d="M12 2v20" strokeDasharray="2 2" />
+          <path d="m3 7 5 5-5 5m18-10-5 5 5 5" />
+        </>
+      );
+      break;
     case 'concentric':
       shape = (
         <>
@@ -314,6 +322,7 @@ const constraints: { id: ConstraintCommandTool; label: string; key?: string }[] 
   { id: 'vertical', label: 'Vertical', key: 'V' },
   { id: 'coincident', label: 'Coincident', key: 'I' },
   { id: 'concentric', label: 'Concentric', key: 'Shift+O' },
+  { id: 'symmetric', label: 'Symmetric', key: 'Shift+Q' },
   { id: 'midpoint', label: 'Midpoint', key: 'Shift+M' },
   { id: 'parallel', label: 'Parallel', key: 'B' },
   { id: 'perpendicular', label: 'Perpendicular', key: 'Shift+L' },
