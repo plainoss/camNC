@@ -19,6 +19,7 @@ export type SketchTool =
   | 'mirror'
   | 'dimension'
   | 'fillet'
+  | 'chamfer'
   | 'conic'
   | 'spline'
   | 'bezier'
@@ -50,6 +51,7 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'inscribedPolygon', label: 'Inscribed polygon' },
   { id: 'circumscribedPolygon', label: 'Circumscribed polygon' },
   { id: 'point', label: 'Point', key: 'Shift+S' },
+  { id: 'chamfer', label: 'Sketch chamfer' },
   { id: 'fillet', label: 'Sketch fillet', key: 'Shift+F' },
   { id: 'trim', label: 'Trim', key: 'M' },
   { id: 'extend', label: 'Extend', key: 'X' },
@@ -58,7 +60,7 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'dimension', label: 'Dimension', key: 'D' },
 ];
 
-const modifyTools = { id: 'modify', label: 'Modify tools', tools: ['fillet', 'trim', 'extend', 'offset', 'mirror'] } as const;
+const modifyTools = { id: 'modify', label: 'Modify tools', tools: ['fillet', 'chamfer', 'trim', 'extend', 'offset', 'mirror'] } as const;
 
 /** Only the compact layout combines drawing commands; wide layouts retain their native families. */
 export const sketchToolGroups = [

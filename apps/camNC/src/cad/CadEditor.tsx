@@ -22,6 +22,8 @@ import {
   dimensionValueError,
   entityPointIds as curvePointIds,
   filletLineCorners,
+  chamferLineCorners,
+  resolveChamferCorners,
   extendSketchCurve,
   mirrorSketchEntities,
   offsetSketch,
@@ -339,6 +341,8 @@ export function CadEditor({
   const [width, setWidth] = useState('100');
   const [height, setHeight] = useState('60');
   const [radius, setRadius] = useState('10');
+  const chamferDrag = useRef<{ side: number; origin: CadPoint; direction: CadPoint; previous: string[] } | null>(null);
+  const [chamferDistances, setChamferDistances] = useState(['10', '10']);
   const [filletRadius, setFilletRadius] = useState('10');
   const [filletEditing, setFilletEditing] = useState(false);
   const [modification, setModification] = useState<ModificationWorkflow>(idleModificationWorkflow);
@@ -430,7 +434,25 @@ export function CadEditor({
       ? { ok: false as const, message: radius.error, cornerPointIds: filletSelection.cornerPointIds }
       : filletLineCorners(sketch, { cornerPointIds: filletSelection.cornerPointIds, radius: radius.value });
   }, [sketch, filletSelection, filletRadius]);
-  const shownSketch = filletPreview?.ok ? filletPreview.sketch : sketch;
+  const chamferSelection = useMemo(
+    () => (sketch && tool === 'chamfer' ? resolveChamferCorners(sketch, selected) : null),
+    [sketch, tool, selected]
+  );
+  const chamferPreview = useMemo(() => {
+    if (!sketch || !chamferSelection?.ok) return null;
+    const values = chamferDistances.map(value => parseCadValue(value, { unit: 'mm' }));
+    const error = values.find(value => 'error' in value);
+    return error && 'error' in error
+      ? { ok: false as const, message: error.error, cornerPointIds: chamferSelection.cornerPointIds }
+      : chamferLineCorners(sketch, {
+          cornerPointIds: chamferSelection.cornerPointIds,
+          distanceA: (values[0] as { value: number }).value,
+          distanceB: (values[1] as { value: number }).value,
+          selectedLineIds: selected,
+        });
+  }, [sketch, chamferSelection, chamferDistances, selected]);
+  const cornerPreview = tool === 'chamfer' ? chamferPreview : filletPreview;
+  const shownSketch = cornerPreview?.ok ? cornerPreview.sketch : sketch;
   const offsetPreview = useMemo(() => {
     if (!sketch || modification.phase !== 'offset' || !modification.entityIds.length) return null;
     const parsed = parseCadValue(modification.text, { unit: 'mm' });
@@ -787,6 +809,7 @@ export function CadEditor({
     setDimension(null);
     setPalette(false);
     setFilletEditing(false);
+    chamferDrag.current = null;
     setConicEditing(null);
     setModification(idleModificationWorkflow());
     setHoveredModifyCurve(null);
@@ -896,15 +919,17 @@ export function CadEditor({
                                   ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
                                   : next === 'trim'
                                     ? 'Click an interval to trim between intersections or placed points.'
-                                    : next === 'fillet'
-                                      ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
-                                      : next === 'conic'
-                                        ? 'Click the start, end, then control point. Enter rho to shape the conic.'
-                                        : next === 'spline' || next === 'bezier'
-                                          ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
-                                          : next === 'curveControlPoint'
-                                            ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                            : 'Select a line, circle, point pair or existing dimension.'
+                                    : next === 'chamfer'
+                                      ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
+                                      : next === 'fillet'
+                                        ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                                        : next === 'conic'
+                                          ? 'Click the start, end, then control point. Enter rho to shape the conic.'
+                                          : next === 'spline' || next === 'bezier'
+                                            ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
+                                            : next === 'curveControlPoint'
+                                              ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
+                                              : 'Select a line, circle, point pair or existing dimension.'
     );
     svg.current?.focus();
   };
@@ -1406,6 +1431,23 @@ export function CadEditor({
       setMessage(error instanceof Error ? error.message : String(error));
     }
   };
+  const acceptChamfer = () => {
+    if (!chamferPreview?.ok)
+      return setMessage(
+        chamferPreview?.message ?? (chamferSelection && !chamferSelection.ok ? chamferSelection.message : 'Select corners to chamfer.')
+      );
+    const next = structuredClone(chamferPreview.sketch);
+    chamferPreview.dimensionIds.forEach((id, index) => {
+      const value = parseCadValue(chamferDistances[index]!, { unit: 'mm' });
+      const dimension = next.constraints.find(c => c.id === id);
+      if (dimension && 'value' in dimension && 'value' in value && value.expression) dimension.expression = value.expression;
+    });
+    changeSketch(next);
+    chooseTool('select');
+    setSelected([]);
+    setSelectedConstraints(chamferPreview.dimensionIds);
+    setMessage('Chamfers created. Double-click either setback dimension to edit the group.');
+  };
   const acceptFillet = () => {
     if (!filletPreview?.ok) {
       setMessage(
@@ -1475,7 +1517,7 @@ export function CadEditor({
     }
   };
   const removeSelected = (entityIds: readonly string[] = selected, constraintIds: readonly string[] = selectedConstraints) => {
-    if (tool === 'fillet' && selected.length) {
+    if ((tool === 'fillet' || tool === 'chamfer') && selected.length) {
       chooseTool('select');
       setSelected([]);
       return;
@@ -2027,7 +2069,7 @@ export function CadEditor({
       }
       return;
     }
-    if (tool === 'fillet') {
+    if (tool === 'fillet' || tool === 'chamfer') {
       if (id) {
         setSelected(previous => (previous.includes(id) ? previous.filter(existing => existing !== id) : [...previous, id]));
         setFilletEditing(false);
@@ -2273,6 +2315,18 @@ export function CadEditor({
     }
   };
   const pointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    if (chamferDrag.current) {
+      const matrix = svg.current?.getScreenCTM();
+      if (!matrix) return;
+      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+      const { side, origin, direction } = chamferDrag.current;
+      const distance = Math.max(0.001, (point.x - origin.x) * direction.x + (-point.y - origin.y) * direction.y);
+      setChamferDistances(previous =>
+        previous.map((value, index) => (index === side ? String(Math.round(distance * 1000) / 1000) : value))
+      );
+      return;
+    }
+
     contextPress.current = transitionSketchContextPress(contextPress.current, {
       type: 'move',
       pointerId: event.pointerId,
@@ -2426,6 +2480,12 @@ export function CadEditor({
     void solveDrag(moving);
   };
   const pointerEnd = (cancel = false, event?: PointerEvent<SVGSVGElement>) => {
+    if (chamferDrag.current) {
+      if (cancel) setChamferDistances(chamferDrag.current.previous);
+      chamferDrag.current = null;
+      return;
+    }
+
     pan.current = null;
     if (contextPress.current.phase === 'pressed') {
       const context = transitionSketchContextPress(
@@ -2518,7 +2578,7 @@ export function CadEditor({
     if (busy || solving || finishing.current || preparingDimension.current) return blocked('Wait for the current sketch check to finish.');
     const reason = !thicknessValid
       ? 'Enter a valid part thickness before finishing the sketch.'
-      : tool === 'fillet' && selected.length
+      : (tool === 'fillet' || tool === 'chamfer') && selected.length
         ? 'Apply the fillet radius or press Escape before finishing the sketch.'
         : modification.phase === 'mirror' && modification.entityIds.length
           ? 'Choose the mirror line or press Escape before finishing the sketch.'
@@ -2642,7 +2702,7 @@ export function CadEditor({
   const currentSolverResult = !solving && lastCheckedRevision.current === `${doc.id}:${doc.revision}`;
   const colorNotice = currentSolverResult ? constraintColorNotice(activeSketchStatus) : undefined;
   const entityStatus =
-    currentSolverResult && !drag.current && !filletPreview?.ok && activeSketchStatus?.status === 'solved'
+    currentSolverResult && !drag.current && !cornerPreview?.ok && activeSketchStatus?.status === 'solved'
       ? activeSketchStatus.entityStatus
       : undefined;
   const stroke =
@@ -2679,7 +2739,11 @@ export function CadEditor({
         canFinish={
           faceSketch
             ? !solving && !problems.length
-            : thicknessValid && !solving && !problems.length && numberOfShapes > 0 && !(tool === 'fillet' && selected.length)
+            : thicknessValid &&
+              !solving &&
+              !problems.length &&
+              numberOfShapes > 0 &&
+              !((tool === 'fillet' || tool === 'chamfer') && selected.length)
         }
         onTool={next => {
           if (next === 'dimension') beginDimension();
@@ -2954,7 +3018,7 @@ export function CadEditor({
               partId={part?.id}
               verified={
                 !solving &&
-                !(tool === 'fillet' && selected.length) &&
+                !((tool === 'fillet' || tool === 'chamfer') && selected.length) &&
                 activeSketchStatus?.status === 'solved' &&
                 lastCheckedRevision.current === `${doc.id}:${doc.revision}`
               }
@@ -3005,7 +3069,7 @@ export function CadEditor({
                   ...hoveredConstraintEntities,
                   ...selectedConstraints.flatMap(id => associatedEntityIds(sketch, id)),
                 ]}
-                stroke={filletPreview?.ok ? '#858d96' : stroke}
+                stroke={cornerPreview?.ok ? '#858d96' : stroke}
                 entityStatus={entityStatus}
                 pixelScale={markerScale}
                 hoveredPointId={hoveredPoint}
@@ -3019,10 +3083,44 @@ export function CadEditor({
                 }}
               />
             )}
-            {tool === 'fillet' &&
-              filletPreview &&
-              !filletPreview.ok &&
-              filletPreview.cornerPointIds.map(id => {
+            {tool === 'chamfer' &&
+              chamferPreview?.ok &&
+              chamferPreview.dimensionIds.map((id, side) => {
+                const dimension = chamferPreview.sketch.constraints.find(c => c.id === id);
+                if (dimension?.type !== 'distance') return null;
+                const origin = chamferPreview.sketch.entities.find(e => e.id === dimension.pointAId);
+                const point = chamferPreview.sketch.entities.find(e => e.id === dimension.pointBId);
+                if (origin?.type !== 'point' || point?.type !== 'point') return null;
+                const length = Math.hypot(point.x - origin.x, point.y - origin.y);
+                return (
+                  <circle
+                    key={side}
+                    data-chamfer-handle={side}
+                    cx={point.x}
+                    cy={-point.y}
+                    r={6 / markerScale}
+                    fill="#fff"
+                    stroke="#2467d1"
+                    vectorEffect="non-scaling-stroke"
+                    style={{ cursor: 'move' }}
+                    onPointerDown={event => {
+                      event.stopPropagation();
+                      event.preventDefault();
+                      chamferDrag.current = {
+                        side,
+                        origin,
+                        direction: { x: (point.x - origin.x) / length, y: (point.y - origin.y) / length },
+                        previous: chamferDistances,
+                      };
+                      svg.current?.setPointerCapture(event.pointerId);
+                    }}
+                  />
+                );
+              })}
+            {(tool === 'fillet' || tool === 'chamfer') &&
+              cornerPreview &&
+              !cornerPreview.ok &&
+              cornerPreview.cornerPointIds.map(id => {
                 const point = sketch?.entities.find(entity => entity.type === 'point' && entity.id === id);
                 return point?.type === 'point' ? (
                   <circle
@@ -3361,6 +3459,52 @@ export function CadEditor({
               <button type="submit" disabled={!pending[1]}>
                 Create polygon
               </button>
+            </form>
+          )}
+          {tool === 'chamfer' && selected.length > 0 && (
+            <form
+              className="cad-create-size cad-chamfer-editor"
+              onSubmit={event => {
+                event.preventDefault();
+                acceptChamfer();
+              }}>
+              {chamferDistances.map((value, index) => (
+                <label key={index}>
+                  Distance {index + 1}{' '}
+                  <CadValueInput
+                    aria-label={`Chamfer distance ${index + 1}`}
+                    inputMode="decimal"
+                    value={value}
+                    onChange={event =>
+                      setChamferDistances(previous => previous.map((text, i) => (i === index ? event.target.value : text)))
+                    }
+                    onKeyDown={event => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        chooseTool('select');
+                        setSelected([]);
+                      }
+                    }}
+                  />
+                </label>
+              ))}
+              <button type="submit" disabled={!chamferPreview?.ok}>
+                Apply chamfers
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  chooseTool('select');
+                  setSelected([]);
+                }}>
+                Cancel chamfers
+              </button>
+              {((chamferPreview && !chamferPreview.ok) || (chamferSelection && !chamferSelection.ok)) && (
+                <span role="alert" className="cad-error">
+                  {(chamferPreview && !chamferPreview.ok ? chamferPreview.message : undefined) ??
+                    (chamferSelection && !chamferSelection.ok ? chamferSelection.message : '')}
+                </span>
+              )}
             </form>
           )}
           {tool === 'fillet' && selected.length > 0 && (

@@ -29,20 +29,27 @@ interface Corner {
   bisector: CadPoint;
 }
 
-function connectedCurves(sketch: CadSketch, pointId: string, equivalent: CadPointEquivalence) {
-  return sketch.entities.filter(
+function connectedCurves(sketch: CadSketch, pointId: string, equivalent: CadPointEquivalence, includeConstruction = false) {
+  const curves = sketch.entities.filter(
     entity =>
       entity.type !== 'point' &&
-      !entity.construction &&
+      (includeConstruction || !entity.construction) &&
       'startId' in entity &&
       'endId' in entity &&
       (equivalent.equivalent(entity.startId, pointId) || equivalent.equivalent(entity.endId, pointId))
   );
+  const profile = curves.filter(entity => !entity.construction);
+  return includeConstruction && profile.length ? profile : curves;
 }
 
-function lineCorner(sketch: CadSketch, pointId: string, equivalent: CadPointEquivalence): Corner | string {
+export function lineCorner(
+  sketch: CadSketch,
+  pointId: string,
+  equivalent: CadPointEquivalence,
+  includeConstruction = false
+): Corner | string {
   const point = sketch.entities.find((entity): entity is CadPointEntity => entity.type === 'point' && entity.id === pointId);
-  const connected = connectedCurves(sketch, pointId, equivalent);
+  const connected = connectedCurves(sketch, pointId, equivalent, includeConstruction);
   if (!point || connected.length !== 2 || !connected.every((entity): entity is CadLineEntity => entity.type === 'line'))
     return 'Select a corner shared by exactly two straight profile lines.';
   const lines = connected as [CadLineEntity, CadLineEntity];
@@ -80,7 +87,7 @@ function lineCorner(sketch: CadSketch, pointId: string, equivalent: CadPointEqui
 }
 
 /** Explicit corner points and pairs of selected incident lines resolve to the same atomic operation. */
-export function resolveFilletCorners(sketch: CadSketch, selectedIds: readonly string[]): CadFilletSelection {
+export function resolveFilletCorners(sketch: CadSketch, selectedIds: readonly string[], includeConstruction = false): CadFilletSelection {
   const equivalent = pointEquivalence(sketch.constraints);
   const selected = [...new Set(selectedIds)];
   const corners = new Set<string>();
@@ -88,7 +95,7 @@ export function resolveFilletCorners(sketch: CadSketch, selectedIds: readonly st
   for (const id of selected) {
     const entity = sketch.entities.find(candidate => candidate.id === id);
     if (entity?.type === 'point') corners.add(equivalent.canonical(id));
-    else if (entity?.type === 'line' && !entity.construction) lines.add(id);
+    else if (entity?.type === 'line' && (includeConstruction || !entity.construction)) lines.add(id);
     else
       return {
         ok: false,
@@ -99,14 +106,14 @@ export function resolveFilletCorners(sketch: CadSketch, selectedIds: readonly st
   const pairedLines = new Set<string>();
   for (const entity of sketch.entities) {
     if (entity.type !== 'point') continue;
-    const connected = connectedCurves(sketch, entity.id, equivalent);
+    const connected = connectedCurves(sketch, entity.id, equivalent, includeConstruction);
     if (connected.length === 2 && connected.every(curve => lines.has(curve.id))) {
       corners.add(equivalent.canonical(entity.id));
       connected.forEach(curve => pairedLines.add(curve.id));
     }
   }
   for (const id of corners) {
-    const corner = lineCorner(sketch, id, equivalent);
+    const corner = lineCorner(sketch, id, equivalent, includeConstruction);
     if (typeof corner === 'string') return { ok: false, cornerPointIds: [id], message: corner };
     corner.lines.forEach(line => pairedLines.add(line.id));
   }
