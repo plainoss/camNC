@@ -23,6 +23,9 @@ import {
   entityPointIds as curvePointIds,
   filletLineCorners,
   chamferLineCorners,
+  splitSketchCurve,
+  isClosedSketchCurve,
+  evaluateCurvePoint,
   resolveChamferCorners,
   extendSketchCurve,
   mirrorSketchEntities,
@@ -341,6 +344,8 @@ export function CadEditor({
   const [width, setWidth] = useState('100');
   const [height, setHeight] = useState('60');
   const [radius, setRadius] = useState('10');
+  const [splitNotice, setSplitNotice] = useState('');
+  const [splitFirst, setSplitFirst] = useState<{ entityId: string; parameter: number; point: CadPoint } | null>(null);
   const chamferDrag = useRef<{ side: number; origin: CadPoint; direction: CadPoint; previous: string[] } | null>(null);
   const [chamferDistances, setChamferDistances] = useState(['10', '10']);
   const [filletRadius, setFilletRadius] = useState('10');
@@ -809,6 +814,8 @@ export function CadEditor({
     setDimension(null);
     setPalette(false);
     setFilletEditing(false);
+    setSplitFirst(null);
+    setSplitNotice('');
     chamferDrag.current = null;
     setConicEditing(null);
     setModification(idleModificationWorkflow());
@@ -917,19 +924,21 @@ export function CadEditor({
                                 ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
                                 : next === 'line'
                                   ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
-                                  : next === 'trim'
-                                    ? 'Click an interval to trim between intersections or placed points.'
-                                    : next === 'chamfer'
-                                      ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
-                                      : next === 'fillet'
-                                        ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
-                                        : next === 'conic'
-                                          ? 'Click the start, end, then control point. Enter rho to shape the conic.'
-                                          : next === 'spline' || next === 'bezier'
-                                            ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
-                                            : next === 'curveControlPoint'
-                                              ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                              : 'Select a line, circle, point pair or existing dimension.'
+                                  : next === 'split'
+                                    ? 'Click a curve to split it. Closed curves require two distinct split points.'
+                                    : next === 'trim'
+                                      ? 'Click an interval to trim between intersections or placed points.'
+                                      : next === 'chamfer'
+                                        ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
+                                        : next === 'fillet'
+                                          ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                                          : next === 'conic'
+                                            ? 'Click the start, end, then control point. Enter rho to shape the conic.'
+                                            : next === 'spline' || next === 'bezier'
+                                              ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
+                                              : next === 'curveControlPoint'
+                                                ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
+                                                : 'Select a line, circle, point pair or existing dimension.'
     );
     svg.current?.focus();
   };
@@ -2149,6 +2158,44 @@ export function CadEditor({
       svg.current?.focus();
       return;
     }
+    if (tool === 'split') {
+      const hit = pickSketchSnap(
+        sketch,
+        { x: event.clientX, y: event.clientY },
+        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
+      );
+      const curve = sketch.entities.find(e => e.id === hit?.entityId);
+      if (!curve || curve.type === 'point' || isOwnedSplineHandle(curve) || hit?.parameter === undefined)
+        return setMessage('Select a sketch curve, away from its endpoints or tangent handles.');
+      const tau = Math.PI * 2;
+      const wrap = (angle: number) => ((angle % tau) + tau) % tau;
+      const parameter =
+        curve.type === 'circle'
+          ? wrap(hit.parameter) / tau
+          : curve.type === 'arc'
+            ? wrap(hit.parameter - curve.startAngle) / (wrap(curve.endAngle - curve.startAngle) || tau)
+            : hit.parameter;
+      if (isClosedSketchCurve(curve) && splitFirst?.entityId !== curve.id) {
+        const points = new Map(sketch.entities.filter(e => e.type === 'point').map(e => [e.id, e]));
+        setSplitFirst({ entityId: curve.id, parameter, point: evaluateCurvePoint(curve, points, parameter) });
+        setMessage('Choose a second distinct point on the same closed curve. Escape cancels both split points.');
+        return;
+      }
+      const result = splitSketchCurve(sketch, curve.id, isClosedSketchCurve(curve) ? [splitFirst!.parameter, parameter] : [parameter]);
+      if (!result.ok) return setMessage(result.message);
+      changeSketch(result.sketch);
+      setSplitFirst(null);
+      setSelected([]);
+      const notice =
+        result.releasedConstraintIds.length || result.releasedFixedPointIds.length
+          ? `Released relations: ${result.releasedConstraintIds.length}; released fixed control points: ${result.releasedFixedPointIds.length}. The exact pieces are independently editable.`
+          : '';
+      setSplitNotice(notice);
+      setMessage(
+        notice ? 'Curve split. Review the released relations shown above.' : 'Curve split. Click another curve to split, or press Escape.'
+      );
+      return;
+    }
     if (tool === 'trim') {
       // Trimming may replace the clicked circle or delete its interval before mousedown.
       event.preventDefault();
@@ -2578,15 +2625,17 @@ export function CadEditor({
     if (busy || solving || finishing.current || preparingDimension.current) return blocked('Wait for the current sketch check to finish.');
     const reason = !thicknessValid
       ? 'Enter a valid part thickness before finishing the sketch.'
-      : (tool === 'fillet' || tool === 'chamfer') && selected.length
-        ? 'Apply the fillet radius or press Escape before finishing the sketch.'
-        : modification.phase === 'mirror' && modification.entityIds.length
-          ? 'Choose the mirror line or press Escape before finishing the sketch.'
-          : modification.phase === 'extend' && modification.entityId
-            ? 'Place the extended endpoint or press Escape before finishing the sketch.'
-            : pending.length && !lineContinuation
-              ? 'Complete the current shape or press Escape before finishing the sketch.'
-              : null;
+      : splitFirst
+        ? 'Choose the second split point or press Escape before finishing the sketch.'
+        : (tool === 'fillet' || tool === 'chamfer') && selected.length
+          ? 'Apply the corner preview or press Escape before finishing the sketch.'
+          : modification.phase === 'mirror' && modification.entityIds.length
+            ? 'Choose the mirror line or press Escape before finishing the sketch.'
+            : modification.phase === 'extend' && modification.entityId
+              ? 'Place the extended endpoint or press Escape before finishing the sketch.'
+              : pending.length && !lineContinuation
+                ? 'Complete the current shape or press Escape before finishing the sketch.'
+                : null;
     if (reason) {
       return blocked(reason);
     }
@@ -2738,11 +2787,12 @@ export function CadEditor({
         canRedo={session.future.length > 0}
         canFinish={
           faceSketch
-            ? !solving && !problems.length
+            ? !solving && !problems.length && !splitFirst
             : thicknessValid &&
               !solving &&
               !problems.length &&
               numberOfShapes > 0 &&
+              !splitFirst &&
               !((tool === 'fillet' || tool === 'chamfer') && selected.length)
         }
         onTool={next => {
@@ -3018,6 +3068,7 @@ export function CadEditor({
               partId={part?.id}
               verified={
                 !solving &&
+                !splitFirst &&
                 !((tool === 'fillet' || tool === 'chamfer') && selected.length) &&
                 activeSketchStatus?.status === 'solved' &&
                 lastCheckedRevision.current === `${doc.id}:${doc.revision}`
@@ -3081,6 +3132,18 @@ export function CadEditor({
                     setConicEditing(id);
                   }
                 }}
+              />
+            )}
+            {tool === 'split' && splitFirst && (
+              <circle
+                cx={splitFirst.point.x}
+                cy={-splitFirst.point.y}
+                r={5 / markerScale}
+                fill="#fff"
+                stroke="#2467d1"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="none"
+                data-split-first="true"
               />
             )}
             {tool === 'chamfer' &&
@@ -3460,6 +3523,11 @@ export function CadEditor({
                 Create polygon
               </button>
             </form>
+          )}
+          {tool === 'split' && splitNotice && (
+            <div className="cad-create-size" role="status">
+              {splitNotice}
+            </div>
           )}
           {tool === 'chamfer' && selected.length > 0 && (
             <form

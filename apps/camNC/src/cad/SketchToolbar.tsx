@@ -136,6 +136,15 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'split':
+      shape = (
+        <>
+          <path d="M3 17 10 10m4 0 7-7" />
+          <circle cx="12" cy="10" r="2" />
+          <path d="M12 3v4m0 6v5" strokeDasharray="2 2" />
+        </>
+      );
+      break;
     case 'chamfer':
       shape = (
         <>
