@@ -141,7 +141,7 @@ export function sketchPointReferences(sketch: CadSketch, options: CadPickingOpti
     for (const id of pointIds(curve)) {
       const role = owners.get(id) ?? { endpoint: false, center: false, ids: [] };
       role.ids.push(curve.id);
-      if ((curve.type === 'circle' || curve.type === 'arc') && id === curve.centerId) role.center = true;
+      if ((curve.type === 'circle' || curve.type === 'arc' || curve.type === 'ellipse') && id === curve.centerId) role.center = true;
       else if ('startId' in curve && (id === curve.startId || id === curve.endId)) role.endpoint = true;
       owners.set(id, role);
     }
@@ -255,7 +255,7 @@ function circularProjection(
 
 /** Refine all sampled local minima, rather than assuming a spline has one closest branch. */
 function nurbsProjection(
-  curve: Extract<Curve, { type: 'conic' | 'spline' | 'bezier' }>,
+  curve: Extract<Curve, { type: 'conic' | 'spline' | 'bezier' | 'ellipse' }>,
   points: Map<string, CadPointEntity>,
   pointer: ScreenPoint,
   project: CadPickingOptions['project']

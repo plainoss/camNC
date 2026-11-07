@@ -1,3 +1,4 @@
+import { ellipseFromPoints } from '@wbcnc/cad';
 import { ArcPreview } from './ArcPreview';
 import { SketchPreview } from './SketchGeometry';
 import { SKETCH_APPEARANCE } from './sketchAppearance';
@@ -12,6 +13,7 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
   if (!start) return null;
   const scale = Number.isFinite(pixelScale) && pixelScale > 0 ? pixelScale : 1;
   const feedback = sketchPreviewFeedback(props);
+  const ellipse = tool === 'ellipse' && pending[1] ? ellipseFromPoints(start, pending[1], cursor) : null;
   return (
     <g data-sketch-tool-preview={tool} pointerEvents="none">
       {curvePreview ? (
@@ -48,6 +50,14 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
               y={tool === 'centerRectangle' ? -start.y - Math.abs(cursor.y - start.y) : -Math.max(start.y, cursor.y)}
               width={Math.abs(cursor.x - start.x) * (tool === 'centerRectangle' ? 2 : 1)}
               height={Math.abs(cursor.y - start.y) * (tool === 'centerRectangle' ? 2 : 1)}
+            />
+          ) : ellipse ? (
+            <ellipse
+              cx={start.x}
+              cy={-start.y}
+              rx={ellipse.primary}
+              ry={ellipse.secondary}
+              transform={`rotate(${(-ellipse.angle * 180) / Math.PI} ${start.x} ${-start.y})`}
             />
           ) : tool === 'circle' ? (
             <circle cx={start.x} cy={-start.y} r={Math.hypot(cursor.x - start.x, cursor.y - start.y)} />
