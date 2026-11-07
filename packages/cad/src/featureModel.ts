@@ -16,7 +16,12 @@ export function validateCadFeatures(part: CadPart): CadDiagnostic[] {
     regions = new Set<string>();
   for (const feature of part.features ?? []) {
     if (feature.type === 'sketch') {
-      if (typeof feature.on === 'object' && !seenCuts.has(feature.on.floorOf))
+      // A floor whose cut was removed is reported as a lost face when the part is evaluated.
+      if (
+        typeof feature.on === 'object' &&
+        !seenCuts.has(feature.on.floorOf) &&
+        part.features!.some(f => f.id === (feature.on as { floorOf: string }).floorOf)
+      )
         error('invalid-face', 'A sketch can only sit on the floor of an earlier cut.');
       sketchIds.add(feature.sketch.id);
       continue;
