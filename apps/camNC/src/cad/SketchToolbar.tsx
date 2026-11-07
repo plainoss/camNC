@@ -136,6 +136,14 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'chamfer':
+      shape = (
+        <>
+          <path d="M4 4v10l6 6h10" />
+          <path d="M4 20h16M4 4v16" strokeDasharray="2 3" />
+        </>
+      );
+      break;
     case 'fillet':
       shape = (
         <>
