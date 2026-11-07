@@ -102,14 +102,30 @@ test('merge queue runs all validation and isolates concurrent candidate builds',
   }
 });
 
-test('all cached validation jobs share optional remote cache configuration', () => {
+test('remote caching uses short-lived tokens and skips untrusted fork PRs', () => {
   const { jobs } = parse(read('.github/workflows/ci.yml'));
   for (const id of ['checks', 'test', 'specs']) {
-    assert.equal(jobs[id].env.TURBO_TOKEN, '${{ secrets.TURBO_TOKEN }}');
-    assert.equal(jobs[id].env.TURBO_TEAM, '${{ vars.TURBO_TEAM }}');
+    assert.deepEqual(jobs[id].permissions, { contents: 'read', 'id-token': 'write' });
+    const auth = jobs[id].steps.find(step => step.name === 'Authenticate remote cache');
+    assert.equal(auth.uses, 'vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10');
+    assert.equal(auth.with.team, '${{ vars.TURBO_TEAM }}');
+    assert.equal(auth.with.audience, 'https://vercel.com/camnc-ci-cache');
+    assert.equal(auth.with.policy, '${{ vars.TURBO_POLICY_ID }}');
+    const enabled = new Function('github', 'vars', `return (${auth.if});`);
+    const event = (event_name, head = 'plainoss/camNC') => ({
+      event_name, repository: 'plainoss/camNC', event: { pull_request: { head: { repo: { full_name: head } } } },
+    });
+    for (const name of ['push', 'merge_group', 'pull_request']) {
+      assert.equal(enabled(event(name), { TURBO_TEAM: 'cache-team' }), true);
+      assert.equal(enabled(event(name), { TURBO_TEAM: '' }), false);
+    }
+    assert.equal(enabled(event('pull_request', 'contributor/camNC'), { TURBO_TEAM: 'cache-team' }), false);
     assert(jobs[id].steps.some(step => step.uses === 'actions/cache@v6'), 'retain local snapshot warming until remote reuse is verified');
   }
-  assert.equal(jobs.results.env, undefined, 'the aggregation job needs no cache credentials');
+  for (const id of ['results', 'fluidnc-sim']) {
+    assert.equal(jobs[id].permissions, undefined, 'non-Turbo jobs must not request identity tokens');
+  }
+  assert.doesNotMatch(read('.github/workflows/ci.yml'), /secrets\.TURBO_TOKEN|pull_request_target/);
 });
 
 
