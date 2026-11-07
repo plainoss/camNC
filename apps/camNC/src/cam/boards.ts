@@ -1470,7 +1470,7 @@ export interface MissingPart {
 }
 
 /** Parts on a board that don't fit on it: they would silently not be cut. */
-export function missingParts(boards: { board: BoardV1; nest: BoardNest }[], instances: PartInstance[]): MissingPart[] {
+export function missingParts<B extends { board: BoardV1; nest: BoardNest }>(boards: B[], instances: PartInstance[]): MissingPart[] {
   const byId = new Map(instances.map(i => [i.id, i]));
   return boards.flatMap(b => b.nest.unplaced.map(id => ({ id, name: byId.get(id)?.name ?? id, board: b.board.name })));
 }

@@ -129,6 +129,7 @@ test('production smoke accepts Cloudflare production checks after queue merges a
 
 
 test('the explicit Node test allocation is disjoint from browser and storage integration coverage', () => {
+  assert(read('vitest.workspace.ts').includes('./apps/*/vitest.node.config.ts'), 'workspace and IDE runs must include domain tests');
   const node = JSON.parse(read('apps/camNC/vitest.node-files.json'));
   assert.equal(new Set(node).size, node.length);
   for (const file of node) assert(existsSync(new URL(`apps/camNC/${file}`, root)), file);
