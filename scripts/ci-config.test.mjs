@@ -65,20 +65,27 @@ test('the required check rejects a failed, cancelled or skipped dependency', () 
   }
 });
 
-test('the CI suites cover every package test exactly once and retain every performance gate', () => {
+test('CI covers every runtime task and both browser shards, without duplicating other tests', () => {
   const suites = parse(read('.github/workflows/ci.yml')).jobs.test.strategy.matrix.include;
-  const selected = filters => {
-    const plan = execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', 'test', ...filters, '--dry=json', '--', 'run'], {
-      cwd: root,
-      encoding: 'utf8',
-      maxBuffer: 8 * 1024 * 1024,
+  const selected = (tasks, filters) => {
+    const plan = execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', ...tasks, ...filters, '--dry=json'], {
+      cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024,
     });
-    return JSON.parse(plan).tasks.filter(task => task.task === 'test').map(task => task.taskId);
+    return JSON.parse(plan).tasks.filter(task => tasks.includes(task.task) && task.command !== '<NONEXISTENT>').map(task => task.taskId);
   };
-  const assigned = suites.flatMap(suite => selected(suite.filter.split(/\s+/)));
-  assert.deepEqual(assigned.sort(), selected([]).sort(), 'no test task may be omitted or duplicated across runners');
+  const assigned = suites.flatMap(suite => selected(suite.tasks.split(/\s+/), suite.filter.split(/\s+/)));
+  const expected = [
+    ...selected(['test'], ['--filter=!@wbcnc/camNC']),
+    ...selected(['test:domain', 'test:worker', 'test:licenses', 'test:browser'], ['--filter=@wbcnc/camNC']),
+    '@wbcnc/camNC#test:browser',
+  ];
+  assert.deepEqual(assigned.sort(), expected.sort());
+  assert.deepEqual(suites.filter(suite => suite.tasks === 'test:browser').map(suite => suite.args).sort(), ['--shard=1/2', '--shard=2/2']);
   const scripts = JSON.parse(read('package.json')).scripts;
   assert.deepEqual(suites.map(suite => suite.performance).filter(Boolean).sort(), scripts['test:performance'].split(' && ').sort());
+  const specs = parse(read('.github/workflows/ci.yml')).jobs.specs;
+  assert.deepEqual(specs.strategy.matrix.shard, ['1/2', '2/2']);
+  assert.match(specs.steps.find(step => step.name === 'Run sketch behaviour specs').run, /--shard=\$\{\{ matrix.shard \}\}/);
 });
 
 
