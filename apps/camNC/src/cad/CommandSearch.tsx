@@ -55,10 +55,16 @@ export function CommandSearch({
         } else if (event.altKey && event.code === 'KeyC') {
           event.preventDefault();
           onClose();
-        } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        } else if (
+          (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+          (event.target === input.current || (event.target instanceof HTMLElement && event.target.getAttribute('role') === 'option'))
+        ) {
           event.preventDefault();
-          if (matches.length)
-            setIndex((Math.min(index, matches.length - 1) + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length);
+          if (matches.length) {
+            const next = (Math.min(index, matches.length - 1) + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length;
+            setIndex(next);
+            if (event.target !== input.current) panel.current?.querySelectorAll<HTMLButtonElement>('[role="option"]')[next]?.focus();
+          }
         } else if (event.key === 'Enter' && event.target === input.current && active) {
           event.preventDefault();
           onChoose(active.id);
@@ -99,7 +105,11 @@ export function CommandSearch({
                 type="button"
                 role="option"
                 aria-selected={command.id === active?.id}
-                onPointerMove={() => setIndex(matches.indexOf(command))}
+                onFocus={() => setIndex(matches.indexOf(command))}
+                onPointerMove={event => {
+                  setIndex(matches.indexOf(command));
+                  if (event.currentTarget.parentElement?.contains(document.activeElement)) event.currentTarget.focus();
+                }}
                 onClick={() => onChoose(command.id)}>
                 {command.id !== 'fit' && <SketchToolGlyph kind={command.id} />}
                 <span>{command.label}</span>
