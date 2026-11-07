@@ -31,9 +31,13 @@ Use the cached `spec:cad` task for local-source validation. Run production/exter
 
 ### Shared CI cache setup
 
-The static/build, test and behaviour jobs accept a repository secret `TURBO_TOKEN` and repository variable `TURBO_TEAM` for Vercel Remote Cache. Configure both for the same cache scope to reuse identical task inputs across PR, merge queue and main runs. The token must belong to a dedicated cache account with only the access it needs. Fork PRs receive no token and continue using the existing local cache. Do not expose write credentials through `pull_request_target` or execute untrusted fork code with cache credentials.
+The static/build, test and behaviour jobs exchange GitHub OIDC identities for short-lived, cache-only Vercel tokens. No long-lived `TURBO_TOKEN` secret is needed. Configure repository variable `TURBO_TEAM` with the Vercel team slug and, optionally, `TURBO_POLICY_ID` to select a specific policy. Without `TURBO_TEAM`, authentication is skipped and existing per-suite GitHub cache snapshots remain available.
 
-Without those settings, remote caching is not enabled and there is no cross-event speedup to claim. Existing per-suite GitHub cache snapshots remain available. Keep main-push validation, which warms the default-branch snapshots, until remote reuse is verified. Before changing that policy, compare task hashes and actual hit rates on representative PR and merge-group runs, and confirm that dependency edits invalidate the affected tasks. Never cache performance-gate execution.
+Create a Turborepo CLI policy in the team's **Settings → Build and Deployment → OIDC Policies** with issuer `https://token.actions.githubusercontent.com` and audience `https://vercel.com/camnc-ci-cache`. Restrict it to repository ID `941977139`, owner ID `318181168`, and workflow `CI`. These exact claims cover PR, main and temporary merge-queue refs without a subject wildcard; the immutable IDs prevent an unrelated repository taking over a reused name. The policy grants remote-cache access, not deployment or account-management access.
+
+Only the three Turbo job groups request `id-token: write`. Their authentication step skips fork PRs, which continue using the local cache. Do not expose cache write credentials through `pull_request_target` or execute untrusted fork code with cache credentials.
+
+Keep main-push validation, which warms the default-branch snapshots, until remote reuse is verified. Before changing that policy, compare task hashes and actual hit rates on representative PR and merge-group runs, and confirm that dependency edits invalidate the affected tasks. Never cache performance-gate execution.
 
 ## Measuring changes
 

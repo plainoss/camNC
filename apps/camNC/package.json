@@ -21,6 +21,7 @@
     "test:licenses": "node --test e2e/cad/licenses.node.mjs",
     "smoke:cad": "node e2e/cad/run.mjs",
     "spec:cad": "node e2e/spec/run.mjs",
+    "spec:session": "node e2e/spec/session.mjs",
     "test:domain": "vitest run --config vitest.node.config.ts",
     "test:worker": "vitest run --config vitest.worker.config.ts",
     "test:browser": "vitest run"
