@@ -101,6 +101,11 @@ export function withFaceSketchDocument(document: CadDocument, partId: string, sk
   };
 }
 
+/** Puts a face sketch on another face, for one that lost the pocket floor it sat on. */
+export function moveFaceSketch(document: CadDocument, partId: string, sketchId: string, on: CadFaceRef): CadDocument {
+  return editPart(document, partId, features => features.map(f => (f.type === 'sketch' && f.sketch.id === sketchId ? { ...f, on } : f)));
+}
+
 /** Removes a feature, and the cuts of a removed sketch. Sketches on a removed cut's floor report the lost face. */
 export function removeCadFeature(document: CadDocument, partId: string, featureId: string): CadDocument {
   return editPart(document, partId, features => {

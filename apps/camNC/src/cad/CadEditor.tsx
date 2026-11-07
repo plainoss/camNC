@@ -42,7 +42,9 @@ import {
   type CadSolveOptions,
   addFaceSketch,
   evaluateCadPart,
+  moveFaceSketch,
   removeCadFeature,
+  type CadFaceRef,
   setCutSuppressed,
   withFeatureVersion,
   type CadPoint,
@@ -241,7 +243,9 @@ export interface CadEditorProps {
   /** Hosts that can open a face sketch offer drawing on the part's top face. */
   onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string) => void;
   /** Editing one face sketch, with the part's outline shown behind it. It can be open, and it isn't a profile. */
-  faceSketch?: { outline: CadPoint[]; label: string };
+  faceSketch?: { outline: CadPoint[]; floor?: CadPoint[]; label: string };
+  /** Open on the part in 3D, when it has an outline to show. */
+  startIn3D?: boolean;
 }
 
 /** Native editable source stays in one document while CAM remains a derived consumer of accepted revisions. */
@@ -257,6 +261,7 @@ export function CadEditor({
   controller,
   onEditFaceSketch,
   faceSketch,
+  startIn3D,
 }: CadEditorProps) {
   const [session] = useState(() => cadSession(initialDocument));
   const [doc, setDocument] = useState(session.document);
@@ -320,7 +325,7 @@ export function CadEditor({
   const [rho, setRho] = useState('0.5');
   const [selectionBox, setSelectionBox] = useState<CadSelectionBox | null>(null);
   const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
-  const [show3D, setShow3D] = useState(false);
+  const [show3D, setShow3D] = useState(!!startIn3D);
   const sketchOnly = !!faceSketch;
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
@@ -2348,6 +2353,15 @@ export function CadEditor({
       setBusy(false);
     }
   };
+  const sketchOnFace = (face: CadFaceRef) => {
+    if (!part || !onEditFaceSketch) return;
+    // Checked first: a blocked sketch command mustn't leave an empty face sketch behind.
+    const prepared = prepareDocument();
+    if (!prepared || !hasOutline(prepared, part.id)) return;
+    const added = addFaceSketch(prepared, part.id, face);
+    commit(added.document);
+    onEditFaceSketch(documentRef.current, part.id, added.sketchId);
+  };
   const valuePosition = (anchor: Point | null, desiredWidth = 216, topOffset = 12) => {
     const matrix = svg.current?.getScreenCTM();
     const drawing = svg.current?.closest('.cad-drawing')?.getBoundingClientRect();
@@ -2540,17 +2554,8 @@ export function CadEditor({
                       if (prepared && hasOutline(prepared, part.id)) onEditFaceSketch(prepared, part.id, sketchId);
                     })
                   }
-                  onNew={
-                    onEditFaceSketch &&
-                    (() => {
-                      // Checked first: a blocked sketch command mustn't leave an empty face sketch behind.
-                      const prepared = prepareDocument();
-                      if (!prepared || !hasOutline(prepared, part.id)) return;
-                      const added = addFaceSketch(prepared, part.id, 'top');
-                      commit(added.document);
-                      onEditFaceSketch(documentRef.current, part.id, added.sketchId);
-                    })
-                  }
+                  onMoveToTop={sketchId => commit(moveFaceSketch(documentRef.current, part.id, sketchId, 'top'))}
+                  onNew={onEditFaceSketch && (() => sketchOnFace('top'))}
                 />
               )}
               <div className="cad-divider" />
@@ -2651,6 +2656,7 @@ export function CadEditor({
                 key={part.id}
                 part={part}
                 onChoose={(entry, depth) => commit(withRegionDepth(documentRef.current, part.id, entry, depth))}
+                onSketchFace={onEditFaceSketch && sketchOnFace}
               />
             </Suspense>
           )}
@@ -2715,6 +2721,17 @@ export function CadEditor({
                 data-face-outline
                 className="cad-face-outline"
                 d={faceSketch.outline.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                pointerEvents="none"
+              />
+            )}
+            {faceSketch?.floor && (
+              <path
+                data-face-floor
+                d={faceSketch.floor.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                fill="#c99a5b"
+                fillOpacity={0.25}
+                stroke="#7a5526"
+                strokeWidth={1 / markerScale}
                 pointerEvents="none"
               />
             )}
@@ -2983,7 +3000,7 @@ export function CadEditor({
               key={regionField.entry.region.id}
               style={valuePosition(regionField.anchor, 280)}
               depth={regionField.entry.depth}
-              thickness={part.thickness}
+              thickness={part.thickness - regionField.entry.from}
               onClose={() => {
                 setRegionField(null);
                 svg.current?.focus();

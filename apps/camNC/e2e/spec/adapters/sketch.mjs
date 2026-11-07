@@ -200,6 +200,13 @@ export async function createAdapter(page, url) {
   await page.getByRole('button', { name: /^New design/ }).click();
   const canvas = page.getByTestId('cad-canvas');
   await canvas.waitFor();
+  // Existing designs open on the part in 3D, and most steps work on the drawing.
+  const flatView = async () => {
+    const button = page.getByRole('button', { name: '3D', exact: true });
+    await button.waitFor();
+    if ((await button.getAttribute('aria-pressed')) === 'true') await button.click();
+    await canvas.waitFor();
+  };
   const jobId = new URL(page.url()).pathname.split('/')[2];
   let cursor = null;
 
@@ -329,6 +336,8 @@ export async function createAdapter(page, url) {
         return;
       case 'tool':
         return chooseTool(rest);
+      case 'flat':
+        return flatView();
       case 'click3d': {
         // The camera frames the part, so the middle of the view is the middle of the part.
         const box = await page.getByTestId('part-3d').boundingBox();
@@ -457,7 +466,7 @@ export async function createAdapter(page, url) {
       }
       case 'edit':
         await page.getByText('Edit design', { exact: true }).first().click();
-        await canvas.waitFor();
+        await flatView();
         await page.waitForTimeout(400);
         return;
       case 'finish':
@@ -471,7 +480,7 @@ export async function createAdapter(page, url) {
         return;
       case 'design':
         await page.getByRole('link', { name: /Design/ }).first().click();
-        await canvas.waitFor();
+        await flatView();
         await page.waitForTimeout(250);
         return;
       default:

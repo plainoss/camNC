@@ -40,7 +40,7 @@ after geometry changes.
 
 Current limits and deferred work:
 
-- Cuts are set on the drawing, on the top face only. Sketching in the 3D view, pocket floors and the underside are in [the roadmap](CAD_ROADMAP.md).
+- Sketches go on the top face and pocket floors. The camera turns to face the surface, then the flat sketch editor opens. The underside is in [the roadmap](CAD_ROADMAP.md).
 - Partial or open multi-edge Offset chains and rational-curve Offset are unsupported.
 - Mirror rejects conics, fit splines, and Bezier curves.
 - Rational curves can bound Trim or Extend operations, but cannot themselves be interval-trimmed or extended.

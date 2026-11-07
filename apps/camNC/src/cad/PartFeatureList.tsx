@@ -1,4 +1,12 @@
-import { cadCuts, cadFaceSketches, cadSketchRegions, evaluateCadPart, type CadFaceSketch, type CadPart } from '@wbcnc/cad';
+import {
+  cadCuts,
+  cadFaceSketches,
+  cadSketchRegions,
+  evaluateCadFeatures,
+  evaluateCadPart,
+  type CadFaceSketch,
+  type CadPart,
+} from '@wbcnc/cad';
 
 const faceName = (face: CadFaceSketch) => (face.on === 'top' ? 'Top face' : face.on === 'underside' ? 'Underside' : 'Pocket floor');
 
@@ -7,20 +15,25 @@ export function PartFeatureList({
   part,
   onRemove,
   onSwitchCut,
+  onMoveToTop,
   onEdit,
   onNew,
 }: {
   part: CadPart;
   onRemove: (featureId: string) => void;
   onSwitchCut?: (cutId: string, on: boolean) => void;
+  onMoveToTop?: (sketchId: string) => void;
   onEdit?: (sketchId: string) => void;
   onNew?: () => void;
 }) {
   const faces = cadFaceSketches(part),
-    outline = evaluateCadPart(part).part?.outline,
+    profile = evaluateCadPart(part).part,
+    outline = profile?.outline,
     regionIds = new Set(
       [part.sketch.id, ...faces.map(face => face.sketch.id)].flatMap(id => cadSketchRegions(part, id, outline).map(r => r.id))
     );
+  const made = new Set(profile ? (evaluateCadFeatures(part, profile).part.cuts ?? []).map(cut => cut.id) : []),
+    isLost = (face: CadFaceSketch) => typeof face.on === 'object' && !made.has(face.on.floorOf);
   return (
     <div className="cad-feature-list">
       <h3>Sketches and cuts</h3>
@@ -29,8 +42,13 @@ export function PartFeatureList({
         {faces.map((face, i) => (
           <li key={face.id}>
             <span>
-              Sketch {i + 1} <small className="cad-muted">{faceName(face)}</small>
+              Sketch {i + 1} <small className="cad-muted">{isLost(face) ? 'Floor lost' : faceName(face)}</small>
             </span>
+            {onMoveToTop && isLost(face) && (
+              <button type="button" onClick={() => onMoveToTop(face.sketch.id)}>
+                Move to top
+              </button>
+            )}
             {onEdit && (
               <button type="button" disabled={!outline} onClick={() => onEdit(face.sketch.id)}>
                 Edit
