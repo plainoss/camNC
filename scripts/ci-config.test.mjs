@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { parse } from 'yaml';
 
@@ -9,6 +11,42 @@ const root = new URL('../', import.meta.url);
 const read = file => readFileSync(new URL(file, root), 'utf8');
 const lock = parse(read('pnpm-lock.yaml'));
 const require = createRequire(import.meta.url);
+
+test('desktop cache restores rediscover CMake tools while preserving compiled artifacts', t => {
+  const steps = parse(read('.github/workflows/desktop.yml')).jobs.build.steps;
+  const resetIndex = steps.findIndex(step => step.name === 'Reset restored CMake configuration');
+  assert(resetIndex > steps.findIndex(step => step.uses === 'Swatinem/rust-cache@v2'));
+  assert(resetIndex > steps.findIndex(step => step.name === 'Cache macOS CEF helper'));
+  assert(resetIndex < steps.findIndex(step => step.name === 'Build'));
+  const reset = steps[resetIndex];
+  assert.equal(reset.if, undefined, 'every platform must reset restored CMake configuration');
+
+  const cwd = mkdtempSync(join(tmpdir(), 'desktop-cmake-cache-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const run = () => {
+    const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', reset.run], { cwd, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  run(); // A first build has no target directory.
+  const target = join(cwd, 'apps/camnc-desktop/src-tauri/target');
+  const caches = [
+    'release/build/cef-dll-sys-123/out/build/CMakeCache.txt',
+    'tauri-cef-helper/target/release/build/cef-dll-sys-456/out/build/CMakeCache.txt',
+  ];
+  const retained = [
+    'release/deps/libcef.rlib',
+    'release/build/cef-dll-sys-123/out/build/CMakeFiles/wrapper.dir/wrapper.cc.o',
+    'tauri-cef-helper/target/release/tauri-cef-helper',
+  ];
+  for (const file of [...caches, ...retained]) {
+    const dest = join(target, file);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, 'cached');
+  }
+  run();
+  for (const file of caches) assert(!existsSync(join(target, file)), `${file} must be regenerated`);
+  for (const file of retained) assert.equal(readFileSync(join(target, file), 'utf8'), 'cached');
+});
 
 for (const [workflow, job] of [['ci.yml', 'test'], ['ci.yml', 'specs'], ['setup-smoke.yml', 'setup-smoke']]) {
   test(`${workflow} ${job}: preinstalled browsers match the locked and installed Playwright versions`, () => {

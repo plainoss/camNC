@@ -94,6 +94,13 @@ jobs:
         with:
           path: apps/camnc-desktop/src-tauri/target/tauri-cef-helper
           key: desktop-cef-helper-v1-${{ matrix.target }}-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('pnpm-lock.yaml', 'apps/camnc-desktop/src-tauri/Cargo.lock', 'apps/camnc-desktop/src-tauri/Cargo.toml') }}
+      - name: Reset restored CMake configuration
+        run: |
+          # CMake caches absolute paths to Ninja and compilers from the runner that populated the cache.
+          # Rediscover those tools after restoring Rust/CEF helper caches, retaining compiled artifacts.
+          if [ -d apps/camnc-desktop/src-tauri/target ]; then
+            find apps/camnc-desktop/src-tauri/target -type f -name CMakeCache.txt -print -delete
+          fi
       # CEF's C++ wrapper uses Ninja, preinstalled on all three hosted runner images.
       - name: Verify Ninja
         run: ninja --version
