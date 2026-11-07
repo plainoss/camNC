@@ -236,12 +236,15 @@ function solverConstraint(
     case 'circleCircleDistance': {
       const a = entities.get(c.entityAId) as import('./types').CadCircleEntity | CadArcEntity;
       const b = entities.get(c.entityBId) as import('./types').CadCircleEntity | CadArcEntity;
-      const distance = `${id}:center-distance`,
+      // Shared (including explicitly coincident) centers have no separation parameter.
+      // A zero-length p2p equation has a singular Jacobian and hides the radius-gap rank.
+      const concentric = coincident.equivalent(a.centerId, b.centerId);
+      const distance = concentric ? 0 : `${id}:center-distance`,
         intermediate = `${id}:radius-distance`;
       const ra = { o_id: a.id, prop: 'radius' as const },
         rb = { o_id: b.id, prop: 'radius' as const };
       return [
-        { id, type: 'p2p_distance', p1_id: a.centerId, p2_id: b.centerId, distance },
+        ...(!concentric ? [{ id, type: 'p2p_distance' as const, p1_id: a.centerId, p2_id: b.centerId, distance }] : []),
         c.radiusASign === 1
           ? { id: `${id}:radius-a`, type: 'difference', param1: distance, param2: intermediate, difference: ra }
           : { id: `${id}:radius-a`, type: 'difference', param1: ra, param2: distance, difference: intermediate },
@@ -636,7 +639,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
               const ca = points.get(a.centerId)!,
                 cb = points.get(b.centerId)!;
               const distance = Math.hypot(cb.x - ca.x, cb.y - ca.y);
-              target.push_sketch_param(`${c.id}:center-distance`, distance, false);
+              if (!coincident.equivalent(a.centerId, b.centerId)) target.push_sketch_param(`${c.id}:center-distance`, distance, false);
               target.push_sketch_param(`${c.id}:radius-distance`, distance + c.radiusASign * a.radius, false);
               continue;
             }
