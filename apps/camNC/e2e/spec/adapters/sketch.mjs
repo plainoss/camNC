@@ -345,12 +345,18 @@ export async function createAdapter(page, url) {
       case 'flat':
         return flatView();
       case 'click3d': {
-        // The camera frames the part, so the middle of the view is the middle of the part.
-        const box = await page.getByTestId('part-3d').boundingBox();
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 3 });
-        await page.waitForTimeout(150);
-        await page.mouse.down();
-        await page.mouse.up();
+        // The camera frames the part, so the middle of the view is the middle of the part. A busy machine can take a
+        // moment to have the view ready to pick, so click again until the region's depth field opens.
+        const view = page.getByTestId('part-3d'),
+          field = page.getByRole('group', { name: 'Cut depth' });
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const box = await view.boundingBox();
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 3 });
+          await page.waitForTimeout(150);
+          await page.mouse.down();
+          await page.mouse.up();
+          if (await field.waitFor({ timeout: 1000 }).then(() => true, () => false)) break;
+        }
         await page.waitForTimeout(80);
         return;
       }
