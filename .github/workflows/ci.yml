@@ -22,14 +22,14 @@ jobs:
     name: Format, lint and types
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         name: Install pnpm
         with:
           run_install: false
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
@@ -40,7 +40,7 @@ jobs:
         run: pnpm run test:ci
       # Turborepo's local cache, so packages whose inputs did not change replay their result.
       - name: Cache Turborepo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo/cache
           key: turbo-checks-${{ github.sha }}
@@ -96,14 +96,14 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         name: Install pnpm
         with:
           run_install: false
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
@@ -114,7 +114,7 @@ jobs:
       # Git refuses this container's checkout, so scripts/turbo-shared-cache.mjs can't find the git dir. Name the
       # directory here, or the cache action saves a path turbo never wrote.
       - name: Cache Turborepo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo/cache
           key: turbo-test-${{ matrix.suite }}-${{ github.sha }}
@@ -132,7 +132,7 @@ jobs:
         run: ${{ matrix.performance }}
       - name: Upload test timings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-timings-${{ matrix.suite }}-${{ github.run_attempt }}
           path: |
@@ -154,14 +154,14 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         name: Install pnpm
         with:
           run_install: false
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
@@ -169,7 +169,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Cache Turborepo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo/cache
           key: turbo-specs-${{ strategy.job-index }}-${{ github.sha }}
@@ -181,7 +181,7 @@ jobs:
         run: node scripts/turbo-shared-cache.mjs run spec:cad --filter=@wbcnc/camNC --log-order=stream -- --shard=${{ matrix.shard }}
       - name: Upload spec results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: behaviour-specs-${{ strategy.job-index }}-${{ github.run_attempt }}
           path: apps/camNC/test-results/spec
@@ -209,19 +209,19 @@ jobs:
     name: FluidNC simulator integration
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         name: Install pnpm
         with:
           run_install: false
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install PlatformIO
@@ -238,7 +238,7 @@ jobs:
             python --version
           } | sha256sum | awk '{print "hash=" $1}' >> "$GITHUB_OUTPUT"
       - name: Cache FluidNC simulator build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/camnc
