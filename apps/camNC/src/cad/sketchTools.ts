@@ -9,6 +9,7 @@ export type SketchTool =
   | 'ellipse'
   | 'arc'
   | 'tangentArc'
+  | 'centerPointArc'
   | 'point'
   | 'trim'
   | 'extend'
@@ -38,6 +39,7 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'threePointCircle', label: '3 point circle' },
   { id: 'ellipse', label: 'Ellipse' },
   { id: 'arc', label: 'Arc', key: 'A' },
+  { id: 'centerPointArc', label: 'Center point arc' },
   { id: 'tangentArc', label: 'Tangent arc', key: 'Shift+A' },
   { id: 'conic', label: 'Conic' },
   { id: 'spline', label: 'Spline' },
@@ -69,6 +71,7 @@ export const sketchToolGroups = [
       'ellipse',
       'arc',
       'tangentArc',
+      'centerPointArc',
       'conic',
       'spline',
       'bezier',
@@ -82,7 +85,7 @@ export const sketchToolGroups = [
 export const sketchToolFamilies = [
   { id: 'circle', label: 'Circle tools', tools: ['circle', 'threePointCircle', 'ellipse'] },
   { id: 'rectangle', label: 'Rectangle tools', tools: ['rectangle', 'centerRectangle', 'alignedRectangle'] },
-  { id: 'arc', label: 'Arc tools', tools: ['arc', 'tangentArc', 'conic'] },
+  { id: 'arc', label: 'Arc tools', tools: ['arc', 'tangentArc', 'centerPointArc', 'conic'] },
   { id: 'spline', label: 'Spline tools', tools: ['spline', 'bezier', 'curveControlPoint'] },
   { id: 'trim', label: 'Trim tools', tools: ['trim', 'extend'] },
 ] as const;
@@ -93,7 +96,7 @@ export const sketchToolSection = (tool: SketchTool) =>
     ? 'circle'
     : tool === 'centerRectangle' || tool === 'alignedRectangle'
       ? 'rectangle'
-      : tool === 'tangentArc'
+      : tool === 'tangentArc' || tool === 'centerPointArc'
         ? 'arc'
         : tool === 'bezier' || tool === 'curveControlPoint'
           ? 'spline'

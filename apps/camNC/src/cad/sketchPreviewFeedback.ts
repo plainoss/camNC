@@ -1,4 +1,10 @@
-import { ellipseFromPoints, circleThroughThreePoints, alignedRectangleFromPoints, type CadPoint } from '@wbcnc/cad';
+import {
+  centerPointArcFromPoints,
+  ellipseFromPoints,
+  circleThroughThreePoints,
+  alignedRectangleFromPoints,
+  type CadPoint,
+} from '@wbcnc/cad';
 import { buildArcPreview } from './arcPreviewGeometry';
 import type { SketchTool } from './sketchTools';
 import { formatCadValue } from './valueExpressions';
@@ -11,6 +17,7 @@ export interface SketchToolPreviewInput {
   tangent?: CadPoint;
   pixelScale: number;
   construction?: boolean;
+  sweepIntent?: number;
 }
 
 interface PreviewValue {
@@ -20,7 +27,7 @@ interface PreviewValue {
 }
 
 /** Native measurements use source millimetres; annotation offsets and markers use CSS pixels. */
-export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelScale }: SketchToolPreviewInput) {
+export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelScale, sweepIntent }: SketchToolPreviewInput) {
   const start = pending[0],
     scale = Number.isFinite(pixelScale) && pixelScale > 0 ? pixelScale : 1;
   const values: PreviewValue[] = [],
@@ -90,6 +97,10 @@ export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelSca
     const offset = radius + (text.length * 3.5 + 14) / scale;
     if (radius > 1e-7)
       values.push({ kind: 'diameter', text, at: { x: start.x - (dx / radius) * offset, y: start.y - (dy / radius) * offset } });
+  } else if (tool === 'centerPointArc') {
+    markers.push(...pending);
+    const arc = pending[1] ? centerPointArcFromPoints(start, pending[1], cursor, sweepIntent) : null;
+    if (arc) values.push({ kind: 'radius', text: `R${formatCadValue(arc.radius)}`, at: { x: start.x, y: start.y + 20 / scale } });
   } else if (tool === 'arc' || tool === 'tangentArc') {
     const preview = buildArcPreview({ mode: tool === 'arc' ? 'threePoint' : 'tangent', pending, cursor, tangent });
     // A suggested endpoint-stage curve is not a chosen radius.
