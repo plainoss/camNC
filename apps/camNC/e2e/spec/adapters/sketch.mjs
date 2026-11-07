@@ -540,6 +540,9 @@ export async function createAdapter(page, url) {
     }
     if (expect.noFalseGrid && /\bgrid\b/i.test(scene.footer) && !scene.gridLines) fail('grid label', 'no label without a drawn grid', scene.footer);
     if ('pageText' in expect) {
+      // Persisted edits can settle before their asynchronous status warning is painted.
+      // Keep the same assertion and diagnostic, but wait for its visible text first.
+      await page.waitForFunction(pattern => new RegExp(pattern, 'i').test(document.body.innerText), expect.pageText, { timeout: 8000 }).catch(() => {});
       const text = await page.locator('body').innerText();
       if (!new RegExp(expect.pageText, 'i').test(text)) fail('pageText', expect.pageText, text.slice(0, 200));
     }
