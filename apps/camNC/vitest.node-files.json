@@ -1,0 +1,13 @@
+[
+  "src/cam/planSettings.test.ts",
+  "src/cam/numberFormat.test.ts",
+  "src/cam/holeChoices.test.ts",
+  "src/cam/partMatch.test.ts",
+  "src/cam/boards.physicalSheet.test.ts",
+  "src/cam/rebaseJob.test.ts",
+  "src/cam/rebaseJob.physicalSheet.test.ts",
+  "src/cam/rebaseJob.sourceConflict.test.ts",
+  "src/cam/boards.test.ts",
+  "src/test/browserSequencer.test.ts",
+  "e2e/spec/session.test.mjs"
+]

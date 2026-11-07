@@ -1,0 +1,13 @@
+{
+  "extends": "@wbcnc/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "noUncheckedIndexedAccess": false,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src", "../cad/src/assets.d.ts"
+  ]
+}

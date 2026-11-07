@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { test } from 'node:test';
+import { onTestFinished, test } from 'vitest';
 import { assertLocalUrl, createSession, socketPath } from './session.mjs';
 
-async function fixture(t, overrides = {}) {
+async function fixture(overrides = {}) {
   const outDir = await mkdtemp(path.join(tmpdir(), 'camnc-session-'));
-  t.after(() => rm(outDir, { recursive: true, force: true }));
+  onTestFinished(() => rm(outDir, { recursive: true, force: true }));
   const log = { steps: [], opened: 0, closed: 0, runtime: [] };
   const adapter = {
     inDemo: async () => true,
@@ -28,8 +28,8 @@ async function fixture(t, overrides = {}) {
   return { log, session: createSession({ open, outDir }), outDir };
 }
 
-test('a step keeps the page open and returns the state after it', async t => {
-  const { log, session } = await fixture(t);
+test('a step keeps the page open and returns the state after it', async () => {
+  const { log, session } = await fixture();
   assert.equal((await session.run('rect 0,0 10,10')).state.steps, 1);
   const second = await session.run('  line 0,0 10,10 ');
   assert.equal(second.ok, true);
@@ -38,8 +38,8 @@ test('a step keeps the page open and returns the state after it', async t => {
   assert.equal(log.opened, 1);
 });
 
-test('a failed step reports the error and what is on screen, and the session carries on', async t => {
-  const { session } = await fixture(t);
+test('a failed step reports the error and what is on screen, and the session carries on', async () => {
+  const { session } = await fixture();
   await session.run('rect 0,0 10,10');
   const failed = await session.run('bad');
   assert.equal(failed.ok, false);
@@ -48,42 +48,42 @@ test('a failed step reports the error and what is on screen, and the session car
   assert.equal((await session.run('rect 1,1 2,2')).ok, true);
 });
 
-test('expect uses the scenario matchers, and a failure fails the line', async t => {
-  const { session } = await fixture(t);
+test('expect uses the scenario matchers, and a failure fails the line', async () => {
+  const { session } = await fixture();
   assert.deepEqual(await session.run('expect {}').then(({ ok, failures }) => ({ ok, failures })), { ok: true, failures: [] });
   assert.deepEqual(await session.run('expect {"fail":true}').then(({ ok, failures }) => ({ ok, failures })), { ok: false, failures: ['nope'] });
   assert.equal((await session.run('expect not json')).ok, false);
 });
 
-test('runtime errors are reported once, with the line that caused them', async t => {
-  const { log, session } = await fixture(t);
+test('runtime errors are reported once, with the line that caused them', async () => {
+  const { log, session } = await fixture();
   log.runtime.push('page error: boom');
   assert.deepEqual((await session.run('rect 0,0 1,1')).errors, ['page error: boom']);
   assert.equal((await session.run('rect 0,0 1,1')).errors, undefined);
 });
 
-test('frame writes the normalized drawing, and names cannot leave the output folder', async t => {
-  const { session, outDir } = await fixture(t);
+test('frame writes the normalized drawing, and names cannot leave the output folder', async () => {
+  const { session, outDir } = await fixture();
   const { file } = await session.run('frame after-rect');
   assert.equal(file, path.join(outDir, 'after-rect.svg'));
   assert.equal(await readFile(file, 'utf8'), '<svg/>');
   assert.equal((await session.run('frame ../../escape')).ok, false);
 });
 
-test('frame says so when there is no canvas', async t => {
-  const { session } = await fixture(t, { frame: async () => null });
+test('frame says so when there is no canvas', async () => {
+  const { session } = await fixture({ frame: async () => null });
   assert.match((await session.run('frame x')).error, /no sketch canvas/);
 });
 
-test('reset starts over on a fresh page', async t => {
-  const { log, session } = await fixture(t);
+test('reset starts over on a fresh page', async () => {
+  const { log, session } = await fixture();
   await session.run('rect 0,0 1,1');
   assert.equal((await session.run('reset')).ok, true);
   assert.deepEqual([log.opened, log.closed], [2, 1]);
 });
 
-test('nothing is driven once the page has left demo mode', async t => {
-  const { log, session } = await fixture(t, { inDemo: async () => false });
+test('nothing is driven once the page has left demo mode', async () => {
+  const { log, session } = await fixture({ inDemo: async () => false });
   const result = await session.run('run');
   assert.equal(result.ok, false);
   assert.match(result.error, /left demo mode/);

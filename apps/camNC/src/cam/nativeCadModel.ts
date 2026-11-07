@@ -1,7 +1,8 @@
 import { solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
-import { summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
+import { featuresFromCuts, summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three';
 import type { BodyMesh, CamPartInfo, ModelImport, Outline2D } from './camTypes';
+import { cutPartMesh } from './cutPartMesh';
 
 export interface NativeCadEntry {
   part: FlatPart;
@@ -10,6 +11,7 @@ export interface NativeCadEntry {
 
 /** Native curves are tessellated once by CAD, then go straight to CAM's polygon feature seam. */
 function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: CamPartInfo; mesh: BodyMesh } {
+  if (source.cuts?.some(cut => cut.side === 'underside')) throw new Error(`${source.name}: cuts on the underside can’t be machined yet.`);
   const x0 = Math.min(...source.outline.map(p => p.x));
   const y0 = Math.min(...source.outline.map(p => p.y));
   const point = (p: { x: number; y: number }) => ({ x: p.x - x0, y: p.y - y0 });
@@ -24,7 +26,19 @@ function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: Ca
   const outer = positive(outline);
   const inner = holes.map(positive);
   const footprint = [outer, ...inner.map(h => [...h].reverse())];
-  const features: PartFeatures = {
+  const holeLoops = source.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id);
+  const cut = source.cuts?.length
+    ? featuresFromCuts({
+        thickness: source.thickness,
+        outline: outer,
+        holes: inner,
+        cuts: source.cuts.map(c => ({ ...c, outline: c.outline.map(point), islands: c.islands.map(island => island.map(point)) })),
+      })
+    : null;
+  // CAD refuses a through cut that reaches the edge, but cuts from separate sketches can still add up to a split.
+  if (cut && cut.features.outlines.length !== 1)
+    throw new Error(`${source.name}: these through cuts split the part. Use a separate part for each piece.`);
+  const features: PartFeatures = cut?.features ?? {
     thickness: source.thickness,
     footprint,
     outlines: [outer],
@@ -34,12 +48,16 @@ function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: Ca
     bottomFaces: [],
     slopedArea: 0,
   };
-  const shape = new Shape(outer.map(p => new Vector2(p.x, p.y)));
-  shape.holes.push(...inner.map(h => new Path(h.map(p => new Vector2(p.x, p.y)))));
-  const geometry = new ExtrudeGeometry(shape, { depth: source.thickness, bevelEnabled: false, curveSegments: 4 });
-  const positions = Float64Array.from(geometry.getAttribute('position').array);
-  const indices = geometry.index ? Uint32Array.from(geometry.index.array) : Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
-  geometry.dispose();
+  let positions: Float64Array, indices: Uint32Array;
+  if (cut) ({ positions, indices } = cutPartMesh(cut.features));
+  else {
+    const shape = new Shape(outer.map(p => new Vector2(p.x, p.y)));
+    shape.holes.push(...inner.map(h => new Path(h.map(p => new Vector2(p.x, p.y)))));
+    const geometry = new ExtrudeGeometry(shape, { depth: source.thickness, bevelEnabled: false, curveSegments: 4 });
+    positions = Float64Array.from(geometry.getAttribute('position').array);
+    indices = geometry.index ? Uint32Array.from(geometry.index.array) : Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
+    geometry.dispose();
+  }
   const size: [number, number, number] = [Math.max(...outer.map(p => p.x)), Math.max(...outer.map(p => p.y)), source.thickness];
   const part: FlatPart = {
     name: source.name,
@@ -52,7 +70,7 @@ function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: Ca
       [0, 0, 1],
     ],
     origin: [0, 0, 0],
-    topFeatureArea: 0,
+    topFeatureArea: features.pockets.reduce((sum, pocket) => sum + pocket.area, 0),
     bottomFeatureArea: 0,
     flipped: false,
     prismaticRatio: 1,
@@ -64,7 +82,7 @@ function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: Ca
     entry: { part, features },
     info: {
       id: source.partId,
-      holeIds: source.loops.filter(loop => loop.kind === 'hole').map(loop => loop.id),
+      holeIds: cut ? cut.holeSources.map(from => ('hole' in from ? holeLoops[from.hole]! : from.cut)) : holeLoops,
       sourceOrigin: [x0, y0],
       name: source.name,
       modelName: source.name,
@@ -72,7 +90,11 @@ function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: Ca
       size,
       thickness: source.thickness,
       summary: summarizePart(part, features),
-      shape: { outlines: paths([outer]), holes: paths(inner), pockets: [] },
+      shape: {
+        outlines: paths(features.outlines),
+        holes: paths(features.throughHoles),
+        pockets: features.pockets.map(pocket => ({ depth: source.thickness - pocket.floorZ, region: paths(pocket.strictRegion) })),
+      },
     },
     mesh: {
       name: source.name,

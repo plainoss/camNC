@@ -121,7 +121,7 @@ async function browserSession(options) {
       throw error;
     }
   };
-  const outDir = fileURLToPath(new URL('../../../../output/playwright/spec-session/', import.meta.url));
+  const outDir = fileURLToPath(new URL('../../test-results/spec-session/', import.meta.url));
   const session = createSession({ open, outDir });
   return {
     run: session.run,

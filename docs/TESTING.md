@@ -1,0 +1,48 @@
+# Test architecture and CI feedback
+
+Run `pnpm run test:fast` for local feedback, plus any slow browser files changed by the work. Run `pnpm run test:ci` after changing task allocation, cache inputs, or workflows. CI runs the complete corpus and isolated performance gates; the fast subset never counts as a full result.
+
+During an edit, run focused test files directly. Both root broad commands (`test` and `test:fast`) acquire the same local worktree lock; CI skips that lock because each suite has its own runner. Waiting for a broad suite does not prevent focused checks. This avoids concurrent agents repeatedly timing out otherwise passing browser tests.
+
+| Boundary                                         | Owner                          | Runtime                 | Coverage                                                                               |
+| ------------------------------------------------ | ------------------------------ | ----------------------- | -------------------------------------------------------------------------------------- |
+| Cutting recipes and hardware defaults            | `packages/cam-settings`        | Node                    | Pure resolution and identity rules; browser persistence remains tested in the app      |
+| Editor commands, selection, sessions and history | `packages/cad-editor`          | Node + real solver WASM | Command rules and command → solve → Undo/Redo workflows                                |
+| CAD geometry and CAM kernels                     | `packages/cad`, `packages/cam` | Node + real WASM        | Geometry, toolpaths, safety and complete fixture corpora                               |
+| App board decisions and document rebasing        | `test:domain`                  | Node                    | Explicit allocation in `apps/camNC/vitest.node-files.json`                             |
+| Auth and database worker                         | `test:worker`                  | workerd                 | Real D1 migrations and request handling                                                |
+| UI and browser adapters                          | `test:browser`                 | Chromium                | Layout, pointer coordinates, focus, IndexedDB, worker transport and end-to-end imports |
+| Behaviour scenarios                              | `spec:cad`                     | Chromium                | Every declarative scenario, including goldens and known-gap accounting                 |
+| CPU budgets                                      | `test:performance`             | Node, then Chromium     | Dedicated serial phase, separate from functional tests                                 |
+
+The application keeps compatibility facades for editor imports. Headless packages depend only on their geometry/kernel package, never on React, persisted stores, app routes, or worker transport. CI checks those import boundaries. Put new semantic editor cases in the headless package; use browser tests when the assertion needs browser behavior. A command test does not replace coverage of picking, keyboard focus, layout, or transport.
+
+The board browser suite is divided into replacement/auto-fill, dragging, holds, and settings. Each file uses the same real STEP fixture and creates fresh jobs and query clients. Only immutable input bytes are shared within a file. The varied-board workflow generates through the page once; kernel and worker tests retain direct output checks.
+
+## Scheduling and cache correctness
+
+CI runs the browser files across two Vitest shards and every behaviour scenario across four deterministic shards balanced by measured duration. Scenario IDs break assignment ties. Golden updates remain unsharded. Unit tests exercise the actual scenario corpus to prove complete, duplicate-free assignment. New files/scenarios receive a conservative fallback estimate and are always assigned. Long scenarios start immediately after the first warmup scenario. The duration weights record their source CI run and can be refreshed from timing artifacts; they only affect scheduling, never selection. Runtime allocation and performance-gate wiring are checked by `test:ci`.
+
+The required check stays named **Run tests**. It waits for all test/spec matrix entries, static validation, builds, and simulator integration, and fails on failed, cancelled, or unexpectedly skipped dependencies. No correctness tests were moved to a nightly-only lane.
+
+Domain, worker, license, browser and behaviour tasks have independent Turbo entries. The root full/fast commands use these entries rather than the combined app script. The app's `pnpm test` remains a complete standalone command. Source dependencies flow through Turbo transit nodes; package/lockfile changes invalidate relevant work. Worker tasks hash worker sources and migrations. Browser/spec tasks default to all app inputs, excluding only worker sources and migrations. New app files invalidate them automatically. The new headless workspace packages provide genuinely independent source/cache boundaries.
+
+Use the cached `spec:cad` task for local-source validation. Run production/external-URL smoke scripts directly; external deployment state is not a source cache input. Browser correctness shards cache independently because their CLI arguments are part of the Turbo task hash. Performance gates execute directly and are never replayed from the functional cache.
+
+### Shared CI cache setup
+
+The static/build, test and behaviour jobs accept a repository secret `TURBO_TOKEN` and repository variable `TURBO_TEAM` for Vercel Remote Cache. Configure both for the same cache scope to reuse identical task inputs across PR, merge queue and main runs. The token must belong to a dedicated cache account with only the access it needs. Fork PRs receive no token and continue using the existing local cache. Do not expose write credentials through `pull_request_target` or execute untrusted fork code with cache credentials.
+
+Without those settings, remote caching is not enabled and there is no cross-event speedup to claim. Existing per-suite GitHub cache snapshots remain available. Keep main-push validation, which warms the default-branch snapshots, until remote reuse is verified. Before changing that policy, compare task hashes and actual hit rates on representative PR and merge-group runs, and confirm that dependency edits invalidate the affected tasks. Never cache performance-gate execution.
+
+## Measuring changes
+
+CI always uploads test timing reports and behaviour results, including restored reports on cache hits. Vitest reports distinguish file collection, setup, preparation and test/hook time from wall time; summed file times are not parallel wall time. Behaviour results include bootstrap and complete scenario duration. Reports go under each package's ignored `test-results` directory.
+
+Compare cold and warm runs separately. Record source SHA, cache hits, slowest files/scenarios, per-job duration, queue delay, end-to-end required-check duration, and total runner-minutes. Compare representative UI-only, CAD, CAM, worker and documentation changes. Repeat timings before claiming a p95 or a fixed percentage improvement. Cache-hit reports describe the original execution; the current CI step duration shows replay cost.
+
+The first two-shard CI trial passed all 148 scenarios but still left the slower spec lane at about six minutes. The four-shard spec matrix and duration-based browser allocation address that measured tail.
+
+The initial targets are under one minute for ordinary local feedback and under five minutes for typical PR validation. These are acceptance targets, not guaranteed timings. Measure both browser lanes: shortening one does not help the required-check time if the other still dominates. More shards must justify their runner-minutes and setup overhead.
+
+The incremental hold-timeline algorithm remains a separate product/safety change. It requires independent invariants and differential checks against the existing implementation, and is not needed to adopt these test boundaries.

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { test } from 'node:test';
@@ -24,7 +24,8 @@ for (const [workflow, job] of [['ci.yml', 'test'], ['ci.yml', 'specs'], ['setup-
 
 test('every file the fast test set skips still exists and CI still runs the full test task', () => {
   const skipped = JSON.parse(read('apps/camNC/vitest.fast-excludes.json'));
-  assert.equal(skipped.length, 20);
+  assert(skipped.length >= 20);
+  assert.equal(new Set(skipped).size, skipped.length);
   for (const file of skipped) assert(existsSync(new URL(`apps/camNC/${file}`, root)), `${file} is gone; update the list`);
   assert.doesNotMatch(read('.github/workflows/ci.yml'), /test:fast/);
 });
@@ -64,20 +65,27 @@ test('the required check rejects a failed, cancelled or skipped dependency', () 
   }
 });
 
-test('the CI suites cover every package test exactly once and retain every performance gate', () => {
+test('CI covers every runtime task and both browser shards, without duplicating other tests', () => {
   const suites = parse(read('.github/workflows/ci.yml')).jobs.test.strategy.matrix.include;
-  const selected = filters => {
-    const plan = execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', 'test', ...filters, '--dry=json', '--', 'run'], {
-      cwd: root,
-      encoding: 'utf8',
-      maxBuffer: 8 * 1024 * 1024,
+  const selected = (tasks, filters) => {
+    const plan = execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', ...tasks, ...filters, '--dry=json'], {
+      cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024,
     });
-    return JSON.parse(plan).tasks.filter(task => task.task === 'test').map(task => task.taskId);
+    return JSON.parse(plan).tasks.filter(task => tasks.includes(task.task) && task.command !== '<NONEXISTENT>').map(task => task.taskId);
   };
-  const assigned = suites.flatMap(suite => selected(suite.filter.split(/\s+/)));
-  assert.deepEqual(assigned.sort(), selected([]).sort(), 'no test task may be omitted or duplicated across runners');
+  const assigned = suites.flatMap(suite => selected(suite.tasks.split(/\s+/), suite.filter.split(/\s+/)));
+  const expected = [
+    ...selected(['test'], ['--filter=!@wbcnc/camNC']),
+    ...selected(['test:domain', 'test:worker', 'test:licenses', 'test:browser'], ['--filter=@wbcnc/camNC']),
+    '@wbcnc/camNC#test:browser',
+  ];
+  assert.deepEqual(assigned.sort(), expected.sort());
+  assert.deepEqual(suites.filter(suite => suite.tasks === 'test:browser').map(suite => suite.args).sort(), ['--shard=1/2', '--shard=2/2']);
   const scripts = JSON.parse(read('package.json')).scripts;
   assert.deepEqual(suites.map(suite => suite.performance).filter(Boolean).sort(), scripts['test:performance'].split(' && ').sort());
+  const specs = parse(read('.github/workflows/ci.yml')).jobs.specs;
+  assert.deepEqual(specs.strategy.matrix.shard, ['1/4', '2/4', '3/4', '4/4']);
+  assert.match(specs.steps.find(step => step.name === 'Run sketch behaviour specs').run, /--shard=\$\{\{ matrix.shard \}\}/);
 });
 
 
@@ -92,6 +100,16 @@ test('merge queue runs all validation and isolates concurrent candidate builds',
     assert.equal(job.if, id === 'results' ? 'always()' : undefined,
       `${id} must not skip validation on merge_group events`);
   }
+});
+
+test('all cached validation jobs share optional remote cache configuration', () => {
+  const { jobs } = parse(read('.github/workflows/ci.yml'));
+  for (const id of ['checks', 'test', 'specs']) {
+    assert.equal(jobs[id].env.TURBO_TOKEN, '${{ secrets.TURBO_TOKEN }}');
+    assert.equal(jobs[id].env.TURBO_TEAM, '${{ vars.TURBO_TEAM }}');
+    assert(jobs[id].steps.some(step => step.uses === 'actions/cache@v6'), 'retain local snapshot warming until remote reuse is verified');
+  }
+  assert.equal(jobs.results.env, undefined, 'the aggregation job needs no cache credentials');
 });
 
 
@@ -117,4 +135,105 @@ test('production smoke accepts Cloudflare production checks after queue merges a
   assert.equal(passes(check({ app: { slug: 'another-app' } })), false);
   assert.equal(passes({ event_name: 'workflow_dispatch' }), true);
   assert.equal(passes({ event_name: 'schedule' }), true);
+});
+
+
+test('the explicit Node test allocation is disjoint from browser and storage integration coverage', () => {
+  assert(read('vitest.workspace.ts').includes('./apps/*/vitest.node.config.ts'), 'workspace and IDE runs must include domain tests');
+  const node = JSON.parse(read('apps/camNC/vitest.node-files.json'));
+  assert.equal(new Set(node).size, node.length);
+  for (const file of node) assert(existsSync(new URL(`apps/camNC/${file}`, root)), file);
+  const browser = read('apps/camNC/vitest.config.ts');
+  assert.match(browser, /exclude:.*\.\.\.nodeFiles/);
+  assert.match(read('apps/camNC/vitest.node.config.ts'), /include: files/);
+  assert(!node.some(file => /jobDb|solveCad|workers\//.test(file)), 'platform adapters retain real browser coverage');
+  const scripts = JSON.parse(read('apps/camNC/package.json')).scripts;
+  for (const task of ['licenses', 'domain', 'worker', 'browser']) assert(scripts.test.includes(`test:${task}`));
+});
+
+test('headless workspace packages cannot import app or browser state adapters', () => {
+  for (const pkg of ['cad-editor', 'cam-settings']) {
+    const manifest = JSON.parse(read(`packages/${pkg}/package.json`));
+    assert.deepEqual(Object.keys(manifest.dependencies), [pkg === 'cad-editor' ? '@wbcnc/cad' : '@wbcnc/cam']);
+    for (const file of readdirSync(new URL(`packages/${pkg}/src`, root)).filter(file => file.endsWith('.ts'))) {
+      const source = read(`packages/${pkg}/src/${file}`);
+      for (const match of source.matchAll(/(?:from|import)\s*['"]([^'"]+)['"]/g)) {
+        assert(!/^(?:@\/|react(?:-dom)?$|zustand|comlink)|apps\//.test(match[1]), `${pkg}/${file}: ${match[1]}`);
+      }
+    }
+  }
+});
+
+test('worker cache includes its schema and migrations while browser tasks exclude worker-only edits', () => {
+  const { tasks } = JSON.parse(read('apps/camNC/turbo.json'));
+  assert(tasks['test:worker'].inputs.includes('worker/**'));
+  assert(tasks['test:worker'].inputs.includes('migrations/**'));
+  for (const task of ['test:browser', 'spec:cad']) {
+    assert(tasks[task].inputs.includes('$TURBO_DEFAULT$'), 'unknown new app files must invalidate the cache');
+    assert(tasks[task].inputs.includes('!worker/**'));
+    assert(tasks[task].inputs.includes('!migrations/**'));
+  }
+});
+
+
+test('scoped app task caches do not inherit the entire app through a same-package transit node', () => {
+  const tasks = ['test:worker', 'test:licenses', 'test:browser', 'spec:cad'];
+  const plan = JSON.parse(execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', ...tasks, '--filter=@wbcnc/camNC', '--dry=json'], { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }));
+  for (const name of tasks) {
+    const task = plan.tasks.find(task => task.taskId === `@wbcnc/camNC#${name}`);
+    assert(task, name);
+    assert(!task.dependencies.includes('@wbcnc/camNC#transit'), `${name} must not hash excluded app sources via transit`);
+    assert(task.dependencies.includes('@wbcnc/cad-editor#transit'), 'workspace source dependencies must still invalidate results');
+  }
+});
+
+
+test('license validation and distribution builds hash their verifier and canonical application license', () => {
+  const plan = JSON.parse(execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', 'test:licenses', 'build', '--filter=@wbcnc/camNC', '--dry=json'], { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }));
+  for (const name of ['test:licenses', 'build']) {
+    const task = plan.tasks.find(task => task.taskId === `@wbcnc/camNC#${name}`);
+    const inputs = Object.keys(task.inputs);
+    assert(inputs.some(file => file.endsWith('e2e/cad/check-distribution.mjs')), `${name} must hash its verifier`);
+    assert(inputs.some(file => /(?:^|\/)LICENSE$/.test(file)), `${name} must hash the root license`);
+  }
+});
+
+
+test('package and fast-task input overrides retain the shared timing reporter', () => {
+  const plan = JSON.parse(execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', 'test', 'test:fast', '--filter=@wbcnc/cam', '--filter=@wbcnc/camNC', '--dry=json'], { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }));
+  for (const id of ['@wbcnc/cam#test', '@wbcnc/camNC#test:fast']) {
+    const task = plan.tasks.find(task => task.taskId === id);
+    assert(Object.keys(task.inputs).some(file => file.endsWith('scripts/test-timings.mjs')), `${id} must hash its timing reporter`);
+  }
+});
+
+test('all workflows use maintained Node.js 24 action releases', () => {
+  // Verified against each action's action.yml; cache subactions share the same release.
+  const minimumMajor = {
+    'actions/checkout': 7,
+    'actions/setup-node': 7,
+    'actions/cache': 6,
+    'pnpm/action-setup': 6,
+    'actions/setup-python': 7,
+    'actions/upload-artifact': 7,
+    'actions/download-artifact': 8,
+  };
+  for (const file of readdirSync(new URL('.github/workflows/', root)).filter(file => /\.ya?ml$/.test(file))) {
+    const workflow = parse(read(`.github/workflows/${file}`));
+    assert.doesNotMatch(JSON.stringify(workflow), /ubuntu-latest/,
+      `${file}: pin Linux runners to avoid unplanned OS migrations`);
+    for (const [id, job] of Object.entries(workflow.jobs)) {
+      for (const step of job.steps ?? []) {
+        if (!step.uses) continue;
+        assert(!step.uses.startsWith('seanmiddleditch/gha-setup-ninja@'),
+          `${file} ${id}: use hosted Ninja instead of the Node.js 20 installer`);
+        const [action, version] = step.uses.split('@');
+        const repository = action.split('/').slice(0, 2).join('/');
+        if (!(repository in minimumMajor)) continue;
+        const major = /^v(\d+)(?:\.|$)/.exec(version);
+        assert(major && Number(major[1]) >= minimumMajor[repository],
+          `${file} ${id}: ${step.uses} must use a maintained Node.js 24 release`);
+      }
+    }
+  }
 });

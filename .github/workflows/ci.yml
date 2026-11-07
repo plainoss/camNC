@@ -20,16 +20,20 @@ concurrency:
 jobs:
   checks:
     name: Format, lint and types
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    # Optional shared task cache; without configuration the existing local cache still works.
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         name: Install pnpm
         with:
           run_install: false
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
@@ -40,7 +44,7 @@ jobs:
         run: pnpm run test:ci
       # Turborepo's local cache, so packages whose inputs did not change replay their result.
       - name: Cache Turborepo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo/cache
           key: turbo-checks-${{ github.sha }}
@@ -57,21 +61,40 @@ jobs:
 
   test:
     name: Tests (${{ matrix.suite }})
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     # CAD/WASM, the app browser suite, and OpenCV must not compete for one runner's CPUs.
     strategy:
       fail-fast: false
       matrix:
         include:
           - suite: cam
+            tasks: test
+            args: run
             filter: --filter=@wbcnc/cam
             performance: pnpm --filter @wbcnc/cam test:performance
-          - suite: app
+          - suite: app-core
+            tasks: test:domain test:worker test:licenses
+            args: ''
             filter: --filter=@wbcnc/camNC
             performance: pnpm --filter @wbcnc/camNC test:performance
+          - suite: app-browser-1
+            tasks: test:browser
+            args: --shard=1/2
+            filter: --filter=@wbcnc/camNC
+            performance: ''
+          - suite: app-browser-2
+            tasks: test:browser
+            args: --shard=2/2
+            filter: --filter=@wbcnc/camNC
+            performance: ''
           - suite: packages
+            tasks: test
+            args: run
             filter: --filter=!@wbcnc/cam --filter=!@wbcnc/camNC --concurrency=1
             performance: ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.
       image: mcr.microsoft.com/playwright:v1.54.1-noble
@@ -80,14 +103,14 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         name: Install pnpm
         with:
           run_install: false
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
@@ -98,7 +121,7 @@ jobs:
       # Git refuses this container's checkout, so scripts/turbo-shared-cache.mjs can't find the git dir. Name the
       # directory here, or the cache action saves a path turbo never wrote.
       - name: Cache Turborepo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo/cache
           key: turbo-test-${{ matrix.suite }}-${{ github.sha }}
@@ -109,15 +132,30 @@ jobs:
         timeout-minutes: 20
         env:
           TURBO_CACHE_DIR: .turbo/cache
-        run: node scripts/turbo-shared-cache.mjs run test --log-order=stream ${{ matrix.filter }} -- run
+        run: node scripts/turbo-shared-cache.mjs run ${{ matrix.tasks }} --log-order=stream ${{ matrix.filter }} -- ${{ matrix.args }}
       # Each gate gets an otherwise idle runner, just as in the root test script.
       - name: Performance gates
         if: matrix.performance != ''
         run: ${{ matrix.performance }}
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-timings-${{ matrix.suite }}-${{ github.run_attempt }}
+          path: |
+            apps/camNC/test-results
+            packages/*/test-results
 
   specs:
-    name: Behaviour specs
-    runs-on: ubuntu-latest
+    name: Behaviour specs (${{ matrix.shard }})
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/4, 2/4, 3/4, 4/4]
+    runs-on: ubuntu-24.04
     container:
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.
       image: mcr.microsoft.com/playwright:v1.54.1-noble
@@ -126,39 +164,48 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         name: Install pnpm
         with:
           run_install: false
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Cache Turborepo
+        uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: turbo-specs-${{ strategy.job-index }}-${{ github.sha }}
+          restore-keys: turbo-specs-${{ strategy.job-index }}-
       - name: Run sketch behaviour specs
         timeout-minutes: 15
-        run: pnpm --filter @wbcnc/camNC spec:cad
+        env:
+          TURBO_CACHE_DIR: .turbo/cache
+        run: node scripts/turbo-shared-cache.mjs run spec:cad --filter=@wbcnc/camNC --log-order=stream -- --shard=${{ matrix.shard }}
       - name: Check the interactive spec session
+        if: matrix.shard == '1/4'
         timeout-minutes: 5
         run: printf 'rect 10,10 100,60\nexpect {"entityCount":4}\nframe smoke\n' | pnpm --silent --filter @wbcnc/camNC spec:session
       - name: Upload spec results
-        if: failure()
-        uses: actions/upload-artifact@v4
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          name: behaviour-specs
-          path: output/playwright/spec
+          name: behaviour-specs-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: apps/camNC/test-results/spec
 
   results:
     # Keep the check required by main's ruleset, including builds now running in checks.
     name: Run tests
     if: always()
     needs: [checks, test, specs, fluidnc-sim]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require all validation jobs to pass
         env:
@@ -174,21 +221,21 @@ jobs:
 
   fluidnc-sim:
     name: FluidNC simulator integration
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         name: Install pnpm
         with:
           run_install: false
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install PlatformIO
@@ -205,7 +252,7 @@ jobs:
             python --version
           } | sha256sum | awk '{print "hash=" $1}' >> "$GITHUB_OUTPUT"
       - name: Cache FluidNC simulator build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/camnc

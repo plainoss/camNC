@@ -53,14 +53,14 @@ listening session.
 
 Besides the steps below, a line can be:
 
-| Line            | Meaning                                                       |
-| --------------- | ------------------------------------------------------------- |
-| `state`         | The state now, without doing anything                         |
-| `expect <json>` | Check any expectation from a scenario; failures fail the line |
-| `frame [name]`  | Write the normalized SVG to `output/playwright/spec-session/` |
-| `shot [name]`   | Write a screenshot to the same folder                         |
-| `reset`         | Start again on a fresh page with nothing saved                |
-| `quit`          | Stop                                                          |
+| Line            | Meaning                                                             |
+| --------------- | ------------------------------------------------------------------- |
+| `state`         | The state now, without doing anything                               |
+| `expect <json>` | Check any expectation from a scenario; failures fail the line       |
+| `frame [name]`  | Write the normalized SVG to `apps/camNC/test-results/spec-session/` |
+| `shot [name]`   | Write a screenshot to the same folder                               |
+| `reset`         | Start again on a fresh page with nothing saved                      |
+| `quit`          | Stop                                                                |
 
 Once a behaviour works, write the steps that showed it as a scenario.
 
