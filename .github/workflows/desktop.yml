@@ -41,7 +41,7 @@ jobs:
   platforms:
     # Adding any other label to a pull request does not rebuild it.
     if: github.event.action != 'labeled' || github.event.label.name == 'desktop-all-platforms'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       include: ${{ steps.pick.outputs.include }}
     steps:
@@ -70,11 +70,11 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
@@ -90,12 +90,13 @@ jobs:
       # Tauri only rewrites its sources when they change and still signs each new app bundle.
       - name: Cache macOS CEF helper
         if: runner.os == 'macOS'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: apps/camnc-desktop/src-tauri/target/tauri-cef-helper
           key: desktop-cef-helper-v1-${{ matrix.target }}-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('pnpm-lock.yaml', 'apps/camnc-desktop/src-tauri/Cargo.lock', 'apps/camnc-desktop/src-tauri/Cargo.toml') }}
-      # CEF's C++ wrapper is built with CMake and Ninja.
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      # CEF's C++ wrapper uses Ninja, preinstalled on all three hosted runner images.
+      - name: Verify Ninja
+        run: ninja --version
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -108,7 +109,7 @@ jobs:
         run: echo "version=$(grep -A1 '^name = "cef"$' apps/camnc-desktop/src-tauri/Cargo.lock | sed -n 's/^version = "\(.*\)"$/\1/p')" >> "$GITHUB_OUTPUT"
       - name: Restore CEF
         id: cef-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/Library/Caches/tauri-cef
@@ -117,7 +118,7 @@ jobs:
           key: tauri-cef-${{ matrix.target }}-${{ steps.cef.outputs.version }}
       - run: pnpm install --frozen-lockfile
       - name: Cache desktop frontend
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo/cache
           key: desktop-frontend-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
@@ -146,7 +147,7 @@ jobs:
       # Saved even when bundling fails, since CEF is downloaded during the compile.
       - name: Save CEF
         if: ${{ !cancelled() && steps.cef-cache.outputs.cache-hit != 'true' && steps.build.outcome != 'skipped' }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/Library/Caches/tauri-cef
@@ -165,7 +166,7 @@ jobs:
             [ -e "$file" ] && mv "$file" "dist/camNC_${VERSION}_aarch64${file#dist/camNC}"
           done
           ls -la dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: camnc-desktop-${{ matrix.target }}
           path: dist/*
@@ -176,9 +177,9 @@ jobs:
   release:
     needs: build
     if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check for the signing key
         id: key
         env:
@@ -186,7 +187,7 @@ jobs:
         run: |
           echo "present=$HAS_KEY" >> "$GITHUB_OUTPUT"
           if [ "$HAS_KEY" != true ]; then echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set, so nothing is released."; fi
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: steps.key.outputs.present == 'true'
         with:
           path: dist
