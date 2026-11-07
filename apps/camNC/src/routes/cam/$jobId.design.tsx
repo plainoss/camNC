@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import {
   cadFaceSketches,
   evaluateCadFeatures,
+  faceIsUnderside,
+  flipUnderside,
   evaluateCadPart,
   faceSketchDocument,
   removeCadFeature,
@@ -241,6 +243,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   const facePartSource = faceEdit && faceEdit.base.parts.find(part => part.id === faceEdit.partId)!,
     facePart = facePartSource && evaluateCadPart(facePartSource).part,
     faceOn = facePartSource && cadFaceSketches(facePartSource).find(face => face.sketch.id === faceEdit!.sketchId)?.on,
+    faceBelow = !!facePartSource && !!faceOn && faceIsUnderside(facePartSource, faceOn),
     faceFloor =
       facePartSource && facePart && typeof faceOn === 'object'
         ? evaluateCadFeatures(facePartSource, facePart).part.cuts?.find(cut => cut.id === (faceOn as { floorOf: string }).floorOf)?.outline
@@ -266,7 +269,12 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
           <CadEditor
             key={faceEdit.sketchId}
             document={faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId)}
-            faceSketch={{ outline: facePart.outline, floor: faceFloor, label: faceFloor ? 'Pocket floor' : 'Top face' }}
+            faceSketch={{
+              outline: faceBelow ? flipUnderside(facePart.outline) : facePart.outline,
+              floor: faceBelow && faceFloor ? flipUnderside(faceFloor) : faceFloor,
+              label: `${faceFloor ? 'Pocket floor' : faceBelow ? 'Underside' : 'Top face'}${faceBelow ? ', seen from below' : ''}`,
+              below: faceBelow,
+            }}
             onDraftChange={edited => {
               const merged = withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited);
               if (activeSession.current === session) syncCadSession(session, merged);

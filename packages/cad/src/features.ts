@@ -1,5 +1,5 @@
 import { newCadId, originId } from './document';
-import { cadFaceSketches } from './featureModel';
+import { cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type {
@@ -120,7 +120,8 @@ export function cadSketchRegions(part: CadPart, sketchId: string, outline?: CadP
   if (sketchId === part.sketch.id) return sketchRegions(part.sketch, CAD_CHORD_TOLERANCE);
   const face = cadFaceSketches(part).find(candidate => candidate.sketch.id === sketchId);
   if (!face) return [];
-  const points = outline ?? evaluateCadPart(part).part?.outline;
+  const profile = outline ?? evaluateCadPart(part).part?.outline,
+    points = profile && faceIsUnderside(part, face.on) ? flipUnderside(profile) : profile;
   return points ? sketchRegions(face.sketch, CAD_CHORD_TOLERANCE, { boundary: { id: `${part.id}:outline`, points } }) : [];
 }
 
@@ -204,7 +205,8 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
         continue;
       }
     }
-    const outline = hole ? [...hole.points].reverse() : region.points;
+    const flip = (points: CadPoint[]) => (at.side === 'underside' ? flipUnderside(points) : points),
+      outline = hole ? [...hole.points].reverse() : flip(region.points);
     if (Math.abs(polygonArea(outline)) - region.holes.reduce((sum, island) => sum + Math.abs(polygonArea(island)), 0) < MIN_CUT_AREA) {
       error('cut-too-small', `A cut needs at least ${MIN_CUT_AREA} mm² of area to be machined.`);
       continue;
@@ -218,7 +220,7 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
       to,
       through: feature.depth === 'through',
       outline,
-      islands: region.holes,
+      islands: region.holes.map(flip),
     });
   }
   // Holes whose loop gained a depth aren't holes any more; every other inner loop keeps its place and order.

@@ -212,13 +212,14 @@ describe('reporting problems', () => {
     expect(codes(report.warnings)).toContain('cut-outside-floor');
   });
 
-  it('says underside cuts are not machinable yet', async () => {
+  it('says underside cuts go to a second side, which the report leaves out', async () => {
     const { report } = await editCad(null, d => {
       const part = d.part('Plate');
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
+      // Seen from below, X runs the other way.
       const under = part.sketchOn('underside');
-      under.rect({ at: [10, 10], w: 20, h: 20 });
-      part.cut(under.regionAt(20, 20), { depth: 3 });
+      under.rect({ at: [-30, 10], w: 20, h: 20 });
+      part.cut(under.regionAt(-20, 20), { depth: 3 });
     });
     expect(codes(report.warnings)).toContain('cam-underside');
     expect(report.parts[0]!.cam).toBeUndefined();

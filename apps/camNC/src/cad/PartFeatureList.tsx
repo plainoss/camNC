@@ -55,7 +55,7 @@ export function PartFeatureList({
   /** A cut's region can end up covered by a sketch on its floor, so its depth can be set from here too. */
   onCutDepth?: (cut: CadCut, depth: number) => void;
   onEdit?: (sketchId: string) => void;
-  onNew?: () => void;
+  onNew?: (face: 'top' | 'underside') => void;
 }) {
   const faces = cadFaceSketches(part),
     profile = evaluateCadPart(part).part,
@@ -128,9 +128,14 @@ export function PartFeatureList({
         ))}
       </ul>
       {onNew && (
-        <button type="button" disabled={!outline} onClick={onNew}>
-          New sketch on top
-        </button>
+        <>
+          <button type="button" disabled={!outline} onClick={() => onNew('top')}>
+            New sketch on top
+          </button>
+          <button type="button" disabled={!outline} onClick={() => onNew('underside')}>
+            New sketch on underside
+          </button>
+        </>
       )}
       {(onNew || onEdit) && !outline && <small className="cad-muted">Close the outline before sketching on a face.</small>}
     </div>

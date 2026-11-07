@@ -25,7 +25,7 @@ function shapes(region: Path[]) {
  * A watertight solid for a part with cuts, without the hidden faces stacked slabs would leave: one cap per height, the
  * bottom, and walls between heights. Each horizontal face is exactly a level, so `extractFeatures` reads it back.
  */
-export function cutPartMesh(features: PartFeatures): { positions: Float64Array; indices: Uint32Array } {
+export function cutPartMesh(features: PartFeatures, underside?: PartFeatures): { positions: Float64Array; indices: Uint32Array } {
   const positions: number[] = [];
   const triangle = (a: [number, number, number], b: [number, number, number], c: [number, number, number]) =>
     positions.push(...a, ...b, ...c);
@@ -46,8 +46,14 @@ export function cutPartMesh(features: PartFeatures): { positions: Float64Array; 
   };
   const levels = [...features.levels].sort((a, b) => b.z - a.z);
   for (const level of levels) cap(level.region, level.z, true);
-  cap(features.footprint, 0, false);
-  const heights = [...levels.map(level => level.z), 0];
+  // The underside is the same stack seen from the other face, with its heights turned over.
+  const below = [...(underside?.levels ?? [])].sort((a, b) => b.z - a.z),
+    thickness = features.thickness;
+  if (below.length) for (const level of below) cap(level.region, thickness - level.z, false);
+  else cap(features.footprint, 0, false);
+  // With cuts from below, the outside walls of the top stack stop where the deepest of them starts, and the underside
+  // stack's own walls cover the rest, so a cut reaching the edge from below stays open.
+  const heights = [...levels.map(level => level.z), below.length ? thickness - below[below.length - 1]!.z : 0];
   levels.forEach((_, i) => {
     const high = heights[i]!,
       low = heights[i + 1]!;
@@ -60,6 +66,18 @@ export function cutPartMesh(features: PartFeatures): { positions: Float64Array; 
         triangle([p.x, p.y, low], [q.x, q.y, high], [p.x, p.y, high]);
       });
     }
+  });
+  below.slice(0, -1).forEach((_, i) => {
+    // The solid this low is everything the underside's cuts leave, so its walls run the same way as those above. The
+    // last step up is the part's own outside, which the walls above cover from there.
+    const low = thickness - below[i]!.z,
+      high = thickness - below[i + 1]!.z;
+    for (const path of unionPaths(below.slice(0, i + 1).flatMap(level => level.region)))
+      path.forEach((p, n) => {
+        const q = path[(n + 1) % path.length]!;
+        triangle([p.x, p.y, low], [q.x, q.y, low], [q.x, q.y, high]);
+        triangle([p.x, p.y, low], [q.x, q.y, high], [p.x, p.y, high]);
+      });
   });
   return { positions: Float64Array.from(positions), indices: Uint32Array.from({ length: positions.length / 3 }, (_, i) => i) };
 }

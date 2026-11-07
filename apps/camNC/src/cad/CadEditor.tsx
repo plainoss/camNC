@@ -121,7 +121,7 @@ import { constraintColorNotice, sketchDofStatus, sketchFeedback } from './sketch
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
-import { cutRegionAt, cutRegions, withRegionDepth, type CutRegion } from './cutRegions';
+import { cutRegionAt, cutRegions, topRegions, withRegionDepth, type CutRegion } from './cutRegions';
 import { CutOverlay } from './CutOverlay';
 import { PartFeatureList } from './PartFeatureList';
 import { RegionDepthField } from './RegionDepthField';
@@ -248,7 +248,7 @@ export interface CadEditorProps {
   /** Hosts that can open a face sketch offer drawing on the part's top face. */
   onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string) => void;
   /** Editing one face sketch, with the part's outline shown behind it. It can be open, and it isn't a profile. */
-  faceSketch?: { outline: CadPoint[]; floor?: CadPoint[]; label: string };
+  faceSketch?: { outline: CadPoint[]; floor?: CadPoint[]; label: string; below?: boolean };
   /** Open on the part in 3D, when it has an outline to show. */
   startIn3D?: boolean;
 }
@@ -905,6 +905,8 @@ export function CadEditor({
         })
       );
     const bounds = [...points.values()].filter(p => !included || included.has(p.id)).map(p => ({ x: p.x, y: p.y }));
+    // A face sketch is framed by the face, not just what's drawn on it so far.
+    if (faceSketch && !entityIds) bounds.push(...faceSketch.outline);
     for (const e of sketch.entities)
       if ((!entityIds || entityIds.includes(e.id)) && (e.type === 'circle' || e.type === 'arc')) {
         const p = points.get(e.centerId);
@@ -918,6 +920,11 @@ export function CadEditor({
     const margin = 35;
     setView({ x: xmin - margin, y: -ymax - margin, w: Math.max(100, xmax - xmin + margin * 2), h: Math.max(80, ymax - ymin + margin * 2) });
   };
+  useEffect(() => {
+    if (faceSketch) fit();
+    // Only on opening: afterwards the view is the user's.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const projectPoint = (point: Point) => {
     const matrix = svg.current?.getScreenCTM();
     if (!matrix) return { x: point.x, y: -point.y };
@@ -2328,7 +2335,7 @@ export function CadEditor({
         setSelected(box.additive ? [...new Set([...box.selected, ...result.entityIds])] : result.entityIds);
         if (!box.additive) setSelectedConstraints([]);
       } else if (!cancel && !box.moved && !box.additive && tool === 'select' && !faceSketch && part) {
-        const entry = cutRegionAt(cutRegions(part), box.start);
+        const entry = cutRegionAt(topRegions(cutRegions(part)), box.start);
         if (entry) setRegionField({ entry, anchor: box.start });
       }
       return;
@@ -2651,7 +2658,7 @@ export function CadEditor({
                   }
                   onCutDepth={(cut, depth) => commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth))}
                   onMoveToTop={sketchId => commit(moveFaceSketch(documentRef.current, part.id, sketchId, 'top'))}
-                  onNew={onEditFaceSketch && (() => sketchOnFace('top'))}
+                  onNew={onEditFaceSketch && (face => sketchOnFace(face))}
                 />
               )}
               <div className="cad-divider" />
@@ -2710,7 +2717,8 @@ export function CadEditor({
           )}
           <div className="cad-canvas-bar">
             <span>
-              <strong>TOP</strong> · {part?.name ?? 'Sketch'} <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
+              <strong>{faceSketch?.below ? 'BOTTOM' : 'TOP'}</strong> · {part?.name ?? 'Sketch'}{' '}
+              <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
             </span>
             <div>
               {!faceSketch && (

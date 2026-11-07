@@ -106,3 +106,25 @@ export function featuresFromCuts(
     holeSources,
   };
 }
+
+/**
+ * The same profile as side B sees it: the part turned over around its X axis, or its Y axis when it lies turned. Only
+ * the positions change. A cut's depths still count from the face it's cut from.
+ */
+export function flippedProfile(profile: FlatProfile, axis: 'x' | 'y', [width, height]: [number, number]): FlatProfile {
+  const turn = (path: PathD) => path.map(p => (axis === 'x' ? { x: p.x, y: height - p.y } : { x: width - p.x, y: p.y })).reverse();
+  return {
+    ...profile,
+    outline: turn(profile.outline),
+    holes: profile.holes.map(turn),
+    cuts: profile.cuts.map(cut => ({ ...cut, outline: turn(cut.outline), islands: cut.islands.map(turn) })),
+  };
+}
+
+/** Whether cuts from the two faces would meet, which would make a hole neither side's program means to cut. */
+export function cutsMeet(top: PartFeatures, underside: PartFeatures): boolean {
+  const cuts = (f: PartFeatures) => f.levels.filter(level => level.z < f.thickness - Z_TOL);
+  return cuts(top).some(a =>
+    cuts(underside).some(b => a.z <= top.thickness - b.z + Z_TOL && Math.abs(polyArea(intersect(a.region, b.region))) > 0.01)
+  );
+}
