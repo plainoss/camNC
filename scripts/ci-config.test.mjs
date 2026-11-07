@@ -164,3 +164,15 @@ test('worker cache includes its schema and migrations while browser tasks exclud
     assert(tasks[task].inputs.includes('!migrations/**'));
   }
 });
+
+
+test('scoped app task caches do not inherit the entire app through a same-package transit node', () => {
+  const tasks = ['test:worker', 'test:licenses', 'test:browser', 'spec:cad'];
+  const plan = JSON.parse(execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', ...tasks, '--filter=@wbcnc/camNC', '--dry=json'], { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }));
+  for (const name of tasks) {
+    const task = plan.tasks.find(task => task.taskId === `@wbcnc/camNC#${name}`);
+    assert(task, name);
+    assert(!task.dependencies.includes('@wbcnc/camNC#transit'), `${name} must not hash excluded app sources via transit`);
+    assert(task.dependencies.includes('@wbcnc/cad-editor#transit'), 'workspace source dependencies must still invalidate results');
+  }
+});

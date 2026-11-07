@@ -5,7 +5,8 @@
   "tasks": {
     "build": {
       "dependsOn": [
-        "^build"
+        "^build",
+        "^transit"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -24,7 +25,7 @@
       "dependsOn": ["^transit"]
     },
     "test": {
-      "dependsOn": ["transit"],
+      "dependsOn": ["^transit"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/test-timings.mjs"],
       "outputs": ["test-results/**"],
       "env": ["CI", "FLUIDNC_SIM_HOST", "FLUIDNC_SIM_VARIANT"],
@@ -32,12 +33,12 @@
     },
     // Its own task, so a run without the slowest files can never replay as a passed "test".
     "test:fast": {
-      "dependsOn": ["transit"],
+      "dependsOn": ["^transit"],
       "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH"]
     },
     "test:domain": {
       "dependsOn": [
-        "transit"
+        "^transit"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -52,7 +53,7 @@
     },
     "test:worker": {
       "dependsOn": [
-        "transit"
+        "^transit"
       ],
       "outputs": [
         "test-results/worker.json"
@@ -63,7 +64,7 @@
     },
     "test:licenses": {
       "dependsOn": [
-        "transit"
+        "^transit"
       ],
       "env": [
         "CI"
@@ -71,7 +72,7 @@
     },
     "test:browser": {
       "dependsOn": [
-        "transit"
+        "^transit"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -89,7 +90,7 @@
     },
     "spec:cad": {
       "dependsOn": [
-        "transit"
+        "^transit"
       ],
       "outputs": [
         "test-results/spec/**"
@@ -106,8 +107,8 @@
       "cache": false,
       "env": ["CAMNC_SMOKE_URL", "CAMNC_SMOKE_HEADED", "CAMNC_SMOKE_OUTPUT"]
     },
-    "lint": {},
-    "check-types": {},
+    "lint": { "dependsOn": ["^transit"] },
+    "check-types": { "dependsOn": ["^transit"] },
     "dev": {
       "cache": false,
       "persistent": true,
