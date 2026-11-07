@@ -1,4 +1,4 @@
-import { ellipseFromPoints, type CadPoint } from '@wbcnc/cad';
+import { ellipseFromPoints, circleThroughThreePoints, type CadPoint } from '@wbcnc/cad';
 import { buildArcPreview } from './arcPreviewGeometry';
 import type { SketchTool } from './sketchTools';
 import { formatCadValue } from './valueExpressions';
@@ -62,6 +62,15 @@ export function sketchPreviewFeedback({ tool, pending, cursor, tangent, pixelSca
         { kind: 'secondaryDiameter', text: formatCadValue(shape.secondary * 2), at: { x: start.x, y: start.y - 20 / scale } }
       );
     }
+  } else if (tool === 'threePointCircle') {
+    markers.push(...pending, cursor);
+    const circle = pending[1] ? circleThroughThreePoints(start, pending[1], cursor) : null;
+    if (circle)
+      values.push({
+        kind: 'diameter',
+        text: `⌀${formatCadValue(circle.radius * 2)}`,
+        at: { x: circle.x, y: circle.y + circle.radius + 20 / scale },
+      });
   } else if (tool === 'circle') {
     markers.push(start);
     const radius = Math.hypot(cursor.x - start.x, cursor.y - start.y),

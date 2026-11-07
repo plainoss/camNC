@@ -2,6 +2,7 @@ import {
   addArc,
   addBezier,
   addCircle,
+  addThreePointCircle,
   addEllipse,
   addConic,
   addCenterRectangle,
@@ -854,25 +855,27 @@ export function CadEditor({
                 ? `Click or drag from the ${next === 'centerRectangle' ? 'center' : 'first corner'} to the opposite corner. Or enter sizes below.`
                 : next === 'ellipse'
                   ? 'Click the center, then the first axis radius, then the second axis radius.'
-                  : next === 'circle'
-                    ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
-                    : next === 'arc'
-                      ? 'Click the start, end, then a point on the arc.'
-                      : next === 'point'
-                        ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
-                        : next === 'line'
-                          ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
-                          : next === 'trim'
-                            ? 'Click an interval to trim between intersections or placed points.'
-                            : next === 'fillet'
-                              ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
-                              : next === 'conic'
-                                ? 'Click the start, end, then control point. Enter rho to shape the conic.'
-                                : next === 'spline' || next === 'bezier'
-                                  ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
-                                  : next === 'curveControlPoint'
-                                    ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                    : 'Select a line, circle, point pair or existing dimension.'
+                  : next === 'threePointCircle'
+                    ? 'Click three points along the circle circumference.'
+                    : next === 'circle'
+                      ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
+                      : next === 'arc'
+                        ? 'Click the start, end, then a point on the arc.'
+                        : next === 'point'
+                          ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
+                          : next === 'line'
+                            ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
+                            : next === 'trim'
+                              ? 'Click an interval to trim between intersections or placed points.'
+                              : next === 'fillet'
+                                ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                                : next === 'conic'
+                                  ? 'Click the start, end, then control point. Enter rho to shape the conic.'
+                                  : next === 'spline' || next === 'bezier'
+                                    ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
+                                    : next === 'curveControlPoint'
+                                      ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
+                                      : 'Select a line, circle, point pair or existing dimension.'
     );
     svg.current?.focus();
   };
@@ -926,6 +929,7 @@ export function CadEditor({
       'rectangle',
       'centerRectangle',
       'circle',
+      'threePointCircle',
       'ellipse',
       'arc',
       'tangentArc',
@@ -1006,7 +1010,7 @@ export function CadEditor({
     } else if (!hit) point = { x: Math.round(raw.x), y: Math.round(raw.y) };
     return point;
   };
-  const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex = -1) => {
+  const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex: number | readonly number[] = -1) => {
     let next = source;
     const createdCurve = source.entities.find(
       e => (e.type === 'circle' || e.type === 'arc') && !sketch?.entities.some(before => before.id === e.id)
@@ -1018,7 +1022,7 @@ export function CadEditor({
         (e): e is SketchPoint => e.type === 'point' && Math.hypot(e.x - inference.point.x, e.y - inference.point.y) < 1e-7
       );
       let point: SketchPoint | undefined = candidates.find(e => !sketch?.entities.some(before => before.id === e.id)) ?? candidates[0];
-      if (index === curvePointIndex && createdCurve) {
+      if ((Array.isArray(curvePointIndex) ? curvePointIndex.includes(index) : index === curvePointIndex) && createdCurve) {
         // A circle's rim / arc's through click needs a concrete construction point to retain its inferred intent.
         if (!point) {
           next = addPoint(next, { ...inference.point, construction: true, standalone: false });
@@ -1103,6 +1107,12 @@ export function CadEditor({
       } catch (error) {
         return setMessage(error instanceof Error ? error.message : String(error));
       }
+    } else if (tool === 'threePointCircle' && pending[1] && end) {
+      try {
+        next = addThreePointCircle(sketch, { points: [start, pending[1], end], construction });
+      } catch (error) {
+        return setMessage(error instanceof Error ? error.message : String(error));
+      }
     } else if (tool === 'circle') {
       const radiusValue = end ? null : parseCadValue(radius, { unit: 'mm' });
       if (radiusValue && 'error' in radiusValue) return setMessage(`Circle radius: ${radiusValue.error}`);
@@ -1172,7 +1182,11 @@ export function CadEditor({
         ),
       };
     const hints = end ? [...pendingSnaps.current, lastDrawingHint.current] : pendingSnaps.current;
-    next = addSnapRelations(next, hints, end && (tool === 'circle' || tool === 'arc') ? hints.length - 1 : -1);
+    next = addSnapRelations(
+      next,
+      hints,
+      tool === 'threePointCircle' ? [0, 1, 2] : end && (tool === 'circle' || tool === 'arc') ? hints.length - 1 : -1
+    );
     changeSketch(next);
     drawingGesture.current = idleDrawingGesture();
     if (tool === 'conic') {
@@ -1183,6 +1197,7 @@ export function CadEditor({
         setRho(String(curve.rho));
       }
     }
+    if (tool === 'threePointCircle') setMessage('Click three points along the circle circumference.');
     setDrawingCue(null);
     setSnapCue(null);
     setChain(continued);
@@ -2076,16 +2091,18 @@ export function CadEditor({
         event.currentTarget.setPointerCapture(event.pointerId);
       }
       if (tool === 'arc') setMessage('Click the arc end, then move to shape the arc.');
-    } else if ((tool === 'arc' || tool === 'conic' || tool === 'ellipse') && pending.length === 1) {
-      if (tool === 'ellipse' && Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) < 0.1) return;
+    } else if ((tool === 'arc' || tool === 'conic' || tool === 'ellipse' || tool === 'threePointCircle') && pending.length === 1) {
+      if ((tool === 'ellipse' || tool === 'threePointCircle') && Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) < 0.1) return;
       setPending([...pending, p]);
       pendingSnaps.current.push(lastDrawingHint.current);
       setMessage(
-        tool === 'ellipse'
-          ? 'Click to set the second axis radius, perpendicular to the first.'
-          : tool === 'arc'
-            ? 'Move to shape the arc, then click a point on it.'
-            : 'Click the conic control point.'
+        tool === 'threePointCircle'
+          ? 'Click the third point on the circle circumference.'
+          : tool === 'ellipse'
+            ? 'Click to set the second axis radius, perpendicular to the first.'
+            : tool === 'arc'
+              ? 'Move to shape the arc, then click a point on it.'
+              : 'Click the conic control point.'
       );
     } else {
       // Rho opens during this pointerdown. Suppress the browser's following mousedown
@@ -3057,7 +3074,11 @@ export function CadEditor({
                 ...tools.map(t => ({
                   ...t,
                   description:
-                    t.id === 'ellipse' ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.' : undefined,
+                    t.id === 'ellipse'
+                      ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.'
+                      : t.id === 'threePointCircle'
+                        ? 'Sketch a circle by defining three points along its circumference.'
+                        : undefined,
                 })),
                 ...(['horizontal', 'vertical', 'coincident', 'midpoint', 'parallel', 'perpendicular', 'equal', 'tangent'] as const).map(
                   id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })

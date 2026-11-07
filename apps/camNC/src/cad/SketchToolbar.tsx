@@ -57,6 +57,16 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'threePointCircle':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+          <circle cx="12" cy="4" r="1.5" fill="currentColor" />
+          <circle cx="20" cy="12" r="1.5" fill="currentColor" />
+        </>
+      );
+      break;
     case 'circle':
       shape = (
         <>

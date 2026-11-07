@@ -4,6 +4,7 @@ export type SketchTool =
   | 'rectangle'
   | 'centerRectangle'
   | 'circle'
+  | 'threePointCircle'
   | 'ellipse'
   | 'arc'
   | 'tangentArc'
@@ -32,6 +33,7 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'rectangle', label: 'Corner rectangle', key: 'G' },
   { id: 'centerRectangle', label: 'Center rectangle', key: 'R' },
   { id: 'circle', label: 'Circle', key: 'C' },
+  { id: 'threePointCircle', label: '3 point circle' },
   { id: 'ellipse', label: 'Ellipse' },
   { id: 'arc', label: 'Arc', key: 'A' },
   { id: 'tangentArc', label: 'Tangent arc', key: 'Shift+A' },
@@ -60,6 +62,7 @@ export const sketchToolGroups = [
       'rectangle',
       'centerRectangle',
       'circle',
+      'threePointCircle',
       'ellipse',
       'arc',
       'tangentArc',
@@ -74,7 +77,7 @@ export const sketchToolGroups = [
 ] as const;
 
 export const sketchToolFamilies = [
-  { id: 'circle', label: 'Circle tools', tools: ['circle', 'ellipse'] },
+  { id: 'circle', label: 'Circle tools', tools: ['circle', 'threePointCircle', 'ellipse'] },
   { id: 'rectangle', label: 'Rectangle tools', tools: ['rectangle', 'centerRectangle'] },
   { id: 'arc', label: 'Arc tools', tools: ['arc', 'tangentArc', 'conic'] },
   { id: 'spline', label: 'Spline tools', tools: ['spline', 'bezier', 'curveControlPoint'] },
@@ -83,7 +86,7 @@ export const sketchToolFamilies = [
 
 export const sketchToolLabel = (tool: SketchToolDefinition) => (tool.key ? `${tool.label} (${tool.key})` : tool.label);
 export const sketchToolSection = (tool: SketchTool) =>
-  tool === 'ellipse'
+  tool === 'ellipse' || tool === 'threePointCircle'
     ? 'circle'
     : tool === 'centerRectangle'
       ? 'rectangle'
