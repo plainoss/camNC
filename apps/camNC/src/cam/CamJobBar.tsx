@@ -49,7 +49,15 @@ export function CamJobBar({
     };
   }, [job?.id, onStageNavigate, navigationPending]);
   const note =
-    job?.origin?.kind === 'sample' ? (isDemoMode() ? 'Temporary rehearsal copy' : 'Sample copy · saved in this browser') : undefined;
+    job?.origin?.kind === 'sample'
+      ? isDemoMode()
+        ? 'Temporary rehearsal copy'
+        : 'Sample copy · saved in this browser'
+      : job?.origin?.kind === 'designFile'
+        ? // It may have been written by a script or an AI, which nobody has checked against the real part.
+          'Imported · check before cutting'
+        : undefined;
+  const noteDetail = job?.origin?.kind === 'designFile' ? `Imported from ${job.origin.fileName}. Check it before cutting.` : undefined;
   return (
     <>
       <header
@@ -64,7 +72,11 @@ export function CamJobBar({
             <span className="truncate">{job?.name ?? 'CAM job'}</span>
             {board && <span className="shrink-0 whitespace-nowrap text-foreground">· Board {board}</span>}
           </span>
-          {note && <span className="truncate text-[11px] text-muted-foreground">{note}</span>}
+          {note && (
+            <span className="truncate text-[11px] text-muted-foreground" title={noteDetail}>
+              {note}
+            </span>
+          )}
         </div>
         {tools}
         <div className="flex min-w-0 grow flex-wrap items-center justify-end gap-2">

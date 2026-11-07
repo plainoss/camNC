@@ -5,8 +5,8 @@ import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
 import { camKeys, useCamJobs } from '@/cam/camQueries';
 import { createDesignJob, deleteJob } from '@/cam/jobDb';
-import { kModelFile } from '@/cam/jobDb';
-import { createJobFromFile, pickModelFile, toastNotAModel } from '@/cam/openModelFile';
+import { kDesignFile, kModelFile } from '@/cam/jobDb';
+import { createJobFromFile, firstStage, pickModelFile, toastNotAModel } from '@/cam/openModelFile';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { Button } from '@wbcnc/ui/components/button';
@@ -32,11 +32,11 @@ function CamIndex() {
   const open = async () => {
     const file = await pickModelFile();
     if (!file) return;
-    if (!kModelFile.test(file.name)) return toastNotAModel(file.name);
+    if (!kModelFile.test(file.name) && !kDesignFile.test(file.name)) return toastNotAModel(file.name);
     try {
       const job = await createJobFromFile(file);
       void queryClient.invalidateQueries({ queryKey: camKeys.jobs });
-      void navigate({ to: '/cam/$jobId/model', params: { jobId: job.id } });
+      void navigate({ to: firstStage(job), params: { jobId: job.id } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     }
@@ -114,6 +114,7 @@ function CamIndex() {
                       </span>
                       <span className="truncate text-xs text-muted-foreground">
                         {job.origin?.kind === 'sample' && 'Sample project · '}
+                        {job.origin?.kind === 'designFile' && 'Imported design · '}
                         {job.design ? 'Native design' : job.fileName}
                         {job.parts.length > 0 && ` · ${parts} ${parts === 1 ? 'part' : 'parts'} to mill`} · {kWhen.format(job.updatedAt)}
                       </span>

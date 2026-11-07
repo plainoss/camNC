@@ -1,28 +1,43 @@
+import { parseCadDocument } from '@wbcnc/cad';
 import { toast } from '@wbcnc/ui/components/sonner';
-import { createJob, kModelFile, type CamJobV1 } from './jobDb';
+import { createJob, importDesignJob, kDesignFile, kModelFile, type CamJobV1 } from './jobDb';
 
 /** Let the user pick a STEP/STL file; resolves to the new job, or null if nothing was picked. */
 export function pickModelFile(): Promise<File | null> {
   return new Promise(resolve => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.step,.stp,.stl';
+    input.accept = '.step,.stp,.stl,.json';
     input.onchange = () => resolve(input.files?.[0] ?? null);
     input.oncancel = () => resolve(null);
     input.click();
   });
 }
 
-export const kNotAModel = 'Not a STEP or STL file';
+export const kNotAModel = 'Not a STEP, STL or design file';
 
 /** A file picked via "All files" (or dropped) that is no model: say so instead of doing nothing. */
 export function toastNotAModel(fileName: string) {
-  toast.error(kNotAModel, { description: `${fileName} can't be opened here. Open a .step, .stp or .stl file.` });
+  toast.error(kNotAModel, { description: `${fileName} can't be opened here. Open a .step, .stp, .stl or camNC design .json file.` });
 }
 
 export async function createJobFromFile(file: File): Promise<CamJobV1> {
+  if (kDesignFile.test(file.name)) return importDesignFile(file);
   if (!kModelFile.test(file.name)) throw new Error(`${kNotAModel}: ${file.name}`);
   return createJob(file);
+}
+
+/** Where a new job opens: a design goes to its sketch, to be checked and finished, and a model to its parts. */
+export const firstStage = (job: CamJobV1) => (job.design ? ('/cam/$jobId/design' as const) : ('/cam/$jobId/model' as const));
+
+async function importDesignFile(file: File): Promise<CamJobV1> {
+  let document;
+  try {
+    document = parseCadDocument(JSON.parse(await file.text()));
+  } catch (cause) {
+    throw new Error(`${file.name} isn't a camNC design: ${cause instanceof Error ? cause.message : String(cause)}`);
+  }
+  return importDesignJob(document, file.name);
 }
 
 /**

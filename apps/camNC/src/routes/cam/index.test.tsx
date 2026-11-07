@@ -1,4 +1,5 @@
 import { createJob, getJob, listJobs, saveJob } from '@/cam/jobDb';
+import { createPlateDocument } from '@wbcnc/cad';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
@@ -39,7 +40,33 @@ describe('CAM job list', () => {
     renderIndex();
     fireEvent.click(screen.getByRole('button', { name: /Open model/ }));
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith('Not a STEP or STL file', { description: expect.stringContaining('notes.txt') })
+      expect(toastError).toHaveBeenCalledWith('Not a STEP, STL or design file', { description: expect.stringContaining('notes.txt') })
+    );
+    expect(await listJobs()).toHaveLength(before);
+  });
+
+  it('starts a draft job from a design file, labelled as imported', async () => {
+    picked.file = new File([JSON.stringify(createPlateDocument({ name: 'Scripted plate' }))], 'plate.json');
+    renderIndex();
+    fireEvent.click(screen.getByRole('button', { name: /Open model/ }));
+    await waitFor(async () => expect((await listJobs()).some(job => job.name === 'Scripted plate')).toBe(true));
+    const job = (await listJobs()).find(candidate => candidate.name === 'Scripted plate')!;
+    expect(job).toMatchObject({ origin: { kind: 'designFile', fileName: 'plate.json' }, design: { acceptedRevision: 0 } });
+    expect(job.design!.accepted).toBeUndefined();
+    cleanup();
+    renderIndex();
+    expect((await screen.findByText(/Imported design · Native design/)).textContent).toBeTruthy();
+  });
+
+  it('says what is wrong with a design file it cannot read, and makes no job', async () => {
+    const before = (await listJobs()).length;
+    picked.file = new File(['{"version": 9}'], 'broken.json');
+    renderIndex();
+    fireEvent.click(screen.getByRole('button', { name: /Open model/ }));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        expect.stringMatching(/^broken\.json isn’t a camNC design|^broken\.json isn't a camNC design/)
+      )
     );
     expect(await listJobs()).toHaveLength(before);
   });
