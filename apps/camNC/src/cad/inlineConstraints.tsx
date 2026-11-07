@@ -56,6 +56,7 @@ export function ConstraintSymbol({ kind }: { kind: InlineConstraintKind }) {
       return <path d="M-5-2H5M-5 2H5" />;
     case 'parallel':
       return <path d="M-5 5L-1-5M1 5L5-5" />;
+    case 'symmetricCurves':
     case 'symmetricPoints':
       return (
         <>

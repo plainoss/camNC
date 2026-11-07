@@ -49,6 +49,7 @@ const labels: Record<InlineConstraintKind, string> = {
   parallel: 'Parallel',
   perpendicular: 'Perpendicular',
   symmetricPoints: 'Symmetric',
+  symmetricCurves: 'Symmetric',
   fix: 'Fixed point',
 };
 

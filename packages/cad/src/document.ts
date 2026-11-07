@@ -149,6 +149,7 @@ export function constraintEntityIds(constraint: CadConstraint): string[] {
     return Array.isArray(constraint.members)
       ? [...new Set(constraint.members.flatMap(member => (member ? [member.sourceId, member.targetId] : [])))]
       : [];
+  if (constraint.type === 'symmetricCurves') return [constraint.entityAId, constraint.entityBId, constraint.lineId];
   if (constraint.type === 'regularPolygon') return [constraint.circleId, ...constraint.edgeIds];
   if (constraint.type === 'symmetricPoints') return [constraint.pointAId, constraint.pointBId, constraint.lineId];
   if ('sourceEntityId' in constraint && constraint.sourceEntityId !== undefined)
@@ -700,6 +701,7 @@ export function parseCadDocument(input: unknown): CadDocument {
             'vertical',
             'coincident',
             'symmetricPoints',
+            'symmetricCurves',
             'regularPolygon',
             'horizontalPoints',
             'verticalPoints',
@@ -729,6 +731,8 @@ export function parseCadDocument(input: unknown): CadDocument {
         )
           throw new Error('Unknown CAD constraint');
         if (c.label !== undefined && typeof c.label !== 'string') throw new Error('Invalid constraint label');
+        if (c.type === 'symmetricCurves' && c.focusSign !== undefined && c.focusSign !== 1 && c.focusSign !== -1)
+          throw new Error('Invalid ellipse symmetry branch.');
         if (c.type === 'regularPolygon') {
           if (
             !['inscribed', 'circumscribed'].includes(c.mode) ||
