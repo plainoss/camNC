@@ -206,6 +206,14 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
     case 'vertical':
       shape = <path d="M12 4v16m-3-16h6m-6 16h6" />;
       break;
+    case 'concentric':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="12" cy="12" r="4" />
+        </>
+      );
+      break;
     case 'coincident':
       shape = (
         <>
@@ -285,10 +293,11 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
   );
 }
 
-const constraints: { id: ConstraintCommandTool; label: string; key: string }[] = [
+const constraints: { id: ConstraintCommandTool; label: string; key?: string }[] = [
   { id: 'horizontal', label: 'Horizontal', key: 'H' },
   { id: 'vertical', label: 'Vertical', key: 'V' },
   { id: 'coincident', label: 'Coincident', key: 'I' },
+  { id: 'concentric', label: 'Concentric', key: 'Shift+O' },
   { id: 'midpoint', label: 'Midpoint', key: 'Shift+M' },
   { id: 'parallel', label: 'Parallel', key: 'B' },
   { id: 'perpendicular', label: 'Perpendicular', key: 'Shift+L' },

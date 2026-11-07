@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseCadDocument } from '@wbcnc/cad';
+import { cadFaceSketches, parseCadDocument } from '@wbcnc/cad';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { design, editCad, inspectCadDocument, renderCadSvg, shortHandles, type CadScript } from './index';
 import { typeErrors } from './typecheck';
@@ -317,4 +317,18 @@ describe('inspectCadDocument', () => {
     const { report } = await inspectCadDocument(edited.document);
     expect(report).toEqual(edited.report);
   });
+});
+
+it('applies a multi-curve concentric relation through the script API', async () => {
+  const result = await editCad(null, d => {
+    const part = d.part('Plate');
+    part.profile.rect({ at: [0, 0], w: 120, h: 100 });
+    const sketch = part.sketchOn('top');
+    const a = sketch.arc({ at: [20, 20], r: 5, from: 0, to: 180 });
+    const b = sketch.arc({ at: [50, 40], r: 10, from: 0, to: 180 });
+    const c = sketch.arc({ at: [80, 60], r: 15, from: 0, to: 180 });
+    sketch.relate('concentric', a, b, c);
+  });
+  expect(result.scriptError).toBeUndefined();
+  expect(cadFaceSketches(result.document.parts[0]!)[0]!.sketch.constraints.filter(c => c.label === 'Concentric')).toHaveLength(2);
 });
