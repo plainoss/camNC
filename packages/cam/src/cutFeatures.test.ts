@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { camPart } from './toolpaths';
 import { featuresFromCuts, type FlatCut } from './cutFeatures';
-import { polyArea, type PathD } from './geom';
+import { intersect, polyArea, type PathD } from './geom';
 
 const rect = (x: number, y: number, w: number, h: number): PathD => [
   { x, y },
@@ -52,6 +52,40 @@ describe('features from cuts', () => {
     const { features } = featuresFromCuts(profile([cut('a', rect(20, 20, 70, 60), 6, { islands: [rect(40, 40, 10, 10)] })]));
     expect(features.pockets[0]!.area).toBeCloseTo(4200 - 100, 0);
     expect(features.levels[0]!.area).toBeCloseTo(24000 - 4100, 0);
+  });
+
+  it('keeps an island too small for a level out of the pocket', () => {
+    const island = rect(50, 50, 0.2, 0.2),
+      { features } = featuresFromCuts(profile([cut('a', rect(20, 20, 80, 80), 6, { islands: [island] })])),
+      pocket = features.pockets[0]!;
+    expect(pocket.area).toBeCloseTo(6400 - 0.04, 2);
+    expect(polyArea(intersect([island], pocket.strictRegion))).toBeCloseTo(0, 6);
+    expect(polyArea(intersect([island], pocket.region))).toBeCloseTo(0, 6);
+  });
+
+  it('keeps a hole beside a floor cut, naming only the hole the cut really made', () => {
+    const hole = rect(120, 40, 10, 10),
+      { features, holeSources } = featuresFromCuts(
+        profile([cut('pocket', rect(20, 20, 60, 60), 6), cut('slot', rect(40, 40, 100, 20), 18, { from: 6 })], [hole])
+      );
+    expect(holeSources).toEqual([{ hole: 0 }, { cut: 'slot' }]);
+    expect(features.throughHoles).toHaveLength(2);
+    expect(features.throughHoles[0]).toEqual(hole);
+  });
+
+  it('keeps a hole inside an island of a through cut', () => {
+    const hole = rect(50, 50, 4, 4),
+      { features, holeSources } = featuresFromCuts(
+        profile([cut('ring', rect(20, 20, 80, 80), 18, { islands: [rect(40, 40, 30, 30)] })], [hole])
+      );
+    expect(holeSources).toEqual([{ hole: 0 }, { cut: 'ring' }]);
+    expect(features.throughHoles[0]).toEqual(hole);
+  });
+
+  it('replaces a hole a through cut merged into, without counting it twice', () => {
+    const { features, holeSources } = featuresFromCuts(profile([cut('slot', rect(40, 40, 30, 10), 18)], [rect(60, 40, 30, 10)]));
+    expect(holeSources).toEqual([{ cut: 'slot' }]);
+    expect(polyArea(features.throughHoles)).toBeCloseTo(500, 3);
   });
 
   it('steps a second cut down from a pocket floor, and keeps nesting in one region per height', () => {
@@ -110,7 +144,7 @@ describe('features from cuts', () => {
   });
 
   it('keeps every untouched hole’s identity, whatever Clipper does to its points', () => {
-    for (const radius of [5, 20, 100]) {
+    for (const radius of [5, 20, 95]) {
       const round = Array.from({ length: 120 }, (_, i) => ({
           x: 100 + 0.37 + radius * Math.cos((i * Math.PI) / 60),
           y: 60 + 0.11 + radius * 0.5 * Math.sin((i * Math.PI) / 60),
