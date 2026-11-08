@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardRequest, nestBoard, reconcileBoards } from './boards';
+import { boardRequest, edgeNote, nestBoard, reconcileBoards } from './boards';
 import { boardCarving, carvingProblem, hasWork, kDefaultVBit, withCarving, type CarvingV1 } from './carving';
 import { maskOutline, outlineArt } from './carvingOutline';
 import { camWorker } from './camQueries';
@@ -89,5 +89,7 @@ describe('a carving job', () => {
     expect(plan.ops.some(op => op.kind === 'vcarve' && op.tool.shape === 'v')).toBe(true);
     expect(plan.programs.at(-1)).toMatchObject({ tool: kDefaultVBit.number, name: kDefaultVBit.name });
     expect(plan.gcode).toMatch(/TAPER=45deg/);
+    // Its board has no outlines: no note about cuts past its edge.
+    expect(edgeNote(board, nest, kDefaultPlan.bit.diameter)).toBeNull();
   }, 60_000);
 });

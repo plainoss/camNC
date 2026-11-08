@@ -281,7 +281,8 @@ export function spacingProblem(board: BoardV1, nest: { gap: number; margin: numb
  * thin strip left at the edge can't hold).
  */
 export function edgeNote(board: BoardV1, nest: { gap: number; margin: number }, bit: number): string | null {
-  if (nest.margin >= bit) return null;
+  // No parts, no outline cuts (a carving's board).
+  if (nest.margin >= bit || !board.items.length) return null;
   const past = `Board ${board.name}: the outline cuts run past the board edge (${nest.margin} mm margin, ⌀${bit} bit).`;
   // The hold check blocks the job if the bit would hit a fixture.
   return board.fixtures?.length
