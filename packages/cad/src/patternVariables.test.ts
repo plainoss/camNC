@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   addCircle,
+  cadSketchRegions,
+  evaluateCadDocument,
+  setCutDepth,
   cadVariableProblems,
   createPlateDocument,
   linearPatternSketchEntities,
   parseCadDocument,
   setCadVariable,
   solveCadDocument,
+  type CadDimension,
   type CadDocument,
   type CadLinearPattern,
 } from './index';
@@ -24,6 +28,7 @@ const pattern = (document: CadDocument) =>
 async function side() {
   let document = variable(variable(createPlateDocument({ width: 300, height: 720, thickness: 18 }), 'height', '720mm'), 'pitch', '32mm');
   const part = document.parts[0]!;
+  part.sketch.constraints.find((c): c is CadDimension => c.label === 'Height' && 'value' in c)!.expression = 'height';
   part.sketch = addCircle(part.sketch, { x: 37, y: 32, radius: 2.5 });
   const pin = part.sketch.entities.filter(entity => entity.type === 'circle').at(-1)!;
   const result = linearPatternSketchEntities(part.sketch, {
@@ -66,5 +71,32 @@ describe('patterns that follow variables', () => {
     if ('error' in result) throw new Error(result.error);
     document = result.document;
     expect(pattern(document).expressions).toEqual({ countX: '(height - 64)/system + 1', spacingX: 'system' });
+  });
+
+  it('cuts every pin a pattern has, including the ones it gains or loses, unless a pin has its own cut', async () => {
+    let document = await side();
+    const part = document.parts[0]!;
+    const original = pattern(document).instances.find(instance => instance.x === 0)!;
+    const regionOf = (doc: CadDocument, curveId: string) =>
+      cadSketchRegions(doc.parts[0]!, doc.parts[0]!.sketch.id).find(region => region.curveIds.includes(curveId))!;
+    const pin = Object.values(original.idMap).find(id => document.parts[0]!.sketch.entities.find(e => e.id === id)?.type === 'circle')!;
+    document = setCutDepth(document, part.id, part.sketch.id, regionOf(document, pin).id, 12);
+    const pockets = (doc: CadDocument) => {
+      const result = evaluateCadDocument(doc);
+      if (!result.parts[0]) throw new Error(JSON.stringify(result.diagnostics));
+      return result.parts[0].cuts!.map(cut => cut.to);
+    };
+    expect(pockets(document)).toEqual(Array(21).fill(12));
+    expect(evaluateCadDocument(document).parts[0]!.holes).toEqual([]);
+    document = (await solveCadDocument(variable(document, 'height', '900mm'))).document;
+    expect(pockets(document)).toEqual(Array(27).fill(12));
+    document = (await solveCadDocument(variable(document, 'height', '400mm'))).document;
+    expect(pockets(document)).toEqual(Array(11).fill(12));
+    expect(evaluateCadDocument(document).diagnostics).toEqual([]);
+    // A pin given its own depth keeps it.
+    const third = pattern(document).instances.find(instance => instance.x === 2)!;
+    const thirdPin = Object.values(third.idMap).find(id => document.parts[0]!.sketch.entities.find(e => e.id === id)?.type === 'circle')!;
+    document = setCutDepth(document, part.id, part.sketch.id, regionOf(document, thirdPin).id, 6);
+    expect(pockets(document).sort()).toEqual([...Array(10).fill(12), 6].sort());
   });
 });

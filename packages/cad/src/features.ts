@@ -1,8 +1,10 @@
 import { newCadId, originId } from './document';
-import { cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
+import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
+import { patternMaster } from './pattern';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type {
+  CadCut,
   CadCutDepth,
   CadDiagnostic,
   CadDocument,
@@ -138,6 +140,32 @@ export function cadSketchRegions(part: CadPart, sketchId: string, outline?: CadP
 const MIN_CUT_DEPTH = 0.01;
 const MIN_CUT_AREA = 1;
 
+/**
+ * The regions a pattern's copies make of a region drawn by its original: found by mapping the region's curves through
+ * each copy's IDs. Copies whose region isn't there, as a pattern shrinks, are left out. A region of a copy has none,
+ * so a cut given to one copy stays on it.
+ */
+function patternCopyRegions(
+  sketch: CadSketch,
+  regions: CadSketchRegion[],
+  region: CadSketchRegion
+): { region: CadSketchRegion; key: string }[] {
+  for (const pattern of sketch.constraints) {
+    if (pattern.type !== 'linearPattern' && pattern.type !== 'circularPattern') continue;
+    const own = patternMaster(pattern);
+    if (!own || !region.curveIds.every(id => Object.values(own.idMap).includes(id))) continue;
+    const seedOf = new Map(Object.entries(own.idMap).map(([seed, id]) => [id, seed]));
+    return pattern.instances.flatMap(instance => {
+      if (instance === own) return [];
+      const mapped = region.curveIds.map(id => instance.idMap[seedOf.get(id)!]);
+      if (mapped.some(id => !id)) return [];
+      const copy = regions.find(candidate => sameIds(candidate.curveIds, mapped as string[]));
+      return copy ? [{ region: copy, key: `${instance.x},${instance.y}` }] : [];
+    });
+  }
+  return [];
+}
+
 const sameIds = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
 
 /**
@@ -177,27 +205,40 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
     }
     const at = start(faces.get(feature.sketchId));
     if (!at) continue;
+    const sketch =
+      feature.sketchId === part.sketch.id ? part.sketch : cadFaceSketches(part).find(f => f.sketch.id === feature.sketchId)!.sketch;
+    // A pattern's copies are cut as their original is, including copies it gains later, unless a copy has its own cut.
+    const ownCuts = new Set(cadCuts(part).flatMap(cut => (cut.sketchId === feature.sketchId ? [cut.regionId] : [])));
+    const copies = patternCopyRegions(sketch, regions.get(feature.sketchId)!, region).filter(copy => !ownCuts.has(copy.region.id));
+    for (const { region: target, key } of [{ region, key: '' }, ...copies]) {
+      const failed = diagnostics.length;
+      cutRegion(feature, target, key ? `${feature.id}~${key}` : feature.id, at);
+      // One problem is enough: the copies would only repeat it.
+      if (diagnostics.length > failed) break;
+    }
+  }
+  function cutRegion(feature: CadCut, region: CadSketchRegion, id: string, at: { side: EvaluatedCadCut['side']; from: number }) {
     const fromProfile = feature.sketchId === part.sketch.id,
       hole = fromProfile ? uncut.find(loop => sameIds(loop.entityIds, region.curveIds)) : undefined;
     if (hole && feature.depth === 'through') {
       keptHoles.add(hole.id);
-      continue;
+      return;
     }
     if (hole) uncut.splice(uncut.indexOf(hole), 1);
-    if (feature.depth === 0) continue;
+    if (feature.depth === 0) return;
     if (feature.depth === 'through') {
       // A through cut mustn't change the part's outline or leave a loose piece: CAM holds each part by its one outline.
       if (fromProfile) {
         error('cut-whole-part', 'The whole part can’t be cut through. Pick a region inside it.', region.curveIds);
-        continue;
+        return;
       }
       if (region.curveIds.includes(`${part.id}:outline`)) {
         error('cut-through-edge', 'A through cut can’t reach the part’s edge. Change the profile instead, or use a separate part.');
-        continue;
+        return;
       }
       if (region.holes.length) {
         error('cut-through-island', 'A through cut can’t leave a loose piece inside it. Use a separate part for that piece.');
-        continue;
+        return;
       }
     } else {
       const left = part.thickness - at.from;
@@ -207,22 +248,22 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
           'cut-too-deep',
           `A ${feature.depth} mm cut doesn’t fit in the ${+left.toFixed(3)} mm of material left. Make it shallower, or cut through.`
         );
-        continue;
+        return;
       }
       if (feature.depth < MIN_CUT_DEPTH) {
         error('cut-too-shallow', `A cut needs to be at least ${MIN_CUT_DEPTH} mm deep. Make it deeper, or leave the region uncut.`);
-        continue;
+        return;
       }
     }
     const flip = (points: CadPoint[]) => (at.side === 'underside' ? flipUnderside(points) : points),
       outline = hole ? [...hole.points].reverse() : flip(region.points);
     if (Math.abs(polygonArea(outline)) - region.holes.reduce((sum, island) => sum + Math.abs(polygonArea(island)), 0) < MIN_CUT_AREA) {
       error('cut-too-small', `A cut needs at least ${MIN_CUT_AREA} mm² of area to be machined.`);
-      continue;
+      return;
     }
     const to = feature.depth === 'through' ? part.thickness : at.from + feature.depth;
     cuts.push({
-      id: feature.id,
+      id,
       regionId: region.id,
       side: at.side,
       from: at.from,
