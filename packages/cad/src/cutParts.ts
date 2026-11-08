@@ -187,6 +187,10 @@ export function applyPartCuts(
           const relief = intoSource.cornerRelief
             ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
             : { points: outline, skipped: 0 };
+          if (relief.skipped)
+            warn(
+              `${relief.skipped} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
+            );
           const current = byId.get(targetId)!;
           const cut: EvaluatedCadCut = {
             id: `cut-parts:${step.id}:${toolId}${key}`,
@@ -197,6 +201,7 @@ export function applyPartCuts(
             through,
             outline: relief.points,
             islands: [],
+            opening: { x0, y0, x1, y1 },
           };
           byId.set(targetId, { ...current, cuts: [...(current.cuts ?? []), cut] });
           made++;
