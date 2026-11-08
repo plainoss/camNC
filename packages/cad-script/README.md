@@ -44,6 +44,11 @@ the parts. See `examples/` for more.
   edits later. `polygon` pins each vertex by its position, so `freedom: 0` doesn't make
   it regular. Both return `corners`, in vertex order, and `fillet(corners, r)` rounds
   them in any sketch.
+- `path([x, y]).lineTo([x, y]).arcTo([x, y], { r }).close()` draws any outline of lines
+  and arcs. An arc with `r` turns counterclockwise unless `clockwise`, the short way
+  round unless `large`. One with `tangent: true` carries on smoothly from the segment
+  before it, which makes slots and wavy edges. Every vertex is placed, so the loop comes
+  out fully constrained.
 - `pattern(items, { count, step: [dx, dy], rows? })` repeats curves in linked copies, such
   as a row of shelf-pin holes. Cutting the first copy's region cuts them all, including
   copies the pattern gains later. A count can be an expression, rounded down to say how

@@ -62,6 +62,11 @@ export interface SketchEdit {
   circle(options: { at: LenXy; d: Len }): CadRef & { center: CadRef };
   /** A closed loop through these points, each placed so the loop is fully constrained. Corners can then be filleted. */
   polygon(points: readonly Xy[]): { edges: CadRef[]; corners: CadRef[] };
+  /**
+   * A closed outline of lines and arcs, drawn from `from` and finished with `close()`. Every vertex is placed and each
+   * arc has its radius or a tangency, so the loop comes out fully constrained.
+   */
+  path(from: LenXy): PathEdit;
   /** A single segment with no dimensions, which leaves it free to be constrained. */
   line(from: Xy, to: Xy): CadRef & { start: CadRef; end: CadRef };
   /** Counterclockwise around `at` from `from` degrees to `to` degrees. */
@@ -83,6 +88,16 @@ export interface SketchEdit {
   find(handle: string): CadRef;
   /** The innermost region at a point, as a click picks it. Resolved now to a stable ID, so solving can't move the pick. */
   regionAt(x: number, y: number): CadRegionRef;
+}
+export interface PathEdit {
+  lineTo(to: LenXy): PathEdit;
+  /**
+   * An arc to `to`. With `r`, it turns counterclockwise unless `clockwise`, the short way round unless `large`. With
+   * `tangent`, it carries on smoothly from the segment before it, and its radius follows from where it ends.
+   */
+  arcTo(to: LenXy, how: { r: Len; clockwise?: boolean; large?: boolean } | { tangent: true }): PathEdit;
+  /** Joins the end back to the start with a line, unless it's already there. */
+  close(): { edges: CadRef[]; corners: CadRef[] };
 }
 export interface PartEdit {
   readonly id: string;
@@ -233,7 +248,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       constrain({ type: 'positionX', pointId: point.id, value: measure(x, 'X'), label: 'X', ...expressionOf(x) });
       constrain({ type: 'positionY', pointId: point.id, value: measure(y, 'Y'), label: 'Y', ...expressionOf(y) });
     };
-    return {
+    const self: SketchEdit = {
       id: sketchId,
       rect({ w, h, at, center }) {
         const width = measure(w, 'Width'),
@@ -270,6 +285,100 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
           if (!corners[i]!.fixed && !isPlaced(corners[i]!.id)) place(corners[i]!, at);
         });
         return { edges, corners };
+      },
+      path(from) {
+        type P = { x: number; y: number };
+        const at = (point: LenXy): P => ({ x: measure(point[0], 'X'), y: measure(point[1], 'Y') });
+        const start = at(from);
+        const vertices: { at: P; typed: LenXy }[] = [{ at: start, typed: from }];
+        const edges: CadRef[] = [];
+        let cursor = start;
+        // Which way the last segment leaves its end, for a tangent arc after it.
+        let heading: P | undefined;
+        let closed = false;
+        const unit = (v: P) => {
+          const length = Math.hypot(v.x, v.y);
+          return { x: v.x / length, y: v.y / length };
+        };
+        const left = (v: P) => ({ x: -v.y, y: v.x });
+        const open = () => {
+          if (closed) fail('This path is already closed.');
+        };
+        const arrive = (to: LenXy, point: P) => {
+          if (Math.hypot(point.x - cursor.x, point.y - cursor.y) < 1e-6) fail(`The path is already at ${to.join(', ')}.`);
+          const back = Math.hypot(point.x - start.x, point.y - start.y) < 1e-6;
+          // Ending on the start reuses its point, so the loop closes.
+          const end = back ? start : point;
+          if (!back) vertices.push({ at: point, typed: to });
+          return end;
+        };
+        const edit: PathEdit = {
+          lineTo(to) {
+            open();
+            const end = arrive(to, at(to));
+            const line = added(sketch => addLine(sketch, { x1: cursor.x, y1: cursor.y, x2: end.x, y2: end.y })).find(
+              e => e.type === 'line'
+            )!;
+            edges.push({ id: line.id });
+            heading = unit({ x: end.x - cursor.x, y: end.y - cursor.y });
+            cursor = end;
+            return edit;
+          },
+          arcTo(to, how) {
+            open();
+            const from = cursor,
+              end = arrive(to, at(to));
+            const chord = { x: end.x - from.x, y: end.y - from.y },
+              length = Math.hypot(chord.x, chord.y);
+            let center: P, clockwise: boolean;
+            if ('tangent' in how) {
+              if (!heading) fail('A tangent arc needs a segment before it to carry on from.');
+              const normal = left(heading!);
+              const across = normal.x * chord.x + normal.y * chord.y;
+              if (Math.abs(across) < 1e-9 * length) fail(`${to.join(', ')} is straight ahead: use lineTo.`);
+              // The center lies on the normal at the start, as far from the end as from the start.
+              const k = (length * length) / (2 * across);
+              center = { x: from.x + normal.x * k, y: from.y + normal.y * k };
+              clockwise = k < 0;
+            } else {
+              const r = measure(how.r, 'Radius');
+              if (!(r >= length / 2 - 1e-9))
+                fail(`A ${r} mm radius can't reach ${to.join(', ')}: it needs at least ${+(length / 2).toFixed(3)} mm.`);
+              clockwise = !!how.clockwise;
+              const rise = Math.sqrt(Math.max(0, r * r - (length * length) / 4));
+              // The short way round, the center lies on the side the arc turns towards.
+              const side = (clockwise ? -1 : 1) * (how.large ? -1 : 1);
+              const normal = left(unit(chord));
+              center = { x: from.x + chord.x / 2 + side * normal.x * rise, y: from.y + chord.y / 2 + side * normal.y * rise };
+            }
+            const radius = Math.hypot(from.x - center.x, from.y - center.y);
+            const angle = (p: P) => Math.atan2(p.y - center.y, p.x - center.x);
+            // Arcs run counterclockwise, so a clockwise one is drawn from its end.
+            const [a, b] = clockwise ? [end, from] : [from, end];
+            const arc = added(sketch =>
+              addArc(sketch, { cx: center.x, cy: center.y, radius, startAngle: angle(a), endAngle: angle(b) })
+            ).find(e => e.type === 'arc')!;
+            const previous = edges.at(-1);
+            edges.push({ id: arc.id });
+            if ('tangent' in how) self.relate('tangent', previous!, { id: arc.id });
+            else constrain({ type: 'radius', entityId: arc.id, value: radius, ...expressionOf(how.r) });
+            const out = { x: end.x - center.x, y: end.y - center.y };
+            heading = unit(clockwise ? { x: out.y, y: -out.x } : left(out));
+            cursor = end;
+            return edit;
+          },
+          close() {
+            open();
+            if (Math.hypot(cursor.x - start.x, cursor.y - start.y) > 1e-6) edit.lineTo(from);
+            closed = true;
+            const corners = vertices.map(vertex => pointNear([vertex.at.x, vertex.at.y]));
+            vertices.forEach((vertex, i) => {
+              if (!corners[i]!.fixed && !isPlaced(corners[i]!.id)) place(corners[i]!, vertex.typed);
+            });
+            return { edges, corners };
+          },
+        };
+        return edit;
       },
       line(from, to) {
         const line = added(sketch => addLine(sketch, { x1: from[0], y1: from[1], x2: to[0], y2: to[1] })).find(e => e.type === 'line')!;
@@ -358,6 +467,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         );
       },
     };
+    return self;
   };
 
   const partEdit = (partId: string): PartEdit => ({
