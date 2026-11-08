@@ -499,7 +499,7 @@ export function CadEditor({
   const [pickedEdges, setPickedEdges] = useState<string[]>([]);
   // Use, started with `u` and nothing picked: each part edge clicked goes into the sketch, until Escape or another tool.
   const [usingEdges, setUsingEdges] = useState(false);
-  useEffect(() => setUsingEdges(false), [tool, part?.id, showWorkspace]);
+  useEffect(() => setUsingEdges(false), [part?.id, showWorkspace]);
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   // A variable being added, or the one being changed.
@@ -1097,6 +1097,8 @@ export function CadEditor({
   };
   const chooseTool = (next: Tool) => {
     slotDrag.current = null;
+    // Choosing any tool, Select included, ends Use.
+    setUsingEdges(false);
     if (next === 'slot') {
       setSlotWidth('10');
       setSlotChain(false);

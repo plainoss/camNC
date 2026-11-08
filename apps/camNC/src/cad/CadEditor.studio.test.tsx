@@ -558,6 +558,12 @@ it('uses an edge of a part behind a sketch in it, fixed where it is, picked then
   expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(true);
   await userEvent.keyboard('{Escape}');
   await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(false));
+  // Choosing Select, already the tool, ends it too.
+  await userEvent.keyboard('u');
+  await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(true));
+  await userEvent.click(screen.getByRole('button', { name: /^Select/ }));
+  await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(false));
+  screen.getByTestId('cad-canvas').focus();
   // U again ends it too.
   await userEvent.keyboard('u');
   await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(true));
