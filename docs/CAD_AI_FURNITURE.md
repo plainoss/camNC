@@ -1,0 +1,106 @@
+# Designing furniture with scripts
+
+What [`@wbcnc/cad-script`](../packages/cad-script/README.md) can build today, where real
+furniture still runs into limits, and what to improve next. This is based on thirteen
+pieces scripted on 2026-11-08. Fresh agents wrote twelve of them from the README and
+examples alone. The cupboard is the reference example in
+`packages/cad-script/examples/cupboard.cad.ts`.
+
+## The test set
+
+| Piece                                         |  Parts | Result    | Notes                                                                         |
+| --------------------------------------------- | -----: | --------- | ----------------------------------------------------------------------------- |
+| Phone stand side, drawer front, coaster       | 1 each | First try | Imported into the app: sketch, 3D and planned operations matched the report   |
+| Bookshelf: dados, back rebates, back          |      7 | 2 tries   | Rebates and dados drawn past the part so they run off the edge                |
+| Kitchen cabinet on a 32 mm system             |      7 | 2 tries   | Hand-mirrored sides came out with 28 and 32 pin holes, and nothing noticed    |
+| Nightstand with drawer box and finger joints  |     15 | 5 tries   | Dogbones folded into the outline by hand; dowel holes moved off the underside |
+| Wardrobe door with panel, pull and hinge cups |      1 | First try | Cups on the back, so the report has no toolpaths for it                       |
+| Plant stand with cross-lap legs               |      3 | 5 tries   | Clearance (+0.2 mm) shared as a constant, not tied to the other part          |
+| Stool with wedged through tenons              |     11 | First try | Dogbones from a 120-line helper the agent wrote                               |
+| Wall shelf with keyholes and brackets         |      4 | 4 tries   | Undercut impossible; chamfer faked as two steps                               |
+| Desk organizer with half-laps                 |      7 | 3 tries   | 12 mm pen holes in 9 mm stock became a two-layer base                         |
+| Coat rack with wavy edges and counterbores    |      1 | 4 tries   | CAM dropped both counterbores while the check passed. Now a warning           |
+| Cupboard with variables, placement and pins   |      6 | Reference | Rebuilt 900 wide from 19 mm board, and changed in the app: holds              |
+
+Every piece ended fully constrained and passing. In under 300 lines each, a model can
+describe real joinery: dados, rebates, cross-laps, through tenons, finger joints,
+shelf-pin rows, hinge cups and keyholes. The friction is in what a woodworker means
+that the model can't say, and in what CAM does with it.
+
+## What works now
+
+- **Parts and cuts.** Profiles with holes, pockets on the top, the underside or a
+  pocket's floor, through cuts, and fillets. Every value is dimensioned, so sketches
+  come out fully constrained.
+- **Variables.** `d.variable('board', '18mm')`, then sizes, positions, thicknesses,
+  cut depths and placements written as `'width - 2*board'`. They're saved as the model's
+  expressions. Changing `width`, `board` and `housing` together in a saved cupboard
+  resizes, moves and re-cuts everything with no clashes.
+- **Assembly.** `part.place` stands a part up by naming where its axes point. The
+  model's collision check, used by the report and the app's Assembly view, flags two
+  parts needing the same material, with rebates and dados counted as empty. A shelf
+  1 mm into a side shows up with its exact overlap.
+- **Patterns.** Linked rows of holes, such as 32 mm shelf pins.
+- **Checks.** Types, the solver, feature rules, `expect` for sizes, holes, pockets and
+  depths, and a toolpath summary per part. The summary has the operations, time, CAM
+  warnings, blocked jobs and cuts no tool fits.
+- **Into the app.** The checked `.json` opens as a new job with its variables, parts and
+  placements.
+
+## Where it falls short
+
+Grouped by where the fix belongs.
+
+### The design model (`packages/cad`)
+
+1. **No mirrored or repeated parts.** Left and right sides, four legs and two drawer
+   sides are copies. Mirrored by hand, the cabinet's sides drifted apart.
+2. **No joints or fits.** A dado's width only follows the shelf because both name
+   `board`. A slot can't say "the other part's thickness plus 0.2 mm".
+3. **No inside-corner relief.** Dogbones and T-bones are hand-drawn arcs. Every
+   flat-pack piece needed them, and they made up most of its code.
+4. **Pattern counts and steps are plain numbers.** A pin row whose count should follow
+   `height` doesn't update. Cut depths now take expressions.
+5. **No edge features.** Holes into an edge, round-overs and chamfers can't be recorded,
+   even as notes.
+6. **One bad cut breaks every part.** When one part fails to solve, the others report
+   "no outline" too.
+
+### CAM (`packages/cam`)
+
+1. **Cuts that run off the edge.** Rebates and through grooves drawn past the part get
+   "left in corners" warnings at their open ends, which suggests a lip is left there.
+   Verify on a test cut.
+2. **No drilling.** Pin holes, dowel holes and hinge cups are milled as pockets with the
+   3.175 mm bit.
+3. **A hole inside a counterbore is treated as an island,** so a narrow counterbore gets
+   no tool at all.
+4. **Warnings give heights from the board's bottom** ("z=12" for a 6 mm pocket), and
+   corner warnings don't say where.
+5. **Outline inside corners** in finger joints and notches get no warning, though a
+   round bit leaves them rounded.
+
+### cad-script
+
+1. **Underside cuts drop the part from the summary.** The app now plans a second side,
+   and the report should too.
+2. **No path builder.** Shapes with arcs need relations the model can get singular, such
+   as a half circle with a vertical tangent.
+3. **The drawing is for reading only.** Labels can still crowd on dense parts.
+
+## Next, in order
+
+1. **Mirrored and repeated parts** in the model, with a count for CAM. This fixes a class
+   of real errors the checks can't see.
+2. **Inside-corner relief** as an option on rectangles, polygons and outlines, sized
+   from the bit, with a CAM warning for outline corners left round.
+3. **Open-ended cuts in CAM,** checked against the physical test cut.
+4. **Two-sided parts in the report:** move the app's side B feature building into
+   `packages/cam`, as board planning was, and summarise both sides.
+5. **Joints and fits** (roadmap PR 10). The assembly check is ready to confirm them.
+6. **Expressions for pattern counts and steps.**
+7. **Drilling operations** for holes up to the bit's size and for hinge cups.
+8. **A path builder** in cad-script, then a second furniture run to measure the change
+   in tries and lines.
+
+Results from that second run belong in this file.

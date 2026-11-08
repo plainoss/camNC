@@ -44,10 +44,17 @@ the parts. See `examples/` for more.
   edits later. `polygon` pins each vertex by its position, so `freedom: 0` doesn't make
   it regular. Both return `corners`, in vertex order, and `fillet(corners, r)` rounds
   them in any sketch.
-- There's no pattern helper yet: repeat a shape in a loop.
+- `pattern(items, { count, step: [dx, dy], rows? })` repeats curves in linked copies, such
+  as a row of shelf-pin holes. Pick each copy's region with `regionAt` to cut it.
 - `regionAt(x, y)` picks the innermost region at a point, as a click does. It only sees
   that sketch's own lines, so a profile hole doesn't split a region on `top`.
-- `expect` checks `size`, `thickness`, `holes`, `pockets`, `depths` (each cut's floor
+- `cut(region, { depth })` takes mm, or `'through'` for a hole. A through cut can't reach
+  the part's edge: change the profile instead.
+- `relate` takes `coincident`, `horizontal`, `vertical`, `parallel`, `perpendicular`,
+  `equal`, `tangent`, `midpoint`, `symmetric` or `concentric`. Ends drawn at the same
+  coordinates are already joined.
+- `expect` checks `size`, `thickness`, `holes`, `pockets` (cuts that aren't through),
+  `depths` (each cut's floor
   below its face, in feature order) and `freedom`, within `tolerance` (0.01 mm). It
   doesn't check diameters or positions: read those from the report's cuts.
 - Cuts on `sketchOn({ floorOf: cut })` start at that pocket's floor.
@@ -56,12 +63,29 @@ the parts. See `examples/` for more.
   revision of the design.
 - A script that stops with an error leaves the design as it was.
 
+## Variables and assembly
+
+See `examples/cupboard.cad.ts`.
+
+- `d.variable('board', '18mm')` adds a design variable, or changes the one with that
+  name. A length can then be an expression: `w: 'width - 2*board'`, `thickness: 'board'`.
+  The expression is saved, so the part keeps following the variable when someone changes
+  it in the app. A plain number next to a variable is mm: `'depth + 10'`.
+- Cut depths (`{ depth: 'board/2' }`) and positions in `part.place` follow variables too.
+  Pattern counts and steps don't yet: use `d.value('height')` to work one out.
+- `part.place({ at: [x, y, z], x: '+y', y: '+z' })` puts the part's sketch origin at `at`
+  and says which way its sketch x and y point. The assembly's X runs left to right, Y
+  front to back and Z up, and the part's thickness points along x × y. The report's
+  `assembly` lists each placed part's box, and an error `parts-collide` says where two
+  parts need the same material. Rebates and dados count as empty.
+
 ## The toolpath summary
 
 Each part is planned alone on a board the way the app plans it, with the default 3.175 mm
 bit and settings and tabs holding it: its operations, time, CAM warnings, and anything
 that would block the job. CAM's own warnings, such as material left in corners, stay in
-each part's `toolpaths.warnings`. Only a blocked job adds a top-level warning. Pass `{ toolpaths: false }` to `inspectCadDocument` to skip it.
+each part's `toolpaths.warnings`. Only a blocked job, or a cut no tool fits, adds a
+top-level warning. Pass `{ toolpaths: false }` to `inspectCadDocument` to skip it.
 
 ## What the report doesn't cover
 
