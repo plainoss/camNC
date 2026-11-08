@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cadFaceSketches, parseCadDocument, setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { describe, expect, it, onTestFinished } from 'vitest';
-import { design, editCad, inspectCadDocument, renderCadSvg, shortHandles, type CadScript, type DesignEdit } from './index';
+import { design, editCad, inspectCadDocument, renderCadSvg, shortHandles, type CadReport, type CadScript, type DesignEdit } from './index';
 import { typeErrors } from './typecheck';
 
 const examples = fileURLToPath(new URL('../examples/', import.meta.url));
@@ -301,6 +301,74 @@ describe('paths', () => {
   });
 });
 
+describe('part studio', () => {
+  it('draws a part on a face picked by the way it looks, and keeps it there when that part grows', async () => {
+    const script = (board: string) => (d: DesignEdit) => {
+      d.variable('board', board);
+      const side = d.part('Side', { thickness: 'board' });
+      side.profile.rect({ at: [0, 0], w: 300, h: 600 });
+      side.drawOn('right');
+      const cleat = d.part('Cleat', { thickness: 20 });
+      cleat.profile.rect({ at: [0, 100], w: 300, h: 40 });
+      cleat.drawOn(side.face('+x'));
+    };
+    const box = (report: CadReport) => report.assembly!.parts.find(part => part.name === 'Cleat')!;
+    expect(box((await editCad(null, script('18mm'))).report).at[0]).toBe(18);
+    expect(box((await editCad(null, script('25mm'))).report).at[0]).toBe(25);
+    const { report } = await editCad(null, script('18mm'));
+    const cleat = report.steps!.find(step => step.kind === 'drawnOn' && step.part === 'Cleat')!;
+    expect(cleat.frameInWords).toMatch(/^Side's .*: sketch origin at .*looking \+x\.$/);
+  });
+
+  it('names the faces a part has when none looks the way asked', async () => {
+    const { scriptError } = await editCad(null, d => {
+      const gusset = d.part('Gusset');
+      gusset.profile.polygon([
+        [0, 0],
+        [100, 0],
+        [0, 100],
+      ]);
+      gusset.drawOn('top');
+      gusset.face('+x');
+    });
+    expect(scriptError).toBe('Gusset has no face pointing +x. Its faces point +z (top), -z (underside), -y, -x, plus 1 slanted.');
+  });
+
+  it('asks for a profile before a part is drawn on a face', async () => {
+    const { scriptError } = await editCad(null, d => d.part('Block').drawOn('top'));
+    expect(scriptError).toBe('Draw Block’s profile before drawing it on a plane or face.');
+  });
+
+  it('cuts one part with another, with room to spare', async () => {
+    const { report } = await editCad(null, d => {
+      d.variable('fit', '0.2mm');
+      const leg = d.part('Leg', { thickness: 18 });
+      leg.profile.rect({ at: [0, 0], w: 200, h: 400 });
+      leg.drawOn('front');
+      // A rail lying across the leg's top end, sunk 9 mm into it.
+      const rail = d.part('Rail', { thickness: 18 });
+      rail.profile.rect({ at: [-50, -40], w: 300, h: 40 });
+      rail.drawOn('top', { offset: '400mm - 9mm' });
+      d.cutParts(leg, { with: rail, clearance: 'fit' });
+    });
+    expect(report.errors).toEqual([]);
+    const [opening] = report.steps!.flatMap(step => (step.kind === 'partCut' ? step.cuts : []));
+    expect(opening).toMatchObject({ target: 'Leg', tool: 'Rail' });
+    expect(report.assembly!.collisions).toEqual([]);
+  });
+
+  it('repeats a part in a row that follows a variable', async () => {
+    const { report } = await editCad(null, d => {
+      d.variable('slats', '5');
+      const slat = d.part('Slat', { thickness: 12 });
+      slat.profile.rect({ at: [0, 0], w: 40, h: 600 });
+      slat.drawOn('top');
+      slat.pattern({ axis: 'x', count: 'slats', spacing: '60mm' });
+    });
+    expect(report.assembly!.parts.map(part => part.at[0])).toEqual([0, 60, 120, 180, 240]);
+  });
+});
+
 describe('variables and assembly', () => {
   const box = (report: { assembly?: { parts: { name: string; at: number[]; size: number[] }[] } }, name: string) =>
     report.assembly!.parts.find(part => part.name === name)!;
@@ -310,9 +378,9 @@ describe('variables and assembly', () => {
     const { report } = await editCad(null, cupboard());
     expect(report.assembly!.collisions).toEqual([]);
     expect(box(report, 'Side')).toEqual({ name: 'Side', at: [0, 0, 0], size: [18, 300, 720] });
-    expect(box(report, 'Side 2')).toEqual({ name: 'Side 2', at: [582, 0, 0], size: [18, 300, 720] });
+    expect(box(report, 'Right side')).toEqual({ name: 'Right side', at: [582, 0, 0], size: [18, 300, 720] });
     // The right side is the left's mirror image, which CAM cuts as a shape of its own.
-    expect(report.parts.find(part => part.name === 'Side')!.pieces).toEqual({ names: ['Side'], mirrored: ['Side 2'] });
+    expect(report.parts.find(part => part.name === 'Side')!.pieces).toEqual({ names: ['Side'], mirrored: ['Right side'] });
     expect(box(report, 'Back')).toEqual({ name: 'Back', at: [10, 294, 0], size: [580, 6, 720] });
   });
 
@@ -322,12 +390,13 @@ describe('variables and assembly', () => {
     expect(report.errors).toEqual([]);
     expect(ok).toBe(true);
     expect(box(report, 'Top').size).toEqual([878, 294, 19]);
-    expect(
-      report.parts
-        .find(part => part.name === 'Side')!
-        .cuts.slice(0, 2)
-        .map(cut => cut.size[1])
-    ).toEqual([19, 19]);
+    // The top and bottom cut their rebates as wide as they are thick.
+    const rebates = report.steps!.flatMap(step => (step.kind === 'partCut' ? step.cuts : []));
+    expect(rebates.map(cut => [cut.tool, cut.length, cut.depth])).toEqual([
+      ['Top', 19, 8],
+      ['Bottom', 19, 8],
+      ['Back', 720, 8],
+    ]);
   });
 
   it('keeps sizes, placements and rebate depths following changed variables, as a person would change them', async () => {
@@ -349,10 +418,10 @@ describe('variables and assembly', () => {
     expect(
       report.parts
         .find(part => part.name === 'Side')!
-        .cuts.slice(0, 3)
+        .cuts.filter(cut => cut.to !== 12)
         .map(cut => cut.to)
     ).toEqual([9, 9, 9]);
-    expect(box(report, 'Side 2')).toMatchObject({ at: [881, 0, 0], size: [19, 300, 720] });
+    expect(box(report, 'Right side')).toMatchObject({ at: [881, 0, 0], size: [19, 300, 720] });
     expect(box(report, 'Top').at).toEqual([10, 0, 701]);
     expect(report.assembly!.collisions).toEqual([]);
   });
@@ -365,7 +434,7 @@ describe('variables and assembly', () => {
     if ('error' in changed) throw new Error(changed.error);
     const { report } = await inspectCadDocument(changed.document, new Map(), { toolpaths: false });
     expect(report.errors).toEqual([]);
-    const pins = report.parts.find(part => part.name === 'Side')!.sketches[3]!;
+    const pins = report.parts.find(part => part.name === 'Side')!.sketches[1]!;
     // (900 - 36 - 160)/32 + 1 = 23 a row, up from 17.
     expect(pins.entities.filter(entity => entity.type === 'circle')).toHaveLength(46);
     // One cut on the first pin covers every copy, including the twelve the taller sides gain.
@@ -407,7 +476,7 @@ describe('variables and assembly', () => {
     if ('error' in changed) throw new Error(changed.error);
     const { report } = await inspectCadDocument(changed.document, new Map(), { toolpaths: false });
     expect(report.assembly!.collisions.map(c => c.parts.join(' / '))).toEqual(
-      expect.arrayContaining(['Side 2 / Bottom', 'Side 2 / Top', 'Side 2 / Back', 'Side 2 / Shelf'])
+      expect.arrayContaining(['Right side / Bottom', 'Right side / Top', 'Right side / Back', 'Right side / Shelf'])
     );
     expect(report.errors.map(error => error.code)).toContain('parts-collide');
   });

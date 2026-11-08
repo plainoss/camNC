@@ -77,30 +77,51 @@ the parts. See `examples/` for more.
   revision of the design.
 - A script that stops with an error leaves the design as it was.
 
-## Variables and assembly
-
-See `examples/cupboard.cad.ts`.
+## Variables
 
 - `d.variable('board', '18mm')` adds a design variable, or changes the one with that
   name. A length can then be an expression: `w: 'width - 2*board'`, `thickness: 'board'`.
   The expression is saved, so the part keeps following the variable when someone changes
   it in the app. A plain number next to a variable takes that variable's unit:
   `'depth + 10'` is mm.
-- Cut depths (`{ depth: 'board/2' }`) and positions in `part.place` follow variables too.
-  `d.value('board + margin')` works an expression out now, for a script's own loops. A
-  count or ratio without units, such as `d.value('(height - 160)/pitch')`, comes back as a
-  plain number.
-- `part.place({ at: [x, y, z], x: '+y', y: '+z' })` puts the part's sketch origin at `at`
-  and says which way its sketch x and y point. The assembly's X runs left to right, Y
-  front to back and Z up, and the part's thickness points along x × y. The report's
-  `assembly` lists each placed part's box, and an error `parts-collide` says where two
-  parts need the same material. Rebates and dados count as empty.
-- `part.copy({ at, x, y })` adds another of the part, placed the same way: four legs are
-  one part and three copies. A part turned end over end is still a plain copy. For a
-  left and right pair that aren't alike, `copy({ ..., mirrored: true })` is the mirror
-  image across the sketch's y axis (x becomes -x). The report names the pieces as CAM
-  does (`Leg`, `Leg 2`, …) under each part's `pieces`. Its toolpath summary is for one
-  piece of the shape.
+- Cut depths (`{ depth: 'board/2' }`), offsets, clearances, pattern counts and positions
+  follow variables too. `d.value('board + margin')` works an expression out now, for a
+  script's own loops. A count or ratio without units, such as
+  `d.value('(height - 160)/pitch')`, comes back as a plain number.
+
+## Building a piece in the studio
+
+See `examples/cupboard.cad.ts`. The studio's X runs left to right, Y front to back and Z
+up. Build a piece the way it goes together: each part drawn where it sits, and joints cut
+by the parts that fit them.
+
+- `part.drawOn('top' | 'front' | 'right', { offset })` draws a part on a base plane. The
+  top plane's sketch x and y are X and Y; the front plane's are X and Z, looking -y; the
+  right plane's are Y and Z, looking +x. The thickness grows along the plane's normal, or
+  the other way with `inward: true`, and `offset` moves the part along that normal.
+- `part.drawOn(other.face('+x'), { offset })` draws it on another part's face, so it moves
+  with that part. `face` takes `'top'`, `'underside'`, or the direction an edge face looks
+  in the studio. If no face looks that way, the error lists the ones there are.
+- The report's `steps` say where each face is in words: "Side's top (+x): sketch origin
+  at 18, 0, 0, its x along +y, its y along +z, looking +x." Read them to check a part
+  sits where you meant before reading anything else.
+- `d.cutParts(target, { with: [tools], clearance: 'fit' })` cuts the tools out of the
+  target wherever they reach in: rebates, dados, grooves and mortises that follow both
+  parts. The clearance grows every side of an opening inside the target and deepens a
+  blind one; sides that run off the target's edge stay open. Each opening is listed in
+  `steps` with its width, length, depth and place. Parts have to be square to each other,
+  and a tool has to be a plain block where it reaches in. Half-laps and finger joints
+  aren't covered yet.
+- `part.pattern({ axis: 'x', count: 'slats', spacing: '60mm' })` repeats a part in a row
+  along a studio axis.
+- `part.copy({ at, x, y, mirrored?, name? })` adds another of the part placed by hand. For
+  a left and right pair that aren't alike, `mirrored: true` is the mirror image across the
+  sketch's y axis. `name` gives it its own name, such as `'Right side'`. The report lists
+  the pieces CAM cuts under each part's `pieces`.
+- `part.place({ at, x: '+y', y: '+z' })` places a part by hand when it isn't drawn on a
+  plane or face.
+- The report's `assembly` lists each part's box, and an error `parts-collide` says where
+  two parts need the same material. Openings count as empty.
 
 ## The toolpath summary
 
