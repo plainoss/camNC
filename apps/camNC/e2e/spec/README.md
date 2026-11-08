@@ -84,23 +84,24 @@ The comparison reports themselves are kept outside this repository.
 
 ### Steps
 
-| Step                                                                                     | Meaning                                                                 |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `key <key>`                                                                              | Press a key or chord, such as `key Shift+a`                             |
-| `type <text>`                                                                            | Type characters at the current focus                                    |
-| `click x,y` / `dblclick x,y` / `shiftclick x,y` / `rclick x,y`                           | Pointer press and release with real movement                            |
-| `hover x,y`                                                                              | Move there without pressing                                             |
-| `down x,y` / `move x,y` / `up`                                                           | One gesture in parts, for checks made mid-gesture                       |
-| `drag x,y x,y`                                                                           | Press, move in steps, release                                           |
-| `wheel x,y <delta>`                                                                      | Scroll at a position                                                    |
-| `tool <name>`                                                                            | Choose a tool that has no shortcut, by its visible name                 |
-| `line x,y x,y` / `rect x,y x,y` / `circle x,y r` / `arc x,y x,y x,y`                     | Draw with the normal tool, then leave it                                |
-| `field <label> <value>`                                                                  | Fill a labelled field and press Enter                                   |
-| `finish` / `cancel` / `design` / `goto <stage>`                                          | Finish the sketch, cancel it, return to Design, or click a stage link   |
-| `uncheck <label>` / `hold <key>` / `release <key>` / `selectdim` / `editdim` / `addpart` | Hold a modifier, select or edit the first dimension label, add a part   |
-| `handle <start\|end> <point\|segment> [add]`                                             | Click a spline's own tangent handle, optionally adding to the selection |
-| `frame <name>`                                                                           | Compare this moment with a reviewed golden, if one exists               |
-| `{ "expect": { ... } }`                                                                  | Check the state at this moment                                          |
+| Step                                                                                     | Meaning                                                                                         |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `key <key>`                                                                              | Press a key or chord, such as `key Shift+a`                                                     |
+| `type <text>`                                                                            | Type characters at the current focus                                                            |
+| `click x,y` / `dblclick x,y` / `shiftclick x,y` / `rclick x,y`                           | Pointer press and release with real movement                                                    |
+| `hover x,y`                                                                              | Move there without pressing                                                                     |
+| `down x,y` / `move x,y` / `up`                                                           | One gesture in parts, for checks made mid-gesture                                               |
+| `drag x,y x,y`                                                                           | Press, move in steps, release                                                                   |
+| `wheel x,y <delta>`                                                                      | Scroll at a position                                                                            |
+| `tool <name>`                                                                            | Choose a tool that has no shortcut, by its visible name                                         |
+| `line x,y x,y` / `rect x,y x,y` / `circle x,y r` / `arc x,y x,y x,y`                     | Draw with the normal tool, then leave it                                                        |
+| `field <label> <value>`                                                                  | Fill a labelled field and press Enter                                                           |
+| `finish` / `cancel` / `design` / `goto <stage>`                                          | Accept the design (closing the sketch first), leave it, return to Design, or click a stage link |
+| `closesketch`                                                                            | Close the open sketch back to the Part Studio with its dialog's tick                            |
+| `uncheck <label>` / `hold <key>` / `release <key>` / `selectdim` / `editdim` / `addpart` | Hold a modifier, select or edit the first dimension label, add a part                           |
+| `handle <start\|end> <point\|segment> [add]`                                             | Click a spline's own tangent handle, optionally adding to the selection                         |
+| `frame <name>`                                                                           | Compare this moment with a reviewed golden, if one exists                                       |
+| `{ "expect": { ... } }`                                                                  | Check the state at this moment                                                                  |
 
 ### Expectations
 

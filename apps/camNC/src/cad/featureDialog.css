@@ -112,3 +112,7 @@
 .cad-drawing > .cad-feature-dialog {
   top: 38px;
 }
+/** A part shown in 3D while its sketch is open keeps its own tools clear of the sketch's dialog. */
+.cad-drawing:has(.cad-sketch-dialog) .cad-part-view-tools {
+  left: calc(13rem + 24px);
+}

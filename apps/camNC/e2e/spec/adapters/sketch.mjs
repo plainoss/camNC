@@ -201,12 +201,21 @@ export async function createAdapter(page, url) {
   await page.getByRole('button', { name: /^New design/ }).click();
   const canvas = page.getByTestId('cad-canvas');
   await canvas.waitFor();
-  // Existing designs open on the part in 3D, and most steps work on the drawing.
+  const studioToolbar = page.getByRole('toolbar', { name: 'Part Studio toolbar' });
+  // Existing designs open in the Part Studio, and most steps work on the first part's sketch.
   const flatView = async () => {
-    const button = page.getByRole('button', { name: '3D', exact: true });
-    await button.waitFor();
-    if ((await button.getAttribute('aria-pressed')) === 'true') await button.click();
+    await page.getByRole('toolbar', { name: /^(Part Studio|Sketch) toolbar$/ }).first().waitFor();
+    if (await studioToolbar.isVisible())
+      await page.getByRole('region', { name: 'Steps' }).getByRole('button', { name: /Sketch ·/ }).first().click();
+    // A part shown in 3D, as after a face sketch, goes back to its drawing.
+    const drawing = page.getByRole('group', { name: 'Show' }).getByRole('button', { name: 'Drawing', exact: true });
+    if ((await drawing.isVisible()) && (await drawing.getAttribute('aria-pressed')) !== 'true') await drawing.click();
     await canvas.waitFor();
+  };
+  /** Closes the open sketch back to the studio with its dialog's tick. */
+  const closeSketch = async () => {
+    await page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: /Finish sketch/ }).click();
+    await studioToolbar.waitFor();
   };
   const jobId = new URL(page.url()).pathname.split('/')[2];
   let cursor = null;
@@ -492,14 +501,31 @@ export async function createAdapter(page, url) {
         await flatView();
         await page.waitForTimeout(400);
         return;
-      case 'finish':
+      case 'closesketch':
         await settle();
-        await page.getByRole('button', { name: /Finish sketch/ }).click();
+        await closeSketch();
+        return;
+      case 'finish': {
+        await settle();
+        // A sketch closes back to the studio, and Done there accepts the design.
+        if (!(await studioToolbar.isVisible())) await closeSketch();
+        // Closing a new design's first sketch opens its extrude: keep it as it is.
+        const extrude = page.getByRole('dialog', { name: /^Extrude ·/ });
+        if (await extrude.isVisible()) await extrude.getByRole('button', { name: 'OK', exact: true }).click();
+        const done = studioToolbar.getByRole('button', { name: /Done/ });
+        await page.waitForFunction(element => !element.disabled, await done.elementHandle(), { timeout: 8000 });
+        await done.click();
         await page.waitForURL(u => !u.pathname.endsWith('/design'), { timeout: 8000 });
         await page.waitForTimeout(800);
         return;
+      }
       case 'cancel':
-        await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+        // Cancelling the sketch returns to the studio, and cancelling there leaves the design.
+        if (!(await studioToolbar.isVisible())) {
+          await page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: 'Cancel', exact: true }).click();
+          await studioToolbar.waitFor();
+        }
+        await studioToolbar.getByRole('button', { name: 'Cancel', exact: true }).click();
         return;
       case 'design':
         await page.getByRole('link', { name: /Design/ }).first().click();

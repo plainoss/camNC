@@ -84,7 +84,7 @@ export function ExtrudeDialog({
 }
 
 /** Copies of a whole part in a row, and what each piece is called. */
-export function PartPatternDialog({ document, part, variables, onChange, onOk, onCancel }: PartDialogProps) {
+export function PartPatternDialog({ part, variables, onChange, onOk, onCancel }: PartDialogProps) {
   return (
     <FeatureDialog title={`Linear pattern · ${part.name}`} onOk={onOk} onCancel={onCancel}>
       <div className="cad-feature-selection">

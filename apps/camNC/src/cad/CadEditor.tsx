@@ -441,7 +441,7 @@ export function CadEditor({
   const sketchOnly = !!faceSketch;
   // Opened as a Part Studio: the studio is home, a sketch is opened from it and closed back to it, and steps are set
   // in dialogs over the view.
-  const studioSession = startIn3D === true && !faceSketch;
+  const studioSession = startIn3D !== undefined && !faceSketch;
   // A "cut parts" step being added, or the one being changed.
   const [partCutting, setPartCutting] = useState<{ id?: string } | null>(null);
   // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
@@ -452,7 +452,7 @@ export function CadEditor({
   const sketchBefore = useRef<CadDocument | null>(null);
   // A part sketched new, whose extrude opens once its sketch is closed. A new design's first part is one.
   const extrudeAfterSketch = useRef<string | null>(
-    studioSession && doc.parts.length === 1 && !hasOutline(doc, doc.parts[0]!.id) ? doc.parts[0]!.id : null
+    startIn3D === true && !faceSketch && doc.parts.length === 1 && !hasOutline(doc, doc.parts[0]!.id) ? doc.parts[0]!.id : null
   );
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
@@ -3356,6 +3356,19 @@ export function CadEditor({
   const chainPreview = sketch && chainGeometry(sketch, chain);
   const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
   const acceptanceNotice = notice ?? finishError;
+  // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
+  const sketchCanFinish = faceSketch
+    ? !solving &&
+      !problems.length &&
+      !splitFirst &&
+      !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
+    : thicknessValid &&
+      !solving &&
+      !problems.length &&
+      numberOfShapes > 0 &&
+      !splitFirst &&
+      !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
+      !((tool === 'fillet' || tool === 'chamfer') && selected.length);
   return (
     <div
       ref={root}
@@ -3395,26 +3408,7 @@ export function CadEditor({
           busy={busy}
           canUndo={session.past.length > 0}
           canRedo={session.future.length > 0}
-          canFinish={
-            // Closing a sketch back to the studio keeps it as it is, finished or not, as the reference does.
-            studioSession
-              ? !solving
-              : faceSketch
-                ? !solving &&
-                  !problems.length &&
-                  !splitFirst &&
-                  !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
-                : thicknessValid &&
-                  !solving &&
-                  !problems.length &&
-                  numberOfShapes > 0 &&
-                  !splitFirst &&
-                  !(
-                    (tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') &&
-                    selected.length
-                  ) &&
-                  !((tool === 'fillet' || tool === 'chamfer') && selected.length)
-          }
+          canFinish={sketchCanFinish}
           onTool={next => {
             if (next === 'dimension') beginDimension();
             else chooseTool(next);
@@ -3708,7 +3702,7 @@ export function CadEditor({
             <FeatureDialog
               title={`Sketch · ${part.name}`}
               okLabel="✓ Finish sketch"
-              okDisabled={solving}
+              okDisabled={!sketchCanFinish}
               onOk={() => closeSketch(true)}
               onCancel={() => closeSketch(false)}
               autoFocus={false}
