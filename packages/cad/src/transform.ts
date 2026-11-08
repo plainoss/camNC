@@ -70,6 +70,21 @@ export function transformSketchEntities(sketch: CadSketch, options: CadTransform
       return e.type === 'point' ? [id] : entityPointIds(e);
     })
   );
+  for (const c of sketch.constraints)
+    if (
+      c.type === 'circularPattern' &&
+      c.instances
+        .flatMap(i => i.activeIds)
+        .every(
+          id =>
+            sourceIds.has(id) ||
+            pointIds.has(id) ||
+            (!!splineHandleOwner(sketch, id) && sourceIds.has(splineHandleOwner(sketch, id)!.splineId))
+        )
+    ) {
+      sourceIds.add(c.centerId);
+      pointIds.add(c.centerId);
+    }
   if ([...pointIds].some(id => entities.get(id)?.type !== 'point')) return fail('Repair missing source points before transforming.');
   const normalized = ((angle % 360) + 360) % 360;
   const identity =
@@ -111,14 +126,17 @@ export function transformSketchEntities(sketch: CadSketch, options: CadTransform
   }
   for (const c of sketch.constraints)
     if (
-      c.type === 'linearPattern' &&
+      (c.type === 'linearPattern' || c.type === 'circularPattern') &&
       constraintEntityIds(c).some(id => sourceIds.has(id)) &&
       !constraintEntityIds(c).every(id => selectedIds.has(id))
     )
       return fail('Select the complete pattern or remove its relation before transforming individual instances.');
   if (options.copy)
     for (const constraint of sketch.constraints)
-      if (constraint.type === 'linearPattern' && constraintEntityIds(constraint).every(id => selectedIds.has(id))) {
+      if (
+        (constraint.type === 'linearPattern' || constraint.type === 'circularPattern') &&
+        constraintEntityIds(constraint).every(id => selectedIds.has(id))
+      ) {
         const reserved = constraint.instances.flatMap(i => Object.values(i.idMap));
         for (const id of reserved) if (!ids.has(id) && !id.includes(':handle:')) ids.set(id, newCadId());
         for (const id of reserved)

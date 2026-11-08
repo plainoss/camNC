@@ -1,3 +1,10 @@
+import { SketchCircularPatternControls, SketchCircularPatternManipulator } from './SketchCircularPatternControls';
+import {
+  initialCircularPatternParameters,
+  circularPatternParameters,
+  parseCircularPatternParameters,
+  type CircularPatternParameters,
+} from './circularPatternParameters';
 import {
   CAD_GEOMETRY_TOLERANCE,
   addArc,
@@ -27,6 +34,7 @@ import {
   transformSketchEntities,
   sketchPatternOwner,
   linearPatternSketchEntities,
+  circularPatternSketchEntities,
   patternDeletionNotice,
   isClosedSketchCurve,
   evaluateCurvePoint,
@@ -365,6 +373,15 @@ export function CadEditor({
   const [width, setWidth] = useState('100');
   const [height, setHeight] = useState('60');
   const [radius, setRadius] = useState('10');
+  const [circularParameters, setCircularParameters] = useState(initialCircularPatternParameters);
+  const circularFields = useRef<Partial<Record<'count' | 'angle', HTMLInputElement>>>({});
+  const circularDrag = useRef<{
+    kind: 'center' | 'sweep';
+    start: CadPoint;
+    parameters: CircularPatternParameters;
+    last: number;
+    sweep: number;
+  } | null>(null);
   const [linearParameters, setLinearParameters] = useState(initialLinearPatternParameters);
   const [patternEditId, setPatternEditId] = useState<string | null>(null);
   const [patternNotice, setPatternNotice] = useState('');
@@ -492,9 +509,20 @@ export function CadEditor({
     if (!sketch || tool !== 'transform' || !selected.length) return null;
     return parsedTransform.ok ? transformSketchEntities(sketch, { ...parsedTransform, entityIds: selected }) : parsedTransform;
   }, [sketch, tool, selected, parsedTransform]);
+  const parsedCircular = useMemo(() => parseCircularPatternParameters(circularParameters), [circularParameters]);
   const parsedLinear = useMemo(() => parseLinearPatternParameters(linearParameters), [linearParameters]);
   const linearPreview = useMemo(() => {
-    if (!sketch || tool !== 'linearPattern' || !selected.length) return null;
+    if (!sketch || !selected.length) return null;
+    if (tool === 'circularPattern')
+      return parsedCircular.ok
+        ? circularPatternSketchEntities(sketch, {
+            ...parsedCircular,
+            entityIds: selected,
+            patternId: patternEditId ?? patternCommandId.current,
+            previewLimit: 9,
+          })
+        : parsedCircular;
+    if (tool !== 'linearPattern') return null;
     return parsedLinear.ok
       ? linearPatternSketchEntities(sketch, {
           ...parsedLinear,
@@ -503,7 +531,7 @@ export function CadEditor({
           previewLimit: 9,
         })
       : parsedLinear;
-  }, [sketch, tool, selected, patternEditId, parsedLinear]);
+  }, [sketch, tool, selected, patternEditId, parsedLinear, parsedCircular]);
   const patternAnchor = useMemo(() => (sketch ? linearPatternAnchor(sketch, selected) : { x: 0, y: 0 }), [sketch, selected]);
   const shownSketch = linearPreview?.ok
     ? linearPreview.sketch
@@ -873,9 +901,14 @@ export function CadEditor({
     return xs.length ? { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 } : { x: 0, y: 0 };
   };
   const chooseTool = (next: Tool) => {
+    circularDrag.current = null;
     patternDrag.current = null;
     setPatternEditId(null);
     setPatternNotice('');
+    if (next === 'circularPattern') {
+      setCircularParameters(initialCircularPatternParameters());
+      patternCommandId.current = newCadId();
+    }
     if (next === 'linearPattern') {
       setLinearParameters(initialLinearPatternParameters());
       patternCommandId.current = newCadId();
@@ -1524,15 +1557,49 @@ export function CadEditor({
   };
   const editPattern = (id: string) => {
     const pattern = sketch?.constraints.find(c => c.id === id);
-    if (pattern?.type !== 'linearPattern') return;
-    chooseTool('linearPattern');
+    if (pattern?.type !== 'linearPattern' && pattern?.type !== 'circularPattern') return;
+    chooseTool(pattern.type);
     setPatternEditId(id);
     patternCommandId.current = id;
-    setLinearParameters(linearPatternParameters(pattern));
+    if (pattern.type === 'linearPattern') setLinearParameters(linearPatternParameters(pattern));
+    else setCircularParameters(circularPatternParameters(pattern, sketch!));
     setSelected(editablePatternSources(pattern));
     setMessage('Edit the pattern counts, spacing or direction. Deleted instances remain excluded.');
   };
+  const acceptCircularPattern = () => {
+    if (!sketch || !parsedCircular.ok) return setMessage(parsedCircular.ok ? 'Select source geometry.' : parsedCircular.message);
+    const old = patternEditId && sketch.constraints.find(c => c.id === patternEditId),
+      center = old && old.type === 'circularPattern' ? sketch.entities.find(e => e.id === old.centerId) : undefined;
+    if (
+      old &&
+      old.type === 'circularPattern' &&
+      old.countX === parsedCircular.count &&
+      old.angle === parsedCircular.angle &&
+      old.closed === parsedCircular.closed &&
+      center?.type === 'point' &&
+      Math.hypot(center.x - parsedCircular.center.x, center.y - parsedCircular.center.y) < CAD_GEOMETRY_TOLERANCE
+    ) {
+      chooseTool('select');
+      setSelected([]);
+      setSelectedConstraints([old.id]);
+      return;
+    }
+    const result = circularPatternSketchEntities(sketch, {
+      ...parsedCircular,
+      entityIds: selected,
+      patternId: patternEditId ?? patternCommandId.current,
+    });
+    if (!result.ok) return setMessage(result.message);
+    changeSketch(result.sketch);
+    chooseTool('select');
+    setSelected([]);
+    setSelectedConstraints([result.patternId]);
+    if (result.releasedConstraintIds.length)
+      setPatternNotice(`${result.releasedConstraintIds.length} relations on removed instances were released.`);
+    setMessage('Circular pattern applied. Double-click its pattern icon or use Edit pattern to change it.');
+  };
   const acceptLinearPattern = () => {
+    if (tool === 'circularPattern') return acceptCircularPattern();
     if (!sketch || !parsedLinear.ok) return setMessage(parsedLinear.ok ? 'Select source geometry.' : parsedLinear.message);
     const existing = patternEditId && sketch.constraints.find(c => c.id === patternEditId);
     const same =
@@ -1659,7 +1726,10 @@ export function CadEditor({
     }
   };
   const removeSelected = (entityIds: readonly string[] = selected, constraintIds: readonly string[] = selectedConstraints) => {
-    if ((tool === 'fillet' || tool === 'chamfer' || tool === 'transform' || tool === 'linearPattern') && selected.length) {
+    if (
+      (tool === 'fillet' || tool === 'chamfer' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') &&
+      selected.length
+    ) {
       chooseTool('select');
       setSelected([]);
       return;
@@ -1732,7 +1802,9 @@ export function CadEditor({
     sketch
       ? target.closest('[data-constraint-id]')
         ? sketch.constraints.some(
-            c => c.type === 'linearPattern' && c.id === target.closest('[data-constraint-id]')?.getAttribute('data-constraint-id')
+            c =>
+              (c.type === 'linearPattern' || c.type === 'circularPattern') &&
+              c.id === target.closest('[data-constraint-id]')?.getAttribute('data-constraint-id')
           )
           ? { kind: 'constraint' as const, id: target.closest('[data-constraint-id]')!.getAttribute('data-constraint-id')! }
           : ({ kind: 'blank' } as const)
@@ -2072,7 +2144,7 @@ export function CadEditor({
         chooseTool('select');
         setSelected([]);
       }
-    } else if (key === 'enter' && tool === 'linearPattern') {
+    } else if (key === 'enter' && (tool === 'linearPattern' || tool === 'circularPattern')) {
       event.preventDefault();
       acceptLinearPattern();
     } else if (key === 'enter' && tool === 'transform') {
@@ -2087,7 +2159,7 @@ export function CadEditor({
       finishSpline();
     } else if (key === 'enter' && selectedConstraints.length === 1) {
       const c = sketch?.constraints.find(c => c.id === selectedConstraints[0]);
-      if (c?.type === 'linearPattern') {
+      if (c?.type === 'linearPattern' || c?.type === 'circularPattern') {
         event.preventDefault();
         editPattern(c.id);
         return;
@@ -2320,7 +2392,7 @@ export function CadEditor({
       svg.current?.focus();
       return;
     }
-    if (tool === 'linearPattern') {
+    if (tool === 'linearPattern' || tool === 'circularPattern') {
       const hit = pickSketchSnap(
         sketch,
         { x: event.clientX, y: event.clientY },
@@ -2554,6 +2626,33 @@ export function CadEditor({
     }
   };
   const pointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    if (circularDrag.current) {
+      const matrix = svg.current?.getScreenCTM();
+      if (!matrix) return;
+      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
+        point = { x: raw.x, y: -raw.y },
+        gesture = circularDrag.current,
+        parsed = parseCircularPatternParameters(gesture.parameters);
+      if (!parsed.ok) return;
+      const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
+      if (gesture.kind === 'center')
+        setCircularParameters({
+          ...gesture.parameters,
+          centerX: text(parsed.center.x + point.x - gesture.start.x),
+          centerY: text(parsed.center.y + point.y - gesture.start.y),
+        });
+      else {
+        const a = Math.atan2(point.y - parsed.center.y, point.x - parsed.center.x);
+        gesture.sweep += Math.atan2(Math.sin(a - gesture.last), Math.cos(a - gesture.last));
+        gesture.last = a;
+        setCircularParameters({
+          ...gesture.parameters,
+          closed: false,
+          angle: text(Math.max(-359.999999, Math.min(359.999999, (gesture.sweep * 180) / Math.PI))),
+        });
+      }
+      return;
+    }
     if (patternDrag.current) {
       const matrix = svg.current?.getScreenCTM();
       if (!matrix) return;
@@ -2786,6 +2885,11 @@ export function CadEditor({
     void solveDrag(moving);
   };
   const pointerEnd = (cancel = false, event?: PointerEvent<SVGSVGElement>) => {
+    if (circularDrag.current) {
+      if (cancel) setCircularParameters(circularDrag.current.parameters);
+      circularDrag.current = null;
+      return;
+    }
     if (patternDrag.current) {
       if (cancel) setLinearParameters(patternDrag.current.parameters);
       patternDrag.current = null;
@@ -2896,7 +3000,7 @@ export function CadEditor({
     if (busy || solving || finishing.current || preparingDimension.current) return blocked('Wait for the current sketch check to finish.');
     const reason = !thicknessValid
       ? 'Enter a valid part thickness before finishing the sketch.'
-      : tool === 'linearPattern' && selected.length
+      : (tool === 'linearPattern' || tool === 'circularPattern') && selected.length
         ? 'Apply the pattern or press Escape before finishing the sketch.'
         : tool === 'transform' && selected.length
           ? 'Apply the transform or press Escape before finishing the sketch.'
@@ -3067,13 +3171,16 @@ export function CadEditor({
         canRedo={session.future.length > 0}
         canFinish={
           faceSketch
-            ? !solving && !problems.length && !splitFirst && !((tool === 'transform' || tool === 'linearPattern') && selected.length)
+            ? !solving &&
+              !problems.length &&
+              !splitFirst &&
+              !((tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
             : thicknessValid &&
               !solving &&
               !problems.length &&
               numberOfShapes > 0 &&
               !splitFirst &&
-              !((tool === 'transform' || tool === 'linearPattern') && selected.length) &&
+              !((tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
               !((tool === 'fillet' || tool === 'chamfer') && selected.length)
         }
         onTool={next => {
@@ -3350,7 +3457,7 @@ export function CadEditor({
               verified={
                 !solving &&
                 !splitFirst &&
-                !((tool === 'transform' || tool === 'linearPattern') && selected.length) &&
+                !((tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
                 !((tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
                 activeSketchStatus?.status === 'solved' &&
                 lastCheckedRevision.current === `${doc.id}:${doc.revision}`
@@ -3413,6 +3520,36 @@ export function CadEditor({
                     setRho(String(curve.rho));
                     setConicEditing(id);
                   }
+                }}
+              />
+            )}
+            {tool === 'circularPattern' && selected.length > 0 && parsedCircular.ok && linearPreview?.ok && (
+              <SketchCircularPatternManipulator
+                center={parsedCircular.center}
+                anchor={patternAnchor}
+                count={parsedCircular.count}
+                angle={parsedCircular.angle}
+                closed={parsedCircular.closed}
+                pixelScale={markerScale}
+                onEdit={field => {
+                  circularFields.current[field]?.focus();
+                  circularFields.current[field]?.select();
+                }}
+                onStart={(kind, event) => {
+                  const matrix = svg.current?.getScreenCTM();
+                  if (!matrix) return;
+                  const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+                  circularDrag.current = {
+                    kind,
+                    start: { x: raw.x, y: -raw.y },
+                    parameters: circularParameters,
+                    last: Math.atan2(-raw.y - parsedCircular.center.y, raw.x - parsedCircular.center.x),
+                    sweep:
+                      ((parsedCircular.angle * Math.PI) / 180) *
+                      (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
+                  };
+                  svg.current?.setPointerCapture(event.pointerId);
+                  svg.current?.focus();
                 }}
               />
             )}
@@ -3838,6 +3975,24 @@ export function CadEditor({
                 Create polygon
               </button>
             </form>
+          )}
+          {tool === 'circularPattern' && selected.length > 0 && (
+            <SketchCircularPatternControls
+              parameters={circularParameters}
+              onChange={setCircularParameters}
+              onApply={acceptCircularPattern}
+              onCancel={() => {
+                chooseTool('select');
+                setSelected([]);
+              }}
+              error={linearPreview && !linearPreview.ok ? linearPreview.message : undefined}
+              previewLimited={parsedCircular.ok && parsedCircular.count > 10}
+              releasedCount={linearPreview?.ok ? linearPreview.releasedConstraintIds.length : 0}
+              onField={(key, element) => {
+                if (element) circularFields.current[key] = element;
+                else delete circularFields.current[key];
+              }}
+            />
           )}
           {tool === 'linearPattern' && selected.length > 0 && (
             <SketchLinearPatternControls

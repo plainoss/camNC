@@ -1,4 +1,4 @@
-import { materializePatternJoins } from './patternTopology';
+import { materializePatternJoins, removeUnusedPatternCenters } from './patternTopology';
 import { linearPatternIssue, sketchPatternOwner, afterPatternEntityRemoval } from './pattern';
 import { refreshDimensionMeasurement } from './dimensions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
@@ -66,8 +66,11 @@ export function addConstraint(sketch: CadSketch, constraint: NewCadConstraint): 
 
 export function removeConstraint(sketch: CadSketch, id: string): CadSketch {
   const constraint = sketch.constraints.find(c => c.id === id);
-  const next = constraint?.type === 'linearPattern' ? materializePatternJoins(sketch, sketch, constraint) : sketch;
-  return { ...next, constraints: next.constraints.filter(c => c.id !== id) };
+  const next =
+    constraint?.type === 'linearPattern' || constraint?.type === 'circularPattern'
+      ? materializePatternJoins(sketch, sketch, constraint)
+      : sketch;
+  return removeUnusedPatternCenters(sketch, { ...next, constraints: next.constraints.filter(c => c.id !== id) });
 }
 
 /** Each edit is a detached JSON value suitable for undo history and persistence. */
@@ -149,9 +152,14 @@ export function entityPointIds(entity: CadEntity): string[] {
 }
 
 export function constraintEntityIds(constraint: CadConstraint): string[] {
-  if (constraint.type === 'linearPattern')
+  if (constraint.type === 'linearPattern' || constraint.type === 'circularPattern')
     return Array.isArray(constraint.instances)
-      ? [...new Set(constraint.instances.flatMap(i => (i && Array.isArray(i.activeIds) ? i.activeIds : [])))]
+      ? [
+          ...new Set([
+            ...(constraint.type === 'circularPattern' ? [constraint.centerId] : []),
+            ...constraint.instances.flatMap(i => (i && Array.isArray(i.activeIds) ? i.activeIds : [])),
+          ]),
+        ]
       : [];
   if (constraint.type === 'offset')
     return Array.isArray(constraint.members)
@@ -205,7 +213,9 @@ export function removeEntity(sketch: CadSketch, id: string): CadSketch {
     {
       ...sketch,
       entities,
-      constraints: sketch.constraints.filter(c => c.type === 'linearPattern' || !constraintEntityIds(c).some(e => removed.has(e))),
+      constraints: sketch.constraints.filter(
+        c => c.type === 'linearPattern' || c.type === 'circularPattern' || !constraintEntityIds(c).some(e => removed.has(e))
+      ),
     },
     removed
   );
@@ -722,6 +732,7 @@ export function parseCadDocument(input: unknown): CadDocument {
             'symmetricCurves',
             'regularPolygon',
             'linearPattern',
+            'circularPattern',
             'horizontalPoints',
             'verticalPoints',
             'pointOnLine',
@@ -752,7 +763,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (c.label !== undefined && typeof c.label !== 'string') throw new Error('Invalid constraint label');
         if (c.type === 'symmetricCurves' && c.focusSign !== undefined && c.focusSign !== 1 && c.focusSign !== -1)
           throw new Error('Invalid ellipse symmetry branch.');
-        if (c.type === 'linearPattern') {
+        if (c.type === 'linearPattern' || c.type === 'circularPattern') {
           if (
             !Array.isArray(c.seedKeys) ||
             !c.seedKeys.length ||
@@ -760,12 +771,16 @@ export function parseCadDocument(input: unknown): CadDocument {
             new Set(c.seedKeys).size !== c.seedKeys.length ||
             !Array.isArray(c.instances) ||
             !Array.isArray(c.exclusions) ||
-            !c.stepX ||
-            !c.stepY
+            (c.type === 'linearPattern' && (!c.stepX || !c.stepY))
           )
             throw new Error('Invalid linear pattern data.');
           [c.masterX, c.masterY, c.countX, c.countY].forEach(number);
-          [c.stepX.x, c.stepX.y, c.stepY.x, c.stepY.y].forEach(number);
+          if (c.type === 'linearPattern') [c.stepX.x, c.stepX.y, c.stepY.x, c.stepY.y].forEach(number);
+          else {
+            number(c.angle);
+            if (typeof c.centerId !== 'string' || typeof c.closed !== 'boolean')
+              throw new Error('Invalid circular pattern center or sweep.');
+          }
           for (const i of c.instances) {
             if (
               !i ||

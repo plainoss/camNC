@@ -1,5 +1,6 @@
+import { patternPosition } from './patternPlacement';
 import { patternLogicalPointGroups } from './patternTopology';
-import { patternMaster, patternInstanceOffset } from './pattern';
+import { patternMaster } from './pattern';
 import { reflectAcrossLine } from './symmetry';
 import { constraintEntityIds, entityPointIds } from './document';
 import { curveEndpointIds, evaluateCurvePoint, evaluateCurveTangent, isNurbsCurve } from './curves';
@@ -37,6 +38,7 @@ export function fixedConstraintConflicts(part: CadPart): CadDiagnostic[] {
     if ('value' in constraint && constraint.driven) continue;
     let error: number | undefined;
     switch (constraint.type) {
+      case 'circularPattern':
       case 'linearPattern': {
         const master = patternMaster(constraint);
         if (!master) break;
@@ -50,12 +52,19 @@ export function fixedConstraintConflicts(part: CadPart): CadDiagnostic[] {
         }
         for (const instance of constraint.instances) {
           if (instance === master) continue;
-          const offset = patternInstanceOffset(constraint, instance);
+
           for (const [key, id] of Object.entries(master.idMap)) {
             const a = point(id),
               targetId = instance.idMap[key],
               b = targetId && instance.activeIds.includes(targetId) ? point(targetId) : undefined;
-            if (a && b) error = Math.max(error ?? 0, Math.hypot(b.x - a.x - offset.x, b.y - a.y - offset.y));
+            if (a && b && (constraint.type === 'linearPattern' || point(constraint.centerId)))
+              error = Math.max(
+                error ?? 0,
+                Math.hypot(
+                  b.x - patternPosition(constraint, instance, a, entities).x,
+                  b.y - patternPosition(constraint, instance, a, entities).y
+                )
+              );
           }
         }
         break;

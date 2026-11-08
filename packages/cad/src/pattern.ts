@@ -1,23 +1,25 @@
-import { materializePatternJoins } from './patternTopology';
+import { patternAngle, patternPosition } from './patternPlacement';
+import { materializePatternJoins, removeUnusedPatternCenters } from './patternTopology';
 import { constraintEntityIds, entityPointIds, newCadId, originId } from './document';
 import { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 import { isOwnedSplineHandle, splineHandleId, splineHandleOwner, withSplineHandleSegments } from './splineHandles';
 import { remapCadReferences, transformSketchEntities } from './transform';
-import type { CadEntity, CadLinearPattern, CadPatternInstance, CadPoint, CadPointEntity, CadSketch } from './types';
+import type { CadEntity, CadSketchPattern, CadPatternInstance, CadPoint, CadPointEntity, CadSketch } from './types';
 
 const cellKey = (x: number, y: number) => `${x}:${y}`;
-export function patternInstanceOffset(pattern: CadLinearPattern, instance: Pick<CadPatternInstance, 'x' | 'y'>): CadPoint {
+export function patternInstanceOffset(pattern: CadSketchPattern, instance: Pick<CadPatternInstance, 'x' | 'y'>): CadPoint {
+  if (pattern.type === 'circularPattern') return { x: 0, y: 0 };
   return {
     x: (instance.x - pattern.masterX) * pattern.stepX.x + (instance.y - pattern.masterY) * pattern.stepY.x,
     y: (instance.x - pattern.masterX) * pattern.stepX.y + (instance.y - pattern.masterY) * pattern.stepY.y,
   };
 }
-export function patternMaster(pattern: CadLinearPattern): CadPatternInstance | undefined {
+export function patternMaster(pattern: CadSketchPattern): CadPatternInstance | undefined {
   return pattern.instances.find(i => i.x === pattern.masterX && i.y === pattern.masterY);
 }
-export const patternExcluded = (pattern: CadLinearPattern, seedKey: string, x: number, y: number) =>
+export const patternExcluded = (pattern: CadSketchPattern, seedKey: string, x: number, y: number) =>
   pattern.exclusions.some(e => e.seedKey === seedKey && e.x === x && e.y === y);
-export const patternSourceIds = (pattern: CadLinearPattern) => {
+export const patternSourceIds = (pattern: CadSketchPattern) => {
   const master = patternMaster(pattern);
   return master ? pattern.seedKeys.map(key => master.idMap[key]!) : [];
 };
@@ -33,13 +35,26 @@ export interface CadLinearPatternOptions {
 export type CadPatternResult =
   | { ok: true; sketch: CadSketch; patternId: string; entityIds: string[]; releasedConstraintIds: string[] }
   | { ok: false; message: string };
-function limits(pattern: CadLinearPattern): string | null {
+function limits(pattern: CadSketchPattern): string | null {
   if (
     ![pattern.countX, pattern.countY].every(n => Number.isInteger(n) && n >= 1 && n <= 200) ||
     pattern.countX * pattern.countY < 2 ||
     pattern.countX * pattern.countY > 200
   )
     return 'Use two to 200 total pattern instances, including the original.';
+  if (pattern.type === 'circularPattern') {
+    if (
+      pattern.countY !== 1 ||
+      !Number.isFinite(pattern.angle) ||
+      typeof pattern.closed !== 'boolean' ||
+      Math.abs(pattern.angle) < 1e-6 ||
+      Math.abs(pattern.angle) > 360 ||
+      (pattern.closed && Math.abs(Math.abs(pattern.angle) - 360) > 1e-8) ||
+      (!pattern.closed && Math.abs(pattern.angle) >= 360)
+    )
+      return 'Use a nonzero sweep below 360 degrees for an open pattern, or 360 degrees for a closed pattern.';
+    return null;
+  }
   if (![pattern.stepX.x, pattern.stepX.y, pattern.stepY.x, pattern.stepY.y].every(Number.isFinite))
     return 'Enter finite pattern spacing and direction values.';
   const offsets: CadPoint[] = [];
@@ -55,7 +70,7 @@ function limits(pattern: CadLinearPattern): string | null {
 }
 
 /** Synchronize topology and scalar metadata before native registration; reserved IDs never resurrect excluded seeds. */
-export function reconcileLinearPattern(sketch: CadSketch, pattern: CadLinearPattern, previewLimit = Infinity): CadPatternResult {
+export function reconcileLinearPattern(sketch: CadSketch, pattern: CadSketchPattern, previewLimit = Infinity): CadPatternResult {
   const reservation = linearPatternReservationIssue(sketch, pattern);
   if (reservation) return { ok: false, message: reservation };
   const problem = limits(pattern);
@@ -66,6 +81,8 @@ export function reconcileLinearPattern(sketch: CadSketch, pattern: CadLinearPatt
   const master = patternMaster(group);
   if (!master)
     return { ok: false, message: 'The pattern has lost its master instance. Delete its pattern relation to keep the remaining geometry.' };
+  if (group.type === 'circularPattern' && entities.get(group.centerId)?.type !== 'point')
+    return { ok: false, message: 'The circular pattern needs its center point.' };
   const sourceIds = patternSourceIds(group),
     sources = sourceIds.map(id => entities.get(id));
   if (sources.some(e => !e || isOwnedSplineHandle(e)))
@@ -150,7 +167,7 @@ export function reconcileLinearPattern(sketch: CadSketch, pattern: CadLinearPatt
         instance.activeIds.forEach(id => active.add(id));
         continue;
       }
-      const offset = patternInstanceOffset(group, instance);
+
       for (const sourceId of pointIds) {
         const logical = reverse.get(sourceId)!;
         instance.idMap[logical] ??= newCadId();
@@ -166,8 +183,8 @@ export function reconcileLinearPattern(sketch: CadSketch, pattern: CadLinearPatt
           point: CadPointEntity = {
             ...source,
             id,
-            x: previous?.type === 'point' && previous.fixed ? previous.x : source.x + offset.x,
-            y: previous?.type === 'point' && previous.fixed ? previous.y : source.y + offset.y,
+            x: previous?.type === 'point' && previous.fixed ? previous.x : patternPosition(group, instance, source, entities).x,
+            y: previous?.type === 'point' && previous.fixed ? previous.y : patternPosition(group, instance, source, entities).y,
             fixed: previous?.type === 'point' ? previous.fixed : undefined,
             standalone: seedUnits.has(reverse.get(sourceId)!),
           };
@@ -181,6 +198,11 @@ export function reconcileLinearPattern(sketch: CadSketch, pattern: CadLinearPatt
         const source = entities.get(master.idMap[seed]!)!;
         if (source.type === 'point') continue;
         const copy = remapCadReferences(structuredClone(source), ids);
+        if (copy.type === 'arc') {
+          const angle = patternAngle(group, instance);
+          copy.startAngle += angle;
+          copy.endAngle += angle;
+        }
         if (instance.constructionOverrides && seed in instance.constructionOverrides)
           copy.construction = instance.constructionOverrides[seed];
         output.push(copy);
@@ -233,7 +255,7 @@ export function reconcileLinearPattern(sketch: CadSketch, pattern: CadLinearPatt
 export function linearPatternSketchEntities(sketch: CadSketch, options: CadLinearPatternOptions): CadPatternResult {
   const existing = options.patternId ? sketch.constraints.find(c => c.id === options.patternId) : undefined;
   if (existing && existing.type !== 'linearPattern') return { ok: false, message: 'Select a linear pattern to edit.' };
-  let group: CadLinearPattern;
+  let group: CadSketchPattern;
   if (existing?.type === 'linearPattern') {
     let base = structuredClone(existing);
     if (base.masterX >= options.countX || base.masterY >= (options.countY ?? 1)) {
@@ -248,6 +270,7 @@ export function linearPatternSketchEntities(sketch: CadSketch, options: CadLinea
       const rebased = rebaseLinearPattern(sketch, sketch, base, candidate.x, candidate.y);
       if (!rebased.ok) return rebased;
       sketch = rebased.sketch;
+      if (rebased.pattern.type !== 'linearPattern') return { ok: false, message: 'Select a linear pattern.' };
       base = rebased.pattern;
     }
     group = { ...base, countX: options.countX, countY: options.countY ?? 1, stepX: options.stepX, stepY: options.stepY ?? { x: 0, y: 40 } };
@@ -292,14 +315,13 @@ export function linearPatternSketchEntities(sketch: CadSketch, options: CadLinea
   return reconcileLinearPattern(sketch, group, options.previewLimit);
 }
 /** Validate both saved reservations and complete live coverage before skipping copied native implicit equations. */
-export function linearPatternIssue(sketch: CadSketch, pattern: CadLinearPattern): string | null {
+export function linearPatternIssue(sketch: CadSketch, pattern: CadSketchPattern): string | null {
   if (
     !Array.isArray(pattern.seedKeys) ||
     !pattern.seedKeys.length ||
     !Array.isArray(pattern.instances) ||
     !Array.isArray(pattern.exclusions) ||
-    !pattern.stepX ||
-    !pattern.stepY
+    (pattern.type === 'linearPattern' && (!pattern.stepX || !pattern.stepY))
   )
     return 'A linear pattern needs a source graph, cell maps and spacing.';
   if (pattern.seedKeys.some(k => typeof k !== 'string') || new Set(pattern.seedKeys).size !== pattern.seedKeys.length)
@@ -355,6 +377,8 @@ export function linearPatternIssue(sketch: CadSketch, pattern: CadLinearPattern)
   const master = patternMaster(pattern);
   if (!master) return 'The pattern master is missing.';
   const entities = new Map(sketch.entities.map(e => [e.id, e]));
+  if (pattern.type === 'circularPattern' && entities.get(pattern.centerId)?.type !== 'point')
+    return 'The circular pattern needs a live center point.';
   const reverse = new Map(Object.entries(master.idMap).map(([key, id]) => [id, key]));
   const sourceIds = patternSourceIds(pattern);
   if (new Set(sourceIds).size !== sourceIds.length || sourceIds.some(id => !entities.has(id) || isOwnedSplineHandle(entities.get(id)!)))
@@ -411,14 +435,15 @@ export function linearPatternIssue(sketch: CadSketch, pattern: CadLinearPattern)
   return null;
 }
 
-export function sketchPatternOwner(sketch: CadSketch, entityId: string, replicasOnly = false): CadLinearPattern | undefined {
+export function sketchPatternOwner(sketch: CadSketch, entityId: string, replicasOnly = false): CadSketchPattern | undefined {
   return sketch.constraints.find(
-    (c): c is CadLinearPattern =>
-      c.type === 'linearPattern' && c.instances.some(i => (!replicasOnly || i !== patternMaster(c)) && i.activeIds.includes(entityId))
+    (c): c is CadSketchPattern =>
+      (c.type === 'linearPattern' || c.type === 'circularPattern') &&
+      c.instances.some(i => (!replicasOnly || i !== patternMaster(c)) && i.activeIds.includes(entityId))
   );
 }
 /** Reservations are ownership promises even while a cell is excluded or outside the current count. */
-export function linearPatternReservationIssue(sketch: CadSketch, pattern: CadLinearPattern): string | null {
+export function linearPatternReservationIssue(sketch: CadSketch, pattern: CadSketchPattern): string | null {
   if (!Array.isArray(pattern.instances) || !Array.isArray(pattern.seedKeys)) return 'Invalid pattern reservation data.';
   const master = patternMaster(pattern);
   if (!master || !master.idMap || typeof master.idMap !== 'object') return 'The pattern master map is missing.';
@@ -434,7 +459,7 @@ export function linearPatternReservationIssue(sketch: CadSketch, pattern: CadLin
   const reserved = new Set<string>();
   const otherReserved = new Set(
     sketch.constraints.flatMap(c =>
-      c.type === 'linearPattern' && c.id !== pattern.id && Array.isArray(c.instances)
+      (c.type === 'linearPattern' || c.type === 'circularPattern') && c.id !== pattern.id && Array.isArray(c.instances)
         ? c.instances.flatMap(i => (i && i.idMap ? Object.values(i.idMap) : []))
         : []
     )
@@ -462,17 +487,30 @@ export function linearPatternReservationIssue(sketch: CadSketch, pattern: CadLin
 export function rebaseLinearPattern(
   before: CadSketch,
   after: CadSketch,
-  pattern: CadLinearPattern,
+  pattern: CadSketchPattern,
   x: number,
   y: number
-): { ok: true; sketch: CadSketch; pattern: CadLinearPattern } | { ok: false; message: string } {
-  const original = before.constraints.find((c): c is CadLinearPattern => c.id === pattern.id && c.type === 'linearPattern') ?? pattern;
+): { ok: true; sketch: CadSketch; pattern: CadSketchPattern } | { ok: false; message: string } {
+  const original =
+    before.constraints.find(
+      (c): c is CadSketchPattern => c.id === pattern.id && (c.type === 'linearPattern' || c.type === 'circularPattern')
+    ) ?? pattern;
   const master = patternMaster(original),
     target = pattern.instances.find(i => i.x === x && i.y === y);
   if (!master || !target) return { ok: false, message: 'The pattern needs a complete surviving source instance.' };
   const copied = transformSketchEntities(
     { ...before, constraints: before.constraints.filter(c => c.id !== original.id) },
-    { entityIds: original.seedKeys.map(key => master.idMap[key]!), translation: patternInstanceOffset(original, target), copy: true }
+    {
+      entityIds: original.seedKeys.map(key => master.idMap[key]!),
+      translation: patternInstanceOffset(original, target),
+      ...(original.type === 'circularPattern'
+        ? {
+            angle: (patternAngle(original, target) * 180) / Math.PI,
+            pivot: before.entities.find(e => e.id === original.centerId) as CadPoint,
+          }
+        : {}),
+      copy: true,
+    }
   );
   if (!copied.ok) return copied;
   const realIds = new Map<string, string>();
@@ -487,7 +525,7 @@ export function rebaseLinearPattern(
   const oldInternal = new Set(
     before.constraints.filter(c => constraintEntityIds(c).length > 0 && constraintEntityIds(c).every(id => oldIds.has(id))).map(c => c.id)
   );
-  if (before.constraints.some(c => oldInternal.has(c.id) && c.type === 'linearPattern'))
+  if (before.constraints.some(c => oldInternal.has(c.id) && (c.type === 'linearPattern' || c.type === 'circularPattern')))
     return { ok: false, message: 'Remove nested pattern relations before changing their source ownership.' };
   const survivingIds = new Set(next.constraints.map(c => c.id)),
     coupled = new Set<string>();
@@ -553,7 +591,9 @@ export function rebaseLinearPattern(
 /** Entity deletion excludes only that seed/cell. A missing master rebases to a complete survivor or dissolves safely. */
 export function afterPatternEntityRemoval(before: CadSketch, after: CadSketch, removed: ReadonlySet<string>): CadSketch {
   let next = after;
-  for (const original of before.constraints.filter((c): c is CadLinearPattern => c.type === 'linearPattern')) {
+  for (const original of before.constraints.filter(
+    (c): c is CadSketchPattern => c.type === 'linearPattern' || c.type === 'circularPattern'
+  )) {
     if (!constraintEntityIds(original).some(id => removed.has(id))) continue;
     let group = structuredClone(original);
     for (const instance of group.instances)
@@ -590,12 +630,12 @@ export function afterPatternEntityRemoval(before: CadSketch, after: CadSketch, r
       next = { ...released, constraints: released.constraints.filter(c => c.id !== group.id) };
     }
   }
-  return next;
+  return removeUnusedPatternCenters(before, next);
 }
 export function patternDeletionNotice(before: CadSketch, after: CadSketch): string | null {
-  for (const old of before.constraints.filter(c => c.type === 'linearPattern')) {
+  for (const old of before.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern')) {
     const next = after.constraints.find(c => c.id === old.id);
-    if (next?.type !== 'linearPattern')
+    if (next?.type !== 'linearPattern' && next?.type !== 'circularPattern')
       return 'The pattern was released because no complete source instance remained. Its surviving geometry is independently editable.';
     if (next.masterX !== old.masterX || next.masterY !== old.masterY)
       return 'The pattern source moved to a complete surviving instance; deleted cells remain excluded.';

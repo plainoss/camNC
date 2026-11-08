@@ -6,7 +6,7 @@ import type { CadConstraint, CadSketch } from './types';
 
 /** Condition the independent ellipse roles before cloning them. Replica span drivers can condition the same source axes. */
 export function conditionPatternEllipseAxes(sketch: CadSketch): void {
-  const patterns = sketch.constraints.filter(c => c.type === 'linearPattern'),
+  const patterns = sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern'),
     replicas = patternReplicaIds(patterns);
   const toSource = new Map<string, string>(),
     equivalent = pointEquivalence(sketch.constraints);

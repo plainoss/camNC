@@ -75,11 +75,11 @@ export function setSketchConstruction(sketch: CadSketch, ids: readonly string[],
     entities: sketch.entities.map(e => (selected.has(e.id) ? { ...e, construction } : e)),
     constraints: sketch.constraints.some(
       c =>
-        c.type === 'linearPattern' &&
+        (c.type === 'linearPattern' || c.type === 'circularPattern') &&
         c.instances.some(i => (i.x !== c.masterX || i.y !== c.masterY) && c.seedKeys.some(key => selected.has(i.idMap[key]!)))
     )
       ? sketch.constraints.map(c =>
-          c.type !== 'linearPattern'
+          c.type !== 'linearPattern' && c.type !== 'circularPattern'
             ? c
             : {
                 ...c,
