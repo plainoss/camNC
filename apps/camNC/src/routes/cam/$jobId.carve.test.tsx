@@ -3,7 +3,7 @@ import { carvingRegion, placeItem } from '@/cam/carving';
 import { outlineArt } from '@/cam/carvingOutline';
 import { ensureWebFont, loadFontCatalog } from '@/cam/webFonts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Route } from './$jobId.carve';
@@ -257,10 +257,15 @@ describe('the Carve step', () => {
     expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
     const svg = screen.getAllByTestId('carving-item')[0].closest('svg')!;
     fireEvent.pointerDown(svg, { button: 0 });
-    expect(screen.getByText('Select an item on the board to edit it, or add one.')).toBeTruthy();
+    expect(screen.getByText('Select an item to edit it on the board.')).toBeTruthy();
+    expect(screen.queryByRole('toolbar')).toBeNull();
     fireEvent.pointerDown(screen.getAllByTestId('carving-item')[1], { button: 0, pointerId: 1 });
     fireEvent.pointerUp(svg, { pointerId: 1 });
     expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Second');
+    // The selected item's own bar floats over the drawing, as on the Boards step.
+    const bar = screen.getByRole('toolbar', { name: 'Lettering' });
+    expect(within(bar).getByRole('combobox', { name: 'Font' })).toBeTruthy();
+    expect(within(bar).getByRole('button', { name: 'Delete "Second"' })).toBeTruthy();
     fireEvent.keyDown(screen.getByLabelText('Text'), { key: 'Backspace' });
     expect(screen.getAllByTestId('carving-item')).toHaveLength(2);
     fireEvent.keyDown(svg, { key: 'Escape' });
@@ -381,7 +386,7 @@ describe('the Carve step', () => {
     );
     fireEvent.change(screen.getByLabelText('Height (mm)'), { target: { value: '40' } });
     fireEvent.blur(screen.getByLabelText('Height (mm)'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete "Welcome"' }));
+    fireEvent.click(within(screen.getByRole('toolbar')).getByRole('button', { name: 'Delete "Welcome"' }));
     await act(async () => finishDeleted(outline));
     await waitFor(async () => {
       const carving = (await getJob(job.id))!.carving!;

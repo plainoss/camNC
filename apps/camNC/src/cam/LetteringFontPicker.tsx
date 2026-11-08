@@ -1,4 +1,5 @@
 import { Button } from '@wbcnc/ui/components/button';
+import { cn } from '@wbcnc/ui/lib/utils';
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@wbcnc/ui/components/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@wbcnc/ui/components/popover';
 import { Check, ChevronsUpDown } from 'lucide-react';
@@ -43,7 +44,18 @@ function FontName({ font }: { font: Font }) {
   );
 }
 
-export function LetteringFontPicker({ id = 'carve-font', font, onChange }: { id?: string; font: Font; onChange: (font: Font) => void }) {
+export function LetteringFontPicker({
+  id = 'carve-font',
+  font,
+  onChange,
+  className,
+}: {
+  id?: string;
+  font: Font;
+  onChange: (font: Font) => void;
+  /** The button's, e.g. to make it smaller. */
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<FontCategory | 'all'>('all');
@@ -108,7 +120,7 @@ export function LetteringFontPicker({ id = 'carve-font', font, onChange }: { id?
             role="combobox"
             aria-label="Font"
             aria-expanded={open}
-            className="min-w-0 flex-1 justify-between">
+            className={cn('min-w-0 flex-1 justify-between', className)}>
             <FontName font={font} />
             <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
           </Button>
