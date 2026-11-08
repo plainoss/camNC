@@ -200,6 +200,8 @@ export async function createAdapter(page, url) {
   await page.goto(new URL('/cam', url).href, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /^New design/ }).click();
   const canvas = page.getByTestId('cad-canvas');
+  // A new design opens in the Part Studio asking for the first sketch's plane: scenarios draw on the top plane.
+  await page.getByRole('button', { name: 'Top plane', exact: true }).click();
   await canvas.waitFor();
   const studioToolbar = page.getByRole('toolbar', { name: 'Part Studio toolbar' });
   // Existing designs open in the Part Studio, and most steps work on the first part's sketch.

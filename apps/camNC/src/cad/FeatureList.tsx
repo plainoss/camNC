@@ -58,9 +58,17 @@ export function FeatureList({
   rollback?: string | null;
 }) {
   const { scope } = cadVariableValues(document);
+  const blank = new Set(
+    document.parts
+      .filter(part => !part.drawnOn && part.sketch.entities.every(entity => entity.type === 'point' && entity.fixed))
+      .map(part => part.id)
+  );
   const entries: FeatureEntry[] = [
     ...(document.variables ?? []).map(variable => ({ kind: 'variable' as const, id: variable.id })),
-    ...designSteps(document).map(step => ({ kind: 'step' as const, step })),
+    // A part with nothing drawn yet, such as a new design's, isn't a feature until it's sketched.
+    ...designSteps(document)
+      .filter(step => !blank.has(step.partId))
+      .map(step => ({ kind: 'step' as const, step })),
   ];
   const [menu, setMenu] = useState<{ entry: FeatureEntry; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
