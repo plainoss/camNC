@@ -992,6 +992,8 @@ describe('boards', () => {
         'Board A: the outline cuts run past the board edge (2 mm margin, ⌀6 bit). Fine if nothing is clamped or screwed there.'
       );
       expect(edgeNote(edge, nest, 2)).toBeNull();
+      // A board with nothing on it, such as a carving's, has no outlines to cut.
+      expect(edgeNote({ ...edge, items: [] }, nest, 6)).toBeNull();
     });
   });
 

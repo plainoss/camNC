@@ -1,4 +1,5 @@
 import { demoStorage } from '@/lib/demo/demo-storage';
+import { hasWork } from '../carving';
 import { orderBoardQueue } from '@wbcnc/cam/board';
 import { create } from 'zustand';
 import { combine, createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
@@ -182,6 +183,8 @@ interface QueueEntryBase {
   release?: ReleaseProgram;
   /** The bit the entries before this one end with, if any has one. */
   bitBefore?: number;
+  /** Its tool number: another tool of the same diameter (a V-bit after a flat bit) is a swap too. */
+  toolBefore?: number;
   /** Why this can't be loaded (a check of the board failed, its plan failed or isn't there yet). */
   blocked?: string;
 }
@@ -220,7 +223,7 @@ function hashOf(program: { gcode: string }) {
 }
 
 /** The program of an entry, if it has one. Never the program of another entry. */
-export function entryProgram(e: QueueEntry): { gcode: string; diameter: number } | undefined {
+export function entryProgram(e: QueueEntry): { gcode: string; diameter: number; tool: number; name?: string } | undefined {
   if (!e.plan || e.kind === 'flip') return undefined;
   return e.release ?? e.plan.programs[e.program];
 }
@@ -243,7 +246,7 @@ export function machineQueue(boards: JobBoard[], plans: (PlanResult | undefined)
       };
     })
     // A board without placed parts has nothing to plan: only a reason, or it's not part of the job.
-    .filter(e => e.board.request.parts.length || e.blocked);
+    .filter(e => hasWork(e.board.request) || e.blocked);
   const ordered = orderBoardQueue(known, Math.min(...known.flatMap(e => e.bits.slice(0, 1))));
   const entries = ordered.flatMap(({ board, plan, blocked, error }): QueueEntry[] => {
     const id = board.board.id;
@@ -307,11 +310,13 @@ export function machineQueue(boards: JobBoard[], plans: (PlanResult | undefined)
       ),
     ];
   });
-  let bit: number | undefined;
+  let bit: number | undefined, tool: number | undefined;
   return entries.map(e => {
-    const bitBefore = bit;
+    const bitBefore = bit,
+      toolBefore = tool;
     bit = entryProgram(e)?.diameter ?? bit;
-    return { ...e, bitBefore };
+    tool = entryProgram(e)?.tool ?? tool;
+    return { ...e, bitBefore, ...(toolBefore !== undefined && { toolBefore }) };
   });
 }
 

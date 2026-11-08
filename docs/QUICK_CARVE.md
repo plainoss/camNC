@@ -14,8 +14,9 @@ Plan page and Machine view as every other job.
 - **Text stays text.** The job saves the string, font and size, or the SVG source,
   plus its placement on the board. Outlines are derived, so a typo can be fixed
   later and Plan re-runs.
-- **Z0 on the board's top for carvings.** Flat parts zero Z on the spoilboard. A
-  V-carve's width follows its depth, so carvings probe the surface instead.
+- **Z0 on the board's underside, for now.** Carvings zero Z like every other job, so the machine flow is unchanged.
+  A V-carve's width follows its depth, so the Carve step asks for the board's measured thickness. Probing the top
+  instead is a later change to the machine flow.
 - **Default bit: 90° V, ⌀6.** The largest V-bit that fits the machine is ⌀8.
 - **Placing a carving on a part comes later.** See the last section.
 
@@ -44,13 +45,13 @@ Machine:  4 → 5 → first test carve
 Later:    6 → 7
 ```
 
-### PR 1: V-bits as tools
+### PR 1: V-bits as tools (merged, #226)
 
 - Add angle and tip flat to bits in the bit library. Default 90° ⌀6, limit ⌀8.
 - Tool identity, bit-change prompts and simulation use the full shape.
 - Stock simulation removes a cone instead of a cylinder.
 
-### PR 2: Variable-depth V-carve planner
+### PR 2: Variable-depth V-carve planner (merged, #226; faster in the next PR)
 
 - Worker op: from closed outlines, cut along the centre line with depth set by
   the local width (distance to the outline times `1 / tan(angle / 2)`).
@@ -59,7 +60,7 @@ Later:    6 → 7
 - Headless fixtures: a single stroke, a letter with a bowl, a stroke wider than
   the cone, and an artwork wider than the depth limit allows.
 
-### PR 3: Carving jobs and the Carve step
+### PRs 3–5: Carving jobs, the Carve step, Plan and the machine (one PR)
 
 - New carving card on the CAM/CAD page. The rail shows Carve, Plan, Machine.
 - Lettering (font, text, height) or an SVG of filled shapes. Drag to place and
@@ -67,16 +68,10 @@ Later:    6 → 7
 - Live preview of the carved board with flat bottoms marked. Hover reads depth
   and width.
 
-### PR 4: Carvings in Plan
-
-- Operations list: clearing program (if any), then the V-carve program.
-- Result and toolpath views, time estimate, depth-limit and fit warnings.
-
-### PR 5: Carvings at the machine
-
-- Queue entries for the carving's programs. The bit change asks to probe Z on
-  the board top again, keeping XY.
-- Run evidence and done marks work as for boards.
+- Plan: clearing program (if any), then the V-carve program, simulated with a
+  cone. Depth-limit and fit warnings.
+- Machine: the same queue. A V-bit is named in the bit-change prompt, and one
+  after a flat bit of the same diameter still asks for the swap.
 
 ## Later: show the carving on the assembled model
 

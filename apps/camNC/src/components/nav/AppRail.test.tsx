@@ -107,6 +107,16 @@ describe('the left panel', () => {
     expect(panel().getByText('Boards').getAttribute('href')).toBe('/cam/job/boards');
   });
 
+  it('gives a carving one Carve step instead of Model and Boards', () => {
+    route.job = { id: 'job', name: 'Sign', carving: {} } as CamJobV1;
+    route.path = '/cam/job/carve';
+    show();
+    expect(panel().getByText('Carve').getAttribute('aria-current')).toBe('step');
+    expect(panel().getByText('Plan').getAttribute('href')).toBe('/cam/job/plan');
+    expect(panel().queryByText('Boards')).toBeNull();
+    expect(panel().queryByText('Model')).toBeNull();
+  });
+
   it('without a job, leaves only the machine to go to', () => {
     route.path = '/settings/bits';
     show();
