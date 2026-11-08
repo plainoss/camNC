@@ -1,5 +1,6 @@
 import { newCadId } from './document';
-import type { CadDocument, CadPart, CadPartCopy, CadPartPattern } from './types';
+import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
+import type { CadDocument, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
 
 const kAxes = { x: 0, y: 1, z: 2 } as const;
 /** The most pieces a pattern makes, counting the part itself. */
@@ -9,18 +10,21 @@ export const CAD_MAX_PART_PATTERN = 200;
 export const cadCopyName = (part: Pick<CadPart, 'name' | 'copies'>, index: number): string =>
   part.copies?.[index]?.name ?? `${part.name} ${index + 2}`;
 
-/** A pattern's copies, laid out from the part's placement. Copies keep their names from one layout to the next. */
-function patternCopies(part: CadPart, pattern: CadPartPattern): CadPartCopy[] {
+/**
+ * A pattern's copies, laid out from where the part sits, which for an unplaced part others are drawn on is the origin.
+ * Copies keep their names from one layout to the next.
+ */
+function patternCopies(part: CadPart, pattern: CadPartPattern, at: CadPlacement | undefined): CadPartCopy[] {
   const before = new Map((part.copies ?? []).map(copy => [copy.id, copy]));
   const axis = kAxes[pattern.axis];
   return Array.from({ length: Math.max(0, pattern.count - 1) }, (_, i) => {
     const id = `${pattern.id}:${i + 1}`;
     const name = before.get(id)?.name;
     const copy: CadPartCopy = { id, pattern: pattern.id, ...(name && { name }) };
-    if (part.placement) {
-      const position = [...part.placement.position] as [number, number, number];
+    if (at) {
+      const position = [...at.position] as [number, number, number];
       position[axis] += (i + 1) * pattern.spacing;
-      copy.placement = { position, rotation: part.placement.rotation };
+      copy.placement = { position, rotation: at.rotation };
     }
     return copy;
   });
@@ -32,10 +36,11 @@ function patternCopies(part: CadPart, pattern: CadPartPattern): CadPartCopy[] {
  */
 export function resolvePartPatterns(document: CadDocument): CadDocument {
   let changed = false;
+  const supports = cadDrawnOnSupports(document);
   const parts = document.parts.map(part => {
     if (!part.pattern && !part.copies?.some(copy => copy.pattern)) return part;
     const own = (part.copies ?? []).filter(copy => !copy.pattern);
-    const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern) : [])];
+    const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern, effectivePlacement(part, supports)) : [])];
     if (JSON.stringify(copies) === JSON.stringify(part.copies ?? [])) return part;
     changed = true;
     const next: CadPart = { ...part, copies };
