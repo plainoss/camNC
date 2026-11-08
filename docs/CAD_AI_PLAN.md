@@ -26,11 +26,15 @@ of this adds a second source of truth.
 2. Done: `editCad`, the report, an SVG and the `check` command.
 3. Done: open a design `.json` from CAM's Open model or by dropping it. It becomes a
    new draft job marked as imported, and someone has to finish the sketch to use it.
-4. Toolpath summary in the report. Board planning has to move from `cam.worker.ts` to
-   `packages/cam` first. A summary only, never a program file.
+4. Done: board planning moved from `cam.worker.ts` to `planBoard` in `packages/cam`, and
+   the report summarises each part's toolpaths with it. A summary only, never a program
+   file.
 5. After the physical test cut and roadmap PRs 8–10: variables, placements and joints
    in the API, then decide on an MCP server and in-app chat. Both need the editor to
    accept outside changes through its session.
+
+Step 5 can't start yet: it needs the physical test cut, and variables, placements and
+joints (roadmap PRs 8–10) to exist before the API can describe them.
 
 ## Safety
 
