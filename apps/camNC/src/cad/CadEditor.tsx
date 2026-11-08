@@ -84,6 +84,7 @@ import {
   cadVariableProblems,
   drawnOnOutline,
   cadFaceFrame,
+  isCadPart,
   extrudeRemove,
   cadDrawnOnSupports,
   CAD_IDENTITY_PLACEMENT,
@@ -517,8 +518,6 @@ export function CadEditor({
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
-  // A part sketched new, whose extrude opens once its sketch is closed. A new design's first part is one.
-  const extrudeAfterSketch = useRef<string | null>(null);
   useEffect(() => {
     const element = svg.current;
     if (!element) return;
@@ -2221,6 +2220,20 @@ export function CadEditor({
       return;
     }
     if (editable(event.target)) return;
+    // Shift+E extrudes the selected sketch or part, as in the reference.
+    if (
+      studioSession &&
+      showWorkspace &&
+      event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      event.key.toLowerCase() === 'e'
+    ) {
+      event.preventDefault();
+      if (!busy && part && (partHasOutline || part.extrude === false)) studioCommand('extrude');
+      return;
+    }
     // Shift+S starts a sketch, on the plane or face picked if there is one, as in the reference.
     if (
       studioSession &&
@@ -3416,7 +3429,7 @@ export function CadEditor({
       setBusy(false);
     }
   };
-  const openFeature = (kind: 'extrude' | 'pattern', partId: string) => {
+  const openFeature = (kind: 'extrude' | 'pattern', partId: string, before = documentRef.current) => {
     setPartCutting(null);
     setVariableDialog(null);
     setTransformDialog(null);
@@ -3425,7 +3438,7 @@ export function CadEditor({
     setSelected([]);
     chooseTool('select');
     setShowWorkspace(true);
-    setFeatureDialog({ kind, partId, before: documentRef.current });
+    setFeatureDialog({ kind, partId, before });
   };
   const closeFeature = (keep: boolean) => {
     if (!keep && featureDialog) commit(featureDialog.before);
@@ -3450,11 +3463,6 @@ export function CadEditor({
   };
   /** Back to the studio from a sketch: keeping it, or leaving the design as it was before it opened. */
   const closeSketch = (keep: boolean) => {
-    if (keep && part && studioSession && part.drawnOn && !part.thin && isSingleLine(part)) {
-      // Drawn as one line: it's a thin board, set up in its Extrude dialog next.
-      commit(replacePart(documentRef.current, part.id, p => ({ ...p, thin: { depth: 100, midPlane: true } })));
-      extrudeAfterSketch.current = part.id;
-    }
     if (keep) {
       // A value still being typed, such as a dimension, is part of the sketch being kept.
       const error =
@@ -3471,9 +3479,16 @@ export function CadEditor({
     setSelected([]);
     setShow3D(false);
     setShowWorkspace(true);
-    const fresh = extrudeAfterSketch.current;
-    extrudeAfterSketch.current = null;
-    if (keep && fresh && hasOutline(documentRef.current, fresh)) openFeature('extrude', fresh);
+    // Finishing a sketch opens nothing: Extrude is started from the toolbar or with Shift+E, as in the reference. The
+    // studio takes the keyboard, so that works straight away.
+    const focusStudio = (frames: number) =>
+      requestAnimationFrame(() => {
+        const view = root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]');
+        // The studio's view may still be loading.
+        if (view) view.focus();
+        else if (frames > 0) focusStudio(frames - 1);
+      });
+    focusStudio(60);
   };
   /** Opens what a step of the design made: its sketch, its dialog, or its part in 3D. */
   const openStep = (step: DesignStep) => {
@@ -3568,7 +3583,13 @@ export function CadEditor({
     // A design's blank first part is the one sketched, rather than a second beside it.
     const blank = documentRef.current.parts.length === 1 && isBlank(documentRef.current.parts[0]!);
     const base = blank ? documentRef.current.parts[0]! : added;
-    const placed = { ...base, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
+    // In the studio a new sketch is a sketch until Extrude makes a part of it, as in the reference.
+    const placed = {
+      ...base,
+      ...(board && { thicknessExpression: board }),
+      drawnOn: { on, offset: 0 },
+      ...(studioSession && { extrude: false as const }),
+    };
     // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
     const drawn = { ...placed, sketch: withFaceEdges(documentRef.current, placed) };
     commit({
@@ -3577,10 +3598,7 @@ export function CadEditor({
       parts: blank ? [drawn] : [...documentRef.current.parts, drawn],
     });
     setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
-    if (studioSession) {
-      extrudeAfterSketch.current = drawn.id;
-      return openSketch(drawn.id, before);
-    }
+    if (studioSession) return openSketch(drawn.id, before);
     setPartId(drawn.id);
     setSelected([]);
     setShowWorkspace(false);
@@ -3626,6 +3644,20 @@ export function CadEditor({
       setFeatureDialog(null);
       setChoosingFace(false);
       setPartCutting({});
+    } else if (command === 'extrude' && part?.extrude === false) {
+      // Extruding a sketch makes a part of it; cancelling leaves the sketch as it was. One line is a board edge-on.
+      const before = documentRef.current;
+      const problem =
+        !(part.drawnOn && isSingleLine(part)) && evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
+      if (problem) return setStudioRefusal(`Can’t extrude this sketch yet: ${problem.message}`);
+      commit(
+        replacePart(before, part.id, p => {
+          const made = { ...p };
+          delete made.extrude;
+          return made.drawnOn && !made.thin && isSingleLine(made) ? { ...made, thin: { depth: 100, midPlane: true } } : made;
+        })
+      );
+      openFeature('extrude', part.id, before);
     } else if (part) openFeature(command, part.id);
   };
   const sketchOnFace = (face: CadFaceRef) => {
@@ -3790,10 +3822,12 @@ export function CadEditor({
         !((tool === 'fillet' || tool === 'chamfer') && selected.length);
   // The parts, each with an eye to show or hide it in the view. In the studio they sit at the bottom left, below the
   // features, as in the reference.
+  // The studio's parts: a sketch not yet extruded is a feature, not a part.
+  const builtParts = doc.parts.filter(isCadPart);
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>
-        <h2>Parts ({studioSession ? doc.parts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0) : doc.parts.length})</h2>
+        <h2>Parts ({studioSession ? builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0) : doc.parts.length})</h2>
         {!studioSession && (
           <button
             type="button"
@@ -3810,7 +3844,7 @@ export function CadEditor({
         )}
       </div>
       <ul className="cad-part-list" aria-label="Parts" hidden={!!faceSketch}>
-        {doc.parts
+        {(studioSession ? builtParts : doc.parts)
           .flatMap(p => [
             { key: p.id, part: p, name: p.name },
             // In the studio every copy is a part of its own in the list, as the reference lists them, with its own eye.
@@ -3887,8 +3921,11 @@ export function CadEditor({
                     : (featureDialog?.kind ?? null)
           }
           disabled={{
-            ...(!partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
-            ...(doc.parts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
+            // A sketch not yet extruded can be extruded; patterns and transforms need a part.
+            ...(part?.extrude === false
+              ? { pattern: 'Extrude the sketch first', transform: 'Extrude the sketch first' }
+              : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
+            ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
           }}
           canUndo={session.past.length > 0}
           canRedo={session.future.length > 0}

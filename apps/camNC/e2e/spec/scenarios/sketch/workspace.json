@@ -10,7 +10,10 @@
       "hover 40,30",
       {
         "expect": {
-          "cursor": [40, 30]
+          "cursor": [
+            40,
+            30
+          ]
         }
       }
     ]
@@ -95,6 +98,7 @@
     "steps": [
       "rect 40,30 140,90",
       "closesketch",
+      "key Shift+E",
       "fieldkeep Thickness 0",
       {
         "expect": {
@@ -138,21 +142,28 @@
   },
   {
     "id": "sketch/finish/blocks-open-profile",
-    "title": "An open outline can't be finished (one line alone is a board drawn edge-on)",
+    "title": "An open outline finishes as a sketch, as in the reference, but can't be extruded into a part",
     "evidence": "design only closed profiles can be cut",
     "steps": [
       "line 20,40 120,40",
       "line 120,40 120,90",
       {
         "expect": {
-          "canFinish": false
+          "canFinish": true
+        }
+      },
+      "closesketch",
+      "key Shift+E",
+      {
+        "expect": {
+          "pageText": "extrude this sketch"
         }
       }
     ]
   },
   {
     "id": "sketch/finish/blocks-crossing-profile",
-    "title": "A self-crossing outline can't be finished and says why",
+    "title": "A self-crossing outline finishes as a sketch, but Extrude refuses it and says why",
     "evidence": "design only valid profiles can be cut",
     "steps": [
       "key l",
@@ -165,23 +176,35 @@
       "key Escape",
       {
         "expect": {
-          "canFinish": false,
-          "status": "attention"
+          "canFinish": true
+        }
+      },
+      "closesketch",
+      "key Shift+E",
+      {
+        "expect": {
+          "pageText": "extrude this sketch"
         }
       }
     ]
   },
   {
     "id": "sketch/finish/blocks-two-outlines",
-    "title": "Two separate outlines in one part must be separate parts",
+    "title": "Two separate outlines finish as a sketch, but extruding them into one part is refused",
     "evidence": "design one outer boundary per flat part, from the approved plan",
     "steps": [
       "rect 20,30 80,90",
       "rect 120,30 180,90",
       {
         "expect": {
-          "canFinish": false,
-          "status": "attention"
+          "canFinish": true
+        }
+      },
+      "closesketch",
+      "key Shift+E",
+      {
+        "expect": {
+          "pageText": "extrude this sketch"
         }
       }
     ]
@@ -224,7 +247,7 @@
   },
   {
     "id": "sketch/finish/undo-survives-boards",
-    "title": "Undo still works after visiting Boards and returning",
+    "title": "Undo still works after visiting Boards and returning, back through the extrude and into the sketch",
     "evidence": "manu 2026-11-06, the approved plan's acceptance list",
     "steps": [
       "rect 20,20 140,100",
@@ -236,6 +259,7 @@
           "canUndo": true
         }
       },
+      "key Control+z",
       "key Control+z",
       {
         "expect": {
@@ -384,7 +408,10 @@
           "entitiesInclude": [
             {
               "type": "circle",
-              "c": [80, 60]
+              "c": [
+                80,
+                60
+              ]
             }
           ]
         }

@@ -13,7 +13,7 @@ const kCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactN
   {
     id: 'extrude',
     label: 'Extrude',
-    hint: 'How thick the selected part is, where it starts and which way it grows',
+    hint: 'Extrude the selected sketch into a part, or change how thick a part is (Shift E)',
     glyph: <path d="M5 15h9v5H5zM5 15l4-4h9l-4 4M18 11v5l-4 4M9 11V4M7 6l2-2 2 2" />,
   },
   {

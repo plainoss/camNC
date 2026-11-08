@@ -432,16 +432,18 @@ it('keeps a value typed as `#name = value` when the tick is clicked straight aft
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull());
   expect(latest().variables?.map(variable => variable.name)).toEqual(['board']);
-  expect(latest().parts[0]!.thickness).toBe(19);
+  // The design takes the thickness once the variable is in it, which can be a solve after the dialog closed.
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(19));
   expect(latest().parts[0]!.thicknessExpression).toMatch(/board/);
 });
 
-it('closes a one-line sketch as a thin board, set in the Extrude dialog’s Thin tab', async () => {
+it('finishes a sketch as a sketch, and extrudes a one-line sketch as a thin board in the Extrude dialog’s Thin tab', async () => {
   const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
   side.drawnOn = { on: { plane: 'right' as const }, offset: 0 };
   const back = { ...createCadPart('Back', 4), drawnOn: { on: { partId: side.id, face: 'top' as const }, offset: -10 } };
   back.sketch = addLine(back.sketch, { x1: 10, y1: 0, x2: 10, y2: 500 });
-  const source: CadDocument = { ...createCadDocument(), parts: [side, back] };
+  // A sketch finished but not yet extruded.
+  const source: CadDocument = { ...createCadDocument(), parts: [side, { ...back, extrude: false }] };
   sessions.push(source.id);
   const change = vi.fn<(document: CadDocument) => void>();
   render(
@@ -452,11 +454,34 @@ it('closes a one-line sketch as a thin board, set in the Extrude dialog’s Thin
   await settled();
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
   const features = await screen.findByRole('region', { name: 'Features' });
+  // It's a feature, not a part.
+  expect(within(features).queryByRole('button', { name: /Extrude · Back/ })).toBeNull();
+  // Nor can it be cut with, or into, while it's a sketch: one part is all there is to cut.
+  expect(
+    within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' }))
+      .getByRole('button', { name: /Cut parts/ })
+      .hasAttribute('disabled') ||
+      within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' }))
+        .getByRole('button', { name: /Cut parts/ })
+        .getAttribute('aria-disabled') === 'true'
+  ).toBe(true);
+  expect(within(screen.getByRole('region', { name: 'Parts panel' })).queryByText('Back')).toBeNull();
   await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Back/ }));
   const sketch = await screen.findByRole('dialog', { name: 'Sketch · Back' });
   await waitFor(() => expect(within(sketch).getByRole('button', { name: '✓ Finish sketch' })).toHaveProperty('disabled', false));
   await userEvent.click(within(sketch).getByRole('button', { name: '✓ Finish sketch' }));
+  // Finishing opens nothing, as in the reference: Extrude is started with Shift+E or from the toolbar.
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch · Back' })).toBeNull());
+  expect(screen.queryByRole('dialog', { name: /^Extrude/ })).toBeNull();
+  expect(latest().parts[1]!.extrude).toBe(false);
+  // Cancelled, Extrude leaves the sketch a sketch.
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('workspace-3d')));
+  await userEvent.keyboard('{Shift>}E{/Shift}');
+  await userEvent.click(within(await screen.findByRole('dialog', { name: 'Extrude · Back' })).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(latest().parts[1]!.extrude).toBe(false));
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Extrude/ }));
   const extrude = await screen.findByRole('dialog', { name: 'Extrude · Back' });
+  expect(latest().parts[1]!.extrude).toBeUndefined();
   expect(within(extrude).getByRole('tab', { name: 'Thin' }).getAttribute('aria-selected')).toBe('true');
   const depth = within(extrude).getByRole('textbox', { name: 'Depth' });
   // A depth that can't be taken keeps the dialog open to fix it.

@@ -33,7 +33,7 @@ export async function saveDesignDraft(
 export async function acceptDesign(base: CamJobV1, document: CadDocument): Promise<CamJobV1> {
   if (!base.design) throw new Error('This job is not a native design.');
   const solved = await solveCadDocument(document);
-  if (solved.status !== 'solved' || !solved.parts.length)
+  if (solved.status !== 'solved' || !cadPartsToCut(solved.document, solved.parts).length)
     throw new Error(
       solved.diagnostics.find(d => d.severity === 'error')?.message || 'Draw at least one closed part before continuing to Boards.'
     );

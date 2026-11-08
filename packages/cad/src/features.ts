@@ -19,6 +19,9 @@ import type {
   EvaluatedCadPart,
 } from './types';
 
+/** Whether a part is one, rather than a sketch not yet extruded. */
+export const isCadPart = (part: CadPart): boolean => part.extrude !== false;
+
 /** Features belong to the newer format, so an older build refuses the file instead of silently cutting without them. */
 export function withFeatureVersion(document: CadDocument): CadDocument {
   return { ...document, version: document.parts.some(part => part.features?.length) ? 2 : 1 };
@@ -358,7 +361,8 @@ export function evaluateCadDocument(document: CadDocument): { parts: EvaluatedCa
   const parts: EvaluatedCadPart[] = [];
   for (const part of document.parts) {
     const result = evaluateCadPart(part);
-    diagnostics.push(...result.diagnostics);
+    // A sketch not yet extruded needn't close into a profile, as a part's must: what's wrong with one is only a warning.
+    diagnostics.push(...(isCadPart(part) ? result.diagnostics : result.diagnostics.map(d => ({ ...d, severity: 'warning' as const }))));
     if (!result.part) continue;
     const evaluated = evaluateCadFeatures(part, result.part);
     diagnostics.push(...evaluated.diagnostics);
