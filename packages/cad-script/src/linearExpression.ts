@@ -71,23 +71,28 @@ function parseLinear(text: string): Linear | undefined {
 
 const number = (value: number) => `${+value.toFixed(6)}`;
 
-function printLinear({ constant, terms }: Linear): string | number {
+/** `a`, `a/2`, `2*a` or `2*a/3`; undefined for a coefficient that is no small fraction, which would print rounded. */
+function scaled(name: string, size: number): string | undefined {
+  for (let q = 1; q <= 12; q++) {
+    const p = Math.round(size * q);
+    if (p > 0 && Math.abs(p / q - size) < kEpsilon) return `${p === 1 ? '' : `${p}*`}${name}${q === 1 ? '' : `/${q}`}`;
+  }
+  return undefined;
+}
+
+function printLinear({ constant, terms }: Linear): string | number | undefined {
   const parts: string[] = [];
   // Added terms first, so a length reads `legW/2 - tenonW/2` rather than starting with a minus.
   const ordered = [...terms].filter(([, c]) => Math.abs(c) >= kEpsilon).sort(([, a], [, b]) => Number(a < 0) - Number(b < 0));
   for (const [name, coefficient] of ordered) {
-    const size = Math.abs(coefficient),
-      inverse = 1 / size;
-    const text =
-      Math.abs(size - 1) < kEpsilon
-        ? name
-        : Math.abs(inverse - Math.round(inverse)) < kEpsilon
-          ? `${name}/${Math.round(inverse)}`
-          : `${number(size)}*${name}`;
+    const text = scaled(name, Math.abs(coefficient));
+    if (text === undefined) return undefined;
     parts.push(parts.length ? `${coefficient < 0 ? '-' : '+'} ${text}` : `${coefficient < 0 ? '-' : ''}${text}`);
   }
-  if (!parts.length) return +constant.toFixed(9);
-  if (Math.abs(constant) >= kEpsilon) parts.push(`${constant < 0 ? '-' : '+'} ${number(Math.abs(constant))}mm`);
+  if (!parts.length) return Math.abs(constant) < kEpsilon ? 0 : constant;
+  // A constant that doesn't print exactly would change the length.
+  if (Math.abs(+constant.toFixed(6) - constant) > kEpsilon) return undefined;
+  if (Math.abs(+constant.toFixed(6)) > 0) parts.push(`${constant < 0 ? '-' : '+'} ${number(Math.abs(constant))}mm`);
   return parts.join(' ');
 }
 
@@ -99,12 +104,27 @@ export function differenceExpression(low: number | string, high: number | string
   const read = (value: number | string) => (typeof value === 'number' ? { constant: value, terms: new Map() } : parseLinear(value));
   const a = read(low),
     b = read(high);
+  if (typeof low === 'string' && typeof high === 'string' && low.trim() === high.trim()) return 0;
   if (a && b) {
     const terms = new Map(b.terms);
     for (const [name, coefficient] of a.terms) terms.set(name, (terms.get(name) ?? 0) - coefficient);
-    return printLinear({ constant: b.constant - a.constant, terms });
+    const printed = printLinear({ constant: b.constant - a.constant, terms });
+    if (printed !== undefined) return printed;
   }
   if (low === 0 || low === '0') return high;
   const term = (value: number | string) => (typeof value === 'number' || /^[\w.]+$/.test(value.trim()) ? `${value}` : `(${value})`);
   return `${typeof high === 'number' ? high : high.trim()} - ${term(low)}`;
+}
+
+/** `Σ k·value` written out, such as the middle of a half circle from its ends; undefined if a value isn't a sum. */
+export function combineExpressions(parts: readonly (readonly [number, number | string])[]): number | string | undefined {
+  let total: Linear = { constant: 0, terms: new Map() };
+  for (const [k, value] of parts) {
+    const read = typeof value === 'number' ? { constant: value, terms: new Map<string, number>() } : parseLinear(value);
+    if (!read) return undefined;
+    const terms = new Map(total.terms);
+    for (const [name, coefficient] of read.terms) terms.set(name, (terms.get(name) ?? 0) + k * coefficient);
+    total = { constant: total.constant + k * read.constant, terms };
+  }
+  return printLinear(total);
 }

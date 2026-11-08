@@ -39,7 +39,7 @@ import {
   cadCopyName,
   resolvePartPatterns,
 } from '@wbcnc/cad';
-import { differenceExpression } from './linearExpression';
+import { combineExpressions, differenceExpression } from './linearExpression';
 import { inspectCadDocument, type CadExpectation, type CadReport } from './inspect';
 
 export type Xy = readonly [number, number];
@@ -432,9 +432,27 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
                 const middle = { x: (from.x + target.x) / 2, y: (from.y + target.y) / 2 },
                   out = { x: from.x - middle.x, y: from.y - middle.y };
                 const top = how.clockwise ? { x: middle.x + out.y, y: middle.y - out.x } : { x: middle.x - out.y, y: middle.y + out.x };
+                // The point between the quarters is written from the ends, so it follows them when a variable changes.
+                const [fx, fy] = vertices.at(-1)!.typed,
+                  [tx, ty] = to;
+                const turn = how.clockwise ? -1 : 1;
+                // middle ∓ the half chord turned a quarter: x = (fx + tx)/2 - turn·(fy - ty)/2, y = (fy + ty)/2 + turn·(fx - tx)/2.
+                const bx = combineExpressions([
+                    [0.5, fx],
+                    [0.5, tx],
+                    [-turn / 2, fy],
+                    [turn / 2, ty],
+                  ]),
+                  by = combineExpressions([
+                    [0.5, fy],
+                    [0.5, ty],
+                    [turn / 2, fx],
+                    [-turn / 2, tx],
+                  ]);
+                const between: LenXy = bx !== undefined && by !== undefined ? [bx, by] : [top.x, top.y];
                 // Each half is a quarter turn, so the short way round.
                 const quarter = { ...how, large: false };
-                edit.arcTo([top.x, top.y], quarter);
+                edit.arcTo(between, quarter);
                 return edit.arcTo(to, quarter);
               }
             }
@@ -505,13 +523,15 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
             vertices.slice(1).forEach((vertex, i) => {
               const a = corners[i]!,
                 b = corners[i + 1]!;
-              if (isPlaced(b.id)) return;
+              // The fixed origin is placed already.
+              if (isPlaced(b.id) || ('fixed' in b && b.fixed)) return;
               const before = vertices[i]!;
               const edge = edges[i]!,
                 straight = current().entities.find(e => e.id === edge.id)?.type === 'line';
               (['x', 'y'] as const).forEach((axis, k) => {
                 const delta = vertex.at[axis] - before.at[axis];
-                if (Math.abs(delta) < 1e-9) {
+                // Along an axis only when it always is: two sizes that are equal now may not stay so.
+                if (differenceExpression(before.typed[k]!, vertex.typed[k]!) === 0) {
                   const along = axis === 'x' ? 'vertical' : 'horizontal';
                   if (straight) constrain({ type: along, entityId: edge.id });
                   else constrain({ type: `${along}Points`, pointAId: a.id, pointBId: b.id });

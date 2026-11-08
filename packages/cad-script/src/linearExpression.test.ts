@@ -15,5 +15,10 @@ describe('differenceExpression', () => {
   it('keeps what it cannot read as a sum', () => {
     expect(differenceExpression('board', 'floor(width/40)*40')).toBe('floor(width/40)*40 - board');
     expect(differenceExpression('a*b', 'c')).toBe('c - (a*b)');
+    // A coefficient or constant that wouldn't print exactly keeps the original text.
+    expect(differenceExpression(0, '2*a/3')).toBe('2*a/3');
+    expect(differenceExpression(0, 'a*0.123456789')).toBe('a*0.123456789');
+    expect(differenceExpression('a', 'a + 10/3')).toBeCloseTo(10 / 3, 9);
+    expect(differenceExpression('floor(x)', 'floor(x)')).toBe(0);
   });
 });
