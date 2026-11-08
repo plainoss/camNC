@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 /** The design's variables, as a value field offers them after `#`, and a way to make or change one from a field. */
 export interface CadVariableFields {
@@ -7,7 +7,30 @@ export interface CadVariableFields {
   define: (name: string, expression: string) => string | null;
 }
 
-export const CadVariableFieldsContext = createContext<CadVariableFields | null>(null);
+// The open editor's variables. One editor is open at a time; fields outside one get none.
+let current: CadVariableFields | null = null;
+const listeners = new Set<() => void>();
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+const publish = (fields: CadVariableFields | null) => {
+  current = fields;
+  listeners.forEach(listener => listener());
+};
+
+/** Offers the editor's variables to every value field while it's open. */
+export function useProvideCadVariableFields(fields: CadVariableFields) {
+  useEffect(() => {
+    publish(fields);
+    return () => {
+      if (current === fields) publish(null);
+    };
+  }, [fields]);
+}
+
+/** The open editor's variables, for a value field. */
+export const useCadVariableFields = () => useSyncExternalStore(subscribe, () => current);
 
 /** `#name = value` typed in a field, to make the variable and use it there, as the reference allows. */
 export const variableDefinition = (text: string): { name: string; expression: string } | null => {
