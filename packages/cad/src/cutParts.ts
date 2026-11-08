@@ -181,23 +181,32 @@ export function applyPartCuts(
     let made = 0,
       refused = false;
     const warn = (message: string) => diagnostics.push({ code: 'part-cut-unresolved', severity: 'warning', message });
+    // A tool `<partId>:<copyId>` cuts with that one copy; a copy that's gone is said once, not once per target.
+    const goneCopies = new Set<string>();
     for (const targetId of step.targets)
       for (const toolId of step.tools) {
-        if (toolId === targetId) continue;
+        const [partId, copyId] = toolId.split(/:(.*)/s) as [string, string?];
+        if (partId === targetId) continue;
         const intoSource = sources.get(targetId),
-          toolSource = sources.get(toolId);
+          toolSource = sources.get(partId);
         const into = byId.get(targetId),
-          tool = before.get(toolId);
+          tool = before.get(partId);
         if (!intoSource || !toolSource || !into || !tool) continue;
+        if (copyId !== undefined && !toolSource.copies?.some(copy => copy.id === copyId)) {
+          refused = true;
+          if (!goneCopies.has(toolId)) warn(`The copy of ${toolSource.name} this step cuts with no longer exists.`);
+          goneCopies.add(toolId);
+          continue;
+        }
         const intoAt = effectivePlacement(intoSource, supports),
           toolAt = effectivePlacement(toolSource, supports);
         // A part that hasn't been placed isn't anywhere yet, so it reaches into nothing.
         if (!intoAt) continue;
         // Each copy of a tool cuts where it sits, a mirrored one with its mirror image.
         const instances = [
-          ...(toolAt ? [{ key: '', at: toolAt, shape: tool, name: toolSource.name }] : []),
+          ...(copyId === undefined && toolAt ? [{ key: '', at: toolAt, shape: tool, name: toolSource.name }] : []),
           ...(toolSource.copies ?? []).flatMap((copy, index) =>
-            copy.placement
+            (copyId === undefined || copy.id === copyId) && copy.placement
               ? [
                   {
                     key: `:${copy.id}`,
@@ -272,7 +281,7 @@ export function applyPartCuts(
               );
             const current = byId.get(targetId)!;
             // The first piece keeps the ID a tool's one cut always had.
-            const id = `cut-parts:${step.id}:${toolId}${key}${index ? `#${index}` : ''}`;
+            const id = `cut-parts:${step.id}:${partId}${key}${index ? `#${index}` : ''}`;
             const cut: EvaluatedCadCut = {
               id,
               regionId: id,
@@ -303,7 +312,7 @@ export function applyPartCuts(
 export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): EvaluatedCadPart {
   const steps = (document.partCuts ?? []).filter(step => step.targets.includes(part.partId));
   if (!steps.length) return part;
-  const toolIds = [...new Set(steps.flatMap(step => step.tools))].filter(id => id !== part.partId);
+  const toolIds = [...new Set(steps.flatMap(step => step.tools.map(id => id.split(':')[0]!)))].filter(id => id !== part.partId);
   const tools = toolIds.flatMap(id => {
     const source = document.parts.find(candidate => candidate.id === id);
     const profile = source && evaluateCadPart(source).part;
