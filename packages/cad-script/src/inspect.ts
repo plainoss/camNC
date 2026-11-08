@@ -403,7 +403,9 @@ export async function inspectCadDocument(
       }
     }
     const box = evaluated && bounds(evaluated.outline, curveExtremes(part.sketch));
-    const names = (id: string) => toCut.find(entry => entry.part.partId === id)?.names ?? [];
+    // Copies cut differently are pieces of their own, `<id>[:mirrored]:copy:<copyId>`; list them with their kind.
+    const names = (id: string) =>
+      toCut.flatMap(entry => (entry.part.partId === id || entry.part.partId.startsWith(`${id}:copy:`) ? entry.names : []));
     const pieces = part.copies?.length ? { names: names(part.id), mirrored: names(mirroredPartId(part.id)) } : undefined;
     const report: CadReportPart = {
       name: part.name,
