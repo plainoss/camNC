@@ -96,7 +96,10 @@ export function createSketchContext(
       entityIds: entityIds.includes(target.id) ? entityIds : [target.id],
       constraintIds: [],
     };
-  if (target.kind === 'constraint' && sketch.constraints.some(c => c.id === target.id && c.type === 'linearPattern'))
+  if (
+    target.kind === 'constraint' &&
+    sketch.constraints.some(c => c.id === target.id && (c.type === 'linearPattern' || c.type === 'circularPattern'))
+  )
     return { target: { ...target }, position: { ...position }, entityIds: [], constraintIds: [target.id] };
   if (target.kind === 'dimension' && sketch.constraints.some(c => c.id === target.id && 'value' in c))
     return {
@@ -114,7 +117,9 @@ export function createSketchContext(
 export function selectedSketchContextTarget(sketch: CadSketch, selection: SketchContextSelection): SketchContextTarget {
   const dimension = selection.constraintIds.find(id => sketch.constraints.some(c => c.id === id && 'value' in c));
   if (dimension) return { kind: 'dimension', id: dimension };
-  const pattern = selection.constraintIds.find(id => sketch.constraints.some(c => c.id === id && c.type === 'linearPattern'));
+  const pattern = selection.constraintIds.find(id =>
+    sketch.constraints.some(c => c.id === id && (c.type === 'linearPattern' || c.type === 'circularPattern'))
+  );
   if (pattern) return { kind: 'constraint', id: pattern };
   const entity = selection.entityIds.find(id => sketch.entities.some(entity => entity.id === id));
   return entity ? { kind: 'entity', id: entity } : { kind: 'blank' };
@@ -135,7 +140,7 @@ export function toggleContextConstruction(sketch: CadSketch, ids: readonly strin
 export function sketchContextItems(sketch: CadSketch, context: SketchContext, busy = false): SketchContextItem[] {
   if (context.target.kind === 'constraint') {
     const id = context.target.id;
-    if (!sketch.constraints.some(c => c.id === id && c.type === 'linearPattern')) return [];
+    if (!sketch.constraints.some(c => c.id === id && (c.type === 'linearPattern' || c.type === 'circularPattern'))) return [];
     return [
       { action: 'edit-pattern', label: 'Edit pattern', disabled: busy, shortcut: 'Enter' },
       { action: 'delete-dimensions', label: 'Remove pattern relation', disabled: busy, shortcut: 'Delete' },

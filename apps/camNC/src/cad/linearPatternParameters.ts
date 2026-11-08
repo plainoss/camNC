@@ -1,4 +1,4 @@
-import type { CadLinearPattern, CadPoint, CadSketch } from '@wbcnc/cad';
+import type { CadLinearPattern, CadSketchPattern, CadPoint, CadSketch } from '@wbcnc/cad';
 import { entityPointIds, patternSourceIds } from '@wbcnc/cad';
 import { parseCadValue } from './valueExpressions';
 export interface LinearPatternParameters {
@@ -66,4 +66,4 @@ export function linearPatternAnchor(sketch: CadSketch, ids: readonly string[]): 
     ys = points.flatMap(e => (e.type === 'point' ? [e.y] : []));
   return xs.length ? { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 } : { x: 0, y: 0 };
 }
-export const editablePatternSources = (pattern: CadLinearPattern) => patternSourceIds(pattern);
+export const editablePatternSources = (pattern: CadSketchPattern) => patternSourceIds(pattern);

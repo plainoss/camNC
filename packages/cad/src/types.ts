@@ -131,21 +131,31 @@ export interface CadPatternExclusion {
   x: number;
   y: number;
 }
-export interface CadLinearPattern extends ConstraintBase {
-  type: 'linearPattern';
+interface CadPatternBase extends ConstraintBase {
   seedKeys: string[];
   masterX: number;
   masterY: number;
   countX: number;
   countY: number;
-  stepX: CadPoint;
-  stepY: CadPoint;
   instances: CadPatternInstance[];
   exclusions: CadPatternExclusion[];
 }
 
+export interface CadLinearPattern extends CadPatternBase {
+  type: 'linearPattern';
+  stepX: CadPoint;
+  stepY: CadPoint;
+}
+export interface CadCircularPattern extends CadPatternBase {
+  type: 'circularPattern';
+  centerId: string;
+  /** Signed overall sweep in degrees. Closed patterns divide it by count; open patterns by count minus one. */
+  angle: number;
+  closed: boolean;
+}
+export type CadSketchPattern = CadLinearPattern | CadCircularPattern;
 export type CadConstraint =
-  | CadLinearPattern
+  | CadSketchPattern
   | (ConstraintBase & { type: 'symmetricCurves'; entityAId: string; entityBId: string; lineId: string; focusSign?: 1 | -1 })
   | (ConstraintBase & { type: 'regularPolygon'; circleId: string; edgeIds: string[]; mode: 'inscribed' | 'circumscribed' })
   | (ConstraintBase & { type: 'horizontal' | 'vertical'; entityId: string })

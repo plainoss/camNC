@@ -204,7 +204,7 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
         )
           error('invalid-reference', 'A regular polygon needs a circle and three to fifty distinct edges.', undefined, [c.id]);
       }
-      if (c.type === 'linearPattern') {
+      if (c.type === 'linearPattern' || c.type === 'circularPattern') {
         const issue = linearPatternIssue(part.sketch, c);
         if (issue) error('invalid-pattern', issue, undefined, [c.id]);
       }

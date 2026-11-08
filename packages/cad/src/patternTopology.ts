@@ -1,11 +1,11 @@
 import type { SketchPrimitive } from '@salusoft89/planegcs';
-import { newCadId } from './document';
+import { newCadId, constraintEntityIds, entityPointIds } from './document';
 import { pointEquivalence } from './pointEquivalence';
 import { patternMaster } from './pattern';
-import type { CadConstraint, CadLinearPattern, CadSketch } from './types';
+import type { CadConstraint, CadSketchPattern, CadSketch } from './types';
 
 /** A join authored on any instance describes the same logical point pair on every affine copy. */
-export function patternLogicalPointGroups(sketch: CadSketch, pattern: CadLinearPattern): string[][] {
+export function patternLogicalPointGroups(sketch: CadSketch, pattern: CadSketchPattern): string[][] {
   const master = patternMaster(pattern);
   if (!master) return [];
   const entities = new Map(sketch.entities.map(e => [e.id, e])),
@@ -37,7 +37,7 @@ export function compilePatternTopology(sketch: CadSketch): { primitives: SketchP
   const primitives: SketchPrimitive[] = [],
     masterJoins: CadConstraint[] = [],
     known: CadConstraint[] = [];
-  for (const pattern of sketch.constraints.filter(c => c.type === 'linearPattern')) {
+  for (const pattern of sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern')) {
     const master = patternMaster(pattern);
     if (!master) continue;
     for (const keys of patternLogicalPointGroups(sketch, pattern)) {
@@ -72,7 +72,7 @@ export function compilePatternTopology(sketch: CadSketch): { primitives: SketchP
 export function materializePatternJoins(
   before: CadSketch,
   after: CadSketch,
-  pattern: CadLinearPattern,
+  pattern: CadSketchPattern,
   onlyCell?: { x: number; y: number }
 ): CadSketch {
   const next = { ...after, constraints: [...after.constraints] },
@@ -89,4 +89,15 @@ export function materializePatternJoins(
           next.constraints.push({ id: newCadId(), type: 'coincident', pointAId: ids[0]!, pointBId: ids[i]! });
     }
   return next;
+}
+
+/** A definition center disappears with its pattern unless other geometry or authored relations still use it. */
+export function removeUnusedPatternCenters(before: CadSketch, after: CadSketch): CadSketch {
+  const candidates = new Set(
+    before.constraints.flatMap(c => (c.type === 'circularPattern' && !after.constraints.some(next => next.id === c.id) ? [c.centerId] : []))
+  );
+  const used = new Set([...after.entities.flatMap(entityPointIds), ...after.constraints.flatMap(constraintEntityIds)]);
+  return candidates.size
+    ? { ...after, entities: after.entities.filter(e => !candidates.has(e.id) || used.has(e.id) || (e.type === 'point' && e.standalone)) }
+    : after;
 }

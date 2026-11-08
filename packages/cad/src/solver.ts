@@ -186,6 +186,7 @@ function solverConstraint(
 ): SketchPrimitive | SketchPrimitive[] {
   const id = c.id;
   switch (c.type) {
+    case 'circularPattern':
     case 'linearPattern':
       return linearPatternPrimitives(c, entities);
     case 'symmetricCurves':
@@ -491,7 +492,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
   }
   const patternDiagnostics: CadSolveResult['diagnostics'] = [];
   for (const part of next.parts.flatMap(sketchTargets)) {
-    const patterns = part.sketch.constraints.filter(c => c.type === 'linearPattern');
+    const patterns = part.sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern');
     const invalid = patterns.map(pattern => ({ pattern, issue: linearPatternReservationIssue(part.sketch, pattern) })).filter(v => v.issue);
     if (invalid.length) {
       for (const { pattern, issue } of invalid)
@@ -612,7 +613,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
         const geometry: SketchPrimitive[] = ordered.map(e => solverGeometry(offsetSeed.get(e.id) ?? e, points));
         const primitives: SketchPrimitive[] = [];
         const draggedIds = new Set(dragTargets.map(target => target.pointId));
-        const replicas = patternReplicaIds(part.sketch.constraints.filter(c => c.type === 'linearPattern'));
+        const replicas = patternReplicaIds(part.sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern'));
         const retainedSplineHandles = new Set<string>();
         for (const e of ordered)
           if (e.type === 'spline' && [...e.fitPointIds, ...e.controlPointIds].some(id => draggedIds.has(id))) {
@@ -875,7 +876,8 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
         const sourceConstraintId = (nativeId: string) =>
           part.sketch.constraints.find(
             c =>
-              (c.type === 'regularPolygon' || c.type === 'symmetricCurves' || c.type === 'linearPattern') && nativeId.startsWith(`${c.id}:`)
+              (c.type === 'regularPolygon' || c.type === 'symmetricCurves' || c.type === 'linearPattern' || c.type === 'circularPattern') &&
+              nativeId.startsWith(`${c.id}:`)
           )?.id ?? nativeId;
         const status = conflicts.length ? 'conflict' : candidate ? 'solved' : 'invalid';
         sketches.push({ partId: part.id, dof: wrapper.gcs.dof(), status });
