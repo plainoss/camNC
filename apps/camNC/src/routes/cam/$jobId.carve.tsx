@@ -332,6 +332,7 @@ const centred = (carving: CarvingV1, size: { w: number; h: number }) => {
 
 function ArtFields({ carving, onArt }: { carving: CarvingV1; onArt: (art: CarvingArt) => void }) {
   const art = carving.art;
+  const svgInput = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(art.kind === 'text' ? art.text : 'Welcome');
   // Typing outlines again once it pauses.
   useEffect(() => {
@@ -349,7 +350,11 @@ function ArtFields({ carving, onArt }: { carving: CarvingV1; onArt: (art: Carvin
             role="tab"
             aria-selected={art.kind === kind}
             className={cn('rounded px-3 py-1', art.kind === kind ? 'bg-background shadow-sm' : 'text-muted-foreground')}
-            onClick={() => kind === 'text' && art.kind !== 'text' && onArt({ kind: 'text', text, font })}>
+            onClick={() => {
+              if (kind === art.kind) return;
+              if (kind === 'text') onArt({ kind: 'text', text, font });
+              else svgInput.current?.click();
+            }}>
             {kind === 'text' ? 'Lettering' : 'SVG'}
           </button>
         ))}
@@ -379,6 +384,7 @@ function ArtFields({ carving, onArt }: { carving: CarvingV1; onArt: (art: Carvin
       <Field label={art.kind === 'svg' ? 'Another SVG' : 'Or an SVG file'} id="carve-svg">
         <Input
           id="carve-svg"
+          ref={svgInput}
           type="file"
           accept=".svg,image/svg+xml"
           onChange={e => {

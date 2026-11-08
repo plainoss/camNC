@@ -48,6 +48,25 @@ describe('carving outlines', () => {
     expect(Math.abs(region.reduce((s, l) => s + area(l), 0))).toBeCloseTo(200, -1);
   });
 
+  it.each([
+    ['viewBox only', 'viewBox="0 0 200 100"', 100],
+    ['physical units', 'width="50mm" height="25mm" viewBox="0 0 50 25"', 25],
+    ['percentage units', 'width="100%" height="100%" viewBox="0 0 200 100"', 100],
+    ['numeric dimensions', 'width="200" height="100"', 100],
+  ])('draws a half-filled SVG with %s at the requested proportions', async (_, attributes, size) => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" ${attributes}><rect width="${size}" height="${size}"/></svg>`;
+    const { region, width, height } = await outlineArt({ kind: 'svg', svg, fileName: 'half.svg' }, 20);
+    expect(width).toBeCloseTo(40);
+    expect(height).toBe(20);
+    expect(region).toHaveLength(1);
+    expect(box(region).w).toBeCloseTo(20, 1);
+    expect(box(region).h).toBeCloseTo(20, 1);
+  });
+
+  it('rejects a file whose root is not SVG', async () => {
+    await expect(outlineArt({ kind: 'svg', svg: '<html/>', fileName: 'x.svg' }, 10)).rejects.toThrow(/not an SVG/);
+  });
+
   it('say why an SVG cannot be read', async () => {
     await expect(outlineArt({ kind: 'svg', svg: '<not svg', fileName: 'x.svg' }, 10)).rejects.toThrow(/could not be read/);
   });

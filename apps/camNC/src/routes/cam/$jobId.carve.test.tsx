@@ -19,7 +19,10 @@ vi.mock('@/cam/CamJobBar', () => ({ CamJobBar: ({ actions }: { actions: ReactNod
 
 const CarveStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const open = async () => {
   const job = await createCarvingJob();
@@ -40,6 +43,33 @@ describe('the Carve step', () => {
     expect(screen.getByTestId('carving-outline').getAttribute('d')).toMatch(/^M/);
     expect(screen.getByRole('link', { name: /Next: Plan/ }).getAttribute('href')).toBe(`/cam/${job.id}/plan`);
     expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
+  });
+
+  it('opens the SVG picker from the tab and selects the uploaded artwork', async () => {
+    const job = await open();
+    const input = screen.getByLabelText('Or an SVG file') as HTMLInputElement;
+    const click = vi.spyOn(input, 'click').mockImplementation(() => {});
+    const svgTab = screen.getByRole('tab', { name: 'SVG' });
+    fireEvent.click(svgTab);
+    expect(click).toHaveBeenCalledTimes(1);
+    // Opening or cancelling the picker keeps the existing lettering.
+    fireEvent.change(input, { target: { files: [] } });
+    expect(svgTab.getAttribute('aria-selected')).toBe('false');
+    expect((await getJob(job.id))?.carving?.art).toEqual(job.carving!.art);
+
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect width="100" height="100"/></svg>';
+    fireEvent.change(input, { target: { files: [new File([svg], 'half.svg', { type: 'image/svg+xml' })] } });
+    expect(await screen.findByText('half.svg')).toBeTruthy();
+    expect(svgTab.getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByLabelText('Another SVG')).toBe(input);
+    expect((await getJob(job.id))?.carving?.art).toEqual({ kind: 'svg', svg, fileName: 'half.svg' });
+    fireEvent.click(svgTab);
+    expect(click).toHaveBeenCalledTimes(1);
+
+    const replacement = svg.replace('200 100', '100 100');
+    fireEvent.change(input, { target: { files: [new File([replacement], 'square.svg', { type: 'image/svg+xml' })] } });
+    expect(await screen.findByText('square.svg')).toBeTruthy();
+    expect((await getJob(job.id))?.carving?.art).toEqual({ kind: 'svg', svg: replacement, fileName: 'square.svg' });
   });
 
   it('outlines new text once typing pauses, and saves it', async () => {
