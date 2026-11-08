@@ -384,3 +384,28 @@ it('lists the parts at the bottom of the sidebar, each with an eye to hide it in
   await userEvent.click(within(panel).getByRole('button', { name: 'Show Plate' }));
   expect(within(panel).getByRole('button', { name: 'Hide Plate' })).toBeDefined();
 });
+
+it('doesn’t apply a field after its dialog is cancelled, and applies a dimension through its form after #name = value', async () => {
+  const { latest } = await studio();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
+  await userEvent.clear(thickness);
+  await userEvent.type(thickness, '#board = 19 mm');
+  // Leaving the field for the cross: the variable is made, but the cancelled step stays as it was.
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await new Promise(resolve => setTimeout(resolve, 200));
+  expect(latest().parts[0]!.thickness).toBe(18);
+
+  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Plate/ }));
+  await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  await userEvent.dblClick(await screen.findByRole('button', { name: /^Edit Width: 200 mm/ }));
+  const width = await screen.findByRole('textbox', { name: /Width/ });
+  await userEvent.clear(width);
+  await userEvent.type(width, '#span = 150 mm{Enter}');
+  await waitFor(() => expect(latest().variables?.find(variable => variable.name === 'span')?.expression).toBe('150 mm'));
+  await waitFor(() =>
+    expect(latest().parts[0]!.sketch.constraints.find(constraint => constraint.label === 'Width')).toMatchObject({ value: 150 })
+  );
+});

@@ -1,6 +1,6 @@
-import { useContext, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type Ref } from 'react';
+import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type Ref } from 'react';
 import { cadValueHasUnit } from './valueExpressions';
-import { CadVariableFieldsContext, variableDefinition, variablePrefix } from './variableFields';
+import { useCadVariableFields, variableDefinition, variablePrefix } from './variableFields';
 
 type Props = ComponentPropsWithoutRef<'input'> & {
   inputRef?: Ref<HTMLInputElement>;
@@ -42,7 +42,7 @@ export function CadValueInput({
   onBlur,
   ...props
 }: Props) {
-  const fields = useContext(CadVariableFieldsContext);
+  const fields = useCadVariableFields();
   const own = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState(() => String(defaultValue ?? ''));
   const [menu, setMenu] = useState<{ start: number; typed: string; at: number } | null>(null);
@@ -52,6 +52,17 @@ export function CadValueInput({
   // The owner's handlers as of the latest render, to finish a key or leave the field once a new variable is in scope.
   const latest = useRef({ onKeyDown, onBlur });
   latest.current = { onKeyDown, onBlur };
+  // A field that's gone, as when its dialog was cancelled meanwhile, finishes nothing.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  /** Runs once the new variable is in scope: two frames on, and only while the field is still there. */
+  const later = (run: () => void) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => mounted.current && own.current?.isConnected && run()));
   const options = menu
     ? [
         ...(fields?.variables ?? []).filter(variable => variable.name.toLowerCase().startsWith(menu.typed.toLowerCase())),
@@ -144,15 +155,13 @@ export function CadValueInput({
                 preventDefault: () => {},
                 stopPropagation: () => {},
               } as unknown as KeyboardEvent<HTMLInputElement>;
-              // The field's own Enter handler, or its form's, such as the creation sizes bar, then takes it.
-              requestAnimationFrame(() =>
-                requestAnimationFrame(() =>
-                  latest.current.onKeyDown
+              // A form applies on submit, as the dimension editor and the sizes bar do; otherwise the field's own Enter.
+              later(() =>
+                input.form
+                  ? input.form.requestSubmit()
+                  : latest.current.onKeyDown
                     ? latest.current.onKeyDown(enter)
-                    : input.form
-                      ? input.form.requestSubmit()
-                      : input.dispatchEvent(new input.ownerDocument.defaultView!.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-                )
+                    : input.dispatchEvent(new input.ownerDocument.defaultView!.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
               );
             }
             return;
@@ -164,9 +173,7 @@ export function CadValueInput({
           const input = event.currentTarget;
           // Leaving the field makes the variable too, then the field takes `#name` as it would on leaving.
           if (variableDefinition(input.value) && define(input)) {
-            requestAnimationFrame(() =>
-              requestAnimationFrame(() => latest.current.onBlur?.({ ...event, currentTarget: input, target: input }))
-            );
+            later(() => latest.current.onBlur?.({ ...event, currentTarget: input, target: input }));
             return;
           }
           onBlur?.(event);
