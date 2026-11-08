@@ -26,4 +26,18 @@ describe('corner relief field', () => {
     fireEvent.keyDown(size, { key: 'Enter' });
     expect(change).toHaveBeenLastCalledWith({ diameter: 8, diameterExpression: 'bit' });
   });
+
+  it('keeps a cancelled size from being saved, and shows a size restored by undo', () => {
+    const change = vi.fn();
+    const { rerender } = render(<CadReliefField relief={{ diameter: 6 }} onChange={change} />);
+    const size = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.change(size, { target: { value: '8' } });
+    fireEvent.keyDown(size, { key: 'Escape' });
+    fireEvent.blur(size);
+    expect(change).not.toHaveBeenCalled();
+    rerender(<CadReliefField relief={{ diameter: 4 }} onChange={change} />);
+    expect(size.value).toBe('4');
+    fireEvent.blur(size);
+    expect(change).not.toHaveBeenCalled();
+  });
 });

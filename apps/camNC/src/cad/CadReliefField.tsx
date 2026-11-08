@@ -1,5 +1,5 @@
 import type { CadPart, CadValueScope } from '@wbcnc/cad';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { parseCadValue } from './valueExpressions';
 import './cadThicknessField.css';
 
@@ -21,6 +21,14 @@ export function CadReliefField({
   const typed = relief ? (relief.diameterExpression ?? String(relief.diameter)) : kDefaultBit;
   const [text, setText] = useState(typed);
   const [error, setError] = useState<string | null>(null);
+  // Only a size typed here and not cancelled is saved; anything else, such as undo, shows through.
+  const dirty = useRef(false);
+  useEffect(() => {
+    if (!dirty.current) {
+      setText(typed);
+      setError(null);
+    }
+  }, [typed]);
   const apply = (on: boolean, value = text) => {
     if (!on) return onChange(undefined);
     const parsed = parseCadValue(value, { unit: 'mm', variables });
@@ -29,6 +37,7 @@ export function CadReliefField({
       return;
     }
     setError(null);
+    dirty.current = false;
     if (parsed.value !== relief?.diameter || parsed.expression !== relief?.diameterExpression)
       onChange({ diameter: parsed.value, ...(parsed.expression && { diameterExpression: parsed.expression }) });
   };
@@ -48,14 +57,20 @@ export function CadReliefField({
               spellCheck={false}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? `${id}-error` : undefined}
-              onChange={event => setText(event.target.value)}
-              onBlur={() => apply(true)}
+              onChange={event => {
+                dirty.current = true;
+                setText(event.target.value);
+              }}
+              onBlur={() => {
+                if (dirty.current) apply(true);
+              }}
               onKeyDown={event => {
                 event.stopPropagation();
                 if (event.key === 'Enter') {
                   apply(true);
                   onDone?.();
                 } else if (event.key === 'Escape') {
+                  dirty.current = false;
                   setText(typed);
                   setError(null);
                   onDone?.();

@@ -116,4 +116,14 @@ describe('inside corners relieved for a round bit', () => {
     }
     expect(document.parts[0]!.cornerRelief).toEqual({ diameter: 8, diameterExpression: 'bit' });
   });
+
+  it('skips a bone that would break through the part’s edge from a hole right beside it', () => {
+    const document = createPlateDocument({ width: 100, height: 60 });
+    document.parts[0]!.sketch = addRectangle(document.parts[0]!.sketch, { x: 0.5, y: 20, width: 40, height: 20 });
+    const { parts, diagnostics } = relieved(document, 6);
+    expect(parts[0]!.holes[0]!.every(p => p.x > 0)).toBe(true);
+    expect(diagnostics).toEqual([
+      expect.objectContaining({ code: 'corner-relief-skipped', message: '2 corners are too tight for a 6 mm bone and stay square.' }),
+    ]);
+  });
 });

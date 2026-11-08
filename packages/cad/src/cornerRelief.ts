@@ -1,4 +1,4 @@
-import { polygonArea } from './geometry';
+import { pointInPolygon, polygonArea } from './geometry';
 import type { CadPoint, EvaluatedCadPart } from './types';
 
 /** A corner bends less than this, in degrees, is a curve's facet, not a corner a bit can't reach. */
@@ -24,7 +24,13 @@ const onLoop = (p: CadPoint, loop: CadPoint[]) => loop.some((a, i) => onSegment(
  * corner's bisector, so the bit reaches the very corner. Corners where `keep` says so stay as they are, and so do corners
  * whose edges are too short to take a bone, which are counted.
  */
-function relieveLoop(points: CadPoint[], cutInside: boolean, radius: number, keep: (p: CadPoint) => boolean) {
+function relieveLoop(
+  points: CadPoint[],
+  cutInside: boolean,
+  radius: number,
+  keep: (p: CadPoint) => boolean,
+  fits: (bone: CadPoint[]) => boolean = () => true
+) {
   const counterclockwise = polygonArea(points) > 0,
     loop = counterclockwise ? points : [...points].reverse();
   const out: CadPoint[] = [];
@@ -60,12 +66,18 @@ function relieveLoop(points: CadPoint[], cutInside: boolean, radius: number, kee
     if (normal(through) > normal(sweep)) sweep = normal(sweep) - 2 * Math.PI;
     else sweep = normal(sweep);
     const steps = Math.max(4, Math.ceil((Math.abs(sweep) / (2 * Math.PI)) * kArcSteps));
-    out.push(from);
+    const bone = [from];
     for (let k = 1; k < steps; k++) {
       const t = start + (sweep * k) / steps;
-      out.push({ x: centre.x + radius * Math.cos(t), y: centre.y + radius * Math.sin(t) });
+      bone.push({ x: centre.x + radius * Math.cos(t), y: centre.y + radius * Math.sin(t) });
     }
-    out.push(to);
+    bone.push(to);
+    // A bone that would break into another contour, such as a hole's bone through a nearby edge, isn't cut.
+    if (!fits(bone)) {
+      skipped++;
+      return out.push(p);
+    }
+    out.push(...bone);
   });
   return { points: counterclockwise ? out : out.reverse(), skipped };
 }
@@ -78,8 +90,12 @@ function relieveLoop(points: CadPoint[], cutInside: boolean, radius: number, kee
 export function relieveCorners(part: EvaluatedCadPart, diameter: number): { part: EvaluatedCadPart; skipped: number } {
   const radius = diameter / 2;
   let skipped = 0;
+  // A bone stays inside the part and out of its holes, so contours never cross.
+  const insidePart = (loop: CadPoint[]) => (bone: CadPoint[]) =>
+    bone.every(p => pointInPolygon(p, part.outline) && !part.holes.some(hole => hole !== loop && pointInPolygon(p, hole)));
+  const clearOfHoles = (bone: CadPoint[]) => bone.every(p => !part.holes.some(hole => pointInPolygon(p, hole)));
   const relieve = (points: CadPoint[], cutInside: boolean, keep: (p: CadPoint) => boolean = () => false, count = true) => {
-    const result = relieveLoop(points, cutInside, radius, keep);
+    const result = relieveLoop(points, cutInside, radius, keep, cutInside ? insidePart(points) : clearOfHoles);
     if (count) skipped += result.skipped;
     return result.points;
   };
