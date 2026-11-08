@@ -1,31 +1,3 @@
-.cad-part-cut-dialog {
-  position: absolute;
-  top: 3.5rem;
-  right: 1rem;
-  z-index: 5;
-  display: grid;
-  gap: 0.5rem;
-  width: min(20rem, calc(100% - 2rem));
-  max-height: calc(100% - 5rem);
-  overflow: auto;
-  box-sizing: border-box;
-  padding: 12px;
-  border: 1px solid #c8d3e1;
-  border-radius: 4px;
-  background: #fff;
-  color: #243247;
-  box-shadow: 0 8px 30px #24324722;
-  font-size: 13px;
-}
-
-.cad-part-cut-dialog h3,
-.cad-part-cut-dialog p {
-  margin: 0;
-}
-
-.cad-part-cut-dialog > p {
-  color: #62758f;
-}
 
 .cad-part-cut-dialog fieldset {
   display: grid;

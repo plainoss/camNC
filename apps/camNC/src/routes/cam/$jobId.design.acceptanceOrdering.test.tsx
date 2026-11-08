@@ -166,12 +166,17 @@ it.each(['toolbar', 'Boards stage'] as const)(
     );
     const view = render(app());
     await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
-    // Existing designs open on the part in 3D, and this test edits the drawing.
-    await userEvent.click(screen.getByRole('button', { name: '3D' }));
+    // Existing designs open in the studio, and this test edits the drawing.
+    await userEvent.click(within(screen.getByRole('region', { name: 'Steps' })).getByRole('button', { name: /Sketch ·/ }));
     await userEvent.dblClick(screen.getByRole('button', { name: 'Edit Width: 120 mm' }));
     await userEvent.fill(screen.getByRole('textbox', { name: 'Width mm' }), '140');
-    if (action === 'toolbar') await userEvent.click(screen.getByRole('button', { name: /Finish sketch/ }));
-    else await userEvent.click(within(screen.getByRole('navigation', { name: 'Steps' })).getByRole('link', { name: /Boards/ }));
+    if (action === 'toolbar') {
+      // The sketch closes back to the studio, and Done there accepts the design.
+      await userEvent.click(screen.getByRole('button', { name: /Finish sketch/ }));
+      const done = await screen.findByRole('button', { name: /Done/ });
+      await waitFor(() => expect(done).toHaveProperty('disabled', false), { timeout: 20_000 });
+      await userEvent.click(done);
+    } else await userEvent.click(within(screen.getByRole('navigation', { name: 'Steps' })).getByRole('link', { name: /Boards/ }));
     await act(async () => {
       await firstSaveStarted.promise;
       await nextFrame();
@@ -210,8 +215,8 @@ it.each(['toolbar', 'Boards stage'] as const)(
     client.setQueryData(camKeys.job(job.id), saved);
     render(app());
     await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
-    // Existing designs open on the part in 3D, and this test edits the drawing.
-    await userEvent.click(screen.getByRole('button', { name: '3D' }));
+    // Existing designs open in the studio, and this test edits the drawing.
+    await userEvent.click(within(screen.getByRole('region', { name: 'Steps' })).getByRole('button', { name: /Sketch ·/ }));
     expect(screen.getByRole('button', { name: 'Edit Width: 140 mm' })).toBeDefined();
     await userEvent.click(screen.getByRole('button', { name: 'Undo (Ctrl or Command Z)' }));
     await waitFor(async () => {

@@ -200,6 +200,9 @@ import {
 import { useSvgPixelScale, SKETCH_APPEARANCE } from './sketchAppearance';
 import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintLayout';
+import { StudioToolbar, type StudioCommand } from './StudioToolbar';
+import { FeatureDialog } from './FeatureDialog';
+import { ExtrudeDialog, PartPatternDialog } from './PartFeatureDialogs';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -436,8 +439,21 @@ export function CadEditor({
     () => startIn3D === true && doc.parts.some(candidate => hasOutline(doc, candidate.id))
   );
   const sketchOnly = !!faceSketch;
+  // Opened as a Part Studio: the studio is home, a sketch is opened from it and closed back to it, and steps are set
+  // in dialogs over the view.
+  const studioSession = startIn3D === true && !faceSketch;
   // A "cut parts" step being added, or the one being changed.
   const [partCutting, setPartCutting] = useState<{ id?: string } | null>(null);
+  // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
+  const [featureDialog, setFeatureDialog] = useState<{ kind: 'extrude' | 'pattern'; partId: string; before: CadDocument } | null>(null);
+  // Picking the plane or face a new part is sketched on.
+  const [choosingFace, setChoosingFace] = useState(false);
+  // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
+  const sketchBefore = useRef<CadDocument | null>(null);
+  // A part sketched new, whose extrude opens once its sketch is closed. A new design's first part is one.
+  const extrudeAfterSketch = useRef<string | null>(
+    studioSession && doc.parts.length === 1 && !hasOutline(doc, doc.parts[0]!.id) ? doc.parts[0]!.id : null
+  );
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
   // Picking a drawing tool, by button or key, means going back to the drawing.
@@ -3199,6 +3215,64 @@ export function CadEditor({
       setBusy(false);
     }
   };
+  const openFeature = (kind: 'extrude' | 'pattern', partId: string) => {
+    setPartCutting(null);
+    setChoosingFace(false);
+    setPartId(partId);
+    setSelected([]);
+    chooseTool('select');
+    setShowWorkspace(true);
+    setFeatureDialog({ kind, partId, before: documentRef.current });
+  };
+  const closeFeature = (keep: boolean) => {
+    if (!keep && featureDialog) commit(featureDialog.before);
+    setFeatureDialog(null);
+  };
+  /** Opens a part's sketch from the studio, remembering the design to go back to if it's cancelled. */
+  const openSketch = (partId: string, before = documentRef.current) => {
+    sketchBefore.current = before;
+    setFeatureDialog(null);
+    setPartCutting(null);
+    setChoosingFace(false);
+    setPartId(partId);
+    setSelected([]);
+    setShowWorkspace(false);
+    setShow3D(false);
+    requestAnimationFrame(() => svg.current?.focus());
+  };
+  /** Back to the studio from a sketch: keeping it, or leaving the design as it was before it opened. */
+  const closeSketch = (keep: boolean) => {
+    if (keep) {
+      // A value still being typed, such as a dimension, is part of the sketch being kept.
+      const error =
+        acceptOffset() ||
+        applyDimensionValue() ||
+        applyConicRho() ||
+        (creationValues?.editing ? applyCreationValue({ advance: false }) : null);
+      if (error) return setMessage(error);
+    }
+    if (!keep && sketchBefore.current) commit(sketchBefore.current);
+    sketchBefore.current = null;
+    setMessage('');
+    chooseTool('select');
+    setSelected([]);
+    setShow3D(false);
+    setShowWorkspace(true);
+    const fresh = extrudeAfterSketch.current;
+    extrudeAfterSketch.current = null;
+    if (keep && fresh && hasOutline(documentRef.current, fresh)) openFeature('extrude', fresh);
+  };
+  const studioCommand = (command: StudioCommand) => {
+    if (command === 'sketch') {
+      setFeatureDialog(null);
+      setPartCutting(null);
+      setChoosingFace(!choosingFace);
+    } else if (command === 'cutParts') {
+      setFeatureDialog(null);
+      setChoosingFace(false);
+      setPartCutting({});
+    } else if (part) openFeature(command, part.id);
+  };
   const sketchOnFace = (face: CadFaceRef) => {
     if (!part || !onEditFaceSketch) return;
     // Checked first: a blocked sketch command mustn't leave an empty face sketch behind.
@@ -3290,46 +3364,72 @@ export function CadEditor({
       data-demo-mode={isDemoMode() || undefined}
       onKeyDown={keyDown}
       onKeyUp={event => event.stopPropagation()}>
-      <SketchToolbar
-        tools={tools}
-        searchHighlight={searchHighlight}
-        onSearch={() => {
-          setSearchMode(true);
-          setPalette(value => !value);
-        }}
-        tool={tool}
-        construction={construction}
-        constraintMode={constraintMode}
-        busy={busy}
-        canUndo={session.past.length > 0}
-        canRedo={session.future.length > 0}
-        canFinish={
-          faceSketch
-            ? !solving &&
-              !problems.length &&
-              !splitFirst &&
-              !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
-            : thicknessValid &&
-              !solving &&
-              !problems.length &&
-              numberOfShapes > 0 &&
-              !splitFirst &&
-              !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
-              !((tool === 'fillet' || tool === 'chamfer') && selected.length)
-        }
-        onTool={next => {
-          if (next === 'dimension') beginDimension();
-          else chooseTool(next);
-        }}
-        onConstruction={toggleConstruction}
-        onConstraint={constrain}
-        onFix={toggleFix}
-        onUndo={() => navigateHistory()}
-        onRedo={() => navigateHistory(true)}
-        onCancel={() => void cancel()}
-        onFinish={() => void finish()}
-        onReturnToCanvas={restoreCanvasKeyboard}
-      />
+      {studioSession && showWorkspace ? (
+        <StudioToolbar
+          busy={busy}
+          active={choosingFace ? 'sketch' : partCutting ? 'cutParts' : (featureDialog?.kind ?? null)}
+          disabled={{
+            ...(!partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first' }),
+            ...(doc.parts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
+          }}
+          canUndo={session.past.length > 0}
+          canRedo={session.future.length > 0}
+          canFinish={thicknessValid && !solving && !problems.length && !featureDialog && !partCutting}
+          onCommand={studioCommand}
+          onUndo={() => navigateHistory()}
+          onRedo={() => navigateHistory(true)}
+          onCancel={() => void cancel()}
+          onFinish={() => void finish()}
+        />
+      ) : (
+        <SketchToolbar
+          tools={tools}
+          searchHighlight={searchHighlight}
+          onSearch={() => {
+            setSearchMode(true);
+            setPalette(value => !value);
+          }}
+          tool={tool}
+          construction={construction}
+          constraintMode={constraintMode}
+          busy={busy}
+          canUndo={session.past.length > 0}
+          canRedo={session.future.length > 0}
+          canFinish={
+            // Closing a sketch back to the studio keeps it as it is, finished or not, as the reference does.
+            studioSession
+              ? !solving
+              : faceSketch
+                ? !solving &&
+                  !problems.length &&
+                  !splitFirst &&
+                  !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
+                : thicknessValid &&
+                  !solving &&
+                  !problems.length &&
+                  numberOfShapes > 0 &&
+                  !splitFirst &&
+                  !(
+                    (tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') &&
+                    selected.length
+                  ) &&
+                  !((tool === 'fillet' || tool === 'chamfer') && selected.length)
+          }
+          onTool={next => {
+            if (next === 'dimension') beginDimension();
+            else chooseTool(next);
+          }}
+          onConstruction={toggleConstruction}
+          onConstraint={constrain}
+          onFix={toggleFix}
+          onUndo={() => navigateHistory()}
+          onRedo={() => navigateHistory(true)}
+          onCancel={() => (studioSession ? closeSketch(false) : void cancel())}
+          onFinish={() => (studioSession ? closeSketch(true) : void finish())}
+          onReturnToCanvas={restoreCanvasKeyboard}
+          closeElsewhere={studioSession}
+        />
+      )}
       <div className="cad-workspace" inert={busy}>
         <aside className="cad-sidebar" aria-label="Parts and sketch properties">
           {faceSketch && (
@@ -3346,6 +3446,10 @@ export function CadEditor({
               document={doc}
               selectedPartId={part?.id ?? null}
               onStep={step => {
+                // In the studio a step opens its dialog, and a sketch opens to be drawn on, as the reference does.
+                if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
+                if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
+                if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
                 setPartId(step.partId);
                 setSelected([]);
                 chooseTool('select');
@@ -3405,7 +3509,7 @@ export function CadEditor({
               </li>
             ))}
           </ul>
-          {part && !faceSketch && (
+          {part && !faceSketch && !(studioSession && showWorkspace) && (
             <div className="cad-properties">
               <h3>{part.name} · Sketch</h3>
               <label htmlFor="cad-part-name">Part name</label>
@@ -3430,56 +3534,63 @@ export function CadEditor({
                   if (name && name !== part.name) commit(replacePart(doc, part.id, p => ({ ...p, name })));
                 }}
               />
-              <CadThicknessField
-                key={part.id}
-                value={part.thickness}
-                expression={part.thicknessExpression}
-                variables={variableScope}
-                onValidityChange={setThicknessValid}
-                onDone={() => svg.current?.focus()}
-                onCommit={(thickness, thicknessExpression) =>
-                  commit(
-                    replacePart(doc, part.id, p => {
-                      const next = { ...p, thickness, thicknessExpression };
-                      if (thicknessExpression === undefined) delete next.thicknessExpression;
-                      return next;
-                    })
-                  )
-                }
-              />
-              {part.drawnOn && (
-                <CadDrawnOnField
-                  key={`${part.id}:drawn-on`}
-                  document={doc}
-                  part={part as typeof part & { drawnOn: NonNullable<typeof part.drawnOn> }}
-                  variables={variableScope}
-                  onDone={() => svg.current?.focus()}
-                  onChange={drawnOn => commit(replacePart(documentRef.current, part.id, p => ({ ...p, drawnOn })))}
-                />
+              {!studioSession && (
+                <>
+                  <CadThicknessField
+                    key={part.id}
+                    value={part.thickness}
+                    expression={part.thicknessExpression}
+                    variables={variableScope}
+                    onValidityChange={setThicknessValid}
+                    onDone={() => svg.current?.focus()}
+                    onCommit={(thickness, thicknessExpression) =>
+                      commit(
+                        replacePart(doc, part.id, p => {
+                          const next = { ...p, thickness, thicknessExpression };
+                          if (thicknessExpression === undefined) delete next.thicknessExpression;
+                          return next;
+                        })
+                      )
+                    }
+                  />
+                  {part.drawnOn && (
+                    <CadDrawnOnField
+                      key={`${part.id}:drawn-on`}
+                      document={doc}
+                      part={part as typeof part & { drawnOn: NonNullable<typeof part.drawnOn> }}
+                      variables={variableScope}
+                      onDone={() => svg.current?.focus()}
+                      onChange={drawnOn => commit(replacePart(documentRef.current, part.id, p => ({ ...p, drawnOn })))}
+                    />
+                  )}
+                  <CadReliefField
+                    key={`${part.id}:relief`}
+                    relief={part.cornerRelief}
+                    variables={variableScope}
+                    onDone={() => svg.current?.focus()}
+                    onChange={cornerRelief =>
+                      commit(
+                        replacePart(documentRef.current, part.id, p => {
+                          const next = { ...p, cornerRelief };
+                          if (!cornerRelief) delete next.cornerRelief;
+                          return next;
+                        })
+                      )
+                    }
+                  />
+                  <CadPartPatternField
+                    key={`${part.id}:pattern`}
+                    pattern={part.pattern}
+                    variables={variableScope}
+                    onDone={() => svg.current?.focus()}
+                    onChange={pattern => commit(setPartPattern(documentRef.current, part.id, pattern))}
+                  />
+                  <CadCopyNames
+                    part={part}
+                    onRename={(copyId, name) => commit(renamePartCopy(documentRef.current, part.id, copyId, name))}
+                  />
+                </>
               )}
-              <CadReliefField
-                key={`${part.id}:relief`}
-                relief={part.cornerRelief}
-                variables={variableScope}
-                onDone={() => svg.current?.focus()}
-                onChange={cornerRelief =>
-                  commit(
-                    replacePart(documentRef.current, part.id, p => {
-                      const next = { ...p, cornerRelief };
-                      if (!cornerRelief) delete next.cornerRelief;
-                      return next;
-                    })
-                  )
-                }
-              />
-              <CadPartPatternField
-                key={`${part.id}:pattern`}
-                pattern={part.pattern}
-                variables={variableScope}
-                onDone={() => svg.current?.focus()}
-                onChange={pattern => commit(setPartPattern(documentRef.current, part.id, pattern))}
-              />
-              <CadCopyNames part={part} onRename={(copyId, name) => commit(renamePartCopy(documentRef.current, part.id, copyId, name))} />
               {variableProblems
                 .filter(problem => problem.partId === part.id)
                 .map((problem, index) => (
@@ -3573,10 +3684,50 @@ export function CadEditor({
               {acceptanceNotice}
             </p>
           )}
+          {showWorkspace &&
+            featureDialog &&
+            (() => {
+              const target = doc.parts.find(candidate => candidate.id === featureDialog.partId);
+              if (!target) return null;
+              const props = {
+                document: doc,
+                part: target,
+                variables: variableScope,
+                onChange: (change: (document: CadDocument) => CadDocument) => commit(change(documentRef.current)),
+                onOk: () => closeFeature(true),
+                onCancel: () => closeFeature(false),
+              };
+              return featureDialog.kind === 'extrude' ? (
+                <ExtrudeDialog key={target.id} {...props} onEditSketch={() => openSketch(target.id)} />
+              ) : (
+                <PartPatternDialog key={target.id} {...props} />
+              );
+            })()}
+          {studioSession && !showWorkspace && part && (
+            // The open sketch, closed from here as the reference's sketch dialog is: away from the studio's Done.
+            <FeatureDialog
+              title={`Sketch · ${part.name}`}
+              okLabel="✓ Finish sketch"
+              okDisabled={solving}
+              onOk={() => closeSketch(true)}
+              onCancel={() => closeSketch(false)}
+              autoFocus={false}
+              className="cad-sketch-dialog">
+              <div className="cad-feature-selection">
+                <small>Sketch plane</small>
+                <span>{part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'Top plane'}</span>
+              </div>
+            </FeatureDialog>
+          )}
           <div className="cad-canvas-bar">
             {showWorkspace ? (
               <span>
-                <strong>DESIGN</strong> · {doc.parts.length === 1 ? 'one part' : `${doc.parts.length} parts`}
+                <strong>PART STUDIO</strong> · {doc.parts.length === 1 ? 'one part' : `${doc.parts.length} parts`}
+              </span>
+            ) : studioSession && part ? (
+              <span>
+                <strong>SKETCH</strong> · {part.name}{' '}
+                <span className="cad-muted">/ on {part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'the top plane'}</span>
               </span>
             ) : (
               <span>
@@ -3585,47 +3736,58 @@ export function CadEditor({
               </span>
             )}
             <div>
-              {!faceSketch && (
-                <button
-                  type="button"
-                  aria-pressed={showWorkspace}
-                  disabled={!doc.parts.length}
-                  title="Every part where it sits"
-                  onClick={() => {
-                    chooseTool('select');
-                    setShowWorkspace(true);
-                  }}>
-                  Workspace
-                </button>
-              )}
-              {!faceSketch && (
-                <button
-                  type="button"
-                  aria-pressed={show3D || showWorkspace}
-                  disabled={!partHasOutline && !showWorkspace}
-                  title={show3D || showWorkspace ? 'Back to the drawing' : 'This part in 3D'}
-                  onClick={() => {
-                    if (show3D || showWorkspace) {
+              {!faceSketch && !(studioSession && showWorkspace) && (
+                <div className="cad-view-switch" role="group" aria-label="Show">
+                  <button
+                    type="button"
+                    aria-pressed={!show3D && !showWorkspace}
+                    title="The sketch, to draw on"
+                    onClick={() => {
                       // Back on the drawing, its keys work straight away.
                       requestAnimationFrame(() => svg.current?.focus());
                       setShow3D(false);
                       setShowWorkspace(false);
-                    } else {
+                    }}>
+                    Drawing
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={show3D && !showWorkspace}
+                    disabled={!partHasOutline}
+                    title="This part in 3D, to set its cuts"
+                    onClick={() => {
                       chooseTool('select');
+                      setShowWorkspace(false);
                       setShow3D(true);
-                    }
-                  }}>
-                  3D
-                </button>
+                    }}>
+                    3D
+                  </button>
+                  {!studioSession && (
+                    <button
+                      type="button"
+                      aria-pressed={showWorkspace}
+                      disabled={!doc.parts.length}
+                      title="Every part where it sits"
+                      onClick={() => {
+                        chooseTool('select');
+                        setShowWorkspace(true);
+                      }}>
+                      All parts
+                    </button>
+                  )}
+                </div>
               )}
               {!show3D && !showWorkspace && (
                 <>
-                  <button type="button" onClick={() => fit()}>
+                  <button type="button" className="cad-bar-button" title="Zoom to show the whole sketch" onClick={() => fit()}>
                     Fit <kbd>F</kbd>
                   </button>
                   <button
                     type="button"
-                    aria-pressed={snap}
+                    role="switch"
+                    className="cad-switch"
+                    aria-checked={snap}
+                    title="Snap to points, lines and the grid while drawing"
                     onClick={() => {
                       setSnap(value => !value);
                       setDrawingCue(null);
@@ -3633,7 +3795,8 @@ export function CadEditor({
                       hoveredReferences.current = [];
                       svg.current?.focus();
                     }}>
-                    Snap {snap ? 'on' : 'off'}
+                    Snap
+                    <span className="cad-switch-track" aria-hidden="true" />
                   </button>
                 </>
               )}
@@ -3649,13 +3812,17 @@ export function CadEditor({
                   setSelected([]);
                 }}
                 onOpen={id => {
+                  if (studioSession) return openSketch(id);
                   setPartId(id);
                   setSelected([]);
                   setShowWorkspace(false);
                   setShow3D(hasOutline(documentRef.current, id));
                 }}
-                onCutParts={() => setPartCutting({})}
+                {...(studioSession
+                  ? { choosing: choosingFace, onChoosingChange: setChoosingFace }
+                  : { onCutParts: () => setPartCutting({}) })}
                 onNewPart={on => {
+                  const before = documentRef.current;
                   // A design's board thickness, when it names one, is what a new part is made from.
                   const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variableScope, name));
                   const added = createCadPart(
@@ -3670,11 +3837,15 @@ export function CadEditor({
                     revision: documentRef.current.revision + 1,
                     parts: [...documentRef.current.parts, drawn],
                   });
+                  setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
+                  if (studioSession) {
+                    extrudeAfterSketch.current = drawn.id;
+                    return openSketch(drawn.id, before);
+                  }
                   setPartId(drawn.id);
                   setSelected([]);
                   setShowWorkspace(false);
                   setShow3D(false);
-                  setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
                   requestAnimationFrame(() => svg.current?.focus());
                 }}>
                 {partCutting && (
@@ -4627,8 +4798,19 @@ export function CadEditor({
       )}
       <footer className="cad-status">
         <span className={problems.length && !inProgress ? 'cad-error' : ''}>
-          {solving ? 'Checking sketch…' : displayStatus}
-          {colorNotice && ` · ${colorNotice}`}
+          {studioSession && showWorkspace ? (
+            // In the studio, a sketch's freedom isn't what's being worked on.
+            solving ? (
+              'Checking sketch…'
+            ) : (
+              ''
+            )
+          ) : (
+            <>
+              {solving ? 'Checking sketch…' : displayStatus}
+              {colorNotice && ` · ${colorNotice}`}
+            </>
+          )}
         </span>
         <span className="cad-instruction" role="status">
           {acceptanceNotice ? '' : message}

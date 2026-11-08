@@ -26,7 +26,7 @@ async function setup() {
   const latest = () => change.mock.calls.at(-1)?.[0].parts[0]!.sketch ?? source.parts[0]!.sketch;
   const settled = () => waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
   await settled();
-  await userEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+  await userEvent.click(screen.getByRole('switch', { name: 'Snap' }));
   const click = async (x: number, y: number) => {
     const point = new DOMPoint(x, -y).matrixTransform(canvas.getScreenCTM()!);
     const bounds = canvas.getBoundingClientRect();

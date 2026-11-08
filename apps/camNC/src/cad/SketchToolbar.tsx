@@ -375,7 +375,7 @@ const constraints: { id: ConstraintCommandTool; label: string; key?: string }[] 
   { id: 'tangent', label: 'Tangent', key: 'T' },
 ];
 
-function ToolHint({ label, children }: { label: string; children: ReactNode }) {
+export function ToolHint({ label, children }: { label: string; children: ReactNode }) {
   return (
     <Tooltip delayDuration={400}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
@@ -406,6 +406,7 @@ export function SketchToolbar({
   onCancel,
   onFinish,
   onReturnToCanvas,
+  closeElsewhere = false,
 }: {
   tools: readonly SketchToolDefinition[];
   searchHighlight?: string | null;
@@ -426,6 +427,8 @@ export function SketchToolbar({
   onCancel: () => void;
   onFinish: () => void;
   onReturnToCanvas: () => void;
+  /** The sketch is closed from its own dialog, as in the studio, so the toolbar has only undo and redo. */
+  closeElsewhere?: boolean;
 }) {
   const toolbar = useRef<HTMLElement>(null);
   const hasSearch = !!onSearch;
@@ -619,22 +622,26 @@ export function SketchToolbar({
             <SketchToolGlyph kind="redo" />
           </button>
         </ToolHint>
-        <span className="cad-toolbar-divider" aria-hidden="true" />
-        <ToolHint label="Cancel sketch">
-          <button type="button" className="cad-icon-button cad-cancel" aria-label="Cancel" disabled={busy} onClick={onCancel}>
-            <SketchToolGlyph kind="cancel" />
-          </button>
-        </ToolHint>
-        <ToolHint label="Finish sketch">
-          <button
-            type="button"
-            className="cad-icon-button cad-finish"
-            aria-label="✓ Finish sketch"
-            disabled={busy || !canFinish}
-            onClick={onFinish}>
-            <SketchToolGlyph kind="finish" />
-          </button>
-        </ToolHint>
+        {!closeElsewhere && (
+          <>
+            <span className="cad-toolbar-divider" aria-hidden="true" />
+            <ToolHint label="Cancel sketch">
+              <button type="button" className="cad-icon-button cad-cancel" aria-label="Cancel" disabled={busy} onClick={onCancel}>
+                <SketchToolGlyph kind="cancel" />
+              </button>
+            </ToolHint>
+            <ToolHint label="Finish sketch">
+              <button
+                type="button"
+                className="cad-icon-button cad-finish"
+                aria-label="✓ Finish sketch"
+                disabled={busy || !canFinish}
+                onClick={onFinish}>
+                <SketchToolGlyph kind="finish" />
+              </button>
+            </ToolHint>
+          </>
+        )}
       </div>
     </header>
   );

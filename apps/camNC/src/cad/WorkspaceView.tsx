@@ -1,5 +1,5 @@
 import { assemblyReport, evaluateCadDocument, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ModelViewport, type ModelFacePick, type ModelView } from '@/cam/model/ModelViewport';
 import { assemblyModel, instanceKey } from './assemblyModel';
 
@@ -25,6 +25,8 @@ export default function WorkspaceView({
   onOpen,
   onNewPart,
   onCutParts,
+  choosing: choosingProp,
+  onChoosingChange,
   children,
 }: {
   document: CadDocument;
@@ -35,6 +37,12 @@ export default function WorkspaceView({
   onNewPart?: (on: CadDrawnOn['on']) => void;
   /** Starts a step cutting some parts out of others. */
   onCutParts?: () => void;
+  /**
+   * Whether a plane or face is being picked for a new part, when the studio's toolbar starts it. Then the view has no
+   * buttons of its own for starting steps.
+   */
+  choosing?: boolean;
+  onChoosingChange?: (choosing: boolean) => void;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
 }) {
@@ -44,8 +52,15 @@ export default function WorkspaceView({
   const clashes = useMemo(() => assemblyReport(document, evaluateCadDocument(document).parts)?.collisions ?? [], [document]);
   const [view, setView] = useState<ModelView>('assembled');
   // Choosing what a new part is drawn on: a plane, or a face clicked in the view.
-  const [choosing, setChoosing] = useState(false);
+  const [ownChoosing, setOwnChoosing] = useState(false);
+  const controlled = choosingProp !== undefined;
+  const choosing = controlled ? choosingProp : ownChoosing;
+  const setChoosing = (value: boolean) => (controlled ? onChoosingChange?.(value) : setOwnChoosing(value));
   const [notice, setNotice] = useState<string | null>(null);
+  // Escape stops picking, so the view takes the keyboard while it picks.
+  useEffect(() => {
+    if (choosing) frame.current?.focus();
+  }, [choosing]);
   const pickFace = (pick: ModelFacePick) => {
     const instance = model.instances[pick.index]!;
     if (instance.copyId) return setNotice('Draw on the part itself rather than a copy of it.');
@@ -84,14 +99,14 @@ export default function WorkspaceView({
         }
       }}>
       <div className="cad-part-view-tools cad-assembly-tools">
-        <div role="group" aria-label="Workspace view">
+        <div role="group" aria-label="Workspace view" className="cad-view-switch">
           {kViews.map(option => (
             <button key={option.view} type="button" aria-pressed={view === option.view} onClick={() => setView(option.view)}>
               {option.label}
             </button>
           ))}
         </div>
-        {onNewPart && (
+        {onNewPart && !controlled && (
           <button
             type="button"
             aria-pressed={choosing}
@@ -123,7 +138,7 @@ export default function WorkspaceView({
             ))}
           </div>
         )}
-        {selectedId && !choosing && (
+        {selectedId && !choosing && !controlled && (
           <button type="button" onClick={() => onOpen(selectedId)}>
             Open {document.parts.find(part => part.id === selectedId)?.name ?? 'part'}
           </button>
