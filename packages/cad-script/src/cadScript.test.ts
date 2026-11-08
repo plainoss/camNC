@@ -140,6 +140,23 @@ describe('review cases', () => {
     expect(report.parts[0]!.cuts[0]!.size).toEqual([20, 20]);
   });
 
+  it('measures a pocket made from a profile loop against the profile sketch', async () => {
+    const { report } = await editCad(null, d => {
+      const plate = d.part('Plate');
+      plate.profile.rect({ at: [0, 0], w: 100, h: 100 });
+      // A slot with round ends, which come out short when only their chords are measured.
+      plate.profile
+        .path([40, 45])
+        .lineTo([60, 45])
+        .arcTo([60, 55], { tangent: true })
+        .lineTo([40, 55])
+        .arcTo([40, 45], { tangent: true })
+        .close();
+      plate.cut(plate.profile.regionAt(50, 50), { depth: 5 });
+    });
+    expect(report.parts[0]!.cuts[0]!.size).toEqual([30, 10]);
+  });
+
   it('warns when a cut on the underside fits no tool, though side B then has nothing to cut', async () => {
     const { report } = await editCad(null, d => {
       const plate = d.part('Plate');

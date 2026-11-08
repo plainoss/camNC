@@ -298,7 +298,9 @@ export async function inspectCadDocument(
     // Each loop is measured against the curves of its own sketch, so nearby geometry elsewhere can't widen it.
     const sketchOfCut = (id: string) => {
       const feature = part.features?.find(f => f.id === id.split('~')[0]);
-      return feature?.type === 'cut' ? faces.find(face => face.sketch.id === feature.sketchId)?.sketch : undefined;
+      if (feature?.type !== 'cut') return undefined;
+      // A profile loop given a depth is cut from the profile sketch itself.
+      return feature.sketchId === part.sketch.id ? part.sketch : faces.find(face => face.sketch.id === feature.sketchId)?.sketch;
     };
     const cuts = (evaluated?.cuts ?? []).map(cut => {
       const { at, size } = bounds(cut.outline, curveExtremes(sketchOfCut(cut.id)));
