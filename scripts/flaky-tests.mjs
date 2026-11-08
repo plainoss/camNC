@@ -16,7 +16,8 @@ export function parseFailures(log) {
   for (const raw of log.split('\n')) {
     // Drop the runner's timestamp and colours.
     const line = raw.replace(/\x1b\[[0-9;]*m/g, '').replace(/^\S+Z /, '').trimEnd();
-    const match = /^@[^\s:]+:[^\s]+:\s+FAIL\s+(?:chromium\s+)?(.+)$/.exec(line);
+    // Turbo prefixes each line with its task; a direct `pnpm vitest run` step, such as the simulator tests, does not.
+    const match = /^(?:@[^\s:]+:[^\s]+:)?\s*FAIL\s+(?:chromium\s+)?(.+)$/.exec(line);
     if (match) failures.add(match[1].trim());
   }
   return [...failures];
@@ -81,7 +82,28 @@ function main() {
     writeFileSync(bodyFile, existing ? report : `${report}\n` +
       'Before fixing it, comment here that you are on it, and link the PR. Later flakes of this test are added here.\n');
     if (existing) gh(['issue', 'comment', String(existing.number), '--repo', repo, '--body-file', bodyFile]);
-    else gh(['issue', 'create', '--repo', repo, '--title', title, '--label', LABEL, '--body-file', bodyFile]);
+    else {
+      gh(['issue', 'create', '--repo', repo, '--title', title, '--label', LABEL, '--body-file', bodyFile]);
+      closeDuplicates(repo, title);
+    }
+  }
+}
+
+/** The oldest open issue among those with this title; a race between two reports leaves several. */
+export function duplicatesOf(issues, title) {
+  const same = issues.filter(issue => issue.title === title).sort((a, b) => a.number - b.number);
+  return { keep: same[0], close: same.slice(1) };
+}
+
+// Two reports of a new flake can both find no issue and both create one. The later one folds into the oldest, so a
+// claim always lands on one issue; a lock would instead drop reports, since Actions keeps one pending run per group.
+function closeDuplicates(repo, title) {
+  const issues = JSON.parse(gh(['issue', 'list', '--repo', repo, '--label', LABEL, '--state', 'open', '--limit', '500',
+    '--json', 'number,title']));
+  const { keep, close } = duplicatesOf(issues, title);
+  for (const issue of close) {
+    gh(['issue', 'close', String(issue.number), '--repo', repo, '--reason', 'not planned',
+      '--comment', `Duplicate of #${keep.number}, which tracks this test.`]);
   }
 }
 

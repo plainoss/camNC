@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { attemptToRead, issueTitle, parseFailures } from './flaky-tests.mjs';
+import { attemptToRead, duplicatesOf, issueTitle, parseFailures } from './flaky-tests.mjs';
 
 test('reads failed specs and Vitest tests from a job log, each once', () => {
   const log = [
@@ -10,11 +10,13 @@ test('reads failed specs and Vitest tests from a job log, each once', () => {
     '2026-11-08T10:51:00.3Z @wbcnc/cad-script:test:  FAIL  src/cadScript.test.ts > toolpath summary > counts each pocket',
     '2026-11-08T10:51:00.4Z @wbcnc/camNC:test:browser:  ✓ src/scene/CanvasLabel.test.tsx (5 tests)',
     '2026-11-08T10:51:00.5Z  ERROR  run failed: command  exited (1)',
+    '2026-11-08T10:52:00.1Z  FAIL  src/sim.integration.test.ts > FluidNC simulator > streams a job',
   ].join('\n');
   assert.deepEqual(parseFailures(log), [
     'sketch/machine/edit-after-cut-keeps-boards',
     'src/cad/CadEditor.test.tsx > integrated sketch editor',
     'src/cadScript.test.ts > toolpath summary > counts each pocket',
+    'src/sim.integration.test.ts > FluidNC simulator > streams a job',
   ]);
 });
 
@@ -29,4 +31,14 @@ test('only a failed queue run or a fixed rerun counts as a flake', () => {
 test('issue titles stay within GitHub limits and name the test', () => {
   assert.equal(issueTitle('sketch/a'), 'Flaky test: sketch/a');
   assert.equal(issueTitle('x'.repeat(300)).length, 200);
+});
+
+test('a raced report keeps the oldest issue for a test and closes the others', () => {
+  const issues = [
+    { number: 12, title: 'Flaky test: a' },
+    { number: 9, title: 'Flaky test: a' },
+    { number: 10, title: 'Flaky test: b' },
+  ];
+  assert.deepEqual(duplicatesOf(issues, 'Flaky test: a'), { keep: issues[1], close: [issues[0]] });
+  assert.deepEqual(duplicatesOf(issues, 'Flaky test: b').close, []);
 });
