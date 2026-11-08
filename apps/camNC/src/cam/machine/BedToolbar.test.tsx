@@ -68,3 +68,13 @@ it('no Add where the board has no holds, and none while the setup is protected',
   expect((screen.getByRole('button', { name: /Add clamp/ }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText('Locked while the program runs.')).toBeTruthy();
 });
+
+it("a selected item's bar still shows its buttons before the board's tools are known", () => {
+  render(
+    <BedToolbar item="Socket">
+      <button>Layout in CAM</button>
+    </BedToolbar>
+  );
+  expect(screen.getByRole('toolbar', { name: 'Socket' }).textContent).toContain('Layout in CAM');
+  expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+});
