@@ -329,6 +329,101 @@ describe('paths', () => {
     expect(report.parts[0]!.cuts[0]!.size).toEqual([14, 14]);
   });
 
+  it('dimensions a path corner to corner, so one length changes one thing', async () => {
+    const { report, document } = await editCad(null, d => {
+      d.variable('legW', '70mm');
+      d.variable('tenonW', '30mm');
+      d.variable('legH', '432mm');
+      d.variable('board', '18mm');
+      // A leg with a tenon on top, as an agent writes it: absolute corners from expressions.
+      d.part('Leg')
+        .profile.path(['-legW/2', 0])
+        .lineTo(['legW/2', 0])
+        .lineTo(['legW/2', 'legH'])
+        .lineTo(['tenonW/2', 'legH'])
+        .lineTo(['tenonW/2', 'legH + board'])
+        .lineTo(['-tenonW/2', 'legH + board'])
+        .lineTo(['-tenonW/2', 'legH'])
+        .lineTo(['-legW/2', 'legH'])
+        .close();
+    });
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+    const constraints = document.parts[0]!.sketch.constraints;
+    // Only the start is placed; every other corner hangs off the one before.
+    expect(constraints.filter(c => c.type === 'positionX' || c.type === 'positionY')).toHaveLength(2);
+    expect(constraints.filter(c => c.type === 'horizontal' || c.type === 'vertical')).toHaveLength(7);
+    const lengths = constraints.flatMap(c => (c.type === 'distanceX' || c.type === 'distanceY' ? [c.expression ?? c.value] : []));
+    expect(lengths).toEqual(['legW', 'legH', 'legW/2 - tenonW/2', 'board', 'tenonW', 'board', 'legW/2 - tenonW/2']);
+  });
+
+  it('keeps a path following sizes that are only equal for now', async () => {
+    const { document } = await editCad(null, d => {
+      d.variable('a', '50mm');
+      d.variable('b', '50mm');
+      d.variable('h', '40mm');
+      d.part('P').profile.path([0, 0]).lineTo(['a', 0]).lineTo(['b', 'h']).lineTo([0, 'h']).close();
+      d.variable('b', '80mm');
+    });
+    const { parts } = await inspectCadDocument(document);
+    const xs = (parts[0]!.outline as { x: number }[]).map(p => Math.round(p.x)).sort((p, q) => p - q);
+    expect([...new Set(xs)]).toEqual([0, 50, 80]);
+  });
+
+  it('measures from the fixed origin when a path passes through it', async () => {
+    const { report } = await editCad(null, d => d.part('P').profile.path([10, 0]).lineTo([0, 0]).lineTo([0, 10]).close());
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+    expect(report.warnings.map(w => w.code)).not.toContain('redundant-constraint');
+  });
+
+  type Profile = ReturnType<DesignEdit['part']>['profile'];
+  it.each<[string, (profile: Profile) => unknown, string, string, number]>([
+    [
+      'a start that follows a variable, through the origin',
+      p => p.path(['w', 0]).lineTo([0, 0]).lineTo([0, 100]).close(),
+      '50mm',
+      '150mm',
+      150,
+    ],
+    [
+      'a variable without units',
+      p => p.path([0, 0]).lineTo(['w + 10', 0]).lineTo(['w + 10', 100]).lineTo([0, 100]).close(),
+      '50',
+      '70',
+      80,
+    ],
+    [
+      'a length inside a function',
+      p => p.path([20, 0]).lineTo(['max(w; 100mm)', 0]).lineTo(['max(w; 100mm)', 50]).lineTo([20, 50]).close(),
+      '50mm',
+      '150mm',
+      130,
+    ],
+  ])('keeps a path following %s', async (_, draw, from, to, width) => {
+    const { report, document } = await editCad(null, d => {
+      d.variable('w', from);
+      draw(d.part('P').profile);
+    });
+    expect(report.warnings.map(w => w.code)).not.toContain('redundant-constraint');
+    const changed = setCadVariable(document, { id: document.variables![0]!.id, name: 'w', expression: to });
+    if ('error' in changed) throw new Error(changed.error);
+    const after = await inspectCadDocument(changed.document);
+    expect(after.report.parts[0]!.sketches[0]!.freedom).toBe(0);
+    expect(after.report.parts[0]!.outline!.size[0]).toBeCloseTo(width, 6);
+  });
+
+  it('keeps the middle of a half circle between its ends when they move', async () => {
+    const { document } = await editCad(null, d => {
+      d.variable('w', '100mm');
+      d.part('R').profile.path([0, 0]).lineTo(['w', 0]).arcTo(['w', 60], { r: 30 }).lineTo([0, 60]).close();
+      d.variable('w', '150mm');
+    });
+    const { report } = await inspectCadDocument(document);
+    // The arc bulges 30 mm past the moved end, as a half circle of radius 30.
+    const outline = report.parts[0]!.outline!;
+    expect(outline.size).toEqual([180, 60]);
+    expect(outline.at.map(v => v + 0)).toEqual([0, 0]);
+  });
+
   it('says what went wrong', async () => {
     const tooSmall = await editCad(null, d => d.part('A').profile.path([0, 0]).arcTo([100, 0], { r: 20 }));
     expect(tooSmall.scriptError).toBe("A 20 mm radius can't reach 100, 0: it needs at least 50 mm.");

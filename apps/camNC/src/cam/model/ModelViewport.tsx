@@ -7,7 +7,7 @@ import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { modelGeometry } from './modelGeometry';
 import { snapToFace } from './faceSnap';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
-import { kOrbitDamping } from '@/lib/orbitDamping';
+import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
 
@@ -310,7 +310,7 @@ export function ModelViewport({
       {shownPlanes.map(plane => (
         <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
       ))}
-      {!sketchView && <OrbitControls makeDefault dampingFactor={kOrbitDamping} />}
+      {!sketchView && <OrbitControls makeDefault dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />}
     </Canvas>
   );
 }

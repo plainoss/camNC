@@ -16,7 +16,7 @@ import * as THREE from 'three';
 import { FitCamera } from '@/cam/model/ModelViewport';
 import { modelGeometry } from '@/cam/model/modelGeometry';
 import { nativePart } from '@/cam/nativeCadModel';
-import { kOrbitDamping } from '@/lib/orbitDamping';
+import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
 import {
   cutRegions,
   depthLabel,
@@ -373,7 +373,12 @@ export default function PartView3D({
             onDone={() => onSketchFace?.(turningTo)}
           />
         )}
-        <OrbitControls makeDefault enabled={dragging === null && !turningTo} dampingFactor={kOrbitDamping} />
+        <OrbitControls
+          makeDefault
+          enabled={dragging === null && !turningTo}
+          dampingFactor={kOrbitDamping}
+          mouseButtons={kCadMouseButtons}
+        />
       </Canvas>
       {entry && picked && dragging === null && (
         <RegionDepthField
@@ -407,7 +412,7 @@ export default function PartView3D({
           : entry
             ? `${depthLabel({ ...entry, depth })}. Type a depth, or drag the arrow.`
             : regions.length
-              ? 'Click a region to set its depth, or a face to sketch on. Drag to orbit.'
+              ? 'Click a region to set its depth, or a face to sketch on. Right-drag to turn, middle-drag to pan.'
               : 'Click the top face, then Sketch, to draw what to cut.'}
       </p>
     </div>

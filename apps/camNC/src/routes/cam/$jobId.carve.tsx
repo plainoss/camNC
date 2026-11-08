@@ -15,8 +15,9 @@ import { Button } from '@wbcnc/ui/components/button';
 import { Input } from '@wbcnc/ui/components/input';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { cn } from '@wbcnc/ui/lib/utils';
-import { AlertTriangle, Image, ListOrdered, Trash2, Type } from 'lucide-react';
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import { SelectionBar } from '@/cam/boards/SelectionBar';
+import { AlertTriangle, Crosshair, FileUp, Image, ListOrdered, Trash2, Type } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/carve')({ component: CarveStep });
 
@@ -139,7 +140,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         });
     }
   };
-  // Text typed within the debounce is committed before another selection unmounts its editor.
+  // Text typed within the debounce is committed before its editor unmounts: another selection, or a drag that hides the bar.
   const flushDraft = useRef<(() => void) | null>(null);
   const select = (id: string | null) => {
     if (id !== selectedId) flushDraft.current?.();
@@ -196,6 +197,8 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   };
   useEffect(() => {
     const keydown = (e: KeyboardEvent) => {
+      // Keys in the font picker's popup are its own: Escape there closes it, not the selection.
+      if (e.target instanceof Element && e.target.closest('[role="dialog"], [data-radix-popper-content-wrapper]')) return;
       if (e.key === 'Escape') {
         select(null);
         drag.current = null;
@@ -233,6 +236,25 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
 
   // Drag an item to move it, its corner to size it, or the handle above it to rotate it.
   const svg = useRef<SVGSVGElement>(null);
+  // The selected item's bar floats over the drawing, placed in its pixels: drawn again when the drawing changes size.
+  const view = useRef<HTMLDivElement>(null);
+  const [, setViewSize] = useState(0);
+  useLayoutEffect(() => {
+    const el = view.current;
+    if (!el) return;
+    setViewSize(n => n + 1);
+    const observer = new ResizeObserver(() => setViewSize(n => n + 1));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  /** A board point, mm with Y up, in the drawing's pixels. */
+  const toView = (p: { x: number; y: number }) => {
+    const m = svg.current?.getScreenCTM(),
+      r = view.current?.getBoundingClientRect();
+    if (!m || !r) return null;
+    const q = new DOMPoint(p.x, size.h - p.y).matrixTransform(m);
+    return { x: q.x - r.left, y: q.y - r.top };
+  };
   const toMm = (e: { clientX: number; clientY: number }) => {
     const m = svg.current?.getScreenCTM();
     if (!m) return { x: 0, y: 0 };
@@ -253,6 +275,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     e.stopPropagation();
     svg.current?.focus();
     svg.current?.setPointerCapture(e.pointerId);
+    flushDraft.current?.();
     select(item.id);
     drag.current = { mode, from: toMm(e), item, preview: item, pointerId: e.pointerId };
     setDragged(item);
@@ -294,6 +317,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     e.preventDefault();
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
+    flushDraft.current?.();
     resize.current = { grip, x: e.clientX, y: e.clientY, pxPerMm: svg.current?.getScreenCTM()?.a || 1, from: saved };
     setResized({ ...saved, from: saved });
   };
@@ -325,7 +349,9 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     setDragged(null);
     if (!d) return;
     if (d.mode === 'size') {
-      if (d.preview.height !== d.item.height) void redraw({ ...d.item, ...pending[d.item.id], height: d.preview.height });
+      // The artwork as saved now: text committed as the drag began may have been outlined since.
+      const now = carving.items.find(item => item.id === d.item.id) ?? d.item;
+      if (d.preview.height !== d.item.height) void redraw({ ...now, ...pending[d.item.id], height: d.preview.height });
     } else if (d.preview !== d.item) updateItem(d.item.id, { x: d.preview.x, y: d.preview.y, rotation: d.preview.rotation });
   };
   const cancel = () => {
@@ -361,7 +387,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         }
       />
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <div className="relative min-h-[320px] flex-1 bg-muted/40">
+        <div ref={view} className="relative min-h-[320px] flex-1 bg-muted/40">
           <svg
             ref={svg}
             role="img"
@@ -501,6 +527,58 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               XY zero · lower left
             </text>
           </svg>
+          {editing &&
+            !dragged &&
+            !resized &&
+            (() => {
+              // Above the item and its rotate handle.
+              const top = placeItem({
+                ...editing,
+                outline: [[...editing.outline.flat(), { x: 0, y: (bounds(editing.outline)?.y1 ?? 0) + 11 }]],
+              });
+              const pts = top.flat();
+              const at = pts.length
+                ? toView({ x: (Math.min(...pts.map(p => p.x)) + Math.max(...pts.map(p => p.x))) / 2, y: Math.max(...pts.map(p => p.y)) })
+                : null;
+              if (!at) return null;
+              return (
+                <SelectionBar<'height' | 'rotation'>
+                  key={editing.id}
+                  id="carve"
+                  title={editing.art.kind === 'text' ? 'Lettering' : editing.art.fileName}
+                  at={at}
+                  fields={[
+                    { key: 'height', label: 'Height', name: 'Height (mm)', value: editing.height, min: 5, max: size.h },
+                    { key: 'rotation', label: 'Angle', name: 'Rotation (°)', value: editing.rotation, unit: '°', min: -360, max: 720 },
+                  ]}
+                  onField={(key, value) => {
+                    if (key === 'height') void redraw({ ...editing, height: value });
+                    else updateItem(editing.id, { rotation: rotationOf(value) });
+                  }}
+                  scopes={[]}
+                  onApply={() => {}}
+                  onDelete={() => deleteItem(editing.id)}
+                  deleteLabel={`Delete ${itemName(editing)}`}
+                  menu={[
+                    {
+                      label: 'Centre on the board',
+                      icon: <Crosshair className="size-4" />,
+                      onSelect: () => updateItem(editing.id, centred(editing, size)),
+                    },
+                  ]}>
+                  <ArtFields
+                    key={artResets[editing.id] ?? 0}
+                    art={editing.art}
+                    onArt={art => {
+                      if (art.kind === 'text') lastFont.current = art;
+                      void redraw({ ...editing, art });
+                    }}
+                    onReplace={() => chooseSvg(editing.id)}
+                    flush={flushDraft}
+                  />
+                </SelectionBar>
+              );
+            })()}
           {outlining && (
             <div className="absolute top-3 left-3 flex items-center gap-2 rounded bg-background/80 px-2 py-1 text-xs text-muted-foreground">
               <LoadingSpinner className="size-3" /> Outlining…
@@ -567,45 +645,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               </li>
             ))}
           </ul>
-          {editing ? (
-            <div key={editing.id} className="grid gap-4">
-              <ArtFields
-                key={artResets[editing.id] ?? 0}
-                art={editing.art}
-                onArt={art => {
-                  if (art.kind === 'text') lastFont.current = art;
-                  void redraw({ ...editing, art });
-                }}
-                onReplace={() => chooseSvg(editing.id)}
-                flush={flushDraft}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Height (mm)" id="carve-height">
-                  <NumberInput
-                    id="carve-height"
-                    value={editing.height}
-                    min={5}
-                    max={size.h}
-                    unit="mm"
-                    onCommit={height => void redraw({ ...editing, height })}
-                  />
-                </Field>
-                <Field label="Rotation (°)" id="carve-rotation">
-                  <NumberInput
-                    id="carve-rotation"
-                    value={editing.rotation}
-                    unit="°"
-                    onCommit={rotation => updateItem(editing.id, { rotation: rotationOf(rotation) })}
-                  />
-                </Field>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => updateItem(editing.id, centred(editing, size))}>
-                Centre on the board
-              </Button>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">Select an item on the board to edit it, or add one.</p>
-          )}
+          {!editing && carving.items.length > 0 && <p className="text-xs text-muted-foreground">Select an item to edit it on the board.</p>}
           <hr />
           <Field label="Deepest (mm)" id="carve-depth">
             <NumberInput
@@ -736,20 +776,27 @@ function ArtFields({
   }, [text, art, onArt, flush]);
   return art.kind === 'text' ? (
     <>
-      <Field label="Text" id="carve-text">
-        <Input id="carve-text" value={text} maxLength={60} onChange={e => setText(e.target.value)} />
-      </Field>
-      <Field label="Font" id="carve-font">
-        <LetteringFontPicker font={art.font} onChange={font => onArt({ ...art, text, font })} />
-      </Field>
+      <Input
+        id="carve-text"
+        aria-label="Text"
+        value={text}
+        maxLength={60}
+        className="h-7 w-36 px-2 text-xs"
+        onChange={e => setText(e.target.value)}
+      />
+      <div className="w-40">
+        <LetteringFontPicker font={art.font} className="h-7 px-2 text-xs" onChange={font => onArt({ ...art, text, font })} />
+      </div>
     </>
   ) : (
-    <div className="grid gap-2">
-      <p className="text-muted-foreground">{art.fileName}</p>
-      <Button variant="outline" size="sm" onClick={onReplace}>
-        Replace SVG
-      </Button>
-    </div>
+    <button
+      type="button"
+      aria-label="Replace SVG"
+      title="Replace SVG"
+      onClick={onReplace}
+      className="flex size-7 items-center justify-center rounded-md hover:bg-muted">
+      <FileUp className="size-4" />
+    </button>
   );
 }
 

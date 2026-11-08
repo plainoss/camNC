@@ -3,7 +3,7 @@ import { carvingRegion, placeItem } from '@/cam/carving';
 import { outlineArt } from '@/cam/carvingOutline';
 import { ensureWebFont, loadFontCatalog } from '@/cam/webFonts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Route } from './$jobId.carve';
@@ -226,6 +226,38 @@ describe('the Carve step', () => {
     });
   });
 
+  it('keeps text typed just before a drag hides the bar', async () => {
+    const job = await open();
+    const svg = screen.getByTestId('carving-item').closest('svg')!;
+    const at = (x: number, y: number) => {
+      const p = new DOMPoint(x, 140 - y).matrixTransform(svg.getScreenCTM()!);
+      return { clientX: p.x, clientY: p.y, pointerId: 1, button: 0 };
+    };
+    const text = async () => (await getJob(job.id))!.carving!.items[0].art;
+    // Moving the selected item: the selection stays, but the bar unmounts while dragging.
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Moved' } });
+    fireEvent.pointerDown(screen.getByTestId('carving-item'), at(150, 70));
+    fireEvent.pointerMove(svg, at(160, 70));
+    fireEvent.pointerUp(svg, at(160, 70));
+    await waitFor(async () => expect(await text()).toMatchObject({ text: 'Moved' }));
+    // Sizing it by the corner: the release outlines again, with the text typed before the drag.
+    await waitFor(() => expect(screen.queryByText('Outlining…')).toBeNull());
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Sized' } });
+    fireEvent.pointerDown(screen.getByLabelText('Drag to resize'), at(190, 55));
+    fireEvent.pointerMove(svg, at(220, 40));
+    await waitFor(() => expect(screen.queryByText('Outlining…')).toBeNull());
+    fireEvent.pointerUp(svg, at(220, 40));
+    // The text was outlined during the drag; the release's outline must not bring back the earlier text.
+    await waitFor(() => expect(screen.queryByText('Outlining…')).toBeNull());
+    expect(await text()).toMatchObject({ text: 'Sized' });
+    expect((await getJob(job.id))!.carving!.items[0].height).toBeGreaterThan(30);
+    // Sizing the board.
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Board' } });
+    fireEvent.pointerDown(svg.querySelector('[data-resize="w"]')!, { clientX: 0, clientY: 0, pointerId: 1, button: 0 });
+    fireEvent.pointerUp(svg, { clientX: 0, clientY: 0, pointerId: 1 });
+    await waitFor(async () => expect(await text()).toMatchObject({ text: 'Board' }));
+  });
+
   it('adds text, selects items from the list and canvas, edits just the selection, and deletes it', async () => {
     const job = await open();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
@@ -257,10 +289,15 @@ describe('the Carve step', () => {
     expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
     const svg = screen.getAllByTestId('carving-item')[0].closest('svg')!;
     fireEvent.pointerDown(svg, { button: 0 });
-    expect(screen.getByText('Select an item on the board to edit it, or add one.')).toBeTruthy();
+    expect(screen.getByText('Select an item to edit it on the board.')).toBeTruthy();
+    expect(screen.queryByRole('toolbar')).toBeNull();
     fireEvent.pointerDown(screen.getAllByTestId('carving-item')[1], { button: 0, pointerId: 1 });
     fireEvent.pointerUp(svg, { pointerId: 1 });
     expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Second');
+    // The selected item's own bar floats over the drawing, as on the Boards step.
+    const bar = screen.getByRole('toolbar', { name: 'Lettering' });
+    expect(within(bar).getByRole('combobox', { name: 'Font' })).toBeTruthy();
+    expect(within(bar).getByRole('button', { name: 'Delete "Second"' })).toBeTruthy();
     fireEvent.keyDown(screen.getByLabelText('Text'), { key: 'Backspace' });
     expect(screen.getAllByTestId('carving-item')).toHaveLength(2);
     fireEvent.keyDown(svg, { key: 'Escape' });
@@ -381,7 +418,7 @@ describe('the Carve step', () => {
     );
     fireEvent.change(screen.getByLabelText('Height (mm)'), { target: { value: '40' } });
     fireEvent.blur(screen.getByLabelText('Height (mm)'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete "Welcome"' }));
+    fireEvent.click(within(screen.getByRole('toolbar')).getByRole('button', { name: 'Delete "Welcome"' }));
     await act(async () => finishDeleted(outline));
     await waitFor(async () => {
       const carving = (await getJob(job.id))!.carving!;

@@ -39,6 +39,7 @@ import {
   cadCopyName,
   resolvePartPatterns,
 } from '@wbcnc/cad';
+import { combineExpressions, differenceExpression } from './linearExpression';
 import { inspectCadDocument, type CadExpectation, type CadReport } from './inspect';
 
 export type Xy = readonly [number, number];
@@ -431,9 +432,27 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
                 const middle = { x: (from.x + target.x) / 2, y: (from.y + target.y) / 2 },
                   out = { x: from.x - middle.x, y: from.y - middle.y };
                 const top = how.clockwise ? { x: middle.x + out.y, y: middle.y - out.x } : { x: middle.x - out.y, y: middle.y + out.x };
+                // The point between the quarters is written from the ends, so it follows them when a variable changes.
+                const [fx, fy] = vertices.at(-1)!.typed,
+                  [tx, ty] = to;
+                const turn = how.clockwise ? -1 : 1;
+                // middle ∓ the half chord turned a quarter: x = (fx + tx)/2 - turn·(fy - ty)/2, y = (fy + ty)/2 + turn·(fx - tx)/2.
+                const bx = combineExpressions([
+                    [0.5, fx],
+                    [0.5, tx],
+                    [-turn / 2, fy],
+                    [turn / 2, ty],
+                  ]),
+                  by = combineExpressions([
+                    [0.5, fy],
+                    [0.5, ty],
+                    [turn / 2, fx],
+                    [-turn / 2, tx],
+                  ]);
+                const between: LenXy = bx !== undefined && by !== undefined ? [bx, by] : [top.x, top.y];
                 // Each half is a quarter turn, so the short way round.
                 const quarter = { ...how, large: false };
-                edit.arcTo([top.x, top.y], quarter);
+                edit.arcTo(between, quarter);
                 return edit.arcTo(to, quarter);
               }
             }
@@ -490,15 +509,65 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
             closed = true;
             const corners = vertices.map(vertex => {
               const point: CadRef & { fixed?: boolean } = pointNear([vertex.at.x, vertex.at.y]);
-              const corner =
-                point.fixed && typed(vertex.typed)
-                  ? detach(
-                      point.id,
-                      edges.map(edge => edge.id)
-                    )
-                  : point;
-              if (!('fixed' in corner && corner.fixed) && !isPlaced(corner.id)) place(corner, vertex.typed);
-              return corner;
+              return point.fixed && typed(vertex.typed)
+                ? detach(
+                    point.id,
+                    edges.map(edge => edge.id)
+                  )
+                : point;
+            });
+            // Dimensioned as a person would: the start is placed, and each corner is measured from the one before, a
+            // straight edge along an axis by its length alone. Changing one length then moves what comes after it.
+            const first = corners[0]!;
+            if (!('fixed' in first && first.fixed) && !isPlaced(first.id)) place(first, vertices[0]!.typed);
+            vertices.slice(1).forEach((vertex, i) => {
+              const a = corners[i]!,
+                b = corners[i + 1]!;
+              // The fixed origin is placed already.
+              if (isPlaced(b.id) || ('fixed' in b && b.fixed)) return;
+              const before = vertices[i]!;
+              const edge = edges[i]!,
+                straight = current().entities.find(e => e.id === edge.id)?.type === 'line';
+              (['x', 'y'] as const).forEach((axis, k) => {
+                const delta = vertex.at[axis] - before.at[axis];
+                // Along an axis only when it always is: two sizes that are equal now may not stay so.
+                if (differenceExpression(before.typed[k]!, vertex.typed[k]!) === 0) {
+                  const along = axis === 'x' ? 'vertical' : 'horizontal';
+                  if (straight) constrain({ type: along, entityId: edge.id });
+                  else constrain({ type: `${along}Points`, pointAId: a.id, pointBId: b.id });
+                  return;
+                }
+                // Dimensions read positive, from the lower point to the higher.
+                const [low, high] = delta > 0 ? [before.typed[k]!, vertex.typed[k]!] : [vertex.typed[k]!, before.typed[k]!];
+                const [lowPoint, highPoint] = delta > 0 ? [a, b] : [b, a];
+                // Written so the model reads it back as this length; units decide which way, so both are tried.
+                const length = ['', 'mm']
+                  .map(unit => differenceExpression(low, high, unit))
+                  .find(candidate => {
+                    if (typeof candidate === 'number') return true;
+                    const read = parseCadValue(candidate, { unit: 'mm', variables: cadVariableScope(document) });
+                    return !('error' in read) && Math.abs(read.value - Math.abs(delta)) < 1e-6 * Math.max(1, Math.abs(delta));
+                  });
+                if (length === undefined) {
+                  // Nothing reads back right, so this corner keeps its own position, which still follows the variables.
+                  constrain({
+                    type: axis === 'x' ? 'positionX' : 'positionY',
+                    pointId: b.id,
+                    value: vertex.at[axis],
+                    label: axis === 'x' ? 'X' : 'Y',
+                    ...expressionOf(vertex.typed[k]!),
+                  });
+                  return;
+                }
+                constrain({
+                  type: axis === 'x' ? 'distanceX' : 'distanceY',
+                  pointAId: lowPoint.id,
+                  pointBId: highPoint.id,
+                  value: Math.abs(delta),
+                  label: axis === 'x' ? 'Width' : 'Height',
+                  ...expressionOf(length),
+                });
+              });
             });
             return { edges, corners };
           },
