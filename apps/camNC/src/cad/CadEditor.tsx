@@ -3420,7 +3420,10 @@ export function CadEditor({
                       if (prepared && hasOutline(prepared, part.id)) onEditFaceSketch(prepared, part.id, sketchId);
                     })
                   }
-                  onCutDepth={(cut, depth) => commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth))}
+                  variables={variableScope}
+                  onCutDepth={(cut, depth, expression) =>
+                    commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth, expression))
+                  }
                   onMoveToTop={sketchId => commit(moveFaceSketch(documentRef.current, part.id, sketchId, 'top'))}
                   onNew={onEditFaceSketch && (face => sketchOnFace(face))}
                 />
@@ -3557,7 +3560,8 @@ export function CadEditor({
               <PartView3D
                 key={part.id}
                 part={part}
-                onChoose={(entry, depth) => commit(withRegionDepth(documentRef.current, part.id, entry, depth))}
+                variables={variableScope}
+                onChoose={(entry, depth, expression) => commit(withRegionDepth(documentRef.current, part.id, entry, depth, expression))}
                 onSketchFace={onEditFaceSketch && sketchOnFace}
               />
             </Suspense>
@@ -4027,13 +4031,15 @@ export function CadEditor({
               key={regionField.entry.region.id}
               style={valuePosition(regionField.anchor, 280)}
               depth={regionField.entry.depth}
+              expression={regionField.entry.cut?.depthExpression}
               thickness={part.thickness - regionField.entry.from}
+              variables={variableScope}
               onClose={() => {
                 setRegionField(null);
                 svg.current?.focus();
               }}
-              onChoose={depth => {
-                const next = withRegionDepth(documentRef.current, part.id, regionField.entry, depth);
+              onChoose={(depth, expression) => {
+                const next = withRegionDepth(documentRef.current, part.id, regionField.entry, depth, expression);
                 if (next !== documentRef.current) commit(next);
                 setRegionField(null);
                 svg.current?.focus();

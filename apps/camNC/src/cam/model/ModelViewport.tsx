@@ -20,6 +20,7 @@ export interface ModelFacePick {
 const kWood = '#c9a477';
 const kSelected = '#8b5cf6';
 const kOff = '#71717a';
+const kClash = '#dc2626';
 function Body({
   mesh,
   matrix,
@@ -94,6 +95,7 @@ export function ModelViewport({
   selectedId,
   milled,
   highlightIds = [],
+  warnIds = [],
   onSelect,
   onPickFace,
   onMissed,
@@ -105,6 +107,8 @@ export function ModelViewport({
   milled: (partId: string) => boolean;
   /** Parts drawn as picked, besides the selected one. */
   highlightIds?: string[];
+  /** Parts drawn as wrong, such as ones sharing space with another. */
+  warnIds?: string[];
   onSelect: (partId: string) => void;
   onPickFace?: (pick: ModelFacePick) => void;
   onMissed?: () => void;
@@ -136,7 +140,15 @@ export function ModelViewport({
             key={i}
             mesh={m}
             matrix={matrices[i]!}
-            color={m.partId === selectedId || highlightIds.includes(m.partId) ? kSelected : milled(m.partId) ? kWood : kOff}
+            color={
+              m.partId === selectedId || highlightIds.includes(m.partId)
+                ? kSelected
+                : warnIds.includes(m.partId)
+                  ? kClash
+                  : milled(m.partId)
+                    ? kWood
+                    : kOff
+            }
             opacity={milled(m.partId) ? 1 : 0.35}
             onSelect={e => pick(m, matrices[i]!, e)}
           />

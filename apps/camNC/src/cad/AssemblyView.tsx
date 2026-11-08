@@ -1,5 +1,7 @@
 import {
+  assemblyReport,
   cadVariableScope,
+  evaluateCadDocument,
   placeAgainst,
   turnAbout,
   type CadDocument,
@@ -99,6 +101,7 @@ export default function AssemblyView({
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const model = useMemo(() => assemblyModel(document), [document]);
+  const clashes = useMemo(() => assemblyReport(document, evaluateCadDocument(document).parts)?.collisions ?? [], [document]);
   const [view, setView] = useState<ModelView>('assembled');
   // Placing: first the face to move, then the face it goes against.
   const [placing, setPlacing] = useState<{ moving?: ModelFacePick } | null>(null);
@@ -145,11 +148,13 @@ export default function AssemblyView({
       ? placing.moving
         ? 'Now click the face to put it against. Esc cancels.'
         : 'Click the face of the part to move. Esc cancels.'
-      : model.problems.length
-        ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
-        : view === 'flat'
-          ? 'Each part turned so its machined side faces up, the way it lies on the board.'
-          : 'Click a part to select it. Drag to orbit.');
+      : clashes.length
+        ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space. Move one, or check the sizes they follow.`
+        : model.problems.length
+          ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
+          : view === 'flat'
+            ? 'Each part turned so its machined side faces up, the way it lies on the board.'
+            : 'Click a part to select it. Drag to orbit.');
   return (
     <div
       ref={frame}
@@ -248,6 +253,7 @@ export default function AssemblyView({
         view={view}
         selectedId={selectedId}
         highlightIds={placing?.moving ? [placing.moving.partId] : []}
+        warnIds={clashes.flatMap(clash => clash.partIds)}
         milled={always}
         onSelect={partId => {
           onSelect(partId);

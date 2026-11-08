@@ -276,6 +276,8 @@ export interface CadCut {
   sketchId: string;
   regionId: string;
   depth: CadCutDepth;
+  /** The depth as typed, kept when it uses design variables so the cut follows them. */
+  depthExpression?: string;
   /** Switched off: the part evaluates as if the cut weren't there, and it keeps its depth for when it's back on. */
   suppressed?: boolean;
 }

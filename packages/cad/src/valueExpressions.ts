@@ -10,6 +10,8 @@ interface Quantity {
   value: number;
   dimension: 'length' | 'angle' | null;
   explicitUnits: boolean;
+  /** A unit was typed, like `in`, rather than coming only from variables. */
+  typedUnit: boolean;
   fraction: boolean;
 }
 /** A word is a unit or a variable name. */
@@ -146,7 +148,13 @@ export function parseCadValue(
         throw new Error(unit === 'mm' ? 'Use length units: mm, cm, m, in, inch or ft.' : 'Use angle units: deg or rad.');
       if (quantity.dimension) throw new Error('This value already has a unit.');
       index++;
-      return { ...quantity, value: checked(quantity.value * conversion.factor), dimension: conversion.dimension, explicitUnits: true };
+      return {
+        ...quantity,
+        value: checked(quantity.value * conversion.factor),
+        dimension: conversion.dimension,
+        explicitUnits: true,
+        typedUnit: true,
+      };
     };
     const primary = (depth: number): Quantity => {
       if (depth > 32) throw new Error('Too many nested parentheses or signs.');
@@ -170,7 +178,13 @@ export function parseCadValue(
         const variable = variables[name]!;
         index++;
         const dimension = variable.kind === 'number' ? null : variable.kind;
-        return applyUnit({ value: checked(variable.value), dimension, explicitUnits: dimension !== null, fraction: false });
+        return applyUnit({
+          value: checked(variable.value),
+          dimension,
+          explicitUnits: dimension !== null,
+          typedUnit: false,
+          fraction: false,
+        });
       }
       if (token?.kind !== 'number') throw new Error('Enter a number or a parenthesized expression.');
       index++;
@@ -186,7 +200,7 @@ export function parseCadValue(
         fraction = true;
         index += 2;
       }
-      return applyUnit({ value, dimension: null, explicitUnits: false, fraction });
+      return applyUnit({ value, dimension: null, explicitUnits: false, typedUnit: false, fraction });
     };
     const product = (depth: number): Quantity => {
       let left = primary(depth);
@@ -203,6 +217,7 @@ export function parseCadValue(
           value: result,
           dimension: divide && right.dimension ? null : (left.dimension ?? right.dimension),
           explicitUnits: left.explicitUnits || right.explicitUnits,
+          typedUnit: left.typedUnit || right.typedUnit,
           fraction: left.fraction || right.fraction || divide,
         };
       }
@@ -213,7 +228,13 @@ export function parseCadValue(
       while (operator('+') || operator('-')) {
         const subtract = operator('-');
         index++;
-        const right = product(depth);
+        let right = product(depth);
+        // A plain number added to a variable is in the field's own unit: `depth + 10` is 10 mm more. With a typed unit,
+        // as in `2 + 1in`, the plain number stays ambiguous and still needs its own.
+        const plain = (q: Quantity) => !q.dimension && !q.explicitUnits && !q.fraction;
+        const named = (q: Quantity) => q.dimension === expectedDimension && q.dimension !== null && !q.typedUnit;
+        if (plain(left) && named(right)) left = { ...left, dimension: right.dimension };
+        if (plain(right) && named(left)) right = { ...right, dimension: left.dimension };
         if (left.dimension !== right.dimension && (left.fraction || right.fraction))
           throw new Error('Put units on each fraction, or put the whole sum in parentheses before its unit.');
         if ((!left.dimension && left.explicitUnits && right.dimension) || (!right.dimension && right.explicitUnits && left.dimension))
@@ -224,6 +245,7 @@ export function parseCadValue(
           value: checked(left.value + (subtract ? -right.value : right.value)),
           dimension: left.dimension ?? right.dimension,
           explicitUnits: left.explicitUnits || right.explicitUnits,
+          typedUnit: left.typedUnit || right.typedUnit,
           fraction: left.fraction || right.fraction,
         };
       }

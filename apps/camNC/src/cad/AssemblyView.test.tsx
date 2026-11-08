@@ -92,4 +92,21 @@ describe('the assembly view', () => {
       },
     ]);
   });
+
+  it('says which parts take up the same space', () => {
+    const at = (z: number) => ({
+      position: [0, 0, z] as [number, number, number],
+      rotation: [0, 0, 0, 1] as [number, number, number, number],
+    });
+    setup({
+      ...createCadDocument(),
+      parts: [
+        { ...panel('Bottom'), placement: at(0) },
+        { ...panel('Shelf'), placement: at(9) },
+      ],
+    });
+    expect(screen.getByRole('status').textContent).toBe(
+      'Bottom and Shelf take up the same space. Move one, or check the sizes they follow.'
+    );
+  });
 });

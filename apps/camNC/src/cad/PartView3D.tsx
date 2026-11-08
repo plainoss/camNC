@@ -8,6 +8,7 @@ import {
   type CadDocument,
   type CadFaceRef,
   type CadPart,
+  type CadValueScope,
 } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -222,11 +223,14 @@ function regionCenter({ region }: CutRegion, clicked: { x: number; y: number }) 
 /** One part in 3D, as it'll be cut. Click a region to set its depth, or drag the arrow to push its floor up and down. */
 export default function PartView3D({
   part,
+  variables,
   onChoose,
   onSketchFace,
 }: {
   part: CadPart;
-  onChoose: (entry: CutRegion, depth: CadCutDepth) => void;
+  /** Design variables a typed depth may use. */
+  variables?: CadValueScope;
+  onChoose: (entry: CutRegion, depth: CadCutDepth, expression?: string) => void;
   onSketchFace?: (face: CadFaceRef) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
@@ -366,13 +370,15 @@ export default function PartView3D({
           key={`${entry.region.id}:${String(entry.depth)}`}
           style={{ left: picked.screen.x, top: picked.screen.y }}
           depth={entry.depth}
+          expression={entry.cut?.depthExpression}
           thickness={part.thickness - entry.from}
+          variables={variables}
           onClose={() => {
             setPicked(null);
             frame.current?.focus();
           }}
-          onChoose={next => {
-            if (next !== entry.depth) onChoose(entry, next);
+          onChoose={(next, expression) => {
+            if (next !== entry.depth || expression !== entry.cut?.depthExpression) onChoose(entry, next, expression);
             setPicked(null);
             frame.current?.focus();
           }}

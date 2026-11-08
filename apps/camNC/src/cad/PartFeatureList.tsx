@@ -8,23 +8,39 @@ import {
   type CadCut,
   type CadFaceSketch,
   type CadPart,
+  type CadValueScope,
 } from '@wbcnc/cad';
+import { parseCadValue } from './valueExpressions';
 
 const faceName = (face: CadFaceSketch) => (face.on === 'top' ? 'Top face' : face.on === 'underside' ? 'Underside' : 'Pocket floor');
 
-function CutDepthInput({ label, depth, onChange }: { label: string; depth: number; onChange: (depth: number) => void }) {
-  const [text, setText] = useState(String(depth));
+function CutDepthInput({
+  label,
+  depth,
+  expression,
+  variables,
+  onChange,
+}: {
+  label: string;
+  depth: number;
+  expression?: string;
+  variables?: CadValueScope;
+  onChange: (depth: number, expression?: string) => void;
+}) {
+  const typed = expression ?? String(depth);
+  const [text, setText] = useState(typed);
   const apply = () => {
-    const value = Number(text);
-    if (text.trim() !== '' && Number.isFinite(value) && value > 0 && value !== depth) onChange(value);
-    else setText(String(depth));
+    const parsed = parseCadValue(text, { unit: 'mm', variables });
+    if ('value' in parsed && parsed.value > 0 && (parsed.value !== depth || parsed.expression !== expression))
+      onChange(parsed.value, parsed.expression);
+    else setText(typed);
   };
   return (
     <small className="cad-muted">
       <input
         className="cad-cut-depth"
         aria-label={label}
-        inputMode="decimal"
+        spellCheck={false}
         value={text}
         onChange={event => setText(event.target.value)}
         onBlur={apply}
@@ -45,6 +61,7 @@ export function PartFeatureList({
   onSwitchCut,
   onMoveToTop,
   onCutDepth,
+  variables,
   onEdit,
   onNew,
 }: {
@@ -53,7 +70,9 @@ export function PartFeatureList({
   onSwitchCut?: (cutId: string, on: boolean) => void;
   onMoveToTop?: (sketchId: string) => void;
   /** A cut's region can end up covered by a sketch on its floor, so its depth can be set from here too. */
-  onCutDepth?: (cut: CadCut, depth: number) => void;
+  onCutDepth?: (cut: CadCut, depth: number, expression?: string) => void;
+  /** Design variables a typed depth may use. */
+  variables?: CadValueScope;
   onEdit?: (sketchId: string) => void;
   onNew?: (face: 'top' | 'underside') => void;
 }) {
@@ -104,10 +123,12 @@ export function PartFeatureList({
               Cut {i + 1}{' '}
               {onCutDepth && regionIds.has(cut.regionId) && typeof cut.depth === 'number' && cut.depth > 0 ? (
                 <CutDepthInput
-                  key={`${cut.id}:${cut.depth}`}
+                  key={`${cut.id}:${cut.depth}:${cut.depthExpression}`}
                   label={`Cut ${i + 1} depth`}
                   depth={cut.depth}
-                  onChange={depth => onCutDepth(cut, depth)}
+                  expression={cut.depthExpression}
+                  variables={variables}
+                  onChange={(depth, expression) => onCutDepth(cut, depth, expression)}
                 />
               ) : (
                 <small className="cad-muted">
