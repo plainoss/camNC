@@ -57,8 +57,10 @@ describe('variables and assembly', () => {
     const { cupboard } = await import('../examples/cupboard.cad');
     const { report } = await editCad(null, cupboard());
     expect(report.assembly!.collisions).toEqual([]);
-    expect(box(report, 'Left side')).toEqual({ name: 'Left side', at: [0, 0, 0], size: [18, 300, 720] });
-    expect(box(report, 'Right side')).toEqual({ name: 'Right side', at: [582, 0, 0], size: [18, 300, 720] });
+    expect(box(report, 'Side')).toEqual({ name: 'Side', at: [0, 0, 0], size: [18, 300, 720] });
+    expect(box(report, 'Side 2')).toEqual({ name: 'Side 2', at: [582, 0, 0], size: [18, 300, 720] });
+    // The right side is a copy of the left, so CAM cuts the same shape twice.
+    expect(report.parts.find(part => part.name === 'Side')!.pieces).toEqual({ names: ['Side', 'Side 2'], mirrored: [] });
     expect(box(report, 'Back')).toEqual({ name: 'Back', at: [10, 294, 0], size: [580, 6, 720] });
   });
 
@@ -70,7 +72,7 @@ describe('variables and assembly', () => {
     expect(box(report, 'Top').size).toEqual([878, 294, 19]);
     expect(
       report.parts
-        .find(part => part.name === 'Left side')!
+        .find(part => part.name === 'Side')!
         .cuts.slice(0, 2)
         .map(cut => cut.size[1])
     ).toEqual([19, 19]);
@@ -94,11 +96,11 @@ describe('variables and assembly', () => {
     expect(report.parts.find(part => part.name === 'Top')!.outline!.size).toEqual([880, 294]);
     expect(
       report.parts
-        .find(part => part.name === 'Left side')!
+        .find(part => part.name === 'Side')!
         .cuts.slice(0, 3)
         .map(cut => cut.to)
     ).toEqual([9, 9, 9]);
-    expect(box(report, 'Right side')).toMatchObject({ at: [881, 0, 0], size: [19, 300, 720] });
+    expect(box(report, 'Side 2')).toMatchObject({ at: [881, 0, 0], size: [19, 300, 720] });
     expect(box(report, 'Top').at).toEqual([10, 0, 701]);
     expect(report.assembly!.collisions).toEqual([]);
   });
@@ -106,11 +108,13 @@ describe('variables and assembly', () => {
   it('reports parts whose numeric placement no longer fits after a change', async () => {
     const { cupboard } = await import('../examples/cupboard.cad');
     const { document } = await editCad(null, cupboard());
-    const right = document.parts.find(part => part.name === 'Right side')!;
+    // The right side's copy keeps a typed position, so it stays where it was.
     const pinned = {
       ...document,
       parts: document.parts.map(part =>
-        part === right ? { ...part, placement: { ...part.placement!, positionExpressions: undefined } } : part
+        part.name === 'Side'
+          ? { ...part, copies: part.copies!.map(copy => ({ ...copy, placement: { ...copy.placement!, positionExpressions: undefined } })) }
+          : part
       ),
     };
     const width = document.variables!.find(variable => variable.name === 'width')!;
@@ -118,9 +122,27 @@ describe('variables and assembly', () => {
     if ('error' in changed) throw new Error(changed.error);
     const { report } = await inspectCadDocument(changed.document, new Map(), { toolpaths: false });
     expect(report.assembly!.collisions.map(c => c.parts.join(' / '))).toEqual(
-      expect.arrayContaining(['Right side / Bottom', 'Right side / Top', 'Right side / Back', 'Right side / Shelf'])
+      expect.arrayContaining(['Side 2 / Bottom', 'Side 2 / Top', 'Side 2 / Back', 'Side 2 / Shelf'])
     );
     expect(report.errors.map(error => error.code)).toContain('parts-collide');
+  });
+
+  it('places a mirrored copy as the mirror image of its part', async () => {
+    const { report } = await editCad(null, d => {
+      // A bracket with a notch near its left end: the other hand needs it at the right.
+      const bracket = d.part('Bracket', { thickness: 18 });
+      bracket.profile.rect({ at: [0, 0], w: 200, h: 100 });
+      bracket.profile.rect({ at: [20, 40], w: 30, h: 20 });
+      bracket.place({ at: [0, 0, 0] });
+      // Mirrored, its sketch runs from x = -200 to 0, so it sits 200 further along to land beside the first.
+      bracket.copy({ at: [400, 0, 0], mirrored: true });
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.parts[0]!.pieces).toEqual({ names: ['Bracket'], mirrored: ['Bracket 2'] });
+    expect(report.assembly!.parts.map(({ name, at, size }) => [name, at, size])).toEqual([
+      ['Bracket', [0, 0, 0], [200, 100, 18]],
+      ['Bracket 2', [200, 0, 0], [200, 100, 18]],
+    ]);
   });
 
   it('finds a shelf that runs into a side', async () => {

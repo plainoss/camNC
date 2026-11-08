@@ -5,6 +5,7 @@ import {
   addConstraint,
   addFaceSketch,
   addLine,
+  addPartCopy,
   addRectangle,
   cadFaceSketches,
   cadVariableScope,
@@ -100,7 +101,17 @@ export interface PartEdit {
    * Where the part sits in the assembly: `at` is where its sketch origin goes, and `x` and `y` say which way its sketch
    * axes point there. Its thickness points along x × y. A position given as an expression follows the variables.
    */
-  place(options: { at: readonly [Len, Len, Len]; x?: CadAxis; y?: CadAxis }): void;
+  place(options: CadPlaceOptions): void;
+  /**
+   * Another of this part, placed like `place`. A mirrored copy is the part's mirror image across its sketch's y axis
+   * (x becomes -x), for a left and right pair that aren't alike; CAM cuts it as a part of its own.
+   */
+  copy(options: CadPlaceOptions & { mirrored?: boolean }): void;
+}
+export interface CadPlaceOptions {
+  at: readonly [Len, Len, Len];
+  x?: CadAxis;
+  y?: CadAxis;
 }
 export interface DesignEdit {
   /** Finds a part by name, or adds it. New parts are 18 mm thick unless `thickness` says otherwise. */
@@ -168,6 +179,15 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     return 'error' in result ? fail(`${what} "${value}": ${result.error}`) : result.value;
   };
   const expressionOf = (value: Len) => (typeof value === 'string' ? { expression: value } : {});
+  const placementOf = ({ at, x = '+x', y = '+y' }: CadPlaceOptions): CadPlacement => {
+    const ex = axes[x],
+      ey = axes[y];
+    if (!ex || !ey) fail(`Axes are written like '+x' or '-z', not ${x} and ${y}.`);
+    if (ex.some((value, i) => value !== 0 && ey[i] !== 0)) fail(`The part's x and y can't both point along ${x[1]}.`);
+    const position = at.map((value, i) => measure(value, `Position ${'xyz'[i]}`)) as [number, number, number];
+    const expressions = at.map(value => (typeof value === 'string' ? value : null)) as [string | null, string | null, string | null];
+    return { position, rotation: rotationTo(ex, ey), ...(expressions.some(Boolean) && { positionExpressions: expressions }) };
+  };
   const minusHalf = (a: Len, b: Len): Len => (typeof a === 'number' && typeof b === 'number' ? a - b / 2 : `(${a}) - (${b})/2`);
   const replacePart = (partId: string, edit: (part: CadPart) => CadPart) => {
     document = { ...document, parts: document.parts.map(part => (part.id === partId ? edit(part) : part)) };
@@ -363,20 +383,17 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     expect(expectation) {
       expectations.set(partId, [...(expectations.get(partId) ?? []), expectation]);
     },
-    place({ at, x = '+x', y = '+y' }) {
-      const ex = axes[x],
-        ey = axes[y];
-      if (!ex || !ey) fail(`Axes are written like '+x' or '-z', not ${x} and ${y}.`);
-      if (ex.some((value, i) => value !== 0 && ey[i] !== 0)) fail(`The part's x and y can't both point along ${x[1]}.`);
-      const position = at.map((value, i) => measure(value, `Position ${'xyz'[i]}`)) as [number, number, number];
-      const expressions = at.map(value => (typeof value === 'string' ? value : null)) as [string | null, string | null, string | null];
+    place(options) {
+      const placement = placementOf(options);
+      replacePart(partId, part => ({ ...part, placement }));
+    },
+    copy({ mirrored, ...options }) {
+      const placement = placementOf(options);
+      const added = addPartCopy(document, partId, { mirrored });
+      document = added.document;
       replacePart(partId, part => ({
         ...part,
-        placement: {
-          position,
-          rotation: rotationTo(ex, ey),
-          ...(expressions.some(Boolean) && { positionExpressions: expressions }),
-        },
+        copies: part.copies?.map(copy => (copy.id === added.id ? { ...copy, placement } : copy)),
       }));
     },
   });

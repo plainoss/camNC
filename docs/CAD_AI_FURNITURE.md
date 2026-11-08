@@ -41,6 +41,9 @@ that the model can't say, and in what CAM does with it.
   parts needing the same material, with rebates and dados counted as empty. A shelf
   1 mm into a side shows up with its exact overlap.
 - **Patterns.** Linked rows of holes, such as 32 mm shelf pins.
+- **Copies.** One part and its copies, plain or mirrored, placed independently and cut
+  as CAM counts them. The cupboard's right side is a copy of the left turned end over
+  end, which rules out the drift the hand-mirrored cabinet sides showed.
 - **Checks.** Types, the solver, feature rules, `expect` for sizes, holes, pockets and
   depths, and a toolpath summary per part. The summary has the operations, time, CAM
   warnings, blocked jobs and cuts no tool fits.
@@ -53,17 +56,15 @@ Grouped by where the fix belongs.
 
 ### The design model (`packages/cad`)
 
-1. **No mirrored or repeated parts.** Left and right sides, four legs and two drawer
-   sides are copies. Mirrored by hand, the cabinet's sides drifted apart.
-2. **No joints or fits.** A dado's width only follows the shelf because both name
+1. **No joints or fits.** A dado's width only follows the shelf because both name
    `board`. A slot can't say "the other part's thickness plus 0.2 mm".
-3. **No inside-corner relief.** Dogbones and T-bones are hand-drawn arcs. Every
+2. **No inside-corner relief.** Dogbones and T-bones are hand-drawn arcs. Every
    flat-pack piece needed them, and they made up most of its code.
-4. **Pattern counts and steps are plain numbers.** A pin row whose count should follow
+3. **Pattern counts and steps are plain numbers.** A pin row whose count should follow
    `height` doesn't update. Cut depths now take expressions.
-5. **No edge features.** Holes into an edge, round-overs and chamfers can't be recorded,
+4. **No edge features.** Holes into an edge, round-overs and chamfers can't be recorded,
    even as notes.
-6. **One bad cut breaks every part.** When one part fails to solve, the others report
+5. **One bad cut breaks every part.** When one part fails to solve, the others report
    "no outline" too.
 
 ### CAM (`packages/cam`)
@@ -90,17 +91,15 @@ Grouped by where the fix belongs.
 
 ## Next, in order
 
-1. **Mirrored and repeated parts** in the model, with a count for CAM. This fixes a class
-   of real errors the checks can't see.
-2. **Inside-corner relief** as an option on rectangles, polygons and outlines, sized
+1. **Inside-corner relief** as an option on rectangles, polygons and outlines, sized
    from the bit, with a CAM warning for outline corners left round.
-3. **Open-ended cuts in CAM,** checked against the physical test cut.
-4. **Two-sided parts in the report:** move the app's side B feature building into
+2. **Open-ended cuts in CAM,** checked against the physical test cut.
+3. **Two-sided parts in the report:** move the app's side B feature building into
    `packages/cam`, as board planning was, and summarise both sides.
-5. **Joints and fits** (roadmap PR 10). The assembly check is ready to confirm them.
-6. **Expressions for pattern counts and steps.**
-7. **Drilling operations** for holes up to the bit's size and for hinge cups.
-8. **A path builder** in cad-script, then a second furniture run to measure the change
+4. **Joints and fits** (roadmap PR 10). The assembly check is ready to confirm them.
+5. **Expressions for pattern counts and steps.**
+6. **Drilling operations** for holes up to the bit's size and for hinge cups.
+7. **A path builder** in cad-script, then a second furniture run to measure the change
    in tries and lines.
 
 Results from that second run belong in this file.
