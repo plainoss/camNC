@@ -255,6 +255,11 @@ export interface CadPart {
   sketch: CadSketch;
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
   placement?: CadPlacement;
+  /**
+   * A bone in every inside corner, so a bit of this diameter cuts it fully and a part that fits into it goes all the
+   * way in. The diameter is the design's bit: a bigger bit in the job can't reach into the bones.
+   */
+  cornerRelief?: { diameter: number; diameterExpression?: string };
   /** More of the same part elsewhere in the assembly, each edited along with it. */
   copies?: CadPartCopy[];
   /** Ordered: a sketch can sit on the floor of an earlier cut. Parts without features are plain flat profiles. */
