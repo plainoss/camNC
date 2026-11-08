@@ -3238,6 +3238,7 @@ export function CadEditor({
   };
   const openFeature = (kind: 'extrude' | 'pattern', partId: string) => {
     setPartCutting(null);
+    setVariableDialog(null);
     setChoosingFace(false);
     setPartId(partId);
     setSelected([]);
@@ -3253,6 +3254,7 @@ export function CadEditor({
   const openSketch = (partId: string, before = documentRef.current) => {
     sketchBefore.current = before;
     setFeatureDialog(null);
+    setVariableDialog(null);
     setPartCutting(null);
     setChoosingFace(false);
     setPartId(partId);
@@ -3350,6 +3352,8 @@ export function CadEditor({
   };
   const studioCommand = (command: StudioCommand) => {
     setStudioRefusal(null);
+    // Starting one step closes any other step's dialog.
+    setVariableDialog(null);
     if (command === 'sketch') {
       setFeatureDialog(null);
       setPartCutting(null);
