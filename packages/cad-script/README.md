@@ -60,7 +60,8 @@ change a variable or a dimension, or a step's settings. So:
 - Name every size a person would change as a variable, and write lengths from them.
 - Prefer a feature over geometry drawn to look like one: `rect` over a four-point path,
   `pattern` and `copy` over repeated parts, `cutParts` over openings drawn into the
-  part that receives them, and `relief` over hand-drawn dogbones.
+  part that receives them, `split` over hand-drawn laps and fingers, and `relief` over
+  hand-drawn dogbones.
 - Draw a custom outline with `path` only when it is one, such as a leg with a tenon.
 
 - All lengths are mm, Y up, in the part's own sketch coordinates. Arc angles are degrees.
@@ -154,9 +155,12 @@ by the parts that fit them.
   `steps` with its width, length, depth and place. Parts have to be square to each other.
   Where a tool reaches in it has to be made of square-cornered, straight-sided blocks: a
   shouldered tenon cuts only its tenon, and a comb of fingers cuts one slot per finger
-  into a plain board. Box joints, where both boards have fingers, and half-laps aren't
-  covered yet: draw them into the outlines. A tool with `relief` has bones on its own
-  shoulders, so it can't cut.
+  into a plain board. A tool with `relief` has bones on its own shoulders, so it can't
+  cut.
+- `d.cutParts(a, { with: b, split: 'half' })` makes a half-lap where two parts cross,
+  each losing half its height, and `split: { fingers: 5 }` a finger joint at a corner.
+  Draw both parts as plain boards: the step makes the slots, so a person changes the
+  joint by its finger count, and the slots follow the boards' sizes.
 - `part.pattern({ axis: 'x', count: 'slats', spacing: '60mm' })` repeats a part in a row
   along a studio axis.
 - `part.copy({ at, x, y, mirrored?, name? })` adds another of the part placed by hand. For
