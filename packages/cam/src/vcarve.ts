@@ -1,6 +1,7 @@
 import { CamInputError, validatePaths, validateTool } from './validation';
 import { areaD, pointInPolygonD, PointInPolygonResult } from 'clipper2-ts';
-import { clipLines, difference, distPointSeg, offset, pathLength, polyArea, union, type PathsD, type Vec3 } from './geom';
+import { clipLines, difference, distPointSeg, maxOf, minOf, offset, pathLength, polyArea, union, type PathsD, type Vec3 } from './geom';
+import { progressOver, type OnProgress } from './progress';
 import { DEFAULT_SETTINGS, pocketOperation, type CamSettings, type Operation, type Pass, type Tool } from './toolpaths';
 
 /** Artwork V-carved into the top of a board: lettering or filled SVG shapes, already outlined. */
@@ -177,6 +178,43 @@ function nearestFirst(passes: Pass[], from: { x: number; y: number }): Pass[] {
 }
 
 /**
+ * About how many rings a carving takes: on its walls, and across its flat bottoms, out to how far in its widest stroke
+ * closes up (found to within a few rings by halving). Each ring is about one offset of the whole artwork.
+ */
+const ringEstimates = new WeakMap<BoardCarving, { walls: number; floor: number }>();
+function ringEstimate(carving: BoardCarving): { walls: number; floor: number } {
+  const known = ringEstimates.get(carving);
+  if (known) return known;
+  const region = union(carving.region);
+  const slope = vSlope(carving.tool);
+  const tipR = (carving.tool.tipDiameter ?? 0) / 2;
+  const rCap = tipR + Math.min(carving.maxDepth, vConeDepth(carving.tool)) / slope;
+  const walls = Math.ceil(Math.max(0, rCap - tipR) / kVCarveStep) + 1;
+  const flatStep = Math.max(0.02, (2 * kFlatCusp) / slope + 2 * tipR);
+  const xs = region.flat().map(q => q.x);
+  const ys = region.flat().map(q => q.y);
+  // Past the flat bit's reach, the V-bit cuts no more floor rings.
+  const reach = carving.clearTool ? carving.clearTool.diameter / 2 + flatStep : Infinity;
+  let [inside, outside] = [rCap, Math.min(rCap + reach, rCap + Math.min(maxOf(xs) - minOf(xs), maxOf(ys) - minOf(ys)) / 2)];
+  if (offset(region, -outside).length) inside = outside;
+  while (outside - inside > 4 * flatStep) {
+    const mid = (inside + outside) / 2;
+    if (offset(region, -mid).length) inside = mid;
+    else outside = mid;
+  }
+  const estimate = { walls, floor: Math.ceil((inside - rCap) / flatStep) };
+  ringEstimates.set(carving, estimate);
+  return estimate;
+}
+
+/** About how long `carvingOperations` takes, in the units of `partWork` (milliseconds on a fast laptop). */
+export function carvingWork(carving: BoardCarving): number {
+  const { walls, floor } = ringEstimate(carving);
+  const points = carving.region.reduce((sum, loop) => sum + loop.length, 0);
+  return 1 + 0.07 * points * (walls + floor);
+}
+
+/**
  * Operations for one carving: a flat bit's clearing pocket first (when strokes are wider than the depth limit allows
  * and `clearTool` is set), then the V-bit.
  *
@@ -184,7 +222,12 @@ function nearestFirst(passes: Pass[], from: { x: number; y: number }): Pass[] {
  * (r - tip radius) × slope, where its cone is exactly r wide at the surface: it touches the outline and never cuts past
  * it.
  */
-export function carvingOperations(carving: BoardCarving, stockTop: number, settings: Partial<CamSettings> = {}): Operation[] {
+export function carvingOperations(
+  carving: BoardCarving,
+  stockTop: number,
+  settings: Partial<CamSettings> = {},
+  onProgress?: OnProgress
+): Operation[] {
   const s: CamSettings = { ...DEFAULT_SETTINGS, ...settings };
   const tool = carving.tool;
   validateTool(tool, 'carving.tool');
@@ -195,6 +238,19 @@ export function carvingOperations(carving: BoardCarving, stockTop: number, setti
     throw new CamInputError([{ field: 'carving.maxDepth', message: `must be less than the board's ${stockTop} mm` }]);
   const region = union(carving.region);
   if (!region.length || polyArea(region) <= 0) return [];
+  // Each ring is about the same work; joining them up afterwards about a tenth of that.
+  const estimate = onProgress ? ringEstimate(carving) : { walls: 0, floor: 0 };
+  const join = 0.1 * (estimate.walls + estimate.floor);
+  const progress = progressOver(onProgress, estimate.walls + estimate.floor + join);
+  // Rings cut so far, and up to how many of them have been reported.
+  let rung = 0;
+  const ring = (upTo: number) => {
+    if (rung++ < upTo) progress.done(1);
+  };
+  const skipTo = (upTo: number) => {
+    if (rung < upTo) progress.done(upTo - rung);
+    rung = Math.max(rung, upTo);
+  };
   const slope = vSlope(tool);
   const tipR = (tool.tipDiameter ?? 0) / 2;
   const cap = Math.min(carving.maxDepth, vConeDepth(tool));
@@ -268,7 +324,9 @@ export function carvingOperations(carving: BoardCarving, stockTop: number, setti
     walls.push(...open.map(line => inSteps(line, z, false)));
     for (const centre of centres) walls.push(...centre.loops.map(loop => inSteps(loop, centre.z, true)));
     r = next;
+    ring(estimate.walls);
   }
+  skipTo(estimate.walls);
   rings.push(...nearestFirst(walls, { x: 0, y: 0 }));
   const flat = offset(region, -rCap);
   const operations: Operation[] = [];
@@ -303,13 +361,16 @@ export function carvingOperations(carving: BoardCarving, stockTop: number, setti
           lastPoint()
         )
       );
+      ring(estimate.walls + estimate.floor);
     }
     if (clearTool) {
       const clear = pocketOperation(`${carving.name}: clear flat bottoms`, flat, stockTop, floorZ, clearTool, s);
       operations.push({ ...clear, title: 'clear flat bottoms', feature: 'pocket' });
     }
   }
+  skipTo(estimate.walls + estimate.floor);
   const passes = joined(rings, region, depth => tipR + depth / slope, stockTop, feed);
+  progress.done(join);
   if (passes.length)
     operations.push({
       name: `${carving.name}: V-carve`,

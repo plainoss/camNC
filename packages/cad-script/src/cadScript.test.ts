@@ -286,7 +286,7 @@ describe('paths', () => {
 
   it('draws a half circle of a given radius fully constrained, through its top', async () => {
     const { report } = await editCad(null, d => {
-      d.part('Keyhole').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5 }).lineTo([0, 5]).close();
+      d.part('Keyhole').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5 }).lineTo([0, 5]).close({ straight: true });
     });
     expect(report.warnings).toEqual([]);
     expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
@@ -310,7 +310,7 @@ describe('paths', () => {
         path.arcTo(middle, { r, clockwise: !rising }).arcTo(next, { r, clockwise: rising });
         previous = next;
       }
-      path.lineTo([300, 120]).lineTo([0, 120]).close();
+      path.lineTo([300, 120]).lineTo([0, 120]).close({ straight: true });
     });
     expect(report.warnings).toEqual([]);
     expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
@@ -490,6 +490,39 @@ describe('part studio', () => {
     expect(report.assembly!.collisions).toEqual([]);
     // The leg's own list names the opening after the part that cuts it, not by its long ID.
     expect(report.parts.find(part => part.name === 'Leg')!.cuts.map(cut => cut.ref)).toEqual(['Rail']);
+  });
+
+  it('shares the material where two parts cross, as a half-lap or a finger joint', async () => {
+    const script = (fingers: number) => (d: DesignEdit) => {
+      d.variable('board', '18mm');
+      // Two legs crossing at their middles, as in a plant stand.
+      const a = d.part('Leg A', { thickness: 'board' });
+      a.profile.rect({ at: [-150, 0], w: 300, h: 400 });
+      a.drawOn('front', { offset: 'board/2' });
+      const b = d.part('Leg B', { thickness: 'board' });
+      b.profile.rect({ at: [-150, 0], w: 300, h: 400 });
+      b.drawOn('right', { offset: '-board/2' });
+      d.cutParts(a, { with: b, split: 'half', clearance: '0.2mm' });
+      // A frame's corner.
+      const front = d.part('Front', { thickness: 'board' });
+      front.profile.rect({ at: [0, 0], w: 300, h: 100 });
+      front.drawOn('front', { offset: '-500mm', inward: true });
+      const side = d.part('Side', { thickness: 'board' });
+      side.profile.rect({ at: [500, 0], w: 200, h: 100 });
+      side.drawOn('right', { offset: '300mm - board' });
+      d.cutParts(side, { with: front, split: { fingers } });
+    };
+    const { report } = await editCad(null, script(5));
+    expect(report.errors).toEqual([]);
+    expect(report.assembly!.collisions).toEqual([]);
+    const cuts = (name: string) => report.parts.find(part => part.name === name)!.cuts;
+    // Each leg loses half its height where the other crosses it, from opposite edges.
+    expect(cuts('Leg A').map(cut => [cut.ref, cut.size])).toEqual([['Leg B', [18.4, 200.2]]]);
+    expect(cuts('Leg B').map(cut => [cut.ref, cut.size])).toEqual([['Leg A', [18.4, 200.2]]]);
+    // Five fingers: three slots in the side, two in the front.
+    expect(cuts('Side')).toHaveLength(3);
+    expect(cuts('Front')).toHaveLength(2);
+    expect((await editCad(null, script(1.5))).scriptError).toBe('A finger joint needs a whole number of fingers, at least 2, not 1.5.');
   });
 
   it('cuts with one copy of a part, from a pattern or placed by hand', async () => {

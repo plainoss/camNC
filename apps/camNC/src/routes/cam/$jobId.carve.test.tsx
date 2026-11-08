@@ -258,6 +258,126 @@ describe('the Carve step', () => {
     await waitFor(async () => expect(await text()).toMatchObject({ text: 'Board' }));
   });
 
+  it('undoes and redoes moves and deletes, by button and ⌘Z, but not inside a text field', async () => {
+    const job = await open();
+    const undo = screen.getByRole('button', { name: 'Undo' }) as HTMLButtonElement;
+    const redo = screen.getByRole('button', { name: 'Redo' }) as HTMLButtonElement;
+    expect(undo.disabled).toBe(true);
+    const path = screen.getByTestId('carving-item');
+    const svg = path.closest('svg')!;
+    const px = svg.getBoundingClientRect().width / (300 * 1.12);
+    const r = path.getBoundingClientRect();
+    const from = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1 };
+    fireEvent.pointerDown(path, from);
+    fireEvent.pointerMove(svg, { ...from, clientX: from.clientX + 20 * px });
+    fireEvent.pointerUp(svg, from);
+    const x0 = job.carving!.items[0].x;
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].x - x0).toBeCloseTo(20, 0));
+    // ⌘Z in the selected item's text field is the field's own.
+    fireEvent.keyDown(screen.getByLabelText('Text'), { key: 'z', metaKey: true });
+    expect((await getJob(job.id))!.carving!.items[0].x - x0).toBeCloseTo(20, 0);
+    fireEvent.click(within(screen.getByRole('toolbar')).getByRole('button', { name: 'Delete "Welcome"' }));
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toHaveLength(0));
+    fireEvent.click(undo);
+    await waitFor(async () => {
+      const items = (await getJob(job.id))!.carving!.items;
+      expect(items).toHaveLength(1);
+      expect(items[0].x - x0).toBeCloseTo(20, 0);
+    });
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toEqual(job.carving!.items));
+    expect(undo.disabled).toBe(true);
+    fireEvent.keyDown(window, { key: 'z', metaKey: true, shiftKey: true });
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].x - x0).toBeCloseTo(20, 0));
+    fireEvent.click(redo);
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toHaveLength(0));
+    expect(redo.disabled).toBe(true);
+    expect(undo.disabled).toBe(false);
+  });
+
+  it('drops a board resize under way when undoing, keeping redo', async () => {
+    const job = await open();
+    const redo = screen.getByRole('button', { name: 'Redo' }) as HTMLButtonElement;
+    const path = screen.getByTestId('carving-item');
+    const svg = path.closest('svg')!;
+    const px = () => svg.getScreenCTM()!.a;
+    const r = path.getBoundingClientRect();
+    const from = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1 };
+    fireEvent.pointerDown(path, from);
+    fireEvent.pointerMove(svg, { ...from, clientX: from.clientX + 20 * px() });
+    fireEvent.pointerUp(svg, from);
+    const x0 = job.carving!.items[0].x;
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].x - x0).toBeCloseTo(20, 0));
+
+    const width = () => (screen.getByLabelText('Width', { selector: '#carve-board-w' }) as HTMLInputElement).value;
+    const edge = svg.querySelector('[data-resize="w"]')!.getBoundingClientRect();
+    const grip = { clientX: edge.left + edge.width / 2, clientY: edge.top + edge.height / 2, pointerId: 1 };
+    fireEvent.pointerDown(svg.querySelector('[data-resize="w"]')!, grip);
+    fireEvent.pointerMove(svg, { ...grip, clientX: grip.clientX + 43 * px() });
+    expect(width()).toBe('340');
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toEqual(job.carving!.items));
+    expect(width()).toBe('300');
+    // The release finds no resize left to save.
+    fireEvent.pointerMove(svg, { ...grip, clientX: grip.clientX + 60 * px() });
+    fireEvent.pointerUp(svg, grip);
+    expect(width()).toBe('300');
+    expect((await getJob(job.id))!.boards![0].size).toEqual({ fit: false, w: 300, h: 140 });
+    expect(redo.disabled).toBe(false);
+  });
+
+  it('edits text on the board itself after a double-click, keeping it on Enter and dropping it on Escape', async () => {
+    const job = await open();
+    const path = screen.getByTestId('carving-item');
+    const svg = path.closest('svg')!;
+    const press = () => {
+      fireEvent.pointerDown(screen.getByTestId('carving-item'), { button: 0, pointerId: 1 });
+      fireEvent.pointerUp(svg, { pointerId: 1 });
+      fireEvent.doubleClick(svg);
+    };
+    press();
+    const typed = screen.getByRole('textbox', { name: 'Text on the board' }) as HTMLInputElement;
+    expect(document.activeElement).toBe(typed);
+    expect(typed.value).toBe('Welcome');
+    // The ink and the bar make way for the text being typed.
+    expect(screen.queryByTestId('carving-item')).toBeNull();
+    expect(screen.queryByRole('toolbar')).toBeNull();
+    fireEvent.change(typed, { target: { value: 'Oak & Ash' } });
+    fireEvent.keyDown(typed, { key: 'Escape' });
+    expect(screen.queryByRole('textbox', { name: 'Text on the board' })).toBeNull();
+    // Escape left the item selected, as it was.
+    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
+    expect((await getJob(job.id))!.carving!.items[0].art).toMatchObject({ text: 'Welcome' });
+    press();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text on the board' }), { target: { value: 'Oak & Ash' } });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Text on the board' }), { key: 'Enter' });
+    await waitFor(async () => {
+      const item = (await getJob(job.id))!.carving!.items[0];
+      expect(item.art).toMatchObject({ text: 'Oak & Ash' });
+      expect(item.outline).not.toEqual(job.carving!.items[0].outline);
+    });
+    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Oak & Ash');
+    // And typed text is kept when the board is clicked away from it.
+    press();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text on the board' }), { target: { value: 'Elm' } });
+    fireEvent.pointerDown(svg, { button: 0 });
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].art).toMatchObject({ text: 'Elm' }));
+  });
+
+  it('selects an item by a click anywhere in its box, not only on its ink', async () => {
+    await open();
+    const svg = screen.getAllByTestId('carving-item')[0].closest('svg')!;
+    fireEvent.pointerDown(svg, { button: 0 });
+    expect(screen.queryByRole('toolbar')).toBeNull();
+    // The middle of "Welcome"'s box, between its letters' strokes or not.
+    const box = screen.getByTestId('carving-item-box').getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + 2, box.top + 2)!;
+    expect(hit.getAttribute('data-testid')).toBe('carving-item-box');
+    fireEvent.pointerDown(hit, { button: 0, pointerId: 1, clientX: box.left + 2, clientY: box.top + 2 });
+    fireEvent.pointerUp(svg, { pointerId: 1 });
+    expect(screen.getByRole('toolbar', { name: 'Lettering' })).toBeTruthy();
+  });
+
   it('adds text, selects items from the list and canvas, edits just the selection, and deletes it', async () => {
     const job = await open();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
@@ -452,12 +572,15 @@ describe('the Carve step', () => {
     await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 340, h: 140 }));
     expect(screen.getByRole('img', { name: /^Board 340 × 140 mm/ })).toBeTruthy();
 
-    // The top edge grows the board upwards; Shift takes single millimetres.
-    drag('h', 0, -23, true)();
+    // The bottom edge grows the board downwards, as on the Boards step; Shift takes single millimetres. The items keep
+    // their place below the top edge, so they move up from XY zero by as much.
+    const y = (await getJob(job.id))!.carving!.items[0].y;
+    drag('h', 0, 23, true)();
     await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 340, h: 163 }));
+    expect((await getJob(job.id))!.carving!.items[0].y).toBe(y + 23);
 
     // The corner takes both, and stops at the fields' least size.
-    drag('wh', -1000, 1000)();
+    drag('wh', -1000, -1000)();
     await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 20, h: 20 }));
 
     // Typed sizes move the edges.
@@ -488,8 +611,8 @@ describe('the Carve step', () => {
     const path = screen.getByTestId('carving-item');
     const grip = (g: string) => path.closest('svg')!.querySelector(`[data-resize="${g}"]`)!;
     const attr = (el: Element, name: string) => Number(el.getAttribute(name));
-    // The edges' grips reach a quarter of the board inwards at most: the top one ends 5 mm below the top edge.
-    expect(attr(grip('h'), 'y') + attr(grip('h'), 'height')).toBeCloseTo(5);
+    // The edges' grips reach a quarter of the board inwards at most: the bottom one starts 5 mm above the bottom edge.
+    expect(attr(grip('h'), 'y')).toBeCloseTo(20 - 5);
     expect(attr(grip('w'), 'x')).toBeCloseTo(1000 - 25);
     // And lie under the artwork, which takes the drag where they meet.
     for (const g of ['w', 'h']) expect(path.compareDocumentPosition(grip(g)) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();

@@ -40,7 +40,7 @@ import {
   resolvePartPatterns,
 } from '@wbcnc/cad';
 import { combineExpressions, differenceExpression } from './linearExpression';
-import { inspectCadDocument, type CadExpectation, type CadReport } from './inspect';
+import { inspectCadDocument, shortHandles, type CadExpectation, type CadReport } from './inspect';
 
 export type Xy = readonly [number, number];
 /** mm, or an expression such as `'width - 2*board'` that keeps following the design's variables. */
@@ -117,7 +117,7 @@ export interface PathEdit {
    */
   arcTo(to: LenXy, how: { r: Len; clockwise?: boolean; large?: boolean } | { tangent: true }): PathEdit;
   /** Joins the end back to the start with a line, unless it's already there. */
-  close(): { edges: CadRef[]; corners: CadRef[] };
+  close(options?: { straight?: boolean }): { edges: CadRef[]; corners: CadRef[] };
 }
 export interface PartEdit {
   readonly id: string;
@@ -185,11 +185,12 @@ export interface DesignEdit {
   /**
    * Cuts the `with` parts out of the target parts wherever they reach in, with `clearance` mm of room: housings, grooves,
    * rebates and mortises that follow both parts. The clearance grows every side of an opening inside the target and
-   * deepens a blind one; a side that runs off the target's edge stays open.
+   * deepens a blind one; a side that runs off the target's edge stays open. With `split`, two parts that cross share the
+   * material where they meet instead: `'half'` for a half-lap, `{ fingers: n }` for a finger joint at a corner.
    */
   cutParts(
     targets: PartEdit | readonly PartEdit[],
-    options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len }
+    options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len; split?: 'half' | { fingers: Len } }
   ): void;
   /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
   value(expression: Len): number;
@@ -246,6 +247,7 @@ function rotationTo(ex: readonly number[], ey: readonly number[]): CadPlacement[
 
 function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpectation[]>) {
   let document = start;
+  const closures: { partId: string; sketchId: string; edgeId: string; from: Xy; to: Xy }[] = [];
   const measure = (value: Len, what: string, unit: 'mm' | 'scalar' = 'mm'): number => {
     if (typeof value === 'number') return value;
     const result = parseCadValue(value, { unit, variables: cadVariableScope(document) });
@@ -503,9 +505,13 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
             cursor = end;
             return edit;
           },
-          close() {
+          close(options) {
             open();
-            if (Math.hypot(cursor.x - start.x, cursor.y - start.y) > 1e-6) edit.lineTo(from);
+            if (Math.hypot(cursor.x - start.x, cursor.y - start.y) > 1e-6) {
+              if (!options?.straight)
+                closures.push({ partId, sketchId, edgeId: edges[0]!.id, from: [cursor.x, cursor.y], to: [start.x, start.y] });
+              edit.lineTo(from);
+            }
             closed = true;
             const corners = vertices.map(vertex => {
               const point: CadRef & { fixed?: boolean } = pointNear([vertex.at.x, vertex.at.y]);
@@ -803,15 +809,23 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         document = result.document;
         return name;
       },
-      cutParts(targets, { with: tools, clearance = 0 }) {
+      cutParts(targets, { with: tools, clearance = 0, split }) {
         const ids = (parts: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]) =>
           'id' in parts ? [parts.id] : parts.map(part => part.id);
         const value = measure(clearance, 'Clearance');
         if (value < 0) fail(`A clearance can't be negative: ${value} mm.`);
-        document = addPartCut(document, ids(tools), ids(targets), {
-          value,
-          ...(typeof clearance === 'string' && { expression: clearance }),
-        }).document;
+        const fingers = typeof split === 'object' ? measure(split.fingers, 'Fingers', 'scalar') : undefined;
+        if (fingers !== undefined && !(Number.isInteger(fingers) && fingers >= 2))
+          fail(`A finger joint needs a whole number of fingers, at least 2, not ${fingers}.`);
+        document = addPartCut(
+          document,
+          ids(tools),
+          ids(targets),
+          { value, ...(typeof clearance === 'string' && { expression: clearance }) },
+          typeof split === 'object'
+            ? { fingers: fingers!, ...(typeof split.fingers === 'string' && { fingersExpression: split.fingers }) }
+            : split
+        ).document;
       },
       value(expression) {
         // A count or ratio, such as `'(height - 2*margin)/pitch'`, has no unit.
@@ -824,6 +838,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       },
     } satisfies DesignEdit,
     document: () => document,
+    closures,
   };
 }
 
@@ -855,6 +870,20 @@ export async function editCad(start: CadDocument | null, script: CadScript, opti
   // A failed script leaves the design as it was: half of an intent is worse than none of it.
   const edited = scriptError ? base : { ...session.document(), revision: base.revision + 1 };
   const inspected = await inspectCadDocument(edited, expectations);
+  if (!scriptError)
+    for (const closure of session.closures) {
+      const part = inspected.document.parts.find(part => part.id === closure.partId);
+      const sketch =
+        part && [part.sketch, ...cadFaceSketches(part).map(face => face.sketch)].find(sketch => sketch.id === closure.sketchId);
+      if (!sketch?.entities.some(entity => entity.id === closure.edgeId)) continue;
+      const ref = shortHandles(sketch.entities.map(entity => entity.id)).get(closure.edgeId)!;
+      inspected.report.warnings.push({
+        code: 'close-straight',
+        part: part!.name,
+        entities: [ref],
+        message: `Path ${ref}: close() adds a straight edge from ${closure.from.join(', ')} to ${closure.to.join(', ')}. Use close({ straight: true }) if intended.`,
+      });
+    }
   // A new design that failed is empty, and saying so would only hide the script's error.
   if (scriptError && !base.parts.length) inspected.report.errors = inspected.report.errors.filter(error => error.code !== 'no-parts');
   return { ...inspected, ok: inspected.report.ok && !scriptError, ...(scriptError && { scriptError }) };
