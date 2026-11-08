@@ -1,4 +1,4 @@
-import { createCarvingJob, getJob } from '@/cam/jobDb';
+import { createCarvingJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { ensureWebFont, loadFontCatalog } from '@/cam/webFonts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -179,6 +179,73 @@ describe('the Carve step', () => {
       expect(saved!.carving!.x - job.carving!.x).toBeCloseTo(20, 0);
       expect(saved!.carving!.region[0][0].x - job.carving!.region[0][0].x).toBeCloseTo(20, 0);
     });
+  });
+
+  it('sizes the board by dragging its edges, in 10 mm steps, with the fields following', async () => {
+    const job = await open();
+    const svg = screen.getByTestId('carving-outline').closest('svg')!;
+    const field = (label: string) =>
+      screen.getByLabelText(label, { selector: '#carve-board-' + label[0].toLowerCase() }) as HTMLInputElement;
+    const drag = (grip: string, dx: number, dy: number, shiftKey = false) => {
+      // 1 mm on the board in screen pixels, as the view is now.
+      const px = svg.getScreenCTM()!.a;
+      const handle = svg.querySelector(`[data-resize="${grip}"]`)!;
+      const r = handle.getBoundingClientRect();
+      const from = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1 };
+      fireEvent.pointerDown(handle, from);
+      fireEvent.pointerMove(svg, { ...from, clientX: from.clientX + dx * px, clientY: from.clientY + dy * px, shiftKey });
+      return () => fireEvent.pointerUp(svg, from);
+    };
+
+    // The right edge: the width, shown in its field while dragging, saved when dropped.
+    const drop = drag('w', 43, 0);
+    expect(field('Width').value).toBe('340');
+    expect(field('Height').value).toBe('140');
+    drop();
+    await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 340, h: 140 }));
+    expect(screen.getByRole('img', { name: /^Board 340 × 140 mm/ })).toBeTruthy();
+
+    // The top edge grows the board upwards; Shift takes single millimetres.
+    drag('h', 0, -23, true)();
+    await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 340, h: 163 }));
+
+    // The corner takes both, and stops at the fields' least size.
+    drag('wh', -1000, 1000)();
+    await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 20, h: 20 }));
+
+    // Typed sizes move the edges.
+    fireEvent.change(field('Width'), { target: { value: '250' } });
+    fireEvent.blur(field('Width'));
+    await waitFor(() => expect(screen.getByRole('img', { name: /^Board 250 × 20 mm/ })).toBeTruthy());
+    const right = svg.querySelector('[data-resize="w"]')!.getBoundingClientRect();
+    const board = svg.querySelector('rect')!.getBoundingClientRect();
+    expect(right.left + right.width / 2).toBeCloseTo(board.right, 0);
+  });
+
+  it('moves the artwork on a narrow board instead of sizing the board', async () => {
+    const job = await open();
+    const field = (id: string) => document.getElementById(id) as HTMLInputElement;
+    const type = async (id: string, value: string, saved: (job: CamJobV1 | null) => unknown) => {
+      fireEvent.change(field(id), { target: { value } });
+      fireEvent.blur(field(id));
+      await waitFor(async () => expect(saved(await getJob(job.id))).toBe(Number(value)));
+    };
+    // Each saved before the next, as a slower outline would save over a board size typed meanwhile.
+    await type('carve-height', '10', j => j?.carving?.height);
+    const board = (j: CamJobV1 | null) => {
+      const size = j?.boards?.[0].size;
+      return size?.fit === false ? size : null;
+    };
+    await type('carve-board-w', '1000', j => board(j)?.w);
+    await type('carve-board-h', '20', j => board(j)?.h);
+    const path = screen.getByTestId('carving-outline');
+    const grip = (g: string) => path.closest('svg')!.querySelector(`[data-resize="${g}"]`)!;
+    const attr = (el: Element, name: string) => Number(el.getAttribute(name));
+    // The edges' grips reach a quarter of the board inwards at most: the top one ends 5 mm below the top edge.
+    expect(attr(grip('h'), 'y') + attr(grip('h'), 'height')).toBeCloseTo(5);
+    expect(attr(grip('w'), 'x')).toBeCloseTo(1000 - 25);
+    // And lie under the artwork, which takes the drag where they meet.
+    for (const g of ['w', 'h']) expect(path.compareDocumentPosition(grip(g)) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
   it('warns when the depth is deeper than the V-bit’s cone', async () => {

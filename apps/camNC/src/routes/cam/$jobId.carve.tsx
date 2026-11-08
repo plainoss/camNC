@@ -21,6 +21,12 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 export const Route = createFileRoute('/cam/$jobId/carve')({ component: CarveStep });
 
 type Loop = { x: number; y: number }[];
+type BoardGrip = 'w' | 'h' | 'wh';
+
+/** A dragged board edge moves in these steps (Shift: 1 mm), between the board size fields' limits. */
+const kBoardSnap = 10;
+const kBoardLeast = 20;
+const kBoardMost = 2000;
 
 /** The carving's outlines as an SVG path, board mm with Y up drawn Y down. */
 const pathOf = (region: Loop[], h: number) =>
@@ -49,7 +55,10 @@ function CarveStep() {
 
 function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV1; board?: BoardV1 }) {
   const save = useSaveCamJob(job);
-  const size = board?.size.fit === false ? board.size : { w: 300, h: 140 };
+  const saved = board?.size.fit === false ? board.size : { w: 300, h: 140 };
+  // While an edge of the board is dragged, its new size is shown (and in the fields) before it's saved.
+  const [resized, setResized] = useState<{ w: number; h: number; from: { w: number; h: number } } | null>(null);
+  const size = resized ? { w: resized.w, h: resized.h } : saved;
   const thickness = board?.thickness ?? 18;
   // While dragging, the moved artwork is shown before it's saved.
   const [dragged, setDragged] = useState<{ x: number; y: number; height: number } | null>(null);
@@ -128,6 +137,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     setDragged({ x: carving.x, y: carving.y, height: carving.height });
   };
   const move = (e: ReactPointerEvent) => {
+    if (moveResize(e)) return;
     const d = drag.current;
     if (!d) return;
     const at = toMm(e);
@@ -144,7 +154,39 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
       setDragged({ x: carving.x, y: carving.y, height: Math.max(5, Math.min(size.h, Math.round(carving.height * (now / was)))) });
     }
   };
+  // Drag the board's right or top edge, or the corner between them, to size it: XY zero, lower left, stays.
+  const resize = useRef<{ grip: BoardGrip; x: number; y: number; pxPerMm: number; from: { w: number; h: number } } | null>(null);
+  const startResize = (grip: BoardGrip) => (e: ReactPointerEvent) => {
+    if (e.button !== 0 || !board) return;
+    e.preventDefault();
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    resize.current = { grip, x: e.clientX, y: e.clientY, pxPerMm: svg.current?.getScreenCTM()?.a || 1, from: saved };
+    setResized({ ...saved, from: saved });
+  };
+  const moveResize = (e: ReactPointerEvent) => {
+    const r = resize.current;
+    if (!r) return false;
+    // In steps like the Boards step's edges, Shift for single millimetres.
+    const step = e.shiftKey ? 1 : kBoardSnap;
+    const to = (from: number, by: number) => Math.max(kBoardLeast, Math.min(kBoardMost, Math.round((from + by / r.pxPerMm) / step) * step));
+    setResized({
+      from: r.from,
+      w: r.grip === 'h' ? r.from.w : to(r.from.w, e.clientX - r.x),
+      h: r.grip === 'w' ? r.from.h : to(r.from.h, r.y - e.clientY),
+    });
+    return true;
+  };
+  const endResize = () => {
+    const r = resize.current;
+    if (!r) return false;
+    resize.current = null;
+    if (resized && (resized.w !== r.from.w || resized.h !== r.from.h)) setBoard({ w: resized.w, h: resized.h });
+    setResized(null);
+    return true;
+  };
   const end = () => {
+    if (endResize()) return;
     const d = drag.current;
     drag.current = null;
     if (!d || !dragged) return setDragged(null);
@@ -165,7 +207,10 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const cone = vConeDepth(carving.vBit);
   const flatBit = (job.plan ?? kDefaultPlan).bit;
   const off = box && (box.x0 < 0 || box.y0 < 0 || box.x1 > size.w || box.y1 > size.h);
-  const pad = Math.max(size.w, size.h) * 0.06;
+  // While resizing, the view holds still around the lower left corner; it fits the board again once dropped.
+  const frame = resized?.from ?? size;
+  const pad = Math.max(frame.w, frame.h) * 0.06;
+  const grip = Math.max(frame.w, frame.h) * 0.025;
 
   return (
     <CamPage className="min-h-dvh md:h-dvh">
@@ -185,8 +230,8 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
             ref={svg}
             role="img"
             aria-label={`Board ${size.w} × ${size.h} mm with the carving`}
-            className="absolute inset-0 h-full w-full touch-none select-none"
-            viewBox={`${-pad} ${-pad} ${size.w + 2 * pad} ${size.h + 2 * pad}`}
+            className="absolute inset-0 h-full w-full touch-none overflow-visible select-none"
+            viewBox={`${-pad} ${-pad + size.h - frame.h} ${frame.w + 2 * pad} ${frame.h + 2 * pad}`}
             onPointerMove={move}
             onPointerUp={end}
             onPointerCancel={end}>
@@ -199,6 +244,31 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               className="fill-amber-200 stroke-amber-700 dark:fill-amber-900/60"
               strokeWidth={0.6}
             />
+            {/* The edges' grips, under the artwork, so a narrow board's edge never takes the artwork's drag. */}
+            {board && (
+              <g className="fill-transparent">
+                <rect
+                  role="presentation"
+                  data-resize="w"
+                  x={size.w - Math.min(grip, size.w / 4)}
+                  y={0}
+                  width={grip + Math.min(grip, size.w / 4)}
+                  height={size.h}
+                  className="cursor-ew-resize"
+                  onPointerDown={startResize('w')}
+                />
+                <rect
+                  role="presentation"
+                  data-resize="h"
+                  x={0}
+                  y={-grip}
+                  width={size.w}
+                  height={grip + Math.min(grip, size.h / 4)}
+                  className="cursor-ns-resize"
+                  onPointerDown={startResize('h')}
+                />
+              </g>
+            )}
             <path
               d={pathOf(region, size.h)}
               data-testid="carving-outline"
@@ -231,6 +301,44 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 <text x={box.x0} y={size.h - box.y1 - 2} className="fill-primary text-[4px]">
                   {(box.x1 - box.x0).toFixed(0)} × {(box.y1 - box.y0).toFixed(0)} mm
                 </text>
+              </g>
+            )}
+            {board && (
+              <g data-testid="board-resize" className="fill-background stroke-amber-700">
+                <rect
+                  className="pointer-events-none"
+                  x={size.w - grip / 3}
+                  y={size.h / 2 - grip * 1.5}
+                  width={(grip * 2) / 3}
+                  height={grip * 3}
+                  rx={grip / 3}
+                  strokeWidth={0.5}
+                />
+                <rect
+                  className="pointer-events-none"
+                  x={size.w / 2 - grip * 1.5}
+                  y={-grip / 3}
+                  width={grip * 3}
+                  height={(grip * 2) / 3}
+                  rx={grip / 3}
+                  strokeWidth={0.5}
+                />
+                <rect
+                  role="presentation"
+                  data-resize="wh"
+                  x={size.w - grip / 2}
+                  y={-grip / 2}
+                  width={grip}
+                  height={grip}
+                  className="cursor-nesw-resize"
+                  strokeWidth={0.5}
+                  onPointerDown={startResize('wh')}
+                />
+                {resized && (
+                  <text x={size.w} y={-grip - 1} textAnchor="end" className="fill-amber-800 stroke-none text-[4px] dark:fill-amber-300">
+                    {size.w} × {size.h} mm
+                  </text>
+                )}
               </g>
             )}
             <circle cx={0} cy={size.h} r={1.5} className="fill-emerald-500" />
@@ -306,10 +414,10 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
           <h3 className="font-medium">Board</h3>
           <div className="grid grid-cols-3 gap-2">
             <Field label="Width" id="carve-board-w">
-              <NumberInput id="carve-board-w" value={size.w} min={20} max={2000} unit="mm" onCommit={w => setBoard({ w })} />
+              <NumberInput id="carve-board-w" value={size.w} min={kBoardLeast} max={kBoardMost} unit="mm" onCommit={w => setBoard({ w })} />
             </Field>
             <Field label="Height" id="carve-board-h">
-              <NumberInput id="carve-board-h" value={size.h} min={20} max={2000} unit="mm" onCommit={h => setBoard({ h })} />
+              <NumberInput id="carve-board-h" value={size.h} min={kBoardLeast} max={kBoardMost} unit="mm" onCommit={h => setBoard({ h })} />
             </Field>
             <Field label="Thick" id="carve-board-t">
               <NumberInput id="carve-board-t" value={thickness} min={3} max={100} unit="mm" onCommit={t => setBoard({ thickness: t })} />
