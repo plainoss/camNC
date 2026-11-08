@@ -74,8 +74,8 @@ describe('the Carve step', () => {
   it('warns when the depth is deeper than the V-bit’s cone', async () => {
     await open();
     expect(screen.getByText(/get a flat bottom/).textContent).not.toMatch(/cone is only/);
-    fireEvent.change(screen.getByLabelText('Deepest (mm)'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('Deepest (mm)'), { target: { value: '6' } });
     fireEvent.blur(screen.getByLabelText('Deepest (mm)'));
-    expect(await screen.findByText(/cone is only 3\.0 mm deep/)).toBeTruthy();
+    expect(await screen.findByText(/cone is only 5\.2 mm deep/)).toBeTruthy();
   });
 });

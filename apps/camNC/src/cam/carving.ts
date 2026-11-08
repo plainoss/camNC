@@ -36,11 +36,14 @@ export interface CarvingV1 {
 
 /** V-bits offered for carving: the largest that fits the collet is ⌀8. Cutting data is cautious, for hardwood. */
 export const kVBits: LibraryTool[] = [
+  { number: 16, diameter: 4, shape: 'v', angle: 60, name: '60° V-bit ⌀4', feed: 800, plungeFeed: 200, rpm: 18000 },
+  { number: 14, diameter: 6, shape: 'v', angle: 60, name: '60° V-bit ⌀6', feed: 1000, plungeFeed: 250, rpm: 18000 },
+  { number: 13, diameter: 8, shape: 'v', angle: 60, name: '60° V-bit ⌀8', feed: 1000, plungeFeed: 250, rpm: 18000 },
+  { number: 15, diameter: 4, shape: 'v', angle: 90, name: '90° V-bit ⌀4', feed: 1000, plungeFeed: 250, rpm: 18000 },
   { number: 11, diameter: 6, shape: 'v', angle: 90, name: '90° V-bit ⌀6', feed: 1200, plungeFeed: 300, rpm: 18000 },
   { number: 12, diameter: 8, shape: 'v', angle: 90, name: '90° V-bit ⌀8', feed: 1200, plungeFeed: 300, rpm: 18000 },
-  { number: 13, diameter: 8, shape: 'v', angle: 60, name: '60° V-bit ⌀8', feed: 1000, plungeFeed: 250, rpm: 18000 },
 ];
-export const kDefaultVBit = kVBits[0];
+export const kDefaultVBit = kVBits.find(bit => bit.number === 14)!;
 
 export const kCarvingBoard = { w: 300, h: 140, thickness: 18 };
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { boardRequest, edgeNote, nestBoard, reconcileBoards } from './boards';
-import { boardCarving, carvingProblem, hasWork, kDefaultVBit, withCarving, type CarvingV1 } from './carving';
+import { boardCarving, carvingProblem, hasWork, kDefaultVBit, kVBits, withCarving, type CarvingV1 } from './carving';
 import { maskOutline, outlineArt } from './carvingOutline';
 import { camWorker } from './camQueries';
 import { createCarvingJob, modelKey } from './jobDb';
@@ -54,11 +54,25 @@ describe('carving outlines', () => {
 });
 
 describe('a carving job', () => {
+  it('offers 60° and 90° V-bits at ⌀4, ⌀6 and ⌀8 with stable tool numbers', () => {
+    expect(kVBits.map(({ number, angle, diameter, feed, plungeFeed }) => [number, angle, diameter, feed, plungeFeed])).toEqual([
+      [16, 60, 4, 800, 200],
+      [14, 60, 6, 1000, 250],
+      [13, 60, 8, 1000, 250],
+      [15, 90, 4, 1000, 250],
+      [11, 90, 6, 1200, 300],
+      [12, 90, 8, 1200, 300],
+    ]);
+    for (const bit of kVBits) {
+      expect(bit).toMatchObject({ shape: 'v', rpm: 18000, name: `${bit.angle}° V-bit ⌀${bit.diameter}` });
+    }
+  });
+
   it('starts with lettering on a fixed board, opens on Carve, and has no model file', async () => {
     const job = await createCarvingJob();
     expect(job.carving?.region.length).toBeGreaterThan(0);
     expect(job.carving?.vBit).toEqual(kDefaultVBit);
-    expect(kDefaultVBit).toMatchObject({ shape: 'v', angle: 90, diameter: 6 });
+    expect(kDefaultVBit).toMatchObject({ number: 14, shape: 'v', angle: 60, diameter: 6 });
     expect(job.boards?.[0].size).toEqual({ fit: false, w: 300, h: 140 });
     expect(modelKey(job)).toBe(`${job.id}:carving`);
     expect(firstStage(job)).toBe('/cam/$jobId/carve');
@@ -88,7 +102,7 @@ describe('a carving job', () => {
     expect(plan.safety).toEqual([]);
     expect(plan.ops.some(op => op.kind === 'vcarve' && op.tool.shape === 'v')).toBe(true);
     expect(plan.programs.at(-1)).toMatchObject({ tool: kDefaultVBit.number, name: kDefaultVBit.name });
-    expect(plan.gcode).toMatch(/TAPER=45deg/);
+    expect(plan.gcode).toMatch(/TAPER=30deg/);
     // Its board has no outlines: no note about cuts past its edge.
     expect(edgeNote(board, nest, kDefaultPlan.bit.diameter)).toBeNull();
   }, 60_000);
