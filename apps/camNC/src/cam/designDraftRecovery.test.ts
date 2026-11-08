@@ -23,9 +23,12 @@ describe('draft recovery before IndexedDB finishes', () => {
     const last = { ...first, name: 'Last edit', revision: first.revision + 1 };
     keepPendingDesignDraft('job', saved, first);
     keepPendingDesignDraft('job', saved, last);
-    acknowledgePendingDesignDraft('job', first);
     expect(pendingDesignDraft('job', saved)).toMatchObject({ document: last, conflict: false });
     expect(pendingDesignDraft('job', first)).toMatchObject({ document: last, conflict: false });
+    acknowledgePendingDesignDraft('job', first);
+    // Once the first edit is stored, the draft before it can't be: it now means another view changed the design.
+    expect(pendingDesignDraft('job', first)).toMatchObject({ document: last, conflict: false, checkpoint: first });
+    expect(pendingDesignDraft('job', saved)).toMatchObject({ document: last, conflict: true });
     acknowledgePendingDesignDraft('job', last);
     expect(pendingDesignDraft('job', saved)).toBeNull();
   });
@@ -73,5 +76,23 @@ describe('draft recovery before IndexedDB finishes', () => {
     } finally {
       write.mockRestore();
     }
+  });
+
+  it('keeps a bounded history when edits outpace IndexedDB', () => {
+    const saved = durableDocument();
+    let latest = saved;
+    for (let n = 1; n <= 30; n++) {
+      latest = { ...latest, name: `Edit ${n}`, revision: saved.revision + n };
+      keepPendingDesignDraft('job', saved, latest);
+    }
+    const stored = JSON.parse(sessionStorage.getItem('camnc-pending-design:normal:job')!) as { sources: string[] };
+    expect(stored.sources).toHaveLength(8);
+    // A recent draft is still recognised as one this tab queued, so recovery resumes without a conflict.
+    const recent = { ...saved, name: 'Edit 25', revision: saved.revision + 25 };
+    expect(pendingDesignDraft('job', recent)).toMatchObject({ document: latest, conflict: false });
+    // A dropped one opens as a conflict, which keeps both versions.
+    expect(pendingDesignDraft('job', { ...saved, name: 'Edit 3', revision: saved.revision + 3 })).toMatchObject({
+      conflict: true,
+    });
   });
 });
