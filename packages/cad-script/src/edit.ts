@@ -190,7 +190,7 @@ export interface DesignEdit {
    */
   cutParts(
     targets: PartEdit | readonly PartEdit[],
-    options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len; split?: 'half' | { fingers: number } }
+    options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len; split?: 'half' | { fingers: Len } }
   ): void;
   /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
   value(expression: Len): number;
@@ -814,14 +814,17 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
           'id' in parts ? [parts.id] : parts.map(part => part.id);
         const value = measure(clearance, 'Clearance');
         if (value < 0) fail(`A clearance can't be negative: ${value} mm.`);
-        if (typeof split === 'object' && !(Number.isInteger(split.fingers) && split.fingers >= 2))
-          fail(`A finger joint needs a whole number of fingers, at least 2, not ${split.fingers}.`);
+        const fingers = typeof split === 'object' ? measure(split.fingers, 'Fingers', 'scalar') : undefined;
+        if (fingers !== undefined && !(Number.isInteger(fingers) && fingers >= 2))
+          fail(`A finger joint needs a whole number of fingers, at least 2, not ${fingers}.`);
         document = addPartCut(
           document,
           ids(tools),
           ids(targets),
           { value, ...(typeof clearance === 'string' && { expression: clearance }) },
-          split
+          typeof split === 'object'
+            ? { fingers: fingers!, ...(typeof split.fingers === 'string' && { fingersExpression: split.fingers }) }
+            : split
         ).document;
       },
       value(expression) {
