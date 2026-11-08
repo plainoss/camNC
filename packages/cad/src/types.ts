@@ -257,6 +257,11 @@ export interface CadPart {
   placement?: CadPlacement;
   /** What the part was drawn on. When it's set, the placement follows from it, so the part moves with that face. */
   drawnOn?: CadDrawnOn;
+  /**
+   * A bone in every inside corner, so a bit of this diameter cuts it fully and a part that fits into it goes all the
+   * way in. The diameter is the design's bit: a bigger bit in the job can't reach into the bones.
+   */
+  cornerRelief?: { diameter: number; diameterExpression?: string };
   /** More of the same part elsewhere in the assembly, each edited along with it. */
   copies?: CadPartCopy[];
   /** Ordered: a sketch can sit on the floor of an earlier cut. Parts without features are plain flat profiles. */

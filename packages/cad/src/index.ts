@@ -23,6 +23,7 @@ export * from './placement';
 export * from './drawnOn';
 export * from './assemblyCollisions';
 export * from './copies';
+export * from './cornerRelief';
 
 export * from './dimensionValues';
 export * from './dimensionCreation';
