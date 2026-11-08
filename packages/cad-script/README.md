@@ -54,6 +54,15 @@ report) and `read_design`.
 
 ## Writing a script
 
+A design is for people to keep working on in the app, as they would a Part Studio:
+change a variable or a dimension, or a step's settings. So:
+
+- Name every size a person would change as a variable, and write lengths from them.
+- Prefer a feature over geometry drawn to look like one: `rect` over a four-point path,
+  `pattern` and `copy` over repeated parts, `cutParts` over openings drawn into the
+  part that receives them, and `relief` over hand-drawn dogbones.
+- Draw a custom outline with `path` only when it is one, such as a leg with a tenon.
+
 - All lengths are mm, Y up, in the part's own sketch coordinates. Arc angles are degrees.
 - `rect`, `circle` and `polygon` come dimensioned and placed, so they're fully
   constrained. `line` and `arc` come free, for you to constrain with `relate`,
@@ -68,8 +77,11 @@ report) and `read_design`.
   and arcs. An arc with `r` turns counterclockwise unless `clockwise`, the short way
   round unless `large`. One with `tangent: true` carries on smoothly from the segment
   before it, which makes slots and wavy edges. Vertices can be expressions, such as
-  `['board + 0.2mm', 'height/2']`, so joints follow the variables. Every vertex is placed,
-  so the loop comes out fully constrained.
+  `['board + 0.2mm', 'height/2']`, so joints follow the variables. The loop comes out
+  fully constrained and dimensioned as a person would draw it: the start is placed, each
+  edge along an axis is horizontal or vertical with its length, such as `board` for a
+  tenon worked out from `legH` and `legH + board`, and every other corner is measured
+  from the one before. Changing one length in the app moves what comes after it.
 - `d.part(name, { relief: 'bit' })`, or `part.relief(...)`, puts dogbones in the part's
   inside corners for a bit of that diameter, so mortises and finger joints close. Corners
   on the outline of a pocket that runs off the part stay square. The check warns with

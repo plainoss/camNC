@@ -329,6 +329,33 @@ describe('paths', () => {
     expect(report.parts[0]!.cuts[0]!.size).toEqual([14, 14]);
   });
 
+  it('dimensions a path corner to corner, so one length changes one thing', async () => {
+    const { report, document } = await editCad(null, d => {
+      d.variable('legW', '70mm');
+      d.variable('tenonW', '30mm');
+      d.variable('legH', '432mm');
+      d.variable('board', '18mm');
+      // A leg with a tenon on top, as an agent writes it: absolute corners from expressions.
+      d.part('Leg')
+        .profile.path(['-legW/2', 0])
+        .lineTo(['legW/2', 0])
+        .lineTo(['legW/2', 'legH'])
+        .lineTo(['tenonW/2', 'legH'])
+        .lineTo(['tenonW/2', 'legH + board'])
+        .lineTo(['-tenonW/2', 'legH + board'])
+        .lineTo(['-tenonW/2', 'legH'])
+        .lineTo(['-legW/2', 'legH'])
+        .close();
+    });
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+    const constraints = document.parts[0]!.sketch.constraints;
+    // Only the start is placed; every other corner hangs off the one before.
+    expect(constraints.filter(c => c.type === 'positionX' || c.type === 'positionY')).toHaveLength(2);
+    expect(constraints.filter(c => c.type === 'horizontal' || c.type === 'vertical')).toHaveLength(7);
+    const lengths = constraints.flatMap(c => (c.type === 'distanceX' || c.type === 'distanceY' ? [c.expression ?? c.value] : []));
+    expect(lengths).toEqual(['legW', 'legH', 'legW/2 - tenonW/2', 'board', 'tenonW', 'board', 'legW/2 - tenonW/2']);
+  });
+
   it('says what went wrong', async () => {
     const tooSmall = await editCad(null, d => d.part('A').profile.path([0, 0]).arcTo([100, 0], { r: 20 }));
     expect(tooSmall.scriptError).toBe("A 20 mm radius can't reach 100, 0: it needs at least 50 mm.");

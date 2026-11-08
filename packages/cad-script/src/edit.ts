@@ -39,6 +39,7 @@ import {
   cadCopyName,
   resolvePartPatterns,
 } from '@wbcnc/cad';
+import { differenceExpression } from './linearExpression';
 import { inspectCadDocument, type CadExpectation, type CadReport } from './inspect';
 
 export type Xy = readonly [number, number];
@@ -490,15 +491,44 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
             closed = true;
             const corners = vertices.map(vertex => {
               const point: CadRef & { fixed?: boolean } = pointNear([vertex.at.x, vertex.at.y]);
-              const corner =
-                point.fixed && typed(vertex.typed)
-                  ? detach(
-                      point.id,
-                      edges.map(edge => edge.id)
-                    )
-                  : point;
-              if (!('fixed' in corner && corner.fixed) && !isPlaced(corner.id)) place(corner, vertex.typed);
-              return corner;
+              return point.fixed && typed(vertex.typed)
+                ? detach(
+                    point.id,
+                    edges.map(edge => edge.id)
+                  )
+                : point;
+            });
+            // Dimensioned as a person would: the start is placed, and each corner is measured from the one before, a
+            // straight edge along an axis by its length alone. Changing one length then moves what comes after it.
+            const first = corners[0]!;
+            if (!('fixed' in first && first.fixed) && !isPlaced(first.id)) place(first, vertices[0]!.typed);
+            vertices.slice(1).forEach((vertex, i) => {
+              const a = corners[i]!,
+                b = corners[i + 1]!;
+              if (isPlaced(b.id)) return;
+              const before = vertices[i]!;
+              const edge = edges[i]!,
+                straight = current().entities.find(e => e.id === edge.id)?.type === 'line';
+              (['x', 'y'] as const).forEach((axis, k) => {
+                const delta = vertex.at[axis] - before.at[axis];
+                if (Math.abs(delta) < 1e-9) {
+                  const along = axis === 'x' ? 'vertical' : 'horizontal';
+                  if (straight) constrain({ type: along, entityId: edge.id });
+                  else constrain({ type: `${along}Points`, pointAId: a.id, pointBId: b.id });
+                  return;
+                }
+                // Dimensions read positive, from the lower point to the higher.
+                const [low, high] = delta > 0 ? [before.typed[k]!, vertex.typed[k]!] : [vertex.typed[k]!, before.typed[k]!];
+                const [lowPoint, highPoint] = delta > 0 ? [a, b] : [b, a];
+                constrain({
+                  type: axis === 'x' ? 'distanceX' : 'distanceY',
+                  pointAId: lowPoint.id,
+                  pointBId: highPoint.id,
+                  value: Math.abs(delta),
+                  label: axis === 'x' ? 'Width' : 'Height',
+                  ...expressionOf(differenceExpression(low, high)),
+                });
+              });
             });
             return { edges, corners };
           },
