@@ -18,8 +18,14 @@ export interface Tool {
   guid?: string;
   presetId?: string;
   presetName?: string;
-  /** Flat end mill diameter in mm. */
+  /** Cutting diameter in mm: a flat end mill's, or a V-bit's widest (at the top of its cone). */
   diameter: number;
+  /** Default `flat`. A `v` bit has a cone of `angle` and cuts deeper where it should cut wider. */
+  shape?: 'flat' | 'v';
+  /** A V-bit's included angle, degrees (90 for a 90° bit). */
+  angle?: number;
+  /** A V-bit's flat at the tip, mm (0: pointed). */
+  tipDiameter?: number;
   name?: string;
   /** Depth per pass with this bit (its cutting data); default: the material's share of the diameter. */
   stepdown?: number;
@@ -190,7 +196,8 @@ export interface Pass {
 
 export interface Operation {
   name: string;
-  kind: 'pocket' | 'profile';
+  /** `vcarve`: a V-bit following the artwork's inward offsets, deeper where it is wider. */
+  kind: 'pocket' | 'profile' | 'vcarve';
   /** What it cuts: board programs put inner features (pockets, holes) before outlines. */
   feature: 'pocket' | 'hole' | 'outline';
   tool: Tool;
