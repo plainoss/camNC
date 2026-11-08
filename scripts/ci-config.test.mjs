@@ -298,3 +298,12 @@ test('all workflows use maintained Node.js 24 action releases', () => {
     }
   }
 });
+
+test('desktop builds run nightly and on demand, not on every merge, and skip a night with no app change', () => {
+  const workflow = parse(read('.github/workflows/desktop.yml'));
+  assert.equal(workflow.on.push, undefined);
+  assert(workflow.on.schedule?.length && 'workflow_dispatch' in workflow.on);
+  const pick = workflow.jobs.platforms.steps.find(step => step.id === 'pick');
+  assert.match(pick.run, /releases\/latest/);
+  assert.equal(workflow.jobs.build.if, "needs.platforms.outputs.include != '[]'");
+});
