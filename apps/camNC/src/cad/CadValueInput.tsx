@@ -60,21 +60,30 @@ export function CadValueInput({
       mounted.current = false;
     };
   }, []);
+  // The design's variables as of the latest render, to know when a variable just made is there to use.
+  const latestFields = useRef(fields);
+  latestFields.current = fields;
   /**
-   * Runs once the new variable is in scope: two frames on, and only while the field is still there. A dialog the field
-   * is in waits for it before it's done.
+   * Runs once the variable the field now names is in scope, a frame after the design has it (a few seconds at most), and
+   * only while the field is still there. A dialog the field is in waits for it before it's done.
    */
-  const later = (run: () => void) =>
+  const later = (run: () => void) => {
+    const name = /^#([A-Za-z_][A-Za-z0-9_]*)$/.exec(own.current?.value ?? '')?.[1];
     settleField(
-      new Promise(resolve =>
-        requestAnimationFrame(() =>
+      new Promise(resolve => {
+        const wait = (frames: number) =>
           requestAnimationFrame(() => {
-            if (mounted.current && own.current?.isConnected) run();
-            resolve();
-          })
-        )
-      )
+            const ready = !name || !!latestFields.current?.variables.some(variable => variable.name === name);
+            if (!ready && frames > 0) return wait(frames - 1);
+            requestAnimationFrame(() => {
+              if (mounted.current && own.current?.isConnected) run();
+              resolve();
+            });
+          });
+        wait(180);
+      })
     );
+  };
   const options = menu
     ? [
         ...(fields?.variables ?? []).filter(variable => variable.name.toLowerCase().startsWith(menu.typed.toLowerCase())),
