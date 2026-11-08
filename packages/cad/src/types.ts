@@ -388,6 +388,8 @@ export interface CadPartCut {
    */
   clearance: number;
   clearanceExpression?: string;
+  /** Alternate cuts along the shared in-plane overlap, counting from its positive world end; half means two segments. */
+  split?: 'half' | { fingers: number; fingersExpression?: string };
 }
 /** A named value. Its kind follows from the expression: a length or angle unit, or a plain number. */
 export interface CadVariable {

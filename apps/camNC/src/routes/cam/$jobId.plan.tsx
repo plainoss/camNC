@@ -6,7 +6,7 @@ import { CamPage } from '@/cam/CamPage';
 import { NoPartsToMill } from '@/cam/NoPartsToMill';
 import { useBoardPlans, useCamJob, useCamModel, useSaveCamJob } from '@/cam/camQueries';
 import type { BoardRequest, CamPartInfo, OpSummary, PlanResult, ReleaseProgram } from '@/cam/camTypes';
-import type { FlipRegistration } from '@wbcnc/cam';
+import type { FlipRegistration, LibraryTool } from '@wbcnc/cam';
 import { missingParts, useJobBoards, type MissingPart } from '@/cam/useJobBoards';
 import { boardSizeProblem, layoutBlock, loose, planBlock, releaseProblems, unstable } from '@/cam/boardBlock';
 import { boardGeometryKey } from '@/cam/cadDesign';
@@ -16,6 +16,7 @@ import { orderBoardQueue } from '@wbcnc/cam/board';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { Hint } from '@/cam/Hint';
 import { PlanSettingsPanel } from '@/cam/plan/PlanSettingsPanel';
+import { PlanningProgress } from '@/cam/plan/PlanningProgress';
 import { ProgramDownloads } from '@/cam/plan/ProgramDownloads';
 import { PlanOperations, type EditProps } from '@/cam/plan/PlanOperations';
 import { usePlanLayout, type PlanTab } from '@/cam/plan/planLayoutStore';
@@ -249,7 +250,11 @@ function PlanStep() {
             </span>
           </Hint>
           <RehearsalButton job={job} boards={boards.map(b => freezeRehearsalBoard(b.board, b.nest))} ready={allReady} inBar />
-          <BitChip value={settings} onChange={savePlan} onOpen={openSettings} />
+          {job.carving ? (
+            <CarvingBitsChip jobId={job.id} vBit={job.carving.vBit} clear={job.carving.clearWithFlat ? settings.bit : undefined} />
+          ) : (
+            <BitChip value={settings} onChange={savePlan} onOpen={openSettings} />
+          )}
           <DropdownMenu>
             <Hint text={`More actions for board ${current.board.name}: show it on the machine on its own, download its G-code.`}>
               <DropdownMenuTrigger asChild>
@@ -360,8 +365,8 @@ function PlanStep() {
               No executable parts on this board. Include excluded parts again or repair their placement on Boards.
             </p>
           ) : !result ? (
-            <div className="flex flex-1 items-center justify-center gap-2 text-muted-foreground">
-              <LoadingSpinner className="size-4" /> Computing toolpaths…
+            <div className="flex flex-1 items-center justify-center">
+              <PlanningProgress boardId={current.board.id} />
             </div>
           ) : (
             <div role="status" className="flex flex-col gap-1 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-[13px]">
@@ -473,13 +478,23 @@ function PlanWorkspace({
       <main className="flex min-w-0 flex-col gap-3 p-3 md:min-h-0 md:flex-1 md:p-4">
         {above}
         {plan && playback ? (
-          <PlanView3D
-            plan={plan}
-            board={board}
-            parts={parts}
-            playback={playback}
-            className={cn('transition-opacity md:min-h-0 md:flex-1', fetching && 'opacity-60')}
-          />
+          <div className="relative flex flex-col md:min-h-0 md:flex-1">
+            <PlanView3D
+              plan={plan}
+              board={board}
+              parts={parts}
+              playback={playback}
+              className={cn('transition-opacity md:min-h-0 md:flex-1', fetching && 'opacity-60')}
+            />
+            {/* The programs shown are the last ones while new ones are computed. */}
+            {fetching && (
+              <PlanningProgress
+                boardId={board.id}
+                after={1000}
+                className="absolute top-12 left-1/2 -translate-x-1/2 rounded-lg border bg-background/95 p-3 shadow-sm"
+              />
+            )}
+          </div>
         ) : (
           status
         )}
@@ -810,5 +825,26 @@ function Shell({
       )}
       {children}
     </CamPage>
+  );
+}
+
+/**
+ * A carving's bits in the bar: its V-bit, and the job's flat bit when it clears flat bottoms first. Both are chosen on the
+ * Carve step, so the chip goes there; the job's flat-bit chip would read as if the carving were cut with that bit alone.
+ */
+function CarvingBitsChip({ jobId, vBit, clear }: { jobId: string; vBit: LibraryTool; clear?: LibraryTool }) {
+  const name = vBit.name ?? `V-bit ⌀${vBit.diameter}`;
+  return (
+    <Hint text="The carving's bits, chosen on the Carve step: the V-bit carves; a flat bit, when asked, clears flat bottoms first.">
+      <Button asChild size="sm" variant="outline">
+        <Link
+          to="/cam/$jobId/carve"
+          params={{ jobId }}
+          aria-label={`Bits: ${name}${clear ? ` and ⌀${clear.diameter} flat` : ''}. Change them on the Carve step`}>
+          <span className="text-muted-foreground">Bits:</span> {name}
+          {clear && <span className="text-muted-foreground">+ ⌀{clear.diameter} flat</span>}
+        </Link>
+      </Button>
+    </Hint>
   );
 }
