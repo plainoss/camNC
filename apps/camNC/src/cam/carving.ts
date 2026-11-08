@@ -11,7 +11,17 @@ export const kCarvingFonts = {
 } as const;
 export type CarvingFont = keyof typeof kCarvingFonts;
 
-export type CarvingArt = { kind: 'text'; text: string; font: CarvingFont } | { kind: 'svg'; svg: string; fileName: string };
+export interface WebFont {
+  family: string;
+  weight: number;
+}
+
+export const isWebFont = (font: CarvingFont | WebFont): font is WebFont => typeof font === 'object';
+
+export const fontLabel = (font: CarvingFont | WebFont): string =>
+  isWebFont(font) ? `${font.family}${font.weight === 400 ? '' : `, ${font.weight}`}` : kCarvingFonts[font].label;
+
+export type CarvingArt = { kind: 'text'; text: string; font: CarvingFont | WebFont } | { kind: 'svg'; svg: string; fileName: string };
 
 /** A carving job: one board, artwork V-carved into its top. */
 export interface CarvingV1 {

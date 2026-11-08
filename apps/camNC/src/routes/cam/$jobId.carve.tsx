@@ -2,7 +2,8 @@ import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { NumberInput } from '@/cam/NumberInput';
-import { carvingProblem, kCarvingFonts, kVBits, type CarvingArt, type CarvingFont, type CarvingV1 } from '@/cam/carving';
+import { LetteringFontPicker } from '@/cam/LetteringFontPicker';
+import { carvingProblem, kVBits, type CarvingArt, type CarvingV1 } from '@/cam/carving';
 import { outlineArt, placeRegion } from '@/cam/carvingOutline';
 import { useCamJob, useSaveCamJob } from '@/cam/camQueries';
 import type { BoardV1 } from '@/cam/boards';
@@ -53,6 +54,9 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   // While dragging, the moved artwork is shown before it's saved.
   const [dragged, setDragged] = useState<{ x: number; y: number; height: number } | null>(null);
   const [outlining, setOutlining] = useState(false);
+  const [pendingArt, setPendingArt] = useState<CarvingArt | null>(null);
+  const [artReset, setArtReset] = useState(0);
+  const art = pendingArt ?? carving.art;
   const [error, setError] = useState<string | null>(null);
   const shown = dragged ?? carving;
   const region = dragged
@@ -69,14 +73,21 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const outlineRun = useRef(0);
   const redraw = async (next: Omit<CarvingV1, 'region'>) => {
     const run = ++outlineRun.current;
+    setPendingArt(next.art);
     setOutlining(true);
     try {
       const { region } = await outlineArt(next.art, next.height);
       if (run !== outlineRun.current) return;
       setError(null);
       saveCarving({ ...next, region: placeRegion(region, next.x, next.y) });
+      setPendingArt(null);
     } catch (e) {
-      if (run === outlineRun.current) setError(e instanceof Error ? e.message : String(e));
+      if (run === outlineRun.current) {
+        setError(e instanceof Error ? e.message : String(e));
+        setPendingArt(null);
+        // Discard draft text too, without replaying its debounce against the saved font.
+        setArtReset(reset => reset + 1);
+      }
     } finally {
       if (run === outlineRun.current) setOutlining(false);
     }
@@ -146,7 +157,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         y: dragged.y,
         region: carving.region.map(loop => loop.map(p => ({ x: p.x + dx, y: p.y + dy }))),
       });
-    } else if (dragged.height !== carving.height) void redraw({ ...carving, height: dragged.height });
+    } else if (dragged.height !== carving.height) void redraw({ ...carving, art, height: dragged.height });
     setDragged(null);
   };
 
@@ -234,7 +245,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
           )}
         </div>
         <aside className="flex w-full shrink-0 flex-col gap-4 overflow-auto border-l p-4 text-sm md:w-80">
-          <ArtFields carving={carving} onArt={setArt} />
+          <ArtFields key={artReset} art={art} onArt={setArt} />
           <div className="grid grid-cols-2 gap-2">
             <Field label="Height (mm)" id="carve-height">
               <NumberInput
@@ -243,7 +254,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 min={5}
                 max={size.h}
                 unit="mm"
-                onCommit={height => void redraw({ ...carving, height })}
+                onCommit={height => void redraw({ ...carving, art, height })}
               />
             </Field>
             <Field label="Deepest (mm)" id="carve-depth">
@@ -330,8 +341,7 @@ const centred = (carving: CarvingV1, size: { w: number; h: number }) => {
   return { x: carving.x + dx, y: carving.y + dy, region: carving.region.map(loop => loop.map(p => ({ x: p.x + dx, y: p.y + dy }))) };
 };
 
-function ArtFields({ carving, onArt }: { carving: CarvingV1; onArt: (art: CarvingArt) => void }) {
-  const art = carving.art;
+function ArtFields({ art, onArt }: { art: CarvingArt; onArt: (art: CarvingArt) => void }) {
   const [text, setText] = useState(art.kind === 'text' ? art.text : 'Welcome');
   // Typing outlines again once it pauses.
   useEffect(() => {
@@ -339,7 +349,7 @@ function ArtFields({ carving, onArt }: { carving: CarvingV1; onArt: (art: Carvin
     const t = setTimeout(() => onArt({ ...art, text }), 300);
     return () => clearTimeout(t);
   }, [text, art, onArt]);
-  const font: CarvingFont = art.kind === 'text' ? art.font : 'serif';
+  const font = art.kind === 'text' ? art.font : 'serif';
   return (
     <>
       <div role="tablist" className="inline-flex self-start rounded-md bg-muted p-0.5">
@@ -360,17 +370,7 @@ function ArtFields({ carving, onArt }: { carving: CarvingV1; onArt: (art: Carvin
             <Input id="carve-text" value={text} maxLength={60} onChange={e => setText(e.target.value)} />
           </Field>
           <Field label="Font" id="carve-font">
-            <select
-              id="carve-font"
-              className="h-9 rounded-md border bg-background px-2"
-              value={font}
-              onChange={e => onArt({ ...art, font: e.target.value as CarvingFont })}>
-              {Object.entries(kCarvingFonts).map(([key, f]) => (
-                <option key={key} value={key}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
+            <LetteringFontPicker font={font} onChange={font => onArt({ ...art, text, font })} />
           </Field>
         </>
       ) : (
