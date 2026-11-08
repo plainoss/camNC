@@ -232,9 +232,12 @@ The studio follows a parametric part studio's workflow. Where it still differs, 
 
 - **Extrude takes the whole sketch.** A part's extrude pushes out its whole outline. Picking which of a sketch's
   regions to extrude, and extruding several regions into separate parts, is not there yet.
-- **Extrude has no New / Add / Remove / Intersect, and no end types.** Every extrude makes a new part, Blind to its
-  thickness (or Thin to its depth). Removing material is done with Cut parts and with face sketches' cut depths.
-- **Sketching happens in a flat editor**, not in place in the 3D view.
+- **Extrude has New and Remove, not Add or Intersect.** Remove works on a sketch drawn on a board's top or underside.
+  It cuts the sketch into that board, Blind to a depth or Through all, as a face sketch with its cuts. It cuts every
+  closed region except what's left of the face: of the regions bounded partly by the board's outline, the largest is
+  taken to be the board. Picking regions comes with region selection. The per-part pocket view still works alongside.
+- **Used edges are fixed copies.** Use (U) puts a part's edges in a sketch where they are, picked first, then U. They
+  don't follow the part when it changes.
 - **Pattern and Transform directions are typed axes**, not an edge or face picked in the view.
 - **Booleans only subtract** (Cut parts); there is no union or intersect, since parts are boards.
 
@@ -242,7 +245,6 @@ The studio follows a parametric part studio's workflow. Where it still differs, 
 
 - Sketching on edges, and angled joints.
 - Fillets and STEP export.
-- Orbiting while sketching.
 - Undoing through feature history with a rollback slider.
 - Rerunning a generator over edited parts.
 
