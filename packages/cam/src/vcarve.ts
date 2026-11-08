@@ -55,13 +55,20 @@ const loopPass = (loop: PathsD[number], z: number, feed: number, plungeFeed: num
   return { pts, feeds: pts.map((_, i) => (i ? feed : plungeFeed)), link: 'retract', phase: 'finish' };
 };
 
-/** Separate pieces of a region: each outer loop with the holes inside it. */
+/**
+ * Separate pieces of a region: each outer loop with the holes inside it. A hole belongs to the smallest outer loop around
+ * it, since an island can sit inside another one's hole and have a hole of its own.
+ */
 function islands(region: PathsD): PathsD[] {
   const outer = region.filter(loop => areaD(loop) > 0);
   const pieces = outer.map(loop => [loop]);
   for (const hole of region.filter(loop => areaD(loop) < 0)) {
-    const i = outer.findIndex(loop => pointInPolygonD(hole[0], loop) !== PointInPolygonResult.IsOutside);
-    if (i >= 0) pieces[i].push(hole);
+    let owner = -1;
+    outer.forEach((loop, i) => {
+      if (pointInPolygonD(hole[0], loop) === PointInPolygonResult.IsOutside) return;
+      if (owner < 0 || areaD(loop) < areaD(outer[owner])) owner = i;
+    });
+    if (owner >= 0) pieces[owner].push(hole);
   }
   return pieces;
 }
