@@ -390,6 +390,34 @@ describe('tools that only fill part of where they reach', () => {
     expect(cuts).toEqual([{ x: [69.5, 100], y: [39.5, 60.5], depth: 8.5, side: 'top' }]);
   });
 
+  it('cuts only the tenon of a relieved shouldered rail and keeps its bones', async () => {
+    const rail = outlined(
+      'Rail',
+      [
+        [100, 20],
+        [200, 20],
+        [200, 80],
+        [100, 80],
+        [100, 60],
+        [70, 60],
+        [70, 40],
+        [100, 40],
+      ],
+      10
+    );
+    const target = leg();
+    const document = addPartCut({ ...createCadDocument(), parts: [target, rail] }, [rail.id], [target.id], { value: 0.5 }).document;
+    const plain = await solveCadDocument(document);
+    rail.cornerRelief = { diameter: 6 };
+    const solved = await solveCadDocument(document);
+    expect(solved.parts[1]!.outline.length).toBeGreaterThan(plain.parts[1]!.outline.length);
+    expect(solved.parts[1]!.outline).not.toEqual(plain.parts[1]!.outline);
+    expect(solved.parts[0]!.cuts).toEqual(plain.parts[0]!.cuts);
+    expect(boxes(solved.parts[0]!.cuts)).toEqual([{ x: [69.5, 100], y: [39.5, 60.5], depth: 8.5, side: 'top' }]);
+    expect(solved.diagnostics.filter(d => d.code === 'part-cut-unresolved')).toEqual([]);
+    expect(withPartCuts(solved.document, evaluateCadPart(target).part!).cuts).toEqual(solved.parts[0]!.cuts);
+  });
+
   it('cuts one slot per finger of a comb', async () => {
     const comb = outlined(
       'Comb',
@@ -628,7 +656,7 @@ describe('half-lap and finger joints', () => {
     expect(() => updatePartCut(document, document.partCuts![0]!.id, { split: { fingers: 1 } })).toThrow('Invalid CAD part cut');
   });
 
-  it('splits the actual rectangular reach of a stepped board', async () => {
+  it.each([false, true])('splits the actual rectangular reach of a stepped board with relief %s', async relief => {
     const document = joint('half');
     const target = document.parts[0]!;
     document.parts[0] = {
@@ -647,7 +675,10 @@ describe('half-lap and finger joints', () => {
       id: target.id,
       placement: target.placement,
     };
+    if (relief) document.parts[0]!.cornerRelief = { diameter: 6 };
     const solved = await solveCadDocument(document);
+    expect(solved.diagnostics.filter(d => d.code === 'part-cut-unresolved')).toEqual([]);
+    if (relief) expect(solved.parts[0]!.outline.length).toBeGreaterThan(6);
     expect(solved.parts[0]!.cuts![0]!.opening!.y0).toBeCloseTo(29.8);
     expect(solved.parts[1]!.cuts![0]!.opening!.y1).toBeCloseTo(30.2);
     expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);

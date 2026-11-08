@@ -173,9 +173,15 @@ export function applyPartCuts(
 ): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
   const diagnostics: CadDiagnostic[] = [];
   const byId = new Map(parts.map(part => [part.partId, part]));
-  // A tool cuts with the shape it has before any step cuts it, so two parts can cut each other.
-  const before = new Map(byId);
   const sources = new Map(document.parts.map(part => [part.id, part]));
+  // Tools reach with their profile outline, before bones or step cuts, so two parts can cut each other.
+  const before = new Map(
+    parts.map(part => {
+      const source = sources.get(part.partId);
+      const outline = source?.cornerRelief && document.partCuts?.length && evaluateCadPart(source).part?.outline;
+      return [part.partId, outline ? { ...part, outline } : part];
+    })
+  );
   const supports = cadDrawnOnSupports(document);
   const targets = new Map(
     parts.map(part => [
