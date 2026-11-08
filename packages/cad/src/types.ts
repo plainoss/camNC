@@ -255,6 +255,11 @@ export interface CadPart {
   /** The thickness as typed, kept when it uses design variables. */
   thicknessExpression?: string;
   sketch: CadSketch;
+  /**
+   * `false` while the sketch is finished but not extruded: a sketch feature, not yet a part. It's left out of the parts,
+   * the 3D view and machining until Extrude makes a part of it.
+   */
+  extrude?: false;
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
   placement?: CadPlacement;
   /** What the part was drawn on. When it's set, the placement follows from it, so the part moves with that face. */

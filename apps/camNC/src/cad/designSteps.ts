@@ -52,13 +52,18 @@ export function designSteps(document: CadDocument): DesignStep[] {
   return document.parts.flatMap((part, partIndex) => {
     const steps: DesignStep[] = [
       { id: `${part.id}:sketch`, kind: 'sketch', label: `Sketch · ${part.name}`, partId: part.id },
-      {
-        id: `${part.id}:extrude`,
-        kind: 'extrude',
-        label: `Extrude · ${part.name}`,
-        detail: typed(part.thicknessExpression, part.thickness),
-        partId: part.id,
-      },
+      // A sketch not yet extruded is only its sketch.
+      ...(part.extrude === false
+        ? []
+        : [
+            {
+              id: `${part.id}:extrude`,
+              kind: 'extrude' as const,
+              label: `Extrude · ${part.name}`,
+              detail: typed(part.thicknessExpression, part.thickness),
+              partId: part.id,
+            },
+          ]),
     ];
     let cut = 0;
     for (const feature of part.features ?? []) {

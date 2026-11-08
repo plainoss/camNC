@@ -1,4 +1,4 @@
-import { Edges, Html, OrbitControls } from '@react-three/drei';
+import { Edges, Html, Line, OrbitControls } from '@react-three/drei';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -213,6 +213,7 @@ export function ModelViewport({
   sketchView,
   planes = [],
   onPickPlane,
+  sketchLines = [],
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -234,6 +235,8 @@ export function ModelViewport({
   /** Planes to show as designed, such as the base planes a sketch can be drawn on. */
   planes?: ViewPlane[];
   onPickPlane?: (id: string) => void;
+  /** Finished sketches not yet extruded, as polylines in the model, shown on their planes. */
+  sketchLines?: [number, number, number][][];
 }) {
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
   const assembled = useMemo(() => centerAssembled(meshes), [meshes]);
@@ -307,6 +310,13 @@ export function ModelViewport({
           />
         ))}
       </group>
+      {view === 'assembled' && sketchLines.length > 0 && (
+        <group matrixAutoUpdate={false} matrix={assembled}>
+          {sketchLines.map((points, i) => (
+            <Line key={i} points={points} color="#1f6fc5" lineWidth={1.5} />
+          ))}
+        </group>
+      )}
       {shownPlanes.map(plane => (
         <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
       ))}

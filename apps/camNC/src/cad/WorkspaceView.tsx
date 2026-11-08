@@ -1,8 +1,9 @@
-import { assemblyReport, evaluateCadDocument, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { assemblyReport, evaluateCadDocument, isCadPart, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ModelViewport, type ModelFacePick, type ModelView } from '@/cam/model/ModelViewport';
 import { assemblyModel, instanceKey } from './assemblyModel';
 import { basePlaneViews, type BasePlane } from './basePlanes';
+import { sketchLinesInModel } from './sketchLines';
 
 const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
@@ -62,9 +63,19 @@ export default function WorkspaceView({
   const frame = useRef<HTMLDivElement>(null);
   const lastClick = useRef<{ partId: string; at: number } | null>(null);
   const model = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
-  const clashes = useMemo(() => assemblyReport(document, evaluateCadDocument(document).parts)?.collisions ?? [], [document]);
+  const clashes = useMemo(() => {
+    // Sketches not yet extruded take up no space.
+    const sketches = new Set(document.parts.filter(part => !isCadPart(part)).map(part => part.id));
+    return (
+      assemblyReport(
+        document,
+        evaluateCadDocument(document).parts.filter(part => !sketches.has(part.partId))
+      )?.collisions ?? []
+    );
+  }, [document]);
   const [view, setView] = useState<ModelView>('assembled');
   const planes = useMemo(() => basePlaneViews(document, selectedPlane), [document, selectedPlane]);
+  const sketchLines = useMemo(() => sketchLinesInModel(document), [document]);
   // Choosing what a new part is drawn on: a plane, or a face clicked in the view.
   const [ownChoosing, setOwnChoosing] = useState(false);
   const controlled = choosingProp !== undefined;
@@ -164,6 +175,7 @@ export default function WorkspaceView({
         milled={always}
         onPickFace={choosing ? pickFace : undefined}
         planes={onNewPart ? planes : undefined}
+        sketchLines={sketchLines}
         onPickPlane={id => {
           const plane = id as BasePlane;
           // Picked while choosing, the new part is drawn on it; otherwise it's picked for the next sketch, as a face is.

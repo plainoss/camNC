@@ -219,6 +219,15 @@ export async function createAdapter(page, url) {
     await page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: /Finish sketch/ }).click();
     await studioToolbar.waitFor();
   };
+  /** A finished sketch is a sketch until it's extruded: Shift+E extrudes it as it is, as the reference's Extrude. */
+  const extrudeSketch = async () => {
+    const extrude = page.getByRole('dialog', { name: /^Extrude ·/ });
+    if (!(await extrude.isVisible())) {
+      await page.keyboard.press('Shift+E');
+      await extrude.waitFor({ timeout: 3000 }).catch(() => {});
+    }
+    if (await extrude.isVisible()) await extrude.getByRole('button', { name: 'OK', exact: true }).click();
+  };
   const jobId = new URL(page.url()).pathname.split('/')[2];
   let cursor = null;
 
@@ -432,9 +441,10 @@ export async function createAdapter(page, url) {
       case 'addpart': {
         // In the Part Studio a new part is sketched from the studio: close the open sketch, then Sketch on the top plane.
         await settle();
-        if (!(await studioToolbar.isVisible())) await closeSketch();
-        const extrude = page.getByRole('dialog', { name: /^Extrude ·/ });
-        if (await extrude.isVisible()) await extrude.getByRole('button', { name: 'OK', exact: true }).click();
+        if (!(await studioToolbar.isVisible())) {
+          await closeSketch();
+          await extrudeSketch();
+        }
         await studioToolbar.getByRole('button', { name: /Sketch/ }).click();
         await page.getByRole('list', { name: 'Default geometry' }).getByRole('button', { name: 'Top', exact: true }).click();
         await canvas.waitFor();
@@ -486,6 +496,11 @@ export async function createAdapter(page, url) {
         return;
       case 'goto':
         await settle();
+        // Leaving the design takes the sketch along as a part, as Extrude makes one of it.
+        if (/Boards|Plan|Machine/.test(rest) && (await page.getByRole('dialog', { name: /^Sketch ·/ }).isVisible())) {
+          await closeSketch();
+          await extrudeSketch();
+        }
         await page.getByRole('link', { name: new RegExp(rest) }).or(page.getByRole('button', { name: new RegExp(`^${rest}$`) })).first().click();
         await page.waitForTimeout(700);
         return;
@@ -524,9 +539,7 @@ export async function createAdapter(page, url) {
         await settle();
         // A sketch closes back to the studio, and Done there accepts the design.
         if (!(await studioToolbar.isVisible())) await closeSketch();
-        // Closing a new design's first sketch opens its extrude: keep it as it is.
-        const extrude = page.getByRole('dialog', { name: /^Extrude ·/ });
-        if (await extrude.isVisible()) await extrude.getByRole('button', { name: 'OK', exact: true }).click();
+        await extrudeSketch();
         const done = studioToolbar.getByRole('button', { name: /Done/ });
         await page.waitForFunction(element => !element.disabled, await done.elementHandle(), { timeout: 8000 });
         await done.click();

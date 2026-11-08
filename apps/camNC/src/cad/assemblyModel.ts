@@ -8,6 +8,7 @@ import {
   cadDrawnOnSupports,
   cadCopyName,
   resolveDrawnPlacements,
+  isCadPart,
   type CadDocument,
   type CadPart,
   type CadPlacement,
@@ -51,7 +52,8 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
   const document = resolveDrawnPlacements(given).document;
   type Shape = ReturnType<typeof nativePart>;
   type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; copies: Shape[] };
-  const built = document.parts.map((part): Built => {
+  // A sketch not yet extruded has nothing to show in 3D.
+  const built = document.parts.filter(isCadPart).map((part): Built => {
     const { part: profile } = evaluateCadPart(part);
     if (!profile) return { part, problem: 'Its sketch needs fixing first.' };
     try {
