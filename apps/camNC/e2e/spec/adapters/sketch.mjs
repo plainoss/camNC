@@ -370,7 +370,9 @@ export async function createAdapter(page, url) {
         return;
       }
       case 'button':
-        await page.getByRole('button', { name: new RegExp(rest, 'i') }).first().click();
+        // A button can wait on work in progress, as "Take the job to the machine" waits for every board's plan. On a busy
+        // runner that takes longer than the default 8 s a click waits for it to enable.
+        await page.getByRole('button', { name: new RegExp(rest, 'i') }).first().click({ timeout: 30_000 });
         return;
       case 'handle': {
         // handle <start|end> <point|segment>, optionally with Shift to add to the selection.
