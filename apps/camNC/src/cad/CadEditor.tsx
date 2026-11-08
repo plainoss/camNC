@@ -205,7 +205,7 @@ import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
-import type { DesignStep } from './designSteps';
+import { rolledBackTo, type DesignStep } from './designSteps';
 import { ExtrudeDialog, PartPatternDialog } from './PartFeatureDialogs';
 import './cad.css';
 
@@ -454,6 +454,8 @@ export function CadEditor({
   const [choosingFace, setChoosingFace] = useState(false);
   // A variable being added, or the one being changed.
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
+  // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
+  const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession ? doc : null);
@@ -493,6 +495,16 @@ export function CadEditor({
   const documentRef = useRef(doc);
   // Every value field can use the design's variables by name.
   const variableScope = useMemo(() => cadVariableScope(doc), [doc]);
+  // The step being edited in its dialog. Like the reference, the studio shows the design only as far as that step.
+  const rollbackStep =
+    !studioSession || !showWorkspace
+      ? null
+      : featureDialog
+        ? featureDialog.kind === 'extrude'
+          ? `${featureDialog.partId}:extrude`
+          : (doc.parts.find(candidate => candidate.id === featureDialog.partId)?.pattern?.id ?? null)
+        : (partCutting?.id ?? null);
+  const shownDocument = useMemo(() => (rollbackStep ? rolledBackTo(doc, rollbackStep) : doc), [doc, rollbackStep]);
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
   const finishing = useRef(false);
@@ -3299,15 +3311,22 @@ export function CadEditor({
   /** A row of the studio's feature list: edited, deleted, suppressed, or its sketch opened. */
   const featureAction = (entry: FeatureEntry, action: FeatureAction) => {
     const current = documentRef.current;
+    setStudioRefusal(null);
     if (entry.kind === 'variable') {
       if (action === 'edit') {
+        // A variable is set in the studio, as any other step: an open sketch is finished first.
+        if (!showWorkspace) {
+          closeSketch(true);
+          if (sketchBefore.current) return;
+        }
         setFeatureDialog(null);
         setPartCutting(null);
         return setVariableDialog({ id: entry.id });
       }
       if (action === 'delete') {
         const result = removeCadVariable(current, entry.id);
-        return 'error' in result ? setMessage(result.error) : commit(result.document);
+        if ('error' in result) return setStudioRefusal(result.error);
+        return commit(result.document);
       }
       return;
     }
@@ -3330,6 +3349,7 @@ export function CadEditor({
     else if (step.kind === 'cut' && step.cutId) commit(removeCadFeature(current, step.partId, step.cutId));
   };
   const studioCommand = (command: StudioCommand) => {
+    setStudioRefusal(null);
     if (command === 'sketch') {
       setFeatureDialog(null);
       setPartCutting(null);
@@ -3517,6 +3537,7 @@ export function CadEditor({
                 }
               }}
               onAction={featureAction}
+              rollback={rollbackStep}
               onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
             />
           )}
@@ -3737,6 +3758,11 @@ export function CadEditor({
               {acceptanceNotice}
             </p>
           )}
+          {studioSession && studioRefusal && (
+            <p className="cad-notice cad-studio-refusal" role="alert">
+              {studioRefusal}
+            </p>
+          )}
           {showWorkspace && variableDialog && (
             <VariableDialog
               key={variableDialog.id ?? 'new'}
@@ -3881,7 +3907,7 @@ export function CadEditor({
           {showWorkspace && (
             <Suspense fallback={<div className="cad-part-view" />}>
               <WorkspaceView
-                document={doc}
+                document={shownDocument}
                 selectedId={part?.id ?? null}
                 onSelect={id => {
                   setPartId(id);

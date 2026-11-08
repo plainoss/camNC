@@ -171,3 +171,50 @@ it('cancels a new design’s first sketch back to how the design opened', async 
     expect(change.mock.calls.at(-1)?.[0].parts[0]!.sketch.entities).toHaveLength(source.parts[0]!.sketch.entities.length)
   );
 });
+
+it('greys out the features after the one being edited, and shows them again once it closes', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  source.parts.push({ ...createPlateDocument({ width: 50, height: 50 }).parts[0]!, id: 'top', name: 'Top' });
+  sessions.push(source.id);
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  const rolledBack = () => [...features.querySelectorAll('.cad-feature-rolled-back')].map(row => row.textContent);
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  expect(rolledBack()).toEqual([expect.stringMatching(/Sketch · Top/), expect.stringMatching(/Extrude · Top/)]);
+  expect(within(features).getByRole('separator', { name: 'Shown up to here' })).toBeDefined();
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  expect(rolledBack()).toEqual([]);
+});
+
+it('says why a variable in use can’t be deleted, and edits a variable from an open sketch in the studio', async () => {
+  const source: CadDocument = {
+    ...createPlateDocument({ width: 200, height: 100 }),
+    variables: [
+      { id: 'a', name: 'a', expression: '10 mm' },
+      { id: 'b', name: 'b', expression: 'a * 2' },
+    ],
+  };
+  sessions.push(source.id);
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /#a = 10 mm/ }));
+  await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Delete' }));
+  expect((await screen.findByRole('alert')).textContent).toMatch(/a is used in one place/);
+
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Plate/ }));
+  await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /#a = 10 mm/ }));
+  expect(await screen.findByRole('dialog', { name: '#a' })).toBeDefined();
+  expect(screen.queryByRole('dialog', { name: 'Sketch · Plate' })).toBeNull();
+});
