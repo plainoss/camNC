@@ -24,6 +24,7 @@ export interface ViewPlane {
 }
 
 const kPlane = '#d08a3c';
+const kNoLines: [number, number, number][][] = [];
 const kPlaneHighlight = '#2f80ed';
 
 function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number; model: THREE.Matrix4; onPick?: () => void }) {
@@ -213,7 +214,7 @@ export function ModelViewport({
   sketchView,
   planes = [],
   onPickPlane,
-  sketchLines = [],
+  sketchLines = kNoLines,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -256,6 +257,9 @@ export function ModelViewport({
   const shownPlanes = view === 'assembled' ? planes : [];
   const box = useMemo(() => {
     const fit = boundsOf(meshes, matrices);
+    // Finished sketches are in view too, as a first one is before it has any part.
+    for (const line of view === 'assembled' ? sketchLines : [])
+      for (const point of line) fit.expandByPoint(new THREE.Vector3(...point).applyMatrix4(assembled));
     if (!shownPlanes.length) return fit;
     // The planes are in view too, so a design with no parts yet still shows them.
     const corner = new THREE.Vector3();
@@ -274,7 +278,7 @@ export function ModelViewport({
     return fit;
     // The planes' identity changes with their highlight, which shouldn't move the camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meshes, matrices, shownPlanes.length, planeSize, assembled]);
+  }, [meshes, matrices, shownPlanes.length, planeSize, assembled, sketchLines, view]);
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
     if (!e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.

@@ -406,6 +406,15 @@ it('finishes a sketch as a sketch, and extrudes a one-line sketch as a thin boar
   const features = await screen.findByRole('region', { name: 'Features' });
   // It's a feature, not a part.
   expect(within(features).queryByRole('button', { name: /Extrude · Back/ })).toBeNull();
+  // Nor can it be cut with, or into, while it's a sketch: one part is all there is to cut.
+  expect(
+    within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' }))
+      .getByRole('button', { name: /Cut parts/ })
+      .hasAttribute('disabled') ||
+      within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' }))
+        .getByRole('button', { name: /Cut parts/ })
+        .getAttribute('aria-disabled') === 'true'
+  ).toBe(true);
   expect(within(screen.getByRole('region', { name: 'Parts panel' })).queryByText('Back')).toBeNull();
   await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Back/ }));
   const sketch = await screen.findByRole('dialog', { name: 'Sketch · Back' });

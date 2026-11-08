@@ -518,7 +518,7 @@ export async function createAdapter(page, url) {
         await page.reload({ waitUntil: 'domcontentloaded' });
         await reopened();
         return;
-      case 'goto':
+      case 'goto': {
         await settle();
         // Leaving the design takes the sketch along as a part, as Extrude makes one of it.
         // A sketch that can't be finished stays open, for leaving to say why.
@@ -530,6 +530,7 @@ export async function createAdapter(page, url) {
         await page.getByRole('link', { name: new RegExp(rest) }).or(page.getByRole('button', { name: new RegExp(`^${rest}$`) })).first().click();
         await page.waitForTimeout(700);
         return;
+      }
       case 'start': {
         await prepareMachine();
         await page.getByRole('button', { name: /^Run job/ }).click();
