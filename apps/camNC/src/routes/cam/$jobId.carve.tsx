@@ -434,6 +434,26 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 />
               </g>
             )}
+            {/* Each item's box takes a click anywhere inside it, not only on its ink; under all the ink, so ink still picks its own item. */}
+            {carving.items.map(item => {
+              const shownItem = dragged?.id === item.id ? dragged : item;
+              const b = bounds(shownItem.outline);
+              return (
+                b && (
+                  <rect
+                    key={item.id}
+                    data-testid="carving-item-box"
+                    transform={`translate(${shownItem.x} ${size.h - shownItem.y}) rotate(${-shownItem.rotation})`}
+                    x={b.x0}
+                    y={-b.y1}
+                    width={b.x1 - b.x0}
+                    height={b.y1 - b.y0}
+                    className="cursor-move fill-transparent"
+                    onPointerDown={start('move', item)}
+                  />
+                )
+              );
+            })}
             {carving.items.map(item => (
               <path
                 key={item.id}

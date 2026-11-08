@@ -258,6 +258,20 @@ describe('the Carve step', () => {
     await waitFor(async () => expect(await text()).toMatchObject({ text: 'Board' }));
   });
 
+  it('selects an item by a click anywhere in its box, not only on its ink', async () => {
+    await open();
+    const svg = screen.getAllByTestId('carving-item')[0].closest('svg')!;
+    fireEvent.pointerDown(svg, { button: 0 });
+    expect(screen.queryByRole('toolbar')).toBeNull();
+    // The middle of "Welcome"'s box, between its letters' strokes or not.
+    const box = screen.getByTestId('carving-item-box').getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + 2, box.top + 2)!;
+    expect(hit.getAttribute('data-testid')).toBe('carving-item-box');
+    fireEvent.pointerDown(hit, { button: 0, pointerId: 1, clientX: box.left + 2, clientY: box.top + 2 });
+    fireEvent.pointerUp(svg, { pointerId: 1 });
+    expect(screen.getByRole('toolbar', { name: 'Lettering' })).toBeTruthy();
+  });
+
   it('adds text, selects items from the list and canvas, edits just the selection, and deletes it', async () => {
     const job = await open();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
