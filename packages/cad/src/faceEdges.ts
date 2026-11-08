@@ -96,6 +96,8 @@ export function withFaceEdges(document: CadDocument, part: CadPart): CadSketch {
       entities.push(kept);
     }
   }
+  // An edge whose ID something of the drawing's own already has, say a piece split off it, isn't put back.
+  for (const id of wanted.keys()) if (entities.some(e => e.id === id)) wanted.delete(id);
   if (wanted.size) changed = true;
   entities.push(...wanted.values());
   return changed ? { ...sketch, entities } : sketch;

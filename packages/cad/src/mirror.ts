@@ -60,7 +60,8 @@ export function mirrorSketchEntities(sketch: CadSketch, { entityIds, axisId }: C
       id: newCadId(),
       type: 'point',
       ...mirrored,
-      construction: source.construction,
+      // A face's edge mirrors into geometry of the drawing's own.
+      construction: source.construction && !source.faceEdge,
       standalone: equivalent.members(sourceId).some(member => (entities.get(member) as CadPointEntity | undefined)?.standalone),
     };
     pointCopies.set(sourceId, copy.id);
@@ -101,6 +102,10 @@ export function mirrorSketchEntities(sketch: CadSketch, { entityIds, axisId }: C
         const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
         copy = { ...source, id, centerId, startId, endId, startAngle, endAngle: startAngle + sweep };
       } else throw Error('This curve cannot be mirrored.');
+      if (copy.faceEdge) {
+        delete copy.faceEdge;
+        delete copy.construction;
+      }
       next.entities.push(copy);
       createdEntityIds.push(id);
       entityCopies.set(source.id, id);

@@ -68,6 +68,8 @@ export function splitSketchCurve(sketch: CadSketch, entityId: string, parameters
   if (sketchPatternOwner(sketch, entityId)) return fail('Remove the pattern relation before splitting its finite geometry.');
   if (!curve || curve.type === 'point' || isOwnedSplineHandle(curve))
     return fail('Select a sketch curve, away from its endpoints or tangent handles.');
+  if (curve.faceEdge)
+    return fail('The edges of the face this part is drawn on stay as they are. Draw your own geometry onto them instead.');
   const closed = isClosedSketchCurve(curve);
   if (parameters.length !== (closed ? 2 : 1) || parameters.some(t => !Number.isFinite(t) || t < 0 || t > 1))
     return fail(closed ? 'Choose two distinct locations on this closed curve.' : 'Choose one interior location on this curve.');

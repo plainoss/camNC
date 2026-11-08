@@ -62,4 +62,14 @@ it('ties a part drawn on a face to that face’s edges when it is drawn onto the
   const tied = (id: string) => faceCorners.some(corner => corner === id || same.equivalent(id, corner));
   // Both clicked corners are held to the face's corners, so the part follows them.
   expect(edges.flatMap(e => [e.startId, e.endId]).filter(tied).length).toBeGreaterThanOrEqual(2);
+
+  // Select all takes the drawing, not the face's edges, so it can all be moved.
+  await userEvent.keyboard('{Control>}a{/Control}');
+  await waitFor(() =>
+    expect(canvas.querySelector(`g.cad-entity[data-entity-id="${edges[0]!.id}"] [data-visible-curve]`)!.getAttribute('stroke')).toBe(
+      '#ff9b23'
+    )
+  );
+  for (const face of canvas.querySelectorAll('g.cad-entity[data-entity-id*=":face:"] [data-visible-curve]'))
+    expect(face.getAttribute('stroke')).toBe('#7f8c96');
 });

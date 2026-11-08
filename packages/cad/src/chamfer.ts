@@ -39,6 +39,8 @@ export function chamferLineCorners(sketch: CadSketch, options: CadChamferOptions
       return fail('Remove the slot relation before chamfering its geometry.');
     if (corner.lines.some(line => sketchPatternOwner(sketch, line.id)))
       return fail('Remove the pattern relation before chamfering its finite geometry.');
+    if (corner.lines.some(line => line.faceEdge))
+      return fail('The edges of the face this part is drawn on stay as they are. Draw your own geometry onto them instead.');
     const order = options.selectedLineIds ?? [];
     const selectedFirst = order.find(lineId => corner.lines.some(line => line.id === lineId));
     const indices = selectedFirst === corner.lines[1].id ? ([1, 0] as const) : ([0, 1] as const);
