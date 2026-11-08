@@ -1614,6 +1614,7 @@ export function CadEditor({
     if (group?.type === 'slot') setSharedSlotWidth(group.widthEntityId);
     setSelected([]);
     setMessage('Slot created. Select more source curves to share its width, or press Escape.');
+    svg.current?.focus();
   };
   const acceptCircularPattern = () => {
     if (!sketch || !parsedCircular.ok) return setMessage(parsedCircular.ok ? 'Select source geometry.' : parsedCircular.message);

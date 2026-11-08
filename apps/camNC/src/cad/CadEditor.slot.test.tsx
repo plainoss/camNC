@@ -63,6 +63,7 @@ it('previews and creates a diameter-controlled slot around a selected path with 
   fireEvent.click(screen.getByRole('button', { name: 'Create slot' }));
   await checked();
   expect(latest().parts[0]!.sketch.entities.filter(e => e.type === 'arc')).toHaveLength(2);
+  expect(canvas).toHaveFocus();
   expect(latest().parts[0]!.sketch.constraints.find(c => c.type === 'diameter')).toMatchObject({ value: 8 });
   fireEvent.click(screen.getByRole('button', { name: /^Undo/ }));
   await checked();
@@ -116,4 +117,23 @@ it('keeps successive paths in one shared-width group and edits the diameter afte
   fireEvent.click(screen.getByRole('button', { name: 'Apply dimension' }));
   await checked();
   expect(reloaded.latest().parts[0]!.sketch.entities.find(e => e.id === groups[0]!.widthEntityId)).toMatchObject({ radius: 8 });
+});
+
+it('releases the slot relation contextually while retaining a closed, independently editable outline', async () => {
+  const { canvas, latest } = await setup();
+  choose(canvas);
+  fireEvent.click(screen.getByRole('button', { name: 'Create slot' }));
+  await checked();
+  fireEvent.keyDown(canvas, { key: 'Escape' });
+  const group = latest().parts[0]!.sketch.constraints.find(c => c.type === 'slot')!;
+  if (group.type !== 'slot') throw new Error('missing slot');
+  const glyph = canvas.querySelector(`[data-constraint-id="${group.id}"]`)!;
+  fireEvent.pointerDown(glyph, { button: 2, pointerId: 4, clientX: 500, clientY: 300 });
+  fireEvent.pointerUp(canvas, { button: 2, pointerId: 4, clientX: 500, clientY: 300 });
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Remove slot relation' }));
+  await checked();
+  expect(latest().parts[0]!.sketch.constraints.some(c => c.type === 'slot')).toBe(false);
+  expect(latest().parts[0]!.sketch.entities.some(e => e.id === group.widthEntityId)).toBe(false);
+  expect(latest().parts[0]!.sketch.entities.filter(e => e.type === 'arc')).toHaveLength(2);
+  expect(screen.getByRole('button', { name: /Finish sketch/ })).toBeEnabled();
 });

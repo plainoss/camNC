@@ -860,3 +860,5 @@
 .cad-pattern-editor fieldset { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 6px; border: 1px solid #d7e1ec; }
 .cad-pattern-editor legend { padding: 0 4px; }
 .cad-pattern-editor input[type='checkbox'] { width: auto; }
+
+.cad-slot-editor input[type='checkbox'] { width: 14px; height: 14px; }

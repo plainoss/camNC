@@ -1,5 +1,5 @@
 import type { SketchPrimitive } from '@salusoft89/planegcs';
-import type { CadConstraint, CadEntity, CadSlot } from './types';
+import type { CadConstraint, CadEntity, CadSlot, CadSlotMember } from './types';
 import { offsetNativePrimitives } from './offsetConstraint';
 /** Cap endpoints already lie on their circles through the normal-offset support links. */
 export function slotPrimitives(
@@ -14,23 +14,7 @@ export function slotPrimitives(
       prefix = `${slot.id}:support:${i}`,
       source = entities.get(member.sourceId)!,
       target = entities.get(member.targetId)!;
-    const anchoredEnds =
-      member.kind === 'line' && target.type === 'line'
-        ? (['start', 'end'] as const).filter(
-            end =>
-              !member.normalEnds.includes(end) &&
-              slot.members.some(other => {
-                const arc = entities.get(other.targetId);
-                return (
-                  other.kind === 'arc' &&
-                  arc?.type === 'arc' &&
-                  other.normalEnds.some(
-                    arcEnd => (arcEnd === 'start' ? arc.startId : arc.endId) === (end === 'start' ? target.startId : target.endId)
-                  )
-                );
-              })
-          )
-        : [];
+    const anchoredEnds = slotAnchoredEnds(slot, member, entities);
     const generated = offsetNativePrimitives(
       { id: prefix, type: 'offset', value: 1, members: [member.kind === 'circle' ? member : { ...member, endpoints: false }] },
       entities,
@@ -39,7 +23,9 @@ export function slotPrimitives(
     result.push(
       ...generated
         .filter(p =>
-          anchoredEnds.length ? anchoredEnds.length === 1 && p.type === 'parallel' : p.type !== 'p2p_coincident' || p.p1_id !== p.p2_id
+          member.kind === 'line' && anchoredEnds.length
+            ? anchoredEnds.length === 1 && p.type === 'parallel'
+            : p.type !== 'p2p_coincident' || p.p1_id !== p.p2_id
         )
         .map(p => {
           if (p.type === 'p2p_distance') return { ...p, distance: half };
@@ -57,6 +43,27 @@ export function slotPrimitives(
           { id: `${id}:angle`, type: 'l2l_angle_ll', l1_id: source.id, l2_id: id, angle: (member.side * Math.PI) / 2 }
         );
       }
+    if (member.kind === 'arc' && target.type === 'arc' && anchoredEnds.length) {
+      for (const end of ['start', 'end'] as const) {
+        const point = end === 'start' ? target.startId : target.endId,
+          prop = end === 'start' ? 'start_angle' : 'end_angle';
+        result.push({
+          id: `${prefix}:support-angle:${end}`,
+          type: 'p2p_angle',
+          p1_id: target.centerId,
+          p2_id: point,
+          angle: { o_id: target.id, prop },
+        });
+        if (!anchoredEnds.includes(end))
+          result.push({
+            id: `${prefix}:support-radius:${end}`,
+            type: 'p2p_distance',
+            p1_id: target.centerId,
+            p2_id: point,
+            distance: { o_id: target.id, prop: 'radius' },
+          });
+      }
+    }
     if (member.kind === 'arc' && source.type === 'arc' && target.type === 'arc')
       for (const end of member.normalEnds) {
         const prop = end === 'start' ? 'start_angle' : 'end_angle';
@@ -74,4 +81,32 @@ export function slotPrimitives(
       result.push({ id: `${slot.id}:cap:${id}:${prop}`, type: 'p2p_angle', p1_id: cap.centerId, p2_id: point, angle: { o_id: id, prop } });
   }
   return result;
+}
+
+/** A retained normal anchor on an adjacent support already fixes the shared endpoint's offset. */
+function slotAnchoredEnds(slot: CadSlot, member: CadSlotMember, entities: ReadonlyMap<string, CadEntity>): ('start' | 'end')[] {
+  const target = entities.get(member.targetId);
+  if (member.kind === 'circle' || !target || (target.type !== 'line' && target.type !== 'arc')) return [];
+  return (['start', 'end'] as const).filter(
+    end =>
+      !member.normalEnds.includes(end) &&
+      slot.members.some(other => {
+        const curve = entities.get(other.targetId);
+        return (
+          other !== member &&
+          other.kind !== 'circle' &&
+          (curve?.type === 'line' || curve?.type === 'arc') &&
+          other.normalEnds.some(
+            otherEnd => (otherEnd === 'start' ? curve.startId : curve.endId) === (end === 'start' ? target.startId : target.endId)
+          )
+        );
+      })
+  );
+}
+export function slotArcRuleOverrides(slots: readonly CadSlot[], entities: ReadonlyMap<string, CadEntity>): Set<string> {
+  return new Set(
+    slots.flatMap(slot =>
+      slot.members.filter(member => member.kind === 'arc' && slotAnchoredEnds(slot, member, entities).length).map(member => member.targetId)
+    )
+  );
 }

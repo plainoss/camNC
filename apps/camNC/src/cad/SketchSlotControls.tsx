@@ -23,7 +23,7 @@ export function SketchSlotControls({
   return (
     <form
       aria-label="Slot"
-      className="cad-create-size"
+      className="cad-create-size cad-slot-editor"
       onSubmit={e => {
         e.preventDefault();
         onApply();

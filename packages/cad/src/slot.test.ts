@@ -163,3 +163,29 @@ it('rejects a source edit that changes its join topology without mutating the sa
   expect(reconcileSlot(edited, group).ok).toBe(false);
   expect(edited).toEqual(before);
 });
+
+it.each(['parallel', 'arcs'] as const)('keeps %s smooth joins linked without adding freedoms or redundant equations', async kind => {
+  const part = createCadPart();
+  let sketch = part.sketch;
+  if (kind === 'parallel') {
+    sketch = addLine(sketch, { x1: 20, y1: 20, x2: 50, y2: 20 });
+    sketch = addLine(sketch, { x1: 50, y1: 20, x2: 80, y2: 20 });
+  } else {
+    sketch = addArc(sketch, { cx: 40, cy: 40, radius: 20, startAngle: -Math.PI / 2, endAngle: 0 });
+    sketch = addArc(sketch, { cx: 80, cy: 40, radius: 20, startAngle: Math.PI / 2, endAngle: Math.PI });
+  }
+  const ids = sketch.entities.filter(e => e.type === 'line' || e.type === 'arc').map(e => e.id);
+  sketch = addConstraint(sketch, { type: kind === 'parallel' ? 'parallel' : 'tangent', entityAId: ids[0]!, entityBId: ids[1]! });
+  const result = slotSketchEntities(sketch, { entityIds: ids, width: 8 });
+  if (!result.ok) throw new Error(result.message);
+  const doc = { ...createCadDocument(), parts: [{ ...part, sketch }] },
+    baseline = await solveCadDocument(doc, { sketchOnly: true }),
+    solved = await solveCadDocument({ ...doc, parts: [{ ...part, sketch: result.sketch }] }, { sketchOnly: true });
+  expect(solved.sketches[0]!.status, JSON.stringify(solved.diagnostics)).toBe('solved');
+  expect(solved.sketches[0]!.dof).toBe(baseline.sketches[0]!.dof);
+  expect(solved.diagnostics.filter(d => d.code === 'redundant-constraint')).toHaveLength(
+    baseline.diagnostics.filter(d => d.code === 'redundant-constraint').length
+  );
+  const wider = await solveCadDocument(updateDimension(solved.document, result.widthConstraintId, 12), { sketchOnly: true });
+  expect(wider.sketches[0]!.status, JSON.stringify(wider.diagnostics)).toBe('solved');
+});

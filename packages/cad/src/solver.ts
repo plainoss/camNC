@@ -1,5 +1,5 @@
 import { reconcileSlot } from './slot';
-import { slotPrimitives } from './slotConstraint';
+import { slotPrimitives, slotArcRuleOverrides } from './slotConstraint';
 import { Algorithm, GcsWrapper, init_planegcs_module, SolveStatus, type ModuleStatic, type SketchPrimitive } from '@salusoft89/planegcs';
 import { sketchTargets } from './featureModel';
 import { evaluateCadDocument } from './features';
@@ -640,7 +640,13 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
         const geometry: SketchPrimitive[] = ordered.map(e => solverGeometry(offsetSeed.get(e.id) ?? e, points));
         const primitives: SketchPrimitive[] = [];
         const draggedIds = new Set(dragTargets.map(target => target.pointId));
-        const slotCaps = new Set(part.sketch.constraints.flatMap(c => (c.type === 'slot' ? c.capIds : [])));
+        const slotCaps = new Set([
+          ...part.sketch.constraints.flatMap(c => (c.type === 'slot' ? c.capIds : [])),
+          ...slotArcRuleOverrides(
+            part.sketch.constraints.filter(c => c.type === 'slot'),
+            entities
+          ),
+        ]);
         const replicas = patternReplicaIds(part.sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern'));
         const retainedSplineHandles = new Set<string>();
         for (const e of ordered)
