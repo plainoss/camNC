@@ -140,6 +140,21 @@ describe('report edge notches', () => {
 });
 
 describe('report missing pattern copies', () => {
+  it('counts a copy with an island inside it as changed', async () => {
+    const { report } = await editCad(null, d => {
+      const part = d.part('Panel', { thickness: 18 });
+      part.profile.rect({ at: [0, 0], w: 200, h: 100 });
+      const top = part.sketchOn('top');
+      top.pattern([top.rect({ at: [20, 20], w: 20, h: 20 })], { count: 3, step: [40, 0] });
+      top.circle({ at: [70, 30], d: 4 });
+      part.cut(top.regionAt(25, 25), { depth: 5 });
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.warnings).toContainEqual(
+      expect.objectContaining({ code: 'pattern-copies-missing', part: 'Panel', message: expect.stringMatching(/1 cop/) })
+    );
+  });
+
   it('warns when an overlapping shape swallows patterned cut regions', async () => {
     const { report } = await editCad(null, d => {
       const part = d.part('Panel', { thickness: 18 });
