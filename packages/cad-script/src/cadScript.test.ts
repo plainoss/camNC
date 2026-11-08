@@ -393,6 +393,8 @@ describe('part studio', () => {
     const [opening] = report.steps!.flatMap(step => (step.kind === 'partCut' ? step.cuts : []));
     expect(opening).toMatchObject({ target: 'Leg', tool: 'Rail' });
     expect(report.assembly!.collisions).toEqual([]);
+    // The leg's own list names the opening after the part that cuts it, not by its long ID.
+    expect(report.parts.find(part => part.name === 'Leg')!.cuts.map(cut => cut.ref)).toEqual(['Rail']);
   });
 
   it('repeats a part in a row that follows a variable', async () => {
