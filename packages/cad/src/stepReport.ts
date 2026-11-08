@@ -45,7 +45,22 @@ export type CadStepReportEntry =
       }[];
     };
 
-const round = (value: number) => Math.round(value * 1e6) / 1e6;
+const round = (value: number) => {
+  const rounded = Math.round(value * 1e3) / 1e3;
+  return rounded === 0 ? 0 : rounded;
+};
+const roundVector = <T extends number[]>(values: T): T => values.map(round) as T;
+
+const roundedFrame = (frame: CadFaceFrame | { error: string }): CadFaceFrame | { error: string } =>
+  'error' in frame
+    ? frame
+    : {
+        origin: roundVector(frame.origin),
+        x: roundVector(frame.x),
+        y: roundVector(frame.y),
+        normal: roundVector(frame.normal),
+        ...(frame.length !== undefined && { length: round(frame.length) }),
+      };
 
 /**
  * Every step that relates parts to each other, in the order the design lists them: what each part is drawn on, each
@@ -62,10 +77,15 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
         partId: part.id,
         part: part.name,
         on: cadFaceName(document, part.drawnOn.on),
-        offset: part.drawnOn.offset,
+        offset: round(part.drawnOn.offset),
         inward: !!part.drawnOn.inward,
-        frame: cadFaceFrame(document, part.drawnOn.on),
-        ...(part.placement && { placement: part.placement }),
+        frame: roundedFrame(cadFaceFrame(document, part.drawnOn.on)),
+        ...(part.placement && {
+          placement: {
+            ...part.placement,
+            position: roundVector(part.placement.position),
+          },
+        }),
       });
     if (part.pattern)
       report.push({
@@ -73,11 +93,11 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
         partId: part.id,
         part: part.name,
         axis: part.pattern.axis,
-        count: part.pattern.count,
-        spacing: part.pattern.spacing,
+        count: round(part.pattern.count),
+        spacing: round(part.pattern.spacing),
         copies: (part.copies ?? []).flatMap((copy, index) =>
           copy.pattern === part.pattern!.id
-            ? [{ name: cadCopyName(part, index), ...(copy.placement && { position: copy.placement.position }) }]
+            ? [{ name: cadCopyName(part, index), ...(copy.placement && { position: roundVector(copy.placement.position) }) }]
             : []
         ),
       });
@@ -85,7 +105,7 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
   /** A tool's name from a step's tool entry or a cut it made, either the whole part or one copy (`<partId>:<copyId>`). */
   const toolName = (cutId: string) => {
     // A tool that fills several rectangles makes a cut for each, numbered after the first.
-    const id = cutId.replace(/#\d+$/, '');
+    const id = cutId.replace(/#\d+$/, '').replace(/:lap(?=:|$)/, '');
     const [partId, copyId] = id.split(':');
     const tool = byId.get(partId!);
     if (!tool) return 'a part that is gone';
@@ -100,7 +120,7 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
       stepId: step.id,
       tools: step.tools.map(toolName),
       targets: step.targets.map(id => byId.get(id)?.name ?? 'a part that is gone'),
-      clearance: step.clearance,
+      clearance: round(step.clearance),
       cuts: parts.flatMap(part =>
         (part.cuts ?? []).flatMap(cut => {
           if (!cut.id.startsWith(prefix) || !cut.opening) return [];

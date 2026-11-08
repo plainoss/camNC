@@ -68,12 +68,64 @@ describe('reading faces by the way they look', () => {
 });
 
 describe('the step report', () => {
+  it('names the part, face and world direction for top and underside sketches', async () => {
+    const side = plate('Side', 300, 720, { on: { plane: 'right' }, offset: 0 });
+    const top = plate('Top cleat', 100, 20, { on: { partId: side.id, face: 'top' }, offset: 0 });
+    const underside = plate('Underside cleat', 100, 20, { on: { partId: side.id, face: 'underside' }, offset: 0 });
+    const solved = await solveCadDocument({ ...createCadDocument(), parts: [side, top, underside] });
+    expect(cadStepReport(solved.document, solved.parts)).toMatchObject([
+      { on: 'the right plane', frame: { normal: [1, 0, 0] } },
+      { on: "Side's top (+x)", frame: { origin: [18, 0, 0], x: [0, 1, 0], y: [0, 0, 1], normal: [1, 0, 0] } },
+      { on: "Side's underside (-x)", frame: { origin: [0, 0, 0], x: [0, -1, 0], y: [0, 0, 1], normal: [-1, 0, 0] } },
+    ]);
+  });
+
+  it('rounds a placement with floating point error to three decimals only in the report', async () => {
+    const part = plate('Panel', 100, 100, { on: { plane: 'top' }, offset: 1199.999998 });
+    const solved = await solveCadDocument({ ...createCadDocument(), parts: [part] });
+    expect(cadStepReport(solved.document, solved.parts)[0]).toMatchObject({
+      offset: 1200,
+      placement: { position: [0, 0, 1200] },
+    });
+    expect(solved.document.parts[0]!.placement!.position[2]).toBe(1199.999998);
+    expect(solved.document.parts[0]!.drawnOn!.offset).toBe(1199.999998);
+  });
+
+  it('rounds frames, positions and pattern copies, keeping rotations exact, without changing their source values', () => {
+    const base = {
+      ...createPlateDocument({ width: 100.123456, height: 100, thickness: 18.123456 }).parts[0]!,
+      name: 'Base',
+      placement: {
+        position: [1199.999998, -0.000001, 2.123456] as [number, number, number],
+        rotation: [0, 0, 0.382683432, 0.923879533] as [number, number, number, number],
+      },
+    };
+    const post = {
+      ...plate('Post', 20, 20, {
+        on: { partId: base.id, face: { edge: base.sketch.entities.find(entity => entity.type === 'line')!.id } },
+        offset: 0.123456,
+      }),
+      placement: base.placement,
+    };
+    const document = setPartPattern({ ...createCadDocument(), parts: [base, post] }, post.id, { axis: 'x', count: 2, spacing: 150.123456 });
+    document.parts[1]!.copies![0]!.placement = base.placement;
+    const before = JSON.stringify(document);
+    const report = cadStepReport(document, []);
+    expect(report[0]).toMatchObject({
+      offset: 0.123,
+      placement: { position: [1200, 0, 2.123], rotation: [0, 0, 0.382683432, 0.923879533] },
+      frame: { origin: [1200, 0, 2.123], x: [0.707, 0.707, 0], y: [0, 0, 1], normal: [0.707, -0.707, 0], length: 100.123 },
+    });
+    expect(report[1]).toMatchObject({ spacing: 150.123, copies: [{ position: [1200, 0, 2.123] }] });
+    expect(JSON.stringify(document)).toBe(before);
+  });
+
   it('says what each step refers to and what it came to: the face, the copies and every opening', async () => {
     const side = plate('Side', 300, 720, { on: { plane: 'right' }, offset: 0 });
     // A shelf 250 deep on the top plane, raised to 300 mm, running through the side's thickness.
     const shelf = plate('Shelf', 500, 250, { on: { plane: 'top' }, offset: 300 });
     let document = { ...createCadDocument(), parts: [side, shelf] };
-    document = addPartCut(document, [shelf.id], [side.id], { value: 0.2 }).document;
+    document = addPartCut(document, [shelf.id], [side.id], { value: 0.2000004 }).document;
     document = setPartPattern(document, shelf.id, { axis: 'z', count: 2, spacing: 200 });
     const solved = await solveCadDocument(document);
     const report = cadStepReport(solved.document, solved.parts);

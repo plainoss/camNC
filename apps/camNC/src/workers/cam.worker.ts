@@ -14,6 +14,7 @@ import {
   type BoardPartSource,
   type CamSettings,
   type FlatPart,
+  type OnProgress,
   type PartFeatures,
   type StepBody,
 } from '@wbcnc/cam';
@@ -113,11 +114,28 @@ const api = {
     key: string,
     board: BoardRequest,
     settings: Partial<CamSettings>,
-    options: { perPart?: boolean } = {}
+    options: { perPart?: boolean } = {},
+    onProgress?: OnProgress
   ): Promise<PlanResult> {
-    return planBoard(board, settings, partSource(key), options);
+    try {
+      return planBoard(board, settings, partSource(key), { ...options, onProgress: onProgress && throttled(onProgress) });
+    } finally {
+      // The page's end of the callback stays open until it's let go.
+      (onProgress as Comlink.Remote<OnProgress> | undefined)?.[Comlink.releaseProxy]();
+    }
   },
 };
+
+/** Progress to the page at most every 100 ms: each report is a message, and a plan can make thousands. 0 always goes. */
+function throttled(onProgress: OnProgress): OnProgress {
+  let last = -Infinity;
+  return fraction => {
+    const now = performance.now();
+    if (fraction > 0 && now - last < 100) return;
+    last = now;
+    void onProgress(fraction);
+  };
+}
 
 /** The parts of an imported model, with each one's turned-over features worked out once and kept. */
 function partSource(key: string): BoardPartSource {

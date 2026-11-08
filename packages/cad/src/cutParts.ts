@@ -1,5 +1,5 @@
 import { relieveLoopCorners } from './cornerRelief';
-import { newCadId } from './document';
+import { newCadId, validPartCutSplit } from './document';
 import { mirrorEvaluatedPart, sameCadCuts } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
@@ -173,9 +173,15 @@ export function applyPartCuts(
 ): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
   const diagnostics: CadDiagnostic[] = [];
   const byId = new Map(parts.map(part => [part.partId, part]));
-  // A tool cuts with the shape it has before any step cuts it, so two parts can cut each other.
-  const before = new Map(byId);
   const sources = new Map(document.parts.map(part => [part.id, part]));
+  // Tools reach with their profile outline, before bones or step cuts, so two parts can cut each other.
+  const before = new Map(
+    parts.map(part => {
+      const source = sources.get(part.partId);
+      const outline = source?.cornerRelief && document.partCuts?.length && evaluateCadPart(source).part?.outline;
+      return [part.partId, outline ? { ...part, outline } : part];
+    })
+  );
   const supports = cadDrawnOnSupports(document);
   const targets = new Map(
     parts.map(part => [
@@ -200,6 +206,85 @@ export function applyPartCuts(
       if (!said.has(message)) diagnostics.push({ code: 'part-cut-unresolved', severity: 'warning', message });
       said.add(message);
     };
+    const cutBoxes = (
+      target: { shape: EvaluatedCadPart },
+      intoSource: (typeof document.parts)[number],
+      name: string,
+      boxes: [Vec3, Vec3][],
+      prefix: string
+    ) => {
+      const into = target.shape;
+      const t = into.thickness,
+        [ilo, ihi] = box(into),
+        c = step.clearance;
+      const reaches = boxes.map(([lo, hi]) => ({
+        lo: [0, 1, 2].map(a => Math.max(lo[a]!, ilo[a]!)) as Vec3,
+        hi: [0, 1, 2].map(a => Math.min(hi[a]!, ihi[a]!)) as Vec3,
+      }));
+      // Two rectangles of one tool that meet aren't widened into each other.
+      const meets = (index: number, axis: 0 | 1, at: number) =>
+        reaches.some(
+          (other, j) =>
+            j !== index &&
+            (Math.abs(other.lo[axis] - at) < kSquare || Math.abs(other.hi[axis] - at) < kSquare) &&
+            other.lo[1 - axis]! < reaches[index]!.hi[1 - axis]! - kSquare &&
+            other.hi[1 - axis]! > reaches[index]!.lo[1 - axis]! + kSquare
+        );
+      reaches.forEach(({ lo, hi }, index) => {
+        const fromTop = hi[2] >= t - kSquare,
+          fromBelow = lo[2] <= kSquare;
+        if (!fromTop && !fromBelow) {
+          warn(`${name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
+          return;
+        }
+        // The clearance widens each side inside the part. A side that runs off its edge stays there, open.
+        const widen = (axis: 0 | 1, side: 'lo' | 'hi') => {
+          const at = side === 'lo' ? lo[axis] : hi[axis];
+          const inside = side === 'lo' ? at > ilo[axis] + kSquare : at < ihi[axis] - kSquare;
+          return inside && !meets(index, axis, at) ? (side === 'lo' ? at - c : at + c) : at;
+        };
+        const x0 = widen(0, 'lo'),
+          x1 = widen(0, 'hi'),
+          y0 = widen(1, 'lo'),
+          y1 = widen(1, 'hi');
+        const outline = [
+          { x: x0, y: y0 },
+          { x: x1, y: y0 },
+          { x: x1, y: y1 },
+          { x: x0, y: y1 },
+        ];
+        // The clearance deepens it too, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
+        const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
+          through = reach >= t - kSquare;
+        const relief = intoSource.cornerRelief
+          ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
+          : { points: outline, skipped: 0 };
+        if (relief.skipped)
+          warn(
+            `${relief.skipped} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
+          );
+        const current = target.shape;
+        // The first piece keeps the ID a tool's one cut always had.
+        const id = `${prefix}${index ? `#${index}` : ''}`;
+        const cut: EvaluatedCadCut = {
+          id,
+          regionId: id,
+          side: fromTop ? 'top' : 'underside',
+          from: 0,
+          to: through ? t : reach,
+          through,
+          outline: relief.points,
+          islands: [],
+          opening: { x0, y0, x1, y1 },
+        };
+        target.shape = { ...current, cuts: [...(current.cuts ?? []), cut] };
+        made++;
+      });
+    };
+    if (!validPartCutSplit(step.split)) {
+      warn('Invalid split in a "cut parts" step: fingers must be an integer of at least 2.');
+      continue;
+    }
     // A tool `<partId>:<copyId>` cuts with that one copy; a copy that's gone is said once, not once per target.
     const goneCopies = new Set<string>();
     for (const targetId of step.targets)
@@ -217,7 +302,8 @@ export function applyPartCuts(
           continue;
         }
         for (const target of targets.get(targetId) ?? []) {
-          const into = target.shape,
+          const original = before.get(targetId)!;
+          const into = target.mirrored ? mirrorEvaluatedPart(original) : original,
             intoAt = target.at;
           const toolAt = effectivePlacement(toolSource, supports);
           // A part that hasn't been placed isn't anywhere yet, so it reaches into nothing.
@@ -250,72 +336,78 @@ export function applyPartCuts(
               warn(`${name} ${found.refused} where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
               continue;
             }
-            const t = into.thickness,
-              [ilo, ihi] = box(into),
-              c = step.clearance;
-            const reaches = found.boxes.map(([lo, hi]) => ({
-              lo: [0, 1, 2].map(a => Math.max(lo[a]!, ilo[a]!)) as Vec3,
-              hi: [0, 1, 2].map(a => Math.min(hi[a]!, ihi[a]!)) as Vec3,
-            }));
-            // Two rectangles of one tool that meet aren't widened into each other.
-            const meets = (index: number, axis: 0 | 1, at: number) =>
-              reaches.some(
-                (other, j) =>
-                  j !== index &&
-                  (Math.abs(other.lo[axis] - at) < kSquare || Math.abs(other.hi[axis] - at) < kSquare) &&
-                  other.lo[1 - axis]! < reaches[index]!.hi[1 - axis]! - kSquare &&
-                  other.hi[1 - axis]! > reaches[index]!.lo[1 - axis]! + kSquare
-              );
-            reaches.forEach(({ lo, hi }, index) => {
-              const fromTop = hi[2] >= t - kSquare,
-                fromBelow = lo[2] <= kSquare;
-              if (!fromTop && !fromBelow) {
-                warn(`${name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
-                return;
-              }
-              // The clearance widens each side inside the part. A side that runs off its edge stays there, open.
-              const widen = (axis: 0 | 1, side: 'lo' | 'hi') => {
-                const at = side === 'lo' ? lo[axis] : hi[axis];
-                const inside = side === 'lo' ? at > ilo[axis] + kSquare : at < ihi[axis] - kSquare;
-                return inside && !meets(index, axis, at) ? (side === 'lo' ? at - c : at + c) : at;
-              };
-              const x0 = widen(0, 'lo'),
-                x1 = widen(0, 'hi'),
-                y0 = widen(1, 'lo'),
-                y1 = widen(1, 'hi');
-              const outline = [
-                { x: x0, y: y0 },
-                { x: x1, y: y0 },
-                { x: x1, y: y1 },
-                { x: x0, y: y1 },
-              ];
-              // The clearance deepens it too, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
-              const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
-                through = reach >= t - kSquare;
-              const relief = intoSource.cornerRelief
-                ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
-                : { points: outline, skipped: 0 };
-              if (relief.skipped)
-                warn(
-                  `${relief.skipped} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
-                );
-              const current = target.shape;
-              // The first piece keeps the ID a tool's one cut always had.
-              const id = `cut-parts:${step.id}:${partId}${key}${index ? `#${index}` : ''}`;
-              const cut: EvaluatedCadCut = {
-                id,
-                regionId: id,
-                side: fromTop ? 'top' : 'underside',
-                from: 0,
-                to: through ? t : reach,
-                through,
-                outline: relief.points,
-                islands: [],
-                opening: { x0, y0, x1, y1 },
-              };
-              target.shape = { ...current, cuts: [...(current.cuts ?? []), cut] };
-              made++;
-            });
+            if (!step.split) {
+              cutBoxes(target, intoSource, name, found.boxes, `cut-parts:${step.id}:${partId}${key}`);
+              continue;
+            }
+            const normal = rotateVector(conjugate(intoAt.rotation), rotateVector(at.rotation, [0, 0, 1]));
+            const axis = ([0, 1] as const).find(a => Math.abs(normal[a]) < kSquare);
+            if (axis === undefined || Math.abs(normal[2]) > kSquare) {
+              refused = true;
+              warn(`${name} and ${intoSource.name} have no shared in-plane axis for a split cut.`);
+              continue;
+            }
+            const reverse = toolBoxes(into, intoAt, shape, at);
+            if ('refused' in reverse) {
+              refused = true;
+              warn(`${intoSource.name} ${reverse.refused} where it reaches into ${name}, so it can't be cut from it yet.`);
+              continue;
+            }
+            const opposite = reverse.boxes.map(bounds => carry(at, intoAt, bounds));
+            // Both outlines limit the overlap: a stepped board may stop short of its bounding box here.
+            const overlap = found.boxes.flatMap(([lo, hi]) =>
+              opposite.flatMap(([rlo, rhi]) => {
+                const bottom = [0, 1, 2].map(a => Math.max(lo[a]!, rlo[a]!)) as Vec3,
+                  top = [0, 1, 2].map(a => Math.min(hi[a]!, rhi[a]!)) as Vec3;
+                return bottom.every((value, a) => top[a]! - value > kSquare) ? [[bottom, top] as [Vec3, Vec3]] : [];
+              })
+            );
+            if (!overlap.length) continue;
+            const unit: Vec3 = [0, 0, 0];
+            unit[axis] = 1;
+            const world = rotateVector(intoAt.rotation, unit);
+            // Orient the shared line towards its positive world end, independent of either sketch's direction.
+            const sign = world.find(value => Math.abs(value) > kSquare)! < 0 ? -1 : 1;
+            const lo = Math.min(...overlap.map(bounds => bounds[0][axis])),
+              hi = Math.max(...overlap.map(bounds => bounds[1][axis]));
+            const count = step.split === 'half' ? 2 : step.split.fingers;
+            const segments = (boxes: [Vec3, Vec3][], placement: CadPlacement, parity: number): [Vec3, Vec3][] => {
+              const localAxis = rotateVector(conjugate(placement.rotation), rotateVector(intoAt.rotation, unit));
+              const a = ([0, 1] as const).find(a => Math.abs(localAxis[a]) > 1 - kSquare)!;
+              return Array.from({ length: count }, (_, i) => i).flatMap(i => {
+                if (i % 2 !== parity) return [];
+                const from = sign > 0 ? hi - ((i + 1) * (hi - lo)) / count : lo + (i * (hi - lo)) / count,
+                  to = sign > 0 ? hi - (i * (hi - lo)) / count : lo + ((i + 1) * (hi - lo)) / count;
+                const point: Vec3 = [0, 0, 0];
+                point[axis] = from;
+                const first = toLocal(placement, toWorld(intoAt, point))[a];
+                point[axis] = to;
+                const last = toLocal(placement, toWorld(intoAt, point))[a];
+                return boxes.flatMap(([bottom, top]) => {
+                  const low: Vec3 = [...bottom],
+                    high: Vec3 = [...top];
+                  low[a] = Math.max(low[a], Math.min(first, last));
+                  high[a] = Math.min(high[a], Math.max(first, last));
+                  // Split joints always cut through the receiving board's thickness.
+                  low[2] = 0;
+                  high[2] = placement === intoAt ? into.thickness : shape.thickness;
+                  return high[a] - low[a] > kSquare ? [[low, high] as [Vec3, Vec3]] : [];
+                });
+              });
+            };
+            const receiver = targets.get(partId)!.find(instance => instance.key === key.slice(1))!;
+            cutBoxes(target, intoSource, name, segments(overlap, intoAt, 0), `cut-parts:${step.id}:${partId}${key}`);
+            cutBoxes(
+              receiver,
+              toolSource,
+              intoSource.name,
+              segments(
+                overlap.map(bounds => carry(intoAt, at, bounds)),
+                at,
+                1
+              ),
+              `cut-parts:${step.id}:${targetId}:lap${target.key ? `:${target.key}` : ''}`
+            );
           }
         }
       }
@@ -340,9 +432,13 @@ export function applyPartCuts(
  * evaluated as they are in `document`.
  */
 export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): EvaluatedCadPart {
-  const steps = (document.partCuts ?? []).filter(step => step.targets.includes(part.partId));
+  const steps = (document.partCuts ?? []).filter(
+    step => step.targets.includes(part.partId) || (step.split && step.tools.some(id => id.split(':')[0] === part.partId))
+  );
   if (!steps.length) return part;
-  const toolIds = [...new Set(steps.flatMap(step => step.tools.map(id => id.split(':')[0]!)))].filter(id => id !== part.partId);
+  const toolIds = [...new Set(steps.flatMap(step => [...step.targets, ...step.tools.map(id => id.split(':')[0]!)]))].filter(
+    id => id !== part.partId
+  );
   const tools = toolIds.flatMap(id => {
     const source = document.parts.find(candidate => candidate.id === id);
     const profile = source && evaluateCadPart(source).part;
@@ -356,13 +452,16 @@ export function addPartCut(
   document: CadDocument,
   tools: string[],
   targets: string[],
-  clearance: { value: number; expression?: string }
+  clearance: { value: number; expression?: string },
+  split?: CadPartCut['split']
 ): { document: CadDocument; id: string } {
+  if (!validPartCutSplit(split)) throw new Error('Invalid CAD part cut');
   const step: CadPartCut = {
     id: newCadId(),
     tools,
     targets,
     clearance: clearance.value,
+    ...(split !== undefined && { split }),
     ...(clearance.expression && { clearanceExpression: clearance.expression }),
   };
   return { id: step.id, document: { ...document, revision: document.revision + 1, partCuts: [...(document.partCuts ?? []), step] } };
@@ -370,6 +469,7 @@ export function addPartCut(
 
 /** Changes a step's parts or clearance. A clearance given without an expression drops the step's old one. */
 export function updatePartCut(document: CadDocument, id: string, change: Partial<Omit<CadPartCut, 'id'>>): CadDocument {
+  if (!validPartCutSplit(change.split)) throw new Error('Invalid CAD part cut');
   return {
     ...document,
     revision: document.revision + 1,
