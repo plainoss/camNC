@@ -2,7 +2,8 @@ import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { NumberInput } from '@/cam/NumberInput';
-import { carvingProblem, kCarvingFonts, kVBits, type CarvingArt, type CarvingFont, type CarvingV1 } from '@/cam/carving';
+import { LetteringFontPicker } from '@/cam/LetteringFontPicker';
+import { carvingProblem, kVBits, type CarvingArt, type CarvingV1 } from '@/cam/carving';
 import { outlineArt, placeRegion } from '@/cam/carvingOutline';
 import { useCamJob, useSaveCamJob } from '@/cam/camQueries';
 import type { BoardV1 } from '@/cam/boards';
@@ -339,7 +340,7 @@ function ArtFields({ carving, onArt }: { carving: CarvingV1; onArt: (art: Carvin
     const t = setTimeout(() => onArt({ ...art, text }), 300);
     return () => clearTimeout(t);
   }, [text, art, onArt]);
-  const font: CarvingFont = art.kind === 'text' ? art.font : 'serif';
+  const font = art.kind === 'text' ? art.font : 'serif';
   return (
     <>
       <div role="tablist" className="inline-flex self-start rounded-md bg-muted p-0.5">
@@ -360,17 +361,7 @@ function ArtFields({ carving, onArt }: { carving: CarvingV1; onArt: (art: Carvin
             <Input id="carve-text" value={text} maxLength={60} onChange={e => setText(e.target.value)} />
           </Field>
           <Field label="Font" id="carve-font">
-            <select
-              id="carve-font"
-              className="h-9 rounded-md border bg-background px-2"
-              value={font}
-              onChange={e => onArt({ ...art, font: e.target.value as CarvingFont })}>
-              {Object.entries(kCarvingFonts).map(([key, f]) => (
-                <option key={key} value={key}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
+            <LetteringFontPicker font={font} onChange={font => onArt({ ...art, font })} />
           </Field>
         </>
       ) : (

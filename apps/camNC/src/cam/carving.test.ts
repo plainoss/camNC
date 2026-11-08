@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import lobsterUrl from './testdata/lobster-oil.ttf?url';
+import { resetWebFontsForTests } from './webFonts';
 import { boardRequest, edgeNote, nestBoard, reconcileBoards } from './boards';
 import { boardCarving, carvingProblem, hasWork, kDefaultVBit, withCarving, type CarvingV1 } from './carving';
 import { maskOutline, outlineArt } from './carvingOutline';
@@ -39,6 +41,33 @@ describe('carving outlines', () => {
     expect(region).toHaveLength(2);
     // One loop each way round: the inside of the O stays uncut.
     expect(Math.sign(area(region[0]))).not.toBe(Math.sign(area(region[1])));
+  });
+
+  it('draws the loaded web face at the requested height, with its own glyph proportions', async () => {
+    const data = await (await fetch(lobsterUrl)).arrayBuffer();
+    const fetcher = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(
+        async input =>
+          new Response(
+            String(input).includes('googleapis')
+              ? '/* latin */ @font-face { src: url(https://fonts.gstatic.com/lobster.ttf); unicode-range: U+0000-00FF; }'
+              : data
+          )
+      );
+    try {
+      const web = await outlineArt({ kind: 'text', text: 'O', font: { family: 'Lobster', weight: 400 } }, 40);
+      const sans = await outlineArt({ kind: 'text', text: 'O', font: 'sans' }, 40);
+      // Lobster’s O has an open gap: its white centre connects to the outside.
+      expect(web.region).toHaveLength(1);
+      expect(web.width).toBeCloseTo((40 * 640) / 756, 2);
+      expect(box(web.region).h).toBeGreaterThan(39.5);
+      expect(box(web.region).h).toBeLessThan(40.5);
+      expect(Math.abs(box(web.region).w - box(sans.region).w)).toBeGreaterThan(1);
+    } finally {
+      fetcher.mockRestore();
+      resetWebFontsForTests();
+    }
   });
 
   it('draw an SVG’s filled shapes at its own proportions', async () => {
