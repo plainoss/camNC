@@ -286,7 +286,7 @@ describe('paths', () => {
 
   it('draws a half circle of a given radius fully constrained, through its top', async () => {
     const { report } = await editCad(null, d => {
-      d.part('Keyhole').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5 }).lineTo([0, 5]).close();
+      d.part('Keyhole').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5 }).lineTo([0, 5]).close({ straight: true });
     });
     expect(report.warnings).toEqual([]);
     expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
@@ -310,7 +310,7 @@ describe('paths', () => {
         path.arcTo(middle, { r, clockwise: !rising }).arcTo(next, { r, clockwise: rising });
         previous = next;
       }
-      path.lineTo([300, 120]).lineTo([0, 120]).close();
+      path.lineTo([300, 120]).lineTo([0, 120]).close({ straight: true });
     });
     expect(report.warnings).toEqual([]);
     expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
