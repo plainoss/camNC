@@ -7,6 +7,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { openPage, startDevServer } from './harness.mjs';
+import { failsRun, scenarioResult } from './results.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
@@ -120,15 +121,16 @@ if (!options.url) {
 }
 const { chromium } = createRequire(import.meta.url)('playwright');
 const browser = await chromium.launch({ headless: !options.headed });
-const counts = { PASS: 0, FAIL: 0, XFAIL: 0, XPASS: 0 };
+const counts = { PASS: 0, FAIL: 0, XFAIL: 0, XPASS: 0, FLAKY: 0 };
 const results = [];
 const run = async (scenario, index) => {
   const { failures, bootstrapMs, durationMs } = await runScenario(browser, scenario, options, outDir);
-  const result = failures.length ? (scenario.known ? 'XFAIL' : 'FAIL') : scenario.known ? 'XPASS' : 'PASS';
+  const result = scenarioResult(scenario, failures);
   counts[result]++;
   results[index] = { id: scenario.id, result, failures, bootstrapMs, durationMs };
   const lines = [`${result.padEnd(5)} ${scenario.id}`];
-  if (result === 'FAIL') lines.push(...failures.map(failure => `        ${failure}`));
+  if (result === 'FAIL' || result === 'FLAKY') lines.push(...failures.map(failure => `        ${failure}`));
+  if (result === 'FLAKY') lines.push(`        quarantined: ${scenario.flaky}`);
   if (result === 'XFAIL') lines.push(`        known: ${scenario.known}`);
   if (result === 'XPASS') lines.push(`        now passes; remove known: ${scenario.known}`);
   console.log(lines.join('\n'));
@@ -155,5 +157,5 @@ await browser.close();
 server?.stop();
 await writeFile(path.join(outDir, 'results.json'), JSON.stringify(results, null, 2) + '\n');
 await writeFile(path.join(outDir, 'summary.json'), JSON.stringify({ shard: options.shard, workers, wallMs: performance.now() - runStarted, scenarios: scenarios.length, counts }, null, 2) + '\n');
-console.log(`\n${scenarios.length} scenarios: ${counts.PASS} pass, ${counts.FAIL} fail, ${counts.XFAIL} known gaps, ${counts.XPASS} newly passing`);
-if (counts.FAIL || counts.XPASS) process.exitCode = 1;
+console.log(`\n${scenarios.length} scenarios: ${counts.PASS} pass, ${counts.FAIL} fail, ${counts.XFAIL} known gaps, ${counts.XPASS} newly passing, ${counts.FLAKY} quarantined failures`);
+if (failsRun(counts)) process.exitCode = 1;

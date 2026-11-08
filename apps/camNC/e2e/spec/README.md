@@ -31,6 +31,10 @@ Results are one of `PASS`, `FAIL`, `XFAIL` (a listed known gap still fails) and
 `XPASS` (a known gap now passes, so remove its `known` field). The run fails on
 `FAIL` and `XPASS`, so a fix can't go unrecorded and a known gap can't be forgotten.
 
+A scenario with a `flaky` field (the issue that tracks it) is quarantined: it still runs, but a failure is reported as
+`FLAKY` and doesn't fail the run. Use it only for a race that blocks other PRs while its issue is open, and remove
+the field with the fix.
+
 ## Interactive session
 
 A session keeps one page open and takes scenario steps a line at a time, so an agent
@@ -72,6 +76,7 @@ Once a behaviour works, write the steps that showed it as a scenario.
   "title": "A point and a diagonal line dimension as their perpendicular distance",
   "evidence": "reference-live 2026-11-06",
   "known": "optional: why this still fails, removed once it passes",
+  "flaky": "optional: the issue of a quarantined race, removed with its fix",
   "steps": ["line 20,10 120,70", "key d", { "expect": { "tool": "dimension" } }]
 }
 ```
