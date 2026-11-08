@@ -492,7 +492,8 @@ function undersideOf(source: BoardPartSource, instanceId: string, board: BoardRe
 
 /** "left: Pocket 2 z=3.5" -> "left · Pocket 4.5 deep" (board programs prefix the part). */
 const label = (name: string, top: number, title?: string) => {
-  const [, prefix, op] = name.match(/^(?:(.+): )?(.+)$/)!;
+  const split = name.lastIndexOf(': ');
+  const [prefix, op] = split > 0 && split + 2 < name.length ? [name.slice(0, split), name.slice(split + 2)] : [undefined, name];
   const z = op.match(/z=([\d.]+)/);
   const text = title
     ? title[0].toUpperCase() + title.slice(1)
