@@ -1,5 +1,5 @@
 import { addCircle, addFaceSketch, addLine, addRectangle, createCadPart, createPlateDocument, type CadDocument } from '@wbcnc/cad';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { endCadSession } from './session';
@@ -131,7 +131,7 @@ describe('setting a cut depth on the drawing', () => {
     const { change } = setup(document);
     clickWorld(60, 45);
     await depthField();
-    fireEvent.click(screen.getByRole('button', { name: /Other/ }));
+    fireEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: /Other/ }));
     await waitFor(() => expect(screen.queryByLabelText('Depth in mm')).toBeNull());
     expect(change.mock.calls.every(([next]) => next.parts.every(part => !part.features))).toBe(true);
   });

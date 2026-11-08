@@ -12,7 +12,7 @@ import {
   type CadDimension,
   type CadDocument,
 } from '@wbcnc/cad';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from '@vitest/browser/context';
 import { CadEditor } from './CadEditor';
@@ -395,7 +395,7 @@ describe('integrated sketch editor', () => {
     second.sketch = addRectangle(second.sketch, { x: 10, y: 10, width: 70, height: 50 });
     document.parts.push(second);
     const { change, finish, cancel, unmount } = setup(document);
-    fireEvent.click(screen.getByRole('button', { name: /Second panel/ }));
+    fireEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: /Second panel/ }));
     const edge = second.sketch.entities.find(e => e.type === 'line')!;
     selectEntities([edge.id]);
     const canvas = screen.getByTestId('cad-canvas');
@@ -891,7 +891,7 @@ describe('integrated sketch editor', () => {
     const document = createPlateDocument();
     document.parts.push(createCadPart('Centered panel'));
     const { change } = setup(document);
-    fireEvent.click(screen.getByRole('button', { name: /Centered panel/ }));
+    fireEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: /Centered panel/ }));
     fireEvent.keyDown(screen.getByTestId('cad-canvas'), { key: 'r' });
     clickWorld(0, 0);
     clickWorld(40, 30);

@@ -43,7 +43,8 @@ wrong.
 ```
 Pockets:   1 → 2 → 3 → 4 → first test cut
 One view:  4 → 5 → 6 → 7
-Assembly:  7 → 8 → 9 → 10 → 11 → 12 → 13
+Variables: 7 → 8 → 9
+Workspace: 9 → 14 → 15 → 16 → 17 → 18 → 19
 ```
 
 ## Milestone 1: real pockets
@@ -134,69 +135,96 @@ Fusion program for the same part, because no camNC program has been cut yet.
 - **Done when:** a part with cuts on both sides produces a correct side B plan, with
   holes in matching positions.
 
-## Milestone 3: assembly and cupboards
+## Milestone 3: variables and placement
 
-### PR 8: Add design variables
+### PR 8: Add design variables (merged, #208)
 
-`feat(cad) Add design variables`
+- Document variables such as `width` and `board` drive dimensions, thickness, cut
+  depths, positions and pattern counts. A value that can't be used keeps the part's
+  last good shape and shows an error on it.
 
-- Add document variables such as `width` and `board`, used by dimensions and
-  thickness. `dimensionExpressions.ts` is display-only today, so this makes
-  expressions drive the solve.
-- **Done when:** changing one variable updates every part that uses it, and an
-  unsolvable value shows an error on that part and keeps the last good geometry.
+### PR 9: Place parts in an assembly (merged, #210, #212)
 
-### PR 9: Place parts in an assembly
+- Placements, copies and mirrored copies, with a collision check. Testing it by hand
+  showed that placing finished parts against each other isn't how furniture is
+  designed, so the Assembly view leaves the UI in milestone 4. Its internals stay, as
+  the way a part follows the face it was drawn on.
 
-`feat(camNC) Place parts in an assembly`
+## Milestone 4: Part Studio
 
-- Add a placement to each `CadPart`, plus "put this face against that face".
-- Feed it into `ModelViewport`, whose assembled/flat toggle and `layoutFlat` exist,
-  and add the exploded step.
-- **Done when:** a two-part design shows assembled and flat, and placement changes
-  alone never mark a physical sheet as out of date.
+Furniture is designed by building parts up in one 3D view, each drawn on a plane or
+on a face of a part that's already there, so it follows that part. Two reference
+designs set the bar: a **hanging shelf** (two sides with a hook, a back and two
+shelves housed in grooves, dogbones) and a **cutlery insert** (a frame of four
+boards with finger-jointed corners, and separators patterned across it with
+tenons). Each PR below is checked by rebuilding those designs by hand, as far as
+the PR allows.
 
-### PR 10: Add housing joints
+The 3D-printed connectors in the cutlery insert are out of scope.
 
-`feat(cad) Add housing joints`
+```
+Workspace:  14 → 15 → 16 → 17 → 18 → 19
+```
 
-- Add a saved joint between two parts, starting with the housing joint because it
-  only adds a pocket.
-- Clearance comes from a variable. Dogbones use a design bit size, with a warning if
-  the job's bit is bigger.
-- **Done when:** a shelf housed in two sides stays correct when the width and board
-  thickness change, and it sits in the pocket with the right clearance.
+### PR 14: One workspace with a feature list
 
-### PR 11: Add tab and mortise joints
+`feat(camNC) Show the design as one workspace with a feature list`
 
-`feat(cad) Add tab and mortise joints`
+- The design opens in one 3D view with every part where it sits. The sidebar lists
+  variables, then the design's steps in order (each part's sketch and its
+  thickness, its cuts, copies, cut-parts steps, relief), then the parts.
+- Clicking a step or a part selects and highlights it. Opening a part's sketch or
+  cut uses the existing flat editor and part view.
+- The Assembly view, "Put against" and typed positions leave the UI.
+- **Done when:** an existing design and the scripted cupboard open with every part
+  in place, and each step can be opened from the list.
 
-- Add tabs that change a part's outline and through-mortises on the other part, plus
-  butt joints with screw holes.
-- Keep the outline combining on the CAM side of the bridge, because `clipper2-ts` is
-  only in `packages/cam`.
-- **Done when:** a generated tab clears its mortise at the set clearance, and hand
-  edits on those parts survive.
+### PR 15: Draw a new part on a plane or a face
 
-### PR 12: Add shelf and change-joint commands
+`feat(cad) Draw a new part on a plane or on another part's face`
 
-`feat(camNC) Add shelf and change-joint commands`
+- A part records what it was drawn on: a base plane, or the top, underside or an
+  edge face of another part, plus a start offset and which way it grows. Its
+  placement follows from that, so it moves and resizes with the part it's on.
+- "New part" in the workspace: pick a plane or a face, sketch in the flat editor
+  with that face's outline shown, then set the thickness (often a variable).
+- **Done when:** the hanging shelf's sides, back and shelves can be drawn by hand,
+  and changing its width and height keeps them together.
 
-- "Add shelf" creates a part, a placement and two joints. "Change all joints" skips
-  any joint changed by hand. Moved shelves keep a rule, such as a set distance from
-  the bottom.
-- Show an error when a change makes an edit impossible, such as a hole falling off a
-  panel or shelves colliding.
-- **Done when:** adding a shelf, switching joints and adding a unit each work on a
-  real document without further edits.
+### PR 16: Cut parts with a clearance
 
-### PR 13: Add a cupboard generator
+`feat(cad) Cut one part with others, with a clearance`
 
-`feat(camNC) Add a cupboard generator`
+- A step that cuts the parts it's given out of other parts, with a clearance all
+  round, wherever they reach in: grooves, housings, mortises for tenons drawn on the
+  other part. Through cuts that reach a part's edge become notches in its outline.
+- **Done when:** the hanging shelf's back and shelves sit in grooves cut into both
+  sides with its tolerance, and it holds through changes to width, board and
+  tolerance all the way to nesting.
 
-- A form writes variables, fully constrained parts, placements and joints.
-- **Done when:** you can generate a cupboard, move a shelf by hand, add a cable hole
-  and change the width, and everything holds through to nesting on sheets.
+### PR 17: Copy and pattern parts
+
+`feat(cad) Copy and pattern whole parts`
+
+- Copy steps and part patterns along a direction, with the count from a variable.
+  Every part and copy has its own name.
+- **Done when:** the cutlery insert's separators are patterned across the frame and
+  follow the separator-count variable.
+
+### PR 18: Rebuild the reference designs
+
+`test(camNC) Rebuild the hanging shelf and cutlery insert`
+
+- Both designs as saved fixtures built only with the workspace's steps, checked
+  through to boards: sizes, cuts, no collisions, and a change of their main
+  variables.
+- **Done when:** both rebuild, change and nest without hand fixes.
+
+### PR 19: Sketch in place in 3D
+
+`feat(camNC) Sketch on a face without turning the view`
+
+- Draw on the face in the 3D view itself, with the other parts' edges to snap to.
 
 ## Not in this plan
 
