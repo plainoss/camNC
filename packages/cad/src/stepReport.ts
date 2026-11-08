@@ -82,6 +82,7 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
         ),
       });
   }
+  /** A tool's name from a step's tool entry or a cut it made, either the whole part or one copy (`<partId>:<copyId>`). */
   const toolName = (cutId: string) => {
     // A tool that fills several rectangles makes a cut for each, numbered after the first.
     const id = cutId.replace(/#\d+$/, '');
@@ -89,6 +90,7 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
     const tool = byId.get(partId!);
     if (!tool) return 'a part that is gone';
     const index = copyId ? (tool.copies ?? []).findIndex(copy => copy.id === id.slice(partId!.length + 1)) : -1;
+    if (copyId && index < 0) return `a copy of ${tool.name} that is gone`;
     return index >= 0 ? cadCopyName(tool, index) : tool.name;
   };
   for (const step of document.partCuts ?? []) {
@@ -96,7 +98,7 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
     report.push({
       kind: 'partCut',
       stepId: step.id,
-      tools: step.tools.map(id => byId.get(id)?.name ?? 'a part that is gone'),
+      tools: step.tools.map(toolName),
       targets: step.targets.map(id => byId.get(id)?.name ?? 'a part that is gone'),
       clearance: step.clearance,
       cuts: parts.flatMap(part =>

@@ -1,4 +1,5 @@
 import { createCarvingJob, getJob } from '@/cam/jobDb';
+import { ensureWebFont } from '@/cam/webFonts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
@@ -16,13 +17,26 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 vi.mock('@/components/page-header', () => ({ PageHeader: () => null }));
 vi.mock('@/cam/CamJobBar', () => ({ CamJobBar: ({ actions }: { actions: ReactNode }) => <header>{actions}</header> }));
+vi.mock('@/cam/webFonts', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/cam/webFonts')>()),
+  ensureWebFont: vi.fn(async () => {}),
+  fontsOnDevice: async () => [],
+  previewStylesheetUrl: (family: string) => `data:text/css,/*${encodeURIComponent(family)}*/`,
+}));
 
 const CarveStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.mocked(ensureWebFont).mockReset();
 });
+
+const pickFont = async (family: string) => {
+  fireEvent.click(screen.getByRole('combobox', { name: 'Font' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Search fonts' }), { target: { value: family } });
+  fireEvent.click(await screen.findByRole('option', { name: family }));
+};
 
 const open = async () => {
   const job = await createCarvingJob();
@@ -81,6 +95,62 @@ describe('the Carve step', () => {
       expect(saved?.carving?.art).toMatchObject({ kind: 'text', text: 'Hi' });
       expect(saved?.carving?.region).not.toEqual(before);
     });
+  });
+
+  it.each([false, true])(
+    'keeps a selected web font when text changes during its download (debounce finished: %s)',
+    async debounceFinished => {
+      const job = await open();
+      let finishDownload!: () => void;
+      const download = new Promise<void>(resolve => {
+        finishDownload = resolve;
+      });
+      vi.mocked(ensureWebFont).mockReturnValue(download);
+      try {
+        await pickFont('Lobster');
+        expect(screen.getByRole('combobox', { name: 'Font' }).textContent).toContain('Lobster');
+        expect(screen.getByRole('tab', { name: 'Lettering' }).getAttribute('aria-selected')).toBe('true');
+        await waitFor(() => expect(ensureWebFont).toHaveBeenCalledTimes(1));
+        fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Hi' } });
+        // Exercise downloads finishing both before and after the text debounce.
+        if (debounceFinished) await waitFor(() => expect(ensureWebFont).toHaveBeenCalledTimes(2));
+        expect((await getJob(job.id))?.carving?.art).toEqual(job.carving!.art);
+        finishDownload();
+        await waitFor(async () => {
+          expect((await getJob(job.id))?.carving?.art).toEqual({ kind: 'text', text: 'Hi', font: { family: 'Lobster', weight: 400 } });
+        });
+        expect(screen.getByRole('combobox', { name: 'Font' }).textContent).toContain('Lobster');
+        expect(screen.queryByText('Outlining…')).toBeNull();
+      } finally {
+        finishDownload();
+      }
+    }
+  );
+
+  it('restores the saved artwork and keeps the error when the pending font fails', async () => {
+    const job = await open();
+    let failDownload!: (error: Error) => void;
+    vi.mocked(ensureWebFont).mockReturnValue(
+      new Promise<void>((_resolve, reject) => {
+        failDownload = reject;
+      })
+    );
+    await pickFont('Lobster');
+    await waitFor(() => expect(ensureWebFont).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Hi' } });
+    await waitFor(() => expect(ensureWebFont).toHaveBeenCalledTimes(2));
+    failDownload(new Error('Font download failed'));
+    expect((await screen.findByRole('alert')).textContent).toContain('Font download failed');
+    await waitFor(() => {
+      expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
+      expect(screen.getByRole('combobox', { name: 'Font' }).textContent).toContain('Serif, bold');
+    });
+    // A new edit proves that the failed selection no longer supplies the font.
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Retry' } });
+    await waitFor(async () => {
+      expect((await getJob(job.id))?.carving?.art).toEqual({ ...job.carving!.art, text: 'Retry' });
+    });
+    expect(ensureWebFont).toHaveBeenCalledTimes(2);
   });
 
   it('moves the artwork where it is dragged, without drawing it again', async () => {

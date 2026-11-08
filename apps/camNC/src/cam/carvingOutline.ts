@@ -1,5 +1,6 @@
 import { unionPaths } from '@wbcnc/cam';
-import { kCarvingFonts, type CarvingArt } from './carving';
+import { isWebFont, kCarvingFonts, type CarvingArt } from './carving';
+import { ensureWebFont, webFontCss } from './webFonts';
 
 type Loop = { x: number; y: number }[];
 
@@ -145,9 +146,11 @@ async function svgImage(svg: string): Promise<HTMLImageElement> {
  */
 export async function outlineArt(art: CarvingArt, height: number): Promise<{ region: Loop[]; width: number; height: number }> {
   if (art.kind === 'text') {
-    const font = kCarvingFonts[art.font];
+    const font = art.font;
+    if (isWebFont(font)) await ensureWebFont(font);
+    const css = isWebFont(font) ? `${font.weight} {size}px ${webFontCss(font)}` : kCarvingFonts[font].css;
     const probe = canvas(8, 8);
-    probe.font = font.css.replace('{size}', '100');
+    probe.font = css.replace('{size}', '100');
     const m = probe.measureText(art.text);
     const inkH = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
     if (!art.text.trim() || inkH <= 0) return { region: [], width: 0, height: 0 };
@@ -158,7 +161,7 @@ export async function outlineArt(art: CarvingArt, height: number): Promise<{ reg
       h = Math.ceil(height * ppm) + 2 * pad;
     const ctx = canvas(w, h);
     const size = (100 * height * ppm) / inkH;
-    ctx.font = font.css.replace('{size}', size.toFixed(2));
+    ctx.font = css.replace('{size}', size.toFixed(2));
     ctx.fillStyle = '#000';
     ctx.textBaseline = 'alphabetic';
     const scale = size / 100;

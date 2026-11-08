@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { withPartCuts } from './cutParts';
 import {
   cadStepReport,
   addCircle,
@@ -8,6 +9,7 @@ import {
   assemblyReport,
   createCadDocument,
   createPlateDocument,
+  evaluateCadPart,
   parseCadDocument,
   removePartCut,
   renamePartCopy,
@@ -131,6 +133,53 @@ describe('a shelf housed in two sides', () => {
 });
 
 describe('shelves patterned up the carcass', () => {
+  it('uses only the named copy, keeps plain part tools, and warns when the copy is gone', async () => {
+    let document = carcass();
+    const shelf = document.parts[2]!.id;
+    document.parts[2]!.placement!.positionExpressions = ['board - housing', null, 'height - 620mm'];
+    document = setPartPattern(document, shelf, { axis: 'z', count: 3, spacing: 150 });
+    const middle = document.parts[2]!.copies![0]!.id;
+    document = renamePartCopy(document, shelf, middle, 'Middle shelf');
+    const step = document.partCuts![0]!;
+    step.tools = [`${shelf}:${middle}`];
+    const solved = await variables(document, {
+      height: '720mm',
+      depth: '300mm',
+      width: '600mm',
+      board: '18mm',
+      housing: '8mm',
+      fit: '0.2mm',
+    });
+    expect(solved.document.partCuts![0]!.tools).toEqual(step.tools);
+    expect(parseCadDocument(JSON.parse(JSON.stringify(solved.document)))).toEqual(solved.document);
+    for (const side of solved.parts.slice(0, 2)) {
+      expect(side.cuts).toHaveLength(1);
+      const cut = side.cuts![0]!;
+      expect(cut.id).toBe(`cut-parts:${step.id}:${shelf}:${middle}`);
+      expect(cut.opening!.x0).toBeCloseTo(249.8, 6);
+      expect(cut.opening!.x1).toBeCloseTo(268.2, 6);
+      const source = solved.document.parts.find(part => part.id === side.partId)!;
+      expect(withPartCuts(solved.document, evaluateCadPart(source).part!).cuts).toEqual(side.cuts);
+    }
+    const report = cadStepReport(solved.document, solved.parts).find(entry => entry.kind === 'partCut');
+    expect(report?.kind === 'partCut' && report.tools).toEqual(['Middle shelf']);
+    expect(report?.kind === 'partCut' && report.cuts.map(cut => cut.tool)).toEqual(['Middle shelf', 'Middle shelf']);
+    expect(solved.diagnostics.filter(d => d.code === 'part-cut-unresolved')).toEqual([]);
+
+    const plain = await solveCadDocument({ ...solved.document, partCuts: [{ ...step, tools: [shelf] }] });
+    for (const side of plain.parts.slice(0, 2)) expect(side.cuts).toHaveLength(3);
+
+    const removed = await solveCadDocument(setPartPattern(solved.document, shelf, null));
+    const removedReport = cadStepReport(removed.document, removed.parts).find(entry => entry.kind === 'partCut');
+    expect(removedReport?.kind === 'partCut' && removedReport.tools).toEqual(['a copy of Shelf that is gone']);
+    for (const side of removed.parts.slice(0, 2)) expect(side.cuts ?? []).toEqual([]);
+    expect(removed.diagnostics).toContainEqual({
+      code: 'part-cut-unresolved',
+      severity: 'warning',
+      message: expect.stringContaining('Shelf'),
+    });
+  });
+
   it('lays out as many shelves as the count says, each housed in both sides, and follows the count and spacing', async () => {
     let document = carcass();
     const shelf = document.parts[2]!.id;
@@ -202,6 +251,28 @@ describe('tools that only fill part of where they reach', () => {
       messages: solved.diagnostics.filter(d => d.code === 'part-cut-unresolved').map(d => d.message),
     };
   };
+
+  it('uses the mirrored shape at the selected copy placement', async () => {
+    const target = leg();
+    const tool = outlined(
+      'Rail',
+      [
+        [10, 20],
+        [30, 20],
+        [30, 40],
+        [10, 40],
+      ],
+      10
+    );
+    tool.copies = [{ id: 'mirror', mirrored: true, placement: { position: [80, 0, 10], rotation: [0, 0, 0, 1] } }];
+    const document = addPartCut({ ...createCadDocument(), parts: [target, tool] }, [`${tool.id}:mirror`], [target.id], {
+      value: 0.5,
+    }).document;
+    const solved = await solveCadDocument(document);
+    expect(boxes(solved.parts[0]!.cuts)).toEqual([{ x: [49.5, 70.5], y: [19.5, 40.5], depth: 8.5, side: 'top' }]);
+    expect(withPartCuts(solved.document, evaluateCadPart(target).part!).cuts).toEqual(solved.parts[0]!.cuts);
+    expect(solved.diagnostics.filter(d => d.code === 'part-cut-unresolved')).toEqual([]);
+  });
 
   it('cuts only the tenon of a shouldered rail, with the clearance round it', async () => {
     // A rail lying across the leg's edge, 8 mm down into it, with a 30 mm tenon 20 mm wide; its shoulders stay outside.
