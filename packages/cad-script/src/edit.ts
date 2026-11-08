@@ -540,13 +540,32 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
                 // Dimensions read positive, from the lower point to the higher.
                 const [low, high] = delta > 0 ? [before.typed[k]!, vertex.typed[k]!] : [vertex.typed[k]!, before.typed[k]!];
                 const [lowPoint, highPoint] = delta > 0 ? [a, b] : [b, a];
+                // Written so the model reads it back as this length; units decide which way, so both are tried.
+                const length = ['', 'mm']
+                  .map(unit => differenceExpression(low, high, unit))
+                  .find(candidate => {
+                    if (typeof candidate === 'number') return true;
+                    const read = parseCadValue(candidate, { unit: 'mm', variables: cadVariableScope(document) });
+                    return !('error' in read) && Math.abs(read.value - Math.abs(delta)) < 1e-6 * Math.max(1, Math.abs(delta));
+                  });
+                if (length === undefined) {
+                  // Nothing reads back right, so this corner keeps its own position, which still follows the variables.
+                  constrain({
+                    type: axis === 'x' ? 'positionX' : 'positionY',
+                    pointId: b.id,
+                    value: vertex.at[axis],
+                    label: axis === 'x' ? 'X' : 'Y',
+                    ...expressionOf(vertex.typed[k]!),
+                  });
+                  return;
+                }
                 constrain({
                   type: axis === 'x' ? 'distanceX' : 'distanceY',
                   pointAId: lowPoint.id,
                   pointBId: highPoint.id,
                   value: Math.abs(delta),
                   label: axis === 'x' ? 'Width' : 'Height',
-                  ...expressionOf(differenceExpression(low, high)),
+                  ...expressionOf(length),
                 });
               });
             });

@@ -375,6 +375,42 @@ describe('paths', () => {
     expect(report.warnings.map(w => w.code)).not.toContain('redundant-constraint');
   });
 
+  type Profile = ReturnType<DesignEdit['part']>['profile'];
+  it.each<[string, (profile: Profile) => unknown, string, string, number]>([
+    [
+      'a start that follows a variable, through the origin',
+      p => p.path(['w', 0]).lineTo([0, 0]).lineTo([0, 100]).close(),
+      '50mm',
+      '150mm',
+      150,
+    ],
+    [
+      'a variable without units',
+      p => p.path([0, 0]).lineTo(['w + 10', 0]).lineTo(['w + 10', 100]).lineTo([0, 100]).close(),
+      '50',
+      '70',
+      80,
+    ],
+    [
+      'a length inside a function',
+      p => p.path([20, 0]).lineTo(['max(w; 100mm)', 0]).lineTo(['max(w; 100mm)', 50]).lineTo([20, 50]).close(),
+      '50mm',
+      '150mm',
+      130,
+    ],
+  ])('keeps a path following %s', async (_, draw, from, to, width) => {
+    const { report, document } = await editCad(null, d => {
+      d.variable('w', from);
+      draw(d.part('P').profile);
+    });
+    expect(report.warnings.map(w => w.code)).not.toContain('redundant-constraint');
+    const changed = setCadVariable(document, { id: document.variables![0]!.id, name: 'w', expression: to });
+    if ('error' in changed) throw new Error(changed.error);
+    const after = await inspectCadDocument(changed.document);
+    expect(after.report.parts[0]!.sketches[0]!.freedom).toBe(0);
+    expect(after.report.parts[0]!.outline!.size[0]).toBeCloseTo(width, 6);
+  });
+
   it('keeps the middle of a half circle between its ends when they move', async () => {
     const { document } = await editCad(null, d => {
       d.variable('w', '100mm');

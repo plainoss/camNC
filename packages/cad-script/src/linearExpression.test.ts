@@ -8,7 +8,9 @@ describe('differenceExpression', () => {
     expect(differenceExpression('-legW/2', '-tenonW/2')).toBe('legW/2 - tenonW/2');
     expect(differenceExpression(0, 'width - 2*board')).toBe('width - 2*board');
     expect(differenceExpression('board', 'board + 10mm')).toBe(10);
-    expect(differenceExpression(20, 'width')).toBe('width - 20mm');
+    expect(differenceExpression(20, 'width')).toBe('width - 20');
+    expect(differenceExpression(20, 'width', 'mm')).toBe('width - 20mm');
+    expect(differenceExpression(20, 'max(w; 100mm)', 'mm')).toBe('max(w; 100mm) - 20mm');
     expect(differenceExpression(3, 7.5)).toBe(4.5);
   });
 

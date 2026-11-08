@@ -80,7 +80,7 @@ function scaled(name: string, size: number): string | undefined {
   return undefined;
 }
 
-function printLinear({ constant, terms }: Linear): string | number | undefined {
+function printLinear({ constant, terms }: Linear, unit = ''): string | number | undefined {
   const parts: string[] = [];
   // Added terms first, so a length reads `legW/2 - tenonW/2` rather than starting with a minus.
   const ordered = [...terms].filter(([, c]) => Math.abs(c) >= kEpsilon).sort(([, a], [, b]) => Number(a < 0) - Number(b < 0));
@@ -92,15 +92,16 @@ function printLinear({ constant, terms }: Linear): string | number | undefined {
   if (!parts.length) return Math.abs(constant) < kEpsilon ? 0 : constant;
   // A constant that doesn't print exactly would change the length.
   if (Math.abs(+constant.toFixed(6) - constant) > kEpsilon) return undefined;
-  if (Math.abs(+constant.toFixed(6)) > 0) parts.push(`${constant < 0 ? '-' : '+'} ${number(Math.abs(constant))}mm`);
+  if (Math.abs(+constant.toFixed(6)) > 0) parts.push(`${constant < 0 ? '-' : '+'} ${number(Math.abs(constant))}${unit}`);
   return parts.join(' ');
 }
 
 /**
  * `high - low` as a person would write it: `legW` for `legW/2 - (-legW/2)`, a plain number when the variables cancel.
- * Anything that isn't a sum is kept as written.
+ * Anything that isn't a sum is kept as written. A plain number written next to an expression gets `unit`: none takes
+ * the unit of the variables beside it, which is right for most sums but not inside a function such as `max`.
  */
-export function differenceExpression(low: number | string, high: number | string): number | string {
+export function differenceExpression(low: number | string, high: number | string, unit = ''): number | string {
   const read = (value: number | string) => (typeof value === 'number' ? { constant: value, terms: new Map() } : parseLinear(value));
   const a = read(low),
     b = read(high);
@@ -108,12 +109,13 @@ export function differenceExpression(low: number | string, high: number | string
   if (a && b) {
     const terms = new Map(b.terms);
     for (const [name, coefficient] of a.terms) terms.set(name, (terms.get(name) ?? 0) - coefficient);
-    const printed = printLinear({ constant: b.constant - a.constant, terms });
+    const printed = printLinear({ constant: b.constant - a.constant, terms }, unit);
     if (printed !== undefined) return printed;
   }
   if (low === 0 || low === '0') return high;
-  const term = (value: number | string) => (typeof value === 'number' || /^[\w.]+$/.test(value.trim()) ? `${value}` : `(${value})`);
-  return `${typeof high === 'number' ? high : high.trim()} - ${term(low)}`;
+  const term = (value: number | string) =>
+    typeof value === 'number' ? `${value}${unit}` : /^[\w.]+$/.test(value.trim()) ? value.trim() : `(${value})`;
+  return `${typeof high === 'number' ? `${high}${unit}` : high.trim()} - ${term(low)}`;
 }
 
 /** `Σ k·value` written out, such as the middle of a half circle from its ends; undefined if a value isn't a sum. */
