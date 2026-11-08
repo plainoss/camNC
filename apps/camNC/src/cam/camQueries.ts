@@ -15,6 +15,7 @@ import { withPartNames } from './partNames';
 import { useCallback, useEffect, useRef } from 'react';
 import { nativeRunHistoryChanged } from './machine/nativeRunHistory';
 import { boardGeometryKey } from './cadDesign';
+import { followPlan } from './planProgress';
 
 export { modelKey } from './jobDb';
 
@@ -200,10 +201,21 @@ export function useBoardPlans(
         enabled: !!job && modelReady && hasWork(request),
         staleTime: Infinity,
         gcTime: 60_000,
-        queryFn: async (): Promise<PlanResult> => ({
-          ...(await camWorker().generateBoard(modelKey(job!), request, settings, { perPart })),
-          sourceKey,
-        }),
+        queryFn: async (): Promise<PlanResult> => {
+          const progress = followPlan(request.id);
+          try {
+            const plan = await camWorker().generateBoard(
+              modelKey(job!),
+              request,
+              settings,
+              { perPart },
+              Comlink.proxy(progress.onProgress)
+            );
+            return { ...plan, sourceKey };
+          } finally {
+            progress.end();
+          }
+        },
       };
     }),
   });

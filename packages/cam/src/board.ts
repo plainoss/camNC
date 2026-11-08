@@ -24,7 +24,8 @@ import {
   type TabSettings,
 } from './toolpaths';
 import { CamInputError } from './validation';
-import { carvingOperations, type BoardCarving } from './vcarve';
+import { progressOver, type OnProgress } from './progress';
+import { carvingOperations, carvingWork, type BoardCarving } from './vcarve';
 
 /**
  * How the parts are held while cutting. `tabs` / `tabs-guided`: tabs into stock that reaches the board's edge (removed
@@ -352,12 +353,30 @@ function transformOperation(operation: Operation, transform: (point: Vec3) => Ve
 const kFeatureOrder = { pocket: 0, hole: 1, outline: 2 } as const;
 
 /**
+ * About how long planning a part's toolpaths takes, in milliseconds on a fast laptop: it grows with the points of its
+ * outlines, holes and pockets. Only good for weighing the steps of a plan against each other.
+ */
+export function partWork(features: PartFeatures): number {
+  const loops = [...features.outlines, ...features.throughHoles, ...features.pockets.flatMap(pocket => pocket.strictRegion)];
+  return 5 + 0.25 * loops.reduce((sum, loop) => sum + loop.length, 0);
+}
+
+/** The work of `camBoard`: its parts, its carvings, and the checks over the parts once they are laid out. */
+export function boardWork(board: Pick<BoardSpec, 'parts' | 'carvings'>) {
+  const parts = board.parts.reduce((sum, part) => sum + partWork(part.features), 0);
+  return { parts, carvings: (board.carvings ?? []).reduce((sum, carving) => sum + carvingWork(carving), 0), checks: 0.5 * parts };
+}
+
+/**
  * One program for a whole board: operations grouped by bit (smallest first, so the swap happens once per bit), and
  * per bit inner features (pockets, holes) of every part before any outline, so no part comes loose while others are
  * still cut (with a skin or tape layer: every bit's inner features before any outline). Parts follow each other
  * nearest-first.
  */
-export function camBoard(board: BoardSpec, settings: Partial<CamSettings>): PartCam {
+export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onProgress?: OnProgress): PartCam {
+  // Weighing the carvings takes a few offsets each: only when someone is watching.
+  const work = onProgress ? boardWork(board) : { parts: 0, carvings: 0, checks: 0 };
+  const progress = progressOver(onProgress, work.parts + work.carvings + work.checks);
   const tabs = usesTabs(board.holdDown) ? (board.tabs ?? DEFAULT_TABS) : false;
   const stockTop = board.stockTop ?? board.thickness;
   const turn = rotateAboutOrigin(board.rotationDeg ?? 0);
@@ -458,6 +477,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>): Part
         index,
       })
     );
+    progress.done(partWork(part.features));
   }
   const diameters = [...new Set(ops.map(o => o.op.tool.diameter))].sort((a, b) => a - b);
   const operations: Operation[] = [];
@@ -469,7 +489,9 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>): Part
   }
   // Carvings next, also on the whole board: each one's flat bit, then its V-bit.
   for (const carving of board.carvings ?? []) {
-    const carved = carvingOperations(carving, stockTop, settings);
+    const cost = onProgress ? carvingWork(carving) : 0;
+    const carved = carvingOperations(carving, stockTop, settings, progress.step(cost));
+    progress.done(cost);
     warnings.push(...carved.flatMap(op => op.warnings ?? []).map(w => `${carving.name}: ${w}`));
     operations.push(...carved.map(op => transformOperation(op, turn)));
   }
@@ -519,7 +541,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>): Part
       return { x: q[0], y: q[1] };
     }),
   ];
-  return finalizePlan(
+  const plan = finalizePlan(
     {
       stockTop,
       operations,
@@ -531,6 +553,8 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>): Part
     { ...DEFAULT_SETTINGS, ...settings },
     blank
   );
+  progress.done(work.checks);
+  return plan;
 }
 
 /** Bits in the order a board program uses them. */
