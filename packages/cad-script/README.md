@@ -135,9 +135,12 @@ by the parts that fit them.
   target wherever they reach in: rebates, dados, grooves and mortises that follow both
   parts. The clearance grows every side of an opening inside the target and deepens a
   blind one; sides that run off the target's edge stay open. Each opening is listed in
-  `steps` with its width, length, depth and place. Parts have to be square to each other,
-  and a tool has to be a plain block where it reaches in. Half-laps and finger joints
-  aren't covered yet.
+  `steps` with its width, length, depth and place. Parts have to be square to each other.
+  Where a tool reaches in it has to be made of square-cornered, straight-sided blocks: a
+  shouldered tenon cuts only its tenon, and a comb of fingers cuts one slot per finger
+  into a plain board. Box joints, where both boards have fingers, and half-laps aren't
+  covered yet: draw them into the outlines. A tool with `relief` has bones on its own
+  shoulders, so it can't cut.
 - `part.pattern({ axis: 'x', count: 'slats', spacing: '60mm' })` repeats a part in a row
   along a studio axis.
 - `part.copy({ at, x, y, mirrored?, name? })` adds another of the part placed by hand. For
