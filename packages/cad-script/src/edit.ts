@@ -185,11 +185,12 @@ export interface DesignEdit {
   /**
    * Cuts the `with` parts out of the target parts wherever they reach in, with `clearance` mm of room: housings, grooves,
    * rebates and mortises that follow both parts. The clearance grows every side of an opening inside the target and
-   * deepens a blind one; a side that runs off the target's edge stays open.
+   * deepens a blind one; a side that runs off the target's edge stays open. With `split`, two parts that cross share the
+   * material where they meet instead: `'half'` for a half-lap, `{ fingers: n }` for a finger joint at a corner.
    */
   cutParts(
     targets: PartEdit | readonly PartEdit[],
-    options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len }
+    options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len; split?: 'half' | { fingers: number } }
   ): void;
   /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
   value(expression: Len): number;
@@ -808,15 +809,20 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         document = result.document;
         return name;
       },
-      cutParts(targets, { with: tools, clearance = 0 }) {
+      cutParts(targets, { with: tools, clearance = 0, split }) {
         const ids = (parts: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]) =>
           'id' in parts ? [parts.id] : parts.map(part => part.id);
         const value = measure(clearance, 'Clearance');
         if (value < 0) fail(`A clearance can't be negative: ${value} mm.`);
-        document = addPartCut(document, ids(tools), ids(targets), {
-          value,
-          ...(typeof clearance === 'string' && { expression: clearance }),
-        }).document;
+        if (typeof split === 'object' && !(Number.isInteger(split.fingers) && split.fingers >= 2))
+          fail(`A finger joint needs a whole number of fingers, at least 2, not ${split.fingers}.`);
+        document = addPartCut(
+          document,
+          ids(tools),
+          ids(targets),
+          { value, ...(typeof clearance === 'string' && { expression: clearance }) },
+          split
+        ).document;
       },
       value(expression) {
         // A count or ratio, such as `'(height - 2*margin)/pitch'`, has no unit.

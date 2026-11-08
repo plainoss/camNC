@@ -376,7 +376,9 @@ export async function inspectCadDocument(
     for (const sketch of [part.sketch, ...faces.map(face => face.sketch)]) {
       const regions = cadSketchRegions(part, sketch.id);
       const handles = shortHandles(sketch.constraints.map(c => c.id));
-      const area = (region: (typeof regions)[number]) => Math.abs(polygonArea(region.points));
+      // A copy cuts its outline less any islands inside it, so an island changes it as much as a changed outline.
+      const area = (region: (typeof regions)[number]) =>
+        Math.abs(polygonArea(region.points)) - region.holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0);
       for (const pattern of sketch.constraints) {
         if (pattern.type !== 'linearPattern' && pattern.type !== 'circularPattern') continue;
         const master = patternMaster(pattern);
