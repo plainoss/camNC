@@ -39,7 +39,13 @@ export function FeatureDialog({
       role="dialog"
       aria-label={title}
       onKeyDown={event => {
-        event.stopPropagation();
+        const target = event.target as HTMLElement;
+        const typing =
+          (target instanceof HTMLInputElement && target.type !== 'checkbox') ||
+          target instanceof HTMLSelectElement ||
+          target instanceof HTMLTextAreaElement;
+        // Typing stays in the dialog; any other key, such as a tool's shortcut after ticking a box, reaches the editor.
+        if (typing || event.key === 'Escape' || event.key === 'Enter') event.stopPropagation();
         if (event.key === 'Escape') onCancel();
         // A field applies its value on Enter first, then the dialog is done.
         else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox' && !okDisabled)

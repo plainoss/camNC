@@ -206,7 +206,7 @@ export async function createAdapter(page, url) {
   const flatView = async () => {
     await page.getByRole('toolbar', { name: /^(Part Studio|Sketch) toolbar$/ }).first().waitFor();
     if (await studioToolbar.isVisible())
-      await page.getByRole('region', { name: 'Steps' }).getByRole('button', { name: /Sketch ·/ }).first().click();
+      await page.getByRole('region', { name: 'Features' }).getByRole('button', { name: /Sketch ·/ }).first().dblclick();
     // A part shown in 3D, as after a face sketch, goes back to its drawing.
     const drawing = page.getByRole('group', { name: 'Show' }).getByRole('button', { name: 'Drawing', exact: true });
     if ((await drawing.isVisible()) && (await drawing.getAttribute('aria-pressed')) !== 'true') await drawing.click();

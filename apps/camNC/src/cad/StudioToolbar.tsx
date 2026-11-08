@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
 
-export type StudioCommand = 'sketch' | 'extrude' | 'cutParts' | 'pattern';
+export type StudioCommand = 'sketch' | 'extrude' | 'cutParts' | 'pattern' | 'variable';
 
 const kCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactNode }[] = [
   {
@@ -27,6 +27,12 @@ const kCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactN
     label: 'Pattern',
     hint: 'Copies of the selected part in a row',
     glyph: <path d="M3 8h4v8H3zM10 8h4v8h-4zM17 8h4v8h-4z" />,
+  },
+  {
+    id: 'variable',
+    label: 'Variable',
+    hint: 'A named size, such as the board thickness, that any value can use',
+    glyph: <path d="M8 5C5 8 5 16 8 19M16 5c3 3 3 11 0 14M10 9l4 6M14 9l-4 6" />,
   },
 ];
 
