@@ -92,6 +92,20 @@ export interface BedNote {
   tone: 'info' | 'warn' | 'bad';
 }
 
+/** The board's own tools, drawn beside it (or beside what's selected) in the top view. */
+export interface BedTools {
+  /** For the bar's name: `Edit board <board>`. */
+  board: string;
+  /** What Add places on this side of the board; nothing where it has no holds (its underside). */
+  hold: 'clamp' | 'screw' | null;
+  /** Undoes the last change here; null while there's nothing to undo or the setup can't change. */
+  undo: (() => void) | null;
+  /** What a tap or a drag does now, or why the setup can't change. */
+  note: string;
+  /** The setup can't change (running, under review, already cut): `note` says why. */
+  blocked: boolean;
+}
+
 /**
  * Edits in the machine's top view: the mode, what can be undone, and where an edit goes. The overlay draws in the 3D
  * canvas; the job is saved outside it (`CamBedEditor` registers `apply` and the board's context).
@@ -104,6 +118,9 @@ export const useBedEdit = create<{
   setApply: (apply: ((edit: BedEdit) => void) | null) => void;
   bed: BedContext | null;
   setBed: (bed: BedContext | null) => void;
+  /** Set by `CamBedEditor` while it edits the board shown. */
+  tools: BedTools | null;
+  setTools: (tools: BedTools | null) => void;
   /** Tapped (or reached with Tab): the arrow keys nudge it, Delete removes a hold. Nothing: the keys nudge the board. */
   selected: BedSelection | null;
   setSelected: (selected: BedSelection | null) => void;
@@ -123,6 +140,8 @@ export const useBedEdit = create<{
   setApply: apply => set({ apply }),
   bed: null,
   setBed: bed => set({ bed }),
+  tools: null,
+  setTools: tools => set({ tools }),
 }));
 
 /** A point turned by `deg` (counterclockwise) about the origin. */

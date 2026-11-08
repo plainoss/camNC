@@ -5,6 +5,7 @@ import { useCamMachine, type QueueEntry } from './camMachine';
 import type { ManufacturingSnapshot } from './manufacturingSnapshot';
 import { useStore } from '@/store/store';
 import { CamBedEditor } from './CamBedEditor';
+import { BedToolbar } from './BedToolbar';
 const h = vi.hoisted(() => ({ api: null as unknown as import('@/lib/fluidnc/cnc-api').CncApi, entry: null as unknown as QueueEntry }));
 vi.mock('@/lib/fluidnc/machine', () => ({ getCncApi: () => h.api, getExistingCncApi: () => h.api }));
 vi.mock('@/lib/fluidnc/machineInstance', () => ({ getExistingCncApi: () => h.api }));
@@ -33,8 +34,13 @@ it('P10 describes finished setup review rather than claiming the idle controller
     runSnapshot: {} as ManufacturingSnapshot,
     overlay: { boardId: 'board', w: 100, h: 80, rotationDeg: 0 },
   });
-  render(<CamBedEditor />);
-  const toolbar = screen.getByRole('toolbar', { name: 'Edit board A' });
-  expect(toolbar.textContent).not.toContain('Locked while the program runs');
-  expect(toolbar.textContent).toMatch(/finished.*review|review.*finished/i);
+  render(
+    <>
+      <CamBedEditor />
+      <BedToolbar />
+    </>
+  );
+  const bar = screen.getByRole('toolbar', { name: 'Edit board A' }).parentElement!;
+  expect(bar.textContent).not.toContain('Locked while the program runs');
+  expect(bar.textContent).toMatch(/finished.*review|review.*finished/i);
 });
