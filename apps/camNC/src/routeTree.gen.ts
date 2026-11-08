@@ -38,6 +38,7 @@ import { Route as SetupCamerasCamIdRouteImport } from './routes/setup/cameras.$c
 import { Route as CamJobIdPlanRouteImport } from './routes/cam/$jobId.plan'
 import { Route as CamJobIdModelRouteImport } from './routes/cam/$jobId.model'
 import { Route as CamJobIdDesignRouteImport } from './routes/cam/$jobId.design'
+import { Route as CamJobIdCarveRouteImport } from './routes/cam/$jobId.carve'
 import { Route as CamJobIdBoardsRouteImport } from './routes/cam/$jobId.boards'
 
 const StartRoute = StartRouteImport.update({
@@ -186,6 +187,11 @@ const CamJobIdDesignRoute = CamJobIdDesignRouteImport.update({
   path: '/cam/$jobId/design',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CamJobIdCarveRoute = CamJobIdCarveRouteImport.update({
+  id: '/cam/$jobId/carve',
+  path: '/cam/$jobId/carve',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CamJobIdBoardsRoute = CamJobIdBoardsRouteImport.update({
   id: '/cam/$jobId/boards',
   path: '/cam/$jobId/boards',
@@ -218,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/cam': typeof CamIndexRoute
   '/setup': typeof SetupIndexRoute
   '/cam/$jobId/boards': typeof CamJobIdBoardsRoute
+  '/cam/$jobId/carve': typeof CamJobIdCarveRoute
   '/cam/$jobId/design': typeof CamJobIdDesignRoute
   '/cam/$jobId/model': typeof CamJobIdModelRoute
   '/cam/$jobId/plan': typeof CamJobIdPlanRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   '/cam': typeof CamIndexRoute
   '/setup': typeof SetupIndexRoute
   '/cam/$jobId/boards': typeof CamJobIdBoardsRoute
+  '/cam/$jobId/carve': typeof CamJobIdCarveRoute
   '/cam/$jobId/design': typeof CamJobIdDesignRoute
   '/cam/$jobId/model': typeof CamJobIdModelRoute
   '/cam/$jobId/plan': typeof CamJobIdPlanRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   '/cam/': typeof CamIndexRoute
   '/setup/': typeof SetupIndexRoute
   '/cam/$jobId/boards': typeof CamJobIdBoardsRoute
+  '/cam/$jobId/carve': typeof CamJobIdCarveRoute
   '/cam/$jobId/design': typeof CamJobIdDesignRoute
   '/cam/$jobId/model': typeof CamJobIdModelRoute
   '/cam/$jobId/plan': typeof CamJobIdPlanRoute
@@ -317,6 +326,7 @@ export interface FileRouteTypes {
     | '/cam'
     | '/setup'
     | '/cam/$jobId/boards'
+    | '/cam/$jobId/carve'
     | '/cam/$jobId/design'
     | '/cam/$jobId/model'
     | '/cam/$jobId/plan'
@@ -349,6 +359,7 @@ export interface FileRouteTypes {
     | '/cam'
     | '/setup'
     | '/cam/$jobId/boards'
+    | '/cam/$jobId/carve'
     | '/cam/$jobId/design'
     | '/cam/$jobId/model'
     | '/cam/$jobId/plan'
@@ -381,6 +392,7 @@ export interface FileRouteTypes {
     | '/cam/'
     | '/setup/'
     | '/cam/$jobId/boards'
+    | '/cam/$jobId/carve'
     | '/cam/$jobId/design'
     | '/cam/$jobId/model'
     | '/cam/$jobId/plan'
@@ -414,6 +426,7 @@ export interface RootRouteChildren {
   CamIndexRoute: typeof CamIndexRoute
   SetupIndexRoute: typeof SetupIndexRoute
   CamJobIdBoardsRoute: typeof CamJobIdBoardsRoute
+  CamJobIdCarveRoute: typeof CamJobIdCarveRoute
   CamJobIdDesignRoute: typeof CamJobIdDesignRoute
   CamJobIdModelRoute: typeof CamJobIdModelRoute
   CamJobIdPlanRoute: typeof CamJobIdPlanRoute
@@ -626,6 +639,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CamJobIdDesignRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cam/$jobId/carve': {
+      id: '/cam/$jobId/carve'
+      path: '/cam/$jobId/carve'
+      fullPath: '/cam/$jobId/carve'
+      preLoaderRoute: typeof CamJobIdCarveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cam/$jobId/boards': {
       id: '/cam/$jobId/boards'
       path: '/cam/$jobId/boards'
@@ -662,6 +682,7 @@ const rootRouteChildren: RootRouteChildren = {
   CamIndexRoute: CamIndexRoute,
   SetupIndexRoute: SetupIndexRoute,
   CamJobIdBoardsRoute: CamJobIdBoardsRoute,
+  CamJobIdCarveRoute: CamJobIdCarveRoute,
   CamJobIdDesignRoute: CamJobIdDesignRoute,
   CamJobIdModelRoute: CamJobIdModelRoute,
   CamJobIdPlanRoute: CamJobIdPlanRoute,

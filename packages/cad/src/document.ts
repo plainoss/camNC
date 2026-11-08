@@ -697,6 +697,13 @@ export function parseCadDocument(input: unknown): CadDocument {
       throw new Error('Invalid CAD part');
     number(p.thickness);
     if (p.thicknessExpression !== undefined && typeof p.thicknessExpression !== 'string') throw new Error('Invalid CAD part');
+    if (p.cornerRelief !== undefined) {
+      if (!p.cornerRelief || typeof p.cornerRelief !== 'object') throw new Error('Invalid corner relief');
+      number(p.cornerRelief.diameter);
+      if (p.cornerRelief.diameter <= 0) throw new Error('Invalid corner relief');
+      if (p.cornerRelief.diameterExpression !== undefined && typeof p.cornerRelief.diameterExpression !== 'string')
+        throw new Error('Invalid corner relief');
+    }
     if (p.copies !== undefined) {
       if (!Array.isArray(p.copies)) throw new Error('Invalid CAD part copies');
       for (const copy of p.copies) {
