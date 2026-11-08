@@ -1,3 +1,4 @@
+import { sketchSlotOwner } from './slot';
 import { sketchPatternOwner } from './pattern';
 import { newCadId, constraintEntityIds } from './document';
 import { lineCorner, resolveFilletCorners } from './fillet';
@@ -34,6 +35,8 @@ export function chamferLineCorners(sketch: CadSketch, options: CadChamferOptions
   for (const id of cornerPointIds) {
     const corner = lineCorner(sketch, id, equivalent, true);
     if (typeof corner === 'string') return fail(corner.replace(/fillet/gi, 'chamfer').replace('profile ', ''));
+    if (corner.lines.some(line => sketchSlotOwner(sketch, line.id)))
+      return fail('Remove the slot relation before chamfering its geometry.');
     if (corner.lines.some(line => sketchPatternOwner(sketch, line.id)))
       return fail('Remove the pattern relation before chamfering its finite geometry.');
     const order = options.selectedLineIds ?? [];

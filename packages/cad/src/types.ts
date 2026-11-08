@@ -154,8 +154,21 @@ export interface CadCircularPattern extends CadPatternBase {
   closed: boolean;
 }
 export type CadSketchPattern = CadLinearPattern | CadCircularPattern;
+export type CadSlotMember =
+  | { kind: 'line' | 'arc'; sourceId: string; targetId: string; side: 1 | -1; normalEnds: ('start' | 'end')[] }
+  | { kind: 'circle'; sourceId: string; targetId: string; side: 1 | -1 };
+export interface CadSlot extends ConstraintBase {
+  type: 'slot';
+  sourceIds: string[];
+  generatedIds: string[];
+  idMap: Record<string, string>;
+  widthEntityId: string;
+  members: CadSlotMember[];
+  capIds: string[];
+}
 export type CadConstraint =
   | CadSketchPattern
+  | CadSlot
   | (ConstraintBase & { type: 'symmetricCurves'; entityAId: string; entityBId: string; lineId: string; focusSign?: 1 | -1 })
   | (ConstraintBase & { type: 'regularPolygon'; circleId: string; edgeIds: string[]; mode: 'inscribed' | 'circumscribed' })
   | (ConstraintBase & { type: 'horizontal' | 'vertical'; entityId: string })

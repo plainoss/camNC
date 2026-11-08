@@ -1,3 +1,5 @@
+import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
+import { previewSlot } from './slotPreview';
 import { SketchCircularPatternControls, SketchCircularPatternManipulator } from './SketchCircularPatternControls';
 import {
   initialCircularPatternParameters,
@@ -36,6 +38,7 @@ import {
   linearPatternSketchEntities,
   circularPatternSketchEntities,
   patternDeletionNotice,
+  slotDeletionNotice,
   isClosedSketchCurve,
   evaluateCurvePoint,
   resolveChamferCorners,
@@ -373,6 +376,11 @@ export function CadEditor({
   const [width, setWidth] = useState('100');
   const [height, setHeight] = useState('60');
   const [radius, setRadius] = useState('10');
+  const [slotWidth, setSlotWidth] = useState('10');
+  const [slotChain, setSlotChain] = useState(false);
+  const [sharedSlotWidth, setSharedSlotWidth] = useState<string | undefined>();
+  const slotWidthField = useRef<HTMLInputElement>(null);
+  const slotDrag = useRef<{ center: CadPoint; width: string } | null>(null);
   const [circularParameters, setCircularParameters] = useState(initialCircularPatternParameters);
   const circularFields = useRef<Partial<Record<'count' | 'angle', HTMLInputElement>>>({});
   const circularDrag = useRef<{
@@ -533,14 +541,37 @@ export function CadEditor({
       : parsedLinear;
   }, [sketch, tool, selected, patternEditId, parsedLinear, parsedCircular]);
   const patternAnchor = useMemo(() => (sketch ? linearPatternAnchor(sketch, selected) : { x: 0, y: 0 }), [sketch, selected]);
-  const shownSketch = linearPreview?.ok
-    ? linearPreview.sketch
-    : transformPreview?.ok
-      ? transformPreview.sketch
-      : cornerPreview?.ok
-        ? cornerPreview.sketch
+  const slotPreview = useMemo(
+    () => (sketch && tool === 'slot' && selected.length ? previewSlot(sketch, selected, slotWidth, slotChain, sharedSlotWidth) : null),
+    [sketch, tool, selected, slotWidth, slotChain, sharedSlotWidth]
+  );
+  const slotWidthCircle = slotPreview?.ok
+    ? slotPreview.sketch.entities.find(
+        e =>
+          e.type === 'circle' &&
+          slotPreview.sketch.constraints.some(c => c.type === 'slot' && c.id === slotPreview.slotId && c.widthEntityId === e.id)
+      )
+    : undefined;
+  const slotWidthCenter =
+    slotWidthCircle?.type === 'circle' && slotPreview?.ok
+      ? slotPreview.sketch.entities.find(e => e.id === slotWidthCircle.centerId)
+      : undefined;
+  const shownSketch = slotPreview?.ok
+    ? slotPreview.sketch
+    : linearPreview?.ok
+      ? linearPreview.sketch
+      : transformPreview?.ok
+        ? transformPreview.sketch
+        : cornerPreview?.ok
+          ? cornerPreview.sketch
+          : sketch;
+  const annotationSketch = slotPreview?.ok
+    ? slotPreview.sketch
+    : linearPreview?.ok
+      ? linearPreview.sketch
+      : transformPreview?.ok
+        ? transformPreview.sketch
         : sketch;
-  const annotationSketch = linearPreview?.ok ? linearPreview.sketch : transformPreview?.ok ? transformPreview.sketch : sketch;
   const offsetPreview = useMemo(() => {
     if (!sketch || modification.phase !== 'offset' || !modification.entityIds.length) return null;
     const parsed = parseCadValue(modification.text, { unit: 'mm' });
@@ -901,6 +932,12 @@ export function CadEditor({
     return xs.length ? { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 } : { x: 0, y: 0 };
   };
   const chooseTool = (next: Tool) => {
+    slotDrag.current = null;
+    if (next === 'slot') {
+      setSlotWidth('10');
+      setSlotChain(false);
+      setSharedSlotWidth(undefined);
+    }
     circularDrag.current = null;
     patternDrag.current = null;
     setPatternEditId(null);
@@ -1035,27 +1072,29 @@ export function CadEditor({
                                 ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
                                 : next === 'line'
                                   ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
-                                  : next === 'circularPattern'
-                                    ? 'Select geometry, then set instances, center and sweep. Drag the center or sweep handle; Enter or click empty space applies.'
-                                    : next === 'linearPattern'
-                                      ? 'Select geometry, then set instance counts, spacing and directions. Enter or click empty space applies; Escape cancels.'
-                                      : next === 'transform'
-                                        ? 'Select geometry, then drag the manipulator or enter translation, rotation and scale. Enter or click empty space applies; Escape cancels.'
-                                        : next === 'split'
-                                          ? 'Click a curve to split it. Closed curves require two distinct split points.'
-                                          : next === 'trim'
-                                            ? 'Click an interval to trim between intersections or placed points.'
-                                            : next === 'chamfer'
-                                              ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
-                                              : next === 'fillet'
-                                                ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
-                                                : next === 'conic'
-                                                  ? 'Click the start, end, then control point. Enter rho to shape the conic.'
-                                                  : next === 'spline' || next === 'bezier'
-                                                    ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
-                                                    : next === 'curveControlPoint'
-                                                      ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                                      : 'Select a line, circle, point pair or existing dimension.'
+                                  : next === 'slot'
+                                    ? 'Select source curves, set the slot diameter, then click empty space or press Enter. Select more paths to share the same width.'
+                                    : next === 'circularPattern'
+                                      ? 'Select geometry, then set instances, center and sweep. Drag the center or sweep handle; Enter or click empty space applies.'
+                                      : next === 'linearPattern'
+                                        ? 'Select geometry, then set instance counts, spacing and directions. Enter or click empty space applies; Escape cancels.'
+                                        : next === 'transform'
+                                          ? 'Select geometry, then drag the manipulator or enter translation, rotation and scale. Enter or click empty space applies; Escape cancels.'
+                                          : next === 'split'
+                                            ? 'Click a curve to split it. Closed curves require two distinct split points.'
+                                            : next === 'trim'
+                                              ? 'Click an interval to trim between intersections or placed points.'
+                                              : next === 'chamfer'
+                                                ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
+                                                : next === 'fillet'
+                                                  ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                                                  : next === 'conic'
+                                                    ? 'Click the start, end, then control point. Enter rho to shape the conic.'
+                                                    : next === 'spline' || next === 'bezier'
+                                                      ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
+                                                      : next === 'curveControlPoint'
+                                                        ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
+                                                        : 'Select a line, circle, point pair or existing dimension.'
     );
     svg.current?.focus();
   };
@@ -1568,6 +1607,15 @@ export function CadEditor({
     setSelected(editablePatternSources(pattern));
     setMessage('Edit the pattern counts, spacing or direction. Deleted instances remain excluded.');
   };
+  const acceptSlot = () => {
+    if (!slotPreview?.ok) return setMessage(slotPreview?.message ?? 'Select source curves for a slot.');
+    const group = slotPreview.sketch.constraints.find(c => c.id === slotPreview.slotId);
+    changeSketch(slotPreview.sketch);
+    if (group?.type === 'slot') setSharedSlotWidth(group.widthEntityId);
+    setSelected([]);
+    setMessage('Slot created. Select more source curves to share its width, or press Escape.');
+    svg.current?.focus();
+  };
   const acceptCircularPattern = () => {
     if (!sketch || !parsedCircular.ok) return setMessage(parsedCircular.ok ? 'Select source geometry.' : parsedCircular.message);
     const old = patternEditId && sketch.constraints.find(c => c.id === patternEditId),
@@ -1729,7 +1777,12 @@ export function CadEditor({
   };
   const removeSelected = (entityIds: readonly string[] = selected, constraintIds: readonly string[] = selectedConstraints) => {
     if (
-      (tool === 'fillet' || tool === 'chamfer' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') &&
+      (tool === 'slot' ||
+        tool === 'fillet' ||
+        tool === 'chamfer' ||
+        tool === 'transform' ||
+        tool === 'linearPattern' ||
+        tool === 'circularPattern') &&
       selected.length
     ) {
       chooseTool('select');
@@ -1782,7 +1835,7 @@ export function CadEditor({
       inference.current = null;
       tangentAxis.current = null;
     }
-    const notice = entityIds.length ? patternDeletionNotice(sketch, next) : null;
+    const notice = entityIds.length ? (patternDeletionNotice(sketch, next) ?? slotDeletionNotice(sketch, next)) : null;
     changeSketch(next);
     if (notice) {
       setMessage(notice);
@@ -1805,7 +1858,7 @@ export function CadEditor({
       ? target.closest('[data-constraint-id]')
         ? sketch.constraints.some(
             c =>
-              (c.type === 'linearPattern' || c.type === 'circularPattern') &&
+              (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot') &&
               c.id === target.closest('[data-constraint-id]')?.getAttribute('data-constraint-id')
           )
           ? { kind: 'constraint' as const, id: target.closest('[data-constraint-id]')!.getAttribute('data-constraint-id')! }
@@ -2146,6 +2199,9 @@ export function CadEditor({
         chooseTool('select');
         setSelected([]);
       }
+    } else if (key === 'enter' && tool === 'slot') {
+      event.preventDefault();
+      acceptSlot();
     } else if (key === 'enter' && (tool === 'linearPattern' || tool === 'circularPattern')) {
       event.preventDefault();
       acceptLinearPattern();
@@ -2394,6 +2450,19 @@ export function CadEditor({
       svg.current?.focus();
       return;
     }
+    if (tool === 'slot') {
+      const hit = pickSketchSnap(
+        sketch,
+        { x: event.clientX, y: event.clientY },
+        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
+      );
+      const sourceId =
+        directEntityId && sketch.entities.some(e => e.id === directEntityId && e.type !== 'point') ? directEntityId : hit?.entityId;
+      if (sourceId)
+        setSelected(previous => (previous.includes(sourceId) ? previous.filter(id => id !== sourceId) : [...previous, sourceId]));
+      else if (selected.length) acceptSlot();
+      return;
+    }
     if (tool === 'linearPattern' || tool === 'circularPattern') {
       const hit = pickSketchSnap(
         sketch,
@@ -2628,6 +2697,14 @@ export function CadEditor({
     }
   };
   const pointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    if (slotDrag.current) {
+      const matrix = svg.current?.getScreenCTM();
+      if (!matrix) return;
+      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
+        center = slotDrag.current.center;
+      setSlotWidth(String(Math.round(2 * Math.hypot(raw.x - center.x, -raw.y - center.y) * 1e6) / 1e6));
+      return;
+    }
     if (circularDrag.current) {
       const matrix = svg.current?.getScreenCTM();
       if (!matrix) return;
@@ -2887,6 +2964,11 @@ export function CadEditor({
     void solveDrag(moving);
   };
   const pointerEnd = (cancel = false, event?: PointerEvent<SVGSVGElement>) => {
+    if (slotDrag.current) {
+      if (cancel) setSlotWidth(slotDrag.current.width);
+      slotDrag.current = null;
+      return;
+    }
     if (circularDrag.current) {
       if (cancel) setCircularParameters(circularDrag.current.parameters);
       circularDrag.current = null;
@@ -3002,21 +3084,23 @@ export function CadEditor({
     if (busy || solving || finishing.current || preparingDimension.current) return blocked('Wait for the current sketch check to finish.');
     const reason = !thicknessValid
       ? 'Enter a valid part thickness before finishing the sketch.'
-      : (tool === 'linearPattern' || tool === 'circularPattern') && selected.length
-        ? 'Apply the pattern or press Escape before finishing the sketch.'
-        : tool === 'transform' && selected.length
-          ? 'Apply the transform or press Escape before finishing the sketch.'
-          : splitFirst
-            ? 'Choose the second split point or press Escape before finishing the sketch.'
-            : (tool === 'fillet' || tool === 'chamfer') && selected.length
-              ? 'Apply the corner preview or press Escape before finishing the sketch.'
-              : modification.phase === 'mirror' && modification.entityIds.length
-                ? 'Choose the mirror line or press Escape before finishing the sketch.'
-                : modification.phase === 'extend' && modification.entityId
-                  ? 'Place the extended endpoint or press Escape before finishing the sketch.'
-                  : pending.length && !lineContinuation
-                    ? 'Complete the current shape or press Escape before finishing the sketch.'
-                    : null;
+      : tool === 'slot' && selected.length
+        ? 'Create the slot or press Escape before finishing the sketch.'
+        : (tool === 'linearPattern' || tool === 'circularPattern') && selected.length
+          ? 'Apply the pattern or press Escape before finishing the sketch.'
+          : tool === 'transform' && selected.length
+            ? 'Apply the transform or press Escape before finishing the sketch.'
+            : splitFirst
+              ? 'Choose the second split point or press Escape before finishing the sketch.'
+              : (tool === 'fillet' || tool === 'chamfer') && selected.length
+                ? 'Apply the corner preview or press Escape before finishing the sketch.'
+                : modification.phase === 'mirror' && modification.entityIds.length
+                  ? 'Choose the mirror line or press Escape before finishing the sketch.'
+                  : modification.phase === 'extend' && modification.entityId
+                    ? 'Place the extended endpoint or press Escape before finishing the sketch.'
+                    : pending.length && !lineContinuation
+                      ? 'Complete the current shape or press Escape before finishing the sketch.'
+                      : null;
     if (reason) {
       return blocked(reason);
     }
@@ -3137,6 +3221,7 @@ export function CadEditor({
     !cornerPreview?.ok &&
     !transformPreview?.ok &&
     !linearPreview?.ok &&
+    !slotPreview?.ok &&
     activeSketchStatus?.status === 'solved'
       ? activeSketchStatus.entityStatus
       : undefined;
@@ -3176,13 +3261,13 @@ export function CadEditor({
             ? !solving &&
               !problems.length &&
               !splitFirst &&
-              !((tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
+              !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
             : thicknessValid &&
               !solving &&
               !problems.length &&
               numberOfShapes > 0 &&
               !splitFirst &&
-              !((tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
+              !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
               !((tool === 'fillet' || tool === 'chamfer') && selected.length)
         }
         onTool={next => {
@@ -3459,8 +3544,8 @@ export function CadEditor({
               verified={
                 !solving &&
                 !splitFirst &&
-                !((tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
-                !((tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
+                !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
+                !((tool === 'slot' || tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
                 activeSketchStatus?.status === 'solved' &&
                 lastCheckedRevision.current === `${doc.id}:${doc.revision}`
               }
@@ -3511,7 +3596,7 @@ export function CadEditor({
                   ...hoveredConstraintEntities,
                   ...selectedConstraints.flatMap(id => associatedEntityIds(sketch, id)),
                 ]}
-                stroke={cornerPreview?.ok || transformPreview?.ok || linearPreview?.ok ? '#858d96' : stroke}
+                stroke={cornerPreview?.ok || transformPreview?.ok || linearPreview?.ok || slotPreview?.ok ? '#858d96' : stroke}
                 entityStatus={entityStatus}
                 pixelScale={markerScale}
                 hoveredPointId={hoveredPoint}
@@ -3522,6 +3607,18 @@ export function CadEditor({
                     setRho(String(curve.rho));
                     setConicEditing(id);
                   }
+                }}
+              />
+            )}
+            {tool === 'slot' && slotWidthCircle?.type === 'circle' && slotWidthCenter?.type === 'point' && (
+              <SketchSlotWidthHandle
+                center={slotWidthCenter}
+                radius={slotWidthCircle.radius}
+                pixelScale={markerScale}
+                onStart={e => {
+                  slotDrag.current = { center: slotWidthCenter, width: slotWidth };
+                  svg.current?.setPointerCapture(e.pointerId);
+                  svg.current?.focus();
                 }}
               />
             )}
@@ -3977,6 +4074,21 @@ export function CadEditor({
                 Create polygon
               </button>
             </form>
+          )}
+          {tool === 'slot' && selected.length > 0 && (
+            <SketchSlotControls
+              width={slotWidth}
+              onWidth={setSlotWidth}
+              chain={slotChain}
+              onChain={setSlotChain}
+              inputRef={slotWidthField}
+              onApply={acceptSlot}
+              onCancel={() => {
+                chooseTool('select');
+                setSelected([]);
+              }}
+              error={slotPreview && !slotPreview.ok ? slotPreview.message : undefined}
+            />
           )}
           {tool === 'circularPattern' && selected.length > 0 && (
             <SketchCircularPatternControls

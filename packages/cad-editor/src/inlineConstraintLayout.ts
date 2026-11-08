@@ -37,6 +37,7 @@ const labels: Record<InlineConstraintKind, string> = {
   regularPolygon: 'Regular polygon',
   linearPattern: 'Linear pattern',
   circularPattern: 'Circular pattern',
+  slot: 'Slot',
   horizontal: 'Horizontal',
   horizontalPoints: 'Horizontal',
   vertical: 'Vertical',

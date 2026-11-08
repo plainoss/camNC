@@ -1,3 +1,4 @@
+import { sketchSlotOwner } from './slot';
 import { sketchPatternOwner } from './pattern';
 import { constraintEntityIds, entityPointIds, newCadId, originId, removeEntity } from './document';
 import { constraintForCurveContact, curveContacts } from './curveContacts';
@@ -303,6 +304,7 @@ function replaceEndpoint(
 
 /** Extend a picked line/arc endpoint atomically; the same detached result serves preview and commit. */
 export function extendSketchCurve(sketch: CadSketch, options: CadExtendOptions): CadExtendResult {
+  if (sketchSlotOwner(sketch, options.entityId)) return { ok: false, message: 'Remove the slot relation before extending its geometry.' };
   if (sketchPatternOwner(sketch, options.entityId))
     return { ok: false, message: 'Remove the pattern relation before extending its finite geometry.' };
   const source = sketch.entities.find(entity => entity.id === options.entityId);

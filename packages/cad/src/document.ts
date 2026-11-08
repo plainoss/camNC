@@ -1,3 +1,4 @@
+import { slotIssue, removeUnusedSlotWidths } from './slot';
 import { materializePatternJoins, removeUnusedPatternCenters } from './patternTopology';
 import { linearPatternIssue, sketchPatternOwner, afterPatternEntityRemoval } from './pattern';
 import { refreshDimensionMeasurement } from './dimensions';
@@ -70,7 +71,10 @@ export function removeConstraint(sketch: CadSketch, id: string): CadSketch {
     constraint?.type === 'linearPattern' || constraint?.type === 'circularPattern'
       ? materializePatternJoins(sketch, sketch, constraint)
       : sketch;
-  return removeUnusedPatternCenters(sketch, { ...next, constraints: next.constraints.filter(c => c.id !== id) });
+  return removeUnusedSlotWidths(
+    sketch,
+    removeUnusedPatternCenters(sketch, { ...next, constraints: next.constraints.filter(c => c.id !== id) })
+  );
 }
 
 /** Each edit is a detached JSON value suitable for undo history and persistence. */
@@ -152,6 +156,10 @@ export function entityPointIds(entity: CadEntity): string[] {
 }
 
 export function constraintEntityIds(constraint: CadConstraint): string[] {
+  if (constraint.type === 'slot')
+    return Array.isArray(constraint.sourceIds) && Array.isArray(constraint.generatedIds)
+      ? [...constraint.sourceIds, ...constraint.generatedIds, constraint.widthEntityId]
+      : [];
   if (constraint.type === 'linearPattern' || constraint.type === 'circularPattern')
     return Array.isArray(constraint.instances)
       ? [
@@ -208,16 +216,19 @@ export function removeEntity(sketch: CadSketch, id: string): CadSketch {
     if (remove) removed.add(e.id);
     return !remove;
   });
-  return afterPatternEntityRemoval(
+  return removeUnusedSlotWidths(
     sketch,
-    {
-      ...sketch,
-      entities,
-      constraints: sketch.constraints.filter(
-        c => c.type === 'linearPattern' || c.type === 'circularPattern' || !constraintEntityIds(c).some(e => removed.has(e))
-      ),
-    },
-    removed
+    afterPatternEntityRemoval(
+      sketch,
+      {
+        ...sketch,
+        entities,
+        constraints: sketch.constraints.filter(
+          c => c.type === 'linearPattern' || c.type === 'circularPattern' || !constraintEntityIds(c).some(e => removed.has(e))
+        ),
+      },
+      removed
+    )
   );
 }
 
@@ -733,6 +744,7 @@ export function parseCadDocument(input: unknown): CadDocument {
             'regularPolygon',
             'linearPattern',
             'circularPattern',
+            'slot',
             'horizontalPoints',
             'verticalPoints',
             'pointOnLine',
@@ -761,6 +773,10 @@ export function parseCadDocument(input: unknown): CadDocument {
         )
           throw new Error('Unknown CAD constraint');
         if (c.label !== undefined && typeof c.label !== 'string') throw new Error('Invalid constraint label');
+        if (c.type === 'slot') {
+          const issue = slotIssue(sketch, c);
+          if (issue) throw new Error(issue);
+        }
         if (c.type === 'symmetricCurves' && c.focusSign !== undefined && c.focusSign !== 1 && c.focusSign !== -1)
           throw new Error('Invalid ellipse symmetry branch.');
         if (c.type === 'linearPattern' || c.type === 'circularPattern') {

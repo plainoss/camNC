@@ -98,7 +98,7 @@ export function createSketchContext(
     };
   if (
     target.kind === 'constraint' &&
-    sketch.constraints.some(c => c.id === target.id && (c.type === 'linearPattern' || c.type === 'circularPattern'))
+    sketch.constraints.some(c => c.id === target.id && (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot'))
   )
     return { target: { ...target }, position: { ...position }, entityIds: [], constraintIds: [target.id] };
   if (target.kind === 'dimension' && sketch.constraints.some(c => c.id === target.id && 'value' in c))
@@ -118,7 +118,7 @@ export function selectedSketchContextTarget(sketch: CadSketch, selection: Sketch
   const dimension = selection.constraintIds.find(id => sketch.constraints.some(c => c.id === id && 'value' in c));
   if (dimension) return { kind: 'dimension', id: dimension };
   const pattern = selection.constraintIds.find(id =>
-    sketch.constraints.some(c => c.id === id && (c.type === 'linearPattern' || c.type === 'circularPattern'))
+    sketch.constraints.some(c => c.id === id && (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot'))
   );
   if (pattern) return { kind: 'constraint', id: pattern };
   const entity = selection.entityIds.find(id => sketch.entities.some(entity => entity.id === id));
@@ -140,7 +140,13 @@ export function toggleContextConstruction(sketch: CadSketch, ids: readonly strin
 export function sketchContextItems(sketch: CadSketch, context: SketchContext, busy = false): SketchContextItem[] {
   if (context.target.kind === 'constraint') {
     const id = context.target.id;
-    if (!sketch.constraints.some(c => c.id === id && (c.type === 'linearPattern' || c.type === 'circularPattern'))) return [];
+    if (!sketch.constraints.some(c => c.id === id && (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot')))
+      return [];
+    if (sketch.constraints.some(c => c.id === id && c.type === 'slot'))
+      return [
+        { action: 'delete-dimensions', label: 'Remove slot relation', disabled: busy, shortcut: 'Delete' },
+        { action: 'fit', label: 'Zoom to fit', separatorBefore: true, shortcut: 'F' },
+      ];
     return [
       { action: 'edit-pattern', label: 'Edit pattern', disabled: busy, shortcut: 'Enter' },
       { action: 'delete-dimensions', label: 'Remove pattern relation', disabled: busy, shortcut: 'Delete' },
