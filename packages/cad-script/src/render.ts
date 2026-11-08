@@ -22,19 +22,20 @@ export function renderCadSvg(parts: readonly EvaluatedCadPart[]): string {
     out.push(
       `<text x="${n(x)}" y="${n(gap - unit)}" font-size="${n(unit * 1.4)}">${part.name.replace(/[<&]/g, '')}, ${part.thickness} mm</text>`
     );
-    const holes = part.holes.map(hole => loop(hole, dx, dy)).join('');
-    out.push(
-      `<path d="${loop(part.outline, dx, dy)}${holes}" fill="#e8e4da" fill-rule="evenodd" stroke="#222" stroke-width="${n(unit / 6)}"/>`
-    );
+    const material = `${loop(part.outline, dx, dy)}${part.holes.map(hole => loop(hole, dx, dy)).join('')}`;
+    out.push(`<path d="${material}" fill="#e8e4da" fill-rule="evenodd" stroke="#222" stroke-width="${n(unit / 6)}"/>`);
+    // Cuts only show over material, so a hole inside a pocket still reads as a hole.
+    out.push(`<clipPath id="material-${i}"><path d="${material}" clip-rule="evenodd"/></clipPath>`);
     for (const cut of part.cuts ?? []) {
       const shade = cut.through ? 1 : Math.min(1, cut.to / part.thickness);
       const islands = cut.islands.map(island => loop(island, dx, dy)).join('');
       out.push(
-        `<path d="${loop(cut.outline, dx, dy)}${islands}" fill="${cut.through ? '#fff' : '#3b6ea5'}" fill-opacity="${n(0.25 + 0.6 * shade)}" fill-rule="evenodd" stroke="#1d3f66" stroke-width="${n(unit / 8)}"${cut.side === 'underside' ? ` stroke-dasharray="${n(unit)}"` : ''}/>`
+        `<path d="${loop(cut.outline, dx, dy)}${islands}" clip-path="url(#material-${i})" fill="${cut.through ? '#fff' : '#3b6ea5'}" fill-opacity="${n(0.25 + 0.6 * shade)}" fill-rule="evenodd" stroke="#1d3f66" stroke-width="${n(unit / 8)}"${cut.side === 'underside' ? ` stroke-dasharray="${n(unit)}"` : ''}/>`
       );
-      // In the cut's corner, because the centres of nested cuts often coincide.
-      const lx = Math.min(...cut.outline.map(p => p.x)) + dx + unit / 2,
-        ly = dy - Math.max(...cut.outline.map(p => p.y)) + unit * 1.2;
+      // At the cut's top-left-most point, which lies on a rounded cut too, and differs for nested cuts with one centre.
+      const corner = cut.outline.reduce((best, p) => (p.y - p.x > best.y - best.x ? p : best));
+      const lx = corner.x + dx + unit / 2,
+        ly = dy - corner.y + unit * 1.2;
       out.push(`<text x="${n(lx)}" y="${n(ly)}" font-size="${n(unit)}">${cut.through ? 'through' : `${n(cut.to)} mm`}</text>`);
     }
     x += box.x1 - box.x0 + gap;

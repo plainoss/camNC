@@ -40,7 +40,16 @@ the parts. See `examples/` for more.
   `distance` and `place`.
 - The profile's outer loop is the part's shape, and inner loops are through-holes
   unless a cut gives them a depth.
-- `regionAt(x, y)` picks the innermost region at a point, as a click does.
+- Use `rect` for a rectangle: it's dimensioned by width and height, which is what a person
+  edits later. `polygon` pins each vertex by its position, so `freedom: 0` doesn't make
+  it regular. Both return `corners`, in vertex order, and `fillet(corners, r)` rounds
+  them in any sketch.
+- There's no pattern helper yet: repeat a shape in a loop.
+- `regionAt(x, y)` picks the innermost region at a point, as a click does. It only sees
+  that sketch's own lines, so a profile hole doesn't split a region on `top`.
+- `expect` checks `size`, `thickness`, `holes`, `pockets`, `depths` (each cut's floor
+  below its face, in feature order) and `freedom`, within `tolerance` (0.01 mm). It
+  doesn't check diameters or positions: read those from the report's cuts.
 - Cuts on `sketchOn({ floorOf: cut })` start at that pocket's floor.
 - `sketchOn('underside')` is drawn as the face is seen from below, so X runs the other way: a point at `x` on the part is at `-x` in the sketch. Its cuts come from a second side, which the report doesn't cover.
 - Handles in the report, such as `7b8b`, work with `find` and `sketch` on that same
@@ -51,7 +60,8 @@ the parts. See `examples/` for more.
 
 Each part is planned alone on a board the way the app plans it, with the default 3.175 mm
 bit and settings and tabs holding it: its operations, time, CAM warnings, and anything
-that would block the job. Pass `{ toolpaths: false }` to `inspectCadDocument` to skip it.
+that would block the job. CAM's own warnings, such as material left in corners, stay in
+each part's `toolpaths.warnings`. Only a blocked job adds a top-level warning. Pass `{ toolpaths: false }` to `inspectCadDocument` to skip it.
 
 ## What the report doesn't cover
 
