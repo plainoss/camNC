@@ -1,3 +1,4 @@
+import { slotIssue } from './slot';
 import { linearPatternIssue } from './pattern';
 import { constraintEntityIds, entityPointIds, originId } from './document';
 import { sketchTargets, validateCadFeatures } from './featureModel';
@@ -203,6 +204,10 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
           c.edgeIds.some(id => entities.get(id)?.type !== 'line')
         )
           error('invalid-reference', 'A regular polygon needs a circle and three to fifty distinct edges.', undefined, [c.id]);
+      }
+      if (c.type === 'slot') {
+        const issue = slotIssue(part.sketch, c);
+        if (issue) diagnostics.push({ code: 'invalid-slot', message: issue, severity: 'error', partId: part.id, constraintIds: [c.id] });
       }
       if (c.type === 'linearPattern' || c.type === 'circularPattern') {
         const issue = linearPatternIssue(part.sketch, c);

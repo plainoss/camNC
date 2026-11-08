@@ -19,6 +19,8 @@ export interface InlineConstraintsProps {
 
 export function ConstraintSymbol({ kind }: { kind: InlineConstraintKind }) {
   switch (kind) {
+    case 'slot':
+      return <path d="M-3-4h6a4 4 0 0 1 0 8h-6a4 4 0 0 1 0-8z" />;
     case 'circularPattern':
       return (
         <>

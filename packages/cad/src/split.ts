@@ -1,3 +1,4 @@
+import { sketchSlotOwner } from './slot';
 import { sketchPatternOwner } from './pattern';
 import { constraintEntityIds, entityPointIds, newCadId, originId } from './document';
 import {
@@ -63,6 +64,7 @@ export type CadSplitResult =
 export function splitSketchCurve(sketch: CadSketch, entityId: string, parameters: readonly number[]): CadSplitResult {
   const curve = sketch.entities.find(e => e.id === entityId);
   const fail = (message: string): CadSplitResult => ({ ok: false, message });
+  if (sketchSlotOwner(sketch, entityId)) return fail('Remove the slot relation before splitting its geometry.');
   if (sketchPatternOwner(sketch, entityId)) return fail('Remove the pattern relation before splitting its finite geometry.');
   if (!curve || curve.type === 'point' || isOwnedSplineHandle(curve))
     return fail('Select a sketch curve, away from its endpoints or tangent handles.');

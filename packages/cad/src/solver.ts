@@ -1,3 +1,5 @@
+import { reconcileSlot } from './slot';
+import { slotPrimitives } from './slotConstraint';
 import { Algorithm, GcsWrapper, init_planegcs_module, SolveStatus, type ModuleStatic, type SketchPrimitive } from '@salusoft89/planegcs';
 import { sketchTargets } from './featureModel';
 import { evaluateCadDocument } from './features';
@@ -186,6 +188,8 @@ function solverConstraint(
 ): SketchPrimitive | SketchPrimitive[] {
   const id = c.id;
   switch (c.type) {
+    case 'slot':
+      return slotPrimitives(c, entities, constraints);
     case 'circularPattern':
     case 'linearPattern':
       return linearPatternPrimitives(c, entities);
@@ -492,6 +496,29 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
   }
   const patternDiagnostics: CadSolveResult['diagnostics'] = [];
   for (const part of next.parts.flatMap(sketchTargets)) {
+    for (const slot of part.sketch.constraints.filter(c => c.type === 'slot')) {
+      try {
+        const result = reconcileSlot(part.sketch, slot);
+        if (result.ok) {
+          part.sketch.entities = result.sketch.entities;
+        } else
+          patternDiagnostics.push({
+            code: 'invalid-slot',
+            message: result.message,
+            severity: 'error',
+            partId: part.id,
+            constraintIds: [slot.id],
+          });
+      } catch {
+        patternDiagnostics.push({
+          code: 'invalid-slot',
+          message: 'Repair the saved slot data before solving.',
+          severity: 'error',
+          partId: part.id,
+          constraintIds: [slot.id],
+        });
+      }
+    }
     const patterns = part.sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern');
     const invalid = patterns.map(pattern => ({ pattern, issue: linearPatternReservationIssue(part.sketch, pattern) })).filter(v => v.issue);
     if (invalid.length) {
@@ -613,6 +640,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
         const geometry: SketchPrimitive[] = ordered.map(e => solverGeometry(offsetSeed.get(e.id) ?? e, points));
         const primitives: SketchPrimitive[] = [];
         const draggedIds = new Set(dragTargets.map(target => target.pointId));
+        const slotCaps = new Set(part.sketch.constraints.flatMap(c => (c.type === 'slot' ? c.capIds : [])));
         const replicas = patternReplicaIds(part.sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern'));
         const retainedSplineHandles = new Set<string>();
         for (const e of ordered)
@@ -676,7 +704,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
               );
           }
         for (const e of ordered)
-          if (e.type === 'arc' && !replicas.has(e.id)) {
+          if (e.type === 'arc' && !replicas.has(e.id) && !slotCaps.has(e.id)) {
             // With all three points fixed, four arc rules overconstrain three native arc parameters.
             // Keep one native radius equation so contradictory user dimensions remain detectable.
             primitives.push(
@@ -876,7 +904,11 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
         const sourceConstraintId = (nativeId: string) =>
           part.sketch.constraints.find(
             c =>
-              (c.type === 'regularPolygon' || c.type === 'symmetricCurves' || c.type === 'linearPattern' || c.type === 'circularPattern') &&
+              (c.type === 'regularPolygon' ||
+                c.type === 'symmetricCurves' ||
+                c.type === 'linearPattern' ||
+                c.type === 'circularPattern' ||
+                c.type === 'slot') &&
               nativeId.startsWith(`${c.id}:`)
           )?.id ?? nativeId;
         const status = conflicts.length ? 'conflict' : candidate ? 'solved' : 'invalid';

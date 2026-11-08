@@ -136,6 +136,14 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'slot':
+      shape = (
+        <>
+          <path d="M7 6h10a6 6 0 0 1 0 12H7A6 6 0 0 1 7 6z" />
+          <path d="M4 12h16" strokeDasharray="2 2" />
+        </>
+      );
+      break;
     case 'circularPattern':
       shape = (
         <>
