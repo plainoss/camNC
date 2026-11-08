@@ -23,8 +23,10 @@ interface Placed {
   placement: CadPlacement;
   lo: Vec3;
   hi: Vec3;
-  /** Coordinates along each assembly axis where its material can change, when it lies square to the axes. */
-  breaks?: [number[], number[], number[]];
+  /** Coordinates along each assembly axis where its material can change, for axes that are one of the part's own. */
+  breaks: (number[] | null)[];
+  /** Axes along which material also changes between those coordinates, across a slanted edge or a tilted part. */
+  slanted: boolean[];
 }
 
 const conjugate = ([x, y, z, w]: readonly number[]) => [-x!, -y!, -z!, w!];
@@ -70,15 +72,16 @@ function place(part: EvaluatedCadPart, id: string, name: string, placement: CadP
   const corners = [0, 1, 2, 3, 4, 5, 6, 7].map(i => toWorld(placement, [box[0]![i & 1]!, box[1]![(i >> 1) & 1]!, box[2]![i >> 2]!]));
   const lo = [0, 1, 2].map(a => Math.min(...corners.map(c => c[a]!))) as Vec3,
     hi = [0, 1, 2].map(a => Math.max(...corners.map(c => c[a]!))) as Vec3;
-  // Square to the axes, each assembly axis is one of the part's own, so its feature edges are where material can change.
-  const breaks = [0, 1, 2].map(a => {
+  // An assembly axis that is one of the part's own has its feature edges where material can change.
+  const along = [0, 1, 2].map(a => {
     const unit: Vec3 = [0, 0, 0];
     unit[a] = 1;
     const back = rotateVector(conjugate(placement.rotation), unit);
-    const k = back.findIndex(c => Math.abs(Math.abs(c) - 1) < 1e-9);
-    return k < 0 ? null : own[k]!.map(value => placement.position[a]! + back[k]! * value);
+    return { back, k: back.findIndex(c => Math.abs(Math.abs(c) - 1) < 1e-9) };
   });
-  // A slanted edge, or a curve's facets, changes material between vertices, so such parts are sampled evenly instead.
+  const breaks = along.map(({ back, k }, a) => (k < 0 ? null : own[k]!.map(value => placement.position[a]! + back[k]! * value)));
+  // A slanted edge, or a curve's facets, changes material between vertices across the sketch, but never up the
+  // thickness, so the depths still break exactly while the sketch's axes are also sampled evenly.
   const square = loops.every(loop =>
     loop.every((p, i) => {
       const q = loop[(i + 1) % loop.length]!;
@@ -92,15 +95,17 @@ function place(part: EvaluatedCadPart, id: string, name: string, placement: CadP
     placement,
     lo,
     hi,
-    ...(square && breaks.every(Boolean) && { breaks: breaks as [number[], number[], number[]] }),
+    breaks,
+    slanted: along.map(({ k }) => k < 0 || (!square && k < 2)),
   };
 }
 
 /** Where cell edges fall along one axis of the overlap: at the parts' feature edges, or evenly. */
-function cellEdges(lo: number, hi: number, breaks: readonly number[] | null, even: number): number[] {
-  const inside = breaks
-    ? breaks.filter(value => value > lo && value < hi)
-    : Array.from({ length: even - 1 }, (_, i) => lo + ((i + 1) * (hi - lo)) / even);
+function cellEdges(lo: number, hi: number, breaks: readonly number[], even: number): number[] {
+  const inside = [
+    ...breaks.filter(value => value > lo && value < hi),
+    ...Array.from({ length: Math.max(0, even - 1) }, (_, i) => lo + ((i + 1) * (hi - lo)) / even),
+  ];
   const sorted = [lo, ...inside, hi].sort((a, b) => a - b);
   return sorted.filter((value, i) => i === 0 || value - sorted[i - 1]! > 1e-6);
 }
@@ -109,10 +114,11 @@ function collide(a: Placed, b: Placed): CadAssemblyReport['collisions'][number] 
   const lo = [0, 1, 2].map(i => Math.max(a.lo[i]!, b.lo[i]!)),
     hi = [0, 1, 2].map(i => Math.min(a.hi[i]!, b.hi[i]!));
   if (lo.some((value, i) => hi[i]! - value < 1e-6)) return null;
-  const exact = a.breaks && b.breaks;
-  let edges = [0, 1, 2].map(i => cellEdges(lo[i]!, hi[i]!, exact ? [...a.breaks![i]!, ...b.breaks![i]!] : null, 24));
+  let edges = [0, 1, 2].map(i =>
+    cellEdges(lo[i]!, hi[i]!, [...(a.breaks[i] ?? []), ...(b.breaks[i] ?? [])], a.slanted[i] || b.slanted[i] ? 24 : 0)
+  );
   // Many small features would split the overlap too finely, so it's sampled evenly instead.
-  if (edges.reduce((n, e) => n * (e.length - 1), 1) > kMaxCells) edges = [0, 1, 2].map(i => cellEdges(lo[i]!, hi[i]!, null, 60));
+  if (edges.reduce((n, e) => n * (e.length - 1), 1) > kMaxCells) edges = [0, 1, 2].map(i => cellEdges(lo[i]!, hi[i]!, [], 60));
   const [ex, ey, ez] = edges as [number[], number[], number[]];
   let volume = 0;
   const min: Vec3 = [Infinity, Infinity, Infinity],

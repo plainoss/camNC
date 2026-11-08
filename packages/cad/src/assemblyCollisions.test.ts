@@ -12,6 +12,8 @@ import {
   type CadDocument,
   type CadPart,
   type CadPlacement,
+  type EvaluatedCadCut,
+  type EvaluatedCadPart,
 } from './index';
 
 const panel = (name: string, width: number, height: number, placement: CadPlacement, widthExpression?: string): CadPart => {
@@ -73,5 +75,55 @@ describe('parts in the same place', () => {
     const block = panel('Block', 20, 100, flat(80, 0, 0));
     const document = { ...createCadDocument(), parts: [{ ...triangle, placement: flat(0, 0, 0) }, block] };
     expect(report(document).collisions.map(clash => clash.parts)).toEqual([['Triangle', 'Block']]);
+  });
+
+  it('keeps exact pocket depths for a part with a slanted hole', () => {
+    // Two coincident panels, one pocketed 8.9 mm from the top and one 9 mm from below, share a 0.1 mm layer. A small
+    // diamond hole in one mustn't make the layer fall between the even samples.
+    const square = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 0, y: 100 },
+    ];
+    const pocket = (side: 'top' | 'underside', to: number): EvaluatedCadCut => ({
+      id: side,
+      regionId: side,
+      side,
+      from: 0,
+      to,
+      through: false,
+      outline: square,
+      islands: [],
+    });
+    const parts: EvaluatedCadPart[] = [
+      {
+        partId: 'a',
+        name: 'A',
+        thickness: 18,
+        outline: square,
+        holes: [
+          [
+            { x: 50, y: 48 },
+            { x: 52, y: 50 },
+            { x: 50, y: 52 },
+            { x: 48, y: 50 },
+          ],
+        ],
+        loops: [],
+        cuts: [pocket('top', 8.9)],
+      },
+      { partId: 'b', name: 'B', thickness: 18, outline: square, holes: [], loops: [], cuts: [pocket('underside', 9)] },
+    ];
+    const document = {
+      ...createCadDocument(),
+      parts: [
+        { ...createCadPart('A', 18), id: 'a', placement: flat(0, 0, 0) },
+        { ...createCadPart('B', 18), id: 'b', placement: flat(0, 0, 0) },
+      ],
+    };
+    const [clash] = assemblyReport(document, parts)!.collisions;
+    expect(clash!.parts).toEqual(['A', 'B']);
+    expect(clash!.volume).toBeGreaterThan(900);
   });
 });
