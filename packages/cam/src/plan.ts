@@ -116,6 +116,8 @@ export interface PlanResult {
   programs: {
     tool: number;
     diameter: number;
+    /** The bit's name, for people: "90° V-bit ⌀6". */
+    name?: string;
     gcode: string;
     timeMin: number;
     timing?: ProgramTimeEstimate;
@@ -549,6 +551,7 @@ export function summarize(
     return {
       tool: tool.number,
       diameter: tool.diameter,
+      ...(tool.name && { name: tool.name }),
       gcode,
       timeMin: timing.estimatedAutomaticSeconds / 60,
       timing,
