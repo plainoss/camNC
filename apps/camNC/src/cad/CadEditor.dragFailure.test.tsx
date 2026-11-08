@@ -55,7 +55,7 @@ async function fixture(withSnapTarget = false) {
   );
   const canvas = screen.getByTestId('cad-canvas') as unknown as SVGSVGElement;
   await waitFor(() => expect(screen.getByRole('button', { name: /Finish sketch/ })).toBeEnabled(), { timeout: 20_000 });
-  await userEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+  await userEvent.click(screen.getByRole('switch', { name: 'Snap' }));
   change.mockClear();
   const corner = source.parts[0]!.sketch.entities.find(entity => entity.type === 'point' && entity.x > 80 && entity.y > 50)!;
   if (corner.type !== 'point') throw Error('Expected rectangle corner');
@@ -181,7 +181,7 @@ describe('atomic drag recovery from a stopped solver', () => {
 
   it('retains only the already-solved movement when the automatic drop relation resets the solver', async () => {
     const f = await fixture(true);
-    await userEvent.click(screen.getByRole('button', { name: 'Snap off' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Snap' }));
     let relationAttempts = 0;
     const originalConstraints = new Set(f.source.parts[0]!.sketch.constraints.map(constraint => constraint.id));
     solver.solve.mockImplementation((document, options) => {

@@ -399,7 +399,9 @@
 .cad-assembly-tools {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
+  left: auto;
   right: 12px;
 }
 .cad-assembly-tools [role='group'] {
@@ -990,4 +992,106 @@
 .cad-slot-editor input[type='checkbox'] {
   width: 14px;
   height: 14px;
+}
+.cad-editor .cad-studio-command,
+.cad-editor .cad-studio-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 9px 0 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.cad-studio-command svg,
+.cad-studio-done svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.cad-editor .cad-studio-command[aria-pressed='true'] {
+  background: #dfeaf8;
+  color: #174f8f;
+}
+.cad-editor .cad-studio-command[aria-disabled='true'] {
+  color: #9aa7b6;
+  cursor: default;
+}
+/** A view toggle reads as a set of tabs: the one showing is filled in. */
+.cad-view-switch {
+  display: inline-flex;
+  border: 1px solid #c3cedb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cad-editor .cad-view-switch button {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #34445d;
+  font-size: 11px;
+}
+.cad-editor .cad-view-switch button + button {
+  border-left: 1px solid #c3cedb;
+}
+.cad-editor .cad-view-switch button[aria-pressed='true'] {
+  background: #2c6fbf;
+  color: #fff;
+}
+/** On or off, as a switch with its state written next to it. */
+.cad-editor .cad-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+  color: #34445d;
+  font-size: 11px;
+}
+.cad-switch-track {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  border-radius: 7px;
+  background: #c3cedb;
+  transition: background 0.15s;
+}
+.cad-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.cad-switch[aria-checked='true'] .cad-switch-track {
+  background: #2c6fbf;
+}
+.cad-switch[aria-checked='true'] .cad-switch-track::after {
+  left: 14px;
+}
+.cad-canvas-bar > div {
+  gap: 8px;
+  align-items: center;
+}
+.cad-editor .cad-canvas-bar .cad-bar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid #c3cedb;
+  border-radius: 4px;
+  background: #fff;
+  color: #34445d;
+  font-size: 11px;
 }

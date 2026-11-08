@@ -1,0 +1,118 @@
+.cad-feature-dialog {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  width: min(17rem, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  box-sizing: border-box;
+  border: 1px solid #b9c4cd;
+  border-radius: 4px;
+  background: #fff;
+  color: #243247;
+  box-shadow: 0 6px 24px #2432472b;
+  font-size: 12px;
+}
+.cad-feature-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 6px 10px;
+  border-bottom: 1px solid #e3e8ef;
+}
+.cad-feature-dialog-head h3 {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cad-editor .cad-feature-dialog-head button {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.cad-feature-dialog-head svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cad-editor .cad-feature-ok,
+.cad-editor .cad-feature-ok:hover {
+  background: #1e8e3e;
+}
+.cad-feature-ok svg {
+  stroke: #fff;
+}
+.cad-editor .cad-feature-ok:disabled {
+  background: #a9cfb4;
+  cursor: default;
+}
+.cad-editor .cad-feature-cancel {
+  background: transparent;
+}
+.cad-feature-cancel svg {
+  stroke: #d33a2c;
+}
+.cad-editor .cad-feature-cancel:hover {
+  background: #fbe9e7;
+}
+.cad-feature-dialog-body {
+  display: grid;
+  gap: 8px;
+  overflow: auto;
+  padding: 10px;
+}
+.cad-feature-dialog-body p {
+  margin: 0;
+}
+.cad-feature-dialog-body .cad-feature-hint {
+  color: #62758f;
+}
+/** What a step works on, as the reference shows a picked selection: a tinted box naming it. */
+.cad-feature-selection {
+  display: grid;
+  gap: 2px;
+  padding: 5px 7px;
+  border: 1px solid #9cc0e8;
+  border-radius: 3px;
+  background: #eef5fd;
+}
+.cad-feature-selection small {
+  color: #50739b;
+}
+.cad-editor .cad-feature-selection button {
+  min-height: 0;
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1f6fc5;
+  cursor: pointer;
+  text-decoration: underline;
+}
+/** A sketch's dialog sits below the drawing's own bar, over the drawing. */
+.cad-feature-dialog.cad-sketch-dialog {
+  top: 38px;
+  width: 13rem;
+}
+.cad-drawing > .cad-feature-dialog {
+  top: 38px;
+}
+/** A part shown in 3D while its sketch is open keeps its own tools clear of the sketch's dialog. */
+.cad-drawing:has(.cad-sketch-dialog) .cad-part-view-tools {
+  left: calc(13rem + 24px);
+}

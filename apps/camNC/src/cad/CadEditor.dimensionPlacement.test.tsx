@@ -40,7 +40,7 @@ async function setup(source: CadDocument, initial?: (canvas: SVGSVGElement) => v
       { timeout: 20_000 }
     );
   await settled();
-  await userEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+  await userEvent.click(screen.getByRole('switch', { name: 'Snap' }));
   const client = (at: CadPoint) => {
     const point = new DOMPoint(at.x, -at.y).matrixTransform(canvas.getScreenCTM()!);
     let frame: Window = window;

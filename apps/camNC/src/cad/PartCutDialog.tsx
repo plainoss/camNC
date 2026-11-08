@@ -1,5 +1,6 @@
 import type { CadDocument, CadPartCut, CadValueScope } from '@wbcnc/cad';
 import { useState } from 'react';
+import { FeatureDialog } from './FeatureDialog';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 import './partCutDialog.css';
 
@@ -54,16 +55,10 @@ export function PartCutDialog({
     </fieldset>
   );
   return (
-    <div
-      className="cad-part-cut-dialog"
-      role="dialog"
-      aria-label="Cut parts"
-      onKeyDown={event => {
-        event.stopPropagation();
-        if (event.key === 'Escape') onClose();
-      }}>
-      <h3>Cut parts</h3>
-      <p>Cuts the first parts out of the second wherever they reach into them, as when a back sits in a groove.</p>
+    <FeatureDialog title="Cut parts" okLabel={step ? 'Save' : 'Cut'} onOk={save} onCancel={onClose} className="cad-part-cut-dialog">
+      <p className="cad-feature-hint">
+        Cuts the first parts out of the second wherever they reach into them, as when a back sits in a groove.
+      </p>
       {list('Cut these', tools, setTools)}
       {list('out of these', targets, setTargets)}
       <label className="cad-part-cut-clearance">
@@ -74,9 +69,6 @@ export function PartCutDialog({
           spellCheck={false}
           aria-invalid={error ? true : undefined}
           onChange={event => setText(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === 'Enter') save();
-          }}
         />
         mm
       </label>
@@ -85,19 +77,13 @@ export function PartCutDialog({
           {error}
         </p>
       )}
-      <div className="cad-part-cut-actions">
-        {onRemove && (
+      {onRemove && (
+        <div className="cad-part-cut-actions">
           <button type="button" onClick={onRemove}>
             Delete step
           </button>
-        )}
-        <button type="button" onClick={onClose}>
-          Cancel
-        </button>
-        <button type="button" onClick={save}>
-          {step ? 'Save' : 'Cut'}
-        </button>
-      </div>
-    </div>
+        </div>
+      )}
+    </FeatureDialog>
   );
 }

@@ -22,7 +22,7 @@ async function setup() {
   );
   const canvas = screen.getByTestId('cad-canvas') as unknown as SVGSVGElement;
   await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
-  await userEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+  await userEvent.click(screen.getByRole('switch', { name: 'Snap' }));
   const local = (x: number, y: number) => new DOMPoint(x, -y).matrixTransform(canvas.getScreenCTM()!);
   const client = (x: number, y: number) => {
     const p = local(x, y);

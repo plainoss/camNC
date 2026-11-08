@@ -133,7 +133,7 @@ describe('integrated real-pointer sketch context commands', () => {
     source.parts.push(part);
     const line = part.sketch.entities.find(entity => entity.type === 'line')!;
     const { canvas, latest, settled, drag } = await setup(source);
-    await userEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Snap' }));
     const input = screen.getByRole('textbox', { name: 'Part name' });
     const frames: FrameRequestCallback[] = [];
     const animationFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => frames.push(callback));
@@ -160,7 +160,7 @@ describe('integrated real-pointer sketch context commands', () => {
     part.sketch = addLine(part.sketch, { x1: 20, y1: 20, x2: 120, y2: 20 });
     source.parts.push(part);
     const { canvas, settled, drag } = await setup(source);
-    await userEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Snap' }));
     let finish!: () => void;
     dragSolver.wait = new Promise<void>(resolve => {
       finish = resolve;
@@ -292,7 +292,7 @@ describe('integrated real-pointer sketch context commands', () => {
     source.parts.push(part);
     const dimension = part.sketch.constraints.find(c => c.type === 'diameter')!;
     const { canvas, latest, settled, rightClick, drag } = await setup(source);
-    await userEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Snap' }));
     const circle = () => latest().parts[0]!.sketch.entities.find(e => e.type === 'circle')!;
     const label = () => canvas.querySelector(`[data-dimension="${dimension.id}"]`)!;
     const center = () => latest().parts[0]!.sketch.entities.find(e => e.id === circle().centerId)!;

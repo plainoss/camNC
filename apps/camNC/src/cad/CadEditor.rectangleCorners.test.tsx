@@ -115,7 +115,7 @@ it.each([true, false])('uses explicit origin snap intent for fresh rectangle end
   const source = createCadDocument();
   source.parts.push(createCadPart());
   const { canvas, latest, click } = await setup(source);
-  if (!enabled) await userEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+  if (!enabled) await userEvent.click(screen.getByRole('switch', { name: 'Snap' }));
   await userEvent.keyboard('g');
   await click(0, 0);
   await click(100, 60);

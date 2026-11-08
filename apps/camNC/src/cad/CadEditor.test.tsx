@@ -720,7 +720,7 @@ describe('integrated sketch editor', () => {
     clickWorld(40, 1);
     const first = change.mock.calls.at(-1)![0].parts[0]!.sketch;
     expect(first.constraints.filter(c => c.type === 'horizontal')).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Snap' }));
     clickWorld(80, 2);
     const second = change.mock.calls.at(-1)![0].parts[0]!.sketch;
     expect(second.constraints.filter(c => c.type === 'horizontal')).toHaveLength(1);

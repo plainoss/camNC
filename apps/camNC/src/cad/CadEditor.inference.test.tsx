@@ -147,7 +147,7 @@ describe('drawing inference previews and persistence', () => {
     moveWorld(145, 115);
     moveWorld(205, 116);
     expect(canvas.querySelector('[data-inference-guide="horizontal"]')).not.toBeNull();
-    if (mode === 'Snap off') fireEvent.click(screen.getByRole('button', { name: 'Snap on' }));
+    if (mode === 'Snap off') fireEvent.click(screen.getByRole('switch', { name: 'Snap' }));
     else fireEvent.keyDown(canvas, { key: 'Shift', shiftKey: true });
     moveWorld(205, 116, mode === 'Shift held');
     noPreview(canvas);

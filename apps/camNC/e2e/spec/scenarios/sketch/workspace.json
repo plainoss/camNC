@@ -94,6 +94,7 @@
     "evidence": "design a rejected value must be visible",
     "steps": [
       "rect 40,30 140,90",
+      "closesketch",
       "fieldkeep Thickness 0",
       {
         "expect": {
