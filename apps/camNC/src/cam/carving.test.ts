@@ -60,7 +60,9 @@ describe('carving outlines', () => {
       const sans = await outlineArt({ kind: 'text', text: 'O', font: 'sans' }, 40);
       // Lobster’s O has an open gap: its white centre connects to the outside.
       expect(web.region).toHaveLength(1);
-      expect(web.width).toBeCloseTo((40 * 640) / 756, 2);
+      // Canvas bounds are rasterized at 100px and vary slightly between platforms.
+      const expectedWidth = (40 * 640) / 756;
+      expect(Math.abs(web.width - expectedWidth) / expectedWidth).toBeLessThan(0.03);
       expect(box(web.region).h).toBeGreaterThan(39.5);
       expect(box(web.region).h).toBeLessThan(40.5);
       expect(Math.abs(box(web.region).w - box(sans.region).w)).toBeGreaterThan(1);
