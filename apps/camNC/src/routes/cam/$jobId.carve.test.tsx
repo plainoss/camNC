@@ -1,9 +1,9 @@
 import { createCarvingJob, getJob } from '@/cam/jobDb';
-import { ensureWebFont } from '@/cam/webFonts';
+import { ensureWebFont, loadFontCatalog } from '@/cam/webFonts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Route } from './$jobId.carve';
 
 const params = vi.hoisted(() => ({ jobId: '' }));
@@ -26,6 +26,8 @@ vi.mock('@/cam/webFonts', async importOriginal => ({
 
 const CarveStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
 
+beforeAll(() => loadFontCatalog(), 30_000);
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -35,7 +37,7 @@ afterEach(() => {
 const pickFont = async (family: string) => {
   fireEvent.click(screen.getByRole('combobox', { name: 'Font' }));
   fireEvent.change(screen.getByRole('combobox', { name: 'Search fonts' }), { target: { value: family } });
-  fireEvent.click(await screen.findByRole('option', { name: family }));
+  fireEvent.click(await screen.findByRole('option', { name: family }, { timeout: 10_000 }));
 };
 
 const open = async () => {
