@@ -175,6 +175,21 @@ function patternCopyRegions(
   return [];
 }
 
+/** Whether a region's curves include one a pattern made for a copy it no longer has. Region IDs list their curves' sides. */
+function onDroppedPatternCopy(sketch: CadSketch, regionId: string): boolean {
+  const sides = regionId
+    .slice(regionId.indexOf(':region:') + ':region:'.length)
+    .replace(/#\d+$/, '')
+    .split('|');
+  const curves = new Set(sides.map(side => side.slice(0, side.lastIndexOf(':'))));
+  const present = new Set(sketch.entities.map(entity => entity.id));
+  return sketch.constraints.some(
+    c =>
+      (c.type === 'linearPattern' || c.type === 'circularPattern') &&
+      c.instances.some(instance => Object.values(instance.idMap).some(id => curves.has(id) && !present.has(id)))
+  );
+}
+
 /** Whether a region could be another one moved by `step`, or turned somewhere when there's no step: the same area, and the same extent shifted. */
 function sameShape(original: CadSketchRegion, candidate: CadSketchRegion, step: CadPoint | null): boolean {
   const area = (region: CadSketchRegion) =>
@@ -241,7 +256,17 @@ function cutFeatures(part: CadPart, profile: EvaluatedCadPart): { part: Evaluate
     if (feature.suppressed) continue;
     const region = regions.get(feature.sketchId)?.find(candidate => candidate.id === feature.regionId);
     if (!region) {
-      error('cut-region-missing', 'A cut lost its sketch region. Pick the region again, or remove the cut.');
+      const sketch =
+        feature.sketchId === part.sketch.id ? part.sketch : cadFaceSketches(part).find(f => f.sketch.id === feature.sketchId)?.sketch;
+      // A copy a shrinking pattern dropped takes its cut with it, as the copy's material is no longer there to cut.
+      if (sketch && onDroppedPatternCopy(sketch, feature.regionId))
+        diagnostics.push({
+          code: 'cut-copy-gone',
+          severity: 'warning',
+          partId: part.id,
+          message: 'A cut was on a pattern copy that’s gone, so it’s left out.',
+        });
+      else error('cut-region-missing', 'A cut lost its sketch region. Pick the region again, or remove the cut.');
       continue;
     }
     const at = start(faces.get(feature.sketchId));

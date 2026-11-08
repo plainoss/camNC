@@ -43,6 +43,33 @@ const carving = (region: PathsD, more: Partial<BoardCarving> = {}): BoardCarving
 });
 
 describe('V-bits', () => {
+  it('cut a stroke thinner than two ring steps along its centre line, as deep as it is wide', () => {
+    // 0.3 mm wide: it closes up before the first ring, 0.2 mm in.
+    const operations = carvingOperations(carving(bar(0.3)), 18);
+    const points = operations.flatMap(op => op.passes.flatMap(pass => pass.pts));
+    expect(points.length).toBeGreaterThan(0);
+    // On the centre line, 0.15 mm in from each side, and a 90° bit there is 0.15 mm deep.
+    for (const [x, y, z] of points) {
+      expect(toOutline(bar(0.3), x, y)).toBeGreaterThan(0.13);
+      expect(18 - z).toBeLessThanOrEqual(0.15 + 1e-6);
+    }
+    expect(Math.min(...points.map(p => p[2]))).toBeCloseTo(18 - 0.15, 1);
+  });
+
+  it('leave the hole of a thin island alone when the island sits in another outline’s hole', () => {
+    // A ring with a 0.3 mm square inside its hole, and a 0.2 mm square hole in that.
+    const square = (cx: number, cy: number, half: number) => rect(cx - half, cy - half, cx + half, cy + half);
+    const region: PathsD = [
+      square(50, 50, 20),
+      [...square(50, 50, 10)].reverse(),
+      square(50, 50, 0.15),
+      [...square(50, 50, 0.1)].reverse(),
+    ];
+    const points = carvingOperations(carving(region), 18).flatMap(op => op.passes.flatMap(pass => pass.pts));
+    // Nothing inside the small hole.
+    expect(points.filter(([x, y]) => Math.abs(x - 50) < 0.1 && Math.abs(y - 50) < 0.1)).toEqual([]);
+  });
+
   it('cut deeper by 1 / tan(half the angle) per mm wider, down to the top of the cone', () => {
     expect(vSlope(V90)).toBeCloseTo(1);
     expect(vSlope(V60)).toBeCloseTo(Math.sqrt(3));

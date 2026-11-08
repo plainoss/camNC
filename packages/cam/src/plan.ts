@@ -40,8 +40,8 @@ import {
 
 /** Where a board's parts come from, by part ID. */
 export interface BoardPartSource {
-  /** Its size (x, y, thickness) and features. */
-  part(partId: string): { size: [number, number, number]; features: PartFeatures };
+  /** Its size (x, y, thickness) and features, and the bit diameter its inside corners are relieved for, if they are. */
+  part(partId: string): { size: [number, number, number]; features: PartFeatures; cornerRelief?: number };
   /** Its underside's features with depths from its own bottom, turned over about Y when the part lies rotated, else X. */
   underside(partId: string, rotated: boolean): PartFeatures;
 }
@@ -224,6 +224,17 @@ export function planBoard(
       problem ??= `No room for two ⌀${diameter} dowel pins clear of the parts: make the board bigger, or re-align with the camera instead.`;
   }
   const cam = camBoard(spec, settings);
+  // Corners relieved for a smaller bit than the board is cut with still come out rounded, and a joint won't close.
+  const widest = Math.max(0, ...cam.operations.map(op => op.tool.diameter));
+  const warned = new Set<string>();
+  for (const p of board.parts) {
+    const relief = source.part(p.partId).cornerRelief;
+    if (relief === undefined || widest <= relief + 1e-6 || warned.has(p.partId)) continue;
+    warned.add(p.partId);
+    cam.warnings.push(
+      `${p.name}: its inside corners are relieved for a ⌀${relief} bit, but this board is cut with a ⌀${widest} bit, so they stay rounded.`
+    );
+  }
   // The second side cuts the undersides: the warning that they need one is answered.
   if (flip) cam.warnings = cam.warnings.filter(w => !w.includes('flipped'));
   const size: [number, number, number] = [board.w, board.h, board.stockTop];

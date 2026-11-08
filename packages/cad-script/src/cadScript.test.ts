@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cadFaceSketches, parseCadDocument, setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { describe, expect, it, onTestFinished } from 'vitest';
-import { design, editCad, inspectCadDocument, renderCadSvg, shortHandles, type CadScript } from './index';
+import { design, editCad, inspectCadDocument, renderCadSvg, shortHandles, type CadScript, type DesignEdit } from './index';
 import { typeErrors } from './typecheck';
 
 const examples = fileURLToPath(new URL('../examples/', import.meta.url));
@@ -166,6 +166,33 @@ describe('review cases', () => {
       plate.cut(under.regionAt(-50, 40), { depth: 3 });
     });
     expect(codes(report.warnings)).toContain('toolpath-missing');
+  });
+});
+
+describe('corner relief', () => {
+  const mortised = (relief: string | number) => (d: DesignEdit) => {
+    d.variable('bit', '6mm');
+    const seat = d.part('Seat', { thickness: 18, relief });
+    seat.profile.rect({ at: [0, 0], w: 200, h: 200 });
+    seat.profile.rect({ at: [80, 91], w: 40, h: 18 });
+  };
+
+  it('puts dogbones in square inside corners and keeps the diameter as an expression', async () => {
+    const { report, document, parts } = await editCad(null, mortised('bit'));
+    expect(report.errors).toEqual([]);
+    expect(document.parts[0]!.cornerRelief).toEqual({ diameter: 6, diameterExpression: 'bit' });
+    // The mortise's four corners each gain a bone; the outline's convex corners don't.
+    expect(parts[0]!.holes[0]!.length).toBeGreaterThan(4);
+    expect(parts[0]!.outline).toHaveLength(4);
+    // Relieved for a 6 mm bit, the 3.175 mm default cuts the bones fully.
+    expect(codes(report.warnings)).not.toContain('relief-bit');
+  });
+
+  it('warns when the bones are smaller than the bit that cuts them', async () => {
+    const { report } = await editCad(null, mortised(2));
+    expect(report.warnings.find(warning => warning.code === 'relief-bit')?.message).toMatch(
+      /relieved for a ⌀2 bit, but this board is cut with a ⌀3\.175 bit/
+    );
   });
 });
 

@@ -68,6 +68,9 @@ jobs:
 
   test:
     name: Tests (${{ matrix.suite }})
+    # The merge queue already validated this exact commit, and Turborepo's remote cache holds its results. On main the
+    # checks job alone keeps the dependency and build caches warm.
+    if: github.event_name != 'push'
     permissions:
       contents: read
       id-token: write
@@ -163,6 +166,8 @@ jobs:
 
   specs:
     name: Behaviour specs (${{ matrix.shard }})
+    # Like test, only on pull requests and in the merge queue.
+    if: github.event_name != 'push'
     permissions:
       contents: read
       id-token: write
@@ -226,7 +231,7 @@ jobs:
   results:
     # Keep the check required by main's ruleset, including builds now running in checks.
     name: Run tests
-    if: always()
+    if: always() && github.event_name != 'push'
     needs: [checks, test, specs, fluidnc-sim]
     runs-on: ubuntu-24.04
     steps:
@@ -244,6 +249,8 @@ jobs:
 
   fluidnc-sim:
     name: FluidNC simulator integration
+    # Like test, only on pull requests and in the merge queue.
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

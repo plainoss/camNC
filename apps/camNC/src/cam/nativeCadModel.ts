@@ -9,6 +9,8 @@ export interface NativeCadEntry {
   features: PartFeatures;
   /** Side B's features for each way the part can turn over, when it has cuts from below. */
   flipped?: { x?: PartFeatures; y?: PartFeatures };
+  /** The bit diameter the design relieved its inside corners for. */
+  cornerRelief?: number;
 }
 
 /** Native curves are tessellated once by CAD, then go straight to CAM's polygon feature seam. */
@@ -81,6 +83,9 @@ export async function nativeCadModel(document: CadDocument): Promise<{ model: Mo
   const parts = cadPartsToCut(solved.document, solved.parts).map(({ part, names }) => {
     const native = nativePart(part);
     native.info.names = names;
+    // A mirrored copy is cut as a part of its own, relieved like the part it mirrors.
+    const relief = solved.document.parts.find(source => part.partId.split(':')[0] === source.id)?.cornerRelief;
+    if (relief) native.entry.cornerRelief = relief.diameter;
     return native;
   });
   return {

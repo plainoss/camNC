@@ -99,4 +99,16 @@ describe('patterns that follow variables', () => {
     document = setCutDepth(document, part.id, part.sketch.id, regionOf(document, thirdPin).id, 6);
     expect(pockets(document).sort()).toEqual([...Array(10).fill(12), 6].sort());
   });
+
+  it('leaves out a cut on a pin the pattern no longer has, with a warning instead of an error', async () => {
+    let document = await side();
+    const part = document.parts[0]!;
+    const last = pattern(document).instances.find(instance => instance.x === 20)!;
+    const pin = Object.values(last.idMap).find(id => part.sketch.entities.find(e => e.id === id)?.type === 'circle')!;
+    const region = cadSketchRegions(part, part.sketch.id).find(r => r.curveIds.includes(pin))!;
+    document = setCutDepth(document, part.id, part.sketch.id, region.id, 12);
+    document = (await solveCadDocument(variable(document, 'height', '400mm'))).document;
+    const { diagnostics } = evaluateCadDocument(document);
+    expect(diagnostics.map(d => [d.code, d.severity])).toEqual([['cut-copy-gone', 'warning']]);
+  });
 });
