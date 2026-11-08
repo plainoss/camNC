@@ -10,6 +10,20 @@ import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
 import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
+export interface ViewRequest {
+  name: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'fit';
+  seq: number;
+}
+
+const kViewDirections = {
+  front: [0, -1, 0],
+  back: [0, 1, 0],
+  left: [-1, 0, 0],
+  right: [1, 0, 0],
+  top: [0, 0, 1],
+  bottom: [0, 0, -1],
+  iso: [0.2, -0.75, 1],
+} satisfies Record<Exclude<ViewRequest['name'], 'fit'>, [number, number, number]>;
 
 /** A plane shown in the view to draw on, as a translucent square with its name at a corner. */
 export interface ViewPlane {
@@ -156,25 +170,46 @@ function Body({
 /**
  * Point the camera at the box from the front-right, above (Z up), and orbit around its center. It does so once there's
  * something to see and again when `fitKey` changes, such as on switching to the exploded view, but never because what's
- * shown changed: hiding a part or editing one leaves the camera where it is, as in the reference.
+ * shown changed: hiding a part or editing one leaves the camera where it is. Explicit view requests also refit it.
  */
-export function FitCamera({ box, fitKey }: { box: THREE.Box3; fitKey?: string }) {
+export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKey?: string; viewRequest?: ViewRequest }) {
   const camera = useThree(s => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree(s => s.controls) as OrbitControlsImpl | null;
   const aspect = useThree(s => s.size.width / s.size.height);
-  const fitted = useRef<{ key?: string; controls: OrbitControlsImpl | null } | null>(null);
+  const fitted = useRef<{ key?: string; seq?: number; controls: OrbitControlsImpl | null } | null>(null);
   useEffect(() => {
     // Nothing to see yet, or no size to see it at.
     if (box.isEmpty() || !(aspect > 0) || !Number.isFinite(aspect)) return;
     // Fitted already, for this key and with the controls that orbit it.
-    if (fitted.current && fitted.current.key === fitKey && fitted.current.controls === controls) return;
-    fitted.current = { key: fitKey, controls };
+    if (fitted.current && fitted.current.key === fitKey && fitted.current.controls === controls && fitted.current.seq === viewRequest?.seq)
+      return;
+    fitted.current = { key: fitKey, controls, seq: viewRequest?.seq };
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const radius = Math.max(size.x / Math.min(aspect, 1.6), size.y, size.z) * 0.62;
-    const dist = radius / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    camera.up.set(0, 0, 1);
-    camera.position.copy(center).addScaledVector(new THREE.Vector3(0.2, -0.75, 1).normalize(), dist);
+    const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    let dist = radius / tan;
+    const name = viewRequest?.name ?? 'iso';
+    const direction =
+      name === 'fit' ? camera.getWorldDirection(new THREE.Vector3()).negate() : new THREE.Vector3(...kViewDirections[name]).normalize();
+    if (name !== 'fit') camera.up.set(0, name === 'top' || name === 'bottom' ? 1 : 0, name === 'top' || name === 'bottom' ? 0 : 1);
+    if (viewRequest) {
+      // Fit every corner in the requested camera frame, including its depth toward the camera.
+      const right = new THREE.Vector3().crossVectors(camera.up, direction).normalize();
+      const up = new THREE.Vector3().crossVectors(direction, right);
+      dist = 0;
+      for (const x of [box.min.x, box.max.x])
+        for (const y of [box.min.y, box.max.y])
+          for (const z of [box.min.z, box.max.z]) {
+            const corner = new THREE.Vector3(x, y, z).sub(center);
+            dist = Math.max(
+              dist,
+              corner.dot(direction) + Math.max(Math.abs(corner.dot(right)) / (tan * aspect), Math.abs(corner.dot(up)) / tan)
+            );
+          }
+      dist = Math.max(dist * 1.1, 1);
+    }
+    camera.position.copy(center).addScaledVector(direction, dist);
     camera.near = dist / 100;
     camera.far = dist * 20;
     camera.lookAt(center);
@@ -183,7 +218,7 @@ export function FitCamera({ box, fitKey }: { box: THREE.Box3; fitKey?: string })
       controls.target.copy(center);
       controls.update();
     }
-  }, [box, camera, controls, aspect, fitKey]);
+  }, [box, camera, controls, aspect, fitKey, viewRequest]);
   return null;
 }
 
@@ -261,6 +296,7 @@ export function ModelViewport({
   onPickFace,
   onMissed,
   sketchView,
+  viewRequest,
   planes = [],
   onPickPlane,
   sketchLines = kNoLines,
@@ -284,6 +320,7 @@ export function ModelViewport({
   onMissed?: () => void;
   /** Looks straight at a sketch's plane, following its drawing, in place of the orbiting camera. */
   sketchView?: SketchView;
+  viewRequest?: ViewRequest;
   /** Planes to show as designed, such as the base planes a sketch can be drawn on. */
   planes?: ViewPlane[];
   onPickPlane?: (id: string) => void;
@@ -347,7 +384,7 @@ export function ModelViewport({
       <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
       <directionalLight position={[300, -500, 800]} intensity={1.8} />
       <directionalLight position={[-400, 300, 200]} intensity={0.4} />
-      {sketchView ? <SketchCamera view={sketchView} model={assembled} /> : <FitCamera box={box} fitKey={view} />}
+      {sketchView ? <SketchCamera view={sketchView} model={assembled} /> : <FitCamera box={box} fitKey={view} viewRequest={viewRequest} />}
       <group>
         {meshes.map((m, i) => (
           <Body
