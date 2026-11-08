@@ -73,23 +73,27 @@ export function setSketchConstruction(sketch: CadSketch, ids: readonly string[],
   return {
     ...sketch,
     entities: sketch.entities.map(e => (selected.has(e.id) ? { ...e, construction } : e)),
-    constraints: sketch.constraints.map(c =>
-      c.type !== 'linearPattern'
-        ? c
-        : {
-            ...c,
-            instances: c.instances.map(i =>
-              i.x === c.masterX && i.y === c.masterY
-                ? i
-                : {
-                    ...i,
-                    constructionOverrides: {
-                      ...i.constructionOverrides,
-                      ...Object.fromEntries(c.seedKeys.filter(key => selected.has(i.idMap[key]!)).map(key => [key, construction])),
-                    },
-                  }
-            ),
-          }
-    ),
+    constraints: sketch.constraints.some(
+      c =>
+        c.type === 'linearPattern' &&
+        c.instances.some(i => (i.x !== c.masterX || i.y !== c.masterY) && c.seedKeys.some(key => selected.has(i.idMap[key]!)))
+    )
+      ? sketch.constraints.map(c =>
+          c.type !== 'linearPattern'
+            ? c
+            : {
+                ...c,
+                instances: c.instances.map(i => {
+                  const keys = c.seedKeys.filter(key => selected.has(i.idMap[key]!));
+                  return (i.x === c.masterX && i.y === c.masterY) || !keys.length
+                    ? i
+                    : {
+                        ...i,
+                        constructionOverrides: { ...i.constructionOverrides, ...Object.fromEntries(keys.map(key => [key, construction])) },
+                      };
+                }),
+              }
+        )
+      : sketch.constraints,
   };
 }
