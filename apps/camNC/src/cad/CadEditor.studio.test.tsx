@@ -1,4 +1,4 @@
-import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
+import { addCircle, cadSketchRegions, createPlateDocument, setCutDepth, type CadDocument } from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -227,4 +227,32 @@ it('closes an open variable dialog when another step is started', async () => {
   await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
   expect(await screen.findByRole('dialog', { name: 'Extrude · Plate' })).toBeDefined();
   expect(screen.queryByRole('dialog', { name: 'Variable' })).toBeNull();
+});
+
+it('keeps steps already set when a cut’s sketch view is cancelled', async () => {
+  let source = createPlateDocument({ width: 200, height: 100 });
+  const plate = source.parts[0]!;
+  plate.sketch = addCircle(plate.sketch, { x: 100, y: 50, radius: 10 });
+  const hole = cadSketchRegions(plate, plate.sketch.id).find(region => region.curveIds.length === 1)!;
+  source = setCutDepth(source, plate.id, plate.sketch.id, hole.id, 6);
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  await userEvent.clear(within(dialog).getByRole('textbox', { name: /Thickness/ }));
+  await userEvent.type(within(dialog).getByRole('textbox', { name: /Thickness/ }), '24');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(24));
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Cut 1 · Plate/ }));
+  await userEvent.click(within(await screen.findByRole('dialog', { name: 'Sketch · Plate' })).getByRole('button', { name: 'Cancel' }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  expect(latest().parts[0]!.thickness).toBe(24);
 });

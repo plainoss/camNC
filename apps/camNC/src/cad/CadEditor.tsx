@@ -467,7 +467,7 @@ export function CadEditor({
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
-  const sketchBefore = useRef<CadDocument | null>(studioSession ? doc : null);
+  const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
   // A part sketched new, whose extrude opens once its sketch is closed. A new design's first part is one.
   const extrudeAfterSketch = useRef<string | null>(
     startIn3D === true && !faceSketch && doc.parts.length === 1 && !hasOutline(doc, doc.parts[0]!.id) ? doc.parts[0]!.id : null
@@ -3300,6 +3300,8 @@ export function CadEditor({
     if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
     if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
     if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
+    // A cut opens its part's sketch view from the studio: cancelling there goes back to the design as it is now.
+    if (studioSession && step.kind === 'cut') sketchBefore.current = documentRef.current;
     setPartId(step.partId);
     setSelected([]);
     chooseTool('select');
