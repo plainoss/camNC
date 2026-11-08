@@ -79,6 +79,67 @@ describe('carving outlines', () => {
     expect(Math.abs(region.reduce((s, l) => s + area(l), 0))).toBeCloseTo(200, -1);
   });
 
+  it.each([
+    ['viewBox only', 'viewBox="0 0 200 100"', 100],
+    ['physical units', 'width="50mm" height="25mm" viewBox="0 0 50 25"', 25],
+    ['percentage units', 'width="100%" height="100%" viewBox="0 0 200 100"', 100],
+    ['numeric dimensions', 'width="200" height="100"', 100],
+    ['only width and a viewBox', 'width="300" viewBox="0 0 200 100"', 100],
+    ['only height and a viewBox', 'height="300" viewBox="0 0 200 100"', 100],
+  ])('draws a half-filled SVG with %s at the requested proportions', async (_, attributes, size) => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" ${attributes}><rect width="${size}" height="${size}"/></svg>`;
+    const { region, width, height } = await outlineArt({ kind: 'svg', svg, fileName: 'half.svg' }, 20);
+    expect(width).toBeCloseTo(40);
+    expect(height).toBe(20);
+    expect(region).toHaveLength(1);
+    expect(box(region).w).toBeCloseTo(20, 1);
+    expect(box(region).h).toBeCloseTo(20, 1);
+  });
+
+  it.each([
+    ['50mm', '25mm', (25 * 96) / 25.4],
+    ['5cm', '2.5cm', (25 * 96) / 25.4],
+    ['2in', '1in', 96],
+    ['144pt', '72pt', 96],
+    ['12pc', '6pc', 96],
+    ['200Q', '100Q', (25 * 96) / 25.4],
+    ['192px', '96px', 96],
+  ])('keeps user coordinates in pixels for an SVG sized %s by %s without a viewBox', async (sourceWidth, sourceHeight, sourceHeightPx) => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${sourceWidth}" height="${sourceHeight}"><rect x="100" y="20" width="50" height="50"/></svg>`;
+    const { region, width, height } = await outlineArt({ kind: 'svg', svg, fileName: 'physical.svg' }, 20);
+    expect(width).toBeCloseTo(40);
+    expect(height).toBe(20);
+    expect(region).toHaveLength(1);
+    const expectedSize = (50 / sourceHeightPx) * 20;
+    expect(box(region).w).toBeCloseTo(expectedSize, 0);
+    expect(box(region).h).toBeCloseTo(expectedSize, 0);
+  });
+
+  it('preserves an explicit viewport that stretches a viewBox circle into an ellipse', async () => {
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 100 100" preserveAspectRatio="none"><circle cx="50" cy="50" r="40"/></svg>';
+    const { region, width } = await outlineArt({ kind: 'svg', svg, fileName: 'ellipse.svg' }, 20);
+    expect(width).toBeCloseTo(40);
+    expect(region).toHaveLength(1);
+    expect(box(region).w).toBeCloseTo(32, 1);
+    expect(box(region).h).toBeCloseTo(16, 1);
+  });
+
+  it.each([
+    'width="100%" height="50%"',
+    'width="200"',
+    'width="20em" height="10em"',
+    'width="20pxjunk" height="10px"',
+    'width="0" height="10"',
+  ])('rejects an SVG without a usable viewport or viewBox: %s', async attributes => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" ${attributes}><rect width="10" height="10"/></svg>`;
+    await expect(outlineArt({ kind: 'svg', svg, fileName: 'invalid-size.svg' }, 10)).rejects.toThrow(/could not be read/);
+  });
+
+  it('rejects a file whose root is not SVG', async () => {
+    await expect(outlineArt({ kind: 'svg', svg: '<html/>', fileName: 'x.svg' }, 10)).rejects.toThrow(/not an SVG/);
+  });
+
   it('say why an SVG cannot be read', async () => {
     await expect(outlineArt({ kind: 'svg', svg: '<not svg', fileName: 'x.svg' }, 10)).rejects.toThrow(/could not be read/);
   });
