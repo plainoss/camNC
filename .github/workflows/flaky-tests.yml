@@ -1,0 +1,37 @@
+name: Flaky tests
+
+# Files or updates a `flaky-test` issue for each test that failed in CI but passed on the same code. Runs main's copy of
+# the script and never checks out the tested code, so the write token stays away from PR changes.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  report:
+    if: >-
+      (github.event.workflow_run.event == 'merge_group' && github.event.workflow_run.conclusion == 'failure') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.run_attempt > 1)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Report flaky tests
+        run: node scripts/flaky-tests.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          RUN_EVENT: ${{ github.event.workflow_run.event }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
