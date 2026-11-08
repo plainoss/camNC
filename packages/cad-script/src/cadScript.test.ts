@@ -15,18 +15,13 @@ const plate: CadScript = d => {
 const codes = (issues: { code: string }[]) => issues.map(issue => issue.code);
 
 describe('example parts', () => {
-  it.each(['plate', 'shelf-side', 'tray', 'bracket', 'cupboard'])(
-    '%s meets what it expects of itself',
-    async name => {
-      const { default: script } = await import(`../examples/${name}.cad.ts`);
-      const result = await editCad(null, script);
-      expect(result.report.errors).toEqual([]);
-      expect(result.ok).toBe(true);
-      expect(typeErrors(path.join(examples, `${name}.cad.ts`))).toEqual([]);
-      // The first file pays for warming up the type checker.
-    },
-    20_000
-  );
+  it.each(['plate', 'shelf-side', 'tray', 'bracket', 'cupboard'])('%s meets what it expects of itself', async name => {
+    const { default: script } = await import(`../examples/${name}.cad.ts`);
+    const result = await editCad(null, script);
+    expect(result.report.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(typeErrors(path.join(examples, `${name}.cad.ts`))).toEqual([]);
+  });
 
   it('covers every example file', async () => {
     expect((await readdir(examples)).sort()).toEqual([
@@ -46,6 +41,66 @@ describe('example parts', () => {
       [8, 14],
     ]);
     expect(report.parts[0]!.cam).toEqual({ pockets: 2, throughHoles: 0 });
+  });
+});
+
+describe('paths', () => {
+  it('draws a slot of tangent arcs, fully constrained', async () => {
+    const { ok, report } = await editCad(null, d => {
+      const part = d.part('Slot plate');
+      part.profile
+        .path([0, 0])
+        .lineTo([100, 0])
+        .arcTo([100, 20], { tangent: true })
+        .lineTo([0, 20])
+        .arcTo([0, 0], { tangent: true })
+        .close();
+    });
+    expect(report.errors).toEqual([]);
+    expect(ok).toBe(true);
+    // The ends bulge 10 mm past the straight sides.
+    expect(report.parts[0]!.outline).toEqual({ at: [-10, 0], size: [120, 20] });
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+  });
+
+  it('draws arcs of a given radius either way round, and keeps the radius as an expression', async () => {
+    const { report, document } = await editCad(null, d => {
+      d.variable('round', '30mm');
+      const part = d.part('Bracket');
+      // A quarter-round corner: up the right side, then round to the top.
+      part.profile.path([0, 0]).lineTo([100, 0]).lineTo([100, 70]).arcTo([70, 100], { r: 'round' }).lineTo([0, 100]).close();
+      // A clockwise scallop cut into the bottom edge of a second part.
+      d.part('Shelf').profile.path([0, 0]).arcTo([60, 0], { r: 40, clockwise: true }).lineTo([60, 50]).lineTo([0, 50]).close();
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.parts[0]!.outline).toEqual({ at: [0, 0], size: [100, 100] });
+    expect(report.parts.map(part => part.sketches[0]!.freedom)).toEqual([0, 0]);
+    const radius = document.parts[0]!.sketch.constraints.find(c => c.type === 'radius')!;
+    expect('expression' in radius && radius.expression).toBe('round');
+    // Clockwise from left to right, the arc bows up into the shelf: its centre is below the edge, and it rises 13.5 mm.
+    const scallop = report.parts[1]!.sketches[0]!.entities.find(entity => entity.type === 'arc') as { at: number[]; r: number };
+    expect(scallop.at[1]).toBeCloseTo(-Math.sqrt(40 ** 2 - 30 ** 2), 3);
+    expect(report.parts[1]!.outline!.size).toEqual([60, 50]);
+    expect(report.parts[1]!.outline!.at.map(Math.abs)).toEqual([0, 0]);
+  });
+
+  it('draws a wavy edge of arcs that run into each other smoothly', async () => {
+    const { report } = await editCad(null, d => {
+      const path = d.part('Coat rack').profile.path([0, 0]).arcTo([150, 0], { r: 300 });
+      for (let x = 300; x <= 900; x += 150) path.arcTo([x, 0], { tangent: true });
+      path.lineTo([900, 130]).lineTo([0, 130]).close();
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+  });
+
+  it('says what went wrong', async () => {
+    const tooSmall = await editCad(null, d => d.part('A').profile.path([0, 0]).arcTo([100, 0], { r: 20 }));
+    expect(tooSmall.scriptError).toBe("A 20 mm radius can't reach 100, 0: it needs at least 50 mm.");
+    const ahead = await editCad(null, d => d.part('A').profile.path([0, 0]).lineTo([50, 0]).arcTo([100, 0], { tangent: true }));
+    expect(ahead.scriptError).toBe('100, 0 is straight ahead: use lineTo.');
+    const first = await editCad(null, d => d.part('A').profile.path([0, 0]).arcTo([100, 0], { tangent: true }));
+    expect(first.scriptError).toBe('A tangent arc needs a segment before it to carry on from.');
   });
 });
 
