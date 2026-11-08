@@ -165,9 +165,9 @@ export function parseCadValue(
       const conversion = unitFor(token.text);
       if (!conversion && Object.hasOwn(variables, variableName(token.text)))
         throw new Error(`Put * between the number and ${variableName(token.text)}.`);
-      if (unit === 'scalar') throw new Error('Use a unitless value; length and angle units are not accepted.');
       if (!conversion) throw new Error(`Unknown unit: ${token.text}.`);
-      if (conversion.dimension !== expectedDimension)
+      // Scalar expressions may use units internally when division cancels them before the final result.
+      if (unit !== 'scalar' && conversion.dimension !== expectedDimension)
         throw new Error(unit === 'mm' ? 'Use length units: mm, cm, m, in, inch or ft.' : 'Use angle units: deg or rad.');
       if (quantity.dimension) throw new Error('This value already has a unit.');
       index++;
@@ -326,6 +326,7 @@ export function parseCadValue(
     };
     const result = sum(0);
     if (index !== tokens.length) throw new Error('Separate values with an operator and check the parentheses.');
+    if (unit === 'scalar' && result.dimension) throw new Error('Use a unitless value; length and angle units are not accepted.');
     if (result.dimension === 'length²') throw new Error('The expression must produce a length, not a squared length: take its sqrt(...).');
     if (result.explicitUnits && result.dimension !== expectedDimension)
       throw new Error(

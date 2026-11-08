@@ -6,7 +6,7 @@ import { CamPage } from '@/cam/CamPage';
 import { NoPartsToMill } from '@/cam/NoPartsToMill';
 import { useBoardPlans, useCamJob, useCamModel, useSaveCamJob } from '@/cam/camQueries';
 import type { BoardRequest, CamPartInfo, OpSummary, PlanResult, ReleaseProgram } from '@/cam/camTypes';
-import type { FlipRegistration } from '@wbcnc/cam';
+import type { FlipRegistration, LibraryTool } from '@wbcnc/cam';
 import { missingParts, useJobBoards, type MissingPart } from '@/cam/useJobBoards';
 import { boardSizeProblem, layoutBlock, loose, planBlock, releaseProblems, unstable } from '@/cam/boardBlock';
 import { boardGeometryKey } from '@/cam/cadDesign';
@@ -249,7 +249,11 @@ function PlanStep() {
             </span>
           </Hint>
           <RehearsalButton job={job} boards={boards.map(b => freezeRehearsalBoard(b.board, b.nest))} ready={allReady} inBar />
-          <BitChip value={settings} onChange={savePlan} onOpen={openSettings} />
+          {job.carving ? (
+            <CarvingBitsChip jobId={job.id} vBit={job.carving.vBit} clear={job.carving.clearWithFlat ? settings.bit : undefined} />
+          ) : (
+            <BitChip value={settings} onChange={savePlan} onOpen={openSettings} />
+          )}
           <DropdownMenu>
             <Hint text={`More actions for board ${current.board.name}: show it on the machine on its own, download its G-code.`}>
               <DropdownMenuTrigger asChild>
@@ -810,5 +814,26 @@ function Shell({
       )}
       {children}
     </CamPage>
+  );
+}
+
+/**
+ * A carving's bits in the bar: its V-bit, and the job's flat bit when it clears flat bottoms first. Both are chosen on the
+ * Carve step, so the chip goes there; the job's flat-bit chip would read as if the carving were cut with that bit alone.
+ */
+function CarvingBitsChip({ jobId, vBit, clear }: { jobId: string; vBit: LibraryTool; clear?: LibraryTool }) {
+  const name = vBit.name ?? `V-bit ⌀${vBit.diameter}`;
+  return (
+    <Hint text="The carving's bits, chosen on the Carve step: the V-bit carves; a flat bit, when asked, clears flat bottoms first.">
+      <Button asChild size="sm" variant="outline">
+        <Link
+          to="/cam/$jobId/carve"
+          params={{ jobId }}
+          aria-label={`Bits: ${name}${clear ? ` and ⌀${clear.diameter} flat` : ''}. Change them on the Carve step`}>
+          <span className="text-muted-foreground">Bits:</span> {name}
+          {clear && <span className="text-muted-foreground">+ ⌀{clear.diameter} flat</span>}
+        </Link>
+      </Button>
+    </Hint>
   );
 }
