@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cadStepReport,
   addCircle,
+  addLine,
+  createCadPart,
   addPartCut,
   assemblyReport,
   createCadDocument,
@@ -122,7 +125,7 @@ describe('a shelf housed in two sides', () => {
     const end = await holed(4);
     expect(end.parts.slice(0, 2).map(part => part.cuts?.length)).toEqual([undefined, 1]);
     expect(end.diagnostics.map(d => d.message)).toContain(
-      "Shelf isn't a plain block where it reaches into Left, so it can't be cut from it yet."
+      "Shelf isn't square-cornered and straight-sided where it reaches into Left, so it can't be cut from it yet."
     );
   });
 });
@@ -153,5 +156,132 @@ describe('shelves patterned up the carcass', () => {
     const names = cadPartsToCut(solved.document, solved.parts).find(entry => entry.part.partId === shelf)!.names;
     expect(names).toEqual(['Shelf', 'Middle shelf', 'Shelf 3', 'Shelf 4']);
     expect(parseCadDocument(JSON.parse(JSON.stringify(solved.document)))).toEqual(solved.document);
+  });
+});
+
+/** A flat part with this outline, its underside `z` up. */
+function outlined(name: string, outline: [number, number][], z: number): CadPart {
+  const part = {
+    ...createCadPart(name, 18),
+    placement: { position: [0, 0, z] as [number, number, number], rotation: [0, 0, 0, 1] as [number, number, number, number] },
+  };
+  outline.forEach(([x1, y1], i) => {
+    const [x2, y2] = outline[(i + 1) % outline.length]!;
+    part.sketch = addLine(part.sketch, { x1, y1, x2, y2 });
+  });
+  return part;
+}
+const boxes = (cuts: EvaluatedCadCut[] | undefined) =>
+  (cuts ?? []).map(cut => {
+    const xs = cut.outline.map(p => p.x),
+      ys = cut.outline.map(p => p.y);
+    return { x: [Math.min(...xs), Math.max(...xs)], y: [Math.min(...ys), Math.max(...ys)], depth: cut.to - cut.from, side: cut.side };
+  });
+
+describe('tools that only fill part of where they reach', () => {
+  const leg = () =>
+    outlined(
+      'Leg',
+      [
+        [0, 0],
+        [100, 0],
+        [100, 100],
+        [0, 100],
+      ],
+      0
+    );
+  const cut = async (tool: CadPart) => {
+    const target = leg();
+    const document = addPartCut({ ...createCadDocument(), parts: [target, tool] }, [tool.id], [target.id], { value: 0.5 }).document;
+    const solved = await solveCadDocument(document);
+    const report = cadStepReport(solved.document, solved.parts).find(step => step.kind === 'partCut');
+    const named = report?.kind === 'partCut' ? report.cuts.map(c => c.tool) : [];
+    return {
+      named,
+      cuts: boxes(solved.parts.find(part => part.partId === target.id)!.cuts),
+      messages: solved.diagnostics.filter(d => d.code === 'part-cut-unresolved').map(d => d.message),
+    };
+  };
+
+  it('cuts only the tenon of a shouldered rail, with the clearance round it', async () => {
+    // A rail lying across the leg's edge, 8 mm down into it, with a 30 mm tenon 20 mm wide; its shoulders stay outside.
+    const rail = outlined(
+      'Rail',
+      [
+        [100, 20],
+        [200, 20],
+        [200, 80],
+        [100, 80],
+        [100, 60],
+        [70, 60],
+        [70, 40],
+        [100, 40],
+      ],
+      10
+    );
+    const { cuts, messages } = await cut(rail);
+    expect(messages).toEqual([]);
+    expect(cuts).toEqual([{ x: [69.5, 100], y: [39.5, 60.5], depth: 8.5, side: 'top' }]);
+  });
+
+  it('cuts one slot per finger of a comb', async () => {
+    const comb = outlined(
+      'Comb',
+      [
+        [100, 0],
+        [200, 0],
+        [200, 100],
+        [100, 100],
+        [100, 80],
+        [80, 80],
+        [80, 60],
+        [100, 60],
+        [100, 30],
+        [80, 30],
+        [80, 10],
+        [100, 10],
+      ],
+      10
+    );
+    const { cuts, messages, named } = await cut(comb);
+    expect(messages).toEqual([]);
+    expect(named).toEqual(['Comb', 'Comb']);
+    expect(cuts).toEqual([
+      { x: [79.5, 100], y: [9.5, 30.5], depth: 8.5, side: 'top' },
+      { x: [79.5, 100], y: [59.5, 80.5], depth: 8.5, side: 'top' },
+    ]);
+  });
+
+  it('keeps an L-shaped reach in one piece, not widened where its rectangles meet', async () => {
+    // The rail's body reaches 20 mm over the leg too, and its tenon 30 mm.
+    const rail = outlined(
+      'Rail',
+      [
+        [80, 20],
+        [200, 20],
+        [200, 80],
+        [80, 80],
+        [80, 60],
+        [70, 60],
+        [70, 40],
+        [80, 40],
+      ],
+      10
+    );
+    const { cuts } = await cut(rail);
+    expect(cuts).toEqual([
+      { x: [79.5, 100], y: [19.5, 40], depth: 8.5, side: 'top' },
+      { x: [69.5, 100], y: [40, 60], depth: 8.5, side: 'top' },
+      { x: [79.5, 100], y: [60, 80.5], depth: 8.5, side: 'top' },
+    ]);
+  });
+
+  it('says only why a refused tool can’t cut, not that the step cuts nothing', async () => {
+    const round = createCadPart('Dowel', 18);
+    round.placement = { position: [0, 0, 10], rotation: [0, 0, 0, 1] };
+    round.sketch = addCircle(round.sketch, { x: 100, y: 50, radius: 10 });
+    const { cuts, messages } = await cut(round);
+    expect(cuts).toEqual([]);
+    expect(messages).toEqual(["Dowel isn't square-cornered and straight-sided where it reaches into Leg, so it can't be cut from it yet."]);
   });
 });
