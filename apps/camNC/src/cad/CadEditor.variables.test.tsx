@@ -1,4 +1,4 @@
-import { createPlateDocument, setCadVariable, type CadDimension, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { addCircle, cadCuts, createPlateDocument, setCadVariable, type CadDimension, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
@@ -32,11 +32,12 @@ function cupboard(): CadDocument {
 function setup(document: CadDocument) {
   ids.push(document.id);
   const change = vi.fn<(document: CadDocument) => void>();
-  render(
+  const result = render(
     <div style={{ height: 700 }}>
       <CadEditor document={document} onDraftChange={change} onFinish={vi.fn()} onCancel={vi.fn()} saveStatus="Saved" />
     </div>
   );
+  vi.spyOn(result.getByTestId('cad-canvas'), 'setPointerCapture').mockImplementation(() => {});
   return { last: () => change.mock.lastCall![0] };
 }
 const setWidth = (text: string) => {
@@ -58,5 +59,26 @@ describe('design variables in the editor', () => {
     expect(screen.getByRole('img', { name: /flip/ }).closest('button')!.textContent).toContain('Shelf');
     fireEvent.click(screen.getByRole('button', { name: /Shelf/ }));
     expect(await screen.findByText(/keeps its last good shape/)).toBeTruthy();
+  });
+
+  it('cuts a pocket to a depth that uses a variable, which then follows it', async () => {
+    let document = createPlateDocument({ width: 120, height: 80, thickness: 18 });
+    document.parts[0]!.sketch = addCircle(document.parts[0]!.sketch, { x: 60, y: 40, radius: 20 });
+    const housing = setCadVariable(document, { name: 'housing', expression: '6mm' });
+    if ('error' in housing) throw new Error(housing.error);
+    document = housing.document;
+    const ui = setup(document);
+    const canvas = screen.getByTestId('cad-canvas') as unknown as SVGSVGElement;
+    const point = new DOMPoint(70, -48).matrixTransform(canvas.getScreenCTM()!);
+    fireEvent.pointerDown(canvas, { clientX: point.x, clientY: point.y, button: 0, pointerId: 1 });
+    fireEvent.pointerUp(canvas, { clientX: point.x, clientY: point.y, button: 0, pointerId: 1 });
+    const depth = await screen.findByLabelText('Depth in mm');
+    fireEvent.change(depth, { target: { value: 'housing' } });
+    fireEvent.keyDown(depth, { key: 'Enter' });
+    await waitFor(() => expect(cadCuts(ui.last().parts[0]!)[0]).toMatchObject({ depth: 6, depthExpression: 'housing' }));
+    const value = screen.getByRole('textbox', { name: 'Value of housing' });
+    fireEvent.change(value, { target: { value: '9mm' } });
+    fireEvent.keyDown(value, { key: 'Enter' });
+    await waitFor(() => expect(cadCuts(ui.last().parts[0]!)[0]).toMatchObject({ depth: 9, depthExpression: 'housing' }));
   });
 });

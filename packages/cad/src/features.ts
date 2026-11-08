@@ -45,16 +45,25 @@ export function addFaceSketch(document: CadDocument, partId: string, on: CadFace
 }
 
 /** Sets the depth of a region's cut, adding the cut if it has none. A region has at most one cut. */
-export function setCutDepth(document: CadDocument, partId: string, sketchId: string, regionId: string, depth: CadCutDepth): CadDocument {
+export function setCutDepth(
+  document: CadDocument,
+  partId: string,
+  sketchId: string,
+  regionId: string,
+  depth: CadCutDepth,
+  /** The depth as typed, when it uses design variables. */
+  depthExpression?: string
+): CadDocument {
+  const typed = depth !== 'through' && depthExpression ? { depthExpression } : {};
   return editPart(document, partId, features =>
     features.some(f => f.type === 'cut' && f.sketchId === sketchId && f.regionId === regionId)
       ? features.map(f => {
           if (f.type !== 'cut' || f.sketchId !== sketchId || f.regionId !== regionId) return f;
           // Setting a depth means the cut is wanted, so it comes back on.
-          const { suppressed: _suppressed, ...cut } = f;
-          return { ...cut, depth };
+          const { suppressed: _suppressed, depthExpression: _typed, ...cut } = f;
+          return { ...cut, depth, ...typed };
         })
-      : [...features, { type: 'cut', id: newCadId(), sketchId, regionId, depth }]
+      : [...features, { type: 'cut', id: newCadId(), sketchId, regionId, depth, ...typed }]
   );
 }
 

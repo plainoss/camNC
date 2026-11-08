@@ -1,6 +1,6 @@
 import { dimensionValueError } from './dimensionValues';
 import { newCadId } from './document';
-import type { CadConstraint, CadDiagnostic, CadDocument, CadPart, CadSketch, CadVariable } from './types';
+import type { CadConstraint, CadCut, CadDiagnostic, CadDocument, CadPart, CadSketch, CadVariable } from './types';
 import {
   cadExpressionNames,
   cadVariableNameError,
@@ -93,6 +93,31 @@ function thicknessOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
     : { error: `Thickness must be between ${CAD_THICKNESS_RANGE.min} and ${CAD_THICKNESS_RANGE.max} mm.` };
 }
 
+const kAxes = ['x', 'y', 'z'] as const;
+
+/** Each position axis that uses a variable, worked out. */
+function positionOutcomes(part: CadPart, scope: CadValueScope): ({ axis: 'x' | 'y' | 'z'; expression: string } & Outcome)[] {
+  return (part.placement?.positionExpressions ?? []).flatMap((expression, index) => {
+    if (!usesVariables(expression ?? undefined)) return [];
+    const parsed = parseCadValue(expression!, { unit: 'mm', variables: scope });
+    return [{ axis: kAxes[index]!, expression: expression!, ...('error' in parsed ? { error: parsed.error } : { value: parsed.value }) }];
+  });
+}
+
+function depthOutcome(cut: CadCut, scope: CadValueScope): Outcome | null {
+  if (!usesVariables(cut.depthExpression)) return null;
+  const parsed = parseCadValue(cut.depthExpression, { unit: 'mm', variables: scope });
+  if ('error' in parsed) return parsed;
+  return parsed.value < 0 ? { error: 'A cut can’t be less than nothing deep.' } : parsed;
+}
+
+/** The part with each cut passed through `edit`, keeping objects that didn't change. */
+function mapCuts(part: CadPart, edit: (cut: CadCut) => CadCut): CadPart {
+  if (!part.features?.some(feature => feature.type === 'cut')) return part;
+  const features = part.features.map(feature => (feature.type === 'cut' ? edit(feature) : feature));
+  return features.every((feature, index) => feature === part.features![index]) ? part : { ...part, features };
+}
+
 /** The part with each of its sketches passed through `edit`, keeping objects that didn't change. */
 function mapSketches(part: CadPart, edit: (sketch: CadSketch) => CadSketch): CadPart {
   const sketch = edit(part.sketch);
@@ -119,7 +144,17 @@ export function applyCadVariables(document: CadDocument): CadDocument {
   const { scope } = cadVariableValues(document);
   const parts = document.parts.map(part => {
     const thickness = thicknessOutcome(part, scope);
-    const sized = thickness && 'value' in thickness && thickness.value !== part.thickness ? { ...part, thickness: thickness.value } : part;
+    let sized = thickness && 'value' in thickness && thickness.value !== part.thickness ? { ...part, thickness: thickness.value } : part;
+    const moves = positionOutcomes(sized, scope);
+    if (moves.some(move => 'value' in move && move.value !== sized.placement!.position[kAxes.indexOf(move.axis)])) {
+      const position = [...sized.placement!.position] as [number, number, number];
+      for (const move of moves) if ('value' in move) position[kAxes.indexOf(move.axis)] = move.value;
+      sized = { ...sized, placement: { ...sized.placement!, position } };
+    }
+    sized = mapCuts(sized, cut => {
+      const outcome = depthOutcome(cut, scope);
+      return outcome && 'value' in outcome && outcome.value !== cut.depth ? { ...cut, depth: outcome.value } : cut;
+    });
     return mapSketches(sized, sketch =>
       mapConstraints(sketch, constraint => {
         const outcome = dimensionOutcome(constraint, scope);
@@ -147,6 +182,24 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
         partId: part.id,
         message: `Thickness ${part.thicknessExpression}: ${thickness.error}`,
       });
+    for (const feature of part.features ?? []) {
+      const outcome = feature.type === 'cut' ? depthOutcome(feature, scope) : null;
+      if (outcome && 'error' in outcome)
+        problems.push({
+          code: 'variable-value',
+          severity: 'error',
+          partId: part.id,
+          message: `Cut depth ${(feature as CadCut).depthExpression}: ${outcome.error}`,
+        });
+    }
+    for (const move of positionOutcomes(part, scope))
+      if ('error' in move)
+        problems.push({
+          code: 'variable-value',
+          severity: 'error',
+          partId: part.id,
+          message: `Position ${move.axis} ${move.expression}: ${move.error}`,
+        });
     for (const sketch of [part.sketch, ...(part.features ?? []).flatMap(feature => (feature.type === 'sketch' ? [feature.sketch] : []))])
       for (const constraint of sketch.constraints) {
         const outcome = dimensionOutcome(constraint, scope);
@@ -163,16 +216,40 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
   return problems;
 }
 
+function withPlacementExpressions(part: CadPart, edit: (expression: string) => string): CadPart {
+  const expressions = part.placement?.positionExpressions;
+  if (!expressions) return part;
+  return {
+    ...part,
+    placement: {
+      ...part.placement!,
+      positionExpressions: expressions.map(expression => (expression ? edit(expression) : expression)) as [
+        string | null,
+        string | null,
+        string | null,
+      ],
+    },
+  };
+}
+
 /** Every expression in the document, rewritten by `edit`. */
 function mapExpressions(document: CadDocument, edit: (expression: string) => string): CadDocument {
   return {
     ...document,
     variables: document.variables?.map(variable => ({ ...variable, expression: edit(variable.expression) })),
     parts: document.parts.map(part =>
-      mapSketches(part.thicknessExpression ? { ...part, thicknessExpression: edit(part.thicknessExpression) } : part, sketch =>
-        mapConstraints(sketch, constraint =>
-          'expression' in constraint && constraint.expression ? { ...constraint, expression: edit(constraint.expression) } : constraint
-        )
+      mapSketches(
+        mapCuts(
+          withPlacementExpressions(
+            part.thicknessExpression ? { ...part, thicknessExpression: edit(part.thicknessExpression) } : part,
+            edit
+          ),
+          cut => (cut.depthExpression ? { ...cut, depthExpression: edit(cut.depthExpression) } : cut)
+        ),
+        sketch =>
+          mapConstraints(sketch, constraint =>
+            'expression' in constraint && constraint.expression ? { ...constraint, expression: edit(constraint.expression) } : constraint
+          )
       )
     ),
   };

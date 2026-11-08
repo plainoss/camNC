@@ -151,13 +151,13 @@ function ModelStep() {
         <main className="relative flex min-h-[320px] flex-col bg-muted/30">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
             <div role="group" aria-label="View" className="flex shrink-0 overflow-hidden rounded-md border">
-              {(['assembled', 'flat'] as ModelView[]).map(v => (
+              {(['assembled', 'exploded', 'flat'] as ModelView[]).map(v => (
                 <Hint key={v} text={kViewHints[v]} side="bottom">
                   <button
                     aria-pressed={view === v}
                     onClick={() => setView(v)}
                     className={cn('h-8 whitespace-nowrap px-3 text-sm', view === v ? 'bg-muted font-medium' : 'text-muted-foreground')}>
-                    {v === 'assembled' ? 'As modeled' : 'Laid flat'}
+                    {kViewNames[v]}
                   </button>
                 </Hint>
               ))}
@@ -184,8 +184,10 @@ function ModelStep() {
   );
 }
 
+const kViewNames: Record<ModelView, string> = { assembled: 'As modeled', exploded: 'Exploded', flat: 'Laid flat' };
 const kViewHints: Record<ModelView, string> = {
   assembled: 'The parts where they sit in your model.',
+  exploded: 'The parts pulled apart from the middle, so you can see how they fit together.',
   flat: 'Each part turned so its machined side faces up, the way it lies on the board.',
 };
 

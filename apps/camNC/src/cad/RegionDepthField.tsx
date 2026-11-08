@@ -1,41 +1,52 @@
-import type { CadCutDepth } from '@wbcnc/cad';
+import type { CadCutDepth, CadValueScope } from '@wbcnc/cad';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { parseCadValue } from './valueExpressions';
 
 /** Sets how deep one region is cut. Every choice applies at once, and Escape leaves it as it was. */
 export function RegionDepthField({
   style,
   depth,
+  expression,
   thickness,
+  variables,
   onChoose,
   onClose,
 }: {
   style?: CSSProperties;
   depth: CadCutDepth;
+  /** The depth as typed, shown in place of the number. */
+  expression?: string;
   thickness: number;
-  onChoose: (depth: CadCutDepth) => void;
+  /** Design variables the depth may use. */
+  variables?: CadValueScope;
+  /** The depth, and the text typed for it when that uses design variables. */
+  onChoose: (depth: CadCutDepth, expression?: string) => void;
   onClose: () => void;
 }) {
-  const [text, setText] = useState(String(depth === 'through' ? thickness : depth));
+  const [text, setText] = useState(expression ?? String(depth === 'through' ? thickness : depth));
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     input.current?.focus();
     input.current?.select();
   }, []);
-  const value = Number(text),
-    valid = text.trim() !== '' && Number.isFinite(value) && value >= 0;
+  const parsed = parseCadValue(text, { unit: 'mm', variables }),
+    valid = 'value' in parsed && parsed.value >= 0,
+    value = 'value' in parsed ? parsed.value : NaN;
   return (
     <div className="cad-region-depth" style={style} role="group" aria-label="Cut depth">
       <input
         ref={input}
         aria-label="Depth in mm"
         aria-invalid={!valid}
-        inputMode="decimal"
+        title={'error' in parsed ? parsed.error : undefined}
+        spellCheck={false}
         value={text}
         onChange={event => setText(event.target.value)}
         onKeyDown={event => {
           event.stopPropagation();
           if (event.key === 'Escape') onClose();
-          if (event.key === 'Enter' && valid) onChoose(value >= thickness ? 'through' : value);
+          if (event.key === 'Enter' && valid)
+            onChoose(value >= thickness ? 'through' : value, 'value' in parsed ? parsed.expression : undefined);
         }}
       />
       <span className="cad-muted">mm</span>

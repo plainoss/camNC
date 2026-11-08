@@ -101,8 +101,15 @@ export const cutRegionPath = (region: CadSketchRegion) =>
 export const depthLabel = ({ depth }: CutRegion) => (depth === 'through' ? 'Through' : depth === 0 ? 'No cut' : `${depth} mm`);
 
 /** A loop that's cut through, or a face region left uncut, needs no feature: it's the default. */
-export function withRegionDepth(document: CadDocument, partId: string, entry: CutRegion, depth: CadCutDepth): CadDocument {
-  if (depth !== (entry.inProfile ? 'through' : 0)) return setCutDepth(document, partId, entry.sketchId, entry.region.id, depth);
+export function withRegionDepth(
+  document: CadDocument,
+  partId: string,
+  entry: CutRegion,
+  depth: CadCutDepth,
+  /** The depth as typed, when it uses design variables. */
+  expression?: string
+): CadDocument {
+  if (depth !== (entry.inProfile ? 'through' : 0)) return setCutDepth(document, partId, entry.sketchId, entry.region.id, depth, expression);
   return entry.cut ? removeCadFeature(document, partId, entry.cut.id) : document;
 }
 

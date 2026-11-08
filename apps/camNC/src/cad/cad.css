@@ -285,7 +285,7 @@
   max-width: 115px;
 }
 .cad-number-field input {
-  width: 84px;
+  width: 116px;
 }
 .cad-divider {
   border-bottom: 1px solid #dde4ed;
@@ -395,6 +395,51 @@
 }
 .cad-part-view-tools button:disabled {
   color: #8d9aa8;
+}
+.cad-assembly-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  right: 12px;
+}
+.cad-assembly-tools [role='group'] {
+  display: flex;
+}
+.cad-assembly-tools [role='group'] button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.cad-assembly-tools [role='group'] button:first-child {
+  border-radius: 6px 0 0 6px;
+  margin-left: 0;
+}
+.cad-assembly-tools [role='group'] button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.cad-assembly-tools button[aria-pressed='true'] {
+  background: #ede9fe;
+  border-color: #8b5cf6;
+}
+.cad-assembly-positions {
+  display: flex;
+  gap: 6px;
+}
+.cad-assembly-position {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #52647d;
+}
+.cad-assembly-position input {
+  width: 116px;
+  padding: 4px 6px;
+  border: 1px solid #b9c4cd;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.cad-assembly-position input[aria-invalid='true'] {
+  border-color: #ac2929;
 }
 .cad-part-view > p {
   position: absolute;

@@ -5,14 +5,22 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { modelGeometry } from './modelGeometry';
-import { centerAssembled, layoutFlat } from './layoutFlat';
+import { snapToFace } from './faceSnap';
+import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
 import { kOrbitDamping } from '@/lib/orbitDamping';
 
-export type ModelView = 'assembled' | 'flat';
+export type ModelView = 'assembled' | 'exploded' | 'flat';
+/** A face clicked on a part, in the model's own space: its nearest corner or its middle, and the way it faces. */
+export interface ModelFacePick {
+  partId: string;
+  point: [number, number, number];
+  normal: [number, number, number];
+}
 
 const kWood = '#c9a477';
 const kSelected = '#8b5cf6';
 const kOff = '#71717a';
+const kClash = '#dc2626';
 function Body({
   mesh,
   matrix,
@@ -24,9 +32,10 @@ function Body({
   matrix: THREE.Matrix4 | null;
   color: string;
   opacity: number;
-  onSelect: () => void;
+  onSelect: (e: ThreeEvent<MouseEvent>) => void;
 }) {
   const geometry = useMemo(() => modelGeometry(mesh), [mesh]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
   return (
     <mesh
       geometry={geometry}
@@ -34,7 +43,8 @@ function Body({
       matrix={matrix ?? new THREE.Matrix4()}
       onClick={(e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
-        onSelect();
+        // A drag that ended here was an orbit, not a click.
+        if (e.delta <= 4) onSelect(e);
       }}>
       <meshStandardMaterial vertexColors color={color} roughness={0.8} transparent={opacity < 1} opacity={opacity} />
     </mesh>
@@ -74,27 +84,52 @@ function boundsOf(meshes: BodyMesh[], matrices: THREE.Matrix4[]) {
   return box;
 }
 
-/** The model in 3D: as designed, or every part laid flat with its machined side up. Click a part to select it. */
+/**
+ * The model in 3D: as designed, pulled apart, or every part laid flat with its machined side up. Click a part to select
+ * it, or with `onPickFace`, a face of it.
+ */
 export function ModelViewport({
   meshes,
   parts,
   view,
   selectedId,
   milled,
+  highlightIds = [],
+  warnIds = [],
   onSelect,
+  onPickFace,
+  onMissed,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
   view: ModelView;
   selectedId: string | null;
   milled: (partId: string) => boolean;
+  /** Parts drawn as picked, besides the selected one. */
+  highlightIds?: string[];
+  /** Parts drawn as wrong, such as ones sharing space with another. */
+  warnIds?: string[];
   onSelect: (partId: string) => void;
+  onPickFace?: (pick: ModelFacePick) => void;
+  onMissed?: () => void;
 }) {
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
   const assembled = useMemo(() => centerAssembled(meshes), [meshes]);
-  const box = useMemo(() => boundsOf(meshes, view === 'flat' ? flat : meshes.map(() => assembled)), [meshes, view, flat, assembled]);
+  const exploded = useMemo(() => explodeAssembled(meshes), [meshes]);
+  const matrices = useMemo(
+    () => (view === 'flat' ? flat : view === 'exploded' ? exploded : meshes.map(() => assembled)),
+    [view, flat, exploded, assembled, meshes]
+  );
+  const box = useMemo(() => boundsOf(meshes, matrices), [meshes, matrices]);
+  const pick = (mesh: BodyMesh, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
+    if (!onPickFace || !e.face) return onSelect(mesh.partId);
+    // Back from where the view drew it to where the part sits in the model.
+    const point = e.point.clone().applyMatrix4(matrix.clone().invert()),
+      normal = e.face.normal.clone().normalize().toArray();
+    onPickFace({ partId: mesh.partId, point: snapToFace(mesh.positions, point.toArray(), normal), normal });
+  };
   return (
-    <Canvas camera={{ fov: 30 }} dpr={[1, 2]}>
+    <Canvas camera={{ fov: 30 }} dpr={[1, 2]} onPointerMissed={() => onMissed?.()}>
       <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
       <directionalLight position={[300, -500, 800]} intensity={1.8} />
       <directionalLight position={[-400, 300, 200]} intensity={0.4} />
@@ -104,10 +139,18 @@ export function ModelViewport({
           <Body
             key={i}
             mesh={m}
-            matrix={view === 'flat' ? flat[i] : assembled}
-            color={m.partId === selectedId ? kSelected : milled(m.partId) ? kWood : kOff}
+            matrix={matrices[i]!}
+            color={
+              m.partId === selectedId || highlightIds.includes(m.partId)
+                ? kSelected
+                : warnIds.includes(m.partId)
+                  ? kClash
+                  : milled(m.partId)
+                    ? kWood
+                    : kOff
+            }
             opacity={milled(m.partId) ? 1 : 0.35}
-            onSelect={() => onSelect(m.partId)}
+            onSelect={e => pick(m, matrices[i]!, e)}
           />
         ))}
       </group>

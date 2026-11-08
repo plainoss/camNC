@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addCircle,
   addConstraint,
+  cadCuts,
+  evaluateCadDocument,
+  polygonArea,
+  setCutDepth,
+  sketchRegions,
   applyCadVariables,
   cadVariableProblems,
   cadVariableValues,
@@ -56,6 +62,14 @@ describe('expressions with variables', () => {
     expect(parseCadValue('2width', { variables: scope })).toEqual({ error: 'Put * between the number and width.' });
     expect(parseCadValue('width mm', { variables: scope })).toEqual({ error: 'This value already has a unit.' });
     expect(parseCadValue('width', { unit: 'deg', variables: scope })).toMatchObject({ error: expect.stringContaining('angle') });
+  });
+
+  it('reads a plain number added to a variable in the field’s own unit, but not one added to a typed unit', () => {
+    expect(parseCadValue('width + 10', { variables: scope })).toEqual({ value: 610, expression: 'width + 10' });
+    expect(parseCadValue('10 + width - 2*board', { variables: scope })).toMatchObject({ value: 574 });
+    expect(parseCadValue('width/2 - 3', { variables: scope })).toMatchObject({ value: 297 });
+    expect(parseCadValue('2 + 1in + width', { variables: scope })).toHaveProperty('error');
+    expect(parseCadValue('count + 1', { variables: scope })).toMatchObject({ value: 4 });
   });
 });
 
@@ -171,5 +185,39 @@ describe('design variables', () => {
     document = variable(variable(document, 'width', '600mm'), 'board', '18mm');
     expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(applyCadVariables(document));
     expect(() => parseCadDocument({ ...document, variables: [{ id: 'v', name: 'mm', expression: '1' }] })).toThrow('variable name');
+  });
+
+  it('moves a placed part whose position uses a variable, and renames carry into it', () => {
+    let document: CadDocument = { ...createCadDocument(), parts: [plate('Right side', 'depth')] };
+    document.parts[0]!.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1], positionExpressions: ['width - board', null, null] };
+    document = variable(variable(variable(document, 'board', '18mm'), 'depth', '300mm'), 'width', '600mm');
+    expect(document.parts[0]!.placement!.position).toEqual([582, 0, 0]);
+    const width = document.variables!.find(v => v.name === 'width')!.id;
+    document = variable(document, 'carcass', '800mm', width);
+    expect(document.parts[0]!.placement).toMatchObject({ position: [782, 0, 0], positionExpressions: ['carcass - board', null, null] });
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document))).parts[0]!.placement).toEqual(document.parts[0]!.placement);
+    const board = document.variables!.find(v => v.name === 'board')!.id;
+    document = variable(document, 'board', '5deg', board);
+    expect(document.parts[0]!.placement!.position).toEqual([782, 0, 0]);
+    expect(cadVariableProblems(document).map(p => p.message)).toContain(
+      'Position x carcass - board: Put units on each added value, or put the whole sum in parentheses before its unit.'
+    );
+  });
+
+  it('cuts to a depth that uses a variable, and says when it can’t', () => {
+    let document = createPlateDocument({ width: 200, height: 100, thickness: 18 });
+    const part = document.parts[0]!;
+    part.sketch = addCircle(part.sketch, { x: 100, y: 50, radius: 20 });
+    const hole = sketchRegions(part.sketch).find(region => Math.abs(polygonArea(region.points)) < 2000)!;
+    document = variable(document, 'housing', '6mm');
+    document = setCutDepth(document, part.id, part.sketch.id, hole.id, 6, 'housing');
+    const id = document.variables![0]!.id;
+    document = variable(document, 'housing', '8mm', id);
+    expect(cadCuts(document.parts[0]!)[0]).toMatchObject({ depth: 8, depthExpression: 'housing' });
+    expect(evaluateCadDocument(document).parts[0]!.cuts![0]).toMatchObject({ to: 8 });
+    document = variable(document, 'housing', '-2mm', id);
+    expect(cadCuts(document.parts[0]!)[0]!.depth).toBe(8);
+    expect(cadVariableProblems(document).map(p => p.message)).toEqual(['Cut depth housing: A cut can’t be less than nothing deep.']);
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
   });
 });

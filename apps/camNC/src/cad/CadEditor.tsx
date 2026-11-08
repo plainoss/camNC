@@ -78,6 +78,7 @@ import {
   withFeatureVersion,
   type CadPoint,
   cadVariableProblems,
+  setPartPlacements,
   cadVariableScope,
 } from '@wbcnc/cad';
 import {
@@ -248,6 +249,7 @@ const entityPointIds = (entity: CadEntity): string[] => {
   return curvePointIds(entity);
 };
 const PartView3D = lazy(() => import('./PartView3D'));
+const AssemblyView = lazy(() => import('./AssemblyView'));
 /** A face sketch is drawn over the part's outline, so a part needs one first. */
 const hasOutline = (document: CadDocument, partId: string) => !!evaluateCadPart(document.parts.find(part => part.id === partId)!).part;
 function replacePart(document: CadDocument, partId: string, change: (part: CadPart) => CadPart): CadDocument {
@@ -416,6 +418,7 @@ export function CadEditor({
   const [selectionBox, setSelectionBox] = useState<CadSelectionBox | null>(null);
   const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
   const [show3D, setShow3D] = useState(!!startIn3D);
+  const [showAssembly, setShowAssembly] = useState(false);
   const sketchOnly = !!faceSketch;
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
@@ -3417,7 +3420,10 @@ export function CadEditor({
                       if (prepared && hasOutline(prepared, part.id)) onEditFaceSketch(prepared, part.id, sketchId);
                     })
                   }
-                  onCutDepth={(cut, depth) => commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth))}
+                  variables={variableScope}
+                  onCutDepth={(cut, depth, expression) =>
+                    commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth, expression))
+                  }
                   onMoveToTop={sketchId => commit(moveFaceSketch(documentRef.current, part.id, sketchId, 'top'))}
                   onNew={onEditFaceSketch && (face => sketchOnFace(face))}
                 />
@@ -3477,12 +3483,31 @@ export function CadEditor({
             </p>
           )}
           <div className="cad-canvas-bar">
-            <span>
-              <strong>{faceSketch?.below ? 'BOTTOM' : 'TOP'}</strong> · {part?.name ?? 'Sketch'}{' '}
-              <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
-            </span>
+            {showAssembly ? (
+              <span>
+                <strong>ASSEMBLY</strong> · {doc.parts.length === 1 ? 'one part' : `${doc.parts.length} parts`}
+              </span>
+            ) : (
+              <span>
+                <strong>{faceSketch?.below ? 'BOTTOM' : 'TOP'}</strong> · {part?.name ?? 'Sketch'}{' '}
+                <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
+              </span>
+            )}
             <div>
               {!faceSketch && (
+                <button
+                  type="button"
+                  aria-pressed={showAssembly}
+                  disabled={!doc.parts.length}
+                  onClick={() => {
+                    if (!showAssembly) chooseTool('select');
+                    else requestAnimationFrame(() => svg.current?.focus());
+                    setShowAssembly(!showAssembly);
+                  }}>
+                  Assembly
+                </button>
+              )}
+              {!faceSketch && !showAssembly && (
                 <button
                   type="button"
                   aria-pressed={show3D}
@@ -3496,7 +3521,7 @@ export function CadEditor({
                   3D
                 </button>
               )}
-              {!show3D && (
+              {!show3D && !showAssembly && (
                 <>
                   <button type="button" onClick={() => fit()}>
                     Fit <kbd>F</kbd>
@@ -3517,12 +3542,26 @@ export function CadEditor({
               )}
             </div>
           </div>
-          {show3D && partHasOutline && part && (
+          {showAssembly && (
+            <Suspense fallback={<div className="cad-part-view" />}>
+              <AssemblyView
+                document={doc}
+                selectedId={part?.id ?? null}
+                onSelect={id => {
+                  setPartId(id);
+                  setSelected([]);
+                }}
+                onPlace={changes => commit(setPartPlacements(documentRef.current, changes))}
+              />
+            </Suspense>
+          )}
+          {!showAssembly && show3D && partHasOutline && part && (
             <Suspense fallback={<div className="cad-part-view" />}>
               <PartView3D
                 key={part.id}
                 part={part}
-                onChoose={(entry, depth) => commit(withRegionDepth(documentRef.current, part.id, entry, depth))}
+                variables={variableScope}
+                onChoose={(entry, depth, expression) => commit(withRegionDepth(documentRef.current, part.id, entry, depth, expression))}
                 onSketchFace={onEditFaceSketch && sketchOnFace}
               />
             </Suspense>
@@ -3530,7 +3569,7 @@ export function CadEditor({
           <svg
             ref={svg}
             className={`cad-canvas cad-tool-${tool}`}
-            style={show3D && partHasOutline ? { display: 'none' } : undefined}
+            style={showAssembly || (show3D && partHasOutline) ? { display: 'none' } : undefined}
             data-testid="cad-canvas"
             role="img"
             aria-label="2D sketch drawing canvas"
@@ -3992,13 +4031,15 @@ export function CadEditor({
               key={regionField.entry.region.id}
               style={valuePosition(regionField.anchor, 280)}
               depth={regionField.entry.depth}
+              expression={regionField.entry.cut?.depthExpression}
               thickness={part.thickness - regionField.entry.from}
+              variables={variableScope}
               onClose={() => {
                 setRegionField(null);
                 svg.current?.focus();
               }}
-              onChoose={depth => {
-                const next = withRegionDepth(documentRef.current, part.id, regionField.entry, depth);
+              onChoose={(depth, expression) => {
+                const next = withRegionDepth(documentRef.current, part.id, regionField.entry, depth, expression);
                 if (next !== documentRef.current) commit(next);
                 setRegionField(null);
                 svg.current?.focus();
