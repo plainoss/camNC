@@ -81,6 +81,47 @@ In #222, #223 and #224:
 - A pattern of a groove that runs off the part now cuts every copy.
 - CAM cuts a counterbore barely wider than its screw hole, using the hole's space.
 
+## The third run, in the Part Studio
+
+Fresh agents built the same nine pieces again from the README, now drawing each part on a
+plane or another part's face and cutting joints with `cutParts`. They then changed each
+piece's board thickness and checked that the joints still fit.
+
+| Piece           |   Lines, runs 1 / 2 / 3 | Check runs, run 3 |
+| --------------- | ----------------------: | ----------------: |
+| Bookshelf       |            73 / 61 / 56 |                 1 |
+| Kitchen cabinet |         112 / 119 / 106 |                 3 |
+| Nightstand      |         241 / 201 / 178 |                 1 |
+| Wardrobe door   |            62 / 63 / 62 |                 2 |
+| Plant stand     |          112 / 125 / 55 |                 6 |
+| Stool           |         238 / 195 / 169 |                 5 |
+| Wall shelf      |          237 / 160 / 90 |                 2 |
+| Desk organizer  |         244 / 217 / 123 |                 2 |
+| Coat rack       |           181 / 84 / 82 |                 3 |
+| **Total**       | **1,500 / 1,225 / 921** |            **25** |
+
+All nine passed with no collisions, and the joints of all nine still fit after the
+thickness change, against one of nine in the second run. Housings, dados, rebates and
+grooves cut by the parts that fit them followed on their own. The rest followed because
+the agents wrote them as expressions.
+
+What still took hand work, or went wrong:
+
+- **Faces after `inward`.** A door drawn `inward` on the front plane still has its `top`
+  at the sketch plane, its show face. The agent put the hinge cups there and every check
+  passed. Picking the face to sketch on by direction would have caught it.
+- **Laps and fingers.** Cross-laps, half-laps and box joints were drawn into outlines by
+  hand, and a finger count can't follow a variable.
+- **Shouldered tenons.** `cutParts` refuses a tool that isn't a plain block where it
+  reaches in, so every mortise for a shouldered tenon was drawn by hand. The step then
+  warns that it cuts nothing while the same report shows the collisions.
+- **Copies.** `copy()` returns nothing to use as a tool, and a plain copy of a housed side
+  carried its housing on the outer face until it was made a mirrored copy.
+- **Expressions.** No `floor`, `sqrt` or squared lengths. A cut whose depth reaches zero
+  after a change disappears silently.
+- **Report.** Cut sizes include the dogbones (15.93 for a 15 mm dado), underside circles
+  measure 34.99, and through cuts drawn in a sketch don't count under `holes`.
+
 ## What works now
 
 - **Parts and cuts.** Profiles with holes, pockets on the top, the underside or a
