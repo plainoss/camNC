@@ -1,5 +1,11 @@
 import {
   cadFaceSketches,
+  cadVariableScope,
+  cadSketchRegions,
+  patternMaster,
+  polygonArea,
+  constraintEntityIds,
+  parseCadValue,
   assemblyReport,
   cadStepReport,
   cadPartsToCut,
@@ -18,16 +24,20 @@ import {
 } from '@wbcnc/cad';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
+import { isEdgeNotch } from './notch';
+
 export interface CadExpectation {
   /** Width and height of the outline, in mm. */
-  size?: readonly [number, number];
-  thickness?: number;
+  size?: readonly [number | string, number | string];
+  thickness?: number | string;
   /** Profile through-holes and explicit through cuts, each pattern copy counted once. */
   holes?: number;
+  /** Through cuts that touch or cross the part outline. */
+  notches?: number;
   /** Cuts that stop short of going through, each counted on its own however CAM groups them. */
   pockets?: number;
   /** Every cut's floor, in mm below the top or underside, in feature order. */
-  depths?: readonly number[];
+  depths?: readonly (number | string)[];
   /** Free movement left across all this part's sketches. Use 0 for a fully constrained part. */
   freedom?: number;
   /** mm, default 0.01. */
@@ -51,6 +61,8 @@ export interface CadReportPart {
   /** Absent when the outline isn't a valid closed profile. */
   outline?: { at: number[]; size: number[] };
   holes?: number;
+  /** Through cuts that touch or cross the part outline. */
+  notches?: number;
   /** A cut's box as drawn; `relieved` is its size with the bones in its corners, when they make it bigger. */
   cuts: {
     ref: string;
@@ -69,6 +81,7 @@ export interface CadReportPart {
     status: string;
     entities: CadReportEntity[];
     constraints: number;
+    patterns?: { ref: string; copies: number }[];
   }[];
   /** Features CAM received. */
   cam?: { pockets: number; throughHoles: number; undersidePockets?: number };
@@ -245,22 +258,35 @@ function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof pr
   };
 }
 
-function checkExpectation(want: CadExpectation, part: CadReportPart, freedom: number): string[] {
+function checkExpectation(want: CadExpectation, part: CadReportPart, freedom: number, document: CadDocument): string[] {
   const tolerance = want.tolerance ?? 0.01;
   const close = (a: number, b: number) => Math.abs(a - b) <= tolerance;
   const failures: string[] = [];
+  const value = (input: number | string, field: string): number => {
+    if (typeof input === 'number') return input;
+    const parsed = parseCadValue(input, { unit: 'mm', variables: cadVariableScope(document) });
+    if ('error' in parsed) {
+      failures.push(`${field}: invalid expression "${input}": ${parsed.error}`);
+      return NaN;
+    }
+    return parsed.value;
+  };
+  const wantedSize = want.size?.map(input => value(input, 'size'));
+  const thickness = want.thickness === undefined ? undefined : value(want.thickness, 'thickness');
+  const depths = want.depths?.map(input => value(input, 'depths'));
   const size = part.outline?.size;
-  if (want.size && !(size && close(size[0]!, want.size[0]) && close(size[1]!, want.size[1])))
+  if (want.size && !(size && close(size[0]!, wantedSize![0]!) && close(size[1]!, wantedSize![1]!)))
     failures.push(`size: wanted ${want.size.join(' × ')}, got ${size?.join(' × ') ?? 'no outline'}`);
-  if (want.thickness !== undefined && !close(part.thickness, want.thickness))
+  if (want.thickness !== undefined && !close(part.thickness, thickness!))
     failures.push(`thickness: wanted ${want.thickness}, got ${part.thickness}`);
+  if (want.notches !== undefined && part.notches !== want.notches) failures.push(`notches: wanted ${want.notches}, got ${part.notches}`);
   if (want.holes !== undefined && part.holes !== want.holes) failures.push(`holes: wanted ${want.holes}, got ${part.holes}`);
   const pockets = part.cuts.filter(cut => !cut.through).length;
   if (want.pockets !== undefined && pockets !== want.pockets) failures.push(`pockets: wanted ${want.pockets}, got ${pockets}`);
   if (want.freedom !== undefined && freedom !== want.freedom) failures.push(`freedom: wanted ${want.freedom}, got ${freedom}`);
   if (want.depths) {
     const got = part.cuts.map(cut => cut.to);
-    if (got.length !== want.depths.length || got.some((depth, i) => !close(depth, want.depths![i]!)))
+    if (got.length !== want.depths.length || got.some((depth, i) => !close(depth, depths![i]!)))
       failures.push(`depths: wanted ${want.depths.join(', ')}, got ${got.join(', ')}`);
   }
   return failures;
@@ -284,7 +310,20 @@ export async function inspectCadDocument(
     return ids.map(id => handles.get(id) ?? id);
   };
   for (const d of solved.diagnostics) {
-    const issue = { code: d.code, message: d.message, part: nameOf(d.partId), entities: entityHandles(d.partId, d.entityIds) };
+    const part = solved.document.parts.find(part => part.id === d.partId);
+    const constraints = part && [part.sketch, ...cadFaceSketches(part).map(face => face.sketch)].flatMap(sketch => sketch.constraints);
+    const ids =
+      d.code === 'redundant-constraint'
+        ? [
+            ...new Set([
+              ...(d.entityIds ?? []),
+              ...(constraints ?? []).filter(c => d.constraintIds?.includes(c.id)).flatMap(constraintEntityIds),
+            ]),
+          ]
+        : d.entityIds;
+    const entities = entityHandles(d.partId, ids);
+    const message = d.code === 'redundant-constraint' && entities?.length ? `${d.message} Entities: ${entities.join(', ')}.` : d.message;
+    const issue = { code: d.code, message, part: nameOf(d.partId), entities };
     (d.severity === 'error' ? errors : warnings).push(issue);
   }
   const statuses = solved.sketches;
@@ -326,7 +365,52 @@ export async function inspectCadDocument(
       status: statusesOf[i]?.status ?? 'invalid',
       entities: reportEntities(sketch),
       constraints: sketch.constraints.length,
+      ...(() => {
+        const patterns = sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern');
+        const handles = shortHandles(sketch.constraints.map(c => c.id));
+        return patterns.length
+          ? { patterns: patterns.map(pattern => ({ ref: handles.get(pattern.id)!, copies: pattern.countX * pattern.countY - 1 })) }
+          : {};
+      })(),
     }));
+    for (const sketch of [part.sketch, ...faces.map(face => face.sketch)]) {
+      const regions = cadSketchRegions(part, sketch.id);
+      const handles = shortHandles(sketch.constraints.map(c => c.id));
+      const area = (region: (typeof regions)[number]) => Math.abs(polygonArea(region.points));
+      for (const pattern of sketch.constraints) {
+        if (pattern.type !== 'linearPattern' && pattern.type !== 'circularPattern') continue;
+        const master = patternMaster(pattern);
+        if (!master) continue;
+        const seeds = new Map(Object.entries(master.idMap).map(([seed, id]) => [id, seed]));
+        const originals = regions.filter(
+          region => region.curveIds.some(id => seeds.has(id)) && region.curveIds.every(id => seeds.has(id) || id === `${part.id}:outline`)
+        );
+        if (!originals.length) continue;
+        const missing = pattern.instances.filter(instance => {
+          if (instance === master || !instance.activeIds.length) return false;
+          return originals.some(original => {
+            const mapped = original.curveIds.map(id => (seeds.has(id) ? instance.idMap[seeds.get(id)!] : id));
+            // Excluded geometry and cells outside a shrunken pattern are intentional.
+            if (mapped.some(id => !id || (id !== `${part.id}:outline` && !instance.activeIds.includes(id)))) return false;
+            return !regions.some(
+              region =>
+                region.curveIds.length === mapped.length &&
+                region.curveIds.every(id => mapped.includes(id)) &&
+                Math.abs(area(region) - area(original)) < 1e-3 * Math.max(1, area(original))
+            );
+          });
+        }).length;
+        if (missing) {
+          const ref = handles.get(pattern.id)!;
+          warnings.push({
+            code: 'pattern-copies-missing',
+            part: part.name,
+            entities: [ref],
+            message: `Pattern ${ref}: ${missing} copies missing their original region shape after overlapping geometry.`,
+          });
+        }
+      }
+    }
     // Each loop is measured against the curves of its own sketch, so nearby geometry elsewhere can't widen it.
     const sketchOfCut = (id: string) => {
       const feature = part.features?.find(f => f.id === id.split('~')[0]);
@@ -412,7 +496,10 @@ export async function inspectCadDocument(
       thickness: part.thickness,
       ...(box && { outline: { at: box.at, size: box.size } }),
       // A profile loop explicitly cut through stays in holes and isn't also emitted as a cut.
-      holes: evaluated && evaluated.holes.length + cuts.filter(cut => cut.through).length,
+      holes:
+        evaluated &&
+        evaluated.holes.length + (evaluated.cuts ?? []).filter(cut => cut.through && !isEdgeNotch(cut, evaluated.outline)).length,
+      notches: evaluated && (evaluated.cuts ?? []).filter(cut => isEdgeNotch(cut, evaluated.outline)).length,
       cuts,
       sketches,
       ...(cam && { cam }),
@@ -421,7 +508,7 @@ export async function inspectCadDocument(
     };
     const freedom = sketches.reduce((sum, sketch) => sum + (sketch.freedom ?? 0), 0);
     for (const want of expectations.get(part.id) ?? [])
-      for (const failure of checkExpectation(want, report, freedom))
+      for (const failure of checkExpectation(want, report, freedom, solved.document))
         errors.push({ code: 'expect-failed', message: failure, part: part.name });
     return report;
   });

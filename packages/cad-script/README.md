@@ -82,6 +82,7 @@ change a variable or a dimension, or a step's settings. So:
   edge along an axis is horizontal or vertical with its length, such as `board` for a
   tenon worked out from `legH` and `legH + board`, and every other corner is measured
   from the one before. Changing one length in the app moves what comes after it.
+  `close()` warns with `close-straight` if it adds a line; use `close({ straight: true })` when intended.
 - `d.part(name, { relief: 'bit' })`, or `part.relief(...)`, puts dogbones in the part's
   inside corners for a bit of that diameter, so mortises and finger joints close. Corners
   on the outline of a pocket that runs off the part stay square. The check warns with
@@ -89,8 +90,9 @@ change a variable or a dimension, or a step's settings. So:
   cut's size as drawn, and its size with the bones as `relieved` when they make it wider.
 - `pattern(items, { count, step: [dx, dy], rows? })` repeats curves, or a whole `rect` or
   `path`, in linked copies, such as a row of shelf-pin holes. Cutting the first copy's region cuts them all, including
-  copies the pattern gains later. A count can be an expression, rounded down to say how
-  many fit, and a step along one axis can be one too:
+  copies the pattern gains later. `pattern-copies-missing` warns with the pattern handle
+  and missing count when overlapping geometry changes copy regions. A count can be an
+  expression, rounded down to say how many fit, and a step along one axis can be one too:
   `count: '(height - 2*margin)/pitch + 1', step: [0, 'pitch']`.
 - `regionAt(x, y)` picks the innermost region at a point, as a click does. It only sees
   that sketch's own lines, so a profile hole doesn't split a region on `top`.
@@ -100,15 +102,17 @@ change a variable or a dimension, or a step's settings. So:
   `equal`, `tangent`, `midpoint`, `symmetric` or `concentric`. Ends drawn at the same
   coordinates are already joined.
 - `expect` checks `size`, `thickness`, `holes` (holes in the profile and through cuts
-  from either face or a pocket floor, each pattern copy counted), `pockets` (cuts that aren't through,
+  from either face or a pocket floor, each pattern copy counted), `notches` (through cuts
+  touching or crossing the part outline, drawn separately in SVG), `pockets` (cuts that aren't through,
   each pattern copy counted), `depths` (each cut's floor below its face, in feature
   order, pattern copies included) and `freedom`, within `tolerance` (0.01 mm). It doesn't
-  check diameters or positions: read those from the report's cuts. Sizes are measured to
-  where curves reach, not to the chords they're drawn with.
+  check diameters or positions: read those from the report's cuts. `size`, `thickness` and
+  `depths` also take expressions evaluated with the design variables; invalid expressions
+  fail the check. Sizes are measured to where curves reach, not to the chords they're drawn with.
 - Cuts on `sketchOn({ floorOf: cut })` start at that pocket's floor.
 - `sketchOn('underside')` is drawn as the face is seen from below, so X runs the other way: a point at `x` on the part is at `-x` in the sketch. Its cuts come from a second side, after turning the board over: the toolpath summary lists them as `Side B: …`.
 - Handles in the report, such as `7b8b`, work with `find` and `sketch` on that same
-  revision of the design.
+  revision of the design. `redundant-constraint` names the involved entity handles.
 - A script that stops with an error leaves the design as it was.
 
 ## Variables
