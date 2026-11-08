@@ -1,11 +1,13 @@
 import {
   cadFaceSketches,
   assemblyReport,
+  cadStepReport,
   cadPartsToCut,
   mirroredPartId,
   pointInPolygon,
   solveCadDocument,
   type CadAssemblyReport,
+  type CadStepReportEntry,
   type CadDocument,
   type CadPart,
   type CadPoint,
@@ -81,6 +83,11 @@ export interface CadReport {
   parts: CadReportPart[];
   /** Present when any part is placed. */
   assembly?: CadAssemblyReport;
+  /**
+   * What each step relating parts refers to and what it came to, in design order: the face a part is drawn on, with that
+   * face's frame in words, part patterns, and the openings each "cut parts" step makes.
+   */
+  steps?: (CadStepReportEntry & { frameInWords?: string })[];
 }
 
 const round = (value: number) => Math.round(value * 1000) / 1000;
@@ -376,6 +383,9 @@ export async function inspectCadDocument(
     return report;
   });
   const assembly = assemblyReport(solved.document, solved.parts);
+  const steps = cadStepReport(solved.document, solved.parts).map(step =>
+    step.kind === 'drawnOn' && !('error' in step.frame) ? { ...step, frameInWords: frameInWords(step.on, step.frame) } : step
+  );
   for (const collision of assembly?.collisions ?? [])
     errors.push({
       code: 'parts-collide',
@@ -391,6 +401,26 @@ export async function inspectCadDocument(
       warnings,
       parts,
       ...(assembly && { assembly }),
+      ...(steps.length && { steps }),
     },
   };
+}
+
+const kAxisNames: [string, readonly number[]][] = [
+  ['+x', [1, 0, 0]],
+  ['-x', [-1, 0, 0]],
+  ['+y', [0, 1, 0]],
+  ['-y', [0, -1, 0]],
+  ['+z', [0, 0, 1]],
+  ['-z', [0, 0, -1]],
+];
+const axisName = (v: readonly number[]) =>
+  kAxisNames.find(([, axis]) => axis.every((c, i) => Math.abs(c - v[i]!) < 1e-6))?.[0] ?? `(${v.map(c => round(c)).join(', ')})`;
+
+/** A face's frame as a sentence, so a script's author can see where a part drawn on it starts and which way it runs. */
+function frameInWords(
+  on: string,
+  frame: { origin: readonly number[]; x: readonly number[]; y: readonly number[]; normal: readonly number[] }
+) {
+  return `${on}: sketch origin at ${frame.origin.map(round).join(', ')}, its x along ${axisName(frame.x)}, its y along ${axisName(frame.y)}, looking ${axisName(frame.normal)}.`;
 }

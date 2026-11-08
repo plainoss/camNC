@@ -6,6 +6,12 @@ import {
   addFaceSketch,
   addLine,
   addPartCopy,
+  addPartCut,
+  cadFaceFacing,
+  evaluateCadDocument,
+  resolveDrawnPlacements,
+  setPartPattern,
+  CAD_MAX_PART_PATTERN,
   addRectangle,
   cadFaceSketches,
   cadVariableScope,
@@ -23,6 +29,7 @@ import {
   setCutDepth,
   type CadDocument,
   type CadFaceRef,
+  type CadDrawnOn,
   type CadPart,
   type CadPlacement,
   type CadPointEntity,
@@ -50,6 +57,13 @@ export interface CadCutRef {
   id: string;
 }
 export type CadFacePick = 'top' | 'underside' | { floorOf: CadCutRef };
+/** One of the studio's base planes. */
+export type CadPlane = 'top' | 'front' | 'right';
+/** A face of a part that another part can be drawn on, from `part.face(...)`. */
+export interface CadPartFace {
+  readonly partId: string;
+  readonly face: Extract<CadDrawnOn['on'], { partId: string }>['face'];
+}
 
 export interface SketchEdit {
   readonly id: string;
@@ -130,7 +144,21 @@ export interface PartEdit {
    * Another of this part, placed like `place`. A mirrored copy is the part's mirror image across its sketch's y axis
    * (x becomes -x), for a left and right pair that aren't alike; CAM cuts it as a part of its own.
    */
-  copy(options: CadPlaceOptions & { mirrored?: boolean }): void;
+  copy(options: CadPlaceOptions & { mirrored?: boolean; name?: string }): void;
+  /**
+   * A face of this part to draw another part on: `'top'`, `'underside'`, or the edge face looking a way in the studio,
+   * such as `'+x'`. It's found now, by where the part is, and kept by what it is, so it stays the same face when the part
+   * is resized or moved.
+   */
+  face(which: 'top' | 'underside' | CadAxis): CadPartFace;
+  /**
+   * Draws this part on a base plane or on another part's face, so it sits there and moves with it. Its sketch's x and y
+   * run as the face's do, and its thickness grows out from the face, or into it with `inward`. `offset` moves it along
+   * the face's normal. `check` reports each face's frame in words.
+   */
+  drawOn(on: CadPlane | CadPartFace, options?: { offset?: Len; inward?: boolean }): void;
+  /** Copies of the part in a row along a studio axis, `spacing` apart. The count and spacing can follow variables. */
+  pattern(options: { axis: 'x' | 'y' | 'z'; count: Len; spacing: Len }): void;
 }
 export interface CadPlaceOptions {
   at: readonly [Len, Len, Len];
@@ -142,6 +170,12 @@ export interface DesignEdit {
   part(name: string, options?: { thickness?: Len; relief?: Len }): PartEdit;
   /** Adds a variable, or changes the one with this name, and returns its name. Later values can use it in expressions. */
   variable(name: string, expression: string): string;
+  /**
+   * Cuts the `with` parts out of the target parts wherever they reach in, with `clearance` mm of room: housings, grooves,
+   * rebates and mortises that follow both parts. The clearance grows every side of an opening inside the target and
+   * deepens a blind one; a side that runs off the target's edge stays open.
+   */
+  cutParts(targets: PartEdit | readonly PartEdit[], options: { with: PartEdit | readonly PartEdit[]; clearance?: Len }): void;
   /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
   value(expression: Len): number;
 }
@@ -604,14 +638,45 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       const placement = placementOf(options);
       replacePart(partId, part => ({ ...part, placement }));
     },
-    copy({ mirrored, ...options }) {
+    copy({ mirrored, name, ...options }) {
       const placement = placementOf(options);
       const added = addPartCopy(document, partId, { mirrored });
       document = added.document;
       replacePart(partId, part => ({
         ...part,
-        copies: part.copies?.map(copy => (copy.id === added.id ? { ...copy, placement } : copy)),
+        copies: part.copies?.map(copy => (copy.id === added.id ? { ...copy, placement, ...(name && { name }) } : copy)),
       }));
+    },
+    face(which) {
+      if (which === 'top' || which === 'underside') return { partId, face: which };
+      const found = cadFaceFacing(document, partId, which);
+      return 'error' in found ? fail(found.error) : { partId, face: found.face };
+    },
+    drawOn(on, { offset = 0, inward } = {}) {
+      if (typeof on === 'object' && on.partId === partId) fail(`${partOf(partId).name} can't be drawn on itself.`);
+      if (!partOf(partId).sketch.entities.some(e => e.type !== 'point'))
+        fail(`Draw ${partOf(partId).name}’s profile before drawing it on a plane or face.`);
+      const drawnOn: CadDrawnOn = {
+        on: typeof on === 'string' ? { plane: on } : { partId: on.partId, face: on.face },
+        offset: measure(offset, 'Offset'),
+        ...(typeof offset === 'string' && { offsetExpression: offset }),
+        ...(inward && { inward: true }),
+      };
+      replacePart(partId, part => ({ ...part, drawnOn }));
+      // Placed now, so a face of this part can be picked by the way it looks.
+      document = resolveDrawnPlacements(document, evaluateCadDocument(document).parts).document;
+    },
+    pattern({ axis, count, spacing }) {
+      const total = Math.floor(measure(count, 'Count', 'scalar') + 1e-9);
+      if (!(total >= 1)) fail(`A part pattern needs at least one part, not ${total}.`);
+      if (total > CAD_MAX_PART_PATTERN) fail(`A part pattern makes at most ${CAD_MAX_PART_PATTERN} parts, not ${total}.`);
+      document = setPartPattern(document, partId, {
+        axis,
+        count: total,
+        spacing: measure(spacing, 'Spacing'),
+        ...(typeof count === 'string' && { countExpression: count }),
+        ...(typeof spacing === 'string' && { spacingExpression: spacing }),
+      });
     },
   });
 
@@ -638,6 +703,15 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         if ('error' in result) return fail(`The variable ${name}: ${result.error}`);
         document = result.document;
         return name;
+      },
+      cutParts(targets, { with: tools, clearance = 0 }) {
+        const ids = (parts: PartEdit | readonly PartEdit[]) => ('id' in parts ? [parts.id] : parts.map(part => part.id));
+        const value = measure(clearance, 'Clearance');
+        if (value < 0) fail(`A clearance can't be negative: ${value} mm.`);
+        document = addPartCut(document, ids(tools), ids(targets), {
+          value,
+          ...(typeof clearance === 'string' && { expression: clearance }),
+        }).document;
       },
       value(expression) {
         // A count or ratio, such as `'(height - 2*margin)/pitch'`, has no unit.
