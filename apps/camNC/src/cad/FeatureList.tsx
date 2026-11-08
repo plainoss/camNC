@@ -97,7 +97,7 @@ export function FeatureList({
     setMenu({ entry, x: event.clientX, y: event.clientY });
   };
   return (
-    <section className="cad-feature-list" aria-label="Features">
+    <section className="cad-studio-features" aria-label="Features">
       <div className="cad-panel-heading">
         <h2>Features ({entries.length})</h2>
       </div>

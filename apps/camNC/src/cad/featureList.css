@@ -1,8 +1,8 @@
-.cad-feature-list {
+.cad-studio-features {
   border-bottom: 1px solid #dde4ed;
   padding-bottom: 8px;
 }
-.cad-feature-list ol {
+.cad-studio-features ol {
   list-style: none;
   margin: 0;
   padding: 0 7px;
@@ -12,7 +12,7 @@
   max-height: 55vh;
   overflow: auto;
 }
-.cad-editor .cad-feature-list button {
+.cad-editor .cad-studio-features button {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
   column-gap: 4px;
@@ -27,23 +27,23 @@
   font-size: 12px;
   user-select: none;
 }
-.cad-editor .cad-feature-list button:hover {
+.cad-editor .cad-studio-features button:hover {
   background: #eef2f7;
 }
-.cad-editor .cad-feature-list button[aria-current='true'] {
+.cad-editor .cad-studio-features button[aria-current='true'] {
   background: #dbe8f8;
 }
-.cad-feature-list button > span:first-child {
+.cad-studio-features button > span:first-child {
   color: #6b7c91;
   font-size: 10.5px;
   text-align: center;
 }
-.cad-feature-list button > span:nth-child(2) {
+.cad-studio-features button > span:nth-child(2) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cad-feature-list small {
+.cad-studio-features small {
   grid-column: 2;
   color: #6b7c91;
   font-size: 10.5px;
