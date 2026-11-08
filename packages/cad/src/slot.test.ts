@@ -16,6 +16,7 @@ import {
   removeEntity,
   removeConstraint,
   reconcileSlot,
+  transformSketchEntities,
 } from './index';
 it.each(['line', 'arc', 'circle', 'chain', 'closed', 'tangent'] as const)(
   'creates a linked %s slot with a diameter width and no extra freedoms',
@@ -188,4 +189,47 @@ it.each(['parallel', 'arcs'] as const)('keeps %s smooth joins linked without add
   );
   const wider = await solveCadDocument(updateDimension(solved.document, result.widthConstraintId, 12), { sketchOnly: true });
   expect(wider.sketches[0]!.status, JSON.stringify(wider.diagnostics)).toBe('solved');
+});
+
+it('follows source diameter edits while retaining the independent slot width', async () => {
+  const part = createCadPart();
+  part.sketch = addCircle(part.sketch, { x: 40, y: 40, radius: 20, dimensioned: true });
+  const source = part.sketch.entities.find(e => e.type === 'circle')!,
+    driver = part.sketch.constraints.find(c => c.type === 'diameter')!;
+  const result = slotSketchEntities(part.sketch, { entityIds: [source.id], width: 8 });
+  if (!result.ok) throw new Error(result.message);
+  const solved = await solveCadDocument(
+    updateDimension({ ...createCadDocument(), parts: [{ ...part, sketch: result.sketch }] }, driver.id, 60),
+    { sketchOnly: true }
+  );
+  expect(solved.sketches[0]!.status, JSON.stringify(solved.diagnostics)).toBe('solved');
+  const group = solved.document.parts[0]!.sketch.constraints.find(c => c.id === result.slotId)!;
+  if (group.type !== 'slot') throw new Error('missing slot');
+  expect(
+    group.members
+      .map(member => solved.document.parts[0]!.sketch.entities.find(e => e.id === member.targetId))
+      .flatMap(e => (e?.type === 'circle' ? [e.radius] : []))
+      .sort((a, b) => a - b)
+  ).toEqual([26, 34]);
+});
+it('copies and transforms complete slot graphs with independent source, width and contour ownership', async () => {
+  const part = createCadPart();
+  part.sketch = addLine(part.sketch, { x1: 20, y1: 20, x2: 70, y2: 20 });
+  const source = part.sketch.entities.find(e => e.type === 'line')!;
+  const initial = slotSketchEntities(part.sketch, { entityIds: [source.id], width: 8 });
+  if (!initial.ok) throw new Error(initial.message);
+  const copied = transformSketchEntities(initial.sketch, {
+    entityIds: initial.sketch.entities.filter(e => e.type !== 'point').map(e => e.id),
+    copy: true,
+    translation: { x: 150, y: 100 },
+    angle: 35,
+    scale: 2,
+  });
+  if (!copied.ok) throw new Error(copied.message);
+  expect(copied.sketch.constraints.filter(c => c.type === 'slot')).toHaveLength(2);
+  const doc = { ...createCadDocument(), parts: [{ ...part, sketch: copied.sketch }] };
+  expect(validateCadDocument(doc)).toEqual([]);
+  const solved = await solveCadDocument(doc, { sketchOnly: true });
+  expect(solved.sketches[0]!.status, JSON.stringify(solved.diagnostics)).toBe('solved');
+  expect(parseCadDocument(JSON.parse(JSON.stringify(solved.document)))).toEqual(solved.document);
 });
