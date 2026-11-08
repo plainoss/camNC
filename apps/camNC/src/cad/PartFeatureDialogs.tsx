@@ -4,6 +4,7 @@ import {
   setPartCopyOffset,
   setPartPattern,
   renamePartCopy,
+  type CadCutDepth,
   type CadDocument,
   type CadPart,
   type CadValueScope,
@@ -33,7 +34,16 @@ const changePart = (document: CadDocument, partId: string, change: (part: CadPar
   parts: document.parts.map(part => (part.id === partId ? change(part) : part)),
 });
 
-/** A part's sketch pushed out into a board: how thick, where it starts from its plane or face, and which way it grows. */
+/** How deep Extrude → Remove cuts, as typed. */
+export interface ExtrudeRemoval {
+  depth: CadCutDepth;
+  depthExpression?: string;
+}
+
+/**
+ * A part's sketch pushed out into a board: how thick, where it starts from its plane or face, and which way it grows.
+ * Drawn on a board's top or underside, it can instead be removed from that board, as a pocket or a hole.
+ */
 export function ExtrudeDialog({
   document,
   part,
@@ -42,7 +52,32 @@ export function ExtrudeDialog({
   onOk,
   onCancel,
   onEditSketch,
-}: PartDialogProps & { onEditSketch: () => void }) {
+  removal,
+  onRemoval,
+}: PartDialogProps & {
+  onEditSketch: () => void;
+  /** Set while the sketch is cut into the board it's drawn on, rather than made a part. */
+  removal?: ExtrudeRemoval | null;
+  /** Switches to Remove with a depth, or back to New; says why not when it can't. Left out where Remove can't apply. */
+  onRemoval?: (removal: ExtrudeRemoval | null) => string | null;
+}) {
+  const [removeDepthText, setRemoveDepthText] = useState(() =>
+    removal && removal.depth !== 'through' ? (removal.depthExpression ?? formatCadValue(removal.depth)) : '6'
+  );
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  /** Remove with the depth as typed, or all the way through. Whether it was taken. */
+  const remove = (through: boolean, text = removeDepthText) => {
+    if (!onRemoval) return false;
+    if (through) {
+      const refused = onRemoval({ depth: 'through' });
+      setRemoveError(refused);
+      return !refused;
+    }
+    const parsed = parseCadValue(text, { unit: 'mm', variables });
+    const refused = 'error' in parsed ? parsed.error : onRemoval({ depth: parsed.value, depthExpression: parsed.expression });
+    setRemoveError(refused);
+    return !refused;
+  };
   // A thickness that can't be used keeps the dialog open until it's fixed or cancelled.
   const [thicknessValid, setThicknessValid] = useState(true);
   const [depthError, setDepthError] = useState<string | null>(null);
@@ -70,110 +105,186 @@ export function ExtrudeDialog({
     return true;
   };
   return (
-    <FeatureDialog title={`Extrude · ${part.name}`} okDisabled={!thicknessValid || !!depthError} onOk={onOk} onCancel={onCancel}>
-      {part.drawnOn && (
-        // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
-        <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
-          <button type="button" role="tab" aria-selected={!part.thin} onClick={() => setThin(null)}>
-            Solid
-          </button>
+    <FeatureDialog
+      title={`Extrude · ${part.name}`}
+      okDisabled={removal ? !!removeError : !thicknessValid || !!depthError}
+      onOk={onOk}
+      onCancel={onCancel}>
+      {onRemoval && (
+        // New makes the sketch a part of its own; Remove cuts it out of the board it's drawn on.
+        <div className="cad-feature-tabs" role="tablist" aria-label="Extrude operation">
           <button
             type="button"
             role="tab"
-            aria-selected={!!part.thin}
+            aria-selected={!removal}
             onClick={() => {
-              const parsed = parseCadValue(depthText, { unit: 'mm', variables });
-              setThin({ depth: 'error' in parsed || parsed.value <= 0 ? 100 : parsed.value, midPlane: true });
+              setRemoveError(null);
+              onRemoval(null);
             }}>
-            Thin
+            New
+          </button>
+          <button type="button" role="tab" aria-selected={!!removal} onClick={() => removal || remove(false)}>
+            Remove
           </button>
         </div>
       )}
-      <div className="cad-feature-selection">
-        <small>Sketch to extrude</small>
-        <span>{part.name}’s sketch</span>
-        <button type="button" onClick={onEditSketch}>
-          Edit sketch
-        </button>
-      </div>
-      <CadThicknessField
-        key={`${part.id}:thickness`}
-        value={part.thickness}
-        expression={part.thicknessExpression}
-        variables={variables}
-        onValidityChange={setThicknessValid}
-        onCommit={(thickness, thicknessExpression) =>
-          onChange(document =>
-            changePart(document, part.id, p => {
-              const next = { ...p, thickness, thicknessExpression };
-              if (thicknessExpression === undefined) delete next.thicknessExpression;
-              return next;
-            })
-          )
-        }
-      />
-      {part.thin && (
+      {removal ? (
         <>
+          <div className="cad-feature-selection">
+            <small>Sketch to cut</small>
+            <span>{part.name}’s sketch</span>
+            <button type="button" onClick={onEditSketch}>
+              Edit sketch
+            </button>
+          </div>
           <label className="cad-number-field">
-            Depth
-            <span>
-              <CadValueInput
-                bare
-                aria-label="Depth"
-                value={depthText}
-                spellCheck={false}
-                aria-invalid={depthError ? true : undefined}
-                onChange={event => setDepthText(event.target.value)}
-                onBlur={applyDepth}
-                onKeyDown={event => {
-                  // A depth that isn't taken keeps the dialog open to fix it, rather than Enter keeping the old one.
-                  if (event.key === 'Enter' && !applyDepth()) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }
-                }}
-              />
-            </span>
-            mm
+            End type
+            <select value={removal.depth === 'through' ? 'through' : 'blind'} onChange={event => remove(event.target.value === 'through')}>
+              <option value="blind">Blind</option>
+              <option value="through">Through all</option>
+            </select>
           </label>
-          {depthError && (
+          {removal.depth !== 'through' && (
+            <label className="cad-number-field">
+              Depth
+              <span>
+                <CadValueInput
+                  bare
+                  aria-label="Cut depth"
+                  value={removeDepthText}
+                  spellCheck={false}
+                  aria-invalid={removeError ? true : undefined}
+                  onChange={event => setRemoveDepthText(event.target.value)}
+                  onBlur={() => remove(false)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' && !remove(false)) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }
+                  }}
+                />
+              </span>
+              mm
+            </label>
+          )}
+          {removeError && (
             <p role="alert" className="cad-thickness-error">
-              {depthError}
+              {removeError}
             </p>
           )}
-          <label>
-            <input
-              type="checkbox"
-              checked={!!part.thin.midPlane}
-              onChange={event => setThin({ ...part.thin!, midPlane: event.target.checked })}
+        </>
+      ) : (
+        <>
+          {removeError && (
+            <p role="alert" className="cad-thickness-error">
+              {removeError}
+            </p>
+          )}
+          {part.drawnOn && (
+            // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
+            <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
+              <button type="button" role="tab" aria-selected={!part.thin} onClick={() => setThin(null)}>
+                Solid
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={!!part.thin}
+                onClick={() => {
+                  const parsed = parseCadValue(depthText, { unit: 'mm', variables });
+                  setThin({ depth: 'error' in parsed || parsed.value <= 0 ? 100 : parsed.value, midPlane: true });
+                }}>
+                Thin
+              </button>
+            </div>
+          )}
+          <div className="cad-feature-selection">
+            <small>Sketch to extrude</small>
+            <span>{part.name}’s sketch</span>
+            <button type="button" onClick={onEditSketch}>
+              Edit sketch
+            </button>
+          </div>
+          <CadThicknessField
+            key={`${part.id}:thickness`}
+            value={part.thickness}
+            expression={part.thicknessExpression}
+            variables={variables}
+            onValidityChange={setThicknessValid}
+            onCommit={(thickness, thicknessExpression) =>
+              onChange(document =>
+                changePart(document, part.id, p => {
+                  const next = { ...p, thickness, thicknessExpression };
+                  if (thicknessExpression === undefined) delete next.thicknessExpression;
+                  return next;
+                })
+              )
+            }
+          />
+          {part.thin && (
+            <>
+              <label className="cad-number-field">
+                Depth
+                <span>
+                  <CadValueInput
+                    bare
+                    aria-label="Depth"
+                    value={depthText}
+                    spellCheck={false}
+                    aria-invalid={depthError ? true : undefined}
+                    onChange={event => setDepthText(event.target.value)}
+                    onBlur={applyDepth}
+                    onKeyDown={event => {
+                      // A depth that isn't taken keeps the dialog open to fix it, rather than Enter keeping the old one.
+                      if (event.key === 'Enter' && !applyDepth()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }
+                    }}
+                  />
+                </span>
+                mm
+              </label>
+              {depthError && (
+                <p role="alert" className="cad-thickness-error">
+                  {depthError}
+                </p>
+              )}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!!part.thin.midPlane}
+                  onChange={event => setThin({ ...part.thin!, midPlane: event.target.checked })}
+                />
+                Mid plane
+              </label>
+            </>
+          )}
+          {part.drawnOn && (
+            <CadDrawnOnField
+              key={`${part.id}:drawn-on`}
+              document={document}
+              part={part as CadPart & { drawnOn: NonNullable<CadPart['drawnOn']> }}
+              variables={variables}
+              onChange={drawnOn => onChange(document => changePart(document, part.id, p => ({ ...p, drawnOn })))}
             />
-            Mid plane
-          </label>
+          )}
+          <CadReliefField
+            key={`${part.id}:relief`}
+            relief={part.cornerRelief}
+            variables={variables}
+            onChange={cornerRelief =>
+              onChange(document =>
+                changePart(document, part.id, p => {
+                  const next = { ...p, cornerRelief };
+                  if (!cornerRelief) delete next.cornerRelief;
+                  return next;
+                })
+              )
+            }
+          />
         </>
       )}
-      {part.drawnOn && (
-        <CadDrawnOnField
-          key={`${part.id}:drawn-on`}
-          document={document}
-          part={part as CadPart & { drawnOn: NonNullable<CadPart['drawnOn']> }}
-          variables={variables}
-          onChange={drawnOn => onChange(document => changePart(document, part.id, p => ({ ...p, drawnOn })))}
-        />
-      )}
-      <CadReliefField
-        key={`${part.id}:relief`}
-        relief={part.cornerRelief}
-        variables={variables}
-        onChange={cornerRelief =>
-          onChange(document =>
-            changePart(document, part.id, p => {
-              const next = { ...p, cornerRelief };
-              if (!cornerRelief) delete next.cornerRelief;
-              return next;
-            })
-          )
-        }
-      />
     </FeatureDialog>
   );
 }

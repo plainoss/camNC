@@ -85,6 +85,7 @@ import {
   drawnOnOutline,
   cadFaceFrame,
   isCadPart,
+  extrudeRemove,
   cadDrawnOnSupports,
   CAD_IDENTITY_PLACEMENT,
   withFaceEdges,
@@ -217,7 +218,7 @@ import type { BasePlane } from './basePlanes';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
-import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
+import { ExtrudeDialog, type ExtrudeRemoval, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 import './cad.css';
 
@@ -479,7 +480,13 @@ export function CadEditor({
   );
   const pickForCut = (partId: string) => setCutPick(previous => ({ partId, seq: (previous?.seq ?? 0) + 1 }));
   // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
-  const [featureDialog, setFeatureDialog] = useState<{ kind: 'extrude' | 'pattern'; partId: string; before: CadDocument } | null>(null);
+  const [featureDialog, setFeatureDialog] = useState<{
+    kind: 'extrude' | 'pattern';
+    partId: string;
+    before: CadDocument;
+    /** Set while the extrude is a Remove, with the design as it was as a part, to go back to on New. */
+    remove?: ExtrudeRemoval & { solid: CadDocument };
+  } | null>(null);
   // Picking the plane or face a new part is sketched on.
   const [choosingFace, setChoosingFace] = useState(startsBlank);
   // A base plane picked in the studio, in its view or feature list, for the next sketch to be drawn on.
@@ -3435,6 +3442,9 @@ export function CadEditor({
   };
   const closeFeature = (keep: boolean) => {
     if (!keep && featureDialog) commit(featureDialog.before);
+    // A removed sketch is a cut in the board it was drawn on now, so that board is the one selected.
+    const on = featureDialog?.remove && featureDialog.remove.solid.parts.find(p => p.id === featureDialog.partId)?.drawnOn?.on;
+    if (keep && on && !('plane' in on)) setPartId(on.partId);
     setFeatureDialog(null);
   };
   /** Opens a part's sketch from the studio, remembering the design to go back to if it's cancelled. */
@@ -4208,8 +4218,12 @@ export function CadEditor({
           {showWorkspace &&
             featureDialog &&
             (() => {
-              const target = doc.parts.find(candidate => candidate.id === featureDialog.partId);
+              // While it's a Remove, the part is gone from the design: the dialog shows it as it was.
+              const source = featureDialog.remove?.solid ?? doc;
+              const target = source.parts.find(candidate => candidate.id === featureDialog.partId);
               if (!target) return null;
+              const on = target.drawnOn?.on;
+              const canRemove = !!on && !('plane' in on) && (on.face === 'top' || on.face === 'underside') && !target.thin;
               const props = {
                 document: doc,
                 part: target,
@@ -4219,7 +4233,34 @@ export function CadEditor({
                 onCancel: () => closeFeature(false),
               };
               return featureDialog.kind === 'extrude' ? (
-                <ExtrudeDialog key={target.id} {...props} onEditSketch={() => openSketch(target.id)} />
+                <ExtrudeDialog
+                  key={target.id}
+                  {...props}
+                  document={source}
+                  onEditSketch={() => {
+                    // The sketch is edited as the part's, so a Remove goes back to New first.
+                    if (featureDialog.remove) commit(featureDialog.remove.solid);
+                    openSketch(target.id);
+                  }}
+                  removal={featureDialog.remove}
+                  onRemoval={
+                    canRemove
+                      ? removal => {
+                          const solid = featureDialog.remove?.solid ?? documentRef.current;
+                          if (!removal) {
+                            commit(solid);
+                            setFeatureDialog({ ...featureDialog, remove: undefined });
+                            return null;
+                          }
+                          const result = extrudeRemove(solid, target.id, removal.depth, removal.depthExpression);
+                          if ('error' in result) return result.error;
+                          commit(result.document);
+                          setFeatureDialog({ ...featureDialog, remove: { ...removal, solid } });
+                          return null;
+                        }
+                      : undefined
+                  }
+                />
               ) : (
                 <PartPatternDialog key={target.id} {...props} />
               );
@@ -4400,14 +4441,17 @@ export function CadEditor({
                         : undefined
                     }
                     onSave={change => {
-                      const { clearance, clearanceExpression, ...parts } = change;
+                      const { clearance, clearanceExpression, split, ...parts } = change;
                       commit(
                         partCutting.id
                           ? updatePartCut(documentRef.current, partCutting.id, change)
-                          : addPartCut(documentRef.current, parts.tools, parts.targets, {
-                              value: clearance,
-                              expression: clearanceExpression,
-                            }).document
+                          : addPartCut(
+                              documentRef.current,
+                              parts.tools,
+                              parts.targets,
+                              { value: clearance, expression: clearanceExpression },
+                              split
+                            ).document
                       );
                       setPartCutting(null);
                     }}
