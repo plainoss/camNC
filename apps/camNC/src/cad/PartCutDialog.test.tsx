@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createCadPart, createPlateDocument, type CadDocument } from '@wbcnc/cad';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PartCutDialog } from './PartCutDialog';
@@ -12,33 +12,52 @@ function design(): CadDocument {
 }
 
 describe('the cut parts dialog', () => {
-  it('cuts the chosen parts out of the others, with the design’s fit as the clearance', () => {
+  it('picks clicked parts into the box being filled, and cuts the tools out of the targets with the design’s fit', () => {
     const document = design();
-    const onSave = vi.fn();
-    render(
+    const side = document.parts[0]!.id;
+    const onSave = vi.fn(),
+      onPicked = vi.fn();
+    const dialog = (pick: { partId: string; seq: number } | null) => (
       <PartCutDialog
         document={document}
         tool="back"
+        pick={pick}
         variables={{ fit: { value: 0.3, kind: 'length' } }}
+        onPicked={onPicked}
         onSave={onSave}
         onClose={() => {}}
       />
     );
+    const view = render(dialog(null));
     expect(screen.getByLabelText('Clearance')).toHaveProperty('value', 'fit');
+    // The selected part is the tool, and the targets box is the one being filled.
+    expect(within(screen.getByRole('group', { name: 'Tools' })).getByText('Back')).toBeDefined();
+    expect(screen.getByRole('group', { name: 'Targets' }).hasAttribute('data-active')).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Cut' }));
     expect(screen.getByRole('alert').textContent).toMatch(/at least one part/);
-    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Side' })[1]!);
+    view.rerender(dialog({ partId: side, seq: 1 }));
+    expect(within(screen.getByRole('group', { name: 'Targets' })).getByText('Side')).toBeDefined();
+    expect(onPicked).toHaveBeenLastCalledWith({ tools: ['back'], targets: [side] });
     fireEvent.click(screen.getByRole('button', { name: 'Cut' }));
-    expect(onSave).toHaveBeenCalledWith({ tools: ['back'], targets: [document.parts[0]!.id], clearance: 0.3, clearanceExpression: 'fit' });
+    expect(onSave).toHaveBeenCalledWith({ tools: ['back'], targets: [side], clearance: 0.3, clearanceExpression: 'fit' });
+    // A second click on a picked part takes it out again, and its cross does too.
+    view.rerender(dialog({ partId: side, seq: 2 }));
+    expect(within(screen.getByRole('group', { name: 'Targets' })).queryByText('Side')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Take Back out of tools' }));
+    expect(within(screen.getByRole('group', { name: 'Tools' })).queryByText('Back')).toBeNull();
   });
 
   it('won’t cut a part out of itself, or with less than no room', () => {
+    const document = design();
     const onSave = vi.fn();
-    render(<PartCutDialog document={design()} tool="back" onSave={onSave} onClose={() => {}} />);
-    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Back' })[1]!);
+    const dialog = (pick: { partId: string; seq: number } | null) => (
+      <PartCutDialog document={document} tool="back" pick={pick} onSave={onSave} onClose={() => {}} />
+    );
+    const view = render(dialog(null));
+    view.rerender(dialog({ partId: 'back', seq: 1 }));
     fireEvent.click(screen.getByRole('button', { name: 'Cut' }));
     expect(screen.getByRole('alert').textContent).toMatch(/itself/);
-    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Side' })[1]!);
+    view.rerender(dialog({ partId: document.parts[0]!.id, seq: 2 }));
     fireEvent.change(screen.getByLabelText('Clearance'), { target: { value: '-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cut' }));
     expect(screen.getByRole('alert').textContent).toMatch(/less than nothing/);

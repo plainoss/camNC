@@ -90,3 +90,14 @@
 .cad-editor .cad-feature-menu button[aria-disabled='true']:hover {
   background: none;
 }
+/** Features after the one being edited, which the view doesn't show. */
+.cad-feature-rolled-back button {
+  color: #9aa7b6;
+  font-style: italic;
+}
+.cad-rollback-bar {
+  height: 4px;
+  margin: 3px 4px;
+  border-radius: 2px;
+  background: #9aa7b6;
+}

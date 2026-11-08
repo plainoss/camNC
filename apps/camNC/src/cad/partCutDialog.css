@@ -23,3 +23,29 @@
   justify-content: flex-end;
   gap: 0.5rem;
 }
+
+.cad-part-cut-box {
+  cursor: pointer;
+  border-color: #c8d3e1;
+  background: #f7f9fb;
+}
+.cad-part-cut-box[data-active] {
+  border-color: #9cc0e8;
+  background: #eef5fd;
+}
+.cad-part-cut-box ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cad-part-cut-box li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cad-editor .cad-part-cut-box li button {
+  min-height: 0;
+  padding: 0 4px;
+  color: #62758f;
+  text-decoration: none;
+}

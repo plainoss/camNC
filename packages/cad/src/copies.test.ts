@@ -95,4 +95,13 @@ describe('transformed copies', () => {
     });
     expect(changed.parts[0]!.copies![0]).toMatchObject({ mirrored: true, placement: { position: [-200, 5, 0] } });
   });
+
+  it('places an unplaced part at the origin once it has a transformed copy, so the copy sits where its offset says', () => {
+    const source = plate();
+    const part = source.parts[0]!;
+    const added = addPartCopy(source, part.id, { offset: { position: [250, 0, 0], rotation: [0, 0, 0, 1] } }).document;
+    expect(added.parts[0]!.copies![0]!.placement!.position).toEqual([250, 0, 0]);
+    const report = assemblyReport(added, evaluateCadDocument(added).parts)!;
+    expect(report.parts.map(entry => entry.name)).toEqual([part.name, `${part.name} 2`]);
+  });
 });

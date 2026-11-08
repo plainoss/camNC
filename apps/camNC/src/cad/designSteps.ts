@@ -104,3 +104,31 @@ export function designSteps(document: CadDocument): DesignStep[] {
     return [...steps, ...(after.get(partIndex) ?? [])];
   });
 }
+
+/**
+ * The design as it was built up to and including one of its steps, as the studio shows it while that step is edited:
+ * parts made after it are gone, and so are later cuts, copies, patterns and cut-parts steps.
+ */
+export function rolledBackTo(document: CadDocument, stepId: string): CadDocument {
+  const steps = designSteps(document);
+  const at = steps.findIndex(step => step.id === stepId);
+  if (at < 0 || at === steps.length - 1) return document;
+  const kept = new Set(steps.slice(0, at + 1).map(step => step.id));
+  const parts = document.parts
+    .filter(part => kept.has(`${part.id}:sketch`))
+    .map(part => {
+      const next: CadPart = { ...part };
+      if (part.features) next.features = part.features.filter(feature => kept.has(feature.id));
+      const pattern = part.pattern && kept.has(part.pattern.id);
+      if (!pattern) delete next.pattern;
+      const copies = (part.copies ?? []).filter(copy => (copy.pattern ? pattern : kept.has(copy.id)));
+      if (copies.length) next.copies = copies;
+      else delete next.copies;
+      return next;
+    });
+  const next: CadDocument = { ...document, parts };
+  const partCuts = (document.partCuts ?? []).filter(step => kept.has(step.id));
+  if (partCuts.length) next.partCuts = partCuts;
+  else delete next.partCuts;
+  return next;
+}

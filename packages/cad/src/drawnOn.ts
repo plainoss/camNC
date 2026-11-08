@@ -76,9 +76,15 @@ function partFace(part: CadPart, evaluated: EvaluatedCadPart, face: Extract<CadD
   return { origin: [a.x, a.y, 0], x: [d.x, d.y, 0], y: [0, 0, 1], z: [d.y, -d.x, 0], length };
 }
 
-/** Parts that others are drawn on. One with no placement of its own stays where they were placed against it. */
+/**
+ * Parts that others are placed against: drawn on, or copied by a transform. One with no placement of its own stays at
+ * the origin, where they were placed against it.
+ */
 export const cadDrawnOnSupports = (document: CadDocument): Set<string> =>
-  new Set(document.parts.flatMap(part => (part.drawnOn && 'partId' in part.drawnOn.on ? [part.drawnOn.on.partId] : [])));
+  new Set([
+    ...document.parts.flatMap(part => (part.drawnOn && 'partId' in part.drawnOn.on ? [part.drawnOn.on.partId] : [])),
+    ...document.parts.flatMap(part => (part.copies?.some(copy => copy.offset) ? [part.id] : [])),
+  ]);
 
 /** Where a part sits: its placement, or the origin for an unplaced part others are drawn on. */
 export function effectivePlacement(part: CadPart, supports: ReadonlySet<string>): CadPlacement | undefined {

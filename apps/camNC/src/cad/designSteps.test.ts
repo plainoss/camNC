@@ -9,7 +9,7 @@ import {
   setCutDepth,
 } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
-import { designSteps } from './designSteps';
+import { designSteps, rolledBackTo } from './designSteps';
 
 describe('the design’s steps', () => {
   it('lists each part’s sketch, thickness, cuts and copies in order', () => {
@@ -63,5 +63,31 @@ describe('the design’s steps', () => {
       ['copy', 'Copy · Divider 2', undefined],
       ['pattern', 'Pattern · Divider × 4 along y', 'spacing 80 mm'],
     ]);
+  });
+
+  it('rolls the design back to a step: later parts, cuts, copies, patterns and cut-parts steps are gone', () => {
+    let document = createPlateDocument({ width: 300, height: 600, thickness: 18 });
+    const side = document.parts[0]!;
+    side.sketch = addCircle(side.sketch, { x: 150, y: 300, radius: 20 });
+    const hole = cadSketchRegions(side, side.sketch.id).find(region => region.curveIds.length === 1)!;
+    document = setCutDepth(document, side.id, side.sketch.id, hole.id, 6);
+    document = addPartCopy(document, side.id, { mirrored: true }).document;
+    const shelf = { ...createCadPart('Shelf', 18), id: 'shelf' };
+    document = { ...document, parts: [...document.parts, shelf] };
+    document = setPartPattern(document, shelf.id, { axis: 'z', count: 3, spacing: 200 });
+    document = addPartCut(document, [shelf.id], [side.id], { value: 0.2 }).document;
+
+    const atExtrude = rolledBackTo(document, `${side.id}:extrude`);
+    expect(atExtrude.parts.map(part => part.id)).toEqual([side.id]);
+    expect(atExtrude.parts[0]!.features ?? []).toEqual([]);
+    expect(atExtrude.parts[0]!.copies).toBeUndefined();
+    expect(atExtrude.partCuts).toBeUndefined();
+
+    const atPattern = rolledBackTo(document, document.parts[1]!.pattern!.id);
+    expect(atPattern.parts[1]!.copies).toHaveLength(2);
+    expect(atPattern.parts[0]!.copies).toHaveLength(1);
+    expect(atPattern.partCuts).toBeUndefined();
+    // The last step shows everything.
+    expect(rolledBackTo(document, document.partCuts![0]!.id)).toBe(document);
   });
 });

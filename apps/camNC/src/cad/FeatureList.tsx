@@ -46,6 +46,7 @@ export function FeatureList({
   onSelect,
   onAction,
   onRename,
+  rollback,
 }: {
   document: CadDocument;
   selectedPartId: string | null;
@@ -53,6 +54,8 @@ export function FeatureList({
   onAction: (entry: FeatureEntry, action: FeatureAction) => void;
   /** A part's new name, typed in place of its step's. */
   onRename: (partId: string, name: string) => void;
+  /** The step being edited: the ones after it are greyed out, as the design is shown only that far. */
+  rollback?: string | null;
 }) {
   const { scope } = cadVariableValues(document);
   const entries: FeatureEntry[] = [
@@ -79,6 +82,7 @@ export function FeatureList({
     return `#${variable.name} = ${result ? `${formatCadValue(result.value)}${unit}` : variable.expression}`;
   };
   const key = (entry: FeatureEntry) => (entry.kind === 'step' ? entry.step.id : entry.id);
+  const rollbackAt = rollback ? entries.findIndex(entry => key(entry) === rollback) : -1;
   const open = (entry: FeatureEntry, event: MouseEvent) => {
     event.preventDefault();
     onSelect(entry);
@@ -90,7 +94,7 @@ export function FeatureList({
         <h2>Features ({entries.length})</h2>
       </div>
       <ol>
-        {entries.map(entry => {
+        {entries.map((entry, index) => {
           const step = entry.kind === 'step' ? entry.step : null;
           if (step && renaming === step.id) {
             const part = document.parts.find(candidate => candidate.id === step.partId);
@@ -120,7 +124,7 @@ export function FeatureList({
             );
           }
           return (
-            <li key={key(entry)}>
+            <li key={key(entry)} className={rollbackAt >= 0 && index > rollbackAt ? 'cad-feature-rolled-back' : undefined}>
               <button
                 type="button"
                 aria-current={step && step.partId === selectedPartId ? 'true' : undefined}
@@ -143,6 +147,9 @@ export function FeatureList({
                 <span>{label(entry)}</span>
                 {step?.detail && <small>{step.detail}</small>}
               </button>
+              {index === rollbackAt && index < entries.length - 1 && (
+                <div className="cad-rollback-bar" role="separator" aria-label="Shown up to here" />
+              )}
             </li>
           );
         })}

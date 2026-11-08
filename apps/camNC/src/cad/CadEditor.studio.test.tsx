@@ -1,4 +1,4 @@
-import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
+import { addCircle, cadSketchRegions, createPlateDocument, setCutDepth, type CadDocument } from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -170,6 +170,91 @@ it('cancels a new design’s first sketch back to how the design opened', async 
   await waitFor(() =>
     expect(change.mock.calls.at(-1)?.[0].parts[0]!.sketch.entities).toHaveLength(source.parts[0]!.sketch.entities.length)
   );
+});
+
+it('greys out the features after the one being edited, and shows them again once it closes', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  source.parts.push({ ...createPlateDocument({ width: 50, height: 50 }).parts[0]!, id: 'top', name: 'Top' });
+  sessions.push(source.id);
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  const rolledBack = () => [...features.querySelectorAll('.cad-feature-rolled-back')].map(row => row.textContent);
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  expect(rolledBack()).toEqual([expect.stringMatching(/Sketch · Top/), expect.stringMatching(/Extrude · Top/)]);
+  expect(within(features).getByRole('separator', { name: 'Shown up to here' })).toBeDefined();
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  expect(rolledBack()).toEqual([]);
+});
+
+it('says why a variable in use can’t be deleted, and edits a variable from an open sketch in the studio', async () => {
+  const source: CadDocument = {
+    ...createPlateDocument({ width: 200, height: 100 }),
+    variables: [
+      { id: 'a', name: 'a', expression: '10 mm' },
+      { id: 'b', name: 'b', expression: 'a * 2' },
+    ],
+  };
+  sessions.push(source.id);
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /#a = 10 mm/ }));
+  await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Delete' }));
+  expect((await screen.findByRole('alert')).textContent).toMatch(/a is used in one place/);
+
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Plate/ }));
+  await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /#a = 10 mm/ }));
+  expect(await screen.findByRole('dialog', { name: '#a' })).toBeDefined();
+  expect(screen.queryByRole('dialog', { name: 'Sketch · Plate' })).toBeNull();
+});
+
+it('closes an open variable dialog when another step is started', async () => {
+  await studio();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Variable/ }));
+  expect(screen.getByRole('dialog', { name: 'Variable' })).toBeDefined();
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  expect(await screen.findByRole('dialog', { name: 'Extrude · Plate' })).toBeDefined();
+  expect(screen.queryByRole('dialog', { name: 'Variable' })).toBeNull();
+});
+
+it('keeps steps already set when a cut’s sketch view is cancelled', async () => {
+  let source = createPlateDocument({ width: 200, height: 100 });
+  const plate = source.parts[0]!;
+  plate.sketch = addCircle(plate.sketch, { x: 100, y: 50, radius: 10 });
+  const hole = cadSketchRegions(plate, plate.sketch.id).find(region => region.curveIds.length === 1)!;
+  source = setCutDepth(source, plate.id, plate.sketch.id, hole.id, 6);
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  await userEvent.clear(within(dialog).getByRole('textbox', { name: /Thickness/ }));
+  await userEvent.type(within(dialog).getByRole('textbox', { name: /Thickness/ }), '24');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(24));
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Cut 1 · Plate/ }));
+  await userEvent.click(within(await screen.findByRole('dialog', { name: 'Sketch · Plate' })).getByRole('button', { name: 'Cancel' }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  expect(latest().parts[0]!.thickness).toBe(24);
 });
 
 it('copies a part with a transform, and edits the copy from its feature', async () => {
