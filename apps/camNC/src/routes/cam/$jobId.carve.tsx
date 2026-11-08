@@ -215,7 +215,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
   });
-  const setBoard = (change: Partial<{ w: number; h: number; thickness: number; taped: boolean }>) => {
+  const setBoard = (change: Partial<{ w: number; h: number; thickness: number }>) => {
     if (!board) return;
     const w = change.w ?? size.w,
       h = change.h ?? size.h;
@@ -223,7 +223,6 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
       ...board,
       size: { fit: false, w, h },
       thickness: change.thickness ?? board.thickness,
-      ...(change.taped !== undefined && { taped: change.taped }),
     };
     saveCarving(
       withItems(
@@ -721,9 +720,6 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               <NumberInput id="carve-board-t" value={thickness} min={3} max={100} unit="mm" onCommit={t => setBoard({ thickness: t })} />
             </Field>
           </div>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={!!board?.taped} onChange={e => setBoard({ taped: e.target.checked })} /> Tape under the board
-          </label>
           <p className="text-xs text-muted-foreground">
             Measure the board&rsquo;s thickness: Z0 is its underside, so a thicker board carves deeper and wider.
           </p>
