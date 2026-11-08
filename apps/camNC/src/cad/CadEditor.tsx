@@ -3640,7 +3640,8 @@ export function CadEditor({
       if (problem) return setStudioRefusal(`Can’t extrude this sketch yet: ${problem.message}`);
       commit(
         replacePart(before, part.id, p => {
-          const { extrude: _sketchOnly, ...made } = p;
+          const made = { ...p };
+          delete made.extrude;
           return made.drawnOn && !made.thin && isSingleLine(made) ? { ...made, thin: { depth: 100, midPlane: true } } : made;
         })
       );
