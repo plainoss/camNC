@@ -1,4 +1,5 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { hasWork } from './carving';
 import * as Comlink from 'comlink';
 import type { CamWorkerAPI } from '../workers/cam.worker';
 import type { BoardRequest, ModelImport, PlanResult } from './camTypes';
@@ -70,6 +71,8 @@ export function useCamModel(job: CamJobV1 | null | undefined) {
     // A file that can't be read fails the same way again: say so now, not after three slow retries.
     retry: false,
     queryFn: async (): Promise<ModelImport> => {
+      // A carving has no parts: its board's request carries the artwork.
+      if (job!.carving) return { parts: [], meshes: [], readMs: 0, analyzeMs: 0 };
       if (job!.design) {
         const document = job!.design.accepted;
         if (!document) return { parts: [], meshes: [], readMs: 0, analyzeMs: 0 };
@@ -194,7 +197,7 @@ export function useBoardPlans(
       const perPart = request.holdDown === 'tabs-guided' && !pauseEachTab;
       return {
         queryKey: ['cam', 'board-plan', sourceKey, request, settings, perPart] as const,
-        enabled: !!job && modelReady && request.parts.length > 0,
+        enabled: !!job && modelReady && hasWork(request),
         staleTime: Infinity,
         gcTime: 60_000,
         queryFn: async (): Promise<PlanResult> => ({

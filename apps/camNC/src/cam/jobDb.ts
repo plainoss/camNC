@@ -1,4 +1,6 @@
 import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
+import { carvingBoard, kCarvingBoard, kDefaultVBit, type CarvingV1 } from './carving';
+import { outlineArt, placeRegion } from './carvingOutline';
 import { rebaseJob } from './rebaseJob';
 import type { BoardV1, StockBoardV1 } from './boards';
 import type { NestObjective } from './autoNest';
@@ -38,6 +40,8 @@ export interface CamJobV1 {
     /** Removed hole targets retain their choices for Undo, but never apply to another hole. */
     holeChoiceIssues?: import('./holeChoices').MissingHoleChoice[];
   };
+  /** A carving job: artwork V-carved into one board, instead of parts (see `carving.ts`). */
+  carving?: CarvingV1;
   /** Goes up with every replaced model file: a file of the same name can hold another model. */
   modelRevision?: number;
   createdAt: number;
@@ -198,6 +202,32 @@ export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV
   });
 }
 
+/** Start a carving: lettering on a board, ready to edit on the Carve step. */
+export async function createCarvingJob(name = 'Untitled carving'): Promise<CamJobV1> {
+  const context = captureStorageContext();
+  const now = Date.now();
+  const title = uniqueJobName(
+    name,
+    (await listJobsIn(context)).map(j => j.name)
+  );
+  const art = { kind: 'text' as const, text: 'Welcome', font: 'serif' as const };
+  const height = 30;
+  const x = kCarvingBoard.w / 2,
+    y = kCarvingBoard.h / 2;
+  const { region } = await outlineArt(art, height);
+  return saveJobIn(context, {
+    v: 1,
+    id: crypto.randomUUID(),
+    name: title,
+    fileName: title,
+    createdAt: now,
+    updatedAt: now,
+    parts: [],
+    carving: { art, height, x, y, maxDepth: 3, vBit: kDefaultVBit, clearWithFlat: true, region: placeRegion(region, x, y) },
+    boards: [carvingBoard(kCarvingBoard)],
+  });
+}
+
 /**
  * Start a job from a design made outside the app, such as by a script. It's only ever a new job and a draft: new part
  * IDs in an existing job would mark its physical sheets out of date, and someone has to finish the sketch to use it.
@@ -270,7 +300,11 @@ async function saveJobIn(context: StorageContext, job: CamJobV1, base?: CamJobV1
 
 /** One version of a job's model: what its parts and programs are computed from. */
 export const modelKey = (job: CamJobV1) =>
-  job.design ? `${job.id}:cad:${job.design.acceptedRevision}` : `${job.id}:${job.fileName}:${job.modelRevision ?? 0}`;
+  job.carving
+    ? `${job.id}:carving`
+    : job.design
+      ? `${job.id}:cad:${job.design.acceptedRevision}`
+      : `${job.id}:${job.fileName}:${job.modelRevision ?? 0}`;
 
 /**
  * Commit an update only while its model still belongs to an existing job. Reading and writing in one transaction

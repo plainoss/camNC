@@ -174,10 +174,20 @@ export function CamQueueCard() {
     }
   };
   const board = current?.board.board;
-  const bit = current && entryProgram(current)?.diameter;
+  const program = current && entryProgram(current);
+  const bit = program?.diameter;
   // The previous entry in the queue left another bit in the collet, on any kind of entry.
-  const swap = bit !== undefined && bit !== current?.bitBefore;
-  const swapText = current?.bitBefore === undefined ? `Put in the ⌀${bit} mm bit` : `Swap the bit to ⌀${bit} mm`;
+  // A V-bit is named: its diameter alone would read like a flat bit's. After another tool of its diameter, it's a swap too.
+  const vBit = program?.name && /V-bit/.test(program.name) ? program.name : undefined;
+  const swap =
+    bit !== undefined &&
+    (bit !== current?.bitBefore || (!!vBit && current?.toolBefore !== undefined && program?.tool !== current.toolBefore));
+  const swapText =
+    current?.bitBefore === undefined
+      ? `Put in the ${vBit ?? `⌀${bit} mm bit`}`
+      : vBit
+        ? `Swap the bit to the ${vBit}`
+        : `Swap the bit to ⌀${bit} mm`;
   const onCamera = current?.flip?.registration === 'camera';
   const at = current ? queue.indexOf(current) : -1;
   const blockedCount = queue.filter(e => e.kind !== 'pending' && e.blocked).length;

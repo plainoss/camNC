@@ -85,10 +85,20 @@ describe('carvingOperations', () => {
     expect(ops[0].warnings).toBeUndefined();
   });
 
-  it('works from the outline inwards: the shallowest ring first', () => {
-    const [op] = carvingOperations(carving(bar(4)), 18);
-    const zs = op.passes.map(p => p.pts[0][2]);
-    expect(zs).toEqual([...zs].sort((a, b) => b - a));
+  it('cuts a straight wall with its deepest ring alone, deep grooves in steps', () => {
+    const passes = carvingOperations(carving(bar(6), { tool: V60, maxDepth: 6 }), 18)[0].passes;
+    // The bar's centre line, 3 × √3 = 5.2 deep, in four steps no deeper than 1.5 mm.
+    const depths = new Set(passes.flatMap(p => p.pts.map(q => +(18 - q[2]).toFixed(1))));
+    for (const step of [1.3, 2.6, 3.9, 5.2]) expect(depths).toContain(step);
+    expect(Math.max(...depths)).toBe(5.2);
+    // Shallower rings only where the bar's ends round off: the whole job is a few times the centre line's length.
+    const length = passes.reduce(
+      (s, p) => s + p.pts.slice(1).reduce((t, q, i) => t + Math.hypot(q[0] - p.pts[i][0], q[1] - p.pts[i][1]), 0),
+      0
+    );
+    expect(length).toBeLessThan(5 * 2 * 60);
+    // Joined up: the bit lifts out only a few times.
+    expect(passes.length).toBeLessThan(6);
   });
 
   it('leaves the hole of an "o" uncut', () => {
@@ -124,15 +134,77 @@ describe('carvingOperations', () => {
   it('clears a flat bottom with the V-bit alone when there is no flat bit', () => {
     const ops = carvingOperations(carving(bar(12), { maxDepth: 2 }), 18);
     expect(ops.map(o => o.kind)).toEqual(['vcarve']);
-    const floor = ops[0].passes.filter(p => p.pts[0][2] === 16);
-    // Rings right across the 8 mm flat bottom, a tenth of a mm apart.
-    expect(floor.length).toBeGreaterThan(30);
+    const floor = ops[0].passes.flatMap(p => p.pts.filter(q => q[2] === 16));
+    const length = floor.slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - floor[i][0], q[1] - floor[i][1]), 0);
+    // Rings right across the 8 mm flat bottom, a tenth of a mm apart, joined at the floor without lifting.
+    expect(length).toBeGreaterThan(40 * 2 * 52);
+    // Without lifting between the rings at the floor.
+    expect(ops[0].passes.length).toBeLessThanOrEqual(4);
   });
 
   it('uses the V-bit where the flat bottom is too narrow for the flat bit', () => {
     const ops = carvingOperations(carving(bar(6), { maxDepth: 2, clearTool: { ...FLAT, diameter: 6 } }), 18);
     expect(ops.map(o => o.kind)).toEqual(['vcarve']);
   });
+});
+
+/** Deepest the passes cut at (x, y), with the V-bit's cone; ramps between depths followed in 0.02 mm steps. */
+function cutDepth(passes: { pts: number[][] }[], x: number, y: number, top: number, slope: number): number {
+  let best = 0;
+  for (const { pts } of passes)
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i],
+        b = pts[Math.min(i + 1, pts.length - 1)];
+      if (a[2] === b[2]) {
+        best = Math.max(best, top - a[2] - distPointSeg(x, y, a[0], a[1], b[0], b[1]) * slope);
+        continue;
+      }
+      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.02));
+      for (let k = 0; k <= n; k++) {
+        const t = k / n;
+        const d = top - (a[2] + (b[2] - a[2]) * t) - Math.hypot(x - a[0] - (b[0] - a[0]) * t, y - a[1] - (b[1] - a[1]) * t) * slope;
+        if (d > best) best = d;
+      }
+    }
+  return best;
+}
+
+describe('the carved surface', () => {
+  const L: PathsD = [
+    [
+      { x: 0, y: 0 },
+      { x: 14, y: 0 },
+      { x: 14, y: 4 },
+      { x: 5, y: 4 },
+      { x: 5, y: 20 },
+      { x: 0, y: 20 },
+    ],
+  ];
+  const O: PathsD = [rect(0, 0, 16, 16), rect(4, 4, 12, 12).reverse()];
+  for (const [name, region] of [
+    ['an L with strokes 4 and 5 wide', L],
+    ['an O', O],
+  ] as const)
+    it(`is cut to depth everywhere in ${name}, never past it`, () => {
+      const [op] = carvingOperations(carving(region), 18);
+      let worst = 0;
+      for (let x = 0.1; x < 16; x += 0.25)
+        for (let y = 0.1; y < 20; y += 0.25) {
+          const target = Math.min(3, toOutline(region, x, y) * vSlope(V90));
+          const cut = cutDepth(op.passes, x, y, 18, vSlope(V90));
+          if (toOutline(region, x, y) < 0.05) continue;
+          // Points outside the artwork are not cut at all.
+          const isInside = name === 'an O' ? !(x > 4 && x < 12 && y > 4 && y < 12) && x < 16 && y < 16 : x < 5 || y < 4;
+          if (!isInside || (name !== 'an O' && x > 14) || (name === 'an O' && y > 16)) {
+            expect(cut).toBeLessThan(0.02);
+            continue;
+          }
+          expect(cut).toBeLessThan(target + 0.02);
+          worst = Math.max(worst, target - cut);
+        }
+      // Ridges where the strokes narrow: no higher than a ring step.
+      expect(worst).toBeLessThan(0.25);
+    });
 });
 
 describe('carvings on a board', () => {
