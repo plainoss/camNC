@@ -34,6 +34,8 @@ export function CadValueInput({ inputRef, unit = 'mm', unitClassName, value, def
   const [draft, setDraft] = useState(() => String(defaultValue ?? ''));
   const [menu, setMenu] = useState<{ start: number; typed: string; at: number } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // Text this field puts in itself, such as a picked `#name`, doesn't open the list again.
+  const quiet = useRef(false);
   // The owner's handlers as of the latest render, to finish a key or leave the field once a new variable is in scope.
   const latest = useRef({ onKeyDown, onBlur });
   latest.current = { onKeyDown, onBlur };
@@ -49,6 +51,7 @@ export function CadValueInput({ inputRef, unit = 'mm', unitClassName, value, def
       end = menu.start + 1 + menu.typed.length;
     // A new variable is typed in place, `#name = value`, and made on Enter.
     const insert = option.name ? `#${option.name}` : `#${menu.typed || 'name'} = `;
+    quiet.current = true;
     typeInto(input, text.slice(0, menu.start) + insert + text.slice(end), menu.start + insert.length);
     if (!option.name && !menu.typed) input.setSelectionRange(menu.start + 1, menu.start + 5);
     setMenu(null);
@@ -59,7 +62,10 @@ export function CadValueInput({ inputRef, unit = 'mm', unitClassName, value, def
     if (!definition) return false;
     const refused = fields.define(definition.name, definition.expression);
     setProblem(refused);
-    if (!refused) typeInto(input, `#${definition.name}`);
+    if (!refused) {
+      quiet.current = true;
+      typeInto(input, `#${definition.name}`);
+    }
     return true;
   };
   const setRefs = (element: HTMLInputElement | null) => {
@@ -80,7 +86,10 @@ export function CadValueInput({ inputRef, unit = 'mm', unitClassName, value, def
         onChange={event => {
           setDraft(event.currentTarget.value);
           setProblem(null);
-          if (fields) {
+          if (quiet.current) {
+            quiet.current = false;
+            setMenu(null);
+          } else if (fields) {
             const prefix = variablePrefix(
               event.currentTarget.value,
               event.currentTarget.selectionStart ?? event.currentTarget.value.length
@@ -122,7 +131,16 @@ export function CadValueInput({ inputRef, unit = 'mm', unitClassName, value, def
                 preventDefault: () => {},
                 stopPropagation: () => {},
               } as unknown as KeyboardEvent<HTMLInputElement>;
-              requestAnimationFrame(() => requestAnimationFrame(() => latest.current.onKeyDown?.(enter)));
+              // The field's own Enter handler, or its form's, such as the creation sizes bar, then takes it.
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() =>
+                  latest.current.onKeyDown
+                    ? latest.current.onKeyDown(enter)
+                    : input.form
+                      ? input.form.requestSubmit()
+                      : input.dispatchEvent(new input.ownerDocument.defaultView!.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+                )
+              );
             }
             return;
           }
