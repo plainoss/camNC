@@ -68,6 +68,14 @@ describe('the Carve step', () => {
     const svgTab = screen.getByRole('tab', { name: 'SVG' });
     fireEvent.click(svgTab);
     expect(click).toHaveBeenCalledTimes(1);
+    // The tab shows the chooser is opening until it closes.
+    expect(svgTab.getAttribute('aria-busy')).toBe('true');
+    fireEvent(input, new Event('cancel'));
+    expect(svgTab.getAttribute('aria-busy')).toBe('false');
+    fireEvent.click(svgTab);
+    expect(click).toHaveBeenCalledTimes(2);
+    fireEvent.focus(window);
+    expect(svgTab.getAttribute('aria-busy')).toBe('false');
     // Opening or cancelling the picker keeps the existing lettering.
     fireEvent.change(input, { target: { files: [] } });
     expect(svgTab.getAttribute('aria-selected')).toBe('false');
@@ -80,7 +88,7 @@ describe('the Carve step', () => {
     expect(screen.getByLabelText('Another SVG')).toBe(input);
     expect((await getJob(job.id))?.carving?.art).toEqual({ kind: 'svg', svg, fileName: 'half.svg' });
     fireEvent.click(svgTab);
-    expect(click).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(2);
 
     const replacement = svg.replace('200 100', '100 100');
     fireEvent.change(input, { target: { files: [new File([replacement], 'square.svg', { type: 'image/svg+xml' })] } });

@@ -343,6 +343,20 @@ const centred = (carving: CarvingV1, size: { w: number; h: number }) => {
 
 function ArtFields({ art, onArt }: { art: CarvingArt; onArt: (art: CarvingArt) => void }) {
   const svgInput = useRef<HTMLInputElement>(null);
+  // The browser's file chooser can take a moment to appear, so the SVG tab shows it is opening until the chooser closes.
+  const [choosing, setChoosing] = useState(false);
+  useEffect(() => {
+    if (!choosing) return;
+    const input = svgInput.current;
+    const done = () => setChoosing(false);
+    // Cancelling fires `cancel`; browsers without it return focus to the window when the chooser closes.
+    input?.addEventListener('cancel', done);
+    window.addEventListener('focus', done);
+    return () => {
+      input?.removeEventListener('cancel', done);
+      window.removeEventListener('focus', done);
+    };
+  }, [choosing]);
   const [text, setText] = useState(art.kind === 'text' ? art.text : 'Welcome');
   // Typing outlines again once it pauses.
   useEffect(() => {
@@ -359,12 +373,20 @@ function ArtFields({ art, onArt }: { art: CarvingArt; onArt: (art: CarvingArt) =
             key={kind}
             role="tab"
             aria-selected={art.kind === kind}
-            className={cn('rounded px-3 py-1', art.kind === kind ? 'bg-background shadow-sm' : 'text-muted-foreground')}
+            aria-busy={kind === 'svg' && choosing}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded px-3 py-1 transition-colors hover:text-foreground active:bg-background/60',
+              art.kind === kind ? 'bg-background shadow-sm' : kind === 'svg' && choosing ? 'text-foreground' : 'text-muted-foreground'
+            )}
             onClick={() => {
               if (kind === art.kind) return;
               if (kind === 'text') onArt({ kind: 'text', text, font });
-              else svgInput.current?.click();
+              else {
+                setChoosing(true);
+                svgInput.current?.click();
+              }
             }}>
+            {kind === 'svg' && choosing && <LoadingSpinner className="size-3" aria-label="Opening file chooser" />}
             {kind === 'text' ? 'Lettering' : 'SVG'}
           </button>
         ))}
@@ -389,7 +411,11 @@ function ArtFields({ art, onArt }: { art: CarvingArt; onArt: (art: CarvingArt) =
           accept=".svg,image/svg+xml"
           onChange={e => {
             const file = e.target.files?.[0];
-            if (file) void file.text().then(svg => onArt({ kind: 'svg', svg, fileName: file.name }));
+            if (!file) return setChoosing(false);
+            void file
+              .text()
+              .then(svg => onArt({ kind: 'svg', svg, fileName: file.name }))
+              .finally(() => setChoosing(false));
             // Choosing the same file again still counts.
             e.target.value = '';
           }}
