@@ -317,6 +317,8 @@ it('sketches on a base plane picked before Sketch or Shift+S, as on one picked a
   // Picking a plane with nothing started only selects it; picking it again lets it go.
   await userEvent.click(within(planes).getByRole('button', { name: /Front/ }));
   expect(within(planes).getByRole('button', { name: /Front/ }).getAttribute('aria-pressed')).toBe('true');
+  // The pick is said, so it isn't hidden from whoever presses Sketch next.
+  expect(within(screen.getByTestId('workspace-3d')).getByRole('status').textContent).toMatch(/Picked the front plane/i);
   expect(screen.queryByRole('dialog', { name: /Sketch/ })).toBeNull();
   const toolbar = screen.getByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Sketch/ }));

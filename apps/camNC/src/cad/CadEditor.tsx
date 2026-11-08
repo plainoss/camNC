@@ -485,6 +485,10 @@ export function CadEditor({
   const [selectedPlane, setSelectedPlane] = useState<BasePlane | null>(null);
   // The face of the part last clicked in the studio, which the next sketch is drawn on, as with a picked plane.
   const [selectedFace, setSelectedFace] = useState<Extract<CadDrawnOn['on'], { partId: string }> | null>(null);
+  // A picked face goes with its part.
+  useEffect(() => {
+    if (selectedFace && !doc.parts.some(candidate => candidate.id === selectedFace.partId)) setSelectedFace(null);
+  }, [doc.parts, selectedFace]);
   // Where the drawing sits in its pane, for the parts shown behind a sketch to line up with it.
   const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
@@ -3590,7 +3594,9 @@ export function CadEditor({
       setFeatureDialog(null);
       setPartCutting(null);
       // A plane or face picked first is drawn on straight away, as the reference sketches on what's selected.
-      const picked = !choosingFace && (selectedPlane ? { plane: selectedPlane } : selectedFace);
+      // A face picked on a part that has since gone, as when it was deleted, is no longer there to draw on.
+      const face = selectedFace && cadFaceFrame(documentRef.current, selectedFace);
+      const picked = !choosingFace && (selectedPlane ? { plane: selectedPlane } : face && !('error' in face) ? selectedFace : null);
       if (picked) {
         setSelectedPlane(null);
         setSelectedFace(null);
@@ -4315,6 +4321,7 @@ export function CadEditor({
                 onNewPart={newPartOn}
                 selectedPlane={selectedPlane}
                 onSelectPlane={pickPlane}
+                picked={selectedPlane ? drawnOnName(doc, { plane: selectedPlane }) : selectedFace ? drawnOnName(doc, selectedFace) : null}
                 onSelectFace={on => {
                   setSelectedFace(on);
                   if (on) setSelectedPlane(null);

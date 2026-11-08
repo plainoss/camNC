@@ -28,6 +28,7 @@ export default function WorkspaceView({
   selectedPlane,
   onSelectPlane,
   onSelectFace,
+  picked,
   children,
 }: {
   document: CadDocument;
@@ -53,6 +54,8 @@ export default function WorkspaceView({
   onSelectPlane?: (plane: BasePlane) => void;
   /** The face of the part last clicked, for a sketch started next to be drawn on, as the reference sketches on a selection. */
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
+  /** The name of the plane or face picked for the next sketch, said in the status line so the pick isn't hidden. */
+  picked?: string | null;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
 }) {
@@ -96,15 +99,17 @@ export default function WorkspaceView({
     ? notice
     : choosing
       ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
-      : clashes.length
-        ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
-        : model.problems.length
-          ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
-          : view === 'flat'
-            ? 'Each part turned so its machined side faces up, the way it lies on the board.'
-            : model.meshes.length
-              ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
-              : 'Draw a part to start.';
+      : picked
+        ? `Picked ${picked}: Sketch or Shift+S draws on it.`
+        : clashes.length
+          ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
+          : model.problems.length
+            ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
+            : view === 'flat'
+              ? 'Each part turned so its machined side faces up, the way it lies on the board.'
+              : model.meshes.length
+                ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
+                : 'Draw a part to start.';
   return (
     <div
       ref={frame}
