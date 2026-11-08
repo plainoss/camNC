@@ -396,6 +396,30 @@
 .cad-part-view-tools button:disabled {
   color: #8d9aa8;
 }
+.cad-assembly-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  right: 12px;
+}
+.cad-assembly-tools [role='group'] {
+  display: flex;
+}
+.cad-assembly-tools [role='group'] button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.cad-assembly-tools [role='group'] button:first-child {
+  border-radius: 6px 0 0 6px;
+  margin-left: 0;
+}
+.cad-assembly-tools [role='group'] button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.cad-assembly-tools button[aria-pressed='true'] {
+  background: #ede9fe;
+  border-color: #8b5cf6;
+}
 .cad-part-view > p {
   position: absolute;
   bottom: 8px;

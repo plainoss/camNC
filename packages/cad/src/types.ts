@@ -244,8 +244,18 @@ export interface CadPart {
   /** The thickness as typed, kept when it uses design variables. */
   thicknessExpression?: string;
   sketch: CadSketch;
+  /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
+  placement?: CadPlacement;
   /** Ordered: a sketch can sit on the floor of an earlier cut. Parts without features are plain flat profiles. */
   features?: CadFeature[];
+}
+/**
+ * A part's sketch x and y, with its thickness as z, turned by `rotation` (a unit quaternion x, y, z, w) and then moved by
+ * `position`, in mm.
+ */
+export interface CadPlacement {
+  position: [number, number, number];
+  rotation: [number, number, number, number];
 }
 /** The face a sketch is drawn on. All sketches share the part's x and y, seen from above, whichever face they're on. */
 export type CadFaceRef = 'top' | 'underside' | { floorOf: string };

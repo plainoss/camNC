@@ -19,6 +19,7 @@ export * from './dimensionPlacement';
 export * from './dimensionExpressions';
 export * from './valueExpressions';
 export * from './variables';
+export * from './placement';
 
 export * from './dimensionValues';
 export * from './dimensionCreation';

@@ -682,6 +682,13 @@ export function parseCadDocument(input: unknown): CadDocument {
       throw new Error('Invalid CAD part');
     number(p.thickness);
     if (p.thicknessExpression !== undefined && typeof p.thicknessExpression !== 'string') throw new Error('Invalid CAD part');
+    if (p.placement !== undefined) {
+      const { position, rotation } = p.placement ?? {};
+      if (!Array.isArray(position) || position.length !== 3 || !Array.isArray(rotation) || rotation.length !== 4)
+        throw new Error('Invalid CAD placement');
+      [...position, ...rotation].forEach(number);
+      if (Math.abs(Math.hypot(...rotation) - 1) > 1e-6) throw new Error('Invalid CAD placement');
+    }
     if (d.version === 1 && p.features !== undefined) throw new Error('Invalid CAD document');
     if (p.features !== undefined && !Array.isArray(p.features)) throw new Error('Invalid CAD features');
     const sketches = [p.sketch];
