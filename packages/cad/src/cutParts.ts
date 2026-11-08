@@ -477,6 +477,7 @@ export function updatePartCut(document: CadDocument, id: string, change: Partial
       if (step.id !== id) return step;
       const next = { ...step, ...change };
       if (change.clearance !== undefined && !change.clearanceExpression) delete next.clearanceExpression;
+      if (Object.hasOwn(change, 'split') && change.split === undefined) delete next.split;
       return next;
     }),
   };
