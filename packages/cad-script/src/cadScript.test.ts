@@ -367,6 +367,16 @@ describe('part studio', () => {
     });
     expect(report.assembly!.parts.map(part => part.at[0])).toEqual([0, 60, 120, 180, 240]);
   });
+
+  it('refuses a part pattern too long for the document to reopen', async () => {
+    const result = await editCad(null, d => {
+      const slat = d.part('Slat', { thickness: 12 });
+      slat.profile.rect({ at: [0, 0], w: 10, h: 100 });
+      slat.drawOn('top');
+      slat.pattern({ axis: 'x', count: 201, spacing: 20 });
+    });
+    expect(result.scriptError).toBe('A part pattern makes at most 200 parts, not 201.');
+  });
 });
 
 describe('variables and assembly', () => {

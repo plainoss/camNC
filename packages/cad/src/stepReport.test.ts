@@ -98,4 +98,14 @@ describe('the step report', () => {
       ],
     });
   });
+
+  it('lays a pattern out from an unplaced part that others are drawn on, as it sits at the origin', async () => {
+    const base = { ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!, name: 'Base' };
+    const post = plate('Post', 20, 20, { on: { partId: base.id, face: 'top' }, offset: 0 });
+    let document = { ...createCadDocument(), parts: [base, post] };
+    document = setPartPattern(document, base.id, { axis: 'x', count: 2, spacing: 150 });
+    const solved = await solveCadDocument(document);
+    expect(solved.document.parts[0]!.placement).toBeUndefined();
+    expect(solved.document.parts[0]!.copies![0]!.placement!.position).toEqual([150, 0, 0]);
+  });
 });

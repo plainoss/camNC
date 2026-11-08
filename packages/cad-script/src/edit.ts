@@ -11,6 +11,7 @@ import {
   evaluateCadDocument,
   resolveDrawnPlacements,
   setPartPattern,
+  CAD_MAX_PART_PATTERN,
   addRectangle,
   cadFaceSketches,
   cadVariableScope,
@@ -668,6 +669,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     pattern({ axis, count, spacing }) {
       const total = Math.floor(measure(count, 'Count', 'scalar') + 1e-9);
       if (!(total >= 1)) fail(`A part pattern needs at least one part, not ${total}.`);
+      if (total > CAD_MAX_PART_PATTERN) fail(`A part pattern makes at most ${CAD_MAX_PART_PATTERN} parts, not ${total}.`);
       document = setPartPattern(document, partId, {
         axis,
         count: total,
