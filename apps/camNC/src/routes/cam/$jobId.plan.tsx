@@ -1,4 +1,5 @@
 import { RehearsalButton } from '@/lib/rehearsal/RehearsalButton';
+import { hasWork } from '@/cam/carving';
 import { freezeRehearsalBoard } from '@/lib/rehearsal/boardSnapshot';
 import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
@@ -61,7 +62,7 @@ function PlanStep() {
   const [side, setSide] = useState<'a' | 'b'>('a');
   const save = useSaveCamJob(job);
   const { boards, instances } = useJobBoards(job, model.data);
-  const executable = boards.filter(b => b.request.parts.length);
+  const executable = boards.filter(b => hasWork(b.request));
   // Keep repair/include actions reachable when no part is currently executable.
   const active = executable.length ? executable : boards.filter(b => b.board.items.length);
   const plans = useBoardPlans(
@@ -354,7 +355,7 @@ function PlanStep() {
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
               Board {current.board.name} couldn’t be planned: {current.error.message}
             </p>
-          ) : !current.request.parts.length ? (
+          ) : !hasWork(current.request) ? (
             <p role="status" className="rounded-lg border bg-muted/30 p-4 text-sm">
               No executable parts on this board. Include excluded parts again or repair their placement on Boards.
             </p>

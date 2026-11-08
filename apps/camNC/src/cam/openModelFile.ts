@@ -28,7 +28,8 @@ export async function createJobFromFile(file: File): Promise<CamJobV1> {
 }
 
 /** Where a new job opens: a design goes to its sketch, to be checked and finished, and a model to its parts. */
-export const firstStage = (job: CamJobV1) => (job.design ? ('/cam/$jobId/design' as const) : ('/cam/$jobId/model' as const));
+export const firstStage = (job: CamJobV1) =>
+  job.carving ? ('/cam/$jobId/carve' as const) : job.design ? ('/cam/$jobId/design' as const) : ('/cam/$jobId/model' as const);
 
 async function importDesignFile(file: File): Promise<CamJobV1> {
   let document;

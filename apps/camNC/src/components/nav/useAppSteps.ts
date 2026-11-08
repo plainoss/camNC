@@ -4,10 +4,10 @@ import { useCamJob } from '@/cam/camQueries';
 import { useCamMachine } from '@/cam/machine/camMachine';
 import { openAtMachine } from '@/cam/machine/openAtMachine';
 import { useLocation, useNavigate, useRouter, useSearch } from '@tanstack/react-router';
-import { Box, Factory, LayoutGrid, ListOrdered, type LucideIcon } from 'lucide-react';
+import { Box, Factory, LayoutGrid, ListOrdered, Type, type LucideIcon } from 'lucide-react';
 
 export interface AppStep {
-  key: 'design' | 'model' | 'boards' | 'plan' | 'machine';
+  key: 'design' | 'model' | 'carve' | 'boards' | 'plan' | 'machine';
   label: string;
   icon: LucideIcon;
   current: boolean;
@@ -15,7 +15,7 @@ export interface AppStep {
   disabled: boolean;
   /** A route to link to, or something to do first. */
   link?: {
-    to: '/cam/$jobId/design' | '/cam/$jobId/model' | '/cam/$jobId/boards' | '/cam/$jobId/plan' | '/visualize/2DView';
+    to: '/cam/$jobId/design' | '/cam/$jobId/model' | '/cam/$jobId/carve' | '/cam/$jobId/boards' | '/cam/$jobId/plan' | '/visualize/2DView';
     params?: { jobId: string };
     search?: { board?: string; part?: string; returnTo?: 'boards' | 'plan' | 'machine' };
   };
@@ -24,7 +24,7 @@ export interface AppStep {
   onPreload?: () => void;
 }
 
-const kPrepareRoute = /^\/cam\/([^/]+)\/(design|model|boards|plan)/;
+const kPrepareRoute = /^\/cam\/([^/]+)\/(design|model|carve|boards|plan)/;
 const kMachineRoute = '/visualize/2DView';
 
 /** The job in view (or at the machine) and its steps, from preparing it to the machine, which works without a job too. */
@@ -59,7 +59,7 @@ export function useAppSteps() {
             });
         }
       : undefined;
-  const prepareStep = (key: 'design' | 'model' | 'boards' | 'plan', label: string, icon: LucideIcon): AppStep => ({
+  const prepareStep = (key: 'design' | 'model' | 'carve' | 'boards' | 'plan', label: string, icon: LucideIcon): AppStep => ({
     key,
     label,
     icon,
@@ -72,7 +72,7 @@ export function useAppSteps() {
           search:
             key === 'design'
               ? { returnTo: atMachine ? 'machine' : prepare?.[2] === 'plan' ? 'plan' : 'boards', board: selectedBoard, part }
-              : key !== 'model' && selectedBoard
+              : key !== 'model' && key !== 'carve' && selectedBoard
                 ? { board: selectedBoard }
                 : undefined,
         }
@@ -80,9 +80,15 @@ export function useAppSteps() {
     onClick: key === 'boards' || key === 'plan' ? guarded(key) : undefined,
     pending: !!stageGuard?.pending,
   });
+  // A carving is edited, board and all, on one step.
+  const carving = !!job?.carving || prepare?.[2] === 'carve';
   const steps: AppStep[] = [
-    prepareStep(native ? 'design' : 'model', native ? (atMachine ? 'Edit design' : 'Design') : 'Model', Box),
-    prepareStep('boards', 'Boards', LayoutGrid),
+    ...(carving
+      ? [prepareStep('carve', 'Carve', Type)]
+      : [
+          prepareStep(native ? 'design' : 'model', native ? (atMachine ? 'Edit design' : 'Design') : 'Model', Box),
+          prepareStep('boards', 'Boards', LayoutGrid),
+        ]),
     prepareStep('plan', 'Plan', ListOrdered),
     {
       key: 'machine',
