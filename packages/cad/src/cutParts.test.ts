@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { withPartCuts } from './cutParts';
+import { updatePartCut, withPartCuts } from './cutParts';
 import {
   cadStepReport,
   addCircle,
@@ -465,5 +465,248 @@ describe('tools that only fill part of where they reach', () => {
     const { cuts, messages } = await cut(round);
     expect(cuts).toEqual([]);
     expect(messages).toEqual(["Dowel isn't square-cornered and straight-sided where it reaches into Leg, so it can't be cut from it yet."]);
+  });
+});
+
+/** Standing boards sharing world z, either crossing in their middles or meeting at their ends. */
+function joint(split: 'half' | { fingers: number }, corner = false): CadDocument {
+  const a = outlined(
+    'Across',
+    [
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [0, 100],
+    ],
+    0
+  );
+  const b = outlined(
+    'Along',
+    [
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [0, 100],
+    ],
+    0
+  );
+  a.placement = { position: [0, corner ? 18 : 59, 0], rotation: [Math.SQRT1_2, 0, 0, Math.SQRT1_2] };
+  b.placement = { position: [corner ? 82 : 41, 0, 0], rotation: [0.5, 0.5, 0.5, 0.5] };
+  const document = addPartCut({ ...createCadDocument(), parts: [a, b] }, [b.id], [a.id], { value: 0.2 }).document;
+  Object.assign(document.partCuts![0]!, { split });
+  return document;
+}
+
+describe('half-lap and finger joints', () => {
+  it.each(['half', { fingers: 2 }] as const)('cuts opposite halves with clearance for %j and follows the overlap height', async split => {
+    const document = joint(split);
+    for (const height of [100, 140]) {
+      document.parts = document.parts.map(part => ({
+        ...outlined(
+          part.name,
+          [
+            [0, 0],
+            [100, 0],
+            [100, height],
+            [0, height],
+          ],
+          0
+        ),
+        id: part.id,
+        placement: part.placement,
+      }));
+      const solved = await solveCadDocument(document);
+      for (const [index, part] of solved.parts.entries()) {
+        expect(part.cuts).toHaveLength(1);
+        const cut = part.cuts![0]!;
+        expect(cut.through).toBe(true);
+        expect(cut.to).toBeCloseTo(18);
+        expect(cut.opening!.x1 - cut.opening!.x0).toBeCloseTo(18.4);
+        expect(cut.opening!.y1 - cut.opening!.y0).toBeCloseTo(height / 2 + 0.2);
+        expect(cut.opening!.y0).toBeCloseTo(index === 0 ? height / 2 - 0.2 : 0);
+        expect(withPartCuts(solved.document, evaluateCadPart(solved.document.parts[index]!).part!)).toEqual(part);
+      }
+      expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+      const report = cadStepReport(solved.document, solved.parts).find(step => step.kind === 'partCut');
+      expect(report?.kind === 'partCut' && report.cuts.map(cut => [cut.target, cut.tool])).toEqual([
+        ['Across', 'Along'],
+        ['Along', 'Across'],
+      ]);
+      expect(solved.parts[1]!.cuts![0]!.id).toBe(`cut-parts:${document.partCuts![0]!.id}:${document.parts[0]!.id}:lap`);
+    }
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
+  });
+
+  it('alternates five corner fingers with clearance only at closed ends', async () => {
+    const document = joint({ fingers: 5 }, true);
+    const solved = await solveCadDocument(document);
+    expect(solved.parts.map(part => part.cuts?.length)).toEqual([3, 2]);
+    for (const [index, part] of solved.parts.entries()) {
+      for (const [piece, cut] of part.cuts!.entries()) {
+        const { y0, y1 } = cut.opening!;
+        expect(y1 - y0).toBeCloseTo(index === 0 && piece !== 1 ? 20.2 : 20.4);
+        expect(cut.through).toBe(true);
+        expect(cut.id).toBe(
+          `cut-parts:${document.partCuts![0]!.id}:${document.parts[1 - index]!.id}${index ? ':lap' : ''}${piece ? `#${piece}` : ''}`
+        );
+      }
+    }
+    expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
+  });
+
+  it.each([false, true])('cuts each placed tool and target copy, including mirrors %s', async mirrored => {
+    const document = joint('half');
+    const [target, tool] = document.parts;
+    target!.copies = [{ id: 'target-copy', placement: target!.placement }];
+    tool!.copies = [
+      {
+        id: 'tool-copy',
+        mirrored,
+        placement: { ...tool!.placement!, position: [41, mirrored ? 100 : 0, 0] },
+      },
+    ];
+    delete target!.placement;
+    delete tool!.placement;
+    document.partCuts![0]!.tools = [`${tool!.id}:tool-copy`];
+    const solved = await solveCadDocument(document);
+    expect(solved.parts.map(part => part.cuts)).toEqual([undefined, undefined]);
+    const targetCut = solved.parts[0]!.copyCuts!['target-copy']![0]!;
+    const toolCut = solved.parts[1]!.copyCuts!['tool-copy']![0]!;
+    expect(targetCut.id).toBe(`cut-parts:${document.partCuts![0]!.id}:${tool!.id}:tool-copy`);
+    expect(toolCut.id).toBe(`cut-parts:${document.partCuts![0]!.id}:${target!.id}:lap:target-copy`);
+    expect(targetCut.opening!.y0).toBeCloseTo(49.8);
+    expect(toolCut.opening!.y1).toBeCloseTo(50.2);
+    expect(toolCut.opening!.x1 - toolCut.opening!.x0).toBeCloseTo(18.4);
+    expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+    for (const [index, part] of solved.parts.entries())
+      expect(withPartCuts(solved.document, evaluateCadPart(solved.document.parts[index]!).part!)).toEqual(part);
+  });
+
+  it('names the target copy that cuts the tool lap', async () => {
+    const document = joint('half');
+    const target = document.parts[0]!;
+    target.copies = [{ id: 'target-copy', name: 'Crossing copy', placement: target.placement }];
+    delete target.placement;
+    const solved = await solveCadDocument(document);
+    const report = cadStepReport(solved.document, solved.parts).find(step => step.kind === 'partCut');
+    expect(report?.kind === 'partCut' && report.cuts.map(cut => cut.tool)).toEqual(['Crossing copy']);
+  });
+
+  it('uses world positive even when the shared sketch axis is reversed', async () => {
+    const document = joint('half');
+    document.parts[0]!.placement = { position: [0, 41, 100], rotation: [-Math.SQRT1_2, 0, 0, Math.SQRT1_2] };
+    const solved = await solveCadDocument(document);
+    expect(solved.parts[0]!.cuts![0]!.opening!.y0).toBeCloseTo(0);
+    expect(solved.parts[0]!.cuts![0]!.opening!.y1).toBeCloseTo(50.2);
+    expect(solved.parts[1]!.cuts![0]!.opening!.y0).toBeCloseTo(0);
+    expect(solved.parts[1]!.cuts![0]!.opening!.y1).toBeCloseTo(50.2);
+    expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+  });
+
+  it('divides the shared overlap when the boards have different heights and elevations', async () => {
+    const document = joint('half');
+    document.parts[1]!.placement!.position[2] = 20;
+    const solved = await solveCadDocument(document);
+    expect(solved.parts[0]!.cuts![0]!.opening!.y0).toBeCloseTo(59.8);
+    expect(solved.parts[0]!.cuts![0]!.opening!.y1).toBeCloseTo(100);
+    expect(solved.parts[1]!.cuts![0]!.opening!.y0).toBeCloseTo(0);
+    expect(solved.parts[1]!.cuts![0]!.opening!.y1).toBeCloseTo(40.2);
+    expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+  });
+
+  it('accepts a split when creating or editing a step and rejects unknown split forms', () => {
+    const document = joint('half');
+    const created = addPartCut(document, [], [], { value: 0.2 }, { fingers: 5 });
+    expect(created.document.partCuts!.at(-1)!.split).toEqual({ fingers: 5 });
+    expect(updatePartCut(document, document.partCuts![0]!.id, { split: { fingers: 3 } }).partCuts![0]!.split).toEqual({ fingers: 3 });
+    for (const split of ['unknown', null, {}, { fingers: '5' }]) {
+      const invalid = JSON.parse(JSON.stringify(document));
+      invalid.partCuts[0].split = split;
+      expect(() => parseCadDocument(invalid)).toThrow('Invalid CAD part cut');
+    }
+    expect(() => updatePartCut(document, document.partCuts![0]!.id, { split: { fingers: 1 } })).toThrow('Invalid CAD part cut');
+  });
+
+  it('splits the actual rectangular reach of a stepped board', async () => {
+    const document = joint('half');
+    const target = document.parts[0]!;
+    document.parts[0] = {
+      ...outlined(
+        target.name,
+        [
+          [0, 0],
+          [100, 0],
+          [100, 60],
+          [20, 60],
+          [20, 100],
+          [0, 100],
+        ],
+        0
+      ),
+      id: target.id,
+      placement: target.placement,
+    };
+    const solved = await solveCadDocument(document);
+    expect(solved.parts[0]!.cuts![0]!.opening!.y0).toBeCloseTo(29.8);
+    expect(solved.parts[1]!.cuts![0]!.opening!.y1).toBeCloseTo(30.2);
+    expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+  });
+
+  it('uses the shapes from before all steps for both sides of the joint', async () => {
+    const document = joint('half');
+    const expected = await solveCadDocument(document);
+    const normal = { ...document.partCuts![0]!, id: 'earlier-cut', split: undefined };
+    document.partCuts!.unshift(normal);
+    const solved = await solveCadDocument(document);
+    for (const [index, part] of solved.parts.entries())
+      expect(part.cuts!.filter(cut => !cut.id.startsWith('cut-parts:earlier-cut:'))).toEqual(expected.parts[index]!.cuts);
+    expect(solved.diagnostics.filter(diagnostic => diagnostic.code === 'part-cut-unresolved')).toEqual([]);
+  });
+
+  it('relieves closed slot corners on both boards', async () => {
+    const document = joint('half');
+    for (const part of document.parts) part.cornerRelief = { diameter: 6 };
+    const solved = await solveCadDocument(document);
+    for (const part of solved.parts) {
+      expect(part.cuts![0]!.outline.length).toBeGreaterThan(4);
+      expect(part.cuts![0]!.opening!.y1 - part.cuts![0]!.opening!.y0).toBeCloseTo(50.2);
+    }
+    expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+  });
+
+  it('refuses parts that are not square without cutting either one', async () => {
+    const document = joint('half');
+    document.parts[1]!.placement!.rotation = [Math.sin(Math.PI / 8), 0, 0, Math.cos(Math.PI / 8)];
+    const solved = await solveCadDocument(document);
+    expect(solved.parts.every(part => !part.cuts?.length)).toBe(true);
+    expect(solved.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'part-cut-unresolved',
+        message: expect.stringMatching(/Along.*Across/),
+      })
+    );
+  });
+
+  it('refuses parallel boards and names both', async () => {
+    const document = joint('half');
+    document.parts[1]!.placement = document.parts[0]!.placement;
+    const solved = await solveCadDocument(document);
+    expect(solved.parts.every(part => !part.cuts?.length)).toBe(true);
+    expect(solved.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'part-cut-unresolved',
+        message: expect.stringMatching(/Across.*Along|Along.*Across/),
+      })
+    );
+  });
+
+  it.each([1, 0, -2, 2.5, NaN])('rejects invalid fingers %s in parsing, creation and evaluation', async fingers => {
+    const document = joint({ fingers });
+    expect(() => parseCadDocument(JSON.parse(JSON.stringify(document)))).toThrow('Invalid CAD part cut');
+    expect(() => addPartCut(document, [], [], { value: 0.2 }, { fingers })).toThrow('Invalid CAD part cut');
+    const solved = await solveCadDocument(document);
+    expect(solved.parts.every(part => !part.cuts?.length)).toBe(true);
+    expect(solved.diagnostics).toContainEqual(expect.objectContaining({ code: 'part-cut-unresolved' }));
   });
 });

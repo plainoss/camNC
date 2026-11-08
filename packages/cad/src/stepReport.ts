@@ -85,7 +85,7 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
   /** A tool's name from a step's tool entry or a cut it made, either the whole part or one copy (`<partId>:<copyId>`). */
   const toolName = (cutId: string) => {
     // A tool that fills several rectangles makes a cut for each, numbered after the first.
-    const id = cutId.replace(/#\d+$/, '');
+    const id = cutId.replace(/#\d+$/, '').replace(/:lap(?=:|$)/, '');
     const [partId, copyId] = id.split(':');
     const tool = byId.get(partId!);
     if (!tool) return 'a part that is gone';

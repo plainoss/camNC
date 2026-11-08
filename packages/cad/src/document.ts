@@ -5,6 +5,7 @@ import { refreshDimensionMeasurement } from './dimensions';
 import { cadVariableNameError } from './valueExpressions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
 import type {
+  CadPartCut,
   CadArcEntity,
   CadCircleEntity,
   CadConstraint,
@@ -694,6 +695,7 @@ export function parseCadDocument(input: unknown): CadDocument {
       addId(step.id);
       [...step.tools, ...step.targets].forEach(reference);
       number(step.clearance);
+      if (!validPartCutSplit(step.split)) throw new Error('Invalid CAD part cut');
       if (step.clearanceExpression !== undefined && typeof step.clearanceExpression !== 'string') throw new Error('Invalid CAD part cut');
     }
   }
@@ -1052,4 +1054,13 @@ export function parseCadDocument(input: unknown): CadDocument {
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);
   }
   return parsed;
+}
+
+/** Whether a split describes alternating segments that can form a joint. */
+export function validPartCutSplit(split: unknown): split is CadPartCut['split'] {
+  return (
+    split === undefined ||
+    split === 'half' ||
+    (!!split && typeof split === 'object' && 'fingers' in split && Number.isInteger(split.fingers) && (split.fingers as number) >= 2)
+  );
 }
