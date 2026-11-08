@@ -4308,14 +4308,17 @@ export function CadEditor({
                         : undefined
                     }
                     onSave={change => {
-                      const { clearance, clearanceExpression, ...parts } = change;
+                      const { clearance, clearanceExpression, split, ...parts } = change;
                       commit(
                         partCutting.id
                           ? updatePartCut(documentRef.current, partCutting.id, change)
-                          : addPartCut(documentRef.current, parts.tools, parts.targets, {
-                              value: clearance,
-                              expression: clearanceExpression,
-                            }).document
+                          : addPartCut(
+                              documentRef.current,
+                              parts.tools,
+                              parts.targets,
+                              { value: clearance, expression: clearanceExpression },
+                              split
+                            ).document
                       );
                       setPartCutting(null);
                     }}

@@ -8,6 +8,7 @@ import { CadValueInput } from './CadValueInput';
 const kDefaultClearance = '0.2';
 
 type Box = 'tools' | 'targets';
+type Joint = 'none' | 'half' | 'fingers';
 
 /**
  * One "cut parts" step, as the reference's subtracting boolean: the parts that cut (tools) and the parts they're cut
@@ -35,7 +36,13 @@ export function PartCutDialog({
   pick?: { partId: string; seq: number } | null;
   /** The parts in both boxes, for the view to show. */
   onPicked?: (picked: { tools: string[]; targets: string[] }) => void;
-  onSave: (change: { tools: string[]; targets: string[]; clearance: number; clearanceExpression?: string }) => void;
+  onSave: (change: {
+    tools: string[];
+    targets: string[];
+    clearance: number;
+    clearanceExpression?: string;
+    split?: CadPartCut['split'];
+  }) => void;
   onRemove?: () => void;
   onClose: () => void;
 }) {
@@ -45,6 +52,19 @@ export function PartCutDialog({
   // A new step has its tool already, so the targets are picked next.
   const [active, setActive] = useState<Box>(step || !tool ? 'tools' : 'targets');
   const [text, setText] = useState(step ? (step.clearanceExpression ?? formatCadValue(step.clearance)) : (fit ?? kDefaultClearance));
+  const [joint, setJoint] = useState<Joint>(step?.split === 'half' ? 'half' : step?.split ? 'fingers' : 'none');
+  const [fingersText, setFingersText] = useState(
+    step?.split && typeof step.split === 'object' ? (step.split.fingersExpression ?? String(step.split.fingers)) : '5'
+  );
+  const fingers = parseCadValue(fingersText, { unit: 'scalar', variables });
+  const fingersError =
+    joint !== 'fingers'
+      ? null
+      : 'error' in fingers
+        ? fingers.error
+        : !Number.isInteger(fingers.value) || fingers.value < 2
+          ? 'Use a whole number of fingers, at least 2.'
+          : null;
   const [error, setError] = useState<string | null>(null);
   const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter(candidate => candidate !== id) : [...list, id]);
   const seen = useRef(pick?.seq);
@@ -62,7 +82,14 @@ export function PartCutDialog({
     const parsed = parseCadValue(text, { unit: 'mm', variables });
     if ('error' in parsed) return setError(parsed.error);
     if (parsed.value < 0) return setError('A clearance can’t be less than nothing.');
-    onSave({ tools, targets, clearance: parsed.value, clearanceExpression: parsed.expression });
+    if (fingersError) return;
+    const split: CadPartCut['split'] =
+      joint === 'half'
+        ? 'half'
+        : joint === 'fingers' && !('error' in fingers)
+          ? { fingers: fingers.value, ...(fingers.expression && { fingersExpression: fingers.expression }) }
+          : undefined;
+    onSave({ tools, targets, clearance: parsed.value, clearanceExpression: parsed.expression, split });
   };
   const name = (id: string) => document.parts.find(part => part.id === id)?.name ?? 'a removed part';
   const box = (which: Box, label: string, chosen: string[], choose: (ids: string[]) => void) => (
@@ -96,7 +123,13 @@ export function PartCutDialog({
     </div>
   );
   return (
-    <FeatureDialog title="Cut parts" okLabel={step ? 'Save' : 'Cut'} onOk={save} onCancel={onClose} className="cad-part-cut-dialog">
+    <FeatureDialog
+      title="Cut parts"
+      okLabel={step ? 'Save' : 'Cut'}
+      okDisabled={!!fingersError}
+      onOk={save}
+      onCancel={onClose}
+      className="cad-part-cut-dialog">
       {box('tools', 'Tools', tools, setTools)}
       {box('targets', 'Targets', targets, setTargets)}
       <label className="cad-part-cut-clearance">
@@ -111,6 +144,33 @@ export function PartCutDialog({
         />
         mm
       </label>
+      <label>
+        Joint
+        <select value={joint} onChange={event => setJoint(event.target.value as Joint)}>
+          <option value="none">Cut out</option>
+          <option value="half">Half lap</option>
+          <option value="fingers">Finger joint</option>
+        </select>
+      </label>
+      {joint === 'fingers' && (
+        <label className="cad-part-cut-clearance">
+          Fingers
+          <CadValueInput
+            bare
+            value={fingersText}
+            aria-label="Fingers"
+            spellCheck={false}
+            aria-invalid={fingersError ? true : undefined}
+            aria-describedby={fingersError ? 'cad-part-cut-fingers-error' : undefined}
+            onChange={event => setFingersText(event.target.value)}
+          />
+        </label>
+      )}
+      {fingersError && (
+        <p id="cad-part-cut-fingers-error" role="alert" className="cad-thickness-error">
+          {fingersError}
+        </p>
+      )}
       {error && (
         <p role="alert" className="cad-thickness-error">
           {error}

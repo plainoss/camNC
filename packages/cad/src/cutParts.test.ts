@@ -684,6 +684,15 @@ describe('half-lap and finger joints', () => {
     expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
   });
 
+  it('preserves an omitted split and removes an explicitly cleared split', () => {
+    const document = joint('half');
+    const id = document.partCuts![0]!.id;
+    expect(updatePartCut(document, id, { clearance: 0.5 }).partCuts![0]!.split).toBe('half');
+    const cleared = updatePartCut(document, id, { split: undefined });
+    expect(cleared.partCuts![0]).not.toHaveProperty('split');
+    expect(document.partCuts![0]!.split).toBe('half');
+  });
+
   it('accepts a split when creating or editing a step and rejects unknown split forms', () => {
     const document = joint('half');
     const created = addPartCut(document, [], [], { value: 0.2 }, { fingers: 5 });
