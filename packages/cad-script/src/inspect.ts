@@ -21,6 +21,7 @@ export interface CadExpectation {
   /** Width and height of the outline, in mm. */
   size?: readonly [number, number];
   thickness?: number;
+  /** Profile through-holes and explicit through cuts, each pattern copy counted once. */
   holes?: number;
   /** Cuts that stop short of going through, each counted on its own however CAM groups them. */
   pockets?: number;
@@ -326,7 +327,8 @@ export async function inspectCadDocument(
     };
     const drawn = unrelieved.find(candidate => candidate.partId === part.id)?.cuts;
     const cuts = (evaluated?.cuts ?? []).map(cut => {
-      const curves = curveExtremes(sketchOfCut(cut.id));
+      // Evaluated underside loops are reflected into part coordinates, as their curve extremes must be too.
+      const curves = curveExtremes(sketchOfCut(cut.id)).map(p => (cut.side === 'underside' ? { x: -p.x, y: p.y } : p));
       const relieved = bounds(cut.outline, curves);
       const asDrawn = drawn?.find(candidate => candidate.id === cut.id);
       const { at, size } = asDrawn ? bounds(asDrawn.outline, curves) : relieved;
@@ -398,7 +400,8 @@ export async function inspectCadDocument(
       name: part.name,
       thickness: part.thickness,
       ...(box && { outline: { at: box.at, size: box.size } }),
-      holes: evaluated?.holes.length,
+      // A profile loop explicitly cut through stays in holes and isn't also emitted as a cut.
+      holes: evaluated && evaluated.holes.length + cuts.filter(cut => cut.through).length,
       cuts,
       sketches,
       ...(cam && { cam }),

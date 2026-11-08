@@ -30,7 +30,8 @@ exits non-zero if anything is wrong. Paths are relative to where you run it.
 Options: `--from <document.json>` edits an existing design, or reports on it if no
 script is given. `--out` writes the document, only if the check passed. Open that
 file in camNC's CAM page to get it as a new job. `--svg` draws
-the parts. See `examples/` for more.
+the parts. A failed check removes any existing `--out` file and any existing `--svg`
+file unless it writes a new SVG for that run. See `examples/` for more.
 
 ## Writing a script
 
@@ -67,7 +68,8 @@ the parts. See `examples/` for more.
 - `relate` takes `coincident`, `horizontal`, `vertical`, `parallel`, `perpendicular`,
   `equal`, `tangent`, `midpoint`, `symmetric` or `concentric`. Ends drawn at the same
   coordinates are already joined.
-- `expect` checks `size`, `thickness`, `holes`, `pockets` (cuts that aren't through,
+- `expect` checks `size`, `thickness`, `holes` (holes in the profile and through cuts
+  from either face or a pocket floor, each pattern copy counted), `pockets` (cuts that aren't through,
   each pattern copy counted), `depths` (each cut's floor below its face, in feature
   order, pattern copies included) and `freedom`, within `tolerance` (0.01 mm). It doesn't
   check diameters or positions: read those from the report's cuts. Sizes are measured to

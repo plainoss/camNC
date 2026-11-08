@@ -79,6 +79,7 @@ import {
   type CadPoint,
   cadVariableProblems,
   drawnOnOutline,
+  withFaceEdges,
   cadVariableScope,
   addPartCut,
   updatePartCut,
@@ -1829,6 +1830,10 @@ export function CadEditor({
       setMessage('Spline tangent handles cannot be deleted individually. Select the curve to delete it.');
       return;
     }
+    if (!constraintIds.length && entityIds.length && entityIds.every(id => sketch.entities.some(e => e.id === id && e.faceEdge))) {
+      setMessage('The edges of the face this part is drawn on stay. Draw onto them so the part follows that face.');
+      return;
+    }
     let next = sketch;
     if (constraintIds.length) {
       constraintIds.forEach(id => {
@@ -2044,7 +2049,8 @@ export function CadEditor({
       })
     );
     ids.delete(originId(sketch));
-    if (!ids.size) return setMessage('Select geometry to fix. The origin always stays fixed.');
+    for (const e of sketch.entities) if (e.faceEdge) ids.delete(e.id);
+    if (!ids.size) return setMessage('Select geometry to fix. The origin and the edges of the face it’s drawn on always stay fixed.');
     const shouldFix = sketch.entities.some(e => e.type === 'point' && ids.has(e.id) && !e.fixed);
     changeSketch({ ...sketch, entities: sketch.entities.map(e => (e.type === 'point' && ids.has(e.id) ? { ...e, fixed: shouldFix } : e)) });
     setMessage(shouldFix ? 'Selected geometry fixed. Shift+J unfixes it.' : 'Selected geometry unfixed.');
@@ -3655,7 +3661,9 @@ export function CadEditor({
                     `Part ${documentRef.current.parts.length + 1}`,
                     board ? variableScope[board]!.value : (part?.thickness ?? 18)
                   );
-                  const drawn = { ...added, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
+                  const placed = { ...added, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
+                  // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
+                  const drawn = { ...placed, sketch: withFaceEdges(documentRef.current, placed) };
                   commit({
                     ...documentRef.current,
                     revision: documentRef.current.revision + 1,

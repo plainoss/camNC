@@ -148,7 +148,7 @@ export function boxSelectSketch(sketch: CadSketch, gesture: CadSelectionBox, opt
   const selected = new Set<string>();
   const ownedBySelection = new Set<string>();
   for (const entity of sketch.entities) {
-    if (entity.type === 'point' || (entity.construction && options.includeConstruction === false)) continue;
+    if (entity.type === 'point' || entity.faceEdge || (entity.construction && options.includeConstruction === false)) continue;
     if (curveSelected(entity, points, box, mode === 'window', tolerance)) {
       selected.add(entity.id);
       entityPointIds(entity).forEach(id => ownedBySelection.add(id));
@@ -158,6 +158,7 @@ export function boxSelectSketch(sketch: CadSketch, gesture: CadSelectionBox, opt
   for (const point of points.values()) {
     if (
       point.id === originId(sketch) ||
+      point.faceEdge ||
       ownedBySelection.has(point.id) ||
       (visible && !visible.has(point.id)) ||
       (point.construction && options.includeConstruction === false)

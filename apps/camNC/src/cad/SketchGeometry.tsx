@@ -62,15 +62,17 @@ export function SketchGeometry({
         const props = {
           stroke: selected
             ? SKETCH_APPEARANCE.selectedColor
-            : entity.construction
-              ? SKETCH_APPEARANCE.constructionColor
-              : entityColor(entity.id),
+            : entity.faceEdge
+              ? SKETCH_APPEARANCE.faceEdgeColor
+              : entity.construction
+                ? SKETCH_APPEARANCE.constructionColor
+                : entityColor(entity.id),
           strokeWidth: selected ? SKETCH_APPEARANCE.selectedStroke : handle ? 1 : SKETCH_APPEARANCE.normalStroke,
           fill: 'none',
           vectorEffect: 'non-scaling-stroke' as const,
           strokeLinecap: 'round' as const,
           strokeLinejoin: 'round' as const,
-          strokeDasharray: entity.construction && !handle ? SKETCH_APPEARANCE.constructionDash : undefined,
+          strokeDasharray: entity.construction && !entity.faceEdge && !handle ? SKETCH_APPEARANCE.constructionDash : undefined,
         };
         let shape: ReactElement<SVGProps<SVGElement>> | undefined;
         if (entity.type === 'line') {
@@ -93,7 +95,7 @@ export function SketchGeometry({
             data-spline-tangents={handle?.splineId}>
             <title>
               {entity.type}
-              {entity.construction ? ' (construction)' : ''}
+              {entity.faceEdge ? ' (face edge)' : entity.construction ? ' (construction)' : ''}
             </title>
             {shape && handle && entity.type === 'line' ? (
               <path

@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -35,7 +35,9 @@ const finish = async (ok: boolean, output: object, document?: unknown, svg?: str
   print(JSON.stringify(output, null, 1));
   // A design that doesn't check out is never written where it could be imported by mistake.
   if (ok && options.out) await writeFile(options.out, `${JSON.stringify(document, null, 1)}\n`);
+  else if (!ok && options.out) await rm(options.out, { force: true });
   if (svg && options.svg) await writeFile(options.svg, svg);
+  else if (!ok && options.svg) await rm(options.svg, { force: true });
   process.exitCode = ok ? 0 : 1;
 };
 

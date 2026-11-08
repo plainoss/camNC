@@ -19,6 +19,8 @@ export const SKETCH_APPEARANCE = {
   constrainedColor: '#000000',
   selectedColor: '#ff9b23',
   constructionColor: '#72909c',
+  /** The edges of the face a part is drawn on, as the face outline is drawn. */
+  faceEdgeColor: '#7f8c96',
   fixedPointColor: '#000000',
   previewColor: '#78b9cb',
 } as const;
