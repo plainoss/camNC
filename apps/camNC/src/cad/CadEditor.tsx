@@ -73,6 +73,7 @@ import {
   moveFaceSketch,
   removeCadFeature,
   removeCadVariable,
+  setCadVariable,
   type CadFaceRef,
   setCutDepth,
   setCutSuppressed,
@@ -143,7 +144,7 @@ import {
   type TransformParameters,
   type TransformDragKind,
 } from './transformParameters';
-import { parseCadValue } from './valueExpressions';
+import { formatCadValue, parseCadValue } from './valueExpressions';
 import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
@@ -208,6 +209,7 @@ import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureLis
 import { VariableDialog } from './VariableDialog';
 import { rolledBackTo, type DesignStep } from './designSteps';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
+import { CadVariableFieldsContext, type CadVariableFields } from './variableFields';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -514,6 +516,27 @@ export function CadEditor({
   const documentRef = useRef(doc);
   // Every value field can use the design's variables by name.
   const variableScope = useMemo(() => cadVariableScope(doc), [doc]);
+  // What every value field offers after `#`, and how it makes a variable from `#name = value`.
+  const variableFields = useMemo<CadVariableFields>(
+    () => ({
+      variables: (doc.variables ?? []).map(variable => {
+        const result = variableScope[variable.name];
+        const unitText = result?.kind === 'length' ? ' mm' : result?.kind === 'angle' ? '°' : '';
+        return { name: variable.name, shown: result ? `${formatCadValue(result.value)}${unitText}` : variable.expression };
+      }),
+      define: (name, expression) => {
+        const current = documentRef.current;
+        const existing = current.variables?.find(variable => variable.name === name);
+        const result = setCadVariable(current, { ...(existing && { id: existing.id }), name, expression });
+        if ('error' in result) return result.error;
+        commit(result.document);
+        return null;
+      },
+    }),
+    // commit and documentRef are stable for the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [doc.variables, variableScope]
+  );
   // The step being edited in its dialog. Like the reference, the studio shows the design only as far as that step.
   const rollbackStep =
     !studioSession || !showWorkspace
@@ -3506,262 +3529,386 @@ export function CadEditor({
       !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
       !((tool === 'fillet' || tool === 'chamfer') && selected.length);
   return (
-    <div
-      ref={root}
-      className="cad-editor"
-      aria-busy={busy}
-      data-demo-mode={isDemoMode() || undefined}
-      onKeyDown={keyDown}
-      onKeyUp={event => event.stopPropagation()}>
-      {studioSession && showWorkspace ? (
-        <StudioToolbar
-          busy={busy}
-          active={
-            choosingFace
-              ? 'sketch'
-              : partCutting
-                ? 'cutParts'
-                : variableDialog
-                  ? 'variable'
-                  : transformDialog
-                    ? 'transform'
-                    : (featureDialog?.kind ?? null)
-          }
-          disabled={{
-            ...(!partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
-            ...(doc.parts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
-          }}
-          canUndo={session.past.length > 0}
-          canRedo={session.future.length > 0}
-          canFinish={
-            thicknessValid && !solving && !problems.length && !featureDialog && !partCutting && !variableDialog && !transformDialog
-          }
-          onCommand={studioCommand}
-          onUndo={() => navigateHistory()}
-          onRedo={() => navigateHistory(true)}
-          onCancel={() => void cancel()}
-          onFinish={() => void finish()}
-        />
-      ) : (
-        <SketchToolbar
-          tools={tools}
-          searchHighlight={searchHighlight}
-          onSearch={() => {
-            setSearchMode(true);
-            setPalette(value => !value);
-          }}
-          tool={tool}
-          construction={construction}
-          constraintMode={constraintMode}
-          busy={busy}
-          canUndo={session.past.length > 0}
-          canRedo={session.future.length > 0}
-          canFinish={sketchCanFinish}
-          onTool={next => {
-            if (next === 'dimension') beginDimension();
-            else chooseTool(next);
-          }}
-          onConstruction={toggleConstruction}
-          onConstraint={constrain}
-          onFix={toggleFix}
-          onUndo={() => navigateHistory()}
-          onRedo={() => navigateHistory(true)}
-          onCancel={() => (studioSession ? closeSketch(false) : void cancel())}
-          onFinish={() => (studioSession ? closeSketch(true) : void finish())}
-          onReturnToCanvas={restoreCanvasKeyboard}
-          closeElsewhere={studioSession}
-        />
-      )}
-      <div className="cad-workspace" inert={busy}>
-        <aside className="cad-sidebar" aria-label="Parts and sketch properties">
-          {faceSketch && (
-            <div className="cad-properties">
-              <h3>Sketch on the {faceSketch.label.toLowerCase()}</h3>
-              <p className="cad-muted">
-                Draw lines or shapes across the part to mark out regions. Finish the sketch, then click a region to set its depth.
-              </p>
-            </div>
-          )}
-          {studioSession && (
-            <FeatureList
-              document={doc}
-              selectedPartId={part?.id ?? null}
-              onSelect={entry => {
-                if (entry.kind === 'step') {
-                  setPartId(entry.step.partId);
-                  setSelected([]);
-                }
-              }}
-              onAction={featureAction}
-              rollback={rollbackStep}
-              onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
-            />
-          )}
-          {!faceSketch && !studioSession && <CadVariablesPanel document={doc} onChange={commit} />}
-          {!faceSketch && !studioSession && <DesignStepsList document={doc} selectedPartId={part?.id ?? null} onStep={openStep} />}
-          <div className="cad-panel-heading" hidden={!!faceSketch}>
-            <h2>Parts</h2>
-            <button
-              type="button"
-              aria-label="Add part"
-              onClick={() => {
-                const added = createCadPart(`Part ${doc.parts.length + 1}`, part?.thickness ?? 18);
-                commit({ ...doc, parts: [...doc.parts, added] });
-                setPartId(added.id);
-                setSelected([]);
-                chooseTool('select');
-              }}>
-              ＋
-            </button>
-          </div>
-          <ul className="cad-part-list" aria-label="Parts" hidden={!!faceSketch}>
-            {doc.parts.map(p => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  aria-pressed={p.id === part?.id}
-                  onClick={() => {
-                    if (partCutting && showWorkspace) return pickForCut(p.id);
-                    setPartId(p.id);
+    <CadVariableFieldsContext.Provider value={variableFields}>
+      <div
+        ref={root}
+        className="cad-editor"
+        aria-busy={busy}
+        data-demo-mode={isDemoMode() || undefined}
+        onKeyDown={keyDown}
+        onKeyUp={event => event.stopPropagation()}>
+        {studioSession && showWorkspace ? (
+          <StudioToolbar
+            busy={busy}
+            active={
+              choosingFace
+                ? 'sketch'
+                : partCutting
+                  ? 'cutParts'
+                  : variableDialog
+                    ? 'variable'
+                    : transformDialog
+                      ? 'transform'
+                      : (featureDialog?.kind ?? null)
+            }
+            disabled={{
+              ...(!partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
+              ...(doc.parts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
+            }}
+            canUndo={session.past.length > 0}
+            canRedo={session.future.length > 0}
+            canFinish={
+              thicknessValid && !solving && !problems.length && !featureDialog && !partCutting && !variableDialog && !transformDialog
+            }
+            onCommand={studioCommand}
+            onUndo={() => navigateHistory()}
+            onRedo={() => navigateHistory(true)}
+            onCancel={() => void cancel()}
+            onFinish={() => void finish()}
+          />
+        ) : (
+          <SketchToolbar
+            tools={tools}
+            searchHighlight={searchHighlight}
+            onSearch={() => {
+              setSearchMode(true);
+              setPalette(value => !value);
+            }}
+            tool={tool}
+            construction={construction}
+            constraintMode={constraintMode}
+            busy={busy}
+            canUndo={session.past.length > 0}
+            canRedo={session.future.length > 0}
+            canFinish={sketchCanFinish}
+            onTool={next => {
+              if (next === 'dimension') beginDimension();
+              else chooseTool(next);
+            }}
+            onConstruction={toggleConstruction}
+            onConstraint={constrain}
+            onFix={toggleFix}
+            onUndo={() => navigateHistory()}
+            onRedo={() => navigateHistory(true)}
+            onCancel={() => (studioSession ? closeSketch(false) : void cancel())}
+            onFinish={() => (studioSession ? closeSketch(true) : void finish())}
+            onReturnToCanvas={restoreCanvasKeyboard}
+            closeElsewhere={studioSession}
+          />
+        )}
+        <div className="cad-workspace" inert={busy}>
+          <aside className="cad-sidebar" aria-label="Parts and sketch properties">
+            {faceSketch && (
+              <div className="cad-properties">
+                <h3>Sketch on the {faceSketch.label.toLowerCase()}</h3>
+                <p className="cad-muted">
+                  Draw lines or shapes across the part to mark out regions. Finish the sketch, then click a region to set its depth.
+                </p>
+              </div>
+            )}
+            {studioSession && (
+              <FeatureList
+                document={doc}
+                selectedPartId={part?.id ?? null}
+                onSelect={entry => {
+                  if (entry.kind === 'step') {
+                    setPartId(entry.step.partId);
                     setSelected([]);
-                    chooseTool('select');
-                  }}>
-                  <span aria-hidden="true">▱</span>
-                  <span>{p.name}</span>
-                  {partTrouble(p.id) && (
-                    <span className="cad-part-trouble" role="img" aria-label={partTrouble(p.id)!} title={partTrouble(p.id)!}>
-                      ⚠
-                    </span>
-                  )}
-                  <small>{p.thickness} mm</small>
-                </button>
-              </li>
-            ))}
-          </ul>
-          {part && !faceSketch && !(studioSession && showWorkspace) && (
-            <div className="cad-properties">
-              <h3>{part.name} · Sketch</h3>
-              <label htmlFor="cad-part-name">Part name</label>
-              <input
-                id="cad-part-name"
-                key={`${part.id}:${part.name}`}
-                defaultValue={part.name}
-                onKeyDown={event => {
-                  if (event.key === 'Enter' && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
-                    event.preventDefault();
-                    event.currentTarget.blur();
-                    svg.current?.focus();
-                  }
-                  if (event.key === 'Escape') {
-                    event.currentTarget.value = part.name;
-                    event.currentTarget.blur();
-                    svg.current?.focus();
                   }
                 }}
-                onBlur={event => {
-                  const name = event.currentTarget.value.trim();
-                  if (name && name !== part.name) commit(replacePart(doc, part.id, p => ({ ...p, name })));
-                }}
+                onAction={featureAction}
+                rollback={rollbackStep}
+                onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
               />
-              {!studioSession && (
-                <>
-                  <CadThicknessField
-                    key={part.id}
-                    value={part.thickness}
-                    expression={part.thicknessExpression}
-                    variables={variableScope}
-                    onValidityChange={setThicknessValid}
-                    onDone={() => svg.current?.focus()}
-                    onCommit={(thickness, thicknessExpression) =>
-                      commit(
-                        replacePart(doc, part.id, p => {
-                          const next = { ...p, thickness, thicknessExpression };
-                          if (thicknessExpression === undefined) delete next.thicknessExpression;
-                          return next;
-                        })
-                      )
-                    }
-                  />
-                  {part.drawnOn && (
-                    <CadDrawnOnField
-                      key={`${part.id}:drawn-on`}
-                      document={doc}
-                      part={part as typeof part & { drawnOn: NonNullable<typeof part.drawnOn> }}
-                      variables={variableScope}
-                      onDone={() => svg.current?.focus()}
-                      onChange={drawnOn => commit(replacePart(documentRef.current, part.id, p => ({ ...p, drawnOn })))}
-                    />
-                  )}
-                  <CadReliefField
-                    key={`${part.id}:relief`}
-                    relief={part.cornerRelief}
-                    variables={variableScope}
-                    onDone={() => svg.current?.focus()}
-                    onChange={cornerRelief =>
-                      commit(
-                        replacePart(documentRef.current, part.id, p => {
-                          const next = { ...p, cornerRelief };
-                          if (!cornerRelief) delete next.cornerRelief;
-                          return next;
-                        })
-                      )
-                    }
-                  />
-                  <CadPartPatternField
-                    key={`${part.id}:pattern`}
-                    pattern={part.pattern}
-                    variables={variableScope}
-                    onDone={() => svg.current?.focus()}
-                    onChange={pattern => commit(setPartPattern(documentRef.current, part.id, pattern))}
-                  />
-                  <CadCopyNames
-                    part={part}
-                    onRename={(copyId, name) => commit(renamePartCopy(documentRef.current, part.id, copyId, name))}
-                  />
-                </>
-              )}
-              {variableProblems
-                .filter(problem => problem.partId === part.id)
-                .map((problem, index) => (
-                  <p key={index} className="cad-variable-problem" role="alert">
-                    Can’t follow the variables, so this part keeps its last good shape. {problem.message}
-                  </p>
-                ))}
+            )}
+            {!faceSketch && !studioSession && <CadVariablesPanel document={doc} onChange={commit} />}
+            {!faceSketch && !studioSession && <DesignStepsList document={doc} selectedPartId={part?.id ?? null} onStep={openStep} />}
+            <div className="cad-panel-heading" hidden={!!faceSketch}>
+              <h2>Parts</h2>
               <button
                 type="button"
-                className="cad-delete-part"
+                aria-label="Add part"
                 onClick={() => {
-                  const parts = doc.parts.filter(p => p.id !== part.id);
-                  commit(withFeatureVersion({ ...doc, parts }));
-                  setPartId(parts[0]?.id ?? '');
+                  const added = createCadPart(`Part ${doc.parts.length + 1}`, part?.thickness ?? 18);
+                  commit({ ...doc, parts: [...doc.parts, added] });
+                  setPartId(added.id);
                   setSelected([]);
                   chooseTool('select');
                 }}>
-                Delete part
+                ＋
               </button>
-              {(!!part.features?.length || onEditFaceSketch) && (
-                <PartFeatureList
-                  part={part}
-                  onRemove={featureId => commit(removeCadFeature(documentRef.current, part.id, featureId))}
-                  onSwitchCut={(cutId, on) => commit(setCutSuppressed(documentRef.current, part.id, cutId, !on))}
-                  onEdit={
-                    onEditFaceSketch &&
-                    (sketchId => {
-                      const prepared = prepareDocument();
-                      if (prepared && hasOutline(prepared, part.id)) onEditFaceSketch(prepared, part.id, sketchId);
-                    })
-                  }
-                  variables={variableScope}
-                  onCutDepth={(cut, depth, expression) =>
-                    commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth, expression))
-                  }
-                  onMoveToTop={sketchId => commit(moveFaceSketch(documentRef.current, part.id, sketchId, 'top'))}
-                  onNew={onEditFaceSketch && (face => sketchOnFace(face))}
+            </div>
+            <ul className="cad-part-list" aria-label="Parts" hidden={!!faceSketch}>
+              {doc.parts.map(p => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    aria-pressed={p.id === part?.id}
+                    onClick={() => {
+                      if (partCutting && showWorkspace) return pickForCut(p.id);
+                      setPartId(p.id);
+                      setSelected([]);
+                      chooseTool('select');
+                    }}>
+                    <span aria-hidden="true">▱</span>
+                    <span>{p.name}</span>
+                    {partTrouble(p.id) && (
+                      <span className="cad-part-trouble" role="img" aria-label={partTrouble(p.id)!} title={partTrouble(p.id)!}>
+                        ⚠
+                      </span>
+                    )}
+                    <small>{p.thickness} mm</small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {part && !faceSketch && !(studioSession && showWorkspace) && (
+              <div className="cad-properties">
+                <h3>{part.name} · Sketch</h3>
+                <label htmlFor="cad-part-name">Part name</label>
+                <input
+                  id="cad-part-name"
+                  key={`${part.id}:${part.name}`}
+                  defaultValue={part.name}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                      svg.current?.focus();
+                    }
+                    if (event.key === 'Escape') {
+                      event.currentTarget.value = part.name;
+                      event.currentTarget.blur();
+                      svg.current?.focus();
+                    }
+                  }}
+                  onBlur={event => {
+                    const name = event.currentTarget.value.trim();
+                    if (name && name !== part.name) commit(replacePart(doc, part.id, p => ({ ...p, name })));
+                  }}
                 />
-              )}
-              <div className="cad-divider" />
-              {!studioSession && (
-                <label className="cad-show-constraints">
+                {!studioSession && (
+                  <>
+                    <CadThicknessField
+                      key={part.id}
+                      value={part.thickness}
+                      expression={part.thicknessExpression}
+                      variables={variableScope}
+                      onValidityChange={setThicknessValid}
+                      onDone={() => svg.current?.focus()}
+                      onCommit={(thickness, thicknessExpression) =>
+                        commit(
+                          replacePart(doc, part.id, p => {
+                            const next = { ...p, thickness, thicknessExpression };
+                            if (thicknessExpression === undefined) delete next.thicknessExpression;
+                            return next;
+                          })
+                        )
+                      }
+                    />
+                    {part.drawnOn && (
+                      <CadDrawnOnField
+                        key={`${part.id}:drawn-on`}
+                        document={doc}
+                        part={part as typeof part & { drawnOn: NonNullable<typeof part.drawnOn> }}
+                        variables={variableScope}
+                        onDone={() => svg.current?.focus()}
+                        onChange={drawnOn => commit(replacePart(documentRef.current, part.id, p => ({ ...p, drawnOn })))}
+                      />
+                    )}
+                    <CadReliefField
+                      key={`${part.id}:relief`}
+                      relief={part.cornerRelief}
+                      variables={variableScope}
+                      onDone={() => svg.current?.focus()}
+                      onChange={cornerRelief =>
+                        commit(
+                          replacePart(documentRef.current, part.id, p => {
+                            const next = { ...p, cornerRelief };
+                            if (!cornerRelief) delete next.cornerRelief;
+                            return next;
+                          })
+                        )
+                      }
+                    />
+                    <CadPartPatternField
+                      key={`${part.id}:pattern`}
+                      pattern={part.pattern}
+                      variables={variableScope}
+                      onDone={() => svg.current?.focus()}
+                      onChange={pattern => commit(setPartPattern(documentRef.current, part.id, pattern))}
+                    />
+                    <CadCopyNames
+                      part={part}
+                      onRename={(copyId, name) => commit(renamePartCopy(documentRef.current, part.id, copyId, name))}
+                    />
+                  </>
+                )}
+                {variableProblems
+                  .filter(problem => problem.partId === part.id)
+                  .map((problem, index) => (
+                    <p key={index} className="cad-variable-problem" role="alert">
+                      Can’t follow the variables, so this part keeps its last good shape. {problem.message}
+                    </p>
+                  ))}
+                <button
+                  type="button"
+                  className="cad-delete-part"
+                  onClick={() => {
+                    const parts = doc.parts.filter(p => p.id !== part.id);
+                    commit(withFeatureVersion({ ...doc, parts }));
+                    setPartId(parts[0]?.id ?? '');
+                    setSelected([]);
+                    chooseTool('select');
+                  }}>
+                  Delete part
+                </button>
+                {(!!part.features?.length || onEditFaceSketch) && (
+                  <PartFeatureList
+                    part={part}
+                    onRemove={featureId => commit(removeCadFeature(documentRef.current, part.id, featureId))}
+                    onSwitchCut={(cutId, on) => commit(setCutSuppressed(documentRef.current, part.id, cutId, !on))}
+                    onEdit={
+                      onEditFaceSketch &&
+                      (sketchId => {
+                        const prepared = prepareDocument();
+                        if (prepared && hasOutline(prepared, part.id)) onEditFaceSketch(prepared, part.id, sketchId);
+                      })
+                    }
+                    variables={variableScope}
+                    onCutDepth={(cut, depth, expression) =>
+                      commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth, expression))
+                    }
+                    onMoveToTop={sketchId => commit(moveFaceSketch(documentRef.current, part.id, sketchId, 'top'))}
+                    onNew={onEditFaceSketch && (face => sketchOnFace(face))}
+                  />
+                )}
+                <div className="cad-divider" />
+                {!studioSession && (
+                  <label className="cad-show-constraints">
+                    <input
+                      type="checkbox"
+                      checked={showConstraints}
+                      onChange={event => {
+                        setShowConstraints(event.target.checked);
+                        setHoveredConstraintEntities([]);
+                      }}
+                    />
+                    Show constraints
+                  </label>
+                )}
+                {(tool === 'dimension' || placingDimension || dimension !== null) && (
+                  <>
+                    <label className="cad-dimension-mode" htmlFor="cad-dimension-mode">
+                      Dimension type
+                      <select
+                        id="cad-dimension-mode"
+                        value={dimensionMode}
+                        onChange={event => applyDimensionEvent({ type: 'mode', mode: event.target.value as DimensionMode })}>
+                        <option value="auto">Automatic</option>
+                        <option value="distance">Length</option>
+                        <option value="distanceX">Horizontal distance</option>
+                        <option value="distanceY">Vertical distance</option>
+                        <option value="angle">Angle</option>
+                      </select>
+                    </label>
+                  </>
+                )}
+                <p className="cad-muted">Select a constraint and press Delete to remove it. Double-click a dimension to edit its value.</p>
+                {selected.length === 1 &&
+                  sketch?.entities.some(entity => entity.id === selected[0] && entity.type === 'conic') &&
+                  tool === 'select' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curve = sketch.entities.find(entity => entity.id === selected[0]);
+                        if (curve?.type === 'conic') {
+                          setRho(String(curve.rho));
+                          setConicEditing(curve.id);
+                        }
+                      }}>
+                      Edit conic rho
+                    </button>
+                  )}
+              </div>
+            )}
+          </aside>
+          <main className="cad-drawing">
+            {acceptanceNotice && (
+              <p className="cad-notice" role="alert">
+                {acceptanceNotice}
+              </p>
+            )}
+            {studioSession && studioRefusal && (
+              <p className="cad-notice cad-studio-refusal" role="alert">
+                {studioRefusal}
+              </p>
+            )}
+            {showWorkspace &&
+              transformDialog &&
+              (() => {
+                const target = doc.parts.find(candidate => candidate.id === transformDialog.partId);
+                return target ? (
+                  <TransformDialog
+                    key={`${target.id}:${transformDialog.copyId ?? 'new'}`}
+                    document={doc}
+                    part={target}
+                    copyId={transformDialog.copyId}
+                    variables={variableScope}
+                    onSave={next => {
+                      commit(next);
+                      setTransformDialog(null);
+                    }}
+                    onCancel={() => setTransformDialog(null)}
+                  />
+                ) : null;
+              })()}
+            {showWorkspace && variableDialog && (
+              <VariableDialog
+                key={variableDialog.id ?? 'new'}
+                document={doc}
+                variableId={variableDialog.id}
+                onSave={next => {
+                  commit(next);
+                  setVariableDialog(null);
+                }}
+                onCancel={() => setVariableDialog(null)}
+              />
+            )}
+            {showWorkspace &&
+              featureDialog &&
+              (() => {
+                const target = doc.parts.find(candidate => candidate.id === featureDialog.partId);
+                if (!target) return null;
+                const props = {
+                  document: doc,
+                  part: target,
+                  variables: variableScope,
+                  onChange: (change: (document: CadDocument) => CadDocument) => commit(change(documentRef.current)),
+                  onOk: () => closeFeature(true),
+                  onCancel: () => closeFeature(false),
+                };
+                return featureDialog.kind === 'extrude' ? (
+                  <ExtrudeDialog key={target.id} {...props} onEditSketch={() => openSketch(target.id)} />
+                ) : (
+                  <PartPatternDialog key={target.id} {...props} />
+                );
+              })()}
+            {studioSession && !showWorkspace && part && (
+              // The open sketch, closed from here as the reference's sketch dialog is: away from the studio's Done.
+              <FeatureDialog
+                title={`Sketch · ${part.name}`}
+                okLabel="✓ Finish sketch"
+                okDisabled={!sketchCanFinish}
+                onOk={() => closeSketch(true)}
+                onCancel={() => closeSketch(false)}
+                autoFocus={false}
+                className="cad-sketch-dialog">
+                <div className="cad-feature-selection">
+                  <small>Sketch plane</small>
+                  <span>{part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'Top plane'}</span>
+                </div>
+                <label>
                   <input
                     type="checkbox"
                     checked={showConstraints}
@@ -3772,1007 +3919,932 @@ export function CadEditor({
                   />
                   Show constraints
                 </label>
-              )}
-              {(tool === 'dimension' || placingDimension || dimension !== null) && (
-                <>
-                  <label className="cad-dimension-mode" htmlFor="cad-dimension-mode">
-                    Dimension type
-                    <select
-                      id="cad-dimension-mode"
-                      value={dimensionMode}
-                      onChange={event => applyDimensionEvent({ type: 'mode', mode: event.target.value as DimensionMode })}>
-                      <option value="auto">Automatic</option>
-                      <option value="distance">Length</option>
-                      <option value="distanceX">Horizontal distance</option>
-                      <option value="distanceY">Vertical distance</option>
-                      <option value="angle">Angle</option>
-                    </select>
-                  </label>
-                </>
-              )}
-              <p className="cad-muted">Select a constraint and press Delete to remove it. Double-click a dimension to edit its value.</p>
-              {selected.length === 1 &&
-                sketch?.entities.some(entity => entity.id === selected[0] && entity.type === 'conic') &&
-                tool === 'select' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const curve = sketch.entities.find(entity => entity.id === selected[0]);
-                      if (curve?.type === 'conic') {
-                        setRho(String(curve.rho));
-                        setConicEditing(curve.id);
-                      }
-                    }}>
-                    Edit conic rho
-                  </button>
-                )}
-            </div>
-          )}
-        </aside>
-        <main className="cad-drawing">
-          {acceptanceNotice && (
-            <p className="cad-notice" role="alert">
-              {acceptanceNotice}
-            </p>
-          )}
-          {studioSession && studioRefusal && (
-            <p className="cad-notice cad-studio-refusal" role="alert">
-              {studioRefusal}
-            </p>
-          )}
-          {showWorkspace &&
-            transformDialog &&
-            (() => {
-              const target = doc.parts.find(candidate => candidate.id === transformDialog.partId);
-              return target ? (
-                <TransformDialog
-                  key={`${target.id}:${transformDialog.copyId ?? 'new'}`}
-                  document={doc}
-                  part={target}
-                  copyId={transformDialog.copyId}
-                  variables={variableScope}
-                  onSave={next => {
-                    commit(next);
-                    setTransformDialog(null);
-                  }}
-                  onCancel={() => setTransformDialog(null)}
-                />
-              ) : null;
-            })()}
-          {showWorkspace && variableDialog && (
-            <VariableDialog
-              key={variableDialog.id ?? 'new'}
-              document={doc}
-              variableId={variableDialog.id}
-              onSave={next => {
-                commit(next);
-                setVariableDialog(null);
-              }}
-              onCancel={() => setVariableDialog(null)}
-            />
-          )}
-          {showWorkspace &&
-            featureDialog &&
-            (() => {
-              const target = doc.parts.find(candidate => candidate.id === featureDialog.partId);
-              if (!target) return null;
-              const props = {
-                document: doc,
-                part: target,
-                variables: variableScope,
-                onChange: (change: (document: CadDocument) => CadDocument) => commit(change(documentRef.current)),
-                onOk: () => closeFeature(true),
-                onCancel: () => closeFeature(false),
-              };
-              return featureDialog.kind === 'extrude' ? (
-                <ExtrudeDialog key={target.id} {...props} onEditSketch={() => openSketch(target.id)} />
-              ) : (
-                <PartPatternDialog key={target.id} {...props} />
-              );
-            })()}
-          {studioSession && !showWorkspace && part && (
-            // The open sketch, closed from here as the reference's sketch dialog is: away from the studio's Done.
-            <FeatureDialog
-              title={`Sketch · ${part.name}`}
-              okLabel="✓ Finish sketch"
-              okDisabled={!sketchCanFinish}
-              onOk={() => closeSketch(true)}
-              onCancel={() => closeSketch(false)}
-              autoFocus={false}
-              className="cad-sketch-dialog">
-              <div className="cad-feature-selection">
-                <small>Sketch plane</small>
-                <span>{part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'Top plane'}</span>
-              </div>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={showConstraints}
-                  onChange={event => {
-                    setShowConstraints(event.target.checked);
-                    setHoveredConstraintEntities([]);
-                  }}
-                />
-                Show constraints
-              </label>
-            </FeatureDialog>
-          )}
-          <div className="cad-canvas-bar">
-            {showWorkspace ? (
-              <span>
-                <strong>PART STUDIO</strong> · {doc.parts.length === 1 ? 'one part' : `${doc.parts.length} parts`}
-              </span>
-            ) : studioSession && part ? (
-              <span>
-                <strong>SKETCH</strong> · {part.name}{' '}
-                <span className="cad-muted">/ on {part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'the top plane'}</span>
-              </span>
-            ) : (
-              <span>
-                <strong>{faceSketch?.below ? 'BOTTOM' : 'TOP'}</strong> · {part?.name ?? 'Sketch'}{' '}
-                <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
-              </span>
+              </FeatureDialog>
             )}
-            <div>
-              {!faceSketch && !(studioSession && showWorkspace) && (
-                <div className="cad-view-switch" role="group" aria-label="Show">
-                  <button
-                    type="button"
-                    aria-pressed={!show3D && !showWorkspace}
-                    title="The sketch, to draw on"
-                    onClick={() => {
-                      // Back on the drawing, its keys work straight away.
-                      requestAnimationFrame(() => svg.current?.focus());
-                      setShow3D(false);
-                      setShowWorkspace(false);
-                    }}>
-                    Drawing
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={show3D && !showWorkspace}
-                    disabled={!partHasOutline}
-                    title="This part in 3D, to set its cuts"
-                    onClick={() => {
-                      chooseTool('select');
-                      setShowWorkspace(false);
-                      setShow3D(true);
-                    }}>
-                    3D
-                  </button>
-                  {!studioSession && (
+            <div className="cad-canvas-bar">
+              {showWorkspace ? (
+                <span>
+                  <strong>PART STUDIO</strong> · {doc.parts.length === 1 ? 'one part' : `${doc.parts.length} parts`}
+                </span>
+              ) : studioSession && part ? (
+                <span>
+                  <strong>SKETCH</strong> · {part.name}{' '}
+                  <span className="cad-muted">/ on {part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'the top plane'}</span>
+                </span>
+              ) : (
+                <span>
+                  <strong>{faceSketch?.below ? 'BOTTOM' : 'TOP'}</strong> · {part?.name ?? 'Sketch'}{' '}
+                  <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
+                </span>
+              )}
+              <div>
+                {!faceSketch && !(studioSession && showWorkspace) && (
+                  <div className="cad-view-switch" role="group" aria-label="Show">
                     <button
                       type="button"
-                      aria-pressed={showWorkspace}
-                      disabled={!doc.parts.length}
-                      title="Every part where it sits"
+                      aria-pressed={!show3D && !showWorkspace}
+                      title="The sketch, to draw on"
+                      onClick={() => {
+                        // Back on the drawing, its keys work straight away.
+                        requestAnimationFrame(() => svg.current?.focus());
+                        setShow3D(false);
+                        setShowWorkspace(false);
+                      }}>
+                      Drawing
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={show3D && !showWorkspace}
+                      disabled={!partHasOutline}
+                      title="This part in 3D, to set its cuts"
                       onClick={() => {
                         chooseTool('select');
-                        setShowWorkspace(true);
+                        setShowWorkspace(false);
+                        setShow3D(true);
                       }}>
-                      All parts
+                      3D
                     </button>
-                  )}
-                </div>
-              )}
-              {!show3D && !showWorkspace && (
-                <>
-                  <button type="button" className="cad-bar-button" title="Zoom to show the whole sketch" onClick={() => fit()}>
-                    Fit <kbd>F</kbd>
-                  </button>
-                  <button
-                    type="button"
-                    role="switch"
-                    className="cad-switch"
-                    aria-checked={snap}
-                    title="Snap to points, lines and the grid while drawing"
-                    onClick={() => {
-                      setSnap(value => !value);
-                      setDrawingCue(null);
-                      setSnapCue(null);
-                      hoveredReferences.current = [];
-                      svg.current?.focus();
-                    }}>
-                    Snap
-                    <span className="cad-switch-track" aria-hidden="true" />
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-          {showWorkspace && (
-            <Suspense fallback={<div className="cad-part-view" />}>
-              <WorkspaceView
-                document={shownDocument}
-                selectedId={part?.id ?? null}
-                onSelect={id => {
-                  if (partCutting) return pickForCut(id);
-                  setPartId(id);
-                  setSelected([]);
-                }}
-                highlightIds={partCutting ? cutPicked : undefined}
-                onOpen={id => {
-                  if (partCutting) return pickForCut(id);
-                  if (studioSession) return openSketch(id);
-                  setPartId(id);
-                  setSelected([]);
-                  setShowWorkspace(false);
-                  setShow3D(hasOutline(documentRef.current, id));
-                }}
-                {...(studioSession
-                  ? { choosing: choosingFace, onChoosingChange: setChoosingFace }
-                  : { onCutParts: () => setPartCutting({}) })}
-                onNewPart={on => {
-                  const before = documentRef.current;
-                  // A design's board thickness, when it names one, is what a new part is made from.
-                  const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variableScope, name));
-                  const added = createCadPart(
-                    `Part ${documentRef.current.parts.length + 1}`,
-                    board ? variableScope[board]!.value : (part?.thickness ?? 18)
-                  );
-                  // A design's blank first part is the one sketched, rather than a second beside it.
-                  const blank = documentRef.current.parts.length === 1 && isBlank(documentRef.current.parts[0]!);
-                  const base = blank ? documentRef.current.parts[0]! : added;
-                  const placed = { ...base, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
-                  // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
-                  const drawn = { ...placed, sketch: withFaceEdges(documentRef.current, placed) };
-                  commit({
-                    ...documentRef.current,
-                    revision: documentRef.current.revision + 1,
-                    parts: blank ? [drawn] : [...documentRef.current.parts, drawn],
-                  });
-                  setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
-                  if (studioSession) {
-                    extrudeAfterSketch.current = drawn.id;
-                    return openSketch(drawn.id, before);
-                  }
-                  setPartId(drawn.id);
-                  setSelected([]);
-                  setShowWorkspace(false);
-                  setShow3D(false);
-                  requestAnimationFrame(() => svg.current?.focus());
-                }}>
-                {partCutting && (
-                  <PartCutDialog
-                    key={partCutting.id ?? 'new'}
-                    document={doc}
-                    step={doc.partCuts?.find(step => step.id === partCutting.id)}
-                    tool={part?.id}
-                    variables={variableScope}
-                    pick={cutPick}
-                    onPicked={showCutPicked}
-                    onClose={() => setPartCutting(null)}
-                    onRemove={
-                      partCutting.id
-                        ? () => {
-                            commit(removePartCut(documentRef.current, partCutting.id!));
-                            setPartCutting(null);
-                          }
-                        : undefined
-                    }
-                    onSave={change => {
-                      const { clearance, clearanceExpression, ...parts } = change;
-                      commit(
-                        partCutting.id
-                          ? updatePartCut(documentRef.current, partCutting.id, change)
-                          : addPartCut(documentRef.current, parts.tools, parts.targets, {
-                              value: clearance,
-                              expression: clearanceExpression,
-                            }).document
-                      );
-                      setPartCutting(null);
-                    }}
-                  />
+                    {!studioSession && (
+                      <button
+                        type="button"
+                        aria-pressed={showWorkspace}
+                        disabled={!doc.parts.length}
+                        title="Every part where it sits"
+                        onClick={() => {
+                          chooseTool('select');
+                          setShowWorkspace(true);
+                        }}>
+                        All parts
+                      </button>
+                    )}
+                  </div>
                 )}
-              </WorkspaceView>
-            </Suspense>
-          )}
-          {!showWorkspace && show3D && partHasOutline && part && (
-            <Suspense fallback={<div className="cad-part-view" />}>
-              <PartView3D
-                key={part.id}
-                part={part}
-                document={doc}
-                variables={variableScope}
-                onChoose={(entry, depth, expression) => commit(withRegionDepth(documentRef.current, part.id, entry, depth, expression))}
-                onSketchFace={onEditFaceSketch && sketchOnFace}
-              />
-            </Suspense>
-          )}
-          <svg
-            ref={svg}
-            className={`cad-canvas cad-tool-${tool}`}
-            style={showWorkspace || (show3D && partHasOutline) ? { display: 'none' } : undefined}
-            data-testid="cad-canvas"
-            role="img"
-            aria-label="2D sketch drawing canvas"
-            tabIndex={0}
-            viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
-            onPointerDown={pointerDown}
-            onPointerMove={pointerMove}
-            onDoubleClick={event => {
-              if (tool === 'spline' || tool === 'bezier') {
-                event.preventDefault();
-                finishSpline();
-                return;
-              }
-              if (tool !== 'select' || !sketch) return;
-              const id = (event.target as Element).closest('[data-entity-id]')?.getAttribute('data-entity-id');
-              const curve = sketch.entities.find(entity => entity.id === id);
-              if (curve?.type === 'conic') {
-                event.preventDefault();
-                setRho(String(curve.rho));
-                setConicEditing(curve.id);
-              }
-            }}
-            onPointerLeave={() => {
-              if (!drag.current) {
-                setHoveredPoint(null);
-                setSnapCue(null);
-                setDrawingCue(null);
-              }
-            }}
-            onPointerUp={event => pointerEnd(false, event)}
-            onPointerCancel={event => pointerEnd(true, event)}
-            onLostPointerCapture={event => pointerEnd(true, event)}
-            onContextMenu={event => {
-              event.preventDefault();
-              if (event.button !== 2) keyboardContext();
-            }}>
-            <defs>
-              <pattern id={`cad-grid-${doc.id}`} width={grid} height={grid} patternUnits="userSpaceOnUse">
-                <circle cx="0" cy="0" r={grid * 0.025} fill="#ccd5df" />
-              </pattern>
-            </defs>
-            <rect x={view.x - view.w} y={view.y - view.h} width={view.w * 3} height={view.h * 3} fill={`url(#cad-grid-${doc.id})`} />
-            <SketchRegion
-              document={doc}
-              partId={part?.id}
-              verified={
-                !solving &&
-                !splitFirst &&
-                !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
-                !((tool === 'slot' || tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
-                activeSketchStatus?.status === 'solved' &&
-                lastCheckedRevision.current === `${doc.id}:${doc.revision}`
-              }
-            />
-            {faceSketch && (
-              <path
-                data-face-outline
-                className="cad-face-outline"
-                d={faceSketch.outline.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
-                pointerEvents="none"
-              />
-            )}
-            {!faceSketch && drawnOnFace && (
-              <path
-                data-drawn-on-face
-                className="cad-face-outline"
-                d={drawnOnFace.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
-                pointerEvents="none"
-              />
-            )}
-            {faceSketch?.floor && (
-              <path
-                data-face-floor
-                d={faceSketch.floor.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
-                fill="#c99a5b"
-                fillOpacity={0.25}
-                stroke="#7a5526"
-                strokeWidth={1 / markerScale}
-                pointerEvents="none"
-              />
-            )}
-            {!faceSketch && <CutOverlay part={part} millimetresPerPixel={1 / markerScale} />}
-            <line
-              x1={view.x - view.w}
-              x2={view.x + view.w * 2}
-              y1="0"
-              y2="0"
-              stroke="#db9d9d"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-            />
-            <line
-              x1="0"
-              x2="0"
-              y1={view.y - view.h}
-              y2={view.y + view.h * 2}
-              stroke="#92bfa2"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-            />
-            {shownSketch && (
-              <SketchGeometry
-                entities={shownSketch.entities}
-                selectedIds={[
-                  ...dimensionSelection,
-                  ...hoveredConstraintEntities,
-                  ...selectedConstraints.flatMap(id => associatedEntityIds(sketch, id)),
-                ]}
-                stroke={cornerPreview?.ok || transformPreview?.ok || linearPreview?.ok || slotPreview?.ok ? '#858d96' : stroke}
-                entityStatus={entityStatus}
-                pixelScale={markerScale}
-                hoveredPointId={hoveredPoint}
-                interactive={tool === 'select' && !constraintMode && !placingDimension}
-                onEditConic={id => {
-                  const curve = sketch?.entities.find(entity => entity.id === id);
-                  if (curve?.type === 'conic') {
-                    setRho(String(curve.rho));
-                    setConicEditing(id);
-                  }
-                }}
-              />
-            )}
-            {tool === 'slot' && slotWidthCircle?.type === 'circle' && slotWidthCenter?.type === 'point' && (
-              <SketchSlotWidthHandle
-                center={slotWidthCenter}
-                radius={slotWidthCircle.radius}
-                pixelScale={markerScale}
-                onStart={e => {
-                  slotDrag.current = { center: slotWidthCenter, width: slotWidth };
-                  svg.current?.setPointerCapture(e.pointerId);
-                  svg.current?.focus();
-                }}
-              />
-            )}
-            {tool === 'circularPattern' && selected.length > 0 && parsedCircular.ok && linearPreview?.ok && (
-              <SketchCircularPatternManipulator
-                center={parsedCircular.center}
-                anchor={patternAnchor}
-                count={parsedCircular.count}
-                angle={parsedCircular.angle}
-                closed={parsedCircular.closed}
-                pixelScale={markerScale}
-                onEdit={field => {
-                  circularFields.current[field]?.focus();
-                  circularFields.current[field]?.select();
-                }}
-                onStart={(kind, event) => {
-                  const matrix = svg.current?.getScreenCTM();
-                  if (!matrix) return;
-                  const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-                  circularDrag.current = {
-                    kind,
-                    start: { x: raw.x, y: -raw.y },
-                    parameters: circularParameters,
-                    last: Math.atan2(-raw.y - parsedCircular.center.y, raw.x - parsedCircular.center.x),
-                    sweep:
-                      ((parsedCircular.angle * Math.PI) / 180) *
-                      (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
-                  };
-                  svg.current?.setPointerCapture(event.pointerId);
-                  svg.current?.focus();
-                }}
-              />
-            )}
-            {tool === 'linearPattern' && selected.length > 0 && parsedLinear.ok && (
-              <SketchLinearPatternManipulator
-                anchor={patternAnchor}
-                steps={linearParameters.secondDirection ? [parsedLinear.stepX, parsedLinear.stepY] : [parsedLinear.stepX]}
-                counts={[parsedLinear.countX, parsedLinear.countY]}
-                pixelScale={markerScale}
-                onStart={(index, event) => {
-                  patternDrag.current = { index, anchor: patternAnchor, parameters: linearParameters };
-                  svg.current?.setPointerCapture(event.pointerId);
-                }}
-                onEdit={field => {
-                  patternFields.current[field]?.focus();
-                  patternFields.current[field]?.select();
-                }}
-              />
-            )}
-            {tool === 'transform' && selected.length > 0 && parsedTransform.ok && (
-              <SketchTransformManipulator
-                pivot={{
-                  x: parsedTransform.pivot.x + parsedTransform.translation.x,
-                  y: parsedTransform.pivot.y + parsedTransform.translation.y,
-                }}
-                pixelScale={markerScale}
-                onStart={(kind, event) => {
-                  const matrix = svg.current?.getScreenCTM();
-                  if (!matrix) return;
-                  const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-                  transformDrag.current = { kind, start: { x: raw.x, y: -raw.y }, parameters: transformParameters };
-                  svg.current?.setPointerCapture(event.pointerId);
-                }}
-              />
-            )}
-            {tool === 'split' && splitFirst && (
-              <circle
-                cx={splitFirst.point.x}
-                cy={-splitFirst.point.y}
-                r={5 / markerScale}
-                fill="#fff"
-                stroke="#2467d1"
-                vectorEffect="non-scaling-stroke"
-                pointerEvents="none"
-                data-split-first="true"
-              />
-            )}
-            {tool === 'chamfer' &&
-              chamferPreview?.ok &&
-              chamferPreview.dimensionIds.map((id, side) => {
-                const dimension = chamferPreview.sketch.constraints.find(c => c.id === id);
-                if (dimension?.type !== 'distance') return null;
-                const origin = chamferPreview.sketch.entities.find(e => e.id === dimension.pointAId);
-                const point = chamferPreview.sketch.entities.find(e => e.id === dimension.pointBId);
-                if (origin?.type !== 'point' || point?.type !== 'point') return null;
-                const length = Math.hypot(point.x - origin.x, point.y - origin.y);
-                return (
-                  <circle
-                    key={side}
-                    data-chamfer-handle={side}
-                    cx={point.x}
-                    cy={-point.y}
-                    r={6 / markerScale}
-                    fill="#fff"
-                    stroke="#2467d1"
-                    vectorEffect="non-scaling-stroke"
-                    style={{ cursor: 'move' }}
-                    onPointerDown={event => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      chamferDrag.current = {
-                        side,
-                        origin,
-                        direction: { x: (point.x - origin.x) / length, y: (point.y - origin.y) / length },
-                        previous: chamferDistances,
-                      };
-                      svg.current?.setPointerCapture(event.pointerId);
-                    }}
-                  />
-                );
-              })}
-            {(tool === 'fillet' || tool === 'chamfer') &&
-              cornerPreview &&
-              !cornerPreview.ok &&
-              cornerPreview.cornerPointIds.map(id => {
-                const point = sketch?.entities.find(entity => entity.type === 'point' && entity.id === id);
-                return point?.type === 'point' ? (
-                  <circle
-                    key={id}
-                    data-fillet-error={id}
-                    cx={point.x}
-                    cy={-point.y}
-                    r={8 / markerScale}
-                    fill="#c43b3522"
-                    stroke="#c43b35"
-                    vectorEffect="non-scaling-stroke"
-                    pointerEvents="none"
-                  />
-                ) : null;
-              })}
-            {annotationSketch && showConstraints && (
-              <InlineConstraints
-                sketch={annotationSketch}
-                scale={markerScale}
-                selectedConstraintIds={selectedConstraints}
-                conflictedConstraintIds={shownConflicts}
-                interactive={tool === 'select' && !constraintMode && !placingDimension}
-                onSelect={(id, additive) => {
-                  setSelectedConstraints(previous =>
-                    additive ? (previous.includes(id) ? previous.filter(existing => existing !== id) : [...previous, id]) : [id]
-                  );
-                  if (!additive) setSelected([]);
-                  setDimension(null);
-                  setMessage('Constraint selected. Press Delete to remove it; Undo restores it.');
-                  svg.current?.focus();
-                }}
-                onHover={(_id, ids) => setHoveredConstraintEntities(ids)}
-                onEdit={editPattern}
-              />
-            )}
-            {annotationSketch &&
-              annotationSketch.constraints
-                .filter(numeric)
-                .map(c => (
-                  <DimensionGraphics
-                    key={c.id}
-                    constraint={c}
-                    sketch={annotationSketch}
-                    pixelScale={markerScale}
-                    selected={
-                      selectedConstraints.includes(c.id) ||
-                      (dimensionFlow.phase === 'placing' && dimensionFlow.existingConstraintId === c.id)
+                {!show3D && !showWorkspace && (
+                  <>
+                    <button type="button" className="cad-bar-button" title="Zoom to show the whole sketch" onClick={() => fit()}>
+                      Fit <kbd>F</kbd>
+                    </button>
+                    <button
+                      type="button"
+                      role="switch"
+                      className="cad-switch"
+                      aria-checked={snap}
+                      title="Snap to points, lines and the grid while drawing"
+                      onClick={() => {
+                        setSnap(value => !value);
+                        setDrawingCue(null);
+                        setSnapCue(null);
+                        hoveredReferences.current = [];
+                        svg.current?.focus();
+                      }}>
+                      Snap
+                      <span className="cad-switch-track" aria-hidden="true" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            {showWorkspace && (
+              <Suspense fallback={<div className="cad-part-view" />}>
+                <WorkspaceView
+                  document={shownDocument}
+                  selectedId={part?.id ?? null}
+                  onSelect={id => {
+                    if (partCutting) return pickForCut(id);
+                    setPartId(id);
+                    setSelected([]);
+                  }}
+                  highlightIds={partCutting ? cutPicked : undefined}
+                  onOpen={id => {
+                    if (partCutting) return pickForCut(id);
+                    if (studioSession) return openSketch(id);
+                    setPartId(id);
+                    setSelected([]);
+                    setShowWorkspace(false);
+                    setShow3D(hasOutline(documentRef.current, id));
+                  }}
+                  {...(studioSession
+                    ? { choosing: choosingFace, onChoosingChange: setChoosingFace }
+                    : { onCutParts: () => setPartCutting({}) })}
+                  onNewPart={on => {
+                    const before = documentRef.current;
+                    // A design's board thickness, when it names one, is what a new part is made from.
+                    const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variableScope, name));
+                    const added = createCadPart(
+                      `Part ${documentRef.current.parts.length + 1}`,
+                      board ? variableScope[board]!.value : (part?.thickness ?? 18)
+                    );
+                    // A design's blank first part is the one sketched, rather than a second beside it.
+                    const blank = documentRef.current.parts.length === 1 && isBlank(documentRef.current.parts[0]!);
+                    const base = blank ? documentRef.current.parts[0]! : added;
+                    const placed = { ...base, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
+                    // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
+                    const drawn = { ...placed, sketch: withFaceEdges(documentRef.current, placed) };
+                    commit({
+                      ...documentRef.current,
+                      revision: documentRef.current.revision + 1,
+                      parts: blank ? [drawn] : [...documentRef.current.parts, drawn],
+                    });
+                    setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
+                    if (studioSession) {
+                      extrudeAfterSketch.current = drawn.id;
+                      return openSketch(drawn.id, before);
                     }
-                    conflicted={shownConflicts.includes(c.id)}
-                    interactive={canEditCanvasDimensions}
-                    onSelect={additive => selectDimension(c.id, additive)}
-                    onEdit={() => editDimension(c.id)}
-                    onLabelPointerDown={event => startAnnotationDrag(c.id, event)}
-                  />
-                ))}
-            {sketch && dimensionDraft && (
-              <DimensionGraphics
-                constraint={dimensionDraft}
-                sketch={sketch}
-                pixelScale={markerScale}
-                position={dimensionDraft.labelPosition ?? cursor}
-                selected
-                interactive={false}
-              />
+                    setPartId(drawn.id);
+                    setSelected([]);
+                    setShowWorkspace(false);
+                    setShow3D(false);
+                    requestAnimationFrame(() => svg.current?.focus());
+                  }}>
+                  {partCutting && (
+                    <PartCutDialog
+                      key={partCutting.id ?? 'new'}
+                      document={doc}
+                      step={doc.partCuts?.find(step => step.id === partCutting.id)}
+                      tool={part?.id}
+                      variables={variableScope}
+                      pick={cutPick}
+                      onPicked={showCutPicked}
+                      onClose={() => setPartCutting(null)}
+                      onRemove={
+                        partCutting.id
+                          ? () => {
+                              commit(removePartCut(documentRef.current, partCutting.id!));
+                              setPartCutting(null);
+                            }
+                          : undefined
+                      }
+                      onSave={change => {
+                        const { clearance, clearanceExpression, ...parts } = change;
+                        commit(
+                          partCutting.id
+                            ? updatePartCut(documentRef.current, partCutting.id, change)
+                            : addPartCut(documentRef.current, parts.tools, parts.targets, {
+                                value: clearance,
+                                expression: clearanceExpression,
+                              }).document
+                        );
+                        setPartCutting(null);
+                      }}
+                    />
+                  )}
+                </WorkspaceView>
+              </Suspense>
             )}
-            {snapCue && (
-              <g pointerEvents="none">
-                <circle
-                  cx={snapCue.point.x}
-                  cy={-snapCue.point.y}
-                  r={5 / markerScale}
-                  fill="none"
-                  stroke="#bd7b18"
-                  strokeWidth="1.5"
-                  vectorEffect="non-scaling-stroke"
+            {!showWorkspace && show3D && partHasOutline && part && (
+              <Suspense fallback={<div className="cad-part-view" />}>
+                <PartView3D
+                  key={part.id}
+                  part={part}
+                  document={doc}
+                  variables={variableScope}
+                  onChoose={(entry, depth, expression) => commit(withRegionDepth(documentRef.current, part.id, entry, depth, expression))}
+                  onSketchFace={onEditFaceSketch && sketchOnFace}
                 />
-                <text
-                  x={snapCue.point.x + 9 / markerScale}
-                  y={-snapCue.point.y - 8 / markerScale}
-                  fontSize={11 / markerScale}
-                  fill="#9b6516">
-                  {snapCue.label}
-                </text>
-              </g>
+              </Suspense>
             )}
-            {modificationPreview && (
-              <ModificationPreview
-                sketch={modificationPreview.sketch}
-                curveIds={
-                  offsetPreview?.ok
-                    ? offsetPreview.entityIds
-                    : extendPreview?.ok
-                      ? [extendPreview.entityId]
-                      : mirrorPreview?.ok
-                        ? mirrorPreview.createdEntityIds
-                        : []
+            <svg
+              ref={svg}
+              className={`cad-canvas cad-tool-${tool}`}
+              style={showWorkspace || (show3D && partHasOutline) ? { display: 'none' } : undefined}
+              data-testid="cad-canvas"
+              role="img"
+              aria-label="2D sketch drawing canvas"
+              tabIndex={0}
+              viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+              onPointerDown={pointerDown}
+              onPointerMove={pointerMove}
+              onDoubleClick={event => {
+                if (tool === 'spline' || tool === 'bezier') {
+                  event.preventDefault();
+                  finishSpline();
+                  return;
                 }
-                pixelScale={markerScale}
+                if (tool !== 'select' || !sketch) return;
+                const id = (event.target as Element).closest('[data-entity-id]')?.getAttribute('data-entity-id');
+                const curve = sketch.entities.find(entity => entity.id === id);
+                if (curve?.type === 'conic') {
+                  event.preventDefault();
+                  setRho(String(curve.rho));
+                  setConicEditing(curve.id);
+                }
+              }}
+              onPointerLeave={() => {
+                if (!drag.current) {
+                  setHoveredPoint(null);
+                  setSnapCue(null);
+                  setDrawingCue(null);
+                }
+              }}
+              onPointerUp={event => pointerEnd(false, event)}
+              onPointerCancel={event => pointerEnd(true, event)}
+              onLostPointerCapture={event => pointerEnd(true, event)}
+              onContextMenu={event => {
+                event.preventDefault();
+                if (event.button !== 2) keyboardContext();
+              }}>
+              <defs>
+                <pattern id={`cad-grid-${doc.id}`} width={grid} height={grid} patternUnits="userSpaceOnUse">
+                  <circle cx="0" cy="0" r={grid * 0.025} fill="#ccd5df" />
+                </pattern>
+              </defs>
+              <rect x={view.x - view.w} y={view.y - view.h} width={view.w * 3} height={view.h * 3} fill={`url(#cad-grid-${doc.id})`} />
+              <SketchRegion
+                document={doc}
+                partId={part?.id}
+                verified={
+                  !solving &&
+                  !splitFirst &&
+                  !(
+                    (tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') &&
+                    selected.length
+                  ) &&
+                  !((tool === 'slot' || tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
+                  activeSketchStatus?.status === 'solved' &&
+                  lastCheckedRevision.current === `${doc.id}:${doc.revision}`
+                }
               />
-            )}
-            {offsetDimension && offsetPreview?.ok && (
-              <DimensionGraphics
-                constraint={offsetDimension}
-                sketch={offsetPreview.sketch}
-                pixelScale={markerScale}
-                interactive={false}
-                showLabel={false}
+              {faceSketch && (
+                <path
+                  data-face-outline
+                  className="cad-face-outline"
+                  d={faceSketch.outline.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                  pointerEvents="none"
+                />
+              )}
+              {!faceSketch && drawnOnFace && (
+                <path
+                  data-drawn-on-face
+                  className="cad-face-outline"
+                  d={drawnOnFace.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                  pointerEvents="none"
+                />
+              )}
+              {faceSketch?.floor && (
+                <path
+                  data-face-floor
+                  d={faceSketch.floor.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                  fill="#c99a5b"
+                  fillOpacity={0.25}
+                  stroke="#7a5526"
+                  strokeWidth={1 / markerScale}
+                  pointerEvents="none"
+                />
+              )}
+              {!faceSketch && <CutOverlay part={part} millimetresPerPixel={1 / markerScale} />}
+              <line
+                x1={view.x - view.w}
+                x2={view.x + view.w * 2}
+                y1="0"
+                y2="0"
+                stroke="#db9d9d"
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
               />
-            )}
-            {modification.phase === 'extend' &&
-              modification.entityId &&
-              sketch &&
-              (() => {
-                const curve = sketch.entities.find(e => e.id === modification.entityId);
-                const point =
-                  curve &&
-                  (curve.type === 'line' || curve.type === 'arc') &&
-                  pointsOf(sketch).get(modification.end === 'start' ? curve.startId : curve.endId);
-                return point ? (
+              <line
+                x1="0"
+                x2="0"
+                y1={view.y - view.h}
+                y2={view.y + view.h * 2}
+                stroke="#92bfa2"
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
+              />
+              {shownSketch && (
+                <SketchGeometry
+                  entities={shownSketch.entities}
+                  selectedIds={[
+                    ...dimensionSelection,
+                    ...hoveredConstraintEntities,
+                    ...selectedConstraints.flatMap(id => associatedEntityIds(sketch, id)),
+                  ]}
+                  stroke={cornerPreview?.ok || transformPreview?.ok || linearPreview?.ok || slotPreview?.ok ? '#858d96' : stroke}
+                  entityStatus={entityStatus}
+                  pixelScale={markerScale}
+                  hoveredPointId={hoveredPoint}
+                  interactive={tool === 'select' && !constraintMode && !placingDimension}
+                  onEditConic={id => {
+                    const curve = sketch?.entities.find(entity => entity.id === id);
+                    if (curve?.type === 'conic') {
+                      setRho(String(curve.rho));
+                      setConicEditing(id);
+                    }
+                  }}
+                />
+              )}
+              {tool === 'slot' && slotWidthCircle?.type === 'circle' && slotWidthCenter?.type === 'point' && (
+                <SketchSlotWidthHandle
+                  center={slotWidthCenter}
+                  radius={slotWidthCircle.radius}
+                  pixelScale={markerScale}
+                  onStart={e => {
+                    slotDrag.current = { center: slotWidthCenter, width: slotWidth };
+                    svg.current?.setPointerCapture(e.pointerId);
+                    svg.current?.focus();
+                  }}
+                />
+              )}
+              {tool === 'circularPattern' && selected.length > 0 && parsedCircular.ok && linearPreview?.ok && (
+                <SketchCircularPatternManipulator
+                  center={parsedCircular.center}
+                  anchor={patternAnchor}
+                  count={parsedCircular.count}
+                  angle={parsedCircular.angle}
+                  closed={parsedCircular.closed}
+                  pixelScale={markerScale}
+                  onEdit={field => {
+                    circularFields.current[field]?.focus();
+                    circularFields.current[field]?.select();
+                  }}
+                  onStart={(kind, event) => {
+                    const matrix = svg.current?.getScreenCTM();
+                    if (!matrix) return;
+                    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+                    circularDrag.current = {
+                      kind,
+                      start: { x: raw.x, y: -raw.y },
+                      parameters: circularParameters,
+                      last: Math.atan2(-raw.y - parsedCircular.center.y, raw.x - parsedCircular.center.x),
+                      sweep:
+                        ((parsedCircular.angle * Math.PI) / 180) *
+                        (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
+                    };
+                    svg.current?.setPointerCapture(event.pointerId);
+                    svg.current?.focus();
+                  }}
+                />
+              )}
+              {tool === 'linearPattern' && selected.length > 0 && parsedLinear.ok && (
+                <SketchLinearPatternManipulator
+                  anchor={patternAnchor}
+                  steps={linearParameters.secondDirection ? [parsedLinear.stepX, parsedLinear.stepY] : [parsedLinear.stepX]}
+                  counts={[parsedLinear.countX, parsedLinear.countY]}
+                  pixelScale={markerScale}
+                  onStart={(index, event) => {
+                    patternDrag.current = { index, anchor: patternAnchor, parameters: linearParameters };
+                    svg.current?.setPointerCapture(event.pointerId);
+                  }}
+                  onEdit={field => {
+                    patternFields.current[field]?.focus();
+                    patternFields.current[field]?.select();
+                  }}
+                />
+              )}
+              {tool === 'transform' && selected.length > 0 && parsedTransform.ok && (
+                <SketchTransformManipulator
+                  pivot={{
+                    x: parsedTransform.pivot.x + parsedTransform.translation.x,
+                    y: parsedTransform.pivot.y + parsedTransform.translation.y,
+                  }}
+                  pixelScale={markerScale}
+                  onStart={(kind, event) => {
+                    const matrix = svg.current?.getScreenCTM();
+                    if (!matrix) return;
+                    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+                    transformDrag.current = { kind, start: { x: raw.x, y: -raw.y }, parameters: transformParameters };
+                    svg.current?.setPointerCapture(event.pointerId);
+                  }}
+                />
+              )}
+              {tool === 'split' && splitFirst && (
+                <circle
+                  cx={splitFirst.point.x}
+                  cy={-splitFirst.point.y}
+                  r={5 / markerScale}
+                  fill="#fff"
+                  stroke="#2467d1"
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                  data-split-first="true"
+                />
+              )}
+              {tool === 'chamfer' &&
+                chamferPreview?.ok &&
+                chamferPreview.dimensionIds.map((id, side) => {
+                  const dimension = chamferPreview.sketch.constraints.find(c => c.id === id);
+                  if (dimension?.type !== 'distance') return null;
+                  const origin = chamferPreview.sketch.entities.find(e => e.id === dimension.pointAId);
+                  const point = chamferPreview.sketch.entities.find(e => e.id === dimension.pointBId);
+                  if (origin?.type !== 'point' || point?.type !== 'point') return null;
+                  const length = Math.hypot(point.x - origin.x, point.y - origin.y);
+                  return (
+                    <circle
+                      key={side}
+                      data-chamfer-handle={side}
+                      cx={point.x}
+                      cy={-point.y}
+                      r={6 / markerScale}
+                      fill="#fff"
+                      stroke="#2467d1"
+                      vectorEffect="non-scaling-stroke"
+                      style={{ cursor: 'move' }}
+                      onPointerDown={event => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        chamferDrag.current = {
+                          side,
+                          origin,
+                          direction: { x: (point.x - origin.x) / length, y: (point.y - origin.y) / length },
+                          previous: chamferDistances,
+                        };
+                        svg.current?.setPointerCapture(event.pointerId);
+                      }}
+                    />
+                  );
+                })}
+              {(tool === 'fillet' || tool === 'chamfer') &&
+                cornerPreview &&
+                !cornerPreview.ok &&
+                cornerPreview.cornerPointIds.map(id => {
+                  const point = sketch?.entities.find(entity => entity.type === 'point' && entity.id === id);
+                  return point?.type === 'point' ? (
+                    <circle
+                      key={id}
+                      data-fillet-error={id}
+                      cx={point.x}
+                      cy={-point.y}
+                      r={8 / markerScale}
+                      fill="#c43b3522"
+                      stroke="#c43b35"
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  ) : null;
+                })}
+              {annotationSketch && showConstraints && (
+                <InlineConstraints
+                  sketch={annotationSketch}
+                  scale={markerScale}
+                  selectedConstraintIds={selectedConstraints}
+                  conflictedConstraintIds={shownConflicts}
+                  interactive={tool === 'select' && !constraintMode && !placingDimension}
+                  onSelect={(id, additive) => {
+                    setSelectedConstraints(previous =>
+                      additive ? (previous.includes(id) ? previous.filter(existing => existing !== id) : [...previous, id]) : [id]
+                    );
+                    if (!additive) setSelected([]);
+                    setDimension(null);
+                    setMessage('Constraint selected. Press Delete to remove it; Undo restores it.');
+                    svg.current?.focus();
+                  }}
+                  onHover={(_id, ids) => setHoveredConstraintEntities(ids)}
+                  onEdit={editPattern}
+                />
+              )}
+              {annotationSketch &&
+                annotationSketch.constraints
+                  .filter(numeric)
+                  .map(c => (
+                    <DimensionGraphics
+                      key={c.id}
+                      constraint={c}
+                      sketch={annotationSketch}
+                      pixelScale={markerScale}
+                      selected={
+                        selectedConstraints.includes(c.id) ||
+                        (dimensionFlow.phase === 'placing' && dimensionFlow.existingConstraintId === c.id)
+                      }
+                      conflicted={shownConflicts.includes(c.id)}
+                      interactive={canEditCanvasDimensions}
+                      onSelect={additive => selectDimension(c.id, additive)}
+                      onEdit={() => editDimension(c.id)}
+                      onLabelPointerDown={event => startAnnotationDrag(c.id, event)}
+                    />
+                  ))}
+              {sketch && dimensionDraft && (
+                <DimensionGraphics
+                  constraint={dimensionDraft}
+                  sketch={sketch}
+                  pixelScale={markerScale}
+                  position={dimensionDraft.labelPosition ?? cursor}
+                  selected
+                  interactive={false}
+                />
+              )}
+              {snapCue && (
+                <g pointerEvents="none">
                   <circle
-                    data-extend-endpoint={modification.end}
-                    cx={point.x}
-                    cy={-point.y}
+                    cx={snapCue.point.x}
+                    cy={-snapCue.point.y}
                     r={5 / markerScale}
                     fill="none"
-                    stroke={SKETCH_APPEARANCE.selectedColor}
-                    strokeWidth={1.5}
+                    stroke="#bd7b18"
+                    strokeWidth="1.5"
                     vectorEffect="non-scaling-stroke"
-                    pointerEvents="none"
                   />
-                ) : null;
-              })()}
-            {extendPreview?.ok && extendPreview.kind === 'delete' && (
-              <text
-                data-extend-removes-curve="true"
-                x={cursor.x + 10 / markerScale}
-                y={-cursor.y - 10 / markerScale}
-                fontSize={13 / markerScale}
-                fill="#c73535"
-                pointerEvents="none">
-                Remove curve
-              </text>
-            )}
-            <SketchToolPreview
-              tool={tool}
-              pending={pending}
-              cursor={cursor}
-              curvePreview={curvePreview}
-              tangent={chainPreview?.tangent}
-              polygonSides={Number(polygonSides)}
-              sweepIntent={centerArcSweep.current?.sweep}
-              pixelScale={markerScale}
-              construction={construction}
-            />
-            {sketch && drawingCue && (
-              <DrawingInferencePreview
-                inference={drawingCue}
-                orientation={inference.current}
-                axis={tangentAxis.current}
-                start={chainPreview?.point ?? pending[0]}
-                sketch={sketch}
-                pixelScale={markerScale}
-              />
-            )}
-            {selectionBox && (
-              <rect
-                data-sketch-selection-box={selectionBox.end.x >= selectionBox.start.x ? 'window' : 'crossing'}
-                x={Math.min(selectionBox.start.x, selectionBox.end.x)}
-                y={-Math.max(selectionBox.start.y, selectionBox.end.y)}
-                width={Math.abs(selectionBox.end.x - selectionBox.start.x)}
-                height={Math.abs(selectionBox.end.y - selectionBox.start.y)}
-                fill={selectionBox.end.x >= selectionBox.start.x ? '#438bd522' : '#32a76a22'}
-                stroke={selectionBox.end.x >= selectionBox.start.x ? '#438bd5' : '#32a76a'}
-                strokeWidth="1"
-                strokeDasharray={selectionBox.end.x >= selectionBox.start.x ? undefined : '4 3'}
-                vectorEffect="non-scaling-stroke"
-                pointerEvents="none"
-              />
-            )}
-          </svg>
-          <ModificationControls
-            state={modification}
-            inputRef={offsetInput}
-            position={offsetPosition}
-            error={offsetPreview && !offsetPreview.ok ? offsetPreview.message : undefined}
-            onText={text => setModification(previous => transitionModification(previous, { type: 'text', text }))}
-            onEdit={() => setModification(previous => transitionModification(previous, { type: 'edit' }))}
-            onAccept={acceptOffset}
-            onCancel={() => {
-              chooseTool('select');
-              setSelected([]);
-              svg.current?.focus();
-            }}
-            onMirrorPicking={picking => {
-              setModification(previous => transitionModification(previous, { type: 'mirrorPicking', picking }));
-              setMessage(picking === 'axis' ? 'Select the mirror line.' : 'Select entities to mirror; Shift-click adds to selection.');
-              svg.current?.focus();
-            }}
-          />
-          {creationValues && creationValues.partId === part?.id && sketch && (
-            <CreationValueControls
-              inputRef={creationInput}
-              state={creationValues}
-              sketch={sketch}
-              positions={creationPositions}
-              onChange={text => setCreationValues({ ...creationValues, text })}
-              onStart={index => {
-                const value = creationValueAt(creationValues, sketch, index);
-                if (value)
-                  setCreationValues({ ...creationValues, index, editing: true, text: String(value.constraint.value), selectAll: true });
-              }}
-              onAccept={applyCreationValue}
-              onCancel={() => {
-                setCreationValues(null);
-                svg.current?.focus();
-              }}
-            />
-          )}
-          {regionField && part && (
-            <RegionDepthField
-              key={regionField.entry.region.id}
-              style={valuePosition(regionField.anchor, 280)}
-              depth={regionField.entry.depth}
-              expression={regionField.entry.cut?.depthExpression}
-              thickness={part.thickness - regionField.entry.from}
-              variables={variableScope}
-              onClose={() => {
-                setRegionField(null);
-                svg.current?.focus();
-              }}
-              onChoose={(depth, expression) => {
-                const next = withRegionDepth(documentRef.current, part.id, regionField.entry, depth, expression);
-                if (next !== documentRef.current) commit(next);
-                setRegionField(null);
-                svg.current?.focus();
-              }}
-            />
-          )}
-          {palette && !searchMode && (
-            <div className="cad-command-palette cad-quick-tools">
-              <h3>Sketch tools</h3>
-              {tools.map(t => (
-                <button type="button" key={t.id} onClick={() => chooseTool(t.id)}>
-                  {t.label}
-                  <kbd>{t.key}</kbd>
-                </button>
-              ))}
-            </div>
-          )}
-          {palette && searchMode && (
-            <CommandSearch
-              commands={[
-                ...tools.map(t => ({
-                  ...t,
-                  description:
-                    t.id === 'circumscribedPolygon'
-                      ? 'Sketch a regular polygon with its vertices on a circumscribing construction circle.'
-                      : t.id === 'inscribedPolygon'
-                        ? 'Sketch a regular polygon around an inscribed construction circle.'
-                        : t.id === 'centerPointArc'
-                          ? 'Sketch an arc by defining its center, start, and end points.'
-                          : t.id === 'ellipse'
-                            ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.'
-                            : t.id === 'threePointCircle'
-                              ? 'Sketch a circle by defining three points along its circumference.'
-                              : t.id === 'alignedRectangle'
-                                ? 'Sketch a rectangle from an oriented first edge and its perpendicular extent.'
-                                : undefined,
-                })),
-                ...(
-                  [
-                    'horizontal',
-                    'vertical',
-                    'coincident',
-                    'concentric',
-                    'symmetric',
-                    'midpoint',
-                    'parallel',
-                    'perpendicular',
-                    'equal',
-                    'tangent',
-                  ] as const
-                ).map(id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })),
-                { id: 'construction', label: 'Construction geometry', key: 'Q' },
-                { id: 'fix', label: 'Fix / unfix', key: 'Shift+J' },
-                { id: 'fit', label: 'Zoom to fit', key: 'F' },
-              ]}
-              onHighlight={setSearchHighlight}
-              onClose={(restoreFocus = true) => {
-                setPalette(false);
-                if (restoreFocus) svg.current?.focus();
-              }}
-              onChoose={id => {
-                setPalette(false);
-                if (id === 'construction') toggleConstruction();
-                else if (id === 'fix') toggleFix();
-                else if (id === 'fit') fit();
-                else if (tools.some(t => t.id === id)) {
-                  if (id === 'dimension') beginDimension();
-                  else chooseTool(id as SketchTool);
-                } else constrain(id as ConstraintTool);
-                svg.current?.focus();
-              }}
-            />
-          )}
-          {polygonTool && (
-            <form
-              className="cad-create-size"
-              onSubmit={event => {
-                event.preventDefault();
-                if (pending[1]) addShape(pending[1]);
-              }}>
-              <label>
-                Polygon sides{' '}
-                <input
-                  ref={polygonInput}
-                  aria-label="Polygon sides"
-                  type="number"
-                  min={3}
-                  max={50}
-                  step={1}
-                  value={polygonSides}
-                  onChange={event => {
-                    setPolygonSides(event.target.value);
-                    if (pending[0])
-                      polygonCountGesture.current = {
-                        sides: Number(event.target.value),
-                        radius: Math.hypot(cursor.x - pending[0].x, cursor.y - pending[0].y),
-                      };
-                  }}
-                  onKeyDown={event => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      chooseTool('select');
-                    }
-                  }}
+                  <text
+                    x={snapCue.point.x + 9 / markerScale}
+                    y={-snapCue.point.y - 8 / markerScale}
+                    fontSize={11 / markerScale}
+                    fill="#9b6516">
+                    {snapCue.label}
+                  </text>
+                </g>
+              )}
+              {modificationPreview && (
+                <ModificationPreview
+                  sketch={modificationPreview.sketch}
+                  curveIds={
+                    offsetPreview?.ok
+                      ? offsetPreview.entityIds
+                      : extendPreview?.ok
+                        ? [extendPreview.entityId]
+                        : mirrorPreview?.ok
+                          ? mirrorPreview.createdEntityIds
+                          : []
+                  }
+                  pixelScale={markerScale}
                 />
-              </label>
-              <button type="submit" disabled={!pending[1]}>
-                Create polygon
-              </button>
-            </form>
-          )}
-          {tool === 'slot' && selected.length > 0 && (
-            <SketchSlotControls
-              width={slotWidth}
-              onWidth={setSlotWidth}
-              chain={slotChain}
-              onChain={setSlotChain}
-              inputRef={slotWidthField}
-              onApply={acceptSlot}
+              )}
+              {offsetDimension && offsetPreview?.ok && (
+                <DimensionGraphics
+                  constraint={offsetDimension}
+                  sketch={offsetPreview.sketch}
+                  pixelScale={markerScale}
+                  interactive={false}
+                  showLabel={false}
+                />
+              )}
+              {modification.phase === 'extend' &&
+                modification.entityId &&
+                sketch &&
+                (() => {
+                  const curve = sketch.entities.find(e => e.id === modification.entityId);
+                  const point =
+                    curve &&
+                    (curve.type === 'line' || curve.type === 'arc') &&
+                    pointsOf(sketch).get(modification.end === 'start' ? curve.startId : curve.endId);
+                  return point ? (
+                    <circle
+                      data-extend-endpoint={modification.end}
+                      cx={point.x}
+                      cy={-point.y}
+                      r={5 / markerScale}
+                      fill="none"
+                      stroke={SKETCH_APPEARANCE.selectedColor}
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  ) : null;
+                })()}
+              {extendPreview?.ok && extendPreview.kind === 'delete' && (
+                <text
+                  data-extend-removes-curve="true"
+                  x={cursor.x + 10 / markerScale}
+                  y={-cursor.y - 10 / markerScale}
+                  fontSize={13 / markerScale}
+                  fill="#c73535"
+                  pointerEvents="none">
+                  Remove curve
+                </text>
+              )}
+              <SketchToolPreview
+                tool={tool}
+                pending={pending}
+                cursor={cursor}
+                curvePreview={curvePreview}
+                tangent={chainPreview?.tangent}
+                polygonSides={Number(polygonSides)}
+                sweepIntent={centerArcSweep.current?.sweep}
+                pixelScale={markerScale}
+                construction={construction}
+              />
+              {sketch && drawingCue && (
+                <DrawingInferencePreview
+                  inference={drawingCue}
+                  orientation={inference.current}
+                  axis={tangentAxis.current}
+                  start={chainPreview?.point ?? pending[0]}
+                  sketch={sketch}
+                  pixelScale={markerScale}
+                />
+              )}
+              {selectionBox && (
+                <rect
+                  data-sketch-selection-box={selectionBox.end.x >= selectionBox.start.x ? 'window' : 'crossing'}
+                  x={Math.min(selectionBox.start.x, selectionBox.end.x)}
+                  y={-Math.max(selectionBox.start.y, selectionBox.end.y)}
+                  width={Math.abs(selectionBox.end.x - selectionBox.start.x)}
+                  height={Math.abs(selectionBox.end.y - selectionBox.start.y)}
+                  fill={selectionBox.end.x >= selectionBox.start.x ? '#438bd522' : '#32a76a22'}
+                  stroke={selectionBox.end.x >= selectionBox.start.x ? '#438bd5' : '#32a76a'}
+                  strokeWidth="1"
+                  strokeDasharray={selectionBox.end.x >= selectionBox.start.x ? undefined : '4 3'}
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                />
+              )}
+            </svg>
+            <ModificationControls
+              state={modification}
+              inputRef={offsetInput}
+              position={offsetPosition}
+              error={offsetPreview && !offsetPreview.ok ? offsetPreview.message : undefined}
+              onText={text => setModification(previous => transitionModification(previous, { type: 'text', text }))}
+              onEdit={() => setModification(previous => transitionModification(previous, { type: 'edit' }))}
+              onAccept={acceptOffset}
               onCancel={() => {
                 chooseTool('select');
                 setSelected([]);
+                svg.current?.focus();
               }}
-              error={slotPreview && !slotPreview.ok ? slotPreview.message : undefined}
-            />
-          )}
-          {tool === 'circularPattern' && selected.length > 0 && (
-            <SketchCircularPatternControls
-              parameters={circularParameters}
-              onChange={setCircularParameters}
-              onApply={acceptCircularPattern}
-              onCancel={() => {
-                chooseTool('select');
-                setSelected([]);
-              }}
-              error={linearPreview && !linearPreview.ok ? linearPreview.message : undefined}
-              previewLimited={parsedCircular.ok && parsedCircular.count > 10}
-              releasedCount={linearPreview?.ok ? linearPreview.releasedConstraintIds.length : 0}
-              onField={(key, element) => {
-                if (element) circularFields.current[key] = element;
-                else delete circularFields.current[key];
+              onMirrorPicking={picking => {
+                setModification(previous => transitionModification(previous, { type: 'mirrorPicking', picking }));
+                setMessage(picking === 'axis' ? 'Select the mirror line.' : 'Select entities to mirror; Shift-click adds to selection.');
+                svg.current?.focus();
               }}
             />
-          )}
-          {tool === 'linearPattern' && selected.length > 0 && (
-            <SketchLinearPatternControls
-              parameters={linearParameters}
-              onChange={setLinearParameters}
-              onApply={acceptLinearPattern}
-              onCancel={() => {
-                chooseTool('select');
-                setSelected([]);
-              }}
-              error={linearPreview && !linearPreview.ok ? linearPreview.message : undefined}
-              releasedCount={linearPreview?.ok ? linearPreview.releasedConstraintIds.length : 0}
-              previewLimited={parsedLinear.ok && parsedLinear.countX * parsedLinear.countY > 10}
-              onField={(key, element) => {
-                if (element) patternFields.current[key] = element;
-                else delete patternFields.current[key];
-              }}
-            />
-          )}
-          {patternNotice && (
-            <div className="cad-create-size" role="status">
-              {patternNotice}
-            </div>
-          )}
-          {tool === 'transform' && selected.length > 0 && (
-            <SketchTransformControls
-              parameters={transformParameters}
-              onChange={next => {
-                if (next.pivotX !== transformParameters.pivotX || next.pivotY !== transformParameters.pivotY) {
-                  const parsed = parseTransformParameters(next);
-                  setTransformParameters(parsed.ok ? repositionTransformPivot(transformParameters, parsed.pivot) : next);
-                } else setTransformParameters(next);
-              }}
-              onApply={acceptTransform}
-              onCancel={() => {
-                chooseTool('select');
-                setSelected([]);
-              }}
-              error={transformPreview && !transformPreview.ok ? transformPreview.message : undefined}
-              releasedCount={transformPreview?.ok ? transformPreview.releasedConstraintIds.length : 0}
-            />
-          )}
-          {transformNotice && (
-            <div className="cad-create-size" role="status">
-              {transformNotice}
-            </div>
-          )}
-          {tool === 'split' && splitNotice && (
-            <div className="cad-create-size" role="status">
-              {splitNotice}
-            </div>
-          )}
-          {tool === 'chamfer' && selected.length > 0 && (
-            <form
-              className="cad-create-size cad-chamfer-editor"
-              onSubmit={event => {
-                event.preventDefault();
-                acceptChamfer();
-              }}>
-              {chamferDistances.map((value, index) => (
-                <label key={index}>
-                  Distance {index + 1}{' '}
+            {creationValues && creationValues.partId === part?.id && sketch && (
+              <CreationValueControls
+                inputRef={creationInput}
+                state={creationValues}
+                sketch={sketch}
+                positions={creationPositions}
+                onChange={text => setCreationValues({ ...creationValues, text })}
+                onStart={index => {
+                  const value = creationValueAt(creationValues, sketch, index);
+                  if (value)
+                    setCreationValues({ ...creationValues, index, editing: true, text: String(value.constraint.value), selectAll: true });
+                }}
+                onAccept={applyCreationValue}
+                onCancel={() => {
+                  setCreationValues(null);
+                  svg.current?.focus();
+                }}
+              />
+            )}
+            {regionField && part && (
+              <RegionDepthField
+                key={regionField.entry.region.id}
+                style={valuePosition(regionField.anchor, 280)}
+                depth={regionField.entry.depth}
+                expression={regionField.entry.cut?.depthExpression}
+                thickness={part.thickness - regionField.entry.from}
+                variables={variableScope}
+                onClose={() => {
+                  setRegionField(null);
+                  svg.current?.focus();
+                }}
+                onChoose={(depth, expression) => {
+                  const next = withRegionDepth(documentRef.current, part.id, regionField.entry, depth, expression);
+                  if (next !== documentRef.current) commit(next);
+                  setRegionField(null);
+                  svg.current?.focus();
+                }}
+              />
+            )}
+            {palette && !searchMode && (
+              <div className="cad-command-palette cad-quick-tools">
+                <h3>Sketch tools</h3>
+                {tools.map(t => (
+                  <button type="button" key={t.id} onClick={() => chooseTool(t.id)}>
+                    {t.label}
+                    <kbd>{t.key}</kbd>
+                  </button>
+                ))}
+              </div>
+            )}
+            {palette && searchMode && (
+              <CommandSearch
+                commands={[
+                  ...tools.map(t => ({
+                    ...t,
+                    description:
+                      t.id === 'circumscribedPolygon'
+                        ? 'Sketch a regular polygon with its vertices on a circumscribing construction circle.'
+                        : t.id === 'inscribedPolygon'
+                          ? 'Sketch a regular polygon around an inscribed construction circle.'
+                          : t.id === 'centerPointArc'
+                            ? 'Sketch an arc by defining its center, start, and end points.'
+                            : t.id === 'ellipse'
+                              ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.'
+                              : t.id === 'threePointCircle'
+                                ? 'Sketch a circle by defining three points along its circumference.'
+                                : t.id === 'alignedRectangle'
+                                  ? 'Sketch a rectangle from an oriented first edge and its perpendicular extent.'
+                                  : undefined,
+                  })),
+                  ...(
+                    [
+                      'horizontal',
+                      'vertical',
+                      'coincident',
+                      'concentric',
+                      'symmetric',
+                      'midpoint',
+                      'parallel',
+                      'perpendicular',
+                      'equal',
+                      'tangent',
+                    ] as const
+                  ).map(id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })),
+                  { id: 'construction', label: 'Construction geometry', key: 'Q' },
+                  { id: 'fix', label: 'Fix / unfix', key: 'Shift+J' },
+                  { id: 'fit', label: 'Zoom to fit', key: 'F' },
+                ]}
+                onHighlight={setSearchHighlight}
+                onClose={(restoreFocus = true) => {
+                  setPalette(false);
+                  if (restoreFocus) svg.current?.focus();
+                }}
+                onChoose={id => {
+                  setPalette(false);
+                  if (id === 'construction') toggleConstruction();
+                  else if (id === 'fix') toggleFix();
+                  else if (id === 'fit') fit();
+                  else if (tools.some(t => t.id === id)) {
+                    if (id === 'dimension') beginDimension();
+                    else chooseTool(id as SketchTool);
+                  } else constrain(id as ConstraintTool);
+                  svg.current?.focus();
+                }}
+              />
+            )}
+            {polygonTool && (
+              <form
+                className="cad-create-size"
+                onSubmit={event => {
+                  event.preventDefault();
+                  if (pending[1]) addShape(pending[1]);
+                }}>
+                <label>
+                  Polygon sides{' '}
+                  <input
+                    ref={polygonInput}
+                    aria-label="Polygon sides"
+                    type="number"
+                    min={3}
+                    max={50}
+                    step={1}
+                    value={polygonSides}
+                    onChange={event => {
+                      setPolygonSides(event.target.value);
+                      if (pending[0])
+                        polygonCountGesture.current = {
+                          sides: Number(event.target.value),
+                          radius: Math.hypot(cursor.x - pending[0].x, cursor.y - pending[0].y),
+                        };
+                    }}
+                    onKeyDown={event => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        chooseTool('select');
+                      }
+                    }}
+                  />
+                </label>
+                <button type="submit" disabled={!pending[1]}>
+                  Create polygon
+                </button>
+              </form>
+            )}
+            {tool === 'slot' && selected.length > 0 && (
+              <SketchSlotControls
+                width={slotWidth}
+                onWidth={setSlotWidth}
+                chain={slotChain}
+                onChain={setSlotChain}
+                inputRef={slotWidthField}
+                onApply={acceptSlot}
+                onCancel={() => {
+                  chooseTool('select');
+                  setSelected([]);
+                }}
+                error={slotPreview && !slotPreview.ok ? slotPreview.message : undefined}
+              />
+            )}
+            {tool === 'circularPattern' && selected.length > 0 && (
+              <SketchCircularPatternControls
+                parameters={circularParameters}
+                onChange={setCircularParameters}
+                onApply={acceptCircularPattern}
+                onCancel={() => {
+                  chooseTool('select');
+                  setSelected([]);
+                }}
+                error={linearPreview && !linearPreview.ok ? linearPreview.message : undefined}
+                previewLimited={parsedCircular.ok && parsedCircular.count > 10}
+                releasedCount={linearPreview?.ok ? linearPreview.releasedConstraintIds.length : 0}
+                onField={(key, element) => {
+                  if (element) circularFields.current[key] = element;
+                  else delete circularFields.current[key];
+                }}
+              />
+            )}
+            {tool === 'linearPattern' && selected.length > 0 && (
+              <SketchLinearPatternControls
+                parameters={linearParameters}
+                onChange={setLinearParameters}
+                onApply={acceptLinearPattern}
+                onCancel={() => {
+                  chooseTool('select');
+                  setSelected([]);
+                }}
+                error={linearPreview && !linearPreview.ok ? linearPreview.message : undefined}
+                releasedCount={linearPreview?.ok ? linearPreview.releasedConstraintIds.length : 0}
+                previewLimited={parsedLinear.ok && parsedLinear.countX * parsedLinear.countY > 10}
+                onField={(key, element) => {
+                  if (element) patternFields.current[key] = element;
+                  else delete patternFields.current[key];
+                }}
+              />
+            )}
+            {patternNotice && (
+              <div className="cad-create-size" role="status">
+                {patternNotice}
+              </div>
+            )}
+            {tool === 'transform' && selected.length > 0 && (
+              <SketchTransformControls
+                parameters={transformParameters}
+                onChange={next => {
+                  if (next.pivotX !== transformParameters.pivotX || next.pivotY !== transformParameters.pivotY) {
+                    const parsed = parseTransformParameters(next);
+                    setTransformParameters(parsed.ok ? repositionTransformPivot(transformParameters, parsed.pivot) : next);
+                  } else setTransformParameters(next);
+                }}
+                onApply={acceptTransform}
+                onCancel={() => {
+                  chooseTool('select');
+                  setSelected([]);
+                }}
+                error={transformPreview && !transformPreview.ok ? transformPreview.message : undefined}
+                releasedCount={transformPreview?.ok ? transformPreview.releasedConstraintIds.length : 0}
+              />
+            )}
+            {transformNotice && (
+              <div className="cad-create-size" role="status">
+                {transformNotice}
+              </div>
+            )}
+            {tool === 'split' && splitNotice && (
+              <div className="cad-create-size" role="status">
+                {splitNotice}
+              </div>
+            )}
+            {tool === 'chamfer' && selected.length > 0 && (
+              <form
+                className="cad-create-size cad-chamfer-editor"
+                onSubmit={event => {
+                  event.preventDefault();
+                  acceptChamfer();
+                }}>
+                {chamferDistances.map((value, index) => (
+                  <label key={index}>
+                    Distance {index + 1}{' '}
+                    <CadValueInput
+                      aria-label={`Chamfer distance ${index + 1}`}
+                      inputMode="decimal"
+                      value={value}
+                      onChange={event =>
+                        setChamferDistances(previous => previous.map((text, i) => (i === index ? event.target.value : text)))
+                      }
+                      onKeyDown={event => {
+                        if (event.key === 'Escape') {
+                          event.preventDefault();
+                          chooseTool('select');
+                          setSelected([]);
+                        }
+                      }}
+                    />
+                  </label>
+                ))}
+                <button type="submit" disabled={!chamferPreview?.ok}>
+                  Apply chamfers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    chooseTool('select');
+                    setSelected([]);
+                  }}>
+                  Cancel chamfers
+                </button>
+                {((chamferPreview && !chamferPreview.ok) || (chamferSelection && !chamferSelection.ok)) && (
+                  <span role="alert" className="cad-error">
+                    {(chamferPreview && !chamferPreview.ok ? chamferPreview.message : undefined) ??
+                      (chamferSelection && !chamferSelection.ok ? chamferSelection.message : '')}
+                  </span>
+                )}
+              </form>
+            )}
+            {tool === 'fillet' && selected.length > 0 && (
+              <form
+                className="cad-create-size cad-fillet-editor"
+                onSubmit={event => {
+                  event.preventDefault();
+                  acceptFillet();
+                }}>
+                <label>
+                  Fillet radius{' '}
                   <CadValueInput
-                    aria-label={`Chamfer distance ${index + 1}`}
+                    inputRef={filletInput}
+                    aria-label="Fillet radius"
                     inputMode="decimal"
-                    value={value}
-                    onChange={event =>
-                      setChamferDistances(previous => previous.map((text, i) => (i === index ? event.target.value : text)))
-                    }
+                    value={filletRadius}
+                    onFocus={() => setFilletEditing(true)}
+                    onChange={event => setFilletRadius(event.target.value)}
                     onKeyDown={event => {
                       if (event.key === 'Escape') {
                         event.preventDefault();
@@ -4782,241 +4854,197 @@ export function CadEditor({
                     }}
                   />
                 </label>
-              ))}
-              <button type="submit" disabled={!chamferPreview?.ok}>
-                Apply chamfers
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  chooseTool('select');
-                  setSelected([]);
-                }}>
-                Cancel chamfers
-              </button>
-              {((chamferPreview && !chamferPreview.ok) || (chamferSelection && !chamferSelection.ok)) && (
-                <span role="alert" className="cad-error">
-                  {(chamferPreview && !chamferPreview.ok ? chamferPreview.message : undefined) ??
-                    (chamferSelection && !chamferSelection.ok ? chamferSelection.message : '')}
-                </span>
-              )}
-            </form>
-          )}
-          {tool === 'fillet' && selected.length > 0 && (
-            <form
-              className="cad-create-size cad-fillet-editor"
-              onSubmit={event => {
-                event.preventDefault();
-                acceptFillet();
-              }}>
-              <label>
-                Fillet radius{' '}
-                <CadValueInput
-                  inputRef={filletInput}
-                  aria-label="Fillet radius"
-                  inputMode="decimal"
-                  value={filletRadius}
-                  onFocus={() => setFilletEditing(true)}
-                  onChange={event => setFilletRadius(event.target.value)}
-                  onKeyDown={event => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      chooseTool('select');
-                      setSelected([]);
-                    }
-                  }}
-                />
-              </label>
-              <button type="submit" disabled={!filletPreview?.ok}>
-                Apply fillets
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  chooseTool('select');
-                  setSelected([]);
-                }}>
-                Cancel fillets
-              </button>
-              {filletPreview && !filletPreview.ok && (
-                <span role="alert" className="cad-error">
-                  {filletPreview.message}
-                </span>
-              )}
-            </form>
-          )}
-          {conicEditing && (
-            <form
-              className="cad-create-size cad-conic-editor"
-              onSubmit={event => {
-                event.preventDefault();
-                applyConicRho();
-              }}>
-              <label>
-                Rho{' '}
-                <input
-                  ref={rhoInput}
-                  aria-label="Conic rho"
-                  inputMode="decimal"
-                  value={rho}
-                  onChange={event => setRho(event.target.value)}
-                  onKeyDown={event => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      chooseTool('select');
-                    }
-                  }}
-                />
-              </label>
-              <span>0 &lt; ρ &lt; 1</span>
-              <button type="submit">Apply rho</button>
-              <button type="button" onClick={() => chooseTool('select')}>
-                Close rho
-              </button>
-            </form>
-          )}
-          {currentDimension && numeric(currentDimension) && (
-            <form
-              className="cad-dimension-editor"
-              style={dimensionEditorPosition}
-              onSubmit={event => {
-                event.preventDefault();
-                applyDimensionValue();
-              }}>
-              <label htmlFor="cad-edit-dimension" className="sr-only">
-                {currentDimension.label ?? currentDimension.type} <span>{currentDimension.type === 'angle' ? 'degrees' : 'mm'}</span>
-              </label>
-              <div>
-                <CadValueInput
-                  id="cad-edit-dimension"
-                  inputRef={dimensionInput}
-                  key={currentDimension.id}
-                  defaultValue={currentDimension.expression ?? String(currentDimension.value)}
-                  inputMode="decimal"
-                  unit={currentDimension.type === 'angle' ? 'deg' : 'mm'}
-                  unitClassName="cad-dimension-unit"
-                  onKeyDown={event => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      cancelDimensionEdit();
-                    } else if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229))
-                      event.preventDefault();
-                  }}
-                />
-                <button type="submit" aria-label="Apply dimension">
-                  ✓
+                <button type="submit" disabled={!filletPreview?.ok}>
+                  Apply fillets
                 </button>
-                <button type="button" aria-label="Cancel dimension edit" onClick={cancelDimensionEdit}>
-                  ×
+                <button
+                  type="button"
+                  onClick={() => {
+                    chooseTool('select');
+                    setSelected([]);
+                  }}>
+                  Cancel fillets
                 </button>
-              </div>
-            </form>
-          )}
-          {pending[0] && (tool === 'rectangle' || tool === 'centerRectangle' || tool === 'circle') && (
-            <form
-              className="cad-create-size"
-              onSubmit={event => {
-                event.preventDefault();
-                addShape();
-              }}>
-              <span>
-                From {rounded(pending[0].x)}, {rounded(pending[0].y)}
-              </span>
-              {tool === 'rectangle' || tool === 'centerRectangle' ? (
-                <>
-                  <label>
-                    Width{' '}
-                    <CadValueInput
-                      aria-label="Rectangle width"
-                      value={width}
-                      onChange={event => setWidth(event.target.value)}
-                      inputMode="decimal"
-                    />
-                  </label>
-                  <label>
-                    Height{' '}
-                    <CadValueInput
-                      aria-label="Rectangle height"
-                      value={height}
-                      onChange={event => setHeight(event.target.value)}
-                      inputMode="decimal"
-                    />
-                  </label>
-                </>
-              ) : (
+                {filletPreview && !filletPreview.ok && (
+                  <span role="alert" className="cad-error">
+                    {filletPreview.message}
+                  </span>
+                )}
+              </form>
+            )}
+            {conicEditing && (
+              <form
+                className="cad-create-size cad-conic-editor"
+                onSubmit={event => {
+                  event.preventDefault();
+                  applyConicRho();
+                }}>
                 <label>
-                  Radius{' '}
-                  <CadValueInput
-                    aria-label="Circle radius"
-                    value={radius}
-                    onChange={event => setRadius(event.target.value)}
+                  Rho{' '}
+                  <input
+                    ref={rhoInput}
+                    aria-label="Conic rho"
                     inputMode="decimal"
+                    value={rho}
+                    onChange={event => setRho(event.target.value)}
+                    onKeyDown={event => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        chooseTool('select');
+                      }
+                    }}
                   />
                 </label>
+                <span>0 &lt; ρ &lt; 1</span>
+                <button type="submit">Apply rho</button>
+                <button type="button" onClick={() => chooseTool('select')}>
+                  Close rho
+                </button>
+              </form>
+            )}
+            {currentDimension && numeric(currentDimension) && (
+              <form
+                className="cad-dimension-editor"
+                style={dimensionEditorPosition}
+                onSubmit={event => {
+                  event.preventDefault();
+                  applyDimensionValue();
+                }}>
+                <label htmlFor="cad-edit-dimension" className="sr-only">
+                  {currentDimension.label ?? currentDimension.type} <span>{currentDimension.type === 'angle' ? 'degrees' : 'mm'}</span>
+                </label>
+                <div>
+                  <CadValueInput
+                    id="cad-edit-dimension"
+                    inputRef={dimensionInput}
+                    key={currentDimension.id}
+                    defaultValue={currentDimension.expression ?? String(currentDimension.value)}
+                    inputMode="decimal"
+                    unit={currentDimension.type === 'angle' ? 'deg' : 'mm'}
+                    unitClassName="cad-dimension-unit"
+                    onKeyDown={event => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        cancelDimensionEdit();
+                      } else if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229))
+                        event.preventDefault();
+                    }}
+                  />
+                  <button type="submit" aria-label="Apply dimension">
+                    ✓
+                  </button>
+                  <button type="button" aria-label="Cancel dimension edit" onClick={cancelDimensionEdit}>
+                    ×
+                  </button>
+                </div>
+              </form>
+            )}
+            {pending[0] && (tool === 'rectangle' || tool === 'centerRectangle' || tool === 'circle') && (
+              <form
+                className="cad-create-size"
+                onSubmit={event => {
+                  event.preventDefault();
+                  addShape();
+                }}>
+                <span>
+                  From {rounded(pending[0].x)}, {rounded(pending[0].y)}
+                </span>
+                {tool === 'rectangle' || tool === 'centerRectangle' ? (
+                  <>
+                    <label>
+                      Width{' '}
+                      <CadValueInput
+                        aria-label="Rectangle width"
+                        value={width}
+                        onChange={event => setWidth(event.target.value)}
+                        inputMode="decimal"
+                      />
+                    </label>
+                    <label>
+                      Height{' '}
+                      <CadValueInput
+                        aria-label="Rectangle height"
+                        value={height}
+                        onChange={event => setHeight(event.target.value)}
+                        inputMode="decimal"
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <label>
+                    Radius{' '}
+                    <CadValueInput
+                      aria-label="Circle radius"
+                      value={radius}
+                      onChange={event => setRadius(event.target.value)}
+                      inputMode="decimal"
+                    />
+                  </label>
+                )}
+                <button type="submit">Create</button>
+              </form>
+            )}
+            <div className="cad-canvas-footer">
+              <span>
+                {rounded(cursor.x)}, {rounded(cursor.y)} mm
+              </span>
+              <span>Scroll to zoom · right-drag to pan</span>
+              {sketch && (
+                <SelectionReadout
+                  sketch={sketch}
+                  selectedIds={dimensionSelection}
+                  picks={dimensionFlow.phase === 'idle' ? selectionHints.current : dimensionFlow.pickHints}
+                />
               )}
-              <button type="submit">Create</button>
-            </form>
-          )}
-          <div className="cad-canvas-footer">
-            <span>
-              {rounded(cursor.x)}, {rounded(cursor.y)} mm
-            </span>
-            <span>Scroll to zoom · right-drag to pan</span>
-            {sketch && (
-              <SelectionReadout
-                sketch={sketch}
-                selectedIds={dimensionSelection}
-                picks={dimensionFlow.phase === 'idle' ? selectionHints.current : dimensionFlow.pickHints}
-              />
+            </div>
+          </main>
+        </div>
+        {sketch && (
+          <SketchContextMenu
+            sketch={sketch}
+            context={contextMenu}
+            busy={busy || solving}
+            onClose={() => setContextMenu(null)}
+            onAction={contextAction}
+            onReturnToCanvas={() => svg.current?.focus()}
+          />
+        )}
+        <footer className="cad-status">
+          <span className={problems.length && !inProgress ? 'cad-error' : ''}>
+            {studioSession && showWorkspace ? (
+              // In the studio, a sketch's freedom isn't what's being worked on.
+              solving ? (
+                'Checking sketch…'
+              ) : (
+                ''
+              )
+            ) : (
+              <>
+                {solving ? 'Checking sketch…' : displayStatus}
+                {colorNotice && ` · ${colorNotice}`}
+              </>
+            )}
+          </span>
+          <span className="cad-instruction" role="status">
+            {acceptanceNotice || (studioSession && showWorkspace) ? '' : message}
+          </span>
+          <span>{saveStatus ?? 'Draft'}</span>
+        </footer>
+        {problems.length > 0 && !acceptanceNotice && (
+          <div className={`cad-problems${inProgress ? ' cad-sketch-progress' : ''}`} role={inProgress ? undefined : 'alert'}>
+            <strong>{inProgress ? 'Sketch in progress' : 'Finish is blocked'}</strong>
+            {inProgress ? (
+              <p>Keep drawing to close the outline. Your sketch is saved as a draft.</p>
+            ) : (
+              <ul>
+                {problems.map((problem, i) => (
+                  <li key={i}>{problem}</li>
+                ))}
+              </ul>
             )}
           </div>
-        </main>
+        )}
       </div>
-      {sketch && (
-        <SketchContextMenu
-          sketch={sketch}
-          context={contextMenu}
-          busy={busy || solving}
-          onClose={() => setContextMenu(null)}
-          onAction={contextAction}
-          onReturnToCanvas={() => svg.current?.focus()}
-        />
-      )}
-      <footer className="cad-status">
-        <span className={problems.length && !inProgress ? 'cad-error' : ''}>
-          {studioSession && showWorkspace ? (
-            // In the studio, a sketch's freedom isn't what's being worked on.
-            solving ? (
-              'Checking sketch…'
-            ) : (
-              ''
-            )
-          ) : (
-            <>
-              {solving ? 'Checking sketch…' : displayStatus}
-              {colorNotice && ` · ${colorNotice}`}
-            </>
-          )}
-        </span>
-        <span className="cad-instruction" role="status">
-          {acceptanceNotice || (studioSession && showWorkspace) ? '' : message}
-        </span>
-        <span>{saveStatus ?? 'Draft'}</span>
-      </footer>
-      {problems.length > 0 && !acceptanceNotice && (
-        <div className={`cad-problems${inProgress ? ' cad-sketch-progress' : ''}`} role={inProgress ? undefined : 'alert'}>
-          <strong>{inProgress ? 'Sketch in progress' : 'Finish is blocked'}</strong>
-          {inProgress ? (
-            <p>Keep drawing to close the outline. Your sketch is saved as a draft.</p>
-          ) : (
-            <ul>
-              {problems.map((problem, i) => (
-                <li key={i}>{problem}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
+    </CadVariableFieldsContext.Provider>
   );
 }

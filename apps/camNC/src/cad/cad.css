@@ -1095,3 +1095,33 @@
   color: #34445d;
   font-size: 11px;
 }
+/** The variables a value field offers after `#`. */
+.cad-variable-menu {
+  position: fixed;
+  z-index: 40;
+  margin: 0;
+  padding: 3px 0;
+  list-style: none;
+  border: 1px solid #c3cedb;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 6px 20px #24324733;
+  font-size: 12px;
+}
+.cad-variable-menu li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.cad-variable-menu li[aria-selected='true'] {
+  background: #dbe8f8;
+}
+.cad-variable-menu small {
+  color: #6b7c91;
+}
+.cad-variable-field-problem {
+  color: #b42318;
+  font-size: 11px;
+}
