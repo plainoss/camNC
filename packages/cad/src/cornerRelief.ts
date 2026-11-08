@@ -82,6 +82,11 @@ function relieveLoop(
   return { points: counterclockwise ? out : out.reverse(), skipped };
 }
 
+/** One cut-away loop with bones in its corners, leaving corners on the part's `outline` square. */
+export function relieveLoopCorners(points: CadPoint[], cutInside: boolean, diameter: number, outline: CadPoint[]) {
+  return relieveLoop(points, cutInside, diameter / 2, p => onLoop(p, outline));
+}
+
 /**
  * The part with a bone in each inside corner of its outline, holes, cuts and the islands left in them, so a bit of
  * `diameter` cuts every corner fully and parts that fit into them go all the way in. Corners on the part's own edge,

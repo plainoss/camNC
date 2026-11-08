@@ -80,6 +80,9 @@ import {
   cadVariableProblems,
   drawnOnOutline,
   cadVariableScope,
+  addPartCut,
+  updatePartCut,
+  removePartCut,
 } from '@wbcnc/cad';
 import {
   useEffect,
@@ -140,6 +143,7 @@ import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
 import { DesignStepsList } from './DesignStepsList';
+import { PartCutDialog } from './PartCutDialog';
 import { CadDrawnOnField } from './CadDrawnOnField';
 import { drawnOnName } from './drawnOnName';
 import { CadReliefField } from './CadReliefField';
@@ -427,6 +431,8 @@ export function CadEditor({
     () => startIn3D === true && doc.parts.some(candidate => hasOutline(doc, candidate.id))
   );
   const sketchOnly = !!faceSketch;
+  // A "cut parts" step being added, or the one being changed.
+  const [partCutting, setPartCutting] = useState<{ id?: string } | null>(null);
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
   // Picking a drawing tool, by button or key, means going back to the drawing.
@@ -3335,6 +3341,9 @@ export function CadEditor({
                 if (step.kind === 'sketch') {
                   setShowWorkspace(false);
                   setShow3D(false);
+                } else if (step.kind === 'partCut') {
+                  setShowWorkspace(true);
+                  setPartCutting({ id: step.partCutId });
                 } else if (step.kind === 'cut' || step.kind === 'extrude') {
                   setShowWorkspace(false);
                   setShow3D(hasOutline(documentRef.current, step.partId));
@@ -3624,6 +3633,7 @@ export function CadEditor({
                   setShowWorkspace(false);
                   setShow3D(hasOutline(documentRef.current, id));
                 }}
+                onCutParts={() => setPartCutting({})}
                 onNewPart={on => {
                   // A design's board thickness, when it names one, is what a new part is made from.
                   const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variableScope, name));
@@ -3643,8 +3653,38 @@ export function CadEditor({
                   setShow3D(false);
                   setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
                   requestAnimationFrame(() => svg.current?.focus());
-                }}
-              />
+                }}>
+                {partCutting && (
+                  <PartCutDialog
+                    key={partCutting.id ?? 'new'}
+                    document={doc}
+                    step={doc.partCuts?.find(step => step.id === partCutting.id)}
+                    tool={part?.id}
+                    variables={variableScope}
+                    onClose={() => setPartCutting(null)}
+                    onRemove={
+                      partCutting.id
+                        ? () => {
+                            commit(removePartCut(documentRef.current, partCutting.id!));
+                            setPartCutting(null);
+                          }
+                        : undefined
+                    }
+                    onSave={change => {
+                      const { clearance, clearanceExpression, ...parts } = change;
+                      commit(
+                        partCutting.id
+                          ? updatePartCut(documentRef.current, partCutting.id, change)
+                          : addPartCut(documentRef.current, parts.tools, parts.targets, {
+                              value: clearance,
+                              expression: clearanceExpression,
+                            }).document
+                      );
+                      setPartCutting(null);
+                    }}
+                  />
+                )}
+              </WorkspaceView>
             </Suspense>
           )}
           {!showWorkspace && show3D && partHasOutline && part && (
@@ -3652,6 +3692,7 @@ export function CadEditor({
               <PartView3D
                 key={part.id}
                 part={part}
+                document={doc}
                 variables={variableScope}
                 onChoose={(entry, depth, expression) => commit(withRegionDepth(documentRef.current, part.id, entry, depth, expression))}
                 onSketchFace={onEditFaceSketch && sketchOnFace}

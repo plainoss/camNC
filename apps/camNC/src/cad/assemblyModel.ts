@@ -4,6 +4,7 @@ import {
   mirrorEvaluatedPart,
   CAD_IDENTITY_PLACEMENT,
   placementMatrix,
+  withPartCuts,
   cadDrawnOnSupports,
   type CadDocument,
   type CadPart,
@@ -49,7 +50,7 @@ export function assemblyModel(document: CadDocument): AssemblyModel {
     const { part: profile } = evaluateCadPart(part);
     if (!profile) return { part, problem: 'Its sketch needs fixing first.' };
     try {
-      const evaluated: EvaluatedCadPart = evaluateCadFeatures(part, profile).part;
+      const evaluated: EvaluatedCadPart = withPartCuts(document, evaluateCadFeatures(part, profile).part);
       const mirrored = part.copies?.some(copy => copy.mirrored) ? nativePart(mirrorEvaluatedPart(evaluated)) : undefined;
       return { part, shape: nativePart(evaluated), ...(mirrored && { mirrored }) };
     } catch (cause) {

@@ -21,6 +21,7 @@ export * from './valueExpressions';
 export * from './variables';
 export * from './placement';
 export * from './drawnOn';
+export * from './cutParts';
 export * from './assemblyCollisions';
 export * from './copies';
 export * from './cornerRelief';

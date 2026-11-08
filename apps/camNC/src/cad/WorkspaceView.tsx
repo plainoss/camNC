@@ -1,5 +1,5 @@
 import { assemblyReport, evaluateCadDocument, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ModelViewport, type ModelFacePick, type ModelView } from '@/cam/model/ModelViewport';
 import { assemblyModel, instanceKey } from './assemblyModel';
 
@@ -24,6 +24,8 @@ export default function WorkspaceView({
   onSelect,
   onOpen,
   onNewPart,
+  onCutParts,
+  children,
 }: {
   document: CadDocument;
   selectedId: string | null;
@@ -31,6 +33,10 @@ export default function WorkspaceView({
   onOpen: (partId: string) => void;
   /** Starts a new part drawn on a base plane or a part's face. */
   onNewPart?: (on: CadDrawnOn['on']) => void;
+  /** Starts a step cutting some parts out of others. */
+  onCutParts?: () => void;
+  /** Shown over the view, such as a step's dialog. */
+  children?: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const lastClick = useRef<{ partId: string; at: number } | null>(null);
@@ -97,6 +103,11 @@ export default function WorkspaceView({
             New part
           </button>
         )}
+        {onCutParts && !choosing && document.parts.length > 1 && (
+          <button type="button" onClick={onCutParts}>
+            Cut parts
+          </button>
+        )}
         {choosing && (
           <div role="group" aria-label="Draw on a plane">
             {kPlanes.map(option => (
@@ -140,6 +151,7 @@ export default function WorkspaceView({
         }}
       />
       <p role="status">{status}</p>
+      {children}
     </div>
   );
 }

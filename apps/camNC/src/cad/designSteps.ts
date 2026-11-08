@@ -3,7 +3,7 @@ import { cadFaceSketches, faceIsUnderside, type CadDocument, type CadPart } from
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
   id: string;
-  kind: 'sketch' | 'extrude' | 'faceSketch' | 'cut' | 'copy';
+  kind: 'sketch' | 'extrude' | 'faceSketch' | 'cut' | 'copy' | 'partCut';
   label: string;
   /** A short reading of the step's main value, such as a thickness or depth. */
   detail?: string;
@@ -11,6 +11,8 @@ export interface DesignStep {
   /** The face sketch or cut the step opens. */
   sketchId?: string;
   cutId?: string;
+  /** The "cut parts" step it stands for. */
+  partCutId?: string;
 }
 
 const typed = (expression: string | undefined, value: number) =>
@@ -21,12 +23,31 @@ function faceName(part: CadPart, on: ReturnType<typeof cadFaceSketches>[number][
   return on === 'underside' ? 'the underside' : 'the top';
 }
 
+const names = (document: CadDocument, ids: string[]) =>
+  ids.map(id => document.parts.find(part => part.id === id)?.name ?? 'a removed part').join(', ');
+
 /**
  * The design's steps: for each part in turn, its sketch and the thickness it's made to, the sketches and cuts on its
- * faces, and its copies.
+ * faces, and its copies. A step cutting parts out of others comes after the last of the parts it uses.
  */
 export function designSteps(document: CadDocument): DesignStep[] {
-  return document.parts.flatMap(part => {
+  const order = new Map(document.parts.map((part, index) => [part.id, index]));
+  const after = new Map<number, DesignStep[]>();
+  for (const step of document.partCuts ?? []) {
+    const last = Math.max(0, ...[...step.tools, ...step.targets].map(id => order.get(id) ?? 0));
+    after.set(last, [
+      ...(after.get(last) ?? []),
+      {
+        id: step.id,
+        kind: 'partCut',
+        label: `Cut ${names(document, step.targets)} with ${names(document, step.tools)}`,
+        detail: `clearance ${typed(step.clearanceExpression, step.clearance)}`,
+        partId: step.targets[0] ?? step.tools[0]!,
+        partCutId: step.id,
+      },
+    ]);
+  }
+  return document.parts.flatMap((part, partIndex) => {
     const steps: DesignStep[] = [
       { id: `${part.id}:sketch`, kind: 'sketch', label: `Sketch · ${part.name}`, partId: part.id },
       {
@@ -68,6 +89,6 @@ export function designSteps(document: CadDocument): DesignStep[] {
         partId: part.id,
       })
     );
-    return steps;
+    return [...steps, ...(after.get(partIndex) ?? [])];
   });
 }

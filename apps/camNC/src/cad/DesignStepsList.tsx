@@ -8,6 +8,7 @@ const kIcons: Record<DesignStep['kind'], string> = {
   faceSketch: '✎',
   cut: '⌴',
   copy: '⧉',
+  partCut: '⊟',
 };
 
 /** The design's steps in order. Clicking one selects its part and opens what it made. */

@@ -2,6 +2,7 @@ import { newCadId, originId } from './document';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
 import { relieveCorners } from './cornerRelief';
+import { applyPartCuts } from './cutParts';
 import { patternInstanceOffset, patternMaster } from './pattern';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type {
@@ -363,5 +364,7 @@ export function evaluateCadDocument(document: CadDocument): { parts: EvaluatedCa
     diagnostics.push(...evaluated.diagnostics);
     parts.push(evaluated.part);
   }
-  return { parts: diagnostics.some(d => d.severity === 'error') ? [] : parts, diagnostics };
+  const cut = applyPartCuts(document, parts);
+  diagnostics.push(...cut.diagnostics);
+  return { parts: diagnostics.some(d => d.severity === 'error') ? [] : cut.parts, diagnostics };
 }
