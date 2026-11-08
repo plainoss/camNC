@@ -1,5 +1,6 @@
 import {
   CAD_GEOMETRY_TOLERANCE,
+  sketchPatternOwner,
   constraintEntityIds,
   constraintForCurveContact,
   curveContacts,
@@ -227,6 +228,7 @@ function trimCircularAt(sketch: CadSketch, curve: Circular, hit: CadPoint): CadS
 /** Shared entry point: line, circle and finite arc trims use the same atomic editor command. */
 export function trimSketchCurveAt(sketch: CadSketch, id: string, hit: CadPoint): CadSketch | null {
   const curve = sketch.entities.find(entity => entity.id === id);
+  if (sketchPatternOwner(sketch, id)) return null;
   if (curve && isOwnedSplineHandle(curve)) return null;
   if (curve?.type === 'line') return trimLineAt(sketch, id, hit);
   if (curve?.type === 'circle' || curve?.type === 'arc') return trimCircularAt(sketch, curve, hit);

@@ -1,3 +1,4 @@
+import { sketchPatternOwner } from './pattern';
 import { constraintEntityIds, entityPointIds, newCadId, originId } from './document';
 import {
   curveEndpointIds,
@@ -62,6 +63,7 @@ export type CadSplitResult =
 export function splitSketchCurve(sketch: CadSketch, entityId: string, parameters: readonly number[]): CadSplitResult {
   const curve = sketch.entities.find(e => e.id === entityId);
   const fail = (message: string): CadSplitResult => ({ ok: false, message });
+  if (sketchPatternOwner(sketch, entityId)) return fail('Remove the pattern relation before splitting its finite geometry.');
   if (!curve || curve.type === 'point' || isOwnedSplineHandle(curve))
     return fail('Select a sketch curve, away from its endpoints or tangent handles.');
   const closed = isClosedSketchCurve(curve);

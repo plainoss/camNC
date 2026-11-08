@@ -1,3 +1,4 @@
+import { sketchPatternOwner } from './pattern';
 import { constraintEntityIds, entityPointIds, newCadId, originId, removeEntity } from './document';
 import { constraintForCurveContact, curveContacts } from './curveContacts';
 import { curveEndpointIds, isNurbsCurve } from './curves';
@@ -302,6 +303,8 @@ function replaceEndpoint(
 
 /** Extend a picked line/arc endpoint atomically; the same detached result serves preview and commit. */
 export function extendSketchCurve(sketch: CadSketch, options: CadExtendOptions): CadExtendResult {
+  if (sketchPatternOwner(sketch, options.entityId))
+    return { ok: false, message: 'Remove the pattern relation before extending its finite geometry.' };
   const source = sketch.entities.find(entity => entity.id === options.entityId);
   if (source && isOwnedSplineHandle(source))
     return { ok: false, message: 'Spline tangent handles belong to their curve and cannot be extended separately.' };

@@ -118,7 +118,34 @@ export type CadOffsetMember =
   | { kind: 'line' | 'arc'; sourceId: string; targetId: string; side: 1 | -1; endpoints: boolean }
   | { kind: 'circle'; sourceId: string; targetId: string; side: 1 | -1 };
 
+/** Logical cell IDs survive count edits and deletion exclusions; inactive IDs remain reserved. */
+export interface CadPatternInstance {
+  x: number;
+  y: number;
+  idMap: Record<string, string>;
+  activeIds: string[];
+  constructionOverrides?: Record<string, boolean>;
+}
+export interface CadPatternExclusion {
+  seedKey: string;
+  x: number;
+  y: number;
+}
+export interface CadLinearPattern extends ConstraintBase {
+  type: 'linearPattern';
+  seedKeys: string[];
+  masterX: number;
+  masterY: number;
+  countX: number;
+  countY: number;
+  stepX: CadPoint;
+  stepY: CadPoint;
+  instances: CadPatternInstance[];
+  exclusions: CadPatternExclusion[];
+}
+
 export type CadConstraint =
+  | CadLinearPattern
   | (ConstraintBase & { type: 'symmetricCurves'; entityAId: string; entityBId: string; lineId: string; focusSign?: 1 | -1 })
   | (ConstraintBase & { type: 'regularPolygon'; circleId: string; edgeIds: string[]; mode: 'inscribed' | 'circumscribed' })
   | (ConstraintBase & { type: 'horizontal' | 'vertical'; entityId: string })

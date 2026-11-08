@@ -1,3 +1,5 @@
+import { materializePatternJoins } from './patternTopology';
+import { linearPatternIssue, sketchPatternOwner, afterPatternEntityRemoval } from './pattern';
 import { refreshDimensionMeasurement } from './dimensions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
 import type {
@@ -63,7 +65,9 @@ export function addConstraint(sketch: CadSketch, constraint: NewCadConstraint): 
 }
 
 export function removeConstraint(sketch: CadSketch, id: string): CadSketch {
-  return { ...sketch, constraints: sketch.constraints.filter(c => c.id !== id) };
+  const constraint = sketch.constraints.find(c => c.id === id);
+  const next = constraint?.type === 'linearPattern' ? materializePatternJoins(sketch, sketch, constraint) : sketch;
+  return { ...next, constraints: next.constraints.filter(c => c.id !== id) };
 }
 
 /** Each edit is a detached JSON value suitable for undo history and persistence. */
@@ -145,6 +149,10 @@ export function entityPointIds(entity: CadEntity): string[] {
 }
 
 export function constraintEntityIds(constraint: CadConstraint): string[] {
+  if (constraint.type === 'linearPattern')
+    return Array.isArray(constraint.instances)
+      ? [...new Set(constraint.instances.flatMap(i => (i && Array.isArray(i.activeIds) ? i.activeIds : [])))]
+      : [];
   if (constraint.type === 'offset')
     return Array.isArray(constraint.members)
       ? [...new Set(constraint.members.flatMap(member => (member ? [member.sourceId, member.targetId] : [])))]
@@ -192,7 +200,15 @@ export function removeEntity(sketch: CadSketch, id: string): CadSketch {
     if (remove) removed.add(e.id);
     return !remove;
   });
-  return { ...sketch, entities, constraints: sketch.constraints.filter(c => !constraintEntityIds(c).some(e => removed.has(e))) };
+  return afterPatternEntityRemoval(
+    sketch,
+    {
+      ...sketch,
+      entities,
+      constraints: sketch.constraints.filter(c => c.type === 'linearPattern' || !constraintEntityIds(c).some(e => removed.has(e))),
+    },
+    removed
+  );
 }
 
 function pointAt(sketch: CadSketch, p: CadPoint, construction?: boolean): CadPointEntity {
@@ -235,6 +251,7 @@ export function addConic(
 }
 
 export function setConicRho(sketch: CadSketch, entityId: string, rho: number): CadSketch {
+  if (sketchPatternOwner(sketch, entityId, true)) throw new Error('Edit the source conic to change a pattern shape.');
   if (!Number.isFinite(rho) || rho <= 0 || rho >= 1) throw new Error('Conic rho must be between zero and one.');
   return { ...sketch, entities: sketch.entities.map(e => (e.id === entityId && e.type === 'conic' ? { ...e, rho } : e)) };
 }
@@ -300,6 +317,7 @@ export function addSpline(sketch: CadSketch, options: { points: CadPoint[]; clos
 }
 
 export function insertCurveControlPoint(sketch: CadSketch, entityId: string, parameter = 0.5): CadSketch {
+  if (sketchPatternOwner(sketch, entityId, true)) throw new Error('Edit the source curve to change the control points of a pattern.');
   const curve = sketch.entities.find(e => e.id === entityId);
   if (curve?.type !== 'spline' && curve?.type !== 'bezier') throw new Error('Select a spline or Bézier curve to add a control point.');
   if (curve.type === 'spline' && curve.closed) throw new Error('Control insertion is currently available on open fit splines.');
@@ -703,6 +721,7 @@ export function parseCadDocument(input: unknown): CadDocument {
             'symmetricPoints',
             'symmetricCurves',
             'regularPolygon',
+            'linearPattern',
             'horizontalPoints',
             'verticalPoints',
             'pointOnLine',
@@ -733,6 +752,42 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (c.label !== undefined && typeof c.label !== 'string') throw new Error('Invalid constraint label');
         if (c.type === 'symmetricCurves' && c.focusSign !== undefined && c.focusSign !== 1 && c.focusSign !== -1)
           throw new Error('Invalid ellipse symmetry branch.');
+        if (c.type === 'linearPattern') {
+          if (
+            !Array.isArray(c.seedKeys) ||
+            !c.seedKeys.length ||
+            c.seedKeys.some(key => typeof key !== 'string') ||
+            new Set(c.seedKeys).size !== c.seedKeys.length ||
+            !Array.isArray(c.instances) ||
+            !Array.isArray(c.exclusions) ||
+            !c.stepX ||
+            !c.stepY
+          )
+            throw new Error('Invalid linear pattern data.');
+          [c.masterX, c.masterY, c.countX, c.countY].forEach(number);
+          [c.stepX.x, c.stepX.y, c.stepY.x, c.stepY.y].forEach(number);
+          for (const i of c.instances) {
+            if (
+              !i ||
+              !i.idMap ||
+              typeof i.idMap !== 'object' ||
+              Array.isArray(i.idMap) ||
+              !Array.isArray(i.activeIds) ||
+              Object.values(i.idMap).some(id => typeof id !== 'string') ||
+              i.activeIds.some(id => typeof id !== 'string')
+            )
+              throw new Error('Invalid pattern instance map.');
+            number(i.x);
+            number(i.y);
+          }
+          for (const e of c.exclusions) {
+            if (!e || typeof e.seedKey !== 'string') throw new Error('Invalid pattern exclusion.');
+            number(e.x);
+            number(e.y);
+          }
+          const issue = linearPatternIssue(sketch, c);
+          if (issue) throw new Error(issue);
+        }
         if (c.type === 'regularPolygon') {
           if (
             !['inscribed', 'circumscribed'].includes(c.mode) ||

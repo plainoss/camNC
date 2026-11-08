@@ -1,3 +1,4 @@
+import { sketchPatternOwner } from './pattern';
 import { newCadId } from './document';
 import { CAD_GEOMETRY_TOLERANCE, evaluateCadPart } from './geometry';
 import type { CadArcEntity, CadConstraint, CadLineEntity, CadPoint, CadPointEntity, CadSketch } from './types';
@@ -143,6 +144,8 @@ export function filletLineCorners(sketch: CadSketch, options: CadFilletOptions):
   for (const id of cornerPointIds) {
     const corner = lineCorner(sketch, id, equivalent);
     if (typeof corner === 'string') return { ok: false, cornerPointIds: [id], message: corner };
+    if (corner.lines.some(line => sketchPatternOwner(sketch, line.id)))
+      return { ok: false, cornerPointIds, message: 'Remove the pattern relation before filleting its finite geometry.' };
     corners.push(corner);
   }
   const consumption = new Map<string, { length: number; factor: number; corners: string[] }>();

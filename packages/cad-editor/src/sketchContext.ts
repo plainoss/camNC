@@ -1,7 +1,7 @@
-import { isSplineTangentHandle, originId, type CadPoint, type CadSketch } from '@wbcnc/cad';
+import { sketchPatternOwner, setSketchConstruction, isSplineTangentHandle, originId, type CadPoint, type CadSketch } from '@wbcnc/cad';
 import { pickSketchPoint, pickSketchSnap, type CadPickingOptions } from './picking';
 
-export type SketchContextTarget = { kind: 'entity' | 'dimension'; id: string } | { kind: 'blank' };
+export type SketchContextTarget = { kind: 'entity' | 'dimension' | 'constraint'; id: string } | { kind: 'blank' };
 export interface SketchContextSelection {
   entityIds: readonly string[];
   constraintIds: readonly string[];
@@ -43,6 +43,7 @@ export type SketchContextAction =
   | 'clear'
   | 'fit'
   | 'fit-selection'
+  | 'edit-pattern'
   | 'edit-dimension'
   | 'toggle-driven'
   | 'delete-dimensions';
@@ -95,6 +96,8 @@ export function createSketchContext(
       entityIds: entityIds.includes(target.id) ? entityIds : [target.id],
       constraintIds: [],
     };
+  if (target.kind === 'constraint' && sketch.constraints.some(c => c.id === target.id && c.type === 'linearPattern'))
+    return { target: { ...target }, position: { ...position }, entityIds: [], constraintIds: [target.id] };
   if (target.kind === 'dimension' && sketch.constraints.some(c => c.id === target.id && 'value' in c))
     return {
       target: { ...target },
@@ -111,6 +114,8 @@ export function createSketchContext(
 export function selectedSketchContextTarget(sketch: CadSketch, selection: SketchContextSelection): SketchContextTarget {
   const dimension = selection.constraintIds.find(id => sketch.constraints.some(c => c.id === id && 'value' in c));
   if (dimension) return { kind: 'dimension', id: dimension };
+  const pattern = selection.constraintIds.find(id => sketch.constraints.some(c => c.id === id && c.type === 'linearPattern'));
+  if (pattern) return { kind: 'constraint', id: pattern };
   const entity = selection.entityIds.find(id => sketch.entities.some(entity => entity.id === id));
   return entity ? { kind: 'entity', id: entity } : { kind: 'blank' };
 }
@@ -124,10 +129,19 @@ export function toggleContextConstruction(sketch: CadSketch, ids: readonly strin
   if (!targets.length) return sketch;
   const construction = !targets.every(entity => entity.construction);
   const targetIds = new Set(targets.map(entity => entity.id));
-  return { ...sketch, entities: sketch.entities.map(entity => (targetIds.has(entity.id) ? { ...entity, construction } : entity)) };
+  return setSketchConstruction(sketch, [...targetIds], construction);
 }
 
 export function sketchContextItems(sketch: CadSketch, context: SketchContext, busy = false): SketchContextItem[] {
+  if (context.target.kind === 'constraint') {
+    const id = context.target.id;
+    if (!sketch.constraints.some(c => c.id === id && c.type === 'linearPattern')) return [];
+    return [
+      { action: 'edit-pattern', label: 'Edit pattern', disabled: busy, shortcut: 'Enter' },
+      { action: 'delete-dimensions', label: 'Remove pattern relation', disabled: busy, shortcut: 'Delete' },
+      { action: 'fit', label: 'Zoom to fit', separatorBefore: true, shortcut: 'F' },
+    ];
+  }
   if (context.target.kind === 'dimension') {
     const id = context.target.id;
     const dimension = sketch.constraints.find(c => c.id === id && 'value' in c);
@@ -147,6 +161,8 @@ export function sketchContextItems(sketch: CadSketch, context: SketchContext, bu
   }
   const items: SketchContextItem[] = [];
   if (context.target.kind === 'entity') {
+    if (context.entityIds.some(id => sketchPatternOwner(sketch, id)))
+      items.push({ action: 'edit-pattern', label: 'Edit pattern', disabled: busy });
     const targets = editableEntities(sketch, context.entityIds);
     const allConstruction = targets.length > 0 && targets.every(entity => entity.construction);
     const someConstruction = targets.some(entity => entity.construction);
