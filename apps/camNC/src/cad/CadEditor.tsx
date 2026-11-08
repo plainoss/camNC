@@ -272,6 +272,8 @@ const entityPointIds = (entity: CadEntity): string[] => {
 const PartView3D = lazy(() => import('./PartView3D'));
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
 /** A face sketch is drawn over the part's outline, so a part needs one first. */
+/** A part with nothing drawn yet, such as a new design's first: the studio asks what it's sketched on first. */
+const isBlank = (part: CadPart) => !part.drawnOn && part.sketch.entities.every(entity => entity.type === 'point' && entity.fixed);
 const hasOutline = (document: CadDocument, partId: string) => !!evaluateCadPart(document.parts.find(part => part.id === partId)!).part;
 function replacePart(document: CadDocument, partId: string, change: (part: CadPart) => CadPart): CadDocument {
   return { ...document, parts: document.parts.map(p => (p.id === partId ? change(p) : p)) };
@@ -440,8 +442,10 @@ export function CadEditor({
   const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
   const [show3D, setShow3D] = useState(startIn3D === 'part');
   // Opening a design shows every part where it sits, once there's a part to show.
+  // A new design opens there too, picking the plane its first part is sketched on, as the reference starts.
+  const startsBlank = startIn3D === true && !faceSketch && doc.parts.length === 1 && isBlank(doc.parts[0]!);
   const [showWorkspace, setShowWorkspace] = useState(
-    () => startIn3D === true && doc.parts.some(candidate => hasOutline(doc, candidate.id))
+    () => startIn3D === true && (startsBlank || doc.parts.some(candidate => hasOutline(doc, candidate.id)))
   );
   const sketchOnly = !!faceSketch;
   // Opened as a Part Studio: the studio is home, a sketch is opened from it and closed back to it, and steps are set
@@ -460,7 +464,7 @@ export function CadEditor({
   // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
   const [featureDialog, setFeatureDialog] = useState<{ kind: 'extrude' | 'pattern'; partId: string; before: CadDocument } | null>(null);
   // Picking the plane or face a new part is sketched on.
-  const [choosingFace, setChoosingFace] = useState(false);
+  const [choosingFace, setChoosingFace] = useState(startsBlank);
   // A variable being added, or the one being changed.
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
@@ -471,9 +475,13 @@ export function CadEditor({
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
   // A part sketched new, whose extrude opens once its sketch is closed. A new design's first part is one.
-  const extrudeAfterSketch = useRef<string | null>(
-    startIn3D === true && !faceSketch && doc.parts.length === 1 && !hasOutline(doc, doc.parts[0]!.id) ? doc.parts[0]!.id : null
-  );
+  const extrudeAfterSketch = useRef<string | null>(null);
+  // A sketch opened from the studio takes the keyboard once its drawing shows, so its shortcuts work straight away.
+  useEffect(() => {
+    if (studioSession && !showWorkspace && !show3D) svg.current?.focus();
+    // Only when the studio gives way to the drawing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showWorkspace]);
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
   // Picking a drawing tool, by button or key, means going back to the drawing.
@@ -4002,13 +4010,16 @@ export function CadEditor({
                     `Part ${documentRef.current.parts.length + 1}`,
                     board ? variableScope[board]!.value : (part?.thickness ?? 18)
                   );
-                  const placed = { ...added, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
+                  // A design's blank first part is the one sketched, rather than a second beside it.
+                  const blank = documentRef.current.parts.length === 1 && isBlank(documentRef.current.parts[0]!);
+                  const base = blank ? documentRef.current.parts[0]! : added;
+                  const placed = { ...base, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
                   // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
                   const drawn = { ...placed, sketch: withFaceEdges(documentRef.current, placed) };
                   commit({
                     ...documentRef.current,
                     revision: documentRef.current.revision + 1,
-                    parts: [...documentRef.current.parts, drawn],
+                    parts: blank ? [drawn] : [...documentRef.current.parts, drawn],
                   });
                   setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
                   if (studioSession) {

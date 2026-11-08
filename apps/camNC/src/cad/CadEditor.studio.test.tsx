@@ -1,4 +1,12 @@
-import { addCircle, cadSketchRegions, createPlateDocument, setCutDepth, type CadDocument } from '@wbcnc/cad';
+import {
+  addCircle,
+  cadSketchRegions,
+  createCadDocument,
+  createCadPart,
+  createPlateDocument,
+  setCutDepth,
+  type CadDocument,
+} from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -272,4 +280,29 @@ it('copies a part with a transform, and edits the copy from its feature', async 
   await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate 2/ }));
   dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
   expect(within(dialog).getAllByRole('textbox')[0]).toHaveProperty('value', '250');
+});
+
+it('opens a new design in the studio, asking for its first sketch’s plane', async () => {
+  const source: CadDocument = { ...createCadDocument(), parts: [createCadPart('Part 1')] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  expect(
+    within(toolbar)
+      .getByRole('button', { name: /Sketch/ })
+      .getAttribute('aria-pressed')
+  ).toBe('true');
+  // The blank part isn't a feature until it's sketched.
+  expect(within(screen.getByRole('region', { name: 'Features' })).queryAllByRole('button')).toEqual([]);
+  await userEvent.click(await screen.findByRole('button', { name: 'Right plane' }));
+  const sketch = await screen.findByRole('dialog', { name: 'Sketch · Part 1' });
+  expect(sketch.textContent).toMatch(/right plane/);
+  await waitFor(() => expect(change.mock.calls.at(-1)?.[0].parts).toHaveLength(1));
+  expect(change.mock.calls.at(-1)![0].parts[0]!.drawnOn).toEqual({ on: { plane: 'right' }, offset: 0 });
 });
