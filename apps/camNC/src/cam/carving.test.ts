@@ -2,10 +2,24 @@ import { describe, expect, it, vi } from 'vitest';
 import lobsterUrl from './testdata/lobster-oil.ttf?url';
 import { resetWebFontsForTests } from './webFonts';
 import { boardRequest, edgeNote, nestBoard, reconcileBoards } from './boards';
-import { boardCarving, carvingProblem, hasWork, kDefaultVBit, kVBits, withCarving, type CarvingV1 } from './carving';
+import {
+  boardCarving,
+  carvingProblem,
+  carvingRegion,
+  itemName,
+  normalizeCarving,
+  placeItem,
+  withItems,
+  hasWork,
+  kDefaultVBit,
+  kVBits,
+  withCarving,
+  type CarvingItemV1,
+  type CarvingV1,
+} from './carving';
 import { maskOutline, outlineArt } from './carvingOutline';
 import { camWorker } from './camQueries';
-import { createCarvingJob, modelKey } from './jobDb';
+import { createCarvingJob, getJob, listJobs, modelKey, saveJob } from './jobDb';
 import { firstStage } from './openModelFile';
 import { kDefaultPlan, toCamSettings } from './planSettings';
 
@@ -171,9 +185,12 @@ describe('a carving job', () => {
   });
 
   it('says what keeps it from being planned', () => {
-    const carving = { art: { kind: 'text', text: ' ', font: 'sans' }, region: [] } as unknown as CarvingV1;
+    const carving = { items: [{ art: { kind: 'text', text: ' ', font: 'sans' } }], region: [] } as unknown as CarvingV1;
+    expect(carvingProblem({ ...carving, items: [] }, { thickness: 18 })).toBe('Add text or an SVG to carve.');
     expect(carvingProblem(carving, { thickness: 18 })).toMatch(/Type something/);
-    expect(carvingProblem({ ...carving, art: { kind: 'text', text: 'A', font: 'sans' } }, { thickness: 18 })).toMatch(/no filled shapes/);
+    expect(
+      carvingProblem({ ...carving, items: [{ ...carving.items[0], art: { kind: 'text', text: 'A', font: 'sans' } }] }, { thickness: 18 })
+    ).toMatch(/no filled shapes/);
   });
 
   it('clears flat bottoms with the job’s flat bit only when asked', async () => {
@@ -198,4 +215,77 @@ describe('a carving job', () => {
     // Its board has no outlines: no note about cuts past its edge.
     expect(edgeNote(board, nest, kDefaultPlan.bit.diameter)).toBeNull();
   }, 60_000);
+});
+
+const rectangle = (x0: number, y0: number, x1: number, y1: number): Loop => [
+  { x: x0, y: y0 },
+  { x: x1, y: y0 },
+  { x: x1, y: y1 },
+  { x: x0, y: y1 },
+];
+const item = (over: Partial<CarvingItemV1> = {}): CarvingItemV1 => ({
+  id: 'text',
+  art: { kind: 'text', text: 'Hi', font: 'serif' },
+  height: 10,
+  x: 20,
+  y: 30,
+  rotation: 0,
+  outline: [rectangle(-10, -5, 10, 5)],
+  ...over,
+});
+
+describe('carving items', () => {
+  it('rotates about the origin before placing, without changing the saved outline', () => {
+    const original = item({ rotation: 90 });
+    const placed = placeItem(original);
+    expect(placed[0][0].x).toBeCloseTo(25);
+    expect(placed[0][0].y).toBeCloseTo(20);
+    expect(box(placed)).toEqual({ w: 10, h: 20 });
+    expect(original.outline).toEqual([rectangle(-10, -5, 10, 5)]);
+    expect(itemName(original)).toBe('"Hi"');
+    expect(itemName(item({ art: { kind: 'svg', svg: '', fileName: 'logo.svg' } }))).toBe('logo.svg');
+  });
+
+  it('merges overlaps with NonZero winding and preserves holes', () => {
+    const ring = item({ x: 0, y: 0, outline: [rectangle(-10, -10, 10, 10), rectangle(-5, -5, 5, 5).reverse()] });
+    expect(carvingRegion([ring])).toHaveLength(2);
+    expect(carvingRegion([ring]).reduce((sum, loop) => sum + area(loop), 0)).toBeCloseTo(300);
+    const union = carvingRegion([item(), item({ id: 'svg', x: 30 })]);
+    expect(union).toHaveLength(1);
+    expect(union.reduce((sum, loop) => sum + area(loop), 0)).toBeCloseTo(300);
+    expect(carvingRegion([])).toEqual([]);
+  });
+
+  it('plans text and SVG together as one carving with their union', async () => {
+    const job = await createCarvingJob();
+    const items = [item(), item({ id: 'svg', x: 100, art: { kind: 'svg', svg: '', fileName: 'logo.svg' } })];
+    const carving = withItems(job.carving!, items);
+    const [board] = job.boards!;
+    const request = withCarving(boardRequest(board, nestBoard(board, [], kDefaultPlan.bit.diameter), []), { ...job, carving });
+    expect(carving.region).toEqual(carvingRegion(items));
+    expect(carving.region).toHaveLength(2);
+    expect(request.carvings).toEqual([{ ...boardCarving(carving, kDefaultPlan), name: '2 items', region: carving.region }]);
+    expect(boardCarving(withItems(carving, [items[0]]), kDefaultPlan).name).toBe('"Hi"');
+  });
+
+  it('normalizes legacy jobs on opening and listing without changing what they cut', async () => {
+    const job = await createCarvingJob();
+    const legacy = {
+      art: item().art,
+      height: 10,
+      x: 20,
+      y: 30,
+      region: placeItem(item()),
+      maxDepth: 3,
+      vBit: kDefaultVBit,
+      clearWithFlat: true,
+    };
+    const normalized = normalizeCarving(legacy);
+    expect(normalized.items).toEqual([item({ id: 'carving-1' })]);
+    expect(placeItem(normalized.items[0])).toEqual(legacy.region);
+    expect(normalizeCarving(normalized)).toBe(normalized);
+    await saveJob({ ...job, carving: legacy as unknown as CarvingV1 });
+    expect((await getJob(job.id))?.carving).toEqual(normalized);
+    expect((await listJobs()).find(saved => saved.id === job.id)?.carving).toEqual(normalized);
+  });
 });

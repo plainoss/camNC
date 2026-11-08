@@ -1,7 +1,9 @@
-import { createCarvingJob, getJob, type CamJobV1 } from '@/cam/jobDb';
+import { createCarvingJob, getJob, saveJob, type CamJobV1 } from '@/cam/jobDb';
+import { carvingRegion, placeItem } from '@/cam/carving';
+import { outlineArt } from '@/cam/carvingOutline';
 import { ensureWebFont, loadFontCatalog } from '@/cam/webFonts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Route } from './$jobId.carve';
@@ -17,6 +19,10 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 vi.mock('@/components/page-header', () => ({ PageHeader: () => null }));
 vi.mock('@/cam/CamJobBar', () => ({ CamJobBar: ({ actions }: { actions: ReactNode }) => <header>{actions}</header> }));
+vi.mock('@/cam/carvingOutline', async importOriginal => {
+  const original = await importOriginal<typeof import('@/cam/carvingOutline')>();
+  return { ...original, outlineArt: vi.fn(original.outlineArt) };
+});
 vi.mock('@/cam/webFonts', async importOriginal => ({
   ...(await importOriginal<typeof import('@/cam/webFonts')>()),
   ensureWebFont: vi.fn(async () => {}),
@@ -40,15 +46,15 @@ const pickFont = async (family: string) => {
   fireEvent.click(await screen.findByRole('option', { name: family }, { timeout: 10_000 }));
 };
 
-const open = async () => {
-  const job = await createCarvingJob();
+const open = async (existing?: Awaited<ReturnType<typeof createCarvingJob>>) => {
+  const job = existing ?? (await createCarvingJob());
   params.jobId = job.id;
   render(
     <QueryClientProvider client={new QueryClient()}>
       <CarveStep />
     </QueryClientProvider>
   );
-  await screen.findByTestId('carving-outline');
+  await screen.findByTestId('carving-item');
   return job;
 };
 
@@ -56,44 +62,58 @@ describe('the Carve step', () => {
   it('shows the lettering on its board and goes on to Plan', async () => {
     const job = await open();
     expect(screen.getByRole('img', { name: 'Board 300 × 140 mm with the carving' })).toBeTruthy();
-    expect(screen.getByTestId('carving-outline').getAttribute('d')).toMatch(/^M/);
+    expect(screen.getByTestId('carving-item').getAttribute('d')).toMatch(/^M/);
     expect(screen.getByRole('link', { name: /Next: Plan/ }).getAttribute('href')).toBe(`/cam/${job.id}/plan`);
     expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
   });
 
-  it('opens the SVG picker from the tab and selects the uploaded artwork', async () => {
+  it('adds SVG alongside text, selects it, and replaces just that item', async () => {
     const job = await open();
-    const input = screen.getByLabelText('Or an SVG file') as HTMLInputElement;
+    const input = screen.getByLabelText('SVG file') as HTMLInputElement;
     const click = vi.spyOn(input, 'click').mockImplementation(() => {});
-    const svgTab = screen.getByRole('tab', { name: 'SVG' });
-    fireEvent.click(svgTab);
+    const svgButton = screen.getByRole('button', { name: 'SVG' });
+    fireEvent.click(svgButton);
     expect(click).toHaveBeenCalledTimes(1);
-    // The tab shows the chooser is opening until it closes.
-    expect(svgTab.getAttribute('aria-busy')).toBe('true');
+    // The button shows the chooser is opening until it closes.
+    expect(svgButton.getAttribute('aria-busy')).toBe('true');
     fireEvent(input, new Event('cancel'));
-    expect(svgTab.getAttribute('aria-busy')).toBe('false');
-    fireEvent.click(svgTab);
-    expect(click).toHaveBeenCalledTimes(2);
+    expect(svgButton.getAttribute('aria-busy')).toBe('false');
+    fireEvent.click(svgButton);
     fireEvent.focus(window);
-    expect(svgTab.getAttribute('aria-busy')).toBe('false');
-    // Opening or cancelling the picker keeps the existing lettering.
+    expect(svgButton.getAttribute('aria-busy')).toBe('false');
     fireEvent.change(input, { target: { files: [] } });
-    expect(svgTab.getAttribute('aria-selected')).toBe('false');
-    expect((await getJob(job.id))?.carving?.art).toEqual(job.carving!.art);
+    expect((await getJob(job.id))?.carving?.items).toEqual(job.carving!.items);
 
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect width="100" height="100"/></svg>';
     fireEvent.change(input, { target: { files: [new File([svg], 'half.svg', { type: 'image/svg+xml' })] } });
-    expect(await screen.findByText('half.svg')).toBeTruthy();
-    expect(svgTab.getAttribute('aria-selected')).toBe('true');
-    expect(screen.getByLabelText('Another SVG')).toBe(input);
-    expect((await getJob(job.id))?.carving?.art).toEqual({ kind: 'svg', svg, fileName: 'half.svg' });
-    fireEvent.click(svgTab);
-    expect(click).toHaveBeenCalledTimes(2);
-
+    await screen.findByRole('button', { name: 'Replace SVG' });
+    await waitFor(async () => {
+      const carving = (await getJob(job.id))!.carving!;
+      expect(carving.items).toHaveLength(2);
+      expect(carving.items[1].art).toEqual({ kind: 'svg', svg, fileName: 'half.svg' });
+      expect(carving.items[1].outline.length).toBeGreaterThan(0);
+      expect(carving.region).toEqual(carvingRegion(carving.items));
+    });
+    expect(screen.getAllByTestId('carving-item')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Replace SVG' }));
+    expect(click).toHaveBeenCalledTimes(3);
     const replacement = svg.replace('200 100', '100 100');
     fireEvent.change(input, { target: { files: [new File([replacement], 'square.svg', { type: 'image/svg+xml' })] } });
-    expect(await screen.findByText('square.svg')).toBeTruthy();
-    expect((await getJob(job.id))?.carving?.art).toEqual({ kind: 'svg', svg: replacement, fileName: 'square.svg' });
+    await waitFor(async () => {
+      const carving = (await getJob(job.id))!.carving!;
+      expect(carving.items[0]).toEqual(job.carving!.items[0]);
+      expect(carving.items[1].art).toEqual({ kind: 'svg', svg: replacement, fileName: 'square.svg' });
+    });
+  });
+
+  it('adds nothing for an SVG it cannot read, and still lets the other items be planned', async () => {
+    const job = await open();
+    const input = screen.getByLabelText('SVG file') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(['<svg'], 'broken.svg', { type: 'image/svg+xml' })] } });
+    expect((await screen.findByRole('alert')).textContent).toMatch(/could not be read/);
+    expect((await getJob(job.id))!.carving!.items).toEqual(job.carving!.items);
+    expect(screen.getAllByTestId('carving-item')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /Next: Plan/ }).hasAttribute('disabled')).toBe(false);
   });
 
   it('outlines new text once typing pauses, and saves it', async () => {
@@ -102,7 +122,7 @@ describe('the Carve step', () => {
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Hi' } });
     await waitFor(async () => {
       const saved = await getJob(job.id);
-      expect(saved?.carving?.art).toMatchObject({ kind: 'text', text: 'Hi' });
+      expect(saved?.carving?.items[0].art).toMatchObject({ kind: 'text', text: 'Hi' });
       expect(saved?.carving?.region).not.toEqual(before);
     });
   });
@@ -119,15 +139,19 @@ describe('the Carve step', () => {
       try {
         await pickFont('Lobster');
         expect(screen.getByRole('combobox', { name: 'Font' }).textContent).toContain('Lobster');
-        expect(screen.getByRole('tab', { name: 'Lettering' }).getAttribute('aria-selected')).toBe('true');
+        expect(screen.queryByRole('tablist')).toBeNull();
         await waitFor(() => expect(ensureWebFont).toHaveBeenCalledTimes(1));
         fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Hi' } });
         // Exercise downloads finishing both before and after the text debounce.
         if (debounceFinished) await waitFor(() => expect(ensureWebFont).toHaveBeenCalledTimes(2));
-        expect((await getJob(job.id))?.carving?.art).toEqual(job.carving!.art);
+        expect((await getJob(job.id))?.carving?.items[0].art).toEqual(job.carving!.items[0].art);
         finishDownload();
         await waitFor(async () => {
-          expect((await getJob(job.id))?.carving?.art).toEqual({ kind: 'text', text: 'Hi', font: { family: 'Lobster', weight: 400 } });
+          expect((await getJob(job.id))?.carving?.items[0].art).toEqual({
+            kind: 'text',
+            text: 'Hi',
+            font: { family: 'Lobster', weight: 400 },
+          });
         });
         expect(screen.getByRole('combobox', { name: 'Font' }).textContent).toContain('Lobster');
         expect(screen.queryByText('Outlining…')).toBeNull();
@@ -158,14 +182,15 @@ describe('the Carve step', () => {
     // A new edit proves that the failed selection no longer supplies the font.
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Retry' } });
     await waitFor(async () => {
-      expect((await getJob(job.id))?.carving?.art).toEqual({ ...job.carving!.art, text: 'Retry' });
+      expect((await getJob(job.id))?.carving?.items[0].art).toEqual({ ...job.carving!.items[0].art, text: 'Retry' });
     });
     expect(ensureWebFont).toHaveBeenCalledTimes(2);
   });
 
   it('moves the artwork where it is dragged, without drawing it again', async () => {
     const job = await open();
-    const path = screen.getByTestId('carving-outline');
+    vi.mocked(outlineArt).mockClear();
+    const path = screen.getByTestId('carving-item');
     const svg = path.closest('svg')!;
     // 1 mm on the board in screen pixels.
     const px = svg.getBoundingClientRect().width / (300 * 1.12);
@@ -176,14 +201,181 @@ describe('the Carve step', () => {
     fireEvent.pointerUp(svg, from);
     await waitFor(async () => {
       const saved = await getJob(job.id);
-      expect(saved!.carving!.x - job.carving!.x).toBeCloseTo(20, 0);
-      expect(saved!.carving!.region[0][0].x - job.carving!.region[0][0].x).toBeCloseTo(20, 0);
+      expect(saved!.carving!.items[0].x - job.carving!.items[0].x).toBeCloseTo(20, 0);
+      expect(saved!.carving!.items[0].outline).toEqual(job.carving!.items[0].outline);
+      expect(saved!.carving!.region).toEqual(carvingRegion(saved!.carving!.items));
+      expect(outlineArt).not.toHaveBeenCalled();
     });
+  });
+
+  it('adds text, selects items from the list and canvas, edits just the selection, and deletes it', async () => {
+    const job = await open();
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    await waitFor(() => expect(screen.getAllByTestId('carving-item')).toHaveLength(2));
+    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Text');
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Second' } });
+    await waitFor(async () => {
+      const carving = (await getJob(job.id))!.carving!;
+      expect(carving.items[1].art).toMatchObject({ text: 'Second' });
+      expect(carving.items[1]).toMatchObject({ height: 20, x: 150, rotation: 0 });
+      // Just below "Welcome", which already sits at the centre, clear of it.
+      const lowest = (item: (typeof carving.items)[number]) =>
+        Math.min(
+          ...placeItem(item)
+            .flat()
+            .map(p => p.y)
+        );
+      const highest = (item: (typeof carving.items)[number]) =>
+        Math.max(
+          ...placeItem(item)
+            .flat()
+            .map(p => p.y)
+        );
+      expect(highest(carving.items[1])).toBeLessThan(lowest(carving.items[0]));
+      expect(lowest(carving.items[0]) - highest(carving.items[1])).toBeLessThan(10);
+      expect(carving.items[0]).toEqual(job.carving!.items[0]);
+    });
+    fireEvent.click(screen.getByRole('button', { name: '"Welcome"' }));
+    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
+    const svg = screen.getAllByTestId('carving-item')[0].closest('svg')!;
+    fireEvent.pointerDown(svg, { button: 0 });
+    expect(screen.getByText('Select an item on the board to edit it, or add one.')).toBeTruthy();
+    fireEvent.pointerDown(screen.getAllByTestId('carving-item')[1], { button: 0, pointerId: 1 });
+    fireEvent.pointerUp(svg, { pointerId: 1 });
+    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Second');
+    fireEvent.keyDown(screen.getByLabelText('Text'), { key: 'Backspace' });
+    expect(screen.getAllByTestId('carving-item')).toHaveLength(2);
+    fireEvent.keyDown(svg, { key: 'Escape' });
+    expect(screen.queryByLabelText('Text')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '"Second"' }));
+    fireEvent.keyDown(svg, { key: 'Delete' });
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toEqual(job.carving!.items));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete "Welcome"' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Add text or an SVG to carve.');
+  });
+
+  it('rotates through the field and handle, snapping unless Shift is held, without re-outlining', async () => {
+    const job = await open();
+    vi.mocked(outlineArt).mockClear();
+    const rotation = screen.getByLabelText('Rotation (°)');
+    fireEvent.change(rotation, { target: { value: '-270' } });
+    fireEvent.blur(rotation);
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].rotation).toBe(90));
+    const svg = screen.getByTestId('carving-item').closest('svg')!;
+    const rotate = (startAngle: number, endAngle: number, shiftKey = false) => {
+      const at = (angle: number) => {
+        const p = new DOMPoint(150 + 30 * Math.cos((angle * Math.PI) / 180), 70 - 30 * Math.sin((angle * Math.PI) / 180)).matrixTransform(
+          svg.getScreenCTM()!
+        );
+        return { clientX: p.x, clientY: p.y, pointerId: 1, button: 0, shiftKey };
+      };
+      fireEvent.pointerDown(screen.getByLabelText('Drag to rotate'), at(startAngle));
+      fireEvent.pointerMove(svg, at(endAngle));
+      fireEvent.pointerUp(svg, at(endAngle));
+    };
+    rotate(180, 202);
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].rotation).toBe(105));
+    rotate(195, 217, true);
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].rotation).toBeCloseTo(127));
+    const saved = (await getJob(job.id))!.carving!;
+    expect(saved.items[0].outline).toEqual(job.carving!.items[0].outline);
+    expect(saved.region).toEqual(carvingRegion(saved.items));
+    expect(outlineArt).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Drag to rotate').parentElement?.getAttribute('transform')).toContain('rotate(-127');
+  });
+
+  it('previews a radial resize and outlines only on release', async () => {
+    const job = await open();
+    vi.mocked(outlineArt).mockClear();
+    const svg = screen.getByTestId('carving-item').closest('svg')!;
+    const at = (x: number, y: number) => {
+      const p = new DOMPoint(x, 140 - y).matrixTransform(svg.getScreenCTM()!);
+      return { clientX: p.x, clientY: p.y, pointerId: 1, button: 0 };
+    };
+    fireEvent.pointerDown(screen.getByLabelText('Drag to resize'), at(180, 55));
+    fireEvent.pointerMove(svg, at(210, 40));
+    expect(outlineArt).not.toHaveBeenCalled();
+    expect((await getJob(job.id))!.carving!.items[0].height).toBe(30);
+    fireEvent.pointerUp(svg, at(210, 40));
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].height).toBe(60));
+    expect(outlineArt).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens a legacy carving as one selected item', async () => {
+    const job = await createCarvingJob();
+    const { items, ...carving } = job.carving!;
+    const { art, height, x, y } = items[0];
+    await saveJob({ ...job, carving: { ...carving, art, height, x, y, region: placeItem(items[0]) } as unknown as typeof job.carving });
+    await open(job);
+    expect(screen.getAllByTestId('carving-item')).toHaveLength(1);
+    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
+    expect((await getJob(job.id))!.carving!.items[0]).toMatchObject({ id: 'carving-1', rotation: 0 });
+  });
+
+  it('keeps the latest outline per item, other items, and moves made while outlining', async () => {
+    const job = await open();
+    type Outline = Awaited<ReturnType<typeof outlineArt>>;
+    let finishFirst!: (outline: Outline) => void;
+    let finishLatest!: (outline: Outline) => void;
+    vi.mocked(outlineArt)
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            finishFirst = resolve;
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            finishLatest = resolve;
+          })
+      );
+    const height = screen.getByLabelText('Height (mm)');
+    fireEvent.change(height, { target: { value: '25' } });
+    fireEvent.blur(height);
+    fireEvent.change(height, { target: { value: '35' } });
+    fireEvent.blur(height);
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[1].outline.length).toBeGreaterThan(0));
+    // This item's completion must not clear the first item's pending work.
+    expect(screen.getByText('Outlining…')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '"Welcome"' }));
+    fireEvent.change(screen.getByLabelText('Rotation (°)'), { target: { value: '45' } });
+    fireEvent.blur(screen.getByLabelText('Rotation (°)'));
+    const outline: Outline = { region: job.carving!.items[0].outline, width: 100, height: 35 };
+    await act(async () => finishLatest(outline));
+    await waitFor(async () => {
+      const carving = (await getJob(job.id))!.carving!;
+      expect(carving.items).toHaveLength(2);
+      expect(carving.items[0]).toMatchObject({ height: 35, rotation: 45 });
+      expect(carving.region).toEqual(carvingRegion(carving.items));
+    });
+    await act(async () => finishFirst({ ...outline, region: [], height: 25 }));
+    expect((await getJob(job.id))!.carving!.items[0]).toMatchObject({ height: 35, rotation: 45, outline: outline.region });
+    expect(screen.queryByText('Outlining…')).toBeNull();
+
+    let finishDeleted!: (outline: Outline) => void;
+    vi.mocked(outlineArt).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finishDeleted = resolve;
+        })
+    );
+    fireEvent.change(screen.getByLabelText('Height (mm)'), { target: { value: '40' } });
+    fireEvent.blur(screen.getByLabelText('Height (mm)'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete "Welcome"' }));
+    await act(async () => finishDeleted(outline));
+    await waitFor(async () => {
+      const carving = (await getJob(job.id))!.carving!;
+      expect(carving.items).toHaveLength(1);
+      expect(carving.items[0].art).toMatchObject({ text: 'Text' });
+    });
+    expect(screen.queryByText('Outlining…')).toBeNull();
   });
 
   it('sizes the board by dragging its edges, in 10 mm steps, with the fields following', async () => {
     const job = await open();
-    const svg = screen.getByTestId('carving-outline').closest('svg')!;
+    const svg = screen.getByTestId('carving-item').closest('svg')!;
     const field = (label: string) =>
       screen.getByLabelText(label, { selector: '#carve-board-' + label[0].toLowerCase() }) as HTMLInputElement;
     const drag = (grip: string, dx: number, dy: number, shiftKey = false) => {
@@ -231,14 +423,14 @@ describe('the Carve step', () => {
       await waitFor(async () => expect(saved(await getJob(job.id))).toBe(Number(value)));
     };
     // Each saved before the next, as a slower outline would save over a board size typed meanwhile.
-    await type('carve-height', '10', j => j?.carving?.height);
+    await type('carve-height', '10', j => j?.carving?.items[0].height);
     const board = (j: CamJobV1 | null) => {
       const size = j?.boards?.[0].size;
       return size?.fit === false ? size : null;
     };
     await type('carve-board-w', '1000', j => board(j)?.w);
     await type('carve-board-h', '20', j => board(j)?.h);
-    const path = screen.getByTestId('carving-outline');
+    const path = screen.getByTestId('carving-item');
     const grip = (g: string) => path.closest('svg')!.querySelector(`[data-resize="${g}"]`)!;
     const attr = (el: Element, name: string) => Number(el.getAttribute(name));
     // The edges' grips reach a quarter of the board inwards at most: the top one ends 5 mm below the top edge.
