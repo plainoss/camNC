@@ -1,9 +1,9 @@
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
 import { evaluateCadFeatures } from './features';
-import { evaluateCadPart } from './geometry';
+import { evaluateCadPart, polygonArea } from './geometry';
 import { CAD_IDENTITY_PLACEMENT, rotateVector, type Vec3 } from './placement';
-import type { CadDiagnostic, CadDocument, CadPartCut, CadPlacement, EvaluatedCadCut, EvaluatedCadPart } from './types';
+import type { CadDiagnostic, CadDocument, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
 const conjugate = ([x, y, z, w]: readonly number[]) => [-x!, -y!, -z!, w!];
 const toWorld = (placement: CadPlacement, point: Vec3): Vec3 => {
@@ -59,11 +59,51 @@ function overlap(into: EvaluatedCadPart, intoAt: CadPlacement, housed: Evaluated
   return { lo, hi };
 }
 
+/** How much of a polygon lies inside a rectangle. */
+function areaWithin(polygon: CadPoint[], lo: Vec3, hi: Vec3): number {
+  const edges: [(p: CadPoint) => number, (a: CadPoint, b: CadPoint) => CadPoint][] = [
+    [p => p.x - lo[0], (a, b) => ({ x: lo[0], y: a.y + ((b.y - a.y) * (lo[0] - a.x)) / (b.x - a.x) })],
+    [p => hi[0] - p.x, (a, b) => ({ x: hi[0], y: a.y + ((b.y - a.y) * (hi[0] - a.x)) / (b.x - a.x) })],
+    [p => p.y - lo[1], (a, b) => ({ x: a.x + ((b.x - a.x) * (lo[1] - a.y)) / (b.y - a.y), y: lo[1] })],
+    [p => hi[1] - p.y, (a, b) => ({ x: a.x + ((b.x - a.x) * (hi[1] - a.y)) / (b.y - a.y), y: hi[1] })],
+  ];
+  let points = polygon;
+  for (const [inside, meet] of edges) {
+    const kept: CadPoint[] = [];
+    points.forEach((p, i) => {
+      const q = points[(i + 1) % points.length]!;
+      if (inside(p) >= 0) kept.push(p);
+      if (inside(p) >= 0 !== inside(q) >= 0) kept.push(meet(p, q));
+    });
+    points = kept;
+  }
+  return points.length < 3 ? 0 : Math.abs(polygonArea(points));
+}
+
+/**
+ * Whether a tool is solid all through where it reaches into a target: its outline fills that region, and no hole or
+ * cut of its own takes anything out of it. Only then is the region it cuts the box it fills.
+ */
+function solidWithin(tool: EvaluatedCadPart, toolAt: CadPlacement, into: EvaluatedCadPart, intoAt: CadPlacement): boolean {
+  const found = overlap(tool, toolAt, into, intoAt);
+  if ('error' in found) return true;
+  const { lo, hi } = found;
+  const full = (hi[0] - lo[0]) * (hi[1] - lo[1]),
+    slack = Math.max(full * 1e-6, kSquare);
+  if (areaWithin(tool.outline, lo, hi) < full - slack) return false;
+  if (tool.holes.some(hole => areaWithin(hole, lo, hi) > slack)) return false;
+  return !(tool.cuts ?? []).some(cut => {
+    const [bottom, top] = cut.side === 'top' ? [tool.thickness - cut.to, tool.thickness - cut.from] : [cut.from, cut.to];
+    return top > lo[2] + kSquare && bottom < hi[2] - kSquare && areaWithin(cut.outline, lo, hi) > slack;
+  });
+}
+
 /**
  * The cuts each "cut parts" step makes, added to the parts it cuts. Wherever a tool part reaches into a target part, as
  * placed, that much of the target is cut away, widened by the step's clearance on every side inside the target, and as
  * deep as the tool reaches in plus the clearance, from whichever face it enters. It follows the parts as they move and change size. The
- * target's corner relief gives it bones. A tool that doesn't reach a target leaves it alone.
+ * target's corner relief gives it bones. A tool that doesn't reach a target leaves it alone, and one with a hole, notch or
+ * cut where it reaches in is left out with a warning rather than cut as a block.
  */
 export function applyPartCuts(
   document: CadDocument,
@@ -71,6 +111,8 @@ export function applyPartCuts(
 ): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
   const diagnostics: CadDiagnostic[] = [];
   const byId = new Map(parts.map(part => [part.partId, part]));
+  // A tool cuts with the shape it has before any step cuts it, so two parts can cut each other.
+  const before = new Map(byId);
   const sources = new Map(document.parts.map(part => [part.id, part]));
   for (const step of document.partCuts ?? []) {
     let made = 0;
@@ -81,7 +123,7 @@ export function applyPartCuts(
         const intoSource = sources.get(targetId),
           toolSource = sources.get(toolId);
         const into = byId.get(targetId),
-          tool = byId.get(toolId);
+          tool = before.get(toolId);
         if (!intoSource || !toolSource || !into || !tool) continue;
         const intoAt = intoSource.placement ?? CAD_IDENTITY_PLACEMENT,
           toolAt = toolSource.placement ?? CAD_IDENTITY_PLACEMENT;
@@ -91,6 +133,10 @@ export function applyPartCuts(
         }
         const found = overlap(into, intoAt, tool, toolAt);
         if ('error' in found) continue;
+        if (!solidWithin(tool, toolAt, into, intoAt)) {
+          warn(`${toolSource.name} isn't a plain block where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
+          continue;
+        }
         const { lo, hi } = found,
           t = into.thickness;
         const fromTop = hi[2] >= t - kSquare,

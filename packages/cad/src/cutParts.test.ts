@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addCircle,
   addPartCut,
   assemblyReport,
   createCadDocument,
@@ -101,5 +102,24 @@ describe('a shelf housed in two sides', () => {
     expect(solved.diagnostics.map(d => d.message)).toContain('A "cut parts" step cuts nothing: none of its tools reach into its targets.');
     document = removePartCut(solved.document, solved.document.partCuts![0]!.id);
     expect(document.partCuts).toBeUndefined();
+  });
+
+  it('leaves out a shelf with a hole where it reaches in, rather than cutting it as a block', async () => {
+    const values = { height: '720mm', depth: '300mm', width: '600mm', board: '18mm', housing: '8mm', fit: '0.2mm' };
+    const holed = (x: number) => {
+      const document = carcass();
+      const shelf = document.parts[2]!;
+      shelf.sketch = addCircle(shelf.sketch, { x, y: 140, radius: 2 });
+      return variables(document, values);
+    };
+    // A hole in the middle of the shelf is nowhere near either side, so both are housed.
+    const middle = await holed(290);
+    expect(middle.parts.slice(0, 2).map(part => part.cuts?.length)).toEqual([1, 1]);
+    // One in the 8 mm that reaches into the left side leaves that side uncut, and says why.
+    const end = await holed(4);
+    expect(end.parts.slice(0, 2).map(part => part.cuts?.length)).toEqual([undefined, 1]);
+    expect(end.diagnostics.map(d => d.message)).toContain(
+      "Shelf isn't a plain block where it reaches into Left, so it can't be cut from it yet."
+    );
   });
 });
