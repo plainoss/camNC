@@ -216,8 +216,11 @@ function followPlacement(placement: CadPlacement | undefined, scope: CadValueSco
 function mapPlacements(part: CadPart, edit: (placement: CadPlacement | undefined) => CadPlacement | undefined): CadPart {
   const placement = edit(part.placement);
   const copies = part.copies?.map(copy => {
-    const moved = edit(copy.placement);
-    return moved === copy.placement ? copy : { ...copy, placement: moved };
+    const moved = edit(copy.placement),
+      offset = edit(copy.offset);
+    return moved === copy.placement && offset === copy.offset
+      ? copy
+      : { ...copy, ...(moved !== copy.placement && { placement: moved }), ...(offset !== copy.offset && { offset }) };
   });
   const copiesChanged = copies?.some((copy, index) => copy !== part.copies![index]);
   if (placement === part.placement && !copiesChanged) return part;
@@ -350,7 +353,7 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
           message: `Cut depth ${(feature as CadCut).depthExpression}: ${outcome.error}`,
         });
     }
-    for (const move of [part.placement, ...(part.copies ?? []).map(copy => copy.placement)].flatMap(placement =>
+    for (const move of [part.placement, ...(part.copies ?? []).flatMap(copy => [copy.placement, copy.offset])].flatMap(placement =>
       positionOutcomes(placement, scope)
     ))
       if ('error' in move)

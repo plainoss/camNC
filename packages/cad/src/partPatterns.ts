@@ -38,9 +38,19 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
   let changed = false;
   const supports = cadDrawnOnSupports(document);
   const parts = document.parts.map(part => {
-    if (!part.pattern && !part.copies?.some(copy => copy.pattern)) return part;
-    const own = (part.copies ?? []).filter(copy => !copy.pattern);
-    const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern, effectivePlacement(part, supports)) : [])];
+    if (!part.pattern && !part.copies?.some(copy => copy.pattern || copy.offset)) return part;
+    const at = effectivePlacement(part, supports);
+    // A transformed copy sits where its offset puts it from the part.
+    const own = (part.copies ?? [])
+      .filter(copy => !copy.pattern)
+      .map(copy => {
+        if (!copy.offset) return copy;
+        const { placement: _placement, ...rest } = copy;
+        if (!at) return rest;
+        const position = at.position.map((value, axis) => value + copy.offset!.position[axis]!) as [number, number, number];
+        return { ...rest, placement: { position, rotation: at.rotation } };
+      });
+    const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern, at) : [])];
     if (JSON.stringify(copies) === JSON.stringify(part.copies ?? [])) return part;
     changed = true;
     const next: CadPart = { ...part, copies };

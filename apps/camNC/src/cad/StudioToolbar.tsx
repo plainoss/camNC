@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
 
-export type StudioCommand = 'sketch' | 'extrude' | 'cutParts' | 'pattern' | 'variable';
+export type StudioCommand = 'sketch' | 'extrude' | 'cutParts' | 'transform' | 'pattern' | 'variable';
 
 const kCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactNode }[] = [
   {
@@ -21,6 +21,12 @@ const kCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactN
     label: 'Cut parts',
     hint: 'Cut parts out of the parts they reach into, with a clearance',
     glyph: <path d="M3 9h18v9H3zM9 9V4h6v5M8 9v4h8V9" />,
+  },
+  {
+    id: 'transform',
+    label: 'Transform',
+    hint: 'A copy of the selected part, moved along X, Y and Z',
+    glyph: <path d="M4 14h8v6H4zM12 4h8v6h-8zM8 14V9h4M16 10v5h-4M10 7l2 2-2 2" />,
   },
   {
     id: 'pattern',
