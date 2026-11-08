@@ -84,7 +84,7 @@ test('the required Run tests check waits for every validation job and cannot hid
   assert.equal(required.length, 1, 'branch protection must have one unambiguous required check');
   const [gate] = required;
   assert.deepEqual([...gate.needs].sort(), Object.keys(jobs).filter(id => jobs[id] !== gate).sort());
-  assert.equal(gate.if, 'always()');
+  assert.equal(gate.if, "always() && github.event_name != 'push'");
   // An aggregate check must execute a real failure check, even when one of its dependencies fails or skips.
   for (const job of gate.needs) {
     assert(Object.values(gate.steps[0].env).includes('${{ needs.' + job + '.result }}'));
@@ -134,10 +134,17 @@ test('merge queue runs all validation and isolates concurrent candidate builds',
   assert(workflow.on.push, 'main checks must still run');
   assert.equal(workflow.concurrency.group, 'ci-${{ github.event.pull_request.number || github.run_id }}');
   assert.equal(workflow.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
+  // Evaluate each job's condition the way Actions would, with always() true as for a gate after a failed dependency.
+  const runs = (job, event_name) =>
+    job.if === undefined || new Function('github', 'always', `return (${job.if});`)({ event_name }, () => true);
   for (const [id, job] of Object.entries(workflow.jobs)) {
-    assert.equal(job.if, id === 'results' ? 'always()' : undefined,
-      `${id} must not skip validation on merge_group events`);
+    for (const event of ['pull_request', 'merge_group']) {
+      assert(runs(job, event), `${id} must not skip validation on ${event} events`);
+    }
   }
+  // The queue validated the commit that lands on main, so main only warms caches through the checks job.
+  const onMain = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], 'push'));
+  assert.deepEqual(onMain, ['checks']);
 });
 
 test('remote caching uses short-lived tokens and skips untrusted fork PRs', () => {
