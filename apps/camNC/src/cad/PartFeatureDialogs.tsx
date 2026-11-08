@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { setPartPattern, renamePartCopy, type CadDocument, type CadPart, type CadValueScope } from '@wbcnc/cad';
 import { CadCopyNames } from './CadCopyNames';
 import { CadDrawnOnField } from './CadDrawnOnField';
@@ -32,8 +33,10 @@ export function ExtrudeDialog({
   onCancel,
   onEditSketch,
 }: PartDialogProps & { onEditSketch: () => void }) {
+  // A thickness that can't be used keeps the dialog open until it's fixed or cancelled.
+  const [thicknessValid, setThicknessValid] = useState(true);
   return (
-    <FeatureDialog title={`Extrude · ${part.name}`} onOk={onOk} onCancel={onCancel}>
+    <FeatureDialog title={`Extrude · ${part.name}`} okDisabled={!thicknessValid} onOk={onOk} onCancel={onCancel}>
       <div className="cad-feature-selection">
         <small>Sketch to extrude</small>
         <span>{part.name}’s sketch</span>
@@ -46,6 +49,7 @@ export function ExtrudeDialog({
         value={part.thickness}
         expression={part.thicknessExpression}
         variables={variables}
+        onValidityChange={setThicknessValid}
         onCommit={(thickness, thicknessExpression) =>
           onChange(document =>
             changePart(document, part.id, p => {

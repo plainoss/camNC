@@ -47,6 +47,16 @@ it('opens as a studio, with its own toolbar and steps set in dialogs that keep o
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(18));
   expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull();
 
+  // A thickness that can't be used can't be kept.
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  await userEvent.clear(within(dialog).getByRole('textbox', { name: /Thickness/ }));
+  await userEvent.type(within(dialog).getByRole('textbox', { name: /Thickness/ }), '0');
+  await userEvent.tab();
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  expect(latest().parts[0]!.thickness).toBe(18);
+
   // The tick keeps it.
   await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
   dialog = screen.getByRole('dialog', { name: 'Extrude · Plate' });
@@ -137,4 +147,27 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
   await waitFor(() => expect(latest().parts).toHaveLength(0));
   await userEvent.click(within(toolbar).getByRole('button', { name: /^Undo/ }));
   await waitFor(() => expect(latest().parts).toHaveLength(1));
+});
+
+it('cancels a new design’s first sketch back to how the design opened', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  const change = vi.fn<(document: CadDocument) => void>();
+  sessions.push(source.id);
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D="part" onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const sketch = await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  await userEvent.click(screen.getByRole('button', { name: 'Drawing' }));
+  await userEvent.keyboard('{Control>}a{/Control}{Delete}');
+  await settled();
+  await waitFor(() =>
+    expect(change.mock.calls.at(-1)?.[0].parts[0]!.sketch.entities.length).toBeLessThan(source.parts[0]!.sketch.entities.length)
+  );
+  await userEvent.click(within(sketch).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() =>
+    expect(change.mock.calls.at(-1)?.[0].parts[0]!.sketch.entities).toHaveLength(source.parts[0]!.sketch.entities.length)
+  );
 });

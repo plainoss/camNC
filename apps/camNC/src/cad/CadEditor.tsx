@@ -455,7 +455,8 @@ export function CadEditor({
   // A variable being added, or the one being changed.
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
-  const sketchBefore = useRef<CadDocument | null>(null);
+  // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
+  const sketchBefore = useRef<CadDocument | null>(studioSession ? doc : null);
   // A part sketched new, whose extrude opens once its sketch is closed. A new design's first part is one.
   const extrudeAfterSketch = useRef<string | null>(
     startIn3D === true && !faceSketch && doc.parts.length === 1 && !hasOutline(doc, doc.parts[0]!.id) ? doc.parts[0]!.id : null
