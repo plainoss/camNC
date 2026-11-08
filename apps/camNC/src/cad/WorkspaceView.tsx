@@ -91,7 +91,7 @@ export default function WorkspaceView({
           : view === 'flat'
             ? 'Each part turned so its machined side faces up, the way it lies on the board.'
             : model.meshes.length
-              ? 'Click a part to select it, double-click to work on it. Drag to orbit.'
+              ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
               : 'Draw a part to start.';
   return (
     <div

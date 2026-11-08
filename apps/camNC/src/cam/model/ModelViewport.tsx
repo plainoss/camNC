@@ -7,7 +7,7 @@ import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { modelGeometry } from './modelGeometry';
 import { snapToFace } from './faceSnap';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
-import { kOrbitDamping } from '@/lib/orbitDamping';
+import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
 /** A face clicked on a part, in the model's own space: its nearest corner or its middle, and the way it faces. */
@@ -210,7 +210,7 @@ export function ModelViewport({
           />
         ))}
       </group>
-      {!sketchView && <OrbitControls makeDefault dampingFactor={kOrbitDamping} />}
+      {!sketchView && <OrbitControls makeDefault dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />}
     </Canvas>
   );
 }

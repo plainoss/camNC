@@ -22,7 +22,9 @@ describe('the design workspace', () => {
   it('shows every part, and opens the selected one', () => {
     const side = panel('Side');
     const { open } = setup({ ...createCadDocument(), parts: [side, panel('Shelf')] }, side.id);
-    expect(screen.getByRole('status').textContent).toBe('Click a part to select it, double-click to work on it. Drag to orbit.');
+    expect(screen.getByRole('status').textContent).toBe(
+      'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Open Side' }));
     expect(open).toHaveBeenCalledWith(side.id);
   });
