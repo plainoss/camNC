@@ -1,11 +1,20 @@
 import { useState } from 'react';
-import { setPartPattern, renamePartCopy, type CadDocument, type CadPart, type CadValueScope } from '@wbcnc/cad';
+import {
+  addPartCopy,
+  setPartCopyOffset,
+  setPartPattern,
+  renamePartCopy,
+  type CadDocument,
+  type CadPart,
+  type CadValueScope,
+} from '@wbcnc/cad';
 import { CadCopyNames } from './CadCopyNames';
 import { CadDrawnOnField } from './CadDrawnOnField';
 import { CadPartPatternField } from './CadPartPatternField';
 import { CadReliefField } from './CadReliefField';
 import { CadThicknessField } from './CadThicknessField';
 import { FeatureDialog } from './FeatureDialog';
+import { formatCadValue, parseCadValue } from './valueExpressions';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -102,6 +111,86 @@ export function PartPatternDialog({ part, variables, onChange, onOk, onCancel }:
         onChange={pattern => onChange(document => setPartPattern(document, part.id, pattern))}
       />
       <CadCopyNames part={part} onRename={(copyId, name) => onChange(document => renamePartCopy(document, part.id, copyId, name))} />
+    </FeatureDialog>
+  );
+}
+
+const kAxisLabels = ['X', 'Y', 'Z'] as const;
+
+/**
+ * A copy of a whole part, moved along the studio's axes, as the reference's transform with "Copy part": the copy follows
+ * the part, and each distance can use variables. It can be the part's mirror image, as a left side is of a right one.
+ */
+export function TransformDialog({
+  document,
+  part,
+  copyId,
+  variables,
+  onSave,
+  onCancel,
+}: {
+  document: CadDocument;
+  part: CadPart;
+  /** The transformed copy being changed, or none for a new one. */
+  copyId?: string;
+  variables?: CadValueScope;
+  onSave: (document: CadDocument) => void;
+  onCancel: () => void;
+}) {
+  const copy = part.copies?.find(candidate => candidate.id === copyId);
+  const typed = (axis: number) =>
+    copy?.offset ? (copy.offset.positionExpressions?.[axis] ?? formatCadValue(copy.offset.position[axis]!)) : '0';
+  const [text, setText] = useState([typed(0), typed(1), typed(2)]);
+  const [mirrored, setMirrored] = useState(!!copy?.mirrored);
+  const [error, setError] = useState<string | null>(null);
+  const save = () => {
+    const parsed = text.map(value => parseCadValue(value, { unit: 'mm', variables }));
+    const failed = parsed.find(result => 'error' in result);
+    if (failed && 'error' in failed) return setError(failed.error);
+    const values = parsed as { value: number; expression?: string }[];
+    const offset = {
+      position: values.map(result => result.value) as [number, number, number],
+      rotation: [0, 0, 0, 1] as [number, number, number, number],
+      ...(values.some(result => result.expression) && {
+        positionExpressions: values.map(result => result.expression ?? null) as [string | null, string | null, string | null],
+      }),
+    };
+    onSave(
+      copy
+        ? setPartCopyOffset(document, part.id, copy.id, { offset, mirrored })
+        : addPartCopy(document, part.id, { offset, mirrored }).document
+    );
+  };
+  return (
+    <FeatureDialog title={`Transform · ${part.name}`} onOk={save} onCancel={onCancel}>
+      <div className="cad-feature-selection">
+        <small>Part to copy</small>
+        <span>{part.name}</span>
+      </div>
+      <p className="cad-feature-hint">Translate by X, Y and Z</p>
+      {kAxisLabels.map((label, axis) => (
+        <label key={label} className="cad-number-field">
+          {label}
+          <span>
+            <input
+              value={text[axis]}
+              spellCheck={false}
+              aria-invalid={error ? true : undefined}
+              onChange={event => setText(values => values.map((value, index) => (index === axis ? event.target.value : value)))}
+            />
+          </span>
+          mm
+        </label>
+      ))}
+      <label>
+        <input type="checkbox" checked={mirrored} onChange={event => setMirrored(event.target.checked)} />
+        Mirror image
+      </label>
+      {error && (
+        <p role="alert" className="cad-thickness-error">
+          {error}
+        </p>
+      )}
     </FeatureDialog>
   );
 }
