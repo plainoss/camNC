@@ -5,7 +5,8 @@ import { NumberInput } from '@/cam/NumberInput';
 import { LetteringFontPicker } from '@/cam/LetteringFontPicker';
 import { carvingProblem, itemName, kVBits, placeItem, withItems, type CarvingArt, type CarvingItemV1, type CarvingV1 } from '@/cam/carving';
 import { outlineArt } from '@/cam/carvingOutline';
-import { useCamJob, useSaveCamJob } from '@/cam/camQueries';
+import { camKeys, useCamJob, useSaveCamJob } from '@/cam/camQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import type { BoardV1 } from '@/cam/boards';
 import type { CamJobV1 } from '@/cam/jobDb';
 import { kDefaultPlan } from '@/cam/planSettings';
@@ -16,12 +17,15 @@ import { Input } from '@wbcnc/ui/components/input';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { SelectionBar } from '@/cam/boards/SelectionBar';
-import { AlertTriangle, Crosshair, FileUp, Image, ListOrdered, Trash2, Type } from 'lucide-react';
+import { AlertTriangle, Crosshair, FileUp, Image, ListOrdered, Redo2, Trash2, Type, Undo2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/carve')({ component: CarveStep });
 
 type Loop = { x: number; y: number }[];
+/** What Undo brings back: the carving and its board. */
+type Snapshot = Pick<CamJobV1, 'carving' | 'boards'>;
+const kUndoSteps = 50;
 type BoardGrip = 'w' | 'h' | 'wh';
 
 /** A dragged board edge moves in these steps (Shift: 1 mm), between the board size fields' limits. */
@@ -103,8 +107,49 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     };
   }, []);
 
-  const saveCarving = (next: CarvingV1, boards = job.boards) => save.mutate({ ...job, carving: next, boards });
-  const updateItem = (id: string, change: Partial<CarvingItemV1>) =>
+  // Undo and Redo step through the carving and its board as they were before each edit, as on the Boards step.
+  const queryClient = useQueryClient();
+  const latest = () => queryClient.getQueryData<CamJobV1>(camKeys.job(job.id)) ?? job;
+  const history = useRef<Snapshot[]>([]);
+  const future = useRef<Snapshot[]>([]);
+  const [, setHistorySize] = useState(0);
+  /** Called right before an edit is saved: the job as it is then is what Undo brings back. */
+  const record = () => {
+    const { carving, boards } = latest();
+    history.current = [...history.current.slice(-(kUndoSteps - 1)), { carving, boards }];
+    future.current = [];
+    setHistorySize(n => n + 1);
+  };
+  const travel = (from: { current: Snapshot[] }, to: { current: Snapshot[] }) => {
+    const back = from.current.at(-1);
+    if (!back) return;
+    from.current = from.current.slice(0, -1);
+    const { carving: was, boards } = latest();
+    to.current = [...to.current, { carving: was, boards }];
+    // Outlines still being drawn, and text still being typed, belong to the edit being left.
+    for (const [id, run] of outlineRuns.current) outlineRuns.current.set(id, run + 1);
+    setPending({});
+    setErrors({});
+    setArtResets(resets =>
+      Object.fromEntries([...(was?.items ?? []), ...(back.carving?.items ?? [])].map(i => [i.id, (resets[i.id] ?? 0) + 1]))
+    );
+    drag.current = null;
+    setDragged(null);
+    setHistorySize(n => n + 1);
+    save.mutateCurrent(current => ({ ...current, carving: back.carving, boards: back.boards }));
+  };
+  const undo = history.current.length ? () => travel(history, future) : undefined;
+  const redo = future.current.length ? () => travel(future, history) : undefined;
+
+  const saveCarving = (next: CarvingV1, boards = job.boards) => {
+    record();
+    save.mutate({ ...job, carving: next, boards });
+  };
+  const updateItem = (id: string, change: Partial<CarvingItemV1>) => {
+    record();
+    commitItem(id, change);
+  };
+  const commitItem = (id: string, change: Partial<CarvingItemV1>) =>
     save.mutateCurrent(current => {
       if (!current.carving) return null;
       return {
@@ -155,6 +200,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
       if (!mounted.current) return;
       setErrors(errors => ({ ...errors, adding: undefined }));
       const id = crypto.randomUUID();
+      record();
       save.mutateCurrent(current => {
         if (!current.carving) return null;
         const item: CarvingItemV1 = { id, art, height, ...freeSpot(current.carving.items, region, size), rotation: 0, outline: region };
@@ -183,6 +229,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     if (selectedId === id) setSelectedId(null);
     drag.current = null;
     setDragged(null);
+    record();
     save.mutateCurrent(current =>
       !current.carving
         ? null
@@ -207,6 +254,14 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
       const target = e.target;
       if (target instanceof Element && target.closest('input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"]'))
         return;
+      // ⌘Z / Ctrl+Z, and ⇧⌘Z or Ctrl+Y; in a text field they stay the field's own.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+        const k = e.key.toLowerCase();
+        if (k !== 'z' && k !== 'y') return;
+        e.preventDefault();
+        (k === 'y' || e.shiftKey ? redo : undo)?.();
+        return;
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
         e.preventDefault();
         deleteItem(selectedId);
@@ -608,6 +663,14 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 </SelectionBar>
               );
             })()}
+          <div className="absolute top-3 right-3 flex gap-1 rounded-md border bg-background/90 p-0.5 shadow-sm">
+            <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!undo} onClick={undo} className={kToolButton}>
+              <Undo2 className="size-[18px]" />
+            </button>
+            <button type="button" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!redo} onClick={redo} className={kToolButton}>
+              <Redo2 className="size-[18px]" />
+            </button>
+          </div>
           {outlining && (
             <div className="absolute top-3 left-3 flex items-center gap-2 rounded bg-background/80 px-2 py-1 text-xs text-muted-foreground">
               <LoadingSpinner className="size-3" /> Outlining…
@@ -744,6 +807,10 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     </CamPage>
   );
 }
+
+/** As the Boards step's tool buttons (`HoldTools`). */
+const kToolButton =
+  'flex size-8 items-center justify-center rounded-md text-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-35';
 
 const rotationOf = (degrees: number) => ((degrees % 360) + 360) % 360;
 

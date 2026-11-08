@@ -258,6 +258,43 @@ describe('the Carve step', () => {
     await waitFor(async () => expect(await text()).toMatchObject({ text: 'Board' }));
   });
 
+  it('undoes and redoes moves and deletes, by button and ⌘Z, but not inside a text field', async () => {
+    const job = await open();
+    const undo = screen.getByRole('button', { name: 'Undo' }) as HTMLButtonElement;
+    const redo = screen.getByRole('button', { name: 'Redo' }) as HTMLButtonElement;
+    expect(undo.disabled).toBe(true);
+    const path = screen.getByTestId('carving-item');
+    const svg = path.closest('svg')!;
+    const px = svg.getBoundingClientRect().width / (300 * 1.12);
+    const r = path.getBoundingClientRect();
+    const from = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1 };
+    fireEvent.pointerDown(path, from);
+    fireEvent.pointerMove(svg, { ...from, clientX: from.clientX + 20 * px });
+    fireEvent.pointerUp(svg, from);
+    const x0 = job.carving!.items[0].x;
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].x - x0).toBeCloseTo(20, 0));
+    // ⌘Z in the selected item's text field is the field's own.
+    fireEvent.keyDown(screen.getByLabelText('Text'), { key: 'z', metaKey: true });
+    expect((await getJob(job.id))!.carving!.items[0].x - x0).toBeCloseTo(20, 0);
+    fireEvent.click(within(screen.getByRole('toolbar')).getByRole('button', { name: 'Delete "Welcome"' }));
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toHaveLength(0));
+    fireEvent.click(undo);
+    await waitFor(async () => {
+      const items = (await getJob(job.id))!.carving!.items;
+      expect(items).toHaveLength(1);
+      expect(items[0].x - x0).toBeCloseTo(20, 0);
+    });
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toEqual(job.carving!.items));
+    expect(undo.disabled).toBe(true);
+    fireEvent.keyDown(window, { key: 'z', metaKey: true, shiftKey: true });
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].x - x0).toBeCloseTo(20, 0));
+    fireEvent.click(redo);
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toHaveLength(0));
+    expect(redo.disabled).toBe(true);
+    expect(undo.disabled).toBe(false);
+  });
+
   it('selects an item by a click anywhere in its box, not only on its ink', async () => {
     await open();
     const svg = screen.getAllByTestId('carving-item')[0].closest('svg')!;
