@@ -77,6 +77,8 @@ import {
   setCutSuppressed,
   withFeatureVersion,
   type CadPoint,
+  cadVariableProblems,
+  cadVariableScope,
 } from '@wbcnc/cad';
 import {
   useEffect,
@@ -135,6 +137,7 @@ import {
 import { parseCadValue } from './valueExpressions';
 import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
+import { CadVariablesPanel } from './CadVariablesPanel';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
   createSketchContext,
@@ -441,6 +444,8 @@ export function CadEditor({
   const solveSequence = useRef(0);
   const lastCheckedRevision = useRef('');
   const documentRef = useRef(doc);
+  // Every value field can use the design's variables by name.
+  const variableScope = useMemo(() => cadVariableScope(doc), [doc]);
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
   const finishing = useRef(false);
@@ -489,18 +494,18 @@ export function CadEditor({
   );
   const filletPreview = useMemo(() => {
     if (!sketch || !filletSelection?.ok) return null;
-    const radius = parseCadValue(filletRadius, { unit: 'mm' });
+    const radius = parseCadValue(filletRadius, { unit: 'mm', variables: variableScope });
     return 'error' in radius
       ? { ok: false as const, message: radius.error, cornerPointIds: filletSelection.cornerPointIds }
       : filletLineCorners(sketch, { cornerPointIds: filletSelection.cornerPointIds, radius: radius.value });
-  }, [sketch, filletSelection, filletRadius]);
+  }, [sketch, filletSelection, filletRadius, variableScope]);
   const chamferSelection = useMemo(
     () => (sketch && tool === 'chamfer' ? resolveChamferCorners(sketch, selected) : null),
     [sketch, tool, selected]
   );
   const chamferPreview = useMemo(() => {
     if (!sketch || !chamferSelection?.ok) return null;
-    const values = chamferDistances.map(value => parseCadValue(value, { unit: 'mm' }));
+    const values = chamferDistances.map(value => parseCadValue(value, { unit: 'mm', variables: variableScope }));
     const error = values.find(value => 'error' in value);
     return error && 'error' in error
       ? { ok: false as const, message: error.error, cornerPointIds: chamferSelection.cornerPointIds }
@@ -510,7 +515,7 @@ export function CadEditor({
           distanceB: (values[1] as { value: number }).value,
           selectedLineIds: selected,
         });
-  }, [sketch, chamferSelection, chamferDistances, selected]);
+  }, [sketch, chamferSelection, chamferDistances, selected, variableScope]);
   const cornerPreview = tool === 'chamfer' ? chamferPreview : filletPreview;
   const parsedTransform = useMemo(() => parseTransformParameters(transformParameters), [transformParameters]);
   const transformPreview = useMemo(() => {
@@ -574,11 +579,11 @@ export function CadEditor({
         : sketch;
   const offsetPreview = useMemo(() => {
     if (!sketch || modification.phase !== 'offset' || !modification.entityIds.length) return null;
-    const parsed = parseCadValue(modification.text, { unit: 'mm' });
+    const parsed = parseCadValue(modification.text, { unit: 'mm', variables: variableScope });
     return 'error' in parsed
       ? { ok: false as const, message: parsed.error }
       : offsetSketch(sketch, { entityIds: modification.entityIds, value: parsed.value });
-  }, [sketch, modification]);
+  }, [sketch, modification, variableScope]);
   const extendPreview = useMemo(
     () =>
       sketch && modification.phase === 'extend' && modification.entityId && modification.end && modifyTarget
@@ -1345,8 +1350,8 @@ export function CadEditor({
       }
     } else if (tool === 'rectangle' || tool === 'centerRectangle') {
       const centered = tool === 'centerRectangle';
-      const widthValue = end ? null : parseCadValue(width, { unit: 'mm' });
-      const heightValue = end ? null : parseCadValue(height, { unit: 'mm' });
+      const widthValue = end ? null : parseCadValue(width, { unit: 'mm', variables: variableScope });
+      const heightValue = end ? null : parseCadValue(height, { unit: 'mm', variables: variableScope });
       if (widthValue && 'error' in widthValue) return setMessage(`Rectangle width: ${widthValue.error}`);
       if (heightValue && 'error' in heightValue) return setMessage(`Rectangle height: ${heightValue.error}`);
       const w = end ? (end.x - start.x) * (centered ? 2 : 1) : widthValue!.value;
@@ -1385,7 +1390,7 @@ export function CadEditor({
         return setMessage(error instanceof Error ? error.message : String(error));
       }
     } else if (tool === 'circle') {
-      const radiusValue = end ? null : parseCadValue(radius, { unit: 'mm' });
+      const radiusValue = end ? null : parseCadValue(radius, { unit: 'mm', variables: variableScope });
       if (radiusValue && 'error' in radiusValue) return setMessage(`Circle radius: ${radiusValue.error}`);
       const r = end ? Math.hypot(end.x - start.x, end.y - start.y) : radiusValue!.value;
       if (!Number.isFinite(r) || r < 0.1) return setMessage('Radius must be greater than zero.');
@@ -1543,7 +1548,7 @@ export function CadEditor({
     if (!currentDimension || !numeric(currentDimension)) return null;
     const input = dimensionInput.current;
     if (!input?.value.trim()) return rejectValue('Enter a dimension value.', input);
-    const parsed = parseCadValue(input.value, { unit: currentDimension.type === 'angle' ? 'deg' : 'mm' });
+    const parsed = parseCadValue(input.value, { unit: currentDimension.type === 'angle' ? 'deg' : 'mm', variables: variableScope });
     if ('error' in parsed) return rejectValue(parsed.error, input);
     const valueError = dimensionValueError(currentDimension, parsed.value);
     if (valueError) return rejectValue(valueError, input);
@@ -1564,7 +1569,7 @@ export function CadEditor({
     if (!current) return rejectValue('This drawing value no longer applies. Select its geometry again.', creationInput.current);
     const parsed = parseCadValue(
       creationValues.editing ? (creationInput.current?.value ?? creationValues.text) : String(current.constraint.value),
-      { unit: 'mm' }
+      { unit: 'mm', variables: variableScope }
     );
     if ('error' in parsed) return rejectValue(parsed.error, creationInput.current);
     const valueError = dimensionValueError(current.constraint, parsed.value);
@@ -1697,7 +1702,7 @@ export function CadEditor({
       );
     const next = structuredClone(chamferPreview.sketch);
     chamferPreview.dimensionIds.forEach((id, index) => {
-      const value = parseCadValue(chamferDistances[index]!, { unit: 'mm' });
+      const value = parseCadValue(chamferDistances[index]!, { unit: 'mm', variables: variableScope });
       const dimension = next.constraints.find(c => c.id === id);
       if (dimension && 'value' in dimension && 'value' in value && value.expression) dimension.expression = value.expression;
     });
@@ -1719,7 +1724,7 @@ export function CadEditor({
       return;
     }
     const radiusId = filletPreview.radiusConstraintId;
-    const parsed = parseCadValue(filletRadius, { unit: 'mm' });
+    const parsed = parseCadValue(filletRadius, { unit: 'mm', variables: variableScope });
     const next =
       'value' in parsed && parsed.expression
         ? {
@@ -1736,7 +1741,7 @@ export function CadEditor({
   const acceptOffset = (): string | null => {
     if (modification.phase !== 'offset' || !modification.entityIds.length) return null;
     if (!offsetPreview?.ok) return rejectValue(offsetPreview?.message ?? 'Select curves to offset.', offsetInput.current);
-    const parsed = parseCadValue(modification.text, { unit: 'mm' });
+    const parsed = parseCadValue(modification.text, { unit: 'mm', variables: variableScope });
     const next =
       'value' in parsed && parsed.expression
         ? {
@@ -3209,6 +3214,13 @@ export function CadEditor({
       : undefined;
   const canEditCanvasDimensions = !constraintMode && dimensionFlow.phase === 'idle' && (tool === 'select' || tool === 'dimension');
   const activeSketchStatus = sketchStatuses[part?.id ?? ''];
+  const variableProblems = cadVariableProblems(doc);
+  // A dimension that can't follow its variables shows like a conflicting one.
+  const shownConflicts = [...conflictedConstraints, ...variableProblems.flatMap(problem => problem.constraintIds ?? [])];
+  /** Why a part can't take its current values, for the mark beside it in the list. */
+  const partTrouble = (id: string) =>
+    variableProblems.find(problem => problem.partId === id)?.message ??
+    (sketchStatuses[id]?.status === 'conflict' ? 'This part’s sketch can’t be solved with its current values.' : null);
   const displayStatus =
     activeSketchStatus?.status === 'solved' && (inProgress || !problems.length)
       ? sketchDofStatus(activeSketchStatus.dof, !sketch?.entities.some(e => e.type !== 'point' && !e.construction))
@@ -3293,6 +3305,7 @@ export function CadEditor({
               </p>
             </div>
           )}
+          {!faceSketch && <CadVariablesPanel document={doc} onChange={commit} />}
           <div className="cad-panel-heading" hidden={!!faceSketch}>
             <h2>Parts</h2>
             <button
@@ -3321,6 +3334,11 @@ export function CadEditor({
                   }}>
                   <span aria-hidden="true">▱</span>
                   <span>{p.name}</span>
+                  {partTrouble(p.id) && (
+                    <span className="cad-part-trouble" role="img" aria-label={partTrouble(p.id)!} title={partTrouble(p.id)!}>
+                      ⚠
+                    </span>
+                  )}
                   <small>{p.thickness} mm</small>
                 </button>
               </li>
@@ -3354,10 +3372,27 @@ export function CadEditor({
               <CadThicknessField
                 key={part.id}
                 value={part.thickness}
+                expression={part.thicknessExpression}
+                variables={variableScope}
                 onValidityChange={setThicknessValid}
                 onDone={() => svg.current?.focus()}
-                onCommit={thickness => commit(replacePart(doc, part.id, p => ({ ...p, thickness })))}
+                onCommit={(thickness, thicknessExpression) =>
+                  commit(
+                    replacePart(doc, part.id, p => {
+                      const next = { ...p, thickness, thicknessExpression };
+                      if (thicknessExpression === undefined) delete next.thicknessExpression;
+                      return next;
+                    })
+                  )
+                }
               />
+              {variableProblems
+                .filter(problem => problem.partId === part.id)
+                .map((problem, index) => (
+                  <p key={index} className="cad-variable-problem" role="alert">
+                    Can’t follow the variables, so this part keeps its last good shape. {problem.message}
+                  </p>
+                ))}
               <button
                 type="button"
                 className="cad-delete-part"
@@ -3754,7 +3789,7 @@ export function CadEditor({
                 sketch={annotationSketch}
                 scale={markerScale}
                 selectedConstraintIds={selectedConstraints}
-                conflictedConstraintIds={conflictedConstraints}
+                conflictedConstraintIds={shownConflicts}
                 interactive={tool === 'select' && !constraintMode && !placingDimension}
                 onSelect={(id, additive) => {
                   setSelectedConstraints(previous =>
@@ -3782,7 +3817,7 @@ export function CadEditor({
                       selectedConstraints.includes(c.id) ||
                       (dimensionFlow.phase === 'placing' && dimensionFlow.existingConstraintId === c.id)
                     }
-                    conflicted={conflictedConstraints.includes(c.id)}
+                    conflicted={shownConflicts.includes(c.id)}
                     interactive={canEditCanvasDimensions}
                     onSelect={additive => selectDimension(c.id, additive)}
                     onEdit={() => editDimension(c.id)}
