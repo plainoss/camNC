@@ -225,7 +225,16 @@ export function carvingOperations(carving: BoardCarving, stockTop: number, setti
   // middle. On a straight wall the deepest ring alone cuts it exactly: its cone reaches every point between it and the
   // outline at that point's depth. So a ring is only cut where no deeper ring comes within a step of it, where the
   // artwork narrows.
-  for (let r = Math.min(tipR + kVCarveStep, rCap); ; ) {
+  const first = Math.min(tipR + kVCarveStep, rCap);
+  // A stroke that closes up before even the first ring gets its centre line, as deep as it's wide, or it would be lost.
+  // Thinner than the tip of a flat-tipped bit, it can't be cut without cutting wider than drawn.
+  for (const part of islands(region)) {
+    if (offset(part, -first).length) continue;
+    const last = closesAt(part, first);
+    if (last <= tipR + 1e-3) continue;
+    walls.push(...offset(part, -last).map(loop => inSteps(loop, depthAt(last), true)));
+  }
+  for (let r = first; ; ) {
     const level = offset(region, -r);
     if (!level.length) break;
     const z = depthAt(r);
