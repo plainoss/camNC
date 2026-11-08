@@ -113,30 +113,38 @@ function toolBoxes(
   // A curved tool would split into slivers that aren't what it fills.
   const curved = "isn't square-cornered and straight-sided";
   if ((xs.length - 1) * (ys.length - 1) > 400) return { refused: curved };
-  const filled = (x: number, y: number) =>
-    pointInPolygon({ x, y }, tool.outline) && !tool.holes.some(hole => pointInPolygon({ x, y }, hole));
+  const slack = Math.max((hi[0] - lo[0]) * (hi[1] - lo[1]) * 1e-6, kSquare);
+  // Each cell is all tool or none of it; one only partly filled means a slanted or curved side, which no box fits.
+  const filled: boolean[][] = [];
+  for (let j = 0; j + 1 < ys.length; j++) {
+    filled.push([]);
+    for (let i = 0; i + 1 < xs.length; i++) {
+      const cellLo: Vec3 = [xs[i]!, ys[j]!, 0],
+        cellHi: Vec3 = [xs[i + 1]!, ys[j + 1]!, 0];
+      const covered =
+        areaWithin(tool.outline, cellLo, cellHi) - tool.holes.reduce((sum, hole) => sum + areaWithin(hole, cellLo, cellHi), 0);
+      const cell = (cellHi[0] - cellLo[0]) * (cellHi[1] - cellLo[1]);
+      if (covered > slack && covered < cell - slack) return { refused: curved };
+      filled[j]!.push(covered >= cell - slack);
+    }
+  }
   // Runs of filled cells along each row, then runs the same width stacked up into rectangles.
   const rectangles: { x0: number; x1: number; y0: number; y1: number }[] = [];
-  let area = 0;
   for (let j = 0; j + 1 < ys.length; j++) {
     const y0 = ys[j]!,
       y1 = ys[j + 1]!;
     for (let i = 0; i + 1 < xs.length; i++) {
-      if (!filled((xs[i]! + xs[i + 1]!) / 2, (y0 + y1) / 2)) continue;
+      if (!filled[j]![i]) continue;
       let k = i + 1;
-      while (k + 1 < xs.length && filled((xs[k]! + xs[k + 1]!) / 2, (y0 + y1) / 2)) k++;
+      while (k + 1 < xs.length && filled[j]![k]) k++;
       const x0 = xs[i]!,
         x1 = xs[k]!;
-      area += (x1 - x0) * (y1 - y0);
       const below = rectangles.find(r => r.y1 === y0 && r.x0 === x0 && r.x1 === x1);
       if (below) below.y1 = y1;
       else rectangles.push({ x0, x1, y0, y1 });
       i = k - 1;
     }
   }
-  const slack = Math.max((hi[0] - lo[0]) * (hi[1] - lo[1]) * 1e-6, kSquare);
-  if (Math.abs(area - areaWithin(tool.outline, lo, hi) + tool.holes.reduce((sum, hole) => sum + areaWithin(hole, lo, hi), 0)) > slack)
-    return { refused: curved };
   const ownCut = (tool.cuts ?? []).some(cut => {
     const [bottom, top] = cut.side === 'top' ? [tool.thickness - cut.to, tool.thickness - cut.from] : [cut.from, cut.to];
     return top > lo[2] + kSquare && bottom < hi[2] - kSquare && areaWithin(cut.outline, lo, hi) > slack;

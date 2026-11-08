@@ -276,6 +276,22 @@ describe('tools that only fill part of where they reach', () => {
     ]);
   });
 
+  it('refuses a slanted tool whose area happens to match a box', async () => {
+    const slanted = outlined(
+      'Brace',
+      [
+        [10, 10],
+        [50, 10],
+        [70, 30],
+        [30, 30],
+      ],
+      10
+    );
+    const { cuts, messages } = await cut(slanted);
+    expect(cuts).toEqual([]);
+    expect(messages).toEqual(["Brace isn't square-cornered and straight-sided where it reaches into Leg, so it can't be cut from it yet."]);
+  });
+
   it('says only why a refused tool can’t cut, not that the step cuts nothing', async () => {
     const round = createCadPart('Dowel', 18);
     round.placement = { position: [0, 0, 10], rotation: [0, 0, 0, 1] };
