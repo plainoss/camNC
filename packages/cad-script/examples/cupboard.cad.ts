@@ -18,9 +18,9 @@ export const cupboard =
     d.variable('pin', '5mm');
     const housing = d.value('housing');
 
-    // A side: sketch x runs front to back, y bottom to top, and its top face is the inside.
-    const side = (name: string) => {
-      const part = d.part(name, { thickness: 'board' });
+    // The sides: sketch x runs front to back, y bottom to top, and the top face is the inside.
+    const side = (() => {
+      const part = d.part('Side', { thickness: 'board' });
       part.profile.rect({ at: [0, 0], w: 'depth', h: 'height' });
       // Rebates run 5 mm past the part, so their ends are open.
       const ends = part.sketchOn('top');
@@ -41,12 +41,11 @@ export const cupboard =
         for (let i = 0; i < count; i++) part.cut(pins.regionAt(37 + row * gap, first + i * 32), { depth: 12 });
       part.expect({ size: [d.value('depth'), d.value('height')], thickness: d.value('board'), freedom: 0 });
       return { part, pinAt: (i: number) => first + i * 32, count };
-    };
-    const left = side('Left side');
-    const right = side('Right side');
-    left.part.place({ at: [0, 0, 0], x: '+y', y: '+z' });
-    // The same part turned over end for end, so its inside faces left.
-    right.part.place({ at: ['width', 0, 'height'], x: '+y', y: '-z' });
+    })();
+    side.part.place({ at: [0, 0, 0], x: '+y', y: '+z' });
+    // The right side is the same part turned over end for end, so its inside faces left. The pins are centred on the
+    // height, so it needs no mirror image.
+    side.part.copy({ at: ['width', 0, 'height'], x: '+y', y: '-z' });
 
     // Top and bottom: sketch x runs left to right, y front to back. They stop at the back panel.
     const panel = (name: string): PartEdit => {
@@ -65,7 +64,7 @@ export const cupboard =
     // The shelf has 1 mm to spare at each side and 10 mm at the back, and rests on the middle pins.
     const shelf = d.part('Shelf', { thickness: 'board' });
     shelf.profile.rect({ at: [0, 0], w: 'width - 2*board - 2mm', h: 'depth - back - 10mm' });
-    const rest = left.pinAt(Math.floor(left.count / 2)) + d.value('pin') / 2;
+    const rest = side.pinAt(Math.floor(side.count / 2)) + d.value('pin') / 2;
     shelf.place({ at: ['board + 1mm', 0, rest] });
     shelf.expect({ freedom: 0 });
   };

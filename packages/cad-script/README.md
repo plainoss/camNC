@@ -78,6 +78,12 @@ See `examples/cupboard.cad.ts`.
   front to back and Z up, and the part's thickness points along x × y. The report's
   `assembly` lists each placed part's box, and an error `parts-collide` says where two
   parts need the same material. Rebates and dados count as empty.
+- `part.copy({ at, x, y })` adds another of the part, placed the same way: four legs are
+  one part and three copies. A part turned end over end is still a plain copy. For a
+  left and right pair that aren't alike, `copy({ ..., mirrored: true })` is the mirror
+  image across the sketch's y axis (x becomes -x). The report names the pieces as CAM
+  does (`Leg`, `Leg 2`, …) under each part's `pieces`. Its toolpath summary is for one
+  piece of the shape.
 
 ## The toolpath summary
 

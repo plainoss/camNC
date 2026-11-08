@@ -1,6 +1,8 @@
 import {
   cadFaceSketches,
   assemblyReport,
+  cadPartsToCut,
+  mirroredPartId,
   pointInPolygon,
   solveCadDocument,
   type CadAssemblyReport,
@@ -55,6 +57,8 @@ export interface CadReportPart {
   }[];
   /** Features CAM received. */
   cam?: { pockets: number; throughHoles: number };
+  /** Pieces CAM cuts when the part has copies, by name. Mirrored copies are cut as their own shape. */
+  pieces?: { names: string[]; mirrored: string[] };
   /**
    * The part planned alone on a board, as the app plans it, with the default bit and settings and tabs holding it. A
    * summary for checking the design: no program comes out of it, and nothing here says one is safe to run.
@@ -212,6 +216,7 @@ export async function inspectCadDocument(
     (d.severity === 'error' ? errors : warnings).push(issue);
   }
   const statuses = solved.sketches;
+  const toCut = cadPartsToCut(solved.document, solved.parts);
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
     const evaluated = solved.parts.find(candidate => candidate.partId === part.id);
     const faces = cadFaceSketches(part);
@@ -288,6 +293,8 @@ export async function inspectCadDocument(
       }
     }
     const box = evaluated && bounds(evaluated.outline);
+    const names = (id: string) => toCut.find(entry => entry.part.partId === id)?.names ?? [];
+    const pieces = part.copies?.length ? { names: names(part.id), mirrored: names(mirroredPartId(part.id)) } : undefined;
     const report: CadReportPart = {
       name: part.name,
       thickness: part.thickness,
@@ -296,6 +303,7 @@ export async function inspectCadDocument(
       cuts,
       sketches,
       ...(cam && { cam }),
+      ...(pieces && { pieces }),
       ...(toolpaths && { toolpaths }),
     };
     const freedom = sketches.reduce((sum, sketch) => sum + (sketch.freedom ?? 0), 0);
