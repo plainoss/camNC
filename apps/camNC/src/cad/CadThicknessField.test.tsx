@@ -196,4 +196,18 @@ describe('CAD thickness entry', () => {
     view.unmount();
     expect(validity.mock.calls.at(-1)).toEqual([true]);
   });
+
+  it('accepts a variable, keeps it as typed and reports the value it stands for', async () => {
+    const commit = vi.fn<(value: number, expression?: string) => void>();
+    const variables = { board: { value: 19, kind: 'length' as const } };
+    render(<CadThicknessField value={18} variables={variables} onCommit={commit} />);
+    const input = screen.getByRole('textbox', { name: 'Thickness' }) as HTMLInputElement;
+    await type(input, 'board');
+    await userEvent.keyboard('{Enter}');
+    expect(commit).toHaveBeenCalledWith(19, 'board');
+    expect(input.value).toBe('board');
+    await type(input, 'boards');
+    await userEvent.keyboard('{Enter}');
+    expect(screen.getByRole('alert').textContent).toBe("There's no variable called boards.");
+  });
 });

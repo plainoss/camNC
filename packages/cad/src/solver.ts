@@ -30,6 +30,7 @@ import { pointEquivalence, type CadPointEquivalence } from './pointEquivalence';
 import { classifyNativeEntities } from './entityFreedom';
 import { refreshDimensionMeasurement } from './dimensions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
+import { applyCadVariables } from './variables';
 import { isFatalSolverError } from './solverFailure';
 import { invalidOffsetBranches, offsetNativePrimitives, offsetNativeSeed } from './offsetConstraint';
 import { entityPointIds } from './document';
@@ -489,7 +490,8 @@ function solvedCurveEquationsHold(part: CadPart): boolean {
 
 /** Solve a detached revision. Callers retain their accepted model while an invalid draft is edited. */
 export async function solveCadDocument(document: CadDocument, options: CadSolveOptions = {}): Promise<CadSolveResult> {
-  const next = migrateDimensionPlacements(document);
+  // Values that use variables follow them before anything is solved.
+  const next = migrateDimensionPlacements(applyCadVariables(document));
   for (const part of next.parts) {
     part.sketch = withSplineHandleSegments(part.sketch);
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);

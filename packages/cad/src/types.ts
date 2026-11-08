@@ -109,7 +109,7 @@ interface DimensionBase extends ConstraintBase {
   labelPlacement?: CadDimensionPlacement;
   /** A reference measurement does not add solver equations or remove freedom. */
   driven?: boolean;
-  /** Display-only arithmetic source; its normalized numeric value remains authoritative. */
+  /** The value as typed. When it uses design variables it drives the value; otherwise it's only shown. The value is always the last good result. */
   expression?: string;
 }
 
@@ -241,6 +241,8 @@ export interface CadPart {
   id: string;
   name: string;
   thickness: number;
+  /** The thickness as typed, kept when it uses design variables. */
+  thicknessExpression?: string;
   sketch: CadSketch;
   /** Ordered: a sketch can sit on the floor of an earlier cut. Parts without features are plain flat profiles. */
   features?: CadFeature[];
@@ -273,7 +275,15 @@ export interface CadDocument {
   name: string;
   /** Increases on source edits; solving preserves the source revision. */
   revision: number;
+  /** Design variables, such as `width` and `board`, that dimensions and thicknesses can use. */
+  variables?: CadVariable[];
   parts: CadPart[];
+}
+/** A named value. Its kind follows from the expression: a length or angle unit, or a plain number. */
+export interface CadVariable {
+  id: string;
+  name: string;
+  expression: string;
 }
 
 export interface CadDiagnostic {
