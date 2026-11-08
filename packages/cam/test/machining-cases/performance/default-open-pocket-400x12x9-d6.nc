@@ -1,6 +1,6 @@
 (camNC CAM)
 (default-open-pocket-400x12x9-d6)
-(Plan: cam-plan-v1-48cba0599992e755)
+(Plan: cam-plan-v1-00a4454f0ea4b74b)
 (Post: fluidnc. Safe Z23. Retract Z20)
 (Planned bounds: X52.825..447.175 Y-1.01..9 Z9..18)
 (Stock: 500 x 100 x 18 mm)
@@ -8,7 +8,7 @@
 ( Tools Table:)
 (  T1 D=6 CR=0 - ZMIN=9 - synthetic flat end mill )
 ( )
-(WARNING: pocket z=9: 31.6mm² left in corners/narrow spots with D=6)
+(WARNING: pocket z=9: 3.9mm² left in corners/narrow spots with D=6)
 G21 G90 G94 G17
 G40 G49 G80
 G0 Z23
