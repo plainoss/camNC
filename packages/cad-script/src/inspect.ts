@@ -13,6 +13,7 @@ import {
   type CadPoint,
   type CadSketch,
   type EvaluatedCadPart,
+  evaluateCadDocument,
 } from '@wbcnc/cad';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
@@ -48,7 +49,17 @@ export interface CadReportPart {
   /** Absent when the outline isn't a valid closed profile. */
   outline?: { at: number[]; size: number[] };
   holes?: number;
-  cuts: { ref: string; side: 'top' | 'underside'; from: number; to: number; through: boolean; at: number[]; size: number[] }[];
+  /** A cut's box as drawn; `relieved` is its size with the bones in its corners, when they make it bigger. */
+  cuts: {
+    ref: string;
+    side: 'top' | 'underside';
+    from: number;
+    to: number;
+    through: boolean;
+    at: number[];
+    size: number[];
+    relieved?: number[];
+  }[];
   sketches: {
     ref: string;
     on: 'profile' | 'top' | 'underside' | { floorOf: string };
@@ -276,6 +287,10 @@ export async function inspectCadDocument(
   }
   const statuses = solved.sketches;
   const toCut = cadPartsToCut(solved.document, solved.parts);
+  // Bones widen a cut past what was drawn, so its opening is measured on the part without them.
+  const unrelieved = solved.document.parts.some(part => part.cornerRelief)
+    ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(({ cornerRelief: _, ...part }) => part) }).parts
+    : solved.parts;
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
     const evaluated = solved.parts.find(candidate => candidate.partId === part.id);
     const faces = cadFaceSketches(part);
@@ -309,9 +324,23 @@ export async function inspectCadDocument(
       // A profile loop given a depth is cut from the profile sketch itself.
       return feature.sketchId === part.sketch.id ? part.sketch : faces.find(face => face.sketch.id === feature.sketchId)?.sketch;
     };
+    const drawn = unrelieved.find(candidate => candidate.partId === part.id)?.cuts;
     const cuts = (evaluated?.cuts ?? []).map(cut => {
-      const { at, size } = bounds(cut.outline, curveExtremes(sketchOfCut(cut.id)));
-      return { ref: cutHandle(cut.id), side: cut.side, from: round(cut.from), to: round(cut.to), through: cut.through, at, size };
+      const curves = curveExtremes(sketchOfCut(cut.id));
+      const relieved = bounds(cut.outline, curves);
+      const asDrawn = drawn?.find(candidate => candidate.id === cut.id);
+      const { at, size } = asDrawn ? bounds(asDrawn.outline, curves) : relieved;
+      const wider = relieved.size.some((length, i) => length > size[i]! + 1e-6);
+      return {
+        ref: cutHandle(cut.id),
+        side: cut.side,
+        from: round(cut.from),
+        to: round(cut.to),
+        through: cut.through,
+        at,
+        size,
+        ...(wider && { relieved: relieved.size }),
+      };
     });
     // CAM clips a floor cut to its pocket without a word, so the drawing and the part would disagree.
     for (const cut of evaluated?.cuts ?? []) {

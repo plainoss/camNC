@@ -188,6 +188,20 @@ describe('corner relief', () => {
     expect(codes(report.warnings)).not.toContain('relief-bit');
   });
 
+  it('measures a dado as drawn, and says how far its bones reach', async () => {
+    const { report } = await editCad(null, d => {
+      const side = d.part('Side', { thickness: 18, relief: 6 });
+      side.profile.rect({ at: [0, 0], w: 300, h: 600 });
+      const dado = side.sketchOn('top');
+      dado.rect({ at: [20, 200], w: 260, h: 15 });
+      side.cut(dado.regionAt(150, 207), { depth: 6 });
+    });
+    expect(report.errors).toEqual([]);
+    const [cut] = report.parts[0]!.cuts;
+    expect(cut).toMatchObject({ at: [20, 200], size: [260, 15] });
+    expect(cut!.relieved![1]).toBeGreaterThan(15);
+  });
+
   it('warns when the bones are smaller than the bit that cuts them', async () => {
     const { report } = await editCad(null, mortised(2));
     expect(report.warnings.find(warning => warning.code === 'relief-bit')?.message).toMatch(
