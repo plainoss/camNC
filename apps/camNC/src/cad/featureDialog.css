@@ -116,3 +116,23 @@
 .cad-drawing:has(.cad-sketch-dialog) .cad-part-view-tools {
   left: calc(13rem + 24px);
 }
+/** A step's kinds, as the reference's tabs across the top of a dialog: the chosen one underlined. */
+.cad-feature-tabs {
+  display: flex;
+  border-bottom: 1px solid #e3e8ef;
+}
+.cad-editor .cad-feature-tabs button {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  font-size: 12px;
+}
+.cad-editor .cad-feature-tabs button[aria-selected='true'] {
+  border-bottom-color: #2c6fbf;
+  color: #174f8f;
+  font-weight: 600;
+}

@@ -1,5 +1,6 @@
 import { constraintEntityIds, entityPointIds } from './document';
 import { drawnOnOutline } from './drawnOn';
+import { evaluateCadPart } from './geometry';
 import type { CadDocument, CadEntity, CadPart, CadPointEntity, CadSketch } from './types';
 
 /** Geometry kept where the edges of the face a part is drawn on are: drawing onto it ties the part to that face. */
@@ -31,6 +32,16 @@ function wantedFaceEdges(document: CadDocument, part: CadPart): CadEntity[] {
     construction: true,
     faceEdge: true,
   });
+  if ((on.face === 'top' || on.face === 'underside') && support.thin) {
+    // A thin board's faces are its flat outline, not its edge-on sketch.
+    const outline = evaluateCadPart(support).part?.outline;
+    if (!outline) return [];
+    const flip = on.face === 'underside' ? -1 : 1;
+    return [
+      ...outline.map((p, i) => point(`corner${i}`, p.x * flip, p.y)),
+      ...outline.map((_, i) => line(`side${i}`, `corner${i}`, `corner${(i + 1) % outline.length}`)),
+    ];
+  }
   if (on.face === 'top' || on.face === 'underside') {
     // The support's own lines, as this sketch sees them: the top as drawn, the underside from below.
     const flip = on.face === 'underside' ? -1 : 1;

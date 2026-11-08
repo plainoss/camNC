@@ -138,10 +138,11 @@
   },
   {
     "id": "sketch/finish/blocks-open-profile",
-    "title": "An open sketch can't be finished",
+    "title": "An open outline can't be finished (one line alone is a board drawn edge-on)",
     "evidence": "design only closed profiles can be cut",
     "steps": [
       "line 20,40 120,40",
+      "line 120,40 120,90",
       {
         "expect": {
           "canFinish": false

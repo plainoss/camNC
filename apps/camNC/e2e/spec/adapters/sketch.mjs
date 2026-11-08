@@ -429,10 +429,18 @@ export async function createAdapter(page, url) {
         await page.waitForTimeout(100);
         return;
       }
-      case 'addpart':
-        await page.getByRole('button', { name: /add part|new part/i }).click();
+      case 'addpart': {
+        // In the Part Studio a new part is sketched from the studio: close the open sketch, then Sketch on the top plane.
+        await settle();
+        if (!(await studioToolbar.isVisible())) await closeSketch();
+        const extrude = page.getByRole('dialog', { name: /^Extrude ·/ });
+        if (await extrude.isVisible()) await extrude.getByRole('button', { name: 'OK', exact: true }).click();
+        await studioToolbar.getByRole('button', { name: /Sketch/ }).click();
+        await page.getByRole('button', { name: 'Top plane', exact: true }).click();
+        await canvas.waitFor();
         await settle();
         return;
+      }
       case 'line':
         await page.keyboard.press('l');
         await click(point(args[0]));

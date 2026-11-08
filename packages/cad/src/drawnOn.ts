@@ -1,4 +1,4 @@
-import { evaluateCadPart, pointInPolygon } from './geometry';
+import { cadThinLine, evaluateCadPart, pointInPolygon } from './geometry';
 import { CAD_IDENTITY_PLACEMENT, placePoint, rotateVector, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadDrawnOn, CadPart, CadPlacement, CadPoint, EvaluatedCadPart } from './types';
 
@@ -18,6 +18,8 @@ const kPlanes: Record<'top' | 'front' | 'right', Frame> = {
   right: { origin: [0, 0, 0], x: [0, 1, 0], y: [0, 0, 1], z: [1, 0, 0] },
 };
 const add = (a: Vec3, b: Vec3, scale = 1): Vec3 => [a[0] + b[0] * scale, a[1] + b[1] * scale, a[2] + b[2] * scale];
+const scale = (a: Vec3, by: number): Vec3 => [a[0] * by, a[1] * by, a[2] * by];
+const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const tidy = (value: number) => {
   const rounded = Math.round(value * 1e9) / 1e9;
   return rounded === 0 ? 0 : rounded;
@@ -137,11 +139,25 @@ export function resolveDrawnPlacements(
       frame = carried(supportPlacement, face);
     }
     visiting.delete(part.id);
-    const along = offset - (inward ? part.thickness : 0);
-    const placement: CadPlacement = {
-      position: add(frame.origin, frame.z, along).map(tidy) as Vec3,
-      rotation: rotationOf(frame),
-    };
+    let placement: CadPlacement;
+    if (part.thin) {
+      // A thin board stands on its line: along it, out from the face (or into it), and across it by its thickness.
+      const line = cadThinLine(part);
+      if ('error' in line) return problem(line.error);
+      const length = Math.hypot(line.b.x - line.a.x, line.b.y - line.a.y);
+      const x = add(scale(frame.x, (line.b.x - line.a.x) / length), frame.y, (line.b.y - line.a.y) / length);
+      const y = inward ? scale(frame.z, -1) : frame.z;
+      const z = cross(x, y);
+      let origin = add(add(add(frame.origin, frame.z, offset), frame.x, line.a.x), frame.y, line.a.y);
+      if (part.thin.midPlane) origin = add(origin, z, -part.thickness / 2);
+      placement = { position: origin.map(tidy) as Vec3, rotation: rotationOf({ origin, x, y, z }) };
+    } else {
+      const along = offset - (inward ? part.thickness : 0);
+      placement = {
+        position: add(frame.origin, frame.z, along).map(tidy) as Vec3,
+        rotation: rotationOf(frame),
+      };
+    }
     placed.set(part.id, placement);
     return placement;
   };
@@ -191,7 +207,8 @@ export function partFaceAt(
   // A pocket's floor looks the same way as the top, but isn't the face a part would sit on.
   if (facing[2] > 0.99) return Math.abs(local[2] - part.thickness) < 0.5 ? 'top' : null;
   if (facing[2] < -0.99) return Math.abs(local[2]) < 0.5 ? 'underside' : null;
-  if (Math.abs(facing[2]) > 0.01) return null;
+  // A thin board's edges aren't lines of its sketch, so only its faces can be drawn on.
+  if (Math.abs(facing[2]) > 0.01 || part.thin) return null;
   const at = (id: string) => part.sketch.entities.find(entity => entity.id === id) as CadPoint | undefined;
   let best: { id: string; distance: number } | null = null;
   for (const entity of part.sketch.entities) {

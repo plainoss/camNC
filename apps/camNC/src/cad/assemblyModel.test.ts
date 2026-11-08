@@ -96,3 +96,14 @@ describe('the assembly', () => {
     expect(model.meshes.map(holeX).map(x => Math.round(x))).toEqual([50, 50, 250]);
   });
 });
+
+describe('hidden parts', () => {
+  it('leaves a hidden part out of the view without moving the others', () => {
+    const document = createPlateDocument({ width: 100, height: 50 });
+    document.parts.push({ ...createPlateDocument({ width: 80, height: 40 }).parts[0]!, id: 'second', name: 'Second' });
+    const all = assemblyModel(document);
+    const shown = assemblyModel(document, new Set([document.parts[0]!.id]));
+    expect(shown.instances.map(instance => instance.name)).toEqual(['Second']);
+    expect(shown.placements.get('second')).toEqual(all.placements.get('second'));
+  });
+});

@@ -395,7 +395,43 @@ export function tessellateArc(arc: CadArcEntity, center: CadPoint): CadPoint[] {
 }
 
 /** Solve-independent profile evaluation. Invalid contours are never partially handed to CAM. */
+/** The line a thin board is drawn as, in its sketch, or why there isn't one. */
+export function cadThinLine(part: CadPart): { a: CadPoint; b: CadPoint; id: string } | { error: string } {
+  const curves = part.sketch.entities.filter(e => e.type !== 'point' && !e.construction);
+  const line = curves[0];
+  if (curves.length !== 1 || line?.type !== 'line') return { error: 'Draw one straight line where the board’s edge sits.' };
+  const at = (id: string) => part.sketch.entities.find((e): e is CadPointEntity => e.type === 'point' && e.id === id);
+  const a = at(line.startId),
+    b = at(line.endId);
+  if (!a || !b || distance(a, b) < CAD_GEOMETRY_TOLERANCE) return { error: 'The board’s line needs some length.' };
+  return { a, b, id: line.id };
+}
+
 export function evaluateCadPart(part: CadPart): { part?: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
+  if (part.thin) {
+    // A thin board, flat as it's cut: as long as its line and as wide as its depth.
+    const line = cadThinLine(part);
+    if ('error' in line) return { diagnostics: [{ code: 'thin-profile', message: line.error, severity: 'error', partId: part.id }] };
+    const length = distance(line.a, line.b),
+      depth = part.thin.depth;
+    const outline = [
+      { x: 0, y: 0 },
+      { x: length, y: 0 },
+      { x: length, y: depth },
+      { x: 0, y: depth },
+    ];
+    return {
+      part: {
+        partId: part.id,
+        name: part.name,
+        thickness: part.thickness,
+        outline,
+        holes: [],
+        loops: [{ id: `${part.id}:profile:${line.id}`, entityIds: [line.id], points: outline, kind: 'outer' }],
+      },
+      diagnostics: [],
+    };
+  }
   const diagnostics: CadDiagnostic[] = [];
   const error = (code: string, message: string, entityIds?: string[]) =>
     diagnostics.push({ code, message, severity: 'error', partId: part.id, entityIds });

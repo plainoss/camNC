@@ -1125,3 +1125,41 @@
   color: #b42318;
   font-size: 11px;
 }
+/** In the studio the parts sit at the bottom of the sidebar, below the features, each with an eye. */
+.cad-editor .cad-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+.cad-parts-panel {
+  margin-top: auto;
+  border-top: 1px solid #dde4ed;
+  background: #f9fbfd;
+}
+.cad-parts-panel .cad-part-list li {
+  display: flex;
+  align-items: center;
+}
+.cad-parts-panel .cad-part-list li > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.cad-editor .cad-part-eye {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  min-height: 0;
+  height: 24px;
+  padding: 0;
+  color: #6b7c91;
+}
+.cad-editor .cad-part-eye[aria-pressed='false'] {
+  color: #b2bcc8;
+}
+.cad-part-eye svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}

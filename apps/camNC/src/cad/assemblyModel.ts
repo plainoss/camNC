@@ -44,7 +44,7 @@ export interface AssemblyModel {
  * Every part and copy as a mesh where it sits in the assembly. Pieces without a placement lie flat in a row beside the
  * placed ones, so a new design shows something sensible before anything is placed.
  */
-export function assemblyModel(document: CadDocument): AssemblyModel {
+export function assemblyModel(document: CadDocument, hidden: ReadonlySet<string> = new Set()): AssemblyModel {
   type Shape = ReturnType<typeof nativePart>;
   type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; copies: Shape[] };
   const built = document.parts.map((part): Built => {
@@ -101,6 +101,8 @@ export function assemblyModel(document: CadDocument): AssemblyModel {
       rotation: [0, 0, 0, 1],
     };
     if (!given) cursor += shape.info.size[0] + kGap;
+    // A hidden part keeps its place in the row, so showing it again doesn't move the others.
+    if (hidden.has(instanceKey(instance))) continue;
     const matrix = new Matrix4().fromArray(placementMatrix(placement)).multiply(local(shape.info.sourceOrigin));
     const positions = shape.mesh.positions.slice(),
       v = new Vector3();

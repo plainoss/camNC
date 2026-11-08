@@ -709,6 +709,13 @@ export function parseCadDocument(input: unknown): CadDocument {
       throw new Error('Invalid CAD part');
     number(p.thickness);
     if (p.thicknessExpression !== undefined && typeof p.thicknessExpression !== 'string') throw new Error('Invalid CAD part');
+    if (p.thin !== undefined) {
+      if (!p.thin || typeof p.thin !== 'object') throw new Error('Invalid thin extrude');
+      number(p.thin.depth);
+      if (p.thin.depth <= 0) throw new Error('Invalid thin extrude');
+      if (p.thin.depthExpression !== undefined && typeof p.thin.depthExpression !== 'string') throw new Error('Invalid thin extrude');
+      if (p.thin.midPlane !== undefined && typeof p.thin.midPlane !== 'boolean') throw new Error('Invalid thin extrude');
+    }
     if (p.cornerRelief !== undefined) {
       if (!p.cornerRelief || typeof p.cornerRelief !== 'object') throw new Error('Invalid corner relief');
       number(p.cornerRelief.diameter);
