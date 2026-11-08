@@ -1,6 +1,6 @@
 import { dimensionValueError } from './dimensionValues';
 import { newCadId } from './document';
-import type { CadConstraint, CadCut, CadDiagnostic, CadDocument, CadPart, CadSketch, CadVariable } from './types';
+import type { CadConstraint, CadCut, CadDiagnostic, CadDocument, CadPart, CadPlacement, CadSketch, CadVariable } from './types';
 import {
   cadExpressionNames,
   cadVariableNameError,
@@ -96,12 +96,36 @@ function thicknessOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
 const kAxes = ['x', 'y', 'z'] as const;
 
 /** Each position axis that uses a variable, worked out. */
-function positionOutcomes(part: CadPart, scope: CadValueScope): ({ axis: 'x' | 'y' | 'z'; expression: string } & Outcome)[] {
-  return (part.placement?.positionExpressions ?? []).flatMap((expression, index) => {
+function positionOutcomes(
+  placement: CadPlacement | undefined,
+  scope: CadValueScope
+): ({ axis: 'x' | 'y' | 'z'; expression: string } & Outcome)[] {
+  return (placement?.positionExpressions ?? []).flatMap((expression, index) => {
     if (!usesVariables(expression ?? undefined)) return [];
     const parsed = parseCadValue(expression!, { unit: 'mm', variables: scope });
     return [{ axis: kAxes[index]!, expression: expression!, ...('error' in parsed ? { error: parsed.error } : { value: parsed.value }) }];
   });
+}
+
+/** The placement moved to where its typed positions say, or the same object when they agree already. */
+function followPlacement(placement: CadPlacement | undefined, scope: CadValueScope): CadPlacement | undefined {
+  const moves = positionOutcomes(placement, scope);
+  if (!moves.some(move => 'value' in move && move.value !== placement!.position[kAxes.indexOf(move.axis)])) return placement;
+  const position = [...placement!.position] as [number, number, number];
+  for (const move of moves) if ('value' in move) position[kAxes.indexOf(move.axis)] = move.value;
+  return { ...placement!, position };
+}
+
+/** The part's own placement and each copy's, passed through `edit`, keeping objects that didn't change. */
+function mapPlacements(part: CadPart, edit: (placement: CadPlacement | undefined) => CadPlacement | undefined): CadPart {
+  const placement = edit(part.placement);
+  const copies = part.copies?.map(copy => {
+    const moved = edit(copy.placement);
+    return moved === copy.placement ? copy : { ...copy, placement: moved };
+  });
+  const copiesChanged = copies?.some((copy, index) => copy !== part.copies![index]);
+  if (placement === part.placement && !copiesChanged) return part;
+  return { ...part, ...(placement !== part.placement && { placement }), ...(copiesChanged && { copies }) };
 }
 
 function depthOutcome(cut: CadCut, scope: CadValueScope): Outcome | null {
@@ -145,12 +169,7 @@ export function applyCadVariables(document: CadDocument): CadDocument {
   const parts = document.parts.map(part => {
     const thickness = thicknessOutcome(part, scope);
     let sized = thickness && 'value' in thickness && thickness.value !== part.thickness ? { ...part, thickness: thickness.value } : part;
-    const moves = positionOutcomes(sized, scope);
-    if (moves.some(move => 'value' in move && move.value !== sized.placement!.position[kAxes.indexOf(move.axis)])) {
-      const position = [...sized.placement!.position] as [number, number, number];
-      for (const move of moves) if ('value' in move) position[kAxes.indexOf(move.axis)] = move.value;
-      sized = { ...sized, placement: { ...sized.placement!, position } };
-    }
+    sized = mapPlacements(sized, placement => followPlacement(placement, scope));
     sized = mapCuts(sized, cut => {
       const outcome = depthOutcome(cut, scope);
       return outcome && 'value' in outcome && outcome.value !== cut.depth ? { ...cut, depth: outcome.value } : cut;
@@ -192,7 +211,9 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
           message: `Cut depth ${(feature as CadCut).depthExpression}: ${outcome.error}`,
         });
     }
-    for (const move of positionOutcomes(part, scope))
+    for (const move of [part.placement, ...(part.copies ?? []).map(copy => copy.placement)].flatMap(placement =>
+      positionOutcomes(placement, scope)
+    ))
       if ('error' in move)
         problems.push({
           code: 'variable-value',
@@ -217,19 +238,18 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
 }
 
 function withPlacementExpressions(part: CadPart, edit: (expression: string) => string): CadPart {
-  const expressions = part.placement?.positionExpressions;
-  if (!expressions) return part;
-  return {
-    ...part,
-    placement: {
-      ...part.placement!,
-      positionExpressions: expressions.map(expression => (expression ? edit(expression) : expression)) as [
-        string | null,
-        string | null,
-        string | null,
-      ],
-    },
-  };
+  return mapPlacements(part, placement =>
+    placement?.positionExpressions
+      ? {
+          ...placement,
+          positionExpressions: placement.positionExpressions.map(expression => (expression ? edit(expression) : expression)) as [
+            string | null,
+            string | null,
+            string | null,
+          ],
+        }
+      : placement
+  );
 }
 
 /** Every expression in the document, rewritten by `edit`. */

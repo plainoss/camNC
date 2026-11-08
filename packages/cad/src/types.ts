@@ -246,6 +246,8 @@ export interface CadPart {
   sketch: CadSketch;
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
   placement?: CadPlacement;
+  /** More of the same part elsewhere in the assembly, each edited along with it. */
+  copies?: CadPartCopy[];
   /** Ordered: a sketch can sit on the floor of an earlier cut. Parts without features are plain flat profiles. */
   features?: CadFeature[];
 }
@@ -258,6 +260,15 @@ export interface CadPlacement {
   rotation: [number, number, number, number];
   /** Each position as typed, kept when it uses design variables so the part follows them, as dimensions do. */
   positionExpressions?: [string | null, string | null, string | null];
+}
+/**
+ * Another of the same part. A mirrored copy is its mirror image across the sketch's y axis, as a left side is of a right
+ * one: it's cut as a part of its own, since turning the part over doesn't make it.
+ */
+export interface CadPartCopy {
+  id: string;
+  placement?: CadPlacement;
+  mirrored?: boolean;
 }
 /** The face a sketch is drawn on. All sketches share the part's x and y, seen from above, whichever face they're on. */
 export type CadFaceRef = 'top' | 'underside' | { floorOf: string };

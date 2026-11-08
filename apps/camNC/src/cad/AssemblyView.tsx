@@ -11,7 +11,7 @@ import {
 } from '@wbcnc/cad';
 import { useMemo, useRef, useState } from 'react';
 import { ModelViewport, type ModelFacePick, type ModelView } from '@/cam/model/ModelViewport';
-import { assemblyModel } from './assemblyModel';
+import { assemblyModel, instanceKey, type AssemblyInstance } from './assemblyModel';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 
 const kViews: { view: ModelView; label: string }[] = [
@@ -85,19 +85,24 @@ function PositionField({
 
 /**
  * Every part of the design together. "Put against" moves a part so a face of it sits flat on a face of another part:
- * click the face to move, then the face it goes against.
+ * click the face to move, then the face it goes against. A part can have copies, each placed on its own.
  */
 export default function AssemblyView({
   document,
   selectedId,
   onSelect,
   onPlace,
+  onAddCopy,
+  onRemoveCopy,
 }: {
   document: CadDocument;
   selectedId: string | null;
   onSelect: (partId: string) => void;
-  /** New placements as one edit; none for a part lays it out with the unplaced parts again. */
+  /** New placements as one edit; none for a piece lays it out with the unplaced pieces again. */
   onPlace: (changes: CadPlacementChange[]) => void;
+  /** Adds a copy of a part and returns its ID. */
+  onAddCopy?: (partId: string, mirrored: boolean) => string;
+  onRemoveCopy?: (partId: string, copyId: string) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const model = useMemo(() => assemblyModel(document), [document]);
@@ -106,17 +111,32 @@ export default function AssemblyView({
   // Placing: first the face to move, then the face it goes against.
   const [placing, setPlacing] = useState<{ moving?: ModelFacePick } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // The face a part was last put against, so it can be turned about it in quarter turns.
+  // The face a piece was last put against, so it can be turned about it in quarter turns.
   const [against, setAgainst] = useState<(ModelFacePick & { moved: string }) | null>(null);
+  // Which copy of the selected part is selected, if not the part itself.
+  const [copyId, setCopyId] = useState<string | null>(null);
   const canPlace = model.meshes.length >= 2 && view !== 'flat';
-  const selected = document.parts.find(part => part.id === selectedId);
-  const selectedPlacement = selected && model.placements.get(selected.id);
+  const part = document.parts.find(candidate => candidate.id === selectedId);
+  const copy = part?.copies?.find(candidate => candidate.id === copyId);
+  const selected = part && (model.instances.find(instance => instance.partId === part.id && instance.copyId === copy?.id) ?? null);
+  const selectedKey = selected ? instanceKey(selected) : null;
+  const selectedPlacement = selectedKey ? model.placements.get(selectedKey) : undefined;
   const variables = useMemo(() => cadVariableScope(document), [document]);
-  /** A quarter turn about an assembly axis through the part's origin, so a position typed for it still holds. */
+  const change = (placement: CadPlacement | undefined): CadPlacementChange => ({
+    partId: selected!.partId,
+    ...(selected!.copyId && { copyId: selected!.copyId }),
+    placement,
+  });
+  const select = (index: number) => {
+    const instance = model.instances[index]!;
+    onSelect(instance.partId);
+    setCopyId(instance.copyId ?? null);
+  };
+  /** A quarter turn about an assembly axis through the piece's origin, so a position typed for it still holds. */
   const turnSelected = (axis: [number, number, number]) => {
     const turned = turnAbout(selectedPlacement, selectedPlacement!.position, axis, 90);
     setAgainst(null);
-    onPlace([{ partId: selected!.id, placement: { ...selectedPlacement!, rotation: turned.rotation } }]);
+    onPlace([change({ ...selectedPlacement!, rotation: turned.rotation })]);
   };
   const stop = () => {
     setPlacing(null);
@@ -124,22 +144,26 @@ export default function AssemblyView({
   };
   const pickFace = (pick: ModelFacePick) => {
     if (!placing?.moving) {
-      onSelect(pick.partId);
+      select(pick.index);
       setPlacing({ moving: pick });
       setNotice(null);
       return;
     }
-    if (pick.partId === placing.moving.partId) {
+    const moving = model.instances[placing.moving.index]!,
+      target = model.instances[pick.index]!;
+    if (instanceKey(target) === instanceKey(moving)) {
       setNotice('That’s the same part. Click a face on another part.');
       return;
     }
-    const target = document.parts.find(part => part.id === pick.partId);
+    const targetSource = document.parts.find(candidate => candidate.id === target.partId);
+    const targetPlaced = target.copyId ? targetSource?.copies?.find(c => c.id === target.copyId)?.placement : targetSource?.placement;
+    const key = (instance: AssemblyInstance) => ({ partId: instance.partId, ...(instance.copyId && { copyId: instance.copyId }) });
     onPlace([
-      { partId: placing.moving.partId, placement: placeAgainst(model.placements.get(placing.moving.partId), placing.moving, pick) },
-      // A part laid out in the row stays where it was shown, rather than shuffling along as the row changes.
-      ...(target && !target.placement ? [{ partId: target.id, placement: model.placements.get(target.id) }] : []),
+      { ...key(moving), placement: placeAgainst(model.placements.get(instanceKey(moving)), placing.moving, pick) },
+      // A piece laid out in the row stays where it was shown, rather than shuffling along as the row changes.
+      ...(targetPlaced ? [] : [{ ...key(target), placement: model.placements.get(instanceKey(target)) }]),
     ]);
-    setAgainst({ ...pick, moved: placing.moving.partId });
+    setAgainst({ ...pick, moved: instanceKey(moving) });
     stop();
   };
   const status =
@@ -155,6 +179,10 @@ export default function AssemblyView({
           : view === 'flat'
             ? 'Each part turned so its machined side faces up, the way it lies on the board.'
             : 'Click a part to select it. Drag to orbit.');
+  const selectedIndexes = model.instances.flatMap((instance, index) =>
+    instanceKey(instance) === selectedKey || index === placing?.moving?.index ? [index] : []
+  );
+  const placed = copy ? copy.placement : part?.placement;
   return (
     <div
       ref={frame}
@@ -197,15 +225,11 @@ export default function AssemblyView({
           }}>
           Put against…
         </button>
-        {against && against.moved === selectedId && !placing && (
+        {against && against.moved === selectedKey && !placing && (
           <button
             type="button"
             title="Turn the part a quarter turn on the face it was put against"
-            onClick={() =>
-              onPlace([
-                { partId: against.moved, placement: turnAbout(model.placements.get(against.moved), against.point, against.normal, 90) },
-              ])
-            }>
+            onClick={() => onPlace([change(turnAbout(selectedPlacement, against.point, against.normal, 90))])}>
             Turn 90°
           </button>
         )}
@@ -213,11 +237,11 @@ export default function AssemblyView({
           <div className="cad-assembly-positions" role="group" aria-label={`Position of ${selected.name}`}>
             {([0, 1, 2] as const).map(axis => (
               <PositionField
-                key={`${selected.id}:${axis}:${selectedPlacement.positionExpressions?.[axis] ?? selectedPlacement.position[axis]}`}
+                key={`${selectedKey}:${axis}:${selectedPlacement.positionExpressions?.[axis] ?? selectedPlacement.position[axis]}`}
                 axis={axis}
                 placement={selectedPlacement}
                 variables={variables}
-                onPlace={placement => onPlace([{ partId: selected.id, placement }])}
+                onPlace={placement => onPlace([change(placement)])}
                 onError={setNotice}
               />
             ))}
@@ -236,15 +260,41 @@ export default function AssemblyView({
             ))}
           </div>
         )}
-        {selected?.placement && !placing && (
+        {placed && !placing && (
           <button
             type="button"
             onClick={() => {
               setAgainst(null);
-              onPlace([{ partId: selected.id, placement: undefined }]);
+              onPlace([change(undefined)]);
             }}>
             Lay out again
           </button>
+        )}
+        {part && !placing && onAddCopy && (
+          <div role="group" aria-label={`Copies of ${part.name}`}>
+            <button
+              type="button"
+              title="Another of this part, cut and edited along with it"
+              onClick={() => setCopyId(onAddCopy(part.id, false))}>
+              Add copy
+            </button>
+            <button
+              type="button"
+              title="This part’s mirror image, as a left side is of a right one. It’s cut as a part of its own."
+              onClick={() => setCopyId(onAddCopy(part.id, true))}>
+              Add mirrored copy
+            </button>
+            {copy && onRemoveCopy && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCopyId(null);
+                  onRemoveCopy(part.id, copy.id);
+                }}>
+                Remove copy
+              </button>
+            )}
+          </div>
         )}
       </div>
       <ModelViewport
@@ -252,11 +302,11 @@ export default function AssemblyView({
         parts={model.parts}
         view={view}
         selectedId={selectedId}
-        highlightIds={placing?.moving ? [placing.moving.partId] : []}
+        selectedIndexes={selectedIndexes}
         warnIds={clashes.flatMap(clash => clash.partIds)}
         milled={always}
-        onSelect={partId => {
-          onSelect(partId);
+        onSelect={(_, index) => {
+          select(index);
           frame.current?.focus();
         }}
         onPickFace={placing ? pickFace : undefined}

@@ -2,11 +2,13 @@ import {
   addCircle,
   addFaceSketch,
   addLine,
+  addPartCopy,
   addRectangle,
   cadSketchRegions,
   createCadDocument,
   createCadPart,
   createPlateDocument,
+  mirroredPartId,
   pointInPolygon,
   polygonArea,
   setCutDepth,
@@ -35,6 +37,24 @@ describe('native CAD to CAM', () => {
     expect(features.pockets).toEqual([]);
     expect(features.throughHoles).toHaveLength(1);
     expect(features.levels).toHaveLength(1);
+  });
+
+  it('cuts a part once more for each copy, and its mirror image as a part of its own', async () => {
+    let document = createPlateDocument({ width: 100, height: 60, thickness: 12 });
+    const part = document.parts[0];
+    part.name = 'Side';
+    part.sketch = addCircle(part.sketch, { x: 20, y: 30, radius: 6 });
+    document = addPartCopy(document, part.id).document;
+    document = addPartCopy(document, part.id, { mirrored: true }).document;
+    const { model } = await nativeCadModel(document);
+    expect(model.parts.map(p => [p.id, p.name, p.names])).toEqual([
+      [part.id, 'Side', ['Side', 'Side 2']],
+      [mirroredPartId(part.id), 'Side (mirrored)', ['Side 3']],
+    ]);
+    // The hole near the left end of the side is near the right end of its mirror image.
+    const holeX = (index: number) => Math.min(...model.parts[index].shape.holes[0].map(p => p[0]));
+    expect(holeX(0)).toBeCloseTo(14, 6);
+    expect(holeX(1)).toBeCloseTo(74, 6);
   });
 
   it('generates a complete cutting program in the existing CAM worker without model-file bytes', async () => {

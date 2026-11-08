@@ -11,6 +11,7 @@ import type {
   CadDocument,
   CadEntity,
   CadPart,
+  CadPlacement,
   CadPoint,
   CadPointEntity,
   CadSketch,
@@ -670,6 +671,20 @@ export function parseCadDocument(input: unknown): CadDocument {
       names.add(variable.name);
     }
   }
+  const checkPlacement = (placement: CadPlacement) => {
+    const { position, rotation, positionExpressions } = placement ?? ({} as CadPlacement);
+    if (!Array.isArray(position) || position.length !== 3 || !Array.isArray(rotation) || rotation.length !== 4)
+      throw new Error('Invalid CAD placement');
+    [...position, ...rotation].forEach(number);
+    if (Math.abs(Math.hypot(...rotation) - 1) > 1e-6) throw new Error('Invalid CAD placement');
+    if (
+      positionExpressions !== undefined &&
+      (!Array.isArray(positionExpressions) ||
+        positionExpressions.length !== 3 ||
+        positionExpressions.some(e => e !== null && typeof e !== 'string'))
+    )
+      throw new Error('Invalid CAD placement');
+  };
   for (const p of d.parts) {
     if (!p || typeof p !== 'object' || !p.sketch || typeof p.sketch !== 'object') throw new Error('Invalid CAD part');
     addId(p.id);
@@ -682,16 +697,16 @@ export function parseCadDocument(input: unknown): CadDocument {
       throw new Error('Invalid CAD part');
     number(p.thickness);
     if (p.thicknessExpression !== undefined && typeof p.thicknessExpression !== 'string') throw new Error('Invalid CAD part');
-    if (p.placement !== undefined) {
-      const { position, rotation } = p.placement ?? {};
-      if (!Array.isArray(position) || position.length !== 3 || !Array.isArray(rotation) || rotation.length !== 4)
-        throw new Error('Invalid CAD placement');
-      [...position, ...rotation].forEach(number);
-      if (Math.abs(Math.hypot(...rotation) - 1) > 1e-6) throw new Error('Invalid CAD placement');
-      const typed = p.placement.positionExpressions;
-      if (typed !== undefined && (!Array.isArray(typed) || typed.length !== 3 || typed.some(e => e !== null && typeof e !== 'string')))
-        throw new Error('Invalid CAD placement');
+    if (p.copies !== undefined) {
+      if (!Array.isArray(p.copies)) throw new Error('Invalid CAD part copies');
+      for (const copy of p.copies) {
+        if (!copy || typeof copy !== 'object') throw new Error('Invalid CAD part copy');
+        addId(copy.id);
+        if (copy.mirrored !== undefined && typeof copy.mirrored !== 'boolean') throw new Error('Invalid CAD part copy');
+        if (copy.placement !== undefined) checkPlacement(copy.placement);
+      }
     }
+    if (p.placement !== undefined) checkPlacement(p.placement);
     if (d.version === 1 && p.features !== undefined) throw new Error('Invalid CAD document');
     if (p.features !== undefined && !Array.isArray(p.features)) throw new Error('Invalid CAD features');
     const sketches = [p.sketch];

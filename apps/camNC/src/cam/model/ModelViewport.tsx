@@ -13,6 +13,8 @@ export type ModelView = 'assembled' | 'exploded' | 'flat';
 /** A face clicked on a part, in the model's own space: its nearest corner or its middle, and the way it faces. */
 export interface ModelFacePick {
   partId: string;
+  /** Which of the meshes was clicked, for a part shown more than once. */
+  index: number;
   point: [number, number, number];
   normal: [number, number, number];
 }
@@ -95,6 +97,7 @@ export function ModelViewport({
   selectedId,
   milled,
   highlightIds = [],
+  selectedIndexes,
   warnIds = [],
   onSelect,
   onPickFace,
@@ -107,9 +110,11 @@ export function ModelViewport({
   milled: (partId: string) => boolean;
   /** Parts drawn as picked, besides the selected one. */
   highlightIds?: string[];
+  /** Draws only these meshes as selected, rather than every mesh of the selected part. */
+  selectedIndexes?: number[];
   /** Parts drawn as wrong, such as ones sharing space with another. */
   warnIds?: string[];
-  onSelect: (partId: string) => void;
+  onSelect: (partId: string, index: number) => void;
   onPickFace?: (pick: ModelFacePick) => void;
   onMissed?: () => void;
 }) {
@@ -121,12 +126,12 @@ export function ModelViewport({
     [view, flat, exploded, assembled, meshes]
   );
   const box = useMemo(() => boundsOf(meshes, matrices), [meshes, matrices]);
-  const pick = (mesh: BodyMesh, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
-    if (!onPickFace || !e.face) return onSelect(mesh.partId);
+  const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
+    if (!onPickFace || !e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.
     const point = e.point.clone().applyMatrix4(matrix.clone().invert()),
       normal = e.face.normal.clone().normalize().toArray();
-    onPickFace({ partId: mesh.partId, point: snapToFace(mesh.positions, point.toArray(), normal), normal });
+    onPickFace({ partId: mesh.partId, index, point: snapToFace(mesh.positions, point.toArray(), normal), normal });
   };
   return (
     <Canvas camera={{ fov: 30 }} dpr={[1, 2]} onPointerMissed={() => onMissed?.()}>
@@ -141,7 +146,7 @@ export function ModelViewport({
             mesh={m}
             matrix={matrices[i]!}
             color={
-              m.partId === selectedId || highlightIds.includes(m.partId)
+              (selectedIndexes ? selectedIndexes.includes(i) : m.partId === selectedId) || highlightIds.includes(m.partId)
                 ? kSelected
                 : warnIds.includes(m.partId)
                   ? kClash
@@ -150,7 +155,7 @@ export function ModelViewport({
                     : kOff
             }
             opacity={milled(m.partId) ? 1 : 0.35}
-            onSelect={e => pick(m, matrices[i]!, e)}
+            onSelect={e => pick(m, i, matrices[i]!, e)}
           />
         ))}
       </group>
