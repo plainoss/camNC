@@ -3327,7 +3327,7 @@ export function CadEditor({
                 if (step.kind === 'sketch') {
                   setShowWorkspace(false);
                   setShow3D(false);
-                } else if (step.kind === 'cut') {
+                } else if (step.kind === 'cut' || step.kind === 'extrude') {
                   setShowWorkspace(false);
                   setShow3D(hasOutline(documentRef.current, step.partId));
                 } else if (step.kind === 'faceSketch' && onEditFaceSketch && step.sketchId) {
