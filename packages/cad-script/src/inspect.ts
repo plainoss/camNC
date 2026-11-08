@@ -14,6 +14,7 @@ import {
   type CadSketch,
   type EvaluatedCadPart,
   evaluateCadDocument,
+  cadCopyName,
 } from '@wbcnc/cad';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
@@ -299,6 +300,14 @@ export async function inspectCadDocument(
     const featureHandles = shortHandles((part.features ?? []).map(f => f.id));
     // A pattern copy's cut is its original's, with the copy's place in the pattern after a ~.
     const cutHandle = (id: string) => {
+      // An opening another part cuts is named after that part, or the copy of it, with the piece's number after a #.
+      const byPart = /^cut-parts:[^:]+:([^:#]+)(?::([^#]+))?(#\d+)?$/.exec(id);
+      if (byPart) {
+        const [, toolId, copyId, piece = ''] = byPart;
+        const tool = solved.document.parts.find(candidate => candidate.id === toolId);
+        const index = copyId === undefined ? -1 : (tool?.copies ?? []).findIndex(copy => copy.id === copyId);
+        return `${tool ? (index >= 0 ? cadCopyName(tool, index) : tool.name) : 'a part that is gone'}${piece}`;
+      }
       const [base, copy] = id.split('~');
       return `${featureHandles.get(base!) ?? base}${copy === undefined ? '' : `~${copy}`}`;
     };
