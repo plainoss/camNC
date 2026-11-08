@@ -705,9 +705,8 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         ...(typeof count === 'string' && { countExpression: count }),
         ...(typeof spacing === 'string' && { spacingExpression: spacing }),
       });
-      return partOf(partId)
-        .copies!.filter(copy => copy.pattern)
-        .map(copy => copyHandle(partId, copy.id));
+      // A pattern of one makes no copies, and the part may have none.
+      return (partOf(partId).copies ?? []).filter(copy => copy.pattern).map(copy => copyHandle(partId, copy.id));
     },
   });
 

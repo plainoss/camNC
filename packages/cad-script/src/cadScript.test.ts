@@ -417,6 +417,18 @@ describe('part studio', () => {
     expect(openings.map(cut => [cut.target, cut.tool])).toEqual([['Leg', 'Rail 4']]);
   });
 
+  it('returns no copies from a pattern of one', async () => {
+    let copies: readonly unknown[] = [0];
+    const { ok } = await editCad(null, d => {
+      const slat = d.part('Slat', { thickness: 12 });
+      slat.profile.rect({ at: [0, 0], w: 40, h: 600 });
+      slat.drawOn('top');
+      copies = slat.pattern({ axis: 'x', count: 1, spacing: '60mm' });
+    });
+    expect(ok).toBe(true);
+    expect(copies).toEqual([]);
+  });
+
   it('repeats a part in a row that follows a variable', async () => {
     const { report } = await editCad(null, d => {
       d.variable('slats', '5');
