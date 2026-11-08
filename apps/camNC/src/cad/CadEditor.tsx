@@ -78,6 +78,7 @@ import {
   withFeatureVersion,
   type CadPoint,
   cadVariableProblems,
+  drawnOnOutline,
   cadVariableScope,
 } from '@wbcnc/cad';
 import {
@@ -139,6 +140,8 @@ import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
 import { DesignStepsList } from './DesignStepsList';
+import { CadDrawnOnField } from './CadDrawnOnField';
+import { drawnOnName } from './drawnOnName';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
   createSketchContext,
@@ -1129,8 +1132,10 @@ export function CadEditor({
         })
       );
     const bounds = [...points.values()].filter(p => !included || included.has(p.id)).map(p => ({ x: p.x, y: p.y }));
-    // A face sketch is framed by the face, not just what's drawn on it so far.
+    // A face sketch is framed by the face, not just what's drawn on it so far, and so is a part drawn on a face.
     if (faceSketch && !entityIds) bounds.push(...faceSketch.outline);
+    const drawnOnFace = !faceSketch && !entityIds && part ? drawnOnOutline(documentRef.current, part) : null;
+    if (drawnOnFace) bounds.push(...drawnOnFace);
     for (const e of sketch.entities)
       if ((!entityIds || entityIds.includes(e.id)) && (e.type === 'circle' || e.type === 'arc')) {
         const p = points.get(e.centerId);
@@ -3225,6 +3230,8 @@ export function CadEditor({
   const canEditCanvasDimensions = !constraintMode && dimensionFlow.phase === 'idle' && (tool === 'select' || tool === 'dimension');
   const activeSketchStatus = sketchStatuses[part?.id ?? ''];
   const variableProblems = cadVariableProblems(doc);
+  // The face a part is drawn on, outlined on its drawing so it can be traced and lined up with.
+  const drawnOnFace = part ? drawnOnOutline(doc, part) : null;
   // A dimension that can't follow its variables shows like a conflicting one.
   const shownConflicts = [...conflictedConstraints, ...variableProblems.flatMap(problem => problem.constraintIds ?? [])];
   /** Why a part can't take its current values, for the mark beside it in the list. */
@@ -3417,6 +3424,16 @@ export function CadEditor({
                   )
                 }
               />
+              {part.drawnOn && (
+                <CadDrawnOnField
+                  key={`${part.id}:drawn-on`}
+                  document={doc}
+                  part={part as typeof part & { drawnOn: NonNullable<typeof part.drawnOn> }}
+                  variables={variableScope}
+                  onDone={() => svg.current?.focus()}
+                  onChange={drawnOn => commit(replacePart(documentRef.current, part.id, p => ({ ...p, drawnOn })))}
+                />
+              )}
               {variableProblems
                 .filter(problem => problem.partId === part.id)
                 .map((problem, index) => (
@@ -3591,6 +3608,26 @@ export function CadEditor({
                   setShowWorkspace(false);
                   setShow3D(hasOutline(documentRef.current, id));
                 }}
+                onNewPart={on => {
+                  // A design's board thickness, when it names one, is what a new part is made from.
+                  const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variableScope, name));
+                  const added = createCadPart(
+                    `Part ${documentRef.current.parts.length + 1}`,
+                    board ? variableScope[board]!.value : (part?.thickness ?? 18)
+                  );
+                  const drawn = { ...added, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
+                  commit({
+                    ...documentRef.current,
+                    revision: documentRef.current.revision + 1,
+                    parts: [...documentRef.current.parts, drawn],
+                  });
+                  setPartId(drawn.id);
+                  setSelected([]);
+                  setShowWorkspace(false);
+                  setShow3D(false);
+                  setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
+                  requestAnimationFrame(() => svg.current?.focus());
+                }}
               />
             </Suspense>
           )}
@@ -3668,6 +3705,14 @@ export function CadEditor({
                 data-face-outline
                 className="cad-face-outline"
                 d={faceSketch.outline.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                pointerEvents="none"
+              />
+            )}
+            {!faceSketch && drawnOnFace && (
+              <path
+                data-drawn-on-face
+                className="cad-face-outline"
+                d={drawnOnFace.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
                 pointerEvents="none"
               />
             )}

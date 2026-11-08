@@ -31,6 +31,7 @@ import { classifyNativeEntities } from './entityFreedom';
 import { refreshDimensionMeasurement } from './dimensions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
 import { applyCadVariables } from './variables';
+import { resolveDrawnPlacements } from './drawnOn';
 import { isFatalSolverError } from './solverFailure';
 import { invalidOffsetBranches, offsetNativePrimitives, offsetNativeSeed } from './offsetConstraint';
 import { entityPointIds } from './document';
@@ -1052,8 +1053,11 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
   if (options.sketchOnly) return { document: next, status: 'solved', diagnostics, parts: [], sketches };
   const evaluated = evaluateCadDocument(next);
   diagnostics.push(...evaluated.diagnostics);
+  // Parts drawn on others go where those parts now are.
+  const resolved = resolveDrawnPlacements(next, evaluated.parts);
+  diagnostics.push(...resolved.diagnostics);
   return {
-    document: next,
+    document: resolved.document,
     status: diagnostics.some(d => d.severity === 'error') ? 'invalid' : 'solved',
     diagnostics,
     parts: evaluated.parts,

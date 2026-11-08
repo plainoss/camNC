@@ -255,6 +255,8 @@ export interface CadPart {
   sketch: CadSketch;
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
   placement?: CadPlacement;
+  /** What the part was drawn on. When it's set, the placement follows from it, so the part moves with that face. */
+  drawnOn?: CadDrawnOn;
   /** More of the same part elsewhere in the assembly, each edited along with it. */
   copies?: CadPartCopy[];
   /** Ordered: a sketch can sit on the floor of an earlier cut. Parts without features are plain flat profiles. */
@@ -264,6 +266,15 @@ export interface CadPart {
  * A part's sketch x and y, with its thickness as z, turned by `rotation` (a unit quaternion x, y, z, w) and then moved by
  * `position`, in mm.
  */
+/** A part drawn on a base plane, or on a face of another part: its top, underside, or the edge face along an outline line. */
+export interface CadDrawnOn {
+  on: { plane: 'top' | 'front' | 'right' } | { partId: string; face: 'top' | 'underside' | { edge: string } };
+  /** How far from the plane or face the part starts, in mm along its normal. */
+  offset: number;
+  offsetExpression?: string;
+  /** Grows into the face rather than out from it. */
+  inward?: boolean;
+}
 export interface CadPlacement {
   position: [number, number, number];
   rotation: [number, number, number, number];

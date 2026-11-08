@@ -1,7 +1,7 @@
-import { assemblyReport, evaluateCadDocument, type CadDocument } from '@wbcnc/cad';
+import { assemblyReport, evaluateCadDocument, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { useMemo, useRef, useState } from 'react';
-import { ModelViewport, type ModelView } from '@/cam/model/ModelViewport';
-import { assemblyModel } from './assemblyModel';
+import { ModelViewport, type ModelFacePick, type ModelView } from '@/cam/model/ModelViewport';
+import { assemblyModel, instanceKey } from './assemblyModel';
 
 const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
@@ -9,6 +9,11 @@ const kViews: { view: ModelView; label: string }[] = [
   { view: 'flat', label: 'Laid flat' },
 ];
 const always = () => true;
+const kPlanes: { plane: 'top' | 'front' | 'right'; label: string }[] = [
+  { plane: 'top', label: 'Top plane' },
+  { plane: 'front', label: 'Front plane' },
+  { plane: 'right', label: 'Right plane' },
+];
 /** Two clicks this close together open a part, rather than selecting it twice. */
 const kDoubleClickMs = 400;
 
@@ -18,29 +23,60 @@ export default function WorkspaceView({
   selectedId,
   onSelect,
   onOpen,
+  onNewPart,
 }: {
   document: CadDocument;
   selectedId: string | null;
   onSelect: (partId: string) => void;
   onOpen: (partId: string) => void;
+  /** Starts a new part drawn on a base plane or a part's face. */
+  onNewPart?: (on: CadDrawnOn['on']) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const lastClick = useRef<{ partId: string; at: number } | null>(null);
   const model = useMemo(() => assemblyModel(document), [document]);
   const clashes = useMemo(() => assemblyReport(document, evaluateCadDocument(document).parts)?.collisions ?? [], [document]);
   const [view, setView] = useState<ModelView>('assembled');
+  // Choosing what a new part is drawn on: a plane, or a face clicked in the view.
+  const [choosing, setChoosing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const pickFace = (pick: ModelFacePick) => {
+    const instance = model.instances[pick.index]!;
+    if (instance.copyId) return setNotice('Draw on the part itself rather than a copy of it.');
+    const part = document.parts.find(candidate => candidate.id === instance.partId)!;
+    const face = partFaceAt(part, model.placements.get(instanceKey(instance))!, pick.point, pick.normal);
+    if (!face) return setNotice('Pick a flat face: a part’s top, its underside, or one of its straight edges.');
+    setChoosing(false);
+    setNotice(null);
+    onNewPart?.({ partId: part.id, face });
+  };
   const selectedIndexes = model.instances.flatMap((instance, index) => (instance.partId === selectedId ? [index] : []));
-  const status = clashes.length
-    ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
-    : model.problems.length
-      ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
-      : view === 'flat'
-        ? 'Each part turned so its machined side faces up, the way it lies on the board.'
-        : model.meshes.length
-          ? 'Click a part to select it, double-click to work on it. Drag to orbit.'
-          : 'Draw a part to start.';
+  const status = notice
+    ? notice
+    : choosing
+      ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
+      : clashes.length
+        ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
+        : model.problems.length
+          ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
+          : view === 'flat'
+            ? 'Each part turned so its machined side faces up, the way it lies on the board.'
+            : model.meshes.length
+              ? 'Click a part to select it, double-click to work on it. Drag to orbit.'
+              : 'Draw a part to start.';
   return (
-    <div ref={frame} className="cad-part-view cad-assembly-view" data-testid="workspace-3d" tabIndex={-1}>
+    <div
+      ref={frame}
+      className="cad-part-view cad-assembly-view"
+      data-testid="workspace-3d"
+      tabIndex={-1}
+      onKeyDown={event => {
+        if (event.key === 'Escape' && choosing) {
+          event.stopPropagation();
+          setChoosing(false);
+          setNotice(null);
+        }
+      }}>
       <div className="cad-part-view-tools cad-assembly-tools">
         <div role="group" aria-label="Workspace view">
           {kViews.map(option => (
@@ -49,7 +85,34 @@ export default function WorkspaceView({
             </button>
           ))}
         </div>
-        {selectedId && (
+        {onNewPart && (
+          <button
+            type="button"
+            aria-pressed={choosing}
+            onClick={() => {
+              setChoosing(!choosing);
+              setNotice(null);
+              frame.current?.focus();
+            }}>
+            New part
+          </button>
+        )}
+        {choosing && (
+          <div role="group" aria-label="Draw on a plane">
+            {kPlanes.map(option => (
+              <button
+                key={option.plane}
+                type="button"
+                onClick={() => {
+                  setChoosing(false);
+                  onNewPart?.({ plane: option.plane });
+                }}>
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {selectedId && !choosing && (
           <button type="button" onClick={() => onOpen(selectedId)}>
             Open {document.parts.find(part => part.id === selectedId)?.name ?? 'part'}
           </button>
@@ -63,6 +126,7 @@ export default function WorkspaceView({
         selectedIndexes={selectedIndexes}
         warnIds={clashes.flatMap(clash => clash.partIds)}
         milled={always}
+        onPickFace={choosing ? pickFace : undefined}
         onSelect={(_, index) => {
           const partId = model.instances[index]!.partId;
           const now = Date.now();

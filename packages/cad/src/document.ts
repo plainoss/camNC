@@ -707,6 +707,22 @@ export function parseCadDocument(input: unknown): CadDocument {
       }
     }
     if (p.placement !== undefined) checkPlacement(p.placement);
+    if (p.drawnOn !== undefined) {
+      const { on, offset, offsetExpression, inward } = p.drawnOn ?? ({} as NonNullable<CadPart['drawnOn']>);
+      const face = on && 'face' in on ? on.face : undefined;
+      if (
+        !on ||
+        typeof on !== 'object' ||
+        ('plane' in on
+          ? !['top', 'front', 'right'].includes(on.plane)
+          : typeof on.partId !== 'string' ||
+            !(face === 'top' || face === 'underside' || (typeof face === 'object' && face && typeof face.edge === 'string'))) ||
+        (offsetExpression !== undefined && typeof offsetExpression !== 'string') ||
+        (inward !== undefined && typeof inward !== 'boolean')
+      )
+        throw new Error('Invalid CAD part support');
+      number(offset);
+    }
     if (d.version === 1 && p.features !== undefined) throw new Error('Invalid CAD document');
     if (p.features !== undefined && !Array.isArray(p.features)) throw new Error('Invalid CAD features');
     const sketches = [p.sketch];
