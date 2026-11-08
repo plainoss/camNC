@@ -201,7 +201,7 @@ export async function createAdapter(page, url) {
   await page.getByRole('button', { name: /^New design/ }).click();
   const canvas = page.getByTestId('cad-canvas');
   // A new design opens in the Part Studio asking for the first sketch's plane: scenarios draw on the top plane.
-  await page.getByRole('button', { name: 'Top plane', exact: true }).click();
+  await page.getByRole('list', { name: 'Default geometry' }).getByRole('button', { name: 'Top', exact: true }).click();
   await canvas.waitFor();
   const studioToolbar = page.getByRole('toolbar', { name: 'Part Studio toolbar' });
   // Existing designs open in the Part Studio, and most steps work on the first part's sketch.
@@ -233,6 +233,14 @@ export async function createAdapter(page, url) {
     cursor = [x, y];
     return [x, y];
   };
+  const inputReady = (keyboard = false) => page.waitForFunction(keyboard => {
+    const editor = document.querySelector('.cad-editor');
+    const canvas = editor?.querySelector('[data-testid="cad-canvas"]');
+    const field = editor?.querySelector('#cad-edit-dimension');
+    return canvas && !canvas.closest('[inert]') && editor.getAttribute('aria-busy') !== 'true' &&
+      (!keyboard || !field || document.activeElement === field) &&
+      !/Checking/.test(editor.querySelector('.cad-status')?.textContent ?? '');
+  }, keyboard, { timeout: 30_000 });
   const settle = async () => {
     // Checking and saving can take more than 5 s on a loaded runner, including when reopening an accepted design.
     // Keep waiting on the editor's actual readiness rather than giving each scenario a pause or retry.
@@ -314,10 +322,22 @@ export async function createAdapter(page, url) {
     const args = rest.split(' ');
     switch (verb) {
       case 'key':
+        // Enter/Escape must reach the value field after dimension preparation, rather than be dropped by busy.
+        if (rest === 'Enter' || rest === 'Escape') await inputReady(true);
         await page.keyboard.press(rest);
         await page.waitForTimeout(40);
         return;
-      case 'type':
+      case 'type': {
+        if ((await canvas.getAttribute('class'))?.includes('cad-tool-dimension')) {
+          // Placing a dimension checks its rank in the worker before mounting/focusing the value field.
+          // Do not send its value (or the following Enter/Escapes) while that operation still owns input.
+          await page.waitForFunction(() => {
+            const field = document.querySelector('#cad-edit-dimension');
+            return field && document.activeElement === field && !field.closest('[inert]');
+          }, undefined, { timeout: 30_000 });
+          await page.keyboard.type(rest);
+          return;
+        }
         // A value field opens just after the click that asks for it, so typing straight away can lose the keys. Not every
         // step types into a field, so this only waits so long.
         await page
@@ -325,6 +345,7 @@ export async function createAdapter(page, url) {
           .catch(() => {});
         await page.keyboard.type(rest);
         return;
+      }
       case 'click':
         return click(point(rest));
       case 'rclick':
@@ -345,6 +366,9 @@ export async function createAdapter(page, url) {
         await page.waitForTimeout(80);
         return;
       case 'down':
+        // Dimension creation/checking runs in the solver worker. A coordinate lookup only waits for DOM attachment,
+        // so starting the drag straight after Enter/Escape can race that work on a loaded runner.
+        await inputReady();
         await moveTo(point(rest));
         await page.mouse.down();
         return;
@@ -436,7 +460,7 @@ export async function createAdapter(page, url) {
         const extrude = page.getByRole('dialog', { name: /^Extrude ·/ });
         if (await extrude.isVisible()) await extrude.getByRole('button', { name: 'OK', exact: true }).click();
         await studioToolbar.getByRole('button', { name: /Sketch/ }).click();
-        await page.getByRole('button', { name: 'Top plane', exact: true }).click();
+        await page.getByRole('list', { name: 'Default geometry' }).getByRole('button', { name: 'Top', exact: true }).click();
         await canvas.waitFor();
         await settle();
         return;
