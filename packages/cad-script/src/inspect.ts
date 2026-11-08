@@ -1,7 +1,9 @@
 import {
   cadFaceSketches,
+  assemblyReport,
   pointInPolygon,
   solveCadDocument,
+  type CadAssemblyReport,
   type CadDocument,
   type CadPart,
   type CadPoint,
@@ -15,7 +17,7 @@ export interface CadExpectation {
   size?: readonly [number, number];
   thickness?: number;
   holes?: number;
-  /** Pockets as CAM sees them. */
+  /** Cuts that stop short of going through, each counted on its own however CAM groups them. */
   pockets?: number;
   /** Every cut's floor, in mm below the top or underside, in feature order. */
   depths?: readonly number[];
@@ -73,6 +75,8 @@ export interface CadReport {
   errors: CadReportIssue[];
   warnings: CadReportIssue[];
   parts: CadReportPart[];
+  /** Present when any part is placed. */
+  assembly?: CadAssemblyReport;
 }
 
 const round = (value: number) => Math.round(value * 1000) / 1000;
@@ -175,8 +179,8 @@ function checkExpectation(want: CadExpectation, part: CadReportPart, freedom: nu
   if (want.thickness !== undefined && !close(part.thickness, want.thickness))
     failures.push(`thickness: wanted ${want.thickness}, got ${part.thickness}`);
   if (want.holes !== undefined && part.holes !== want.holes) failures.push(`holes: wanted ${want.holes}, got ${part.holes}`);
-  if (want.pockets !== undefined && part.cam?.pockets !== want.pockets)
-    failures.push(`pockets: wanted ${want.pockets}, got ${part.cam?.pockets}`);
+  const pockets = part.cuts.filter(cut => !cut.through).length;
+  if (want.pockets !== undefined && pockets !== want.pockets) failures.push(`pockets: wanted ${want.pockets}, got ${pockets}`);
   if (want.freedom !== undefined && freedom !== want.freedom) failures.push(`freedom: wanted ${want.freedom}, got ${freedom}`);
   if (want.depths) {
     const got = part.cuts.map(cut => cut.to);
@@ -271,6 +275,9 @@ export async function inspectCadDocument(
           });
         else if (options.toolpaths !== false) {
           toolpaths = toolpathSummary(evaluated, profile);
+          // CAM leaves out what no tool fits, so the part wouldn't come out as drawn.
+          const dropped = toolpaths.warnings.find(warning => warning.includes('no tool fits'));
+          if (dropped) warnings.push({ code: 'toolpath-missing', message: `A cut wouldn't be machined: ${dropped}`, part: part.name });
           if (toolpaths.blocked.length)
             warnings.push({
               code: 'toolpath-blocked',
@@ -297,9 +304,22 @@ export async function inspectCadDocument(
         errors.push({ code: 'expect-failed', message: failure, part: part.name });
     return report;
   });
+  const assembly = assemblyReport(solved.document, solved.parts);
+  for (const collision of assembly?.collisions ?? [])
+    errors.push({
+      code: 'parts-collide',
+      message: `${collision.parts[0]} and ${collision.parts[1]} both need the material in ${collision.size.join(' × ')} mm at ${collision.at.join(', ')}.`,
+    });
   return {
     document: solved.document,
     parts: solved.parts,
-    report: { ok: solved.status === 'solved' && !errors.length, status: solved.status, errors, warnings, parts },
+    report: {
+      ok: solved.status === 'solved' && !errors.length,
+      status: solved.status,
+      errors,
+      warnings,
+      parts,
+      ...(assembly && { assembly }),
+    },
   };
 }

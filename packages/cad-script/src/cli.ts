@@ -41,9 +41,24 @@ if (options.file) {
   else {
     const script = (await import(/* @vite-ignore */ pathToFileURL(options.file).href)).default as CadScript;
     if (typeof script !== 'function') throw new Error('A design file must export default design(d => { ... }).');
-    const result = await editCad(start, script, { name: path.basename(options.file).replace(/\.cad\.ts$|\.ts$/, '') });
-    const scriptError = result.scriptError && { scriptError: result.scriptError };
-    await finish(result.ok, { ...scriptError, ...result.report, ok: result.ok }, result.document, renderCadSvg(result.parts));
+    const result = await editCad(start, script, { name: path.basename(options.file).replace(/\.cad\.ts$|\.ts$/, '') }).catch(
+      (error: unknown) => {
+        // A bug in the script, not a refusal by the API: the caller still reads JSON, with the line it happened on.
+        const where =
+          error instanceof Error
+            ? error.stack
+                ?.split('\n')
+                .find(line => line.includes(options.file!))
+                ?.trim()
+            : undefined;
+        return { thrown: `${error instanceof Error ? error.message : String(error)}${where ? ` (${where})` : ''}` };
+      }
+    );
+    if ('thrown' in result) await finish(false, { ok: false, scriptError: `The script threw: ${result.thrown}` });
+    else {
+      const scriptError = result.scriptError && { scriptError: result.scriptError };
+      await finish(result.ok, { ...scriptError, ...result.report, ok: result.ok }, result.document, renderCadSvg(result.parts));
+    }
   }
 } else {
   const { document, report, parts } = await inspectCadDocument(start!);

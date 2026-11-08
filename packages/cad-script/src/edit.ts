@@ -7,19 +7,23 @@ import {
   addLine,
   addRectangle,
   cadFaceSketches,
+  cadVariableScope,
   cadSketchRegions,
   createCadDocument,
   createCadPart,
   filletLineCorners,
+  linearPatternSketchEntities,
   newCadId,
+  parseCadValue,
   pointInPolygon,
   polygonArea,
   removeCadFeature,
+  setCadVariable,
   setCutDepth,
-  type CadCutDepth,
   type CadDocument,
   type CadFaceRef,
   type CadPart,
+  type CadPlacement,
   type CadPointEntity,
   type CadSketch,
   type EvaluatedCadPart,
@@ -28,6 +32,11 @@ import {
 import { inspectCadDocument, type CadExpectation, type CadReport } from './inspect';
 
 export type Xy = readonly [number, number];
+/** mm, or an expression such as `'width - 2*board'` that keeps following the design's variables. */
+export type Len = number | string;
+export type LenXy = readonly [Len, Len];
+/** A direction in the assembly: X runs left to right, Y front to back, Z up. */
+export type CadAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
 /** Anything in a sketch: returned when it's made, or looked up with `find` from a handle in the report. */
 export interface CadRef {
   id: string;
@@ -44,12 +53,12 @@ export type CadFacePick = 'top' | 'underside' | { floorOf: CadCutRef };
 export interface SketchEdit {
   readonly id: string;
   /** Dimensioned and placed, so it's fully constrained. `at` is the lower-left corner; use `center` for the middle. */
-  rect(options: { w: number; h: number; at?: Xy; center?: Xy }): {
+  rect(options: { w: Len; h: Len; at?: LenXy; center?: LenXy }): {
     edges: { bottom: CadRef; right: CadRef; top: CadRef; left: CadRef };
     corners: CadRef[];
   };
   /** Dimensioned and placed, so it's fully constrained. */
-  circle(options: { at: Xy; d: number }): CadRef & { center: CadRef };
+  circle(options: { at: LenXy; d: Len }): CadRef & { center: CadRef };
   /** A closed loop through these points, each placed so the loop is fully constrained. Corners can then be filleted. */
   polygon(points: readonly Xy[]): { edges: CadRef[]; corners: CadRef[] };
   /** A single segment with no dimensions, which leaves it free to be constrained. */
@@ -60,9 +69,14 @@ export interface SketchEdit {
   fillet(corners: readonly CadRef[], r: number): CadRef[];
   /** A geometric relation between curves or points, under the same rules as the sketch editor's tools. */
   relate(relation: ConstraintCommandTool, ...items: CadRef[]): void;
-  distance(a: CadRef, b: CadRef, value: number, axis?: 'x' | 'y'): void;
-  radius(curve: CadRef, value: number): void;
-  place(point: CadRef, at: Xy): void;
+  distance(a: CadRef, b: CadRef, value: Len, axis?: 'x' | 'y'): void;
+  radius(curve: CadRef, value: Len): void;
+  place(point: CadRef, at: LenXy): void;
+  /**
+   * Copies of these curves in a row, and in rows when `rows` is given, linked so they keep the first one's shape. Pick the
+   * copies' regions with `regionAt`. The count and step don't follow variables yet.
+   */
+  pattern(items: readonly CadRef[], options: { count: number; step: Xy; rows?: { count: number; step: Xy } }): void;
   /** Looks up a handle from the report. */
   find(handle: string): CadRef;
   /** The innermost region at a point, as a click picks it. Resolved now to a stable ID, so solving can't move the pick. */
@@ -73,18 +87,28 @@ export interface PartEdit {
   readonly name: string;
   /** The outline sketch. Its outer loop is the part's shape, and inner loops are through-holes unless given a depth. */
   readonly profile: SketchEdit;
-  thickness(mm: number): void;
+  thickness(mm: Len): void;
   sketchOn(face: CadFacePick): SketchEdit;
   /** An existing face sketch, by its handle in the report. */
   sketch(handle: string): SketchEdit;
-  cut(region: CadRegionRef, options: { depth: CadCutDepth }): CadCutRef;
+  /** `depth` is mm, an expression that follows the variables, or `'through'`. */
+  cut(region: CadRegionRef, options: { depth: Len | 'through' }): CadCutRef;
   remove(feature: CadCutRef): void;
   /** What this part should measure when finished. A valid design isn't necessarily the one you meant. */
   expect(expectation: CadExpectation): void;
+  /**
+   * Where the part sits in the assembly: `at` is where its sketch origin goes, and `x` and `y` say which way its sketch
+   * axes point there. Its thickness points along x × y. A position given as an expression follows the variables.
+   */
+  place(options: { at: readonly [Len, Len, Len]; x?: CadAxis; y?: CadAxis }): void;
 }
 export interface DesignEdit {
   /** Finds a part by name, or adds it. New parts are 18 mm thick unless `thickness` says otherwise. */
-  part(name: string, options?: { thickness?: number }): PartEdit;
+  part(name: string, options?: { thickness?: Len }): PartEdit;
+  /** Adds a variable, or changes the one with this name, and returns its name. Later values can use it in expressions. */
+  variable(name: string, expression: string): string;
+  /** An expression's value now, in mm, for what can't follow variables yet, such as pattern counts. */
+  value(expression: Len): number;
 }
 export type CadScript = (design: DesignEdit) => void;
 
@@ -104,8 +128,47 @@ function resolveHandle(ids: readonly string[], handle: string, what: string): st
   );
 }
 
+const axes: Record<CadAxis, [number, number, number]> = {
+  '+x': [1, 0, 0],
+  '-x': [-1, 0, 0],
+  '+y': [0, 1, 0],
+  '-y': [0, -1, 0],
+  '+z': [0, 0, 1],
+  '-z': [0, 0, -1],
+};
+
+/** The turn that takes the part's x, y and z to these directions, as a unit quaternion x, y, z, w. */
+function rotationTo(ex: readonly number[], ey: readonly number[]): CadPlacement['rotation'] {
+  const ez = [ex[1]! * ey[2]! - ex[2]! * ey[1]!, ex[2]! * ey[0]! - ex[0]! * ey[2]!, ex[0]! * ey[1]! - ex[1]! * ey[0]!];
+  const [m00, m10, m20] = ex as [number, number, number],
+    [m01, m11, m21] = ey as [number, number, number],
+    [m02, m12, m22] = ez as [number, number, number];
+  const trace = m00 + m11 + m22;
+  if (trace > 0) {
+    const s = 0.5 / Math.sqrt(trace + 1);
+    return [(m21 - m12) * s, (m02 - m20) * s, (m10 - m01) * s, 0.25 / s];
+  }
+  if (m00 > m11 && m00 > m22) {
+    const s = 2 * Math.sqrt(1 + m00 - m11 - m22);
+    return [0.25 * s, (m01 + m10) / s, (m02 + m20) / s, (m21 - m12) / s];
+  }
+  if (m11 > m22) {
+    const s = 2 * Math.sqrt(1 + m11 - m00 - m22);
+    return [(m01 + m10) / s, 0.25 * s, (m12 + m21) / s, (m02 - m20) / s];
+  }
+  const s = 2 * Math.sqrt(1 + m22 - m00 - m11);
+  return [(m02 + m20) / s, (m12 + m21) / s, 0.25 * s, (m10 - m01) / s];
+}
+
 function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpectation[]>) {
   let document = start;
+  const measure = (value: Len, what: string): number => {
+    if (typeof value === 'number') return value;
+    const result = parseCadValue(value, { unit: 'mm', variables: cadVariableScope(document) });
+    return 'error' in result ? fail(`${what} "${value}": ${result.error}`) : result.value;
+  };
+  const expressionOf = (value: Len) => (typeof value === 'string' ? { expression: value } : {});
+  const minusHalf = (a: Len, b: Len): Len => (typeof a === 'number' && typeof b === 'number' ? a - b / 2 : `(${a}) - (${b})/2`);
   const replacePart = (partId: string, edit: (part: CadPart) => CadPart) => {
     document = { ...document, parts: document.parts.map(part => (part.id === partId ? edit(part) : part)) };
   };
@@ -131,30 +194,48 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       return current().entities.filter(e => !before.has(e.id));
     };
     const constrain = (constraint: NewCadConstraint) => apply(sketch => addConstraint(sketch, constraint));
+    /** Runs a drawing helper, then gives the dimensions it added, by type, the expressions their values came from. */
+    const dimensioned = (edit: (sketch: CadSketch) => CadSketch, values: Partial<Record<string, Len>>) => {
+      const before = new Set(current().constraints.map(c => c.id));
+      const made = added(edit);
+      apply(sketch => ({
+        ...sketch,
+        constraints: sketch.constraints.map(c => (before.has(c.id) ? c : { ...c, ...expressionOf(values[c.type] ?? 0) })),
+      }));
+      return made;
+    };
     const pointNear = ([x, y]: Xy) =>
       current().entities.find((e): e is CadPointEntity => e.type === 'point' && Math.hypot(e.x - x, e.y - y) < 1e-7)!;
     const isPlaced = (pointId: string) =>
       current().constraints.some(c => (c.type === 'positionX' || c.type === 'positionY') && c.pointId === pointId);
-    const place = (point: CadRef, [x, y]: Xy) => {
-      constrain({ type: 'positionX', pointId: point.id, value: x, label: 'X' });
-      constrain({ type: 'positionY', pointId: point.id, value: y, label: 'Y' });
+    const place = (point: CadRef, [x, y]: LenXy) => {
+      constrain({ type: 'positionX', pointId: point.id, value: measure(x, 'X'), label: 'X', ...expressionOf(x) });
+      constrain({ type: 'positionY', pointId: point.id, value: measure(y, 'Y'), label: 'Y', ...expressionOf(y) });
     };
     return {
       id: sketchId,
       rect({ w, h, at, center }) {
-        if (!(w > 0 && h > 0)) fail(`A rectangle needs a positive size, not ${w} × ${h}.`);
+        const width = measure(w, 'Width'),
+          height = measure(h, 'Height');
+        if (!(width > 0 && height > 0)) fail(`A rectangle needs a positive size, not ${width} × ${height}.`);
         if (!at === !center) fail('A rectangle needs exactly one of at or center.');
-        const [x, y] = at ?? [center![0] - w / 2, center![1] - h / 2];
-        const made = added(sketch => addRectangle(sketch, { x, y, width: w, height: h, dimensioned: true, positioned: true }));
+        const [ax, ay] = at ?? [minusHalf(center![0], w), minusHalf(center![1], h)];
+        const made = dimensioned(
+          sketch => addRectangle(sketch, { x: measure(ax, 'X'), y: measure(ay, 'Y'), width, height, dimensioned: true, positioned: true }),
+          { distanceX: w, distanceY: h, positionX: ax, positionY: ay }
+        );
         const [bottom, right, top, left] = made.filter(e => e.type === 'line');
         const startOf = (edge: (typeof made)[number]) => ({ id: (edge as { startId: string }).startId });
         return { edges: { bottom: bottom!, right: right!, top: top!, left: left! }, corners: [bottom!, right!, top!, left!].map(startOf) };
       },
       circle({ at: [x, y], d }) {
-        if (!(d > 0)) fail(`A circle needs a positive diameter, not ${d}.`);
-        const circle = added(sketch => addCircle(sketch, { x, y, radius: d / 2, dimensioned: true, positioned: true })).find(
-          e => e.type === 'circle'
-        )!;
+        const diameter = measure(d, 'Diameter');
+        if (!(diameter > 0)) fail(`A circle needs a positive diameter, not ${diameter}.`);
+        const circle = dimensioned(
+          sketch =>
+            addCircle(sketch, { x: measure(x, 'X'), y: measure(y, 'Y'), radius: diameter / 2, dimensioned: true, positioned: true }),
+          { diameter: d, positionX: x, positionY: y }
+        ).find(e => e.type === 'circle')!;
         return { id: circle.id, center: { id: circle.centerId } };
       },
       polygon(points) {
@@ -202,12 +283,22 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       },
       distance(a, b, value, axis) {
         const type = axis === 'x' ? 'distanceX' : axis === 'y' ? 'distanceY' : 'distance';
-        constrain({ type, pointAId: a.id, pointBId: b.id, value });
+        constrain({ type, pointAId: a.id, pointBId: b.id, value: measure(value, 'Distance'), ...expressionOf(value) });
       },
       radius(curve, value) {
-        constrain({ type: 'radius', entityId: curve.id, value });
+        constrain({ type: 'radius', entityId: curve.id, value: measure(value, 'Radius'), ...expressionOf(value) });
       },
       place,
+      pattern(items, { count, step, rows }) {
+        const result = linearPatternSketchEntities(current(), {
+          entityIds: items.map(item => item.id),
+          countX: count,
+          stepX: { x: step[0], y: step[1] },
+          ...(rows && { countY: rows.count, stepY: { x: rows.step[0], y: rows.step[1] } }),
+        });
+        if (!result.ok) return fail(result.message);
+        apply(() => result.sketch);
+      },
       find: handle => ({
         id: resolveHandle(
           current().entities.map(e => e.id),
@@ -235,8 +326,13 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     name: partOf(partId).name,
     profile: sketchEdit(partId, partOf(partId).sketch.id),
     thickness(mm) {
-      if (!(mm > 0)) fail(`A part needs a positive thickness, not ${mm}.`);
-      replacePart(partId, part => ({ ...part, thickness: mm }));
+      const value = measure(mm, 'Thickness');
+      if (!(value > 0)) fail(`A part needs a positive thickness, not ${value}.`);
+      replacePart(partId, ({ thicknessExpression: _, ...part }) => ({
+        ...part,
+        thickness: value,
+        ...(typeof mm === 'string' && { thicknessExpression: mm }),
+      }));
     },
     sketchOn(face) {
       const on: CadFaceRef = typeof face === 'object' ? { floorOf: face.floorOf.id } : face;
@@ -249,7 +345,15 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       return sketchEdit(partId, resolveHandle(ids, handle, 'face sketch'));
     },
     cut({ sketchId, regionId }, { depth }) {
-      document = setCutDepth(document, partId, sketchId, regionId, depth);
+      const mm = depth === 'through' ? depth : measure(depth, 'Depth');
+      document = setCutDepth(
+        document,
+        partId,
+        sketchId,
+        regionId,
+        mm,
+        typeof depth === 'string' && depth !== 'through' ? depth : undefined
+      );
       const cut = partOf(partId).features!.find(f => f.type === 'cut' && f.sketchId === sketchId && f.regionId === regionId)!;
       return { id: cut.id };
     },
@@ -258,6 +362,22 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     },
     expect(expectation) {
       expectations.set(partId, [...(expectations.get(partId) ?? []), expectation]);
+    },
+    place({ at, x = '+x', y = '+y' }) {
+      const ex = axes[x],
+        ey = axes[y];
+      if (!ex || !ey) fail(`Axes are written like '+x' or '-z', not ${x} and ${y}.`);
+      if (ex.some((value, i) => value !== 0 && ey[i] !== 0)) fail(`The part's x and y can't both point along ${x[1]}.`);
+      const position = at.map((value, i) => measure(value, `Position ${'xyz'[i]}`)) as [number, number, number];
+      const expressions = at.map(value => (typeof value === 'string' ? value : null)) as [string | null, string | null, string | null];
+      replacePart(partId, part => ({
+        ...part,
+        placement: {
+          position,
+          rotation: rotationTo(ex, ey),
+          ...(expressions.some(Boolean) && { positionExpressions: expressions }),
+        },
+      }));
     },
   });
 
@@ -270,10 +390,20 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
           if (options?.thickness !== undefined) edit.thickness(options.thickness);
           return edit;
         }
-        const part = { ...createCadPart(name, options?.thickness ?? 18), id: newCadId() };
+        const part = { ...createCadPart(name, 18), id: newCadId() };
         document = { ...document, parts: [...document.parts, part] };
-        return partEdit(part.id);
+        const edit = partEdit(part.id);
+        if (options?.thickness !== undefined) edit.thickness(options.thickness);
+        return edit;
       },
+      variable(name, expression) {
+        const existing = document.variables?.find(variable => variable.name === name);
+        const result = setCadVariable(document, { id: existing?.id, name, expression });
+        if ('error' in result) return fail(`The variable ${name}: ${result.error}`);
+        document = result.document;
+        return name;
+      },
+      value: expression => measure(expression, 'Value'),
     } satisfies DesignEdit,
     document: () => document,
   };
@@ -307,5 +437,7 @@ export async function editCad(start: CadDocument | null, script: CadScript, opti
   // A failed script leaves the design as it was: half of an intent is worse than none of it.
   const edited = scriptError ? base : { ...session.document(), revision: base.revision + 1 };
   const inspected = await inspectCadDocument(edited, expectations);
+  // A new design that failed is empty, and saying so would only hide the script's error.
+  if (scriptError && !base.parts.length) inspected.report.errors = inspected.report.errors.filter(error => error.code !== 'no-parts');
   return { ...inspected, ok: inspected.report.ok && !scriptError, ...(scriptError && { scriptError }) };
 }

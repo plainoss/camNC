@@ -29,12 +29,13 @@ of this adds a second source of truth.
 4. Done: board planning moved from `cam.worker.ts` to `planBoard` in `packages/cam`, and
    the report summarises each part's toolpaths with it. A summary only, never a program
    file.
-5. After the physical test cut and roadmap PRs 8–10: variables, placements and joints
-   in the API, then decide on an MCP server and in-app chat. Both need the editor to
-   accept outside changes through its session.
+5. In progress: variables, placements and patterns are in the API, with a collision
+   check between placed parts. Joints wait for roadmap PR 10. After the physical test
+   cut, decide on an MCP server and in-app chat. Both need the editor to accept
+   outside changes through its session.
 
-Step 5 can't start yet: it needs the physical test cut, and variables, placements and
-joints (roadmap PRs 8–10) to exist before the API can describe them.
+[Designing furniture with scripts](CAD_AI_FURNITURE.md) lists what a furniture test run
+found and what to improve next.
 
 ## Safety
 
@@ -47,6 +48,6 @@ No camNC-generated program has been cut yet, so:
 
 ## Still unproven
 
-How reliably models write working scripts hasn't been measured. Try the API on real
-tasks with a model before adding to it. The batched JSON form stays the fallback, and
+Twelve pieces written by fresh agents from the README all passed, most within five
+tries, but that's one model on tasks we chose. Measure again after each API change. The batched JSON form stays the fallback, and
 any surface for an untrusted client should take data rather than code.

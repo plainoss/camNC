@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cadFaceSketches, parseCadDocument } from '@wbcnc/cad';
+import { cadFaceSketches, parseCadDocument, setCadVariable } from '@wbcnc/cad';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { design, editCad, inspectCadDocument, renderCadSvg, shortHandles, type CadScript } from './index';
 import { typeErrors } from './typecheck';
@@ -15,16 +15,27 @@ const plate: CadScript = d => {
 const codes = (issues: { code: string }[]) => issues.map(issue => issue.code);
 
 describe('example parts', () => {
-  it.each(['plate', 'shelf-side', 'tray', 'bracket'])('%s meets what it expects of itself', async name => {
-    const { default: script } = await import(`../examples/${name}.cad.ts`);
-    const result = await editCad(null, script);
-    expect(result.report.errors).toEqual([]);
-    expect(result.ok).toBe(true);
-    expect(typeErrors(path.join(examples, `${name}.cad.ts`))).toEqual([]);
-  });
+  it.each(['plate', 'shelf-side', 'tray', 'bracket', 'cupboard'])(
+    '%s meets what it expects of itself',
+    async name => {
+      const { default: script } = await import(`../examples/${name}.cad.ts`);
+      const result = await editCad(null, script);
+      expect(result.report.errors).toEqual([]);
+      expect(result.ok).toBe(true);
+      expect(typeErrors(path.join(examples, `${name}.cad.ts`))).toEqual([]);
+      // The first file pays for warming up the type checker.
+    },
+    20_000
+  );
 
   it('covers every example file', async () => {
-    expect((await readdir(examples)).sort()).toEqual(['bracket.cad.ts', 'plate.cad.ts', 'shelf-side.cad.ts', 'tray.cad.ts']);
+    expect((await readdir(examples)).sort()).toEqual([
+      'bracket.cad.ts',
+      'cupboard.cad.ts',
+      'plate.cad.ts',
+      'shelf-side.cad.ts',
+      'tray.cad.ts',
+    ]);
   });
 
   it('sends a floor cut to CAM below the pocket it sits in', async () => {
@@ -38,7 +49,140 @@ describe('example parts', () => {
   });
 });
 
+describe('variables and assembly', () => {
+  const box = (report: { assembly?: { parts: { name: string; at: number[]; size: number[] }[] } }, name: string) =>
+    report.assembly!.parts.find(part => part.name === name)!;
+
+  it("places the cupboard's parts where a cabinet maker would", async () => {
+    const { cupboard } = await import('../examples/cupboard.cad');
+    const { report } = await editCad(null, cupboard());
+    expect(report.assembly!.collisions).toEqual([]);
+    expect(box(report, 'Left side')).toEqual({ name: 'Left side', at: [0, 0, 0], size: [18, 300, 720] });
+    expect(box(report, 'Right side')).toEqual({ name: 'Right side', at: [582, 0, 0], size: [18, 300, 720] });
+    expect(box(report, 'Back')).toEqual({ name: 'Back', at: [10, 294, 0], size: [580, 6, 720] });
+  });
+
+  it('builds the same cupboard wider and from thicker board', async () => {
+    const { cupboard } = await import('../examples/cupboard.cad');
+    const { ok, report } = await editCad(null, cupboard({ width: '900mm', board: '19mm' }));
+    expect(report.errors).toEqual([]);
+    expect(ok).toBe(true);
+    expect(box(report, 'Top').size).toEqual([878, 294, 19]);
+    expect(
+      report.parts
+        .find(part => part.name === 'Left side')!
+        .cuts.slice(0, 2)
+        .map(cut => cut.size[1])
+    ).toEqual([19, 19]);
+  });
+
+  it('keeps sizes, placements and rebate depths following changed variables, as a person would change them', async () => {
+    const { cupboard } = await import('../examples/cupboard.cad');
+    let { document } = await editCad(null, cupboard());
+    for (const [name, expression] of [
+      ['width', '900mm'],
+      ['board', '19mm'],
+      ['housing', '9mm'],
+    ]) {
+      const variable = document.variables!.find(candidate => candidate.name === name)!;
+      const changed = setCadVariable(document, { id: variable.id, name: name!, expression: expression! });
+      if ('error' in changed) throw new Error(changed.error);
+      document = changed.document;
+    }
+    const { report } = await inspectCadDocument(document, new Map(), { toolpaths: false });
+    expect(report.errors).toEqual([]);
+    expect(report.parts.find(part => part.name === 'Top')!.outline!.size).toEqual([880, 294]);
+    expect(
+      report.parts
+        .find(part => part.name === 'Left side')!
+        .cuts.slice(0, 3)
+        .map(cut => cut.to)
+    ).toEqual([9, 9, 9]);
+    expect(box(report, 'Right side')).toMatchObject({ at: [881, 0, 0], size: [19, 300, 720] });
+    expect(box(report, 'Top').at).toEqual([10, 0, 701]);
+    expect(report.assembly!.collisions).toEqual([]);
+  });
+
+  it('reports parts whose numeric placement no longer fits after a change', async () => {
+    const { cupboard } = await import('../examples/cupboard.cad');
+    const { document } = await editCad(null, cupboard());
+    const right = document.parts.find(part => part.name === 'Right side')!;
+    const pinned = {
+      ...document,
+      parts: document.parts.map(part =>
+        part === right ? { ...part, placement: { ...part.placement!, positionExpressions: undefined } } : part
+      ),
+    };
+    const width = document.variables!.find(variable => variable.name === 'width')!;
+    const changed = setCadVariable(pinned, { id: width.id, name: 'width', expression: '900mm' });
+    if ('error' in changed) throw new Error(changed.error);
+    const { report } = await inspectCadDocument(changed.document, new Map(), { toolpaths: false });
+    expect(report.assembly!.collisions.map(c => c.parts.join(' / '))).toEqual(
+      expect.arrayContaining(['Right side / Bottom', 'Right side / Top', 'Right side / Back', 'Right side / Shelf'])
+    );
+    expect(report.errors.map(error => error.code)).toContain('parts-collide');
+  });
+
+  it('finds a shelf that runs into a side', async () => {
+    const { report } = await editCad(null, d => {
+      d.variable('board', '18mm');
+      const side = d.part('Side', { thickness: 'board' });
+      side.profile.rect({ at: [0, 0], w: 300, h: 600 });
+      side.place({ at: [0, 0, 0], x: '+y', y: '+z' });
+      const shelf = d.part('Shelf', { thickness: 'board' });
+      shelf.profile.rect({ at: [0, 0], w: 400, h: 300 });
+      shelf.place({ at: ['board - 1mm', 0, 300] });
+    });
+    expect(report.assembly!.collisions).toMatchObject([{ parts: ['Side', 'Shelf'], at: [17, 0, 300], size: [1, 300, 18], volume: 5400 }]);
+    expect(report.ok).toBe(false);
+  });
+
+  it('saves expressions so the app keeps following them', async () => {
+    const { document } = await editCad(null, d => {
+      d.variable('board', '18mm');
+      const part = d.part('Panel', { thickness: 'board' });
+      part.profile.rect({ center: ['100mm', 50], w: '2*board', h: 40 });
+    });
+    const part = document.parts[0]!;
+    expect(part.thicknessExpression).toBe('board');
+    expect(part.sketch.constraints.flatMap(c => ('expression' in c && c.expression ? [[c.type, c.expression]] : []))).toEqual([
+      ['distanceX', '2*board'],
+      ['positionX', '(100mm) - (2*board)/2'],
+    ]);
+  });
+
+  it("refuses an expression it can't work out, naming the value", async () => {
+    const { scriptError } = await editCad(null, d => d.part('Panel').profile.rect({ at: [0, 0], w: 'depth + 10', h: 40 }));
+    expect(scriptError).toMatch(/^Width "depth \+ 10": /);
+  });
+});
+
 describe('toolpath summary', () => {
+  it('counts each pocket on its own and warns when CAM can fit no tool in one', async () => {
+    const { report } = await editCad(null, d => {
+      const door = d.part('Door', { thickness: 19 });
+      door.profile.rect({ at: [0, 0], w: 400, h: 200 });
+      const back = door.sketchOn('top');
+      back.circle({ at: [40, 50], d: 35 });
+      back.circle({ at: [40, 150], d: 35 });
+      for (const [x, y] of [
+        [40, 50],
+        [40, 150],
+      ] as const)
+        door.cut(back.regionAt(x, y), { depth: 13 });
+      door.expect({ pockets: 2 });
+      const rack = d.part('Rack', { thickness: 19 });
+      rack.profile.rect({ at: [0, 0], w: 200, h: 100 });
+      rack.profile.circle({ at: [100, 50], d: 5 });
+      const face = rack.sketchOn('top');
+      face.circle({ at: [100, 50], d: 10 });
+      // CAM keeps out of the screw hole, which leaves a ring too narrow for the default 3.175 mm bit.
+      rack.cut(face.regionAt(104, 50), { depth: 1.5 });
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.warnings.filter(warning => warning.code === 'toolpath-missing').map(warning => warning.part)).toEqual(['Rack']);
+  });
+
   it('plans each part as the app would, without handing out a program', async () => {
     const { default: tray } = await import('../examples/tray.cad');
     const { report } = await editCad(null, tray);
