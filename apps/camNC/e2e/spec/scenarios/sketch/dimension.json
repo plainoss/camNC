@@ -943,7 +943,7 @@
       {
         "expect": {
           "focus": "input",
-          "status": "enter a"
+          "status": "no variable called abc"
         }
       },
       "key Escape",

@@ -1,0 +1,61 @@
+.cad-variables {
+  border-bottom: 1px solid #dde4ed;
+  padding-bottom: 8px;
+}
+.cad-variables ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cad-variables-hint {
+  margin: 0 12px 4px;
+  color: #52647d;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.cad-variable {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) auto minmax(0, 6fr) 20px;
+  align-items: center;
+  gap: 4px;
+}
+.cad-variable input {
+  min-width: 0;
+  font-size: 12px;
+  padding: 3px 5px;
+}
+.cad-variable-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.cad-variable input[aria-invalid='true'] {
+  border-color: #ac2929;
+}
+.cad-variable > span {
+  color: #6b7c91;
+  font-size: 11px;
+}
+.cad-variable-delete {
+  grid-column: 4;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  color: #6b7c91;
+}
+.cad-variable-result,
+.cad-variable-error {
+  grid-column: 3 / 5;
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+.cad-variable-result {
+  color: #6b7c91;
+}
+.cad-variable-error {
+  grid-column: 1 / 5;
+  color: #ac2929;
+}
