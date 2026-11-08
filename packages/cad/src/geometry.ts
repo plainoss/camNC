@@ -1,3 +1,4 @@
+import { linearPatternIssue } from './pattern';
 import { constraintEntityIds, entityPointIds, originId } from './document';
 import { sketchTargets, validateCadFeatures } from './featureModel';
 import type {
@@ -202,6 +203,10 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
           c.edgeIds.some(id => entities.get(id)?.type !== 'line')
         )
           error('invalid-reference', 'A regular polygon needs a circle and three to fifty distinct edges.', undefined, [c.id]);
+      }
+      if (c.type === 'linearPattern') {
+        const issue = linearPatternIssue(part.sketch, c);
+        if (issue) error('invalid-pattern', issue, undefined, [c.id]);
       }
       if (c.type === 'offset') {
         const sources = new Set(c.members.map(member => member.sourceId));

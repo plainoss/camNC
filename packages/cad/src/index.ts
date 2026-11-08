@@ -6,6 +6,7 @@ export * from './fillet';
 export * from './chamfer';
 export * from './split';
 export * from './transform';
+export * from './pattern';
 export * from './curves';
 export * from './pointEquivalence';
 export * from './curveContacts';

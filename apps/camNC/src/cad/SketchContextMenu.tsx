@@ -25,6 +25,7 @@ const icons = {
   'delete-entities': Trash2,
   'delete-dimensions': Trash2,
   'edit-dimension': Pencil,
+  'edit-pattern': Pencil,
   'toggle-driven': Ruler,
   clear: MousePointer2,
   fit: Maximize,
@@ -37,14 +38,16 @@ export function SketchContextMenu({ sketch, context, busy = false, onClose, onAc
   if (!context) return null;
   const items = sketchContextItems(sketch, context, busy);
   const name =
-    context.target.kind === 'dimension'
-      ? 'Sketch dimension menu'
-      : context.target.kind === 'entity'
-        ? 'Sketch geometry menu'
-        : 'Sketch menu';
+    context.target.kind === 'constraint'
+      ? 'Sketch pattern menu'
+      : context.target.kind === 'dimension'
+        ? 'Sketch dimension menu'
+        : context.target.kind === 'entity'
+          ? 'Sketch geometry menu'
+          : 'Sketch menu';
   const activate = (action: SketchContextAction) => {
     // The dimension editor takes focus itself; menu dismissal must not steal that new input's focus.
-    restoreCanvasFocus.current = action !== 'edit-dimension';
+    restoreCanvasFocus.current = action !== 'edit-dimension' && action !== 'edit-pattern';
     onClose();
     onAction(action, context);
   };

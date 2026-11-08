@@ -19,6 +19,8 @@ export interface InlineConstraintsProps {
 
 export function ConstraintSymbol({ kind }: { kind: InlineConstraintKind }) {
   switch (kind) {
+    case 'linearPattern':
+      return <path d="M-7-5h4v4h-4zm6 0h4v4h-4zm6 0h4v4H5zM-7 2h4v4h-4zm6 0h4v4h-4zm6 0h4v4H5z" />;
     case 'regularPolygon':
       return <path d="m0-6 5 3v6l-5 3-5-3v-6z" />;
     case 'horizontal':

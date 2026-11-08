@@ -31,6 +31,8 @@ export function remapCadReferences<T>(value: T, ids: ReadonlyMap<string, string>
   const visit = (input: unknown, key = ''): unknown => {
     if (typeof input === 'string' && (key === 'id' || key.endsWith('Id') || key.endsWith('Ids'))) return ids.get(input) ?? input;
     if (Array.isArray(input)) return input.map(item => visit(item, key));
+    if (input && typeof input === 'object' && key === 'idMap')
+      return Object.fromEntries(Object.entries(input).map(([logical, id]) => [logical, typeof id === 'string' ? (ids.get(id) ?? id) : id]));
     if (input && typeof input === 'object')
       return Object.fromEntries(Object.entries(input).map(([name, item]) => [name, visit(item, name)]));
     return input;
@@ -107,6 +109,24 @@ export function transformSketchEntities(sketch: CadSketch, options: CadTransform
         ids.set(handle, splineHandleId(ids.get(id)!, end));
       }
   }
+  for (const c of sketch.constraints)
+    if (
+      c.type === 'linearPattern' &&
+      constraintEntityIds(c).some(id => sourceIds.has(id)) &&
+      !constraintEntityIds(c).every(id => selectedIds.has(id))
+    )
+      return fail('Select the complete pattern or remove its relation before transforming individual instances.');
+  if (options.copy)
+    for (const constraint of sketch.constraints)
+      if (constraint.type === 'linearPattern' && constraintEntityIds(constraint).every(id => selectedIds.has(id))) {
+        const reserved = constraint.instances.flatMap(i => Object.values(i.idMap));
+        for (const id of reserved) if (!ids.has(id) && !id.includes(':handle:')) ids.set(id, newCadId());
+        for (const id of reserved)
+          if (!ids.has(id)) {
+            const match = id.match(/^(.*):handle:(start|end)$/);
+            ids.set(id, match && ids.has(match[1]!) ? splineHandleId(ids.get(match[1]!)!, match[2] as 'start' | 'end') : newCadId());
+          }
+      }
   const next = structuredClone(sketch);
   const createdEntityIds: string[] = [],
     releasedConstraintIds: string[] = [];
@@ -205,6 +225,10 @@ export function transformSketchEntities(sketch: CadSketch, options: CadTransform
       if (Math.abs(c.type === 'distanceX' ? a.y - b.y : a.x - b.x) > CAD_GEOMETRY_TOLERANCE) return null;
       c = { ...c, type: 'distance', value: Math.abs(c.value) };
       delete c.expression;
+    }
+    if (c.type === 'linearPattern') {
+      const vector = (p: CadPoint) => ({ x: scale * (p.x * cos - p.y * sin), y: scale * (p.x * sin + p.y * cos) });
+      c = { ...c, stepX: vector(c.stepX), stepY: vector(c.stepY) };
     }
     c = directionRelation(c);
     if ('value' in c) {

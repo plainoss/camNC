@@ -136,6 +136,9 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'linearPattern':
+      shape = <path d="M3 4h4v4H3zm7 0h4v4h-4zm7 0h4v4h-4zM3 15h4v4H3zm7 0h4v4h-4zm7 0h4v4h-4z" />;
+      break;
     case 'transform':
       shape = (
         <>

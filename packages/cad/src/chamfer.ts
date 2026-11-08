@@ -1,3 +1,4 @@
+import { sketchPatternOwner } from './pattern';
 import { newCadId, constraintEntityIds } from './document';
 import { lineCorner, resolveFilletCorners } from './fillet';
 import { CAD_GEOMETRY_TOLERANCE, evaluateCadPart } from './geometry';
@@ -33,6 +34,8 @@ export function chamferLineCorners(sketch: CadSketch, options: CadChamferOptions
   for (const id of cornerPointIds) {
     const corner = lineCorner(sketch, id, equivalent, true);
     if (typeof corner === 'string') return fail(corner.replace(/fillet/gi, 'chamfer').replace('profile ', ''));
+    if (corner.lines.some(line => sketchPatternOwner(sketch, line.id)))
+      return fail('Remove the pattern relation before chamfering its finite geometry.');
     const order = options.selectedLineIds ?? [];
     const selectedFirst = order.find(lineId => corner.lines.some(line => line.id === lineId));
     const indices = selectedFirst === corner.lines[1].id ? ([1, 0] as const) : ([0, 1] as const);
