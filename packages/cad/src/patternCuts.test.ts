@@ -42,4 +42,24 @@ describe('cutting a patterned groove', () => {
     const middles = parts[0]!.cuts!.map(cut => Math.round(cut.outline.reduce((sum, p) => sum + p.y, 0) / cut.outline.length));
     expect(middles.sort((a, b) => a - b)).toEqual([109, 259, 409]);
   });
+
+  it('cuts only the matching side of each copy of a line that divides the part', () => {
+    const plate = createPlateDocument({ width: 300, height: 600, thickness: 18 });
+    const { document, sketchId } = addFaceSketch(plate, plate.parts[0]!.id, 'top');
+    const face = document.parts[0]!.features!.find(f => f.type === 'sketch' && f.sketch.id === sketchId)!;
+    if (face.type !== 'sketch') throw new Error('expected a sketch');
+    face.sketch = addLine(face.sketch, { x1: -10, y1: 100, x2: 310, y2: 100 });
+    const line = face.sketch.entities.filter(e => e.type === 'line').at(-1)!;
+    const result = linearPatternSketchEntities(face.sketch, { entityIds: [line.id], countX: 3, stepX: { x: 0, y: 150 } });
+    if (!result.ok) throw new Error(result.message);
+    face.sketch = result.sketch;
+    const below = cadSketchRegions(document.parts[0]!, sketchId).find(region => pointInPolygon({ x: 150, y: 50 }, region.points))!;
+    const cut = setCutDepth(document, document.parts[0]!.id, sketchId, below.id, 6);
+    const extents = evaluateCadDocument(cut).parts[0]!.cuts!.map(c => [
+      Math.min(...c.outline.map(p => p.y)),
+      Math.max(...c.outline.map(p => p.y)),
+    ]);
+    // The strip below the first line is cut; a copy of it would sit 150 mm higher, between two lines, where no copy of the region exists.
+    expect(extents).toEqual([[0, 100]]);
+  });
 });
