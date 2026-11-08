@@ -3,8 +3,20 @@ import { CamPage } from '@/cam/CamPage';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { NumberInput } from '@/cam/NumberInput';
 import { LetteringFontPicker } from '@/cam/LetteringFontPicker';
-import { carvingProblem, itemName, kVBits, placeItem, withItems, type CarvingArt, type CarvingItemV1, type CarvingV1 } from '@/cam/carving';
+import {
+  carvingProblem,
+  isWebFont,
+  itemName,
+  kCarvingFonts,
+  kVBits,
+  placeItem,
+  withItems,
+  type CarvingArt,
+  type CarvingItemV1,
+  type CarvingV1,
+} from '@/cam/carving';
 import { outlineArt } from '@/cam/carvingOutline';
+import { webFontCss } from '@/cam/webFonts';
 import { camKeys, useCamJob, useSaveCamJob } from '@/cam/camQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BoardV1 } from '@/cam/boards';
@@ -66,6 +78,10 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const size = resized ? { w: resized.w, h: resized.h } : saved;
   const thickness = board?.thickness ?? 18;
   const [selectedId, setSelectedId] = useState<string | null>(carving.items[0]?.id ?? null);
+  // The text item being typed into on the board itself.
+  const [inlineId, setInlineId] = useState<string | null>(null);
+  // The item last pressed on the board, so a double-click edits it.
+  const pressed = useRef<string | null>(null);
   // While dragging, the item is shown before it's saved.
   const [dragged, setDragged] = useState<CarvingItemV1 | null>(null);
   const [pending, setPending] = useState<Record<string, Pick<CarvingItemV1, 'art' | 'height'>>>({});
@@ -189,6 +205,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const flushDraft = useRef<(() => void) | null>(null);
   const select = (id: string | null) => {
     if (id !== selectedId) flushDraft.current?.();
+    if (id !== inlineId) setInlineId(null);
     setSelectedId(id);
   };
   // New items are outlined before they're added, so a file that can't be read adds nothing.
@@ -260,6 +277,11 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         if (k !== 'z' && k !== 'y') return;
         e.preventDefault();
         (k === 'y' || e.shiftKey ? redo : undo)?.();
+        return;
+      }
+      if (e.key === 'Enter' && (target === svg.current || target === document.body) && editing?.art.kind === 'text') {
+        e.preventDefault();
+        setInlineId(editing.id);
         return;
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
@@ -334,6 +356,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     svg.current?.setPointerCapture(e.pointerId);
     flushDraft.current?.();
     select(item.id);
+    pressed.current = item.id;
     drag.current = { mode, from: toMm(e), item, preview: item, pointerId: e.pointerId };
     setDragged(item);
   };
@@ -452,7 +475,15 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
             aria-label={`Board ${size.w} × ${size.h} mm with the carving`}
             className="absolute inset-0 h-full w-full touch-none overflow-visible select-none"
             viewBox={`${-pad} ${-pad} ${frame.w + 2 * pad} ${frame.h + 2 * pad}`}
-            onPointerDown={() => select(null)}
+            onPointerDown={() => {
+              pressed.current = null;
+              select(null);
+            }}
+            onDoubleClick={() => {
+              const item = editing?.id === pressed.current ? editing : undefined;
+              if (item?.art.kind === 'text') setInlineId(item.id);
+              else if (item) chooseSvg(item.id);
+            }}
             onPointerMove={move}
             onPointerUp={end}
             onPointerCancel={cancel}
@@ -513,19 +544,21 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                   )
                 );
               })}
-              {carving.items.map(item => (
-                <path
-                  key={item.id}
-                  d={pathOf(placeItem(dragged?.id === item.id ? dragged : item), size.h)}
-                  data-testid="carving-item"
-                  aria-label={itemName(item)}
-                  className="cursor-move fill-amber-800 stroke-amber-950 dark:fill-amber-500"
-                  strokeWidth={0.15}
-                  fillRule="nonzero"
-                  onPointerDown={start('move', item)}
-                />
-              ))}
-              {box && shown && (
+              {carving.items.map(item =>
+                item.id === inlineId ? null : (
+                  <path
+                    key={item.id}
+                    d={pathOf(placeItem(dragged?.id === item.id ? dragged : item), size.h)}
+                    data-testid="carving-item"
+                    aria-label={itemName(item)}
+                    className="cursor-move fill-amber-800 stroke-amber-950 dark:fill-amber-500"
+                    strokeWidth={0.15}
+                    fillRule="nonzero"
+                    onPointerDown={start('move', item)}
+                  />
+                )
+              )}
+              {box && shown && shown.id !== inlineId && (
                 <g transform={`translate(${shown.x} ${size.h - shown.y}) rotate(${-shown.rotation})`}>
                   <rect
                     x={box.x0}
@@ -564,6 +597,20 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 </g>
               )}
             </g>
+            {editing && editing.id === inlineId && editing.art.kind === 'text' && !dragged && (
+              <InlineText
+                key={editing.id}
+                item={editing}
+                text={editing.art}
+                at={`translate(${editing.x} ${saved.h - editing.y}) rotate(${-editing.rotation})`}
+                flush={flushDraft}
+                onText={text => void redraw({ ...editing, art: { ...editing.art, text } as CarvingArt })}
+                onDone={() => {
+                  setInlineId(null);
+                  svg.current?.focus();
+                }}
+              />
+            )}
             {/* As on the Boards step: grips just outside the right and bottom edges, and the corner between them. */}
             {board && (
               <g data-testid="board-resize" className="fill-primary stroke-background">
@@ -613,6 +660,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
           </svg>
           {editing &&
             !dragged &&
+            editing.id !== inlineId &&
             !resized &&
             (() => {
               // Above the item and its rotate handle.
@@ -838,6 +886,109 @@ const centred = (item: CarvingItemV1, size: { w: number; h: number }) => {
   if (!box) return { x: size.w / 2, y: size.h / 2 };
   return { x: item.x + size.w / 2 - (box.x0 + box.x1) / 2, y: item.y + size.h / 2 - (box.y0 + box.y1) / 2 };
 };
+
+/**
+ * Types straight onto the board, in the item's own font and size, where its lettering is: Enter or a click elsewhere keeps
+ * the text, Escape goes back to it as it was.
+ */
+function InlineText({
+  item,
+  text: art,
+  at,
+  flush,
+  onText,
+  onDone,
+}: {
+  item: CarvingItemV1;
+  text: Extract<CarvingArt, { kind: 'text' }>;
+  /** The item's place on the board, as an SVG transform. */
+  at: string;
+  flush: RefObject<(() => void) | null>;
+  onText: (text: string) => void;
+  onDone: () => void;
+}) {
+  const [text, setText] = useState(art.text);
+  const input = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  const finish = (keep: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    flush.current = null;
+    if (keep && text.trim() && text !== art.text) onText(text);
+    onDone();
+  };
+  // Another selection or a drag commits what's typed, as the bar's Text field does.
+  useEffect(() => {
+    if (text === art.text) return;
+    const commit = () => finish(true);
+    flush.current = commit;
+    return () => {
+      if (flush.current === commit) flush.current = null;
+    };
+  });
+  useEffect(() => {
+    input.current?.focus();
+    input.current?.select();
+  }, []);
+  const m = inkMetrics(art.font, text || 'M');
+  // Sized so the ink is the item's height, as it will be outlined; centred on the item, as the outline is.
+  const size = (100 * item.height) / m.inkH;
+  const k = size / 100;
+  const line = (m.fontA + m.fontD) * k * 1.1;
+  const baseline = (line - (m.fontA + m.fontD) * k) / 2 + m.fontA * k;
+  const inkMid = baseline - ((m.inkA - m.inkD) / 2) * k;
+  // Hugging the text as it grows, with room for the caret.
+  const width = Math.max(m.advance * k, item.height) + item.height / 2;
+  const dx = (m.advance / 2 - (m.inkR - m.inkL) / 2) * k;
+  return (
+    <g transform={at}>
+      <foreignObject x={-width / 2 + dx} y={-inkMid} width={width} height={line} className="overflow-visible">
+        <input
+          ref={input}
+          aria-label="Text on the board"
+          value={text}
+          maxLength={60}
+          spellCheck={false}
+          onChange={e => setText(e.target.value)}
+          onPointerDown={e => e.stopPropagation()}
+          onBlur={() => finish(true)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') finish(true);
+            else if (e.key === 'Escape') {
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+              finish(false);
+            }
+          }}
+          className="block h-full w-full border-0 bg-transparent p-0 text-center text-amber-800 caret-primary outline-none dark:text-amber-500"
+          style={{ font: fontCss(art.font, size), lineHeight: `${line}px`, outline: `${item.height / 60}px dashed var(--primary)` }}
+        />
+      </foreignObject>
+    </g>
+  );
+}
+
+const fontCss = (font: Extract<CarvingArt, { kind: 'text' }>['font'], size: number) =>
+  isWebFont(font) ? `${font.weight} ${size}px ${webFontCss(font)}` : kCarvingFonts[font].css.replace('{size}', String(size));
+
+/** The text's metrics at 100 px, as `outlineArt` measures it. */
+function inkMetrics(font: Extract<CarvingArt, { kind: 'text' }>['font'], text: string) {
+  const ctx = document.createElement('canvas').getContext('2d')!;
+  ctx.font = fontCss(font, 100);
+  const m = ctx.measureText(text);
+  const inkA = m.actualBoundingBoxAscent,
+    inkD = m.actualBoundingBoxDescent;
+  return {
+    inkA,
+    inkD,
+    inkH: Math.max(inkA + inkD, 1),
+    inkL: m.actualBoundingBoxLeft,
+    inkR: m.actualBoundingBoxRight,
+    advance: m.width,
+    fontA: m.fontBoundingBoxAscent,
+    fontD: m.fontBoundingBoxDescent,
+  };
+}
 
 function ArtFields({
   art,

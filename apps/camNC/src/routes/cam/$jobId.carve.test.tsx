@@ -295,6 +295,44 @@ describe('the Carve step', () => {
     expect(undo.disabled).toBe(false);
   });
 
+  it('edits text on the board itself after a double-click, keeping it on Enter and dropping it on Escape', async () => {
+    const job = await open();
+    const path = screen.getByTestId('carving-item');
+    const svg = path.closest('svg')!;
+    const press = () => {
+      fireEvent.pointerDown(screen.getByTestId('carving-item'), { button: 0, pointerId: 1 });
+      fireEvent.pointerUp(svg, { pointerId: 1 });
+      fireEvent.doubleClick(svg);
+    };
+    press();
+    const typed = screen.getByRole('textbox', { name: 'Text on the board' }) as HTMLInputElement;
+    expect(document.activeElement).toBe(typed);
+    expect(typed.value).toBe('Welcome');
+    // The ink and the bar make way for the text being typed.
+    expect(screen.queryByTestId('carving-item')).toBeNull();
+    expect(screen.queryByRole('toolbar')).toBeNull();
+    fireEvent.change(typed, { target: { value: 'Oak & Ash' } });
+    fireEvent.keyDown(typed, { key: 'Escape' });
+    expect(screen.queryByRole('textbox', { name: 'Text on the board' })).toBeNull();
+    // Escape left the item selected, as it was.
+    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
+    expect((await getJob(job.id))!.carving!.items[0].art).toMatchObject({ text: 'Welcome' });
+    press();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text on the board' }), { target: { value: 'Oak & Ash' } });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Text on the board' }), { key: 'Enter' });
+    await waitFor(async () => {
+      const item = (await getJob(job.id))!.carving!.items[0];
+      expect(item.art).toMatchObject({ text: 'Oak & Ash' });
+      expect(item.outline).not.toEqual(job.carving!.items[0].outline);
+    });
+    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Oak & Ash');
+    // And typed text is kept when the board is clicked away from it.
+    press();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text on the board' }), { target: { value: 'Elm' } });
+    fireEvent.pointerDown(svg, { button: 0 });
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].art).toMatchObject({ text: 'Elm' }));
+  });
+
   it('selects an item by a click anywhere in its box, not only on its ink', async () => {
     await open();
     const svg = screen.getAllByTestId('carving-item')[0].closest('svg')!;
