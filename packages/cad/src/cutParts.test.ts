@@ -162,6 +162,7 @@ describe('shelves patterned up the carcass', () => {
       expect(withPartCuts(solved.document, evaluateCadPart(source).part!).cuts).toEqual(side.cuts);
     }
     const report = cadStepReport(solved.document, solved.parts).find(entry => entry.kind === 'partCut');
+    expect(report?.kind === 'partCut' && report.tools).toEqual(['Middle shelf']);
     expect(report?.kind === 'partCut' && report.cuts.map(cut => cut.tool)).toEqual(['Middle shelf', 'Middle shelf']);
     expect(solved.diagnostics.filter(d => d.code === 'part-cut-unresolved')).toEqual([]);
 
@@ -169,6 +170,8 @@ describe('shelves patterned up the carcass', () => {
     for (const side of plain.parts.slice(0, 2)) expect(side.cuts).toHaveLength(3);
 
     const removed = await solveCadDocument(setPartPattern(solved.document, shelf, null));
+    const removedReport = cadStepReport(removed.document, removed.parts).find(entry => entry.kind === 'partCut');
+    expect(removedReport?.kind === 'partCut' && removedReport.tools).toEqual(['a copy of Shelf that is gone']);
     for (const side of removed.parts.slice(0, 2)) expect(side.cuts ?? []).toEqual([]);
     expect(removed.diagnostics).toContainEqual({
       code: 'part-cut-unresolved',
