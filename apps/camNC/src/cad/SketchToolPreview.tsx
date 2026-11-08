@@ -1,4 +1,12 @@
-import { ellipseFromPoints } from '@wbcnc/cad';
+import {
+  inscribedPolygonFromPoints,
+  circumscribedPolygonFromPoints,
+  centerPointArcFromPoints,
+  ellipseFromPoints,
+  circleThroughThreePoints,
+  alignedRectangleFromPoints,
+} from '@wbcnc/cad';
+import { arcPreviewPath } from './arcPreviewGeometry';
 import { ArcPreview } from './ArcPreview';
 import { SketchPreview } from './SketchGeometry';
 import { SKETCH_APPEARANCE } from './sketchAppearance';
@@ -14,6 +22,17 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
   const scale = Number.isFinite(pixelScale) && pixelScale > 0 ? pixelScale : 1;
   const feedback = sketchPreviewFeedback(props);
   const ellipse = tool === 'ellipse' && pending[1] ? ellipseFromPoints(start, pending[1], cursor) : null;
+  const threePointCircle = tool === 'threePointCircle' && pending[1] ? circleThroughThreePoints(start, pending[1], cursor) : null;
+  const aligned = tool === 'alignedRectangle' && pending[1] ? alignedRectangleFromPoints(start, pending[1], cursor) : null;
+  const centerArc = tool === 'centerPointArc' && pending[1] ? centerPointArcFromPoints(start, pending[1], cursor, props.sweepIntent) : null;
+  const polygon =
+    tool === 'inscribedPolygon' || tool === 'circumscribedPolygon'
+      ? (tool === 'inscribedPolygon' ? inscribedPolygonFromPoints : circumscribedPolygonFromPoints)(
+          start,
+          pending[1] ?? cursor,
+          props.polygonSides ?? 6
+        )
+      : null;
   return (
     <g data-sketch-tool-preview={tool} pointerEvents="none">
       {curvePreview ? (
@@ -44,7 +63,16 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
         />
       ) : (
         <SketchPreview construction={construction}>
-          {tool === 'rectangle' || tool === 'centerRectangle' ? (
+          {polygon ? (
+            <g>
+              <circle cx={start.x} cy={-start.y} r={tool === 'inscribedPolygon' ? polygon.apothem : polygon.radius} strokeDasharray="4 4" />
+              <polygon points={polygon.corners.map(p => `${p.x},${-p.y}`).join(' ')} />
+            </g>
+          ) : centerArc ? (
+            <path data-center-arc-preview d={arcPreviewPath(centerArc)} />
+          ) : aligned ? (
+            <polygon points={aligned.corners.map(p => `${p.x},${-p.y}`).join(' ')} />
+          ) : tool === 'rectangle' || tool === 'centerRectangle' ? (
             <rect
               x={tool === 'centerRectangle' ? start.x - Math.abs(cursor.x - start.x) : Math.min(start.x, cursor.x)}
               y={tool === 'centerRectangle' ? -start.y - Math.abs(cursor.y - start.y) : -Math.max(start.y, cursor.y)}
@@ -59,6 +87,8 @@ export function SketchToolPreview(props: SketchToolPreviewProps) {
               ry={ellipse.secondary}
               transform={`rotate(${(-ellipse.angle * 180) / Math.PI} ${start.x} ${-start.y})`}
             />
+          ) : threePointCircle ? (
+            <circle cx={threePointCircle.x} cy={-threePointCircle.y} r={threePointCircle.radius} />
           ) : tool === 'circle' ? (
             <circle cx={start.x} cy={-start.y} r={Math.hypot(cursor.x - start.x, cursor.y - start.y)} />
           ) : (

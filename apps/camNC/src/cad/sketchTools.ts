@@ -3,17 +3,28 @@ export type SketchTool =
   | 'line'
   | 'rectangle'
   | 'centerRectangle'
+  | 'alignedRectangle'
   | 'circle'
+  | 'threePointCircle'
   | 'ellipse'
   | 'arc'
   | 'tangentArc'
+  | 'centerPointArc'
   | 'point'
+  | 'inscribedPolygon'
+  | 'circumscribedPolygon'
+  | 'split'
   | 'trim'
   | 'extend'
   | 'offset'
+  | 'slot'
+  | 'linearPattern'
+  | 'circularPattern'
+  | 'transform'
   | 'mirror'
   | 'dimension'
   | 'fillet'
+  | 'chamfer'
   | 'conic'
   | 'spline'
   | 'bezier'
@@ -31,24 +42,39 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'line', label: 'Line', key: 'L' },
   { id: 'rectangle', label: 'Corner rectangle', key: 'G' },
   { id: 'centerRectangle', label: 'Center rectangle', key: 'R' },
+  { id: 'alignedRectangle', label: 'Aligned rectangle' },
   { id: 'circle', label: 'Circle', key: 'C' },
+  { id: 'threePointCircle', label: '3 point circle' },
   { id: 'ellipse', label: 'Ellipse' },
   { id: 'arc', label: 'Arc', key: 'A' },
+  { id: 'centerPointArc', label: 'Center point arc' },
   { id: 'tangentArc', label: 'Tangent arc', key: 'Shift+A' },
   { id: 'conic', label: 'Conic' },
   { id: 'spline', label: 'Spline' },
   { id: 'bezier', label: 'Bezier' },
   { id: 'curveControlPoint', label: 'Spline control point' },
+  { id: 'inscribedPolygon', label: 'Inscribed polygon' },
+  { id: 'circumscribedPolygon', label: 'Circumscribed polygon' },
   { id: 'point', label: 'Point', key: 'Shift+S' },
+  { id: 'chamfer', label: 'Sketch chamfer' },
   { id: 'fillet', label: 'Sketch fillet', key: 'Shift+F' },
+  { id: 'split', label: 'Split' },
   { id: 'trim', label: 'Trim', key: 'M' },
   { id: 'extend', label: 'Extend', key: 'X' },
   { id: 'offset', label: 'Offset', key: 'O' },
+  { id: 'slot', label: 'Slot' },
+  { id: 'linearPattern', label: 'Linear pattern' },
+  { id: 'circularPattern', label: 'Circular pattern' },
+  { id: 'transform', label: 'Transform' },
   { id: 'mirror', label: 'Mirror' },
   { id: 'dimension', label: 'Dimension', key: 'D' },
 ];
 
-const modifyTools = { id: 'modify', label: 'Modify tools', tools: ['fillet', 'trim', 'extend', 'offset', 'mirror'] } as const;
+const modifyTools = {
+  id: 'modify',
+  label: 'Modify tools',
+  tools: ['fillet', 'chamfer', 'split', 'trim', 'extend', 'offset', 'slot', 'mirror', 'transform', 'linearPattern', 'circularPattern'],
+} as const;
 
 /** Only the compact layout combines drawing commands; wide layouts retain their native families. */
 export const sketchToolGroups = [
@@ -59,14 +85,19 @@ export const sketchToolGroups = [
       'line',
       'rectangle',
       'centerRectangle',
+      'alignedRectangle',
       'circle',
+      'threePointCircle',
       'ellipse',
       'arc',
       'tangentArc',
+      'centerPointArc',
       'conic',
       'spline',
       'bezier',
       'curveControlPoint',
+      'inscribedPolygon',
+      'circumscribedPolygon',
       'point',
     ],
   },
@@ -74,21 +105,26 @@ export const sketchToolGroups = [
 ] as const;
 
 export const sketchToolFamilies = [
-  { id: 'circle', label: 'Circle tools', tools: ['circle', 'ellipse'] },
-  { id: 'rectangle', label: 'Rectangle tools', tools: ['rectangle', 'centerRectangle'] },
-  { id: 'arc', label: 'Arc tools', tools: ['arc', 'tangentArc', 'conic'] },
+  { id: 'polygon', label: 'Polygon tools', tools: ['inscribedPolygon', 'circumscribedPolygon'] },
+  { id: 'circle', label: 'Circle tools', tools: ['circle', 'threePointCircle', 'ellipse'] },
+  { id: 'rectangle', label: 'Rectangle tools', tools: ['rectangle', 'centerRectangle', 'alignedRectangle'] },
+  { id: 'arc', label: 'Arc tools', tools: ['arc', 'tangentArc', 'centerPointArc', 'conic'] },
   { id: 'spline', label: 'Spline tools', tools: ['spline', 'bezier', 'curveControlPoint'] },
-  { id: 'trim', label: 'Trim tools', tools: ['trim', 'extend'] },
+  { id: 'trim', label: 'Trim tools', tools: ['trim', 'extend', 'split'] },
 ] as const;
 
 export const sketchToolLabel = (tool: SketchToolDefinition) => (tool.key ? `${tool.label} (${tool.key})` : tool.label);
 export const sketchToolSection = (tool: SketchTool) =>
-  tool === 'ellipse'
-    ? 'circle'
-    : tool === 'centerRectangle'
-      ? 'rectangle'
-      : tool === 'tangentArc'
-        ? 'arc'
-        : tool === 'bezier' || tool === 'curveControlPoint'
-          ? 'spline'
-          : tool;
+  tool === 'inscribedPolygon' || tool === 'circumscribedPolygon'
+    ? 'polygon'
+    : tool === 'ellipse' || tool === 'threePointCircle'
+      ? 'circle'
+      : tool === 'centerRectangle' || tool === 'alignedRectangle'
+        ? 'rectangle'
+        : tool === 'tangentArc' || tool === 'centerPointArc'
+          ? 'arc'
+          : tool === 'split'
+            ? 'trim'
+            : tool === 'bezier' || tool === 'curveControlPoint'
+              ? 'spline'
+              : tool;

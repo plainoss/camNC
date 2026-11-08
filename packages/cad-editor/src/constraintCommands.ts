@@ -1,7 +1,9 @@
 import {
   pointEquivalence,
+  reflectAcrossLine,
   closestCurvePoint,
   curveEndpointIds,
+  entityPointIds,
   isNurbsCurve,
   type CadConstraint,
   type CadEntity,
@@ -14,6 +16,8 @@ export type ConstraintCommandTool =
   | 'horizontal'
   | 'vertical'
   | 'coincident'
+  | 'concentric'
+  | 'symmetric'
   | 'midpoint'
   | 'parallel'
   | 'perpendicular'
@@ -21,6 +25,7 @@ export type ConstraintCommandTool =
   | 'tangent';
 export interface ConstraintSelectionResult {
   constraint?: NewCadConstraint;
+  constraints?: NewCadConstraint[];
   needsMore: boolean;
   message: string;
   alreadyApplied?: boolean;
@@ -29,13 +34,19 @@ export interface ConstraintSelectionResult {
 export const constraintPrompt = (tool: ConstraintCommandTool) =>
   tool === 'horizontal' || tool === 'vertical'
     ? `Select a line or two points to make them ${tool}.`
-    : tool === 'coincident'
-      ? 'Select two points, or a point and a curve, to make them coincident.'
-      : tool === 'midpoint'
-        ? 'Select a point and a line to place the point at its midpoint.'
-        : `Select two ${tool === 'parallel' || tool === 'perpendicular' ? 'lines' : 'curves'} to make them ${tool}.`;
+    : tool === 'symmetric'
+      ? 'Select the symmetry line first, then two points or compatible curves.'
+      : tool === 'concentric'
+        ? 'Select circles, arcs, ellipses, or a point and a curve to share a center.'
+        : tool === 'coincident'
+          ? 'Select two points, or a point and a curve, to make them coincident.'
+          : tool === 'midpoint'
+            ? 'Select a point and a line to place the point at its midpoint.'
+            : `Select two ${tool === 'parallel' || tool === 'perpendicular' ? 'lines' : 'curves'} to make them ${tool}.`;
 
 function relationshipKey(c: CadConstraint | NewCadConstraint): string {
+  if (c.type === 'symmetricCurves') return `${c.type}:${c.lineId}:${[c.entityAId, c.entityBId].sort().join(':')}`;
+  if (c.type === 'symmetricPoints') return `${c.type}:${c.lineId}:${[c.pointAId, c.pointBId].sort().join(':')}`;
   if ('pointId' in c && 'entityId' in c) return `${c.type}:${c.pointId}:${c.entityId}`;
   if ('pointAId' in c) return `${c.type}:${[c.pointAId, c.pointBId].sort().join(':')}`;
   if ('entityAId' in c) return `${c.type}:${[c.entityAId, c.entityBId].sort().join(':')}`;
@@ -64,6 +75,66 @@ export function buildConstraintForSelection(
     return { constraint, needsMore: false, message: `${tool[0]!.toUpperCase()}${tool.slice(1)} constraint added.` };
   };
   if (!selected.length) return { needsMore: true, message: prompt };
+  if (tool === 'symmetric') {
+    const [axis, a, b] = selected;
+    if (axis?.type !== 'line') return invalid(prompt);
+    const points = new Map(sketch.entities.filter((e): e is CadPointEntity => e.type === 'point').map(e => [e.id, e]));
+    const start = points.get(axis.startId),
+      end = points.get(axis.endId);
+    if (!start || !end || !reflectAcrossLine(start, start, end)) return invalid('Choose a finite symmetry line with distinct endpoints.');
+    if (selected.length < 3)
+      return { needsMore: true, message: a ? 'Select the matching second point or curve.' : 'Select the first point or curve.' };
+    if (selected.length !== 3 || !a || !b) return invalid(prompt);
+    if (a.type === 'point' && b.type === 'point') {
+      if (equivalent.equivalent(a.id, b.id)) return invalid('Choose two distinct points for symmetry.');
+      return done({ type: 'symmetricPoints', pointAId: a.id, pointBId: b.id, lineId: axis.id });
+    }
+    const circular = (e: CadEntity) => e.type === 'circle' || e.type === 'arc';
+    if (!((a.type === 'line' && b.type === 'line') || (circular(a) && circular(b)) || (a.type === 'ellipse' && b.type === 'ellipse')))
+      return invalid('Choose two points, two lines, two circular curves, or two ellipses.');
+    let focusSign: 1 | -1 | undefined;
+    if (a.type === 'ellipse' && b.type === 'ellipse') {
+      const sourceFocus = points.get(a.focusId),
+        focus = points.get(b.focusId),
+        center = points.get(b.centerId);
+      if (!sourceFocus || !focus || !center) return invalid('Repair the ellipse points before adding symmetry.');
+      const reflected = reflectAcrossLine(sourceFocus, start, end);
+      if (!reflected) return invalid('Repair the ellipse points before adding symmetry.');
+      focusSign =
+        Math.hypot(reflected.x - focus.x, reflected.y - focus.y) <=
+        Math.hypot(reflected.x - (2 * center.x - focus.x), reflected.y - (2 * center.y - focus.y))
+          ? 1
+          : -1;
+    }
+    return done({ type: 'symmetricCurves', entityAId: a.id, entityBId: b.id, lineId: axis.id, ...(focusSign ? { focusSign } : {}) });
+  }
+  if (tool === 'concentric') {
+    const curves = selected.filter(
+      (e): e is Extract<CadEntity, { type: 'circle' | 'arc' | 'ellipse' }> =>
+        e.type === 'circle' || e.type === 'arc' || e.type === 'ellipse'
+    );
+    const points = selected.filter(e => e.type === 'point');
+    if (curves.length + points.length !== selected.length) return invalid(prompt);
+    if (selected.length === 1) return { needsMore: true, message: 'Select the next point or circular/elliptical curve.' };
+    if (!curves.length) return invalid(prompt);
+    if (
+      points.some(point =>
+        curves.some(
+          curve => !equivalent.equivalent(point.id, curve.centerId) && entityPointIds(curve).some(id => equivalent.equivalent(point.id, id))
+        )
+      )
+    )
+      return invalid('A curve cannot be concentric with its own rim or axis point.');
+    const ids = [...curves.map(curve => curve.centerId), ...points.map(point => point.id)];
+    const centers = [...new Map(ids.map(id => [equivalent.canonical(id), id])).values()];
+    if (centers.length < 2) return { needsMore: false, alreadyApplied: true, message: 'These curves already share a center.' };
+    const constraints: NewCadConstraint[] = centers
+      .slice(1)
+      .map(centerId => ({ type: 'coincident', pointAId: centers[0]!, pointBId: centerId, label: 'Concentric' }));
+    return constraints.length === 1
+      ? { constraint: constraints[0], needsMore: false, message: 'Concentric constraint added.' }
+      : { constraints, needsMore: false, message: 'Concentric constraints added.' };
+  }
   const [a, b] = selected;
   if (tool === 'horizontal' || tool === 'vertical') {
     if (selected.length === 1 && a!.type === 'line') return done({ type: tool, entityId: a!.id });

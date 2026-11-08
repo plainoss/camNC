@@ -1,3 +1,7 @@
+import { patternPosition } from './patternPlacement';
+import { patternLogicalPointGroups } from './patternTopology';
+import { patternMaster } from './pattern';
+import { reflectAcrossLine } from './symmetry';
 import { constraintEntityIds, entityPointIds } from './document';
 import { curveEndpointIds, evaluateCurvePoint, evaluateCurveTangent, isNurbsCurve } from './curves';
 import { CAD_GEOMETRY_TOLERANCE } from './geometry';
@@ -34,6 +38,82 @@ export function fixedConstraintConflicts(part: CadPart): CadDiagnostic[] {
     if ('value' in constraint && constraint.driven) continue;
     let error: number | undefined;
     switch (constraint.type) {
+      case 'circularPattern':
+      case 'linearPattern': {
+        const master = patternMaster(constraint);
+        if (!master) break;
+        for (const keys of patternLogicalPointGroups(part.sketch, constraint)) {
+          const a = point(master.idMap[keys[0]!]!);
+          if (!a) continue;
+          for (const key of keys.slice(1)) {
+            const b = point(master.idMap[key]!);
+            if (b) error = Math.max(error ?? 0, Math.hypot(a.x - b.x, a.y - b.y));
+          }
+        }
+        for (const instance of constraint.instances) {
+          if (instance === master) continue;
+
+          for (const [key, id] of Object.entries(master.idMap)) {
+            const a = point(id),
+              targetId = instance.idMap[key],
+              b = targetId && instance.activeIds.includes(targetId) ? point(targetId) : undefined;
+            if (a && b && (constraint.type === 'linearPattern' || point(constraint.centerId)))
+              error = Math.max(
+                error ?? 0,
+                Math.hypot(
+                  b.x - patternPosition(constraint, instance, a, entities).x,
+                  b.y - patternPosition(constraint, instance, a, entities).y
+                )
+              );
+          }
+        }
+        break;
+      }
+
+      case 'symmetricCurves': {
+        const axis = line(constraint.lineId);
+        if (!axis) break;
+        const a = entities.get(constraint.entityAId)!,
+          b = entities.get(constraint.entityBId)!;
+        const reflected = (id: string) => {
+          const p = point(id);
+          return p ? reflectAcrossLine(p, axis.a, axis.b) : null;
+        };
+        if (a.type === 'line' && b.type === 'line') {
+          const target = line(b.id),
+            start = reflected(a.startId),
+            end = reflected(a.endId);
+          if (target && target.length && start && end)
+            error = Math.max(
+              ...[start, end].map(p => Math.abs(target.dx * (p.y - target.a.y) - target.dy * (p.x - target.a.x)) / target.length)
+            );
+        } else if ('centerId' in a && 'centerId' in b) {
+          const mirror = reflected(a.centerId),
+            target = point(b.centerId);
+          if (mirror && target) error = Math.hypot(mirror.x - target.x, mirror.y - target.y);
+          if (a.type === 'ellipse' && b.type === 'ellipse') {
+            const mirror = reflected(a.focusId),
+              focus = point(b.focusId),
+              center = point(b.centerId);
+            if (mirror && focus && (constraint.focusSign !== -1 || center)) {
+              const target = constraint.focusSign === -1 ? { x: 2 * center!.x - focus.x, y: 2 * center!.y - focus.y } : focus;
+              error = Math.max(error ?? 0, Math.hypot(mirror.x - target.x, mirror.y - target.y));
+            }
+          }
+        }
+        break;
+      }
+      case 'regularPolygon': {
+        for (let i = 0; i < constraint.edgeIds.length - 1; i++) {
+          const a = line(constraint.edgeIds[i]!),
+            b = line(constraint.edgeIds[i + 1]!);
+          if (!a || !b || !a.length || !b.length) continue;
+          const turn = Math.atan2(a.dx * b.dy - a.dy * b.dx, a.dx * b.dx + a.dy * b.dy);
+          const delta = turn - (2 * Math.PI) / constraint.edgeIds.length;
+          error = Math.max(error ?? 0, Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))));
+        }
+        break;
+      }
       case 'symmetricPoints': {
         const a = point(constraint.pointAId),
           b = point(constraint.pointBId),

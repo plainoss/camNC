@@ -196,8 +196,9 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
           items.map(item => item.id)
         );
         if (result.alreadyApplied) return;
-        if (!result.constraint) fail(result.message);
-        constrain(result.constraint!);
+        const constraints = result.constraints ?? (result.constraint ? [result.constraint] : []);
+        if (!constraints.length) fail(result.message);
+        apply(sketch => constraints.reduce((next, constraint) => addConstraint(next, constraint), sketch));
       },
       distance(a, b, value, axis) {
         const type = axis === 'x' ? 'distanceX' : axis === 'y' ? 'distanceY' : 'distance';

@@ -13,7 +13,21 @@ export function dragTargets(sketch: CadSketch, selectedIds: string[], delta: Cad
         const owners = sketch.entities.filter(
           e => e.type === 'ellipse' && equivalent.equivalent(e.centerId, entity.id) && !fixed.has(equivalent.canonical(e.centerId))
         );
-        return [entity.id, ...owners.flatMap(entityPointIds)];
+        const polygons = sketch.constraints.flatMap(c => {
+          if (c.type !== 'regularPolygon') return [];
+          const circle = sketch.entities.find(e => e.id === c.circleId);
+          if (
+            circle?.type !== 'circle' ||
+            !equivalent.equivalent(circle.centerId, entity.id) ||
+            fixed.has(equivalent.canonical(circle.centerId))
+          )
+            return [];
+          return [circle.id, ...c.edgeIds].flatMap(id => {
+            const e = sketch.entities.find(e => e.id === id);
+            return e ? entityPointIds(e) : [];
+          });
+        });
+        return [entity.id, ...owners.flatMap(entityPointIds), ...polygons];
       }
       return entityPointIds(entity);
     })

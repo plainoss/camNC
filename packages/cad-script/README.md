@@ -42,6 +42,7 @@ the parts. See `examples/` for more.
   unless a cut gives them a depth.
 - `regionAt(x, y)` picks the innermost region at a point, as a click does.
 - Cuts on `sketchOn({ floorOf: cut })` start at that pocket's floor.
+- `sketchOn('underside')` is drawn as the face is seen from below, so X runs the other way: a point at `x` on the part is at `-x` in the sketch. Its cuts come from a second side, which the report doesn't cover.
 - Handles in the report, such as `7b8b`, work with `find` and `sketch` on that same
   revision of the design.
 - A script that stops with an error leaves the design as it was.

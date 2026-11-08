@@ -537,6 +537,7 @@
       "line 40,10 40,130",
       "line 40,10 150,10",
       "button Finish sketch",
+      "flat",
       "click 165,70",
       "field Depth in mm 3",
       {
@@ -613,6 +614,63 @@
         "expect": {
           "cutDepths": [
             "3"
+          ],
+          "canFinish": true
+        }
+      },
+      "finish",
+      {
+        "expect": {
+          "stage": "boards"
+        }
+      }
+    ]
+  },
+  {
+    "id": "sketch/finish/pocket-inside-a-pocket",
+    "title": "A pocket inside a pocket is sketched on the floor of the first, from the 3D view",
+    "evidence": "manu 2026-11-07, the agreed CAD roadmap",
+    "steps": [
+      "rect 20,20 180,120",
+      "circle 100,70 30",
+      "button ^3D$",
+      "click3d",
+      "field Depth in mm 6",
+      {
+        "expect": {
+          "cutDepths": [
+            "6"
+          ]
+        }
+      },
+      "click3d",
+      "button ^Sketch on pocket floor$",
+      {
+        "expect": {
+          "pageText": "Sketch on the pocket floor"
+        }
+      },
+      "circle 100,70 12",
+      "button Finish sketch",
+      "click3d",
+      "field Depth in mm 3",
+      {
+        "expect": {
+          "cutDepths": [
+            "0",
+            "3",
+            "6"
+          ],
+          "canFinish": true
+        }
+      },
+      "field Cut 1 depth 8",
+      {
+        "expect": {
+          "cutDepths": [
+            "0",
+            "3",
+            "8"
           ],
           "canFinish": true
         }

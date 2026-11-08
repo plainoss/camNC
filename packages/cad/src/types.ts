@@ -118,7 +118,59 @@ export type CadOffsetMember =
   | { kind: 'line' | 'arc'; sourceId: string; targetId: string; side: 1 | -1; endpoints: boolean }
   | { kind: 'circle'; sourceId: string; targetId: string; side: 1 | -1 };
 
+/** Logical cell IDs survive count edits and deletion exclusions; inactive IDs remain reserved. */
+export interface CadPatternInstance {
+  x: number;
+  y: number;
+  idMap: Record<string, string>;
+  activeIds: string[];
+  constructionOverrides?: Record<string, boolean>;
+}
+export interface CadPatternExclusion {
+  seedKey: string;
+  x: number;
+  y: number;
+}
+interface CadPatternBase extends ConstraintBase {
+  seedKeys: string[];
+  masterX: number;
+  masterY: number;
+  countX: number;
+  countY: number;
+  instances: CadPatternInstance[];
+  exclusions: CadPatternExclusion[];
+}
+
+export interface CadLinearPattern extends CadPatternBase {
+  type: 'linearPattern';
+  stepX: CadPoint;
+  stepY: CadPoint;
+}
+export interface CadCircularPattern extends CadPatternBase {
+  type: 'circularPattern';
+  centerId: string;
+  /** Signed overall sweep in degrees. Closed patterns divide it by count; open patterns by count minus one. */
+  angle: number;
+  closed: boolean;
+}
+export type CadSketchPattern = CadLinearPattern | CadCircularPattern;
+export type CadSlotMember =
+  | { kind: 'line' | 'arc'; sourceId: string; targetId: string; side: 1 | -1; normalEnds: ('start' | 'end')[] }
+  | { kind: 'circle'; sourceId: string; targetId: string; side: 1 | -1 };
+export interface CadSlot extends ConstraintBase {
+  type: 'slot';
+  sourceIds: string[];
+  generatedIds: string[];
+  idMap: Record<string, string>;
+  widthEntityId: string;
+  members: CadSlotMember[];
+  capIds: string[];
+}
 export type CadConstraint =
+  | CadSketchPattern
+  | CadSlot
+  | (ConstraintBase & { type: 'symmetricCurves'; entityAId: string; entityBId: string; lineId: string; focusSign?: 1 | -1 })
+  | (ConstraintBase & { type: 'regularPolygon'; circleId: string; edgeIds: string[]; mode: 'inscribed' | 'circumscribed' })
   | (ConstraintBase & { type: 'horizontal' | 'vertical'; entityId: string })
   | (ConstraintBase & { type: 'horizontalPoints' | 'verticalPoints'; pointAId: string; pointBId: string })
   | (ConstraintBase & { type: 'coincident'; pointAId: string; pointBId: string })

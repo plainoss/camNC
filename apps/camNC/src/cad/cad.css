@@ -364,6 +364,28 @@
   min-height: 0;
   background: linear-gradient(#f4f6f9, #e3e8ef);
 }
+.cad-part-view:focus {
+  outline: none;
+}
+.cad-part-view-tools {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  left: 12px;
+}
+.cad-part-view-tools button {
+  padding: 5px 10px;
+  border: 1px solid #b9c4cd;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+}
+.cad-part-view-tools button:not(:disabled):hover {
+  background: #f1f4f8;
+}
+.cad-part-view-tools button:disabled {
+  color: #8d9aa8;
+}
 .cad-part-view > p {
   position: absolute;
   bottom: 8px;
@@ -816,6 +838,9 @@
   flex: 1;
   min-width: 0;
 }
+.cad-cut-depth {
+  width: 42px;
+}
 .cad-feature-list ul {
   display: grid;
   gap: 4px;
@@ -827,3 +852,13 @@
 .cad-quick-tools { top: 60px; left: 24px; right: auto; width: 230px; z-index: 4; }
 .cad-quick-tools button {display: flex; width: 100%; justify-content: space-between; text-align: left;}
 @media (max-width: 600px) { .cad-search-trigger kbd {display: none;} }
+
+.cad-transform-editor { max-width: calc(100% - 30px); }
+.cad-transform-editor input[type='checkbox'] { width: auto; }
+
+.cad-pattern-editor { max-width: calc(100% - 30px); }
+.cad-pattern-editor fieldset { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 6px; border: 1px solid #d7e1ec; }
+.cad-pattern-editor legend { padding: 0 4px; }
+.cad-pattern-editor input[type='checkbox'] { width: auto; }
+
+.cad-slot-editor input[type='checkbox'] { width: 14px; height: 14px; }

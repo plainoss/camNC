@@ -7,8 +7,8 @@ wrong.
 
 ## Decisions
 
-- **One 3D view.** Faces and regions are picked directly on the part, as in
-  Onshape. There is no second view to keep in sync.
+- **One 3D view.** Faces and regions are picked directly on the part. There is no
+  second view to keep in sync.
 - **Top, underside and pocket floors first.** These only need polygons, so no
   geometry kernel is added. Sketching on edges is deferred, so end-grain holes
   wait too. Asking for edge cuts or angled joints is what reopens the kernel
@@ -100,7 +100,7 @@ Fusion program for the same part, because no camNC program has been cut yet.
 
 ## Milestone 2: one 3D view
 
-### PR 5: Edit cuts directly on the 3D part
+### PR 5: Edit cuts directly on the 3D part (merged, #181)
 
 `feat(camNC) Edit cuts directly on the 3D part`
 
@@ -110,7 +110,7 @@ Fusion program for the same part, because no camNC program has been cut yet.
   editor. Regions still come from a sketch, so this is about setting depths, and PR 6
   brings drawing them into the 3D view.
 
-### PR 6: Sketch on the top face and pocket floors
+### PR 6: Sketch on the top face and pocket floors (merged, #188)
 
 `feat(camNC) Sketch on the top face and pocket floors`
 
@@ -118,13 +118,13 @@ Fusion program for the same part, because no camNC program has been cut yet.
   Finish returns to 3D.
 - Sketches on a floor follow the pocket's depth. If the pocket is removed, the part
   shows the lost face and offers a fix.
-- Spike the alignment first, including zoom, pan and pointer accuracy at different
-  window sizes. If it proves fragile, fall back to a quick transition into the
-  full-screen sketch editor.
+- Aligning the editor over a tilted 3D view would mean rewriting how it reads the
+  pointer, so the camera turns to face the surface and hands over to the full-screen
+  sketch editor. Drawing in place at any angle would be its own project.
 - **Done when:** a pocket inside a pocket works end to end, and 3D is the default
   view for parts.
 
-### PR 7: Add underside sketches and cuts
+### PR 7: Add underside sketches and cuts (merged, #191)
 
 `feat(camNC) Add underside sketches and cuts`
 

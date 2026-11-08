@@ -1,3 +1,5 @@
+import { slotIssue } from './slot';
+import { linearPatternIssue } from './pattern';
 import { constraintEntityIds, entityPointIds, originId } from './document';
 import { sketchTargets, validateCadFeatures } from './featureModel';
 import type {
@@ -94,7 +96,8 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
             e.degree > 3 ||
             (e.closed && e.degree !== 3) ||
             count <= e.degree ||
-            e.controlPointIds.length > 128 ||
+            // Exact subdivision repeats span knots and may retain every original fit plus two cut endpoints.
+            e.controlPointIds.length > 384 ||
             new Set(e.controlPointIds).size !== e.controlPointIds.length ||
             e.weights.length !== e.controlPointIds.length ||
             e.weights.some(w => !Number.isFinite(w) || w <= 0) ||
@@ -102,7 +105,7 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
             e.knots.some((k, i) => !Number.isFinite(k) || (i > 0 && k < e.knots[i - 1]!)) ||
             !(e.knots[count]! > e.knots[e.degree]!) ||
             e.fitPointIds.length < (e.closed ? 3 : 2) ||
-            e.fitPointIds.length > 64 ||
+            e.fitPointIds.length > 66 ||
             e.fitPointIds.length !== e.fitParameters.length ||
             e.fitParameters.some((t, i) => !Number.isFinite(t) || t < 0 || t > 1 || (i > 0 && t <= e.fitParameters[i - 1]!)) ||
             e.startId !== e.fitPointIds[0] ||
@@ -135,6 +138,10 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
         error('invalid-reference', 'An offset needs source and copied geometry.', undefined, [c.id]);
         continue;
       }
+      if (c.type === 'regularPolygon' && !Array.isArray(c.edgeIds)) {
+        error('invalid-reference', 'A regular polygon needs its edge list.', undefined, [c.id]);
+        continue;
+      }
       const dependencies = constraintEntityIds(c);
       if (dependencies.some(id => !entities.has(id))) {
         error('missing-reference', 'A constraint references deleted geometry.', undefined, [c.id]);
@@ -162,6 +169,22 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
         const message = dimensionValueError(c, c.value);
         if (message) error('invalid-dimension', message, undefined, [c.id]);
       }
+      if (c.type === 'symmetricCurves') {
+        const a = entities.get(c.entityAId),
+          b = entities.get(c.entityBId);
+        const compatible =
+          (a?.type === 'line' && b?.type === 'line') ||
+          (['circle', 'arc'].includes(a?.type ?? '') && ['circle', 'arc'].includes(b?.type ?? '')) ||
+          (a?.type === 'ellipse' && b?.type === 'ellipse');
+        if (
+          !compatible ||
+          entities.get(c.lineId)?.type !== 'line' ||
+          c.entityAId === c.entityBId ||
+          [c.entityAId, c.entityBId].includes(c.lineId) ||
+          (c.focusSign !== undefined && c.focusSign !== 1 && c.focusSign !== -1)
+        )
+          error('invalid-reference', 'Curve symmetry needs a separate line and compatible curves.', undefined, [c.id]);
+      }
       if (c.type === 'symmetricPoints') {
         if (
           entities.get(c.pointAId)?.type !== 'point' ||
@@ -169,6 +192,26 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
           entities.get(c.lineId)?.type !== 'line'
         )
           error('invalid-reference', 'Point symmetry needs two points and a mirror line.', undefined, [c.id]);
+      }
+      if (c.type === 'regularPolygon') {
+        if (
+          !['inscribed', 'circumscribed'].includes(c.mode) ||
+          !Array.isArray(c.edgeIds) ||
+          c.edgeIds.length < 3 ||
+          c.edgeIds.length > 50 ||
+          new Set(c.edgeIds).size !== c.edgeIds.length ||
+          entities.get(c.circleId)?.type !== 'circle' ||
+          c.edgeIds.some(id => entities.get(id)?.type !== 'line')
+        )
+          error('invalid-reference', 'A regular polygon needs a circle and three to fifty distinct edges.', undefined, [c.id]);
+      }
+      if (c.type === 'slot') {
+        const issue = slotIssue(part.sketch, c);
+        if (issue) diagnostics.push({ code: 'invalid-slot', message: issue, severity: 'error', partId: part.id, constraintIds: [c.id] });
+      }
+      if (c.type === 'linearPattern' || c.type === 'circularPattern') {
+        const issue = linearPatternIssue(part.sketch, c);
+        if (issue) error('invalid-pattern', issue, undefined, [c.id]);
       }
       if (c.type === 'offset') {
         const sources = new Set(c.members.map(member => member.sourceId));

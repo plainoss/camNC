@@ -1,7 +1,22 @@
+import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
+import { previewSlot } from './slotPreview';
+import { SketchCircularPatternControls, SketchCircularPatternManipulator } from './SketchCircularPatternControls';
 import {
+  initialCircularPatternParameters,
+  circularPatternParameters,
+  parseCircularPatternParameters,
+  type CircularPatternParameters,
+} from './circularPatternParameters';
+import {
+  CAD_GEOMETRY_TOLERANCE,
   addArc,
+  addInscribedPolygon,
+  addCircumscribedPolygon,
+  addCenterPointArc,
+  centerPointArcFromPoints,
   addBezier,
   addCircle,
+  addThreePointCircle,
   addEllipse,
   addConic,
   addCenterRectangle,
@@ -9,12 +24,24 @@ import {
   addLine,
   addPoint,
   addRectangle,
+  addAlignedRectangle,
   addSpline,
   createCadPart,
   constraintEntityIds,
   dimensionValueError,
   entityPointIds as curvePointIds,
   filletLineCorners,
+  chamferLineCorners,
+  splitSketchCurve,
+  transformSketchEntities,
+  sketchPatternOwner,
+  linearPatternSketchEntities,
+  circularPatternSketchEntities,
+  patternDeletionNotice,
+  slotDeletionNotice,
+  isClosedSketchCurve,
+  evaluateCurvePoint,
+  resolveChamferCorners,
   extendSketchCurve,
   mirrorSketchEntities,
   offsetSketch,
@@ -43,7 +70,10 @@ import {
   type CadSolveOptions,
   addFaceSketch,
   evaluateCadPart,
+  moveFaceSketch,
   removeCadFeature,
+  type CadFaceRef,
+  setCutDepth,
   setCutSuppressed,
   withFeatureVersion,
   type CadPoint,
@@ -85,6 +115,23 @@ import { idleDrawingGesture, transitionDrawingGesture, type DrawingGesture } fro
 import { advanceCreationValue, beginCreationValues, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
 import { CadValueInput } from './CadValueInput';
+import { SketchLinearPatternControls, SketchLinearPatternManipulator } from './SketchLinearPatternControls';
+import {
+  initialLinearPatternParameters,
+  linearPatternParameters,
+  parseLinearPatternParameters,
+  linearPatternAnchor,
+  editablePatternSources,
+  type LinearPatternParameters,
+} from './linearPatternParameters';
+import { SketchTransformControls, SketchTransformManipulator } from './SketchTransformControls';
+import {
+  initialTransformParameters,
+  parseTransformParameters,
+  repositionTransformPivot,
+  type TransformParameters,
+  type TransformDragKind,
+} from './transformParameters';
 import { parseCadValue } from './valueExpressions';
 import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
@@ -116,7 +163,7 @@ import { constraintColorNotice, sketchDofStatus, sketchFeedback } from './sketch
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
-import { cutRegionAt, cutRegions, withRegionDepth, type CutRegion } from './cutRegions';
+import { cutRegionAt, cutRegions, topRegions, withRegionDepth, type CutRegion } from './cutRegions';
 import { CutOverlay } from './CutOverlay';
 import { PartFeatureList } from './PartFeatureList';
 import { RegionDepthField } from './RegionDepthField';
@@ -243,7 +290,9 @@ export interface CadEditorProps {
   /** Hosts that can open a face sketch offer drawing on the part's top face. */
   onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string) => void;
   /** Editing one face sketch, with the part's outline shown behind it. It can be open, and it isn't a profile. */
-  faceSketch?: { outline: CadPoint[]; label: string };
+  faceSketch?: { outline: CadPoint[]; floor?: CadPoint[]; label: string; below?: boolean };
+  /** Open on the part in 3D, when it has an outline to show. */
+  startIn3D?: boolean;
 }
 
 /** Native editable source stays in one document while CAM remains a derived consumer of accepted revisions. */
@@ -259,6 +308,7 @@ export function CadEditor({
   controller,
   onEditFaceSketch,
   faceSketch,
+  startIn3D,
 }: CadEditorProps) {
   const [session] = useState(() => cadSession(initialDocument));
   const [doc, setDocument] = useState(session.document);
@@ -267,6 +317,7 @@ export function CadEditor({
   const part = doc.parts.find(p => p.id === partId) ?? doc.parts[0];
   const sketch = part?.sketch;
   const [tool, setTool] = useState<Tool>('select');
+  const polygonTool = tool === 'inscribedPolygon' || tool === 'circumscribedPolygon';
   const [construction, setConstruction] = useState(false);
   const [selected, setSelected] = useState<string[]>(savedView.selectedEntityIds);
   const selectionHints = useRef<Record<string, Point>>({});
@@ -275,6 +326,15 @@ export function CadEditor({
   const [hoveredConstraintEntities, setHoveredConstraintEntities] = useState<string[]>([]);
   const [conflictedConstraints, setConflictedConstraints] = useState<string[]>([]);
   const [pending, setPending] = useState<Point[]>([]);
+  const [polygonSides, setPolygonSides] = useState('6');
+  const polygonInput = useRef<HTMLInputElement>(null);
+  const polygonCountGesture = useRef<{ sides: number; radius: number } | null>(null);
+  useLayoutEffect(() => {
+    if (polygonTool && pending.length === 2) {
+      polygonInput.current?.focus();
+      polygonInput.current?.select();
+    }
+  }, [polygonTool, pending.length]);
   // A completed line leaves a continuation anchor, not an uncommitted new segment.
   const [lineContinuation, setLineContinuation] = useState(false);
   const [chain, setChain] = useState<ChainAnchor | null>(null);
@@ -283,6 +343,7 @@ export function CadEditor({
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
   const [snapCue, setSnapCue] = useState<{ point: Point; label: string } | null>(null);
   const lastSnap = useRef<CadSnapResult | null>(null);
+  const centerArcSweep = useRef<{ last: number; sweep: number } | null>(null);
   const pendingSnaps = useRef<(CadDrawingInference | null)[]>([]);
   const lastDrawingHint = useRef<CadDrawingInference | null>(null);
   const [drawingCue, setDrawingCue] = useState<CadDrawingInference | null>(null);
@@ -315,6 +376,33 @@ export function CadEditor({
   const [width, setWidth] = useState('100');
   const [height, setHeight] = useState('60');
   const [radius, setRadius] = useState('10');
+  const [slotWidth, setSlotWidth] = useState('10');
+  const [slotChain, setSlotChain] = useState(false);
+  const [sharedSlotWidth, setSharedSlotWidth] = useState<string | undefined>();
+  const slotWidthField = useRef<HTMLInputElement>(null);
+  const slotDrag = useRef<{ center: CadPoint; width: string } | null>(null);
+  const [circularParameters, setCircularParameters] = useState(initialCircularPatternParameters);
+  const circularFields = useRef<Partial<Record<'count' | 'angle', HTMLInputElement>>>({});
+  const circularDrag = useRef<{
+    kind: 'center' | 'sweep';
+    start: CadPoint;
+    parameters: CircularPatternParameters;
+    last: number;
+    sweep: number;
+  } | null>(null);
+  const [linearParameters, setLinearParameters] = useState(initialLinearPatternParameters);
+  const [patternEditId, setPatternEditId] = useState<string | null>(null);
+  const [patternNotice, setPatternNotice] = useState('');
+  const patternCommandId = useRef('');
+  const patternFields = useRef<Partial<Record<Exclude<keyof LinearPatternParameters, 'secondDirection'>, HTMLInputElement>>>({});
+  const patternDrag = useRef<{ index: number; anchor: CadPoint; parameters: LinearPatternParameters } | null>(null);
+  const [transformParameters, setTransformParameters] = useState(initialTransformParameters);
+  const [transformNotice, setTransformNotice] = useState('');
+  const transformDrag = useRef<{ kind: TransformDragKind; start: CadPoint; parameters: TransformParameters } | null>(null);
+  const [splitNotice, setSplitNotice] = useState('');
+  const [splitFirst, setSplitFirst] = useState<{ entityId: string; parameter: number; point: CadPoint } | null>(null);
+  const chamferDrag = useRef<{ side: number; origin: CadPoint; direction: CadPoint; previous: string[] } | null>(null);
+  const [chamferDistances, setChamferDistances] = useState(['10', '10']);
   const [filletRadius, setFilletRadius] = useState('10');
   const [filletEditing, setFilletEditing] = useState(false);
   const [modification, setModification] = useState<ModificationWorkflow>(idleModificationWorkflow);
@@ -324,7 +412,7 @@ export function CadEditor({
   const [rho, setRho] = useState('0.5');
   const [selectionBox, setSelectionBox] = useState<CadSelectionBox | null>(null);
   const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
-  const [show3D, setShow3D] = useState(false);
+  const [show3D, setShow3D] = useState(!!startIn3D);
   const sketchOnly = !!faceSketch;
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
@@ -406,7 +494,84 @@ export function CadEditor({
       ? { ok: false as const, message: radius.error, cornerPointIds: filletSelection.cornerPointIds }
       : filletLineCorners(sketch, { cornerPointIds: filletSelection.cornerPointIds, radius: radius.value });
   }, [sketch, filletSelection, filletRadius]);
-  const shownSketch = filletPreview?.ok ? filletPreview.sketch : sketch;
+  const chamferSelection = useMemo(
+    () => (sketch && tool === 'chamfer' ? resolveChamferCorners(sketch, selected) : null),
+    [sketch, tool, selected]
+  );
+  const chamferPreview = useMemo(() => {
+    if (!sketch || !chamferSelection?.ok) return null;
+    const values = chamferDistances.map(value => parseCadValue(value, { unit: 'mm' }));
+    const error = values.find(value => 'error' in value);
+    return error && 'error' in error
+      ? { ok: false as const, message: error.error, cornerPointIds: chamferSelection.cornerPointIds }
+      : chamferLineCorners(sketch, {
+          cornerPointIds: chamferSelection.cornerPointIds,
+          distanceA: (values[0] as { value: number }).value,
+          distanceB: (values[1] as { value: number }).value,
+          selectedLineIds: selected,
+        });
+  }, [sketch, chamferSelection, chamferDistances, selected]);
+  const cornerPreview = tool === 'chamfer' ? chamferPreview : filletPreview;
+  const parsedTransform = useMemo(() => parseTransformParameters(transformParameters), [transformParameters]);
+  const transformPreview = useMemo(() => {
+    if (!sketch || tool !== 'transform' || !selected.length) return null;
+    return parsedTransform.ok ? transformSketchEntities(sketch, { ...parsedTransform, entityIds: selected }) : parsedTransform;
+  }, [sketch, tool, selected, parsedTransform]);
+  const parsedCircular = useMemo(() => parseCircularPatternParameters(circularParameters), [circularParameters]);
+  const parsedLinear = useMemo(() => parseLinearPatternParameters(linearParameters), [linearParameters]);
+  const linearPreview = useMemo(() => {
+    if (!sketch || !selected.length) return null;
+    if (tool === 'circularPattern')
+      return parsedCircular.ok
+        ? circularPatternSketchEntities(sketch, {
+            ...parsedCircular,
+            entityIds: selected,
+            patternId: patternEditId ?? patternCommandId.current,
+            previewLimit: 9,
+          })
+        : parsedCircular;
+    if (tool !== 'linearPattern') return null;
+    return parsedLinear.ok
+      ? linearPatternSketchEntities(sketch, {
+          ...parsedLinear,
+          entityIds: selected,
+          patternId: patternEditId ?? patternCommandId.current,
+          previewLimit: 9,
+        })
+      : parsedLinear;
+  }, [sketch, tool, selected, patternEditId, parsedLinear, parsedCircular]);
+  const patternAnchor = useMemo(() => (sketch ? linearPatternAnchor(sketch, selected) : { x: 0, y: 0 }), [sketch, selected]);
+  const slotPreview = useMemo(
+    () => (sketch && tool === 'slot' && selected.length ? previewSlot(sketch, selected, slotWidth, slotChain, sharedSlotWidth) : null),
+    [sketch, tool, selected, slotWidth, slotChain, sharedSlotWidth]
+  );
+  const slotWidthCircle = slotPreview?.ok
+    ? slotPreview.sketch.entities.find(
+        e =>
+          e.type === 'circle' &&
+          slotPreview.sketch.constraints.some(c => c.type === 'slot' && c.id === slotPreview.slotId && c.widthEntityId === e.id)
+      )
+    : undefined;
+  const slotWidthCenter =
+    slotWidthCircle?.type === 'circle' && slotPreview?.ok
+      ? slotPreview.sketch.entities.find(e => e.id === slotWidthCircle.centerId)
+      : undefined;
+  const shownSketch = slotPreview?.ok
+    ? slotPreview.sketch
+    : linearPreview?.ok
+      ? linearPreview.sketch
+      : transformPreview?.ok
+        ? transformPreview.sketch
+        : cornerPreview?.ok
+          ? cornerPreview.sketch
+          : sketch;
+  const annotationSketch = slotPreview?.ok
+    ? slotPreview.sketch
+    : linearPreview?.ok
+      ? linearPreview.sketch
+      : transformPreview?.ok
+        ? transformPreview.sketch
+        : sketch;
   const offsetPreview = useMemo(() => {
     if (!sketch || modification.phase !== 'offset' || !modification.entityIds.length) return null;
     const parsed = parseCadValue(modification.text, { unit: 'mm' });
@@ -754,8 +919,42 @@ export function CadEditor({
     event.currentTarget.setPointerCapture(event.pointerId);
     svg.current?.focus();
   };
+  const transformSelectionCenter = (ids: readonly string[]) => {
+    const wanted = new Set(
+      ids.flatMap(id => {
+        const e = sketch?.entities.find(e => e.id === id);
+        return !e ? [] : e.type === 'point' ? [e.id] : curvePointIds(e);
+      })
+    );
+    const points = sketch?.entities.filter(e => e.type === 'point' && wanted.has(e.id)) ?? [];
+    const xs = points.flatMap(e => (e.type === 'point' ? [e.x] : [])),
+      ys = points.flatMap(e => (e.type === 'point' ? [e.y] : []));
+    return xs.length ? { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 } : { x: 0, y: 0 };
+  };
   const chooseTool = (next: Tool) => {
+    slotDrag.current = null;
+    if (next === 'slot') {
+      setSlotWidth('10');
+      setSlotChain(false);
+      setSharedSlotWidth(undefined);
+    }
+    circularDrag.current = null;
+    patternDrag.current = null;
+    setPatternEditId(null);
+    setPatternNotice('');
+    if (next === 'circularPattern') {
+      setCircularParameters(initialCircularPatternParameters());
+      patternCommandId.current = newCadId();
+    }
+    if (next === 'linearPattern') {
+      setLinearParameters(initialLinearPatternParameters());
+      patternCommandId.current = newCadId();
+    }
+
     setContextMenu(null);
+    transformDrag.current = null;
+    setTransformNotice('');
+    if (next === 'transform') setTransformParameters(initialTransformParameters(transformSelectionCenter(selected)));
     contextPress.current = { phase: 'idle' };
     setCreationValues(null);
     drawingGesture.current = idleDrawingGesture();
@@ -763,6 +962,9 @@ export function CadEditor({
     setDimension(null);
     setPalette(false);
     setFilletEditing(false);
+    setSplitFirst(null);
+    setSplitNotice('');
+    chamferDrag.current = null;
     setConicEditing(null);
     setModification(idleModificationWorkflow());
     setHoveredModifyCurve(null);
@@ -852,27 +1054,47 @@ export function CadEditor({
               ? 'Click geometry to select. Drag to move. Shift-click adds to selection.'
               : next === 'rectangle' || next === 'centerRectangle'
                 ? `Click or drag from the ${next === 'centerRectangle' ? 'center' : 'first corner'} to the opposite corner. Or enter sizes below.`
-                : next === 'ellipse'
-                  ? 'Click the center, then the first axis radius, then the second axis radius.'
-                  : next === 'circle'
-                    ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
-                    : next === 'arc'
-                      ? 'Click the start, end, then a point on the arc.'
-                      : next === 'point'
-                        ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
-                        : next === 'line'
-                          ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
-                          : next === 'trim'
-                            ? 'Click an interval to trim between intersections or placed points.'
-                            : next === 'fillet'
-                              ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
-                              : next === 'conic'
-                                ? 'Click the start, end, then control point. Enter rho to shape the conic.'
-                                : next === 'spline' || next === 'bezier'
-                                  ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
-                                  : next === 'curveControlPoint'
-                                    ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                    : 'Select a line, circle, point pair or existing dimension.'
+                : next === 'inscribedPolygon' || next === 'circumscribedPolygon'
+                  ? 'Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.'
+                  : next === 'alignedRectangle'
+                    ? 'Click the first edge start and end, then the perpendicular extent.'
+                    : next === 'ellipse'
+                      ? 'Click the center, then the first axis radius, then the second axis radius.'
+                      : next === 'threePointCircle'
+                        ? 'Click three points along the circle circumference.'
+                        : next === 'circle'
+                          ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
+                          : next === 'centerPointArc'
+                            ? 'Click the arc center, start, then end. Move around the center to choose its sweep.'
+                            : next === 'arc'
+                              ? 'Click the start, end, then a point on the arc.'
+                              : next === 'point'
+                                ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
+                                : next === 'line'
+                                  ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
+                                  : next === 'slot'
+                                    ? 'Select source curves, set the slot diameter, then click empty space or press Enter. Select more paths to share the same width.'
+                                    : next === 'circularPattern'
+                                      ? 'Select geometry, then set instances, center and sweep. Drag the center or sweep handle; Enter or click empty space applies.'
+                                      : next === 'linearPattern'
+                                        ? 'Select geometry, then set instance counts, spacing and directions. Enter or click empty space applies; Escape cancels.'
+                                        : next === 'transform'
+                                          ? 'Select geometry, then drag the manipulator or enter translation, rotation and scale. Enter or click empty space applies; Escape cancels.'
+                                          : next === 'split'
+                                            ? 'Click a curve to split it. Closed curves require two distinct split points.'
+                                            : next === 'trim'
+                                              ? 'Click an interval to trim between intersections or placed points.'
+                                              : next === 'chamfer'
+                                                ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
+                                                : next === 'fillet'
+                                                  ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
+                                                  : next === 'conic'
+                                                    ? 'Click the start, end, then control point. Enter rho to shape the conic.'
+                                                    : next === 'spline' || next === 'bezier'
+                                                      ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
+                                                      : next === 'curveControlPoint'
+                                                        ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
+                                                        : 'Select a line, circle, point pair or existing dimension.'
     );
     svg.current?.focus();
   };
@@ -893,6 +1115,8 @@ export function CadEditor({
         })
       );
     const bounds = [...points.values()].filter(p => !included || included.has(p.id)).map(p => ({ x: p.x, y: p.y }));
+    // A face sketch is framed by the face, not just what's drawn on it so far.
+    if (faceSketch && !entityIds) bounds.push(...faceSketch.outline);
     for (const e of sketch.entities)
       if ((!entityIds || entityIds.includes(e.id)) && (e.type === 'circle' || e.type === 'arc')) {
         const p = points.get(e.centerId);
@@ -906,6 +1130,11 @@ export function CadEditor({
     const margin = 35;
     setView({ x: xmin - margin, y: -ymax - margin, w: Math.max(100, xmax - xmin + margin * 2), h: Math.max(80, ymax - ymin + margin * 2) });
   };
+  useEffect(() => {
+    if (faceSketch) fit();
+    // Only on opening: afterwards the view is the user's.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const projectPoint = (point: Point) => {
     const matrix = svg.current?.getScreenCTM();
     if (!matrix) return { x: point.x, y: -point.y };
@@ -925,10 +1154,15 @@ export function CadEditor({
       'line',
       'rectangle',
       'centerRectangle',
+      'alignedRectangle',
       'circle',
+      'threePointCircle',
       'ellipse',
       'arc',
       'tangentArc',
+      'centerPointArc',
+      'inscribedPolygon',
+      'circumscribedPolygon',
       'point',
       'conic',
       'spline',
@@ -1006,11 +1240,19 @@ export function CadEditor({
     } else if (!hit) point = { x: Math.round(raw.x), y: Math.round(raw.y) };
     return point;
   };
-  const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex = -1) => {
+  const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex: number | readonly number[] = -1) => {
     let next = source;
     const createdCurve = source.entities.find(
       e => (e.type === 'circle' || e.type === 'arc') && !sketch?.entities.some(before => before.id === e.id)
     );
+    const polygonEdge =
+      tool === 'inscribedPolygon'
+        ? source.entities.find(e => e.type === 'line' && !sketch?.entities.some(before => before.id === e.id))
+        : undefined;
+    const rectangleTop =
+      tool === 'alignedRectangle'
+        ? source.entities.filter(e => e.type === 'line' && !sketch?.entities.some(before => before.id === e.id))[2]
+        : undefined;
     for (const [index, inference] of hints.entries()) {
       if (!inference || (!inference.snap && !inference.alignments.length)) continue;
       const hint = inference.snap;
@@ -1018,7 +1260,7 @@ export function CadEditor({
         (e): e is SketchPoint => e.type === 'point' && Math.hypot(e.x - inference.point.x, e.y - inference.point.y) < 1e-7
       );
       let point: SketchPoint | undefined = candidates.find(e => !sketch?.entities.some(before => before.id === e.id)) ?? candidates[0];
-      if (index === curvePointIndex && createdCurve) {
+      if ((Array.isArray(curvePointIndex) ? curvePointIndex.includes(index) : index === curvePointIndex) && createdCurve) {
         // A circle's rim / arc's through click needs a concrete construction point to retain its inferred intent.
         if (!point) {
           next = addPoint(next, { ...inference.point, construction: true, standalone: false });
@@ -1029,6 +1271,22 @@ export function CadEditor({
         const pointId = point?.id;
         if (pointId && !next.constraints.some(c => c.type === 'pointOnCircle' && c.pointId === pointId && c.entityId === createdCurve.id))
           next = addConstraint(next, { type: 'pointOnCircle', pointId, entityId: createdCurve.id });
+      }
+      if (index === 1 && polygonEdge?.type === 'line') {
+        if (!point) {
+          next = addPoint(next, { ...inference.point, construction: true, standalone: false });
+          point = next.entities.at(-1) as SketchPoint;
+        }
+        next = addConstraint(next, { type: 'midpoint', pointId: point.id, entityId: polygonEdge.id });
+      }
+      if (index === 2 && rectangleTop?.type === 'line') {
+        if (!point) {
+          next = addPoint(next, { ...inference.point, construction: true, standalone: false });
+          point = next.entities.at(-1) as SketchPoint;
+        }
+        const equivalent = pointEquivalence(next.constraints);
+        if (![rectangleTop.startId, rectangleTop.endId].some(id => equivalent.equivalent(id, point!.id)))
+          next = addConstraint(next, { type: 'pointOnLine', pointId: point.id, entityId: rectangleTop.id });
       }
       if (point) for (const relation of inferredPointConstraints(inference, point.id, next)) next = addConstraint(next, relation);
       if (point && hint?.targetPointId && point.id !== hint.targetPointId) {
@@ -1074,7 +1332,18 @@ export function CadEditor({
     const sizeExpressions: Record<string, string | undefined> = {};
     let continued: ChainAnchor | null = null;
     let actualEnd = end;
-    if (tool === 'rectangle' || tool === 'centerRectangle') {
+    if (polygonTool && pending[1]) {
+      try {
+        next = (tool === 'inscribedPolygon' ? addInscribedPolygon : addCircumscribedPolygon)(sketch, {
+          center: start,
+          point: pending[1],
+          sides: Number(polygonSides),
+          construction,
+        });
+      } catch (error) {
+        return setMessage(error instanceof Error ? error.message : String(error));
+      }
+    } else if (tool === 'rectangle' || tool === 'centerRectangle') {
       const centered = tool === 'centerRectangle';
       const widthValue = end ? null : parseCadValue(width, { unit: 'mm' });
       const heightValue = end ? null : parseCadValue(height, { unit: 'mm' });
@@ -1097,9 +1366,21 @@ export function CadEditor({
         sizeExpressions.Width = widthValue?.expression;
         sizeExpressions.Height = heightValue?.expression;
       }
+    } else if (tool === 'alignedRectangle' && pending[1] && end) {
+      try {
+        next = addAlignedRectangle(sketch, { start, end: pending[1], through: end, construction });
+      } catch (error) {
+        return setMessage(error instanceof Error ? error.message : String(error));
+      }
     } else if (tool === 'ellipse' && pending[1] && end) {
       try {
         next = addEllipse(sketch, { center: start, axis: pending[1], through: end, construction });
+      } catch (error) {
+        return setMessage(error instanceof Error ? error.message : String(error));
+      }
+    } else if (tool === 'threePointCircle' && pending[1] && end) {
+      try {
+        next = addThreePointCircle(sketch, { points: [start, pending[1], end], construction });
       } catch (error) {
         return setMessage(error instanceof Error ? error.message : String(error));
       }
@@ -1143,6 +1424,18 @@ export function CadEditor({
       } catch (error) {
         return setMessage(error instanceof Error ? error.message : String(error));
       }
+    } else if (tool === 'centerPointArc' && pending[1] && end) {
+      try {
+        next = addCenterPointArc(sketch, {
+          center: start,
+          start: pending[1],
+          end,
+          sweepIntent: centerArcSweep.current?.sweep,
+          construction,
+        });
+      } catch (error) {
+        return setMessage(error instanceof Error ? error.message : String(error));
+      }
     } else if (tool === 'arc' && pending[1] && end) {
       const arc = threePointArc(start, pending[1], end);
       if (!arc || arc.radius < 0.1) return setMessage('Three points on the arc must not lie on one straight line.');
@@ -1171,8 +1464,28 @@ export function CadEditor({
             : c
         ),
       };
-    const hints = end ? [...pendingSnaps.current, lastDrawingHint.current] : pendingSnaps.current;
-    next = addSnapRelations(next, hints, end && (tool === 'circle' || tool === 'arc') ? hints.length - 1 : -1);
+    const hints = polygonTool
+      ? pendingSnaps.current.slice(0, 2)
+      : end
+        ? [...pendingSnaps.current, lastDrawingHint.current]
+        : pendingSnaps.current;
+    if (tool === 'centerPointArc' && end && pending[1] && hints[2]) {
+      const arc = centerPointArcFromPoints(start, pending[1], end, centerArcSweep.current?.sweep);
+      if (arc) {
+        const angle = Math.atan2(end.y - start.y, end.x - start.x);
+        const projected = { x: arc.cx + arc.radius * Math.cos(angle), y: arc.cy + arc.radius * Math.sin(angle) };
+        // A radial projection must not attach the endpoint to an off-circle snap target.
+        hints[2] =
+          Math.hypot(projected.x - hints[2].point.x, projected.y - hints[2].point.y) > CAD_GEOMETRY_TOLERANCE
+            ? null
+            : { ...hints[2], point: projected };
+      }
+    }
+    next = addSnapRelations(
+      next,
+      hints,
+      tool === 'threePointCircle' ? [0, 1, 2] : end && (tool === 'circle' || tool === 'arc') ? hints.length - 1 : -1
+    );
     changeSketch(next);
     drawingGesture.current = idleDrawingGesture();
     if (tool === 'conic') {
@@ -1183,6 +1496,10 @@ export function CadEditor({
         setRho(String(curve.rho));
       }
     }
+    if (polygonTool) setMessage('Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.');
+    if (tool === 'threePointCircle') setMessage('Click three points along the circle circumference.');
+    if (tool === 'centerPointArc') setMessage('Click the arc center, start, then end. Move around the center to choose its sweep.');
+    if (tool === 'alignedRectangle') setMessage('Click the first edge start and end, then the perpendicular extent.');
     setDrawingCue(null);
     setSnapCue(null);
     setChain(continued);
@@ -1279,6 +1596,117 @@ export function CadEditor({
       setMessage(error instanceof Error ? error.message : String(error));
     }
   };
+  const editPattern = (id: string) => {
+    const pattern = sketch?.constraints.find(c => c.id === id);
+    if (pattern?.type !== 'linearPattern' && pattern?.type !== 'circularPattern') return;
+    chooseTool(pattern.type);
+    setPatternEditId(id);
+    patternCommandId.current = id;
+    if (pattern.type === 'linearPattern') setLinearParameters(linearPatternParameters(pattern));
+    else setCircularParameters(circularPatternParameters(pattern, sketch!));
+    setSelected(editablePatternSources(pattern));
+    setMessage('Edit the pattern counts, spacing or direction. Deleted instances remain excluded.');
+  };
+  const acceptSlot = () => {
+    if (!slotPreview?.ok) return setMessage(slotPreview?.message ?? 'Select source curves for a slot.');
+    const group = slotPreview.sketch.constraints.find(c => c.id === slotPreview.slotId);
+    changeSketch(slotPreview.sketch);
+    if (group?.type === 'slot') setSharedSlotWidth(group.widthEntityId);
+    setSelected([]);
+    setMessage('Slot created. Select more source curves to share its width, or press Escape.');
+    svg.current?.focus();
+  };
+  const acceptCircularPattern = () => {
+    if (!sketch || !parsedCircular.ok) return setMessage(parsedCircular.ok ? 'Select source geometry.' : parsedCircular.message);
+    const old = patternEditId && sketch.constraints.find(c => c.id === patternEditId),
+      center = old && old.type === 'circularPattern' ? sketch.entities.find(e => e.id === old.centerId) : undefined;
+    if (
+      old &&
+      old.type === 'circularPattern' &&
+      old.countX === parsedCircular.count &&
+      old.angle === parsedCircular.angle &&
+      old.closed === parsedCircular.closed &&
+      center?.type === 'point' &&
+      Math.hypot(center.x - parsedCircular.center.x, center.y - parsedCircular.center.y) < CAD_GEOMETRY_TOLERANCE
+    ) {
+      chooseTool('select');
+      setSelected([]);
+      setSelectedConstraints([old.id]);
+      return;
+    }
+    const result = circularPatternSketchEntities(sketch, {
+      ...parsedCircular,
+      entityIds: selected,
+      patternId: patternEditId ?? patternCommandId.current,
+    });
+    if (!result.ok) return setMessage(result.message);
+    changeSketch(result.sketch);
+    chooseTool('select');
+    setSelected([]);
+    setSelectedConstraints([result.patternId]);
+    if (result.releasedConstraintIds.length)
+      setPatternNotice(`${result.releasedConstraintIds.length} relations on removed instances were released.`);
+    setMessage('Circular pattern applied. Double-click its pattern icon or use Edit pattern to change it.');
+  };
+  const acceptLinearPattern = () => {
+    if (tool === 'circularPattern') return acceptCircularPattern();
+    if (!sketch || !parsedLinear.ok) return setMessage(parsedLinear.ok ? 'Select source geometry.' : parsedLinear.message);
+    const existing = patternEditId && sketch.constraints.find(c => c.id === patternEditId);
+    const same =
+      existing &&
+      existing.type === 'linearPattern' &&
+      existing.countX === parsedLinear.countX &&
+      existing.countY === parsedLinear.countY &&
+      Math.hypot(existing.stepX.x - parsedLinear.stepX.x, existing.stepX.y - parsedLinear.stepX.y) < CAD_GEOMETRY_TOLERANCE &&
+      Math.hypot(existing.stepY.x - parsedLinear.stepY.x, existing.stepY.y - parsedLinear.stepY.y) < CAD_GEOMETRY_TOLERANCE;
+    if (same) {
+      const id = existing.id;
+      chooseTool('select');
+      setSelected([]);
+      setSelectedConstraints([id]);
+      return;
+    }
+    const result = linearPatternSketchEntities(sketch, {
+      ...parsedLinear,
+      entityIds: selected,
+      patternId: patternEditId ?? patternCommandId.current,
+    });
+    if (!result.ok) return setMessage(result.message);
+    changeSketch(result.sketch);
+    chooseTool('select');
+    setSelected([]);
+    setSelectedConstraints([result.patternId]);
+    if (result.releasedConstraintIds.length)
+      setPatternNotice(`${result.releasedConstraintIds.length} relations on removed instances were released.`);
+    setMessage('Linear pattern applied. Double-click its pattern icon or use Edit pattern to change it.');
+  };
+  const acceptTransform = () => {
+    if (!transformPreview?.ok) return setMessage(transformPreview?.message ?? 'Select geometry to transform.');
+    if (transformPreview.changed) changeSketch(transformPreview.sketch);
+    const ids = transformPreview.entityIds,
+      released = transformPreview.releasedConstraintIds.length;
+    chooseTool('select');
+    setSelected(ids);
+    if (released) setTransformNotice(`${released} external or directed relations were released by the transform.`);
+    setMessage(transformPreview.changed ? 'Transform applied.' : 'Transform closed without changes.');
+  };
+  const acceptChamfer = () => {
+    if (!chamferPreview?.ok)
+      return setMessage(
+        chamferPreview?.message ?? (chamferSelection && !chamferSelection.ok ? chamferSelection.message : 'Select corners to chamfer.')
+      );
+    const next = structuredClone(chamferPreview.sketch);
+    chamferPreview.dimensionIds.forEach((id, index) => {
+      const value = parseCadValue(chamferDistances[index]!, { unit: 'mm' });
+      const dimension = next.constraints.find(c => c.id === id);
+      if (dimension && 'value' in dimension && 'value' in value && value.expression) dimension.expression = value.expression;
+    });
+    changeSketch(next);
+    chooseTool('select');
+    setSelected([]);
+    setSelectedConstraints(chamferPreview.dimensionIds);
+    setMessage('Chamfers created. Double-click either setback dimension to edit the group.');
+  };
   const acceptFillet = () => {
     if (!filletPreview?.ok) {
       setMessage(
@@ -1348,7 +1776,15 @@ export function CadEditor({
     }
   };
   const removeSelected = (entityIds: readonly string[] = selected, constraintIds: readonly string[] = selectedConstraints) => {
-    if (tool === 'fillet' && selected.length) {
+    if (
+      (tool === 'slot' ||
+        tool === 'fillet' ||
+        tool === 'chamfer' ||
+        tool === 'transform' ||
+        tool === 'linearPattern' ||
+        tool === 'circularPattern') &&
+      selected.length
+    ) {
       chooseTool('select');
       setSelected([]);
       return;
@@ -1399,7 +1835,12 @@ export function CadEditor({
       inference.current = null;
       tangentAxis.current = null;
     }
+    const notice = entityIds.length ? (patternDeletionNotice(sketch, next) ?? slotDeletionNotice(sketch, next)) : null;
     changeSketch(next);
+    if (notice) {
+      setMessage(notice);
+      setPatternNotice(notice);
+    }
     setSelected([]);
     setHoveredConstraintEntities([]);
     svg.current?.focus();
@@ -1415,7 +1856,13 @@ export function CadEditor({
   const contextTarget = (target: Element, position: Point) =>
     sketch
       ? target.closest('[data-constraint-id]')
-        ? ({ kind: 'blank' } as const)
+        ? sketch.constraints.some(
+            c =>
+              (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot') &&
+              c.id === target.closest('[data-constraint-id]')?.getAttribute('data-constraint-id')
+          )
+          ? { kind: 'constraint' as const, id: target.closest('[data-constraint-id]')!.getAttribute('data-constraint-id')! }
+          : ({ kind: 'blank' } as const)
         : pickSketchContextTarget(sketch, position, {
             project: projectPoint,
             selectedEntityIds: dimensionSelection,
@@ -1429,15 +1876,22 @@ export function CadEditor({
     const element =
       target.kind === 'blank'
         ? svg.current
-        : (svg.current.querySelector(`[${target.kind === 'dimension' ? 'data-dimension' : 'data-entity-id'}="${CSS.escape(target.id)}"]`) ??
-          svg.current);
+        : (svg.current.querySelector(
+            `[${target.kind === 'dimension' ? 'data-dimension' : target.kind === 'constraint' ? 'data-constraint-id' : 'data-entity-id'}="${CSS.escape(target.id)}"]`
+          ) ?? svg.current);
     const bounds = element.getBoundingClientRect();
     openContext(target, { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 });
   };
   const contextAction = (action: SketchContextAction, context: SketchContext) => {
     if (!sketch) return;
     if (action === 'fit') fit();
-    else if (action === 'fit-selection') fit(context.entityIds);
+    else if (action === 'edit-pattern') {
+      const id =
+        context.target.kind === 'constraint'
+          ? context.target.id
+          : context.entityIds.map(id => sketchPatternOwner(sketch, id)?.id).find(Boolean);
+      if (id) editPattern(id);
+    } else if (action === 'fit-selection') fit(context.entityIds);
     else if (action === 'clear') {
       setSelected([]);
       setSelectedConstraints([]);
@@ -1537,8 +1991,8 @@ export function CadEditor({
       return;
     }
     const result = buildConstraintForSelection(sketch, type, references);
-    if (result.constraint) {
-      changeSketch(addConstraint(sketch, result.constraint));
+    if (result.constraint || result.constraints?.length) {
+      changeSketch((result.constraints ?? [result.constraint!]).reduce((next, c) => addConstraint(next, c), sketch));
       setConstraintMode(null);
       setMessage(result.message);
     } else if (result.alreadyApplied) {
@@ -1586,6 +2040,19 @@ export function CadEditor({
     }
     if (editable(event.target)) return;
     const key = event.key.toLowerCase();
+    if (polygonTool && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (key === 'enter' && pending.length === 2) {
+        event.preventDefault();
+        addShape(pending[1]);
+        return;
+      }
+      if (/^[0-9]$/.test(key)) {
+        event.preventDefault();
+        setPolygonSides(key);
+        polygonInput.current?.focus();
+        return;
+      }
+    }
     // A checkbox does not own drawing letters, but retains its native keyboard
     // activation and focus. Text fields remain isolated by the guard above.
     if (event.target instanceof HTMLInputElement && event.target.type === 'checkbox' && (key === ' ' || key === 'enter')) return;
@@ -1617,7 +2084,9 @@ export function CadEditor({
     }
     if ((event.ctrlKey || event.metaKey) && key === 'a') {
       event.preventDefault();
-      setSelected(sketch?.entities.filter(e => e.type !== 'point').map(e => e.id) ?? []);
+      const ids = sketch?.entities.filter(e => e.type !== 'point').map(e => e.id) ?? [];
+      if (tool === 'transform' && !selected.length) setTransformParameters(initialTransformParameters(transformSelectionCenter(ids)));
+      setSelected(ids);
       return;
     }
     if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
@@ -1689,13 +2158,20 @@ export function CadEditor({
       return;
     }
     const constraintKey =
-      event.shiftKey && key === 'l'
-        ? 'perpendicular'
-        : !event.shiftKey
-          ? (
-              { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<string, ConstraintTool>
-            )[key]
-          : undefined;
+      event.shiftKey && key === 'q'
+        ? 'symmetric'
+        : event.shiftKey && key === 'o'
+          ? 'concentric'
+          : event.shiftKey && key === 'l'
+            ? 'perpendicular'
+            : !event.shiftKey
+              ? (
+                  { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<
+                    string,
+                    ConstraintTool
+                  >
+                )[key]
+              : undefined;
     if (constraintKey) {
       event.preventDefault();
       constrain(constraintKey);
@@ -1723,6 +2199,15 @@ export function CadEditor({
         chooseTool('select');
         setSelected([]);
       }
+    } else if (key === 'enter' && tool === 'slot') {
+      event.preventDefault();
+      acceptSlot();
+    } else if (key === 'enter' && (tool === 'linearPattern' || tool === 'circularPattern')) {
+      event.preventDefault();
+      acceptLinearPattern();
+    } else if (key === 'enter' && tool === 'transform') {
+      event.preventDefault();
+      acceptTransform();
     } else if (key === 'enter' && tool === 'fillet') {
       event.preventDefault();
       if (filletPreview?.ok) setFilletEditing(true);
@@ -1732,6 +2217,11 @@ export function CadEditor({
       finishSpline();
     } else if (key === 'enter' && selectedConstraints.length === 1) {
       const c = sketch?.constraints.find(c => c.id === selectedConstraints[0]);
+      if (c?.type === 'linearPattern' || c?.type === 'circularPattern') {
+        event.preventDefault();
+        editPattern(c.id);
+        return;
+      }
       if (c && numeric(c)) {
         event.preventDefault();
         editDimension(c.id);
@@ -1880,7 +2370,7 @@ export function CadEditor({
       }
       return;
     }
-    if (tool === 'fillet') {
+    if (tool === 'fillet' || tool === 'chamfer') {
       if (id) {
         setSelected(previous => (previous.includes(id) ? previous.filter(existing => existing !== id) : [...previous, id]));
         setFilletEditing(false);
@@ -1933,16 +2423,20 @@ export function CadEditor({
     if (constraintMode) {
       if (!id) return;
       const next = selected.includes(id) ? selected : [...selected, id];
+      const axisIds =
+        constraintMode === 'symmetric' && sketch.entities.some(e => e.id === next[0] && e.type === 'line') ? next.slice(0, 1) : [];
       const result = buildConstraintForSelection(sketch, constraintMode, next);
-      if (result.constraint) {
-        changeSketch(addConstraint(sketch, result.constraint));
-        setSelected([]);
-        setMessage(`${result.message} ${constraintPrompt(constraintMode)}`);
+      if (result.constraint || result.constraints?.length) {
+        changeSketch((result.constraints ?? [result.constraint!]).reduce((next, c) => addConstraint(next, c), sketch));
+        setSelected(constraintMode === 'symmetric' ? axisIds : []);
+        setMessage(
+          `${result.message} ${constraintMode === 'symmetric' ? 'Select the next pair relative to this symmetry line.' : constraintPrompt(constraintMode)}`
+        );
       } else if (result.alreadyApplied) {
-        setSelected([]);
+        setSelected(constraintMode === 'symmetric' ? axisIds : []);
         setMessage(result.message);
       } else {
-        setSelected(result.needsMore ? next : [id]);
+        setSelected(result.needsMore ? next : constraintMode === 'symmetric' ? axisIds : [id]);
         setMessage(result.message);
       }
       return;
@@ -1956,6 +2450,86 @@ export function CadEditor({
       svg.current?.focus();
       return;
     }
+    if (tool === 'slot') {
+      const hit = pickSketchSnap(
+        sketch,
+        { x: event.clientX, y: event.clientY },
+        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
+      );
+      const sourceId =
+        directEntityId && sketch.entities.some(e => e.id === directEntityId && e.type !== 'point') ? directEntityId : hit?.entityId;
+      if (sourceId)
+        setSelected(previous => (previous.includes(sourceId) ? previous.filter(id => id !== sourceId) : [...previous, sourceId]));
+      else if (selected.length) acceptSlot();
+      return;
+    }
+    if (tool === 'linearPattern' || tool === 'circularPattern') {
+      const hit = pickSketchSnap(
+        sketch,
+        { x: event.clientX, y: event.clientY },
+        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
+      );
+      const sourceId =
+        directEntityId && sketch.entities.some(e => e.id === directEntityId) ? directEntityId : (hit?.entityId ?? pointHit?.targetPointId);
+      if (sourceId) {
+        if (!patternEditId)
+          setSelected(previous => (previous.includes(sourceId) ? previous.filter(id => id !== sourceId) : [...previous, sourceId]));
+      } else if (selected.length) acceptLinearPattern();
+      return;
+    }
+    if (tool === 'transform') {
+      const hit = pickSketchSnap(
+        sketch,
+        { x: event.clientX, y: event.clientY },
+        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
+      );
+      const selectedId =
+        directEntityId && sketch.entities.some(e => e.id === directEntityId) ? directEntityId : (hit?.entityId ?? pointHit?.targetPointId);
+      if (selectedId) {
+        const next = selected.includes(selectedId) ? selected.filter(id => id !== selectedId) : [...selected, selectedId];
+        if (!selected.length) setTransformParameters(initialTransformParameters(transformSelectionCenter(next)));
+        setSelected(next);
+      } else if (selected.length) acceptTransform();
+      return;
+    }
+    if (tool === 'split') {
+      const hit = pickSketchSnap(
+        sketch,
+        { x: event.clientX, y: event.clientY },
+        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
+      );
+      const curve = sketch.entities.find(e => e.id === hit?.entityId);
+      if (!curve || curve.type === 'point' || isOwnedSplineHandle(curve) || hit?.parameter === undefined)
+        return setMessage('Select a sketch curve, away from its endpoints or tangent handles.');
+      const tau = Math.PI * 2;
+      const wrap = (angle: number) => ((angle % tau) + tau) % tau;
+      const parameter =
+        curve.type === 'circle'
+          ? wrap(hit.parameter) / tau
+          : curve.type === 'arc'
+            ? wrap(hit.parameter - curve.startAngle) / (wrap(curve.endAngle - curve.startAngle) || tau)
+            : hit.parameter;
+      if (isClosedSketchCurve(curve) && splitFirst?.entityId !== curve.id) {
+        const points = new Map(sketch.entities.filter(e => e.type === 'point').map(e => [e.id, e]));
+        setSplitFirst({ entityId: curve.id, parameter, point: evaluateCurvePoint(curve, points, parameter) });
+        setMessage('Choose a second distinct point on the same closed curve. Escape cancels both split points.');
+        return;
+      }
+      const result = splitSketchCurve(sketch, curve.id, isClosedSketchCurve(curve) ? [splitFirst!.parameter, parameter] : [parameter]);
+      if (!result.ok) return setMessage(result.message);
+      changeSketch(result.sketch);
+      setSplitFirst(null);
+      setSelected([]);
+      const notice =
+        result.releasedConstraintIds.length || result.releasedFixedPointIds.length
+          ? `Released relations: ${result.releasedConstraintIds.length}; released fixed control points: ${result.releasedFixedPointIds.length}. The exact pieces are independently editable.`
+          : '';
+      setSplitNotice(notice);
+      setMessage(
+        notice ? 'Curve split. Review the released relations shown above.' : 'Curve split. Click another curve to split, or press Escape.'
+      );
+      return;
+    }
     if (tool === 'trim') {
       // Trimming may replace the clicked circle or delete its interval before mousedown.
       event.preventDefault();
@@ -1963,6 +2537,7 @@ export function CadEditor({
         const entity = sketch.entities.find(entity => entity.id === id);
         if (entity && isOwnedSplineHandle(entity))
           return setMessage('Spline tangent handles cannot be trimmed. Edit their constraints or reshape the spline.');
+        if (sketchPatternOwner(sketch, id)) return setMessage('Remove the pattern relation before trimming its finite geometry.');
         const trimmed = trimSketchCurveAt(sketch, id, p);
         if (trimmed) changeSketch(trimmed);
         else setMessage('Trim supports line, circle and arc intervals. Select other curves and press Delete to remove them.');
@@ -2060,6 +2635,7 @@ export function CadEditor({
       }
     } else if (!pending.length) {
       setPending([p]);
+      centerArcSweep.current = null;
       pendingSnaps.current = [lastDrawingHint.current];
       setLineContinuation(false);
       const gesture = transitionDrawingGesture(drawingGesture.current, {
@@ -2076,16 +2652,42 @@ export function CadEditor({
         event.currentTarget.setPointerCapture(event.pointerId);
       }
       if (tool === 'arc') setMessage('Click the arc end, then move to shape the arc.');
-    } else if ((tool === 'arc' || tool === 'conic' || tool === 'ellipse') && pending.length === 1) {
-      if (tool === 'ellipse' && Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) < 0.1) return;
+    } else if (
+      (tool === 'arc' ||
+        tool === 'conic' ||
+        tool === 'ellipse' ||
+        tool === 'threePointCircle' ||
+        tool === 'alignedRectangle' ||
+        tool === 'centerPointArc' ||
+        polygonTool) &&
+      pending.length === 1
+    ) {
+      if (
+        (tool === 'ellipse' || tool === 'threePointCircle' || tool === 'alignedRectangle' || tool === 'centerPointArc' || polygonTool) &&
+        Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) < 0.1
+      )
+        return;
+      if (polygonTool) {
+        event.preventDefault();
+        polygonCountGesture.current = { sides: Number(polygonSides), radius: Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) };
+      }
       setPending([...pending, p]);
+      if (tool === 'centerPointArc') centerArcSweep.current = { last: Math.atan2(p.y - pending[0]!.y, p.x - pending[0]!.x), sweep: 0 };
       pendingSnaps.current.push(lastDrawingHint.current);
       setMessage(
-        tool === 'ellipse'
-          ? 'Click to set the second axis radius, perpendicular to the first.'
-          : tool === 'arc'
-            ? 'Move to shape the arc, then click a point on it.'
-            : 'Click the conic control point.'
+        polygonTool
+          ? 'Enter the number of sides, or move toward/away from the center to adjust it. Click or press Enter to finish.'
+          : tool === 'centerPointArc'
+            ? 'Move clockwise or counterclockwise around the center, then click the arc end.'
+            : tool === 'alignedRectangle'
+              ? 'Click to set the perpendicular extent of the rectangle.'
+              : tool === 'threePointCircle'
+                ? 'Click the third point on the circle circumference.'
+                : tool === 'ellipse'
+                  ? 'Click to set the second axis radius, perpendicular to the first.'
+                  : tool === 'arc'
+                    ? 'Move to shape the arc, then click a point on it.'
+                    : 'Click the conic control point.'
       );
     } else {
       // Rho opens during this pointerdown. Suppress the browser's following mousedown
@@ -2095,6 +2697,120 @@ export function CadEditor({
     }
   };
   const pointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    if (slotDrag.current) {
+      const matrix = svg.current?.getScreenCTM();
+      if (!matrix) return;
+      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
+        center = slotDrag.current.center;
+      setSlotWidth(String(Math.round(2 * Math.hypot(raw.x - center.x, -raw.y - center.y) * 1e6) / 1e6));
+      return;
+    }
+    if (circularDrag.current) {
+      const matrix = svg.current?.getScreenCTM();
+      if (!matrix) return;
+      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
+        point = { x: raw.x, y: -raw.y },
+        gesture = circularDrag.current,
+        parsed = parseCircularPatternParameters(gesture.parameters);
+      if (!parsed.ok) return;
+      const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
+      if (gesture.kind === 'center')
+        setCircularParameters({
+          ...gesture.parameters,
+          centerX: text(parsed.center.x + point.x - gesture.start.x),
+          centerY: text(parsed.center.y + point.y - gesture.start.y),
+        });
+      else {
+        const a = Math.atan2(point.y - parsed.center.y, point.x - parsed.center.x);
+        gesture.sweep += Math.atan2(Math.sin(a - gesture.last), Math.cos(a - gesture.last));
+        gesture.last = a;
+        setCircularParameters({
+          ...gesture.parameters,
+          closed: false,
+          angle: text(Math.max(-359.999999, Math.min(359.999999, (gesture.sweep * 180) / Math.PI))),
+        });
+      }
+      return;
+    }
+    if (patternDrag.current) {
+      const matrix = svg.current?.getScreenCTM();
+      if (!matrix) return;
+      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
+        { index, anchor, parameters } = patternDrag.current;
+      const x = raw.x - anchor.x,
+        y = -raw.y - anchor.y,
+        spacing = String(Math.round(Math.hypot(x, y) * 1e6) / 1e6),
+        angle = String(Math.round(((Math.atan2(y, x) * 180) / Math.PI) * 1e6) / 1e6);
+      setLinearParameters({
+        ...parameters,
+        ...(index === 0 ? { spacingX: spacing, angleX: angle } : { spacingY: spacing, angleY: angle }),
+      });
+      return;
+    }
+
+    if (transformDrag.current) {
+      const matrix = svg.current?.getScreenCTM();
+      if (!matrix) return;
+      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+      let point = { x: raw.x, y: -raw.y };
+      const { kind, start, parameters } = transformDrag.current,
+        parsed = parseTransformParameters(parameters);
+      if (!parsed.ok) return;
+      const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
+      const center = { x: parsed.pivot.x + parsed.translation.x, y: parsed.pivot.y + parsed.translation.y };
+      if (kind === 'translate')
+        setTransformParameters({
+          ...parameters,
+          dx: text(parsed.translation.x + point.x - start.x),
+          dy: text(parsed.translation.y + point.y - start.y),
+        });
+      if (kind === 'rotate') {
+        const delta = Math.atan2(point.y - center.y, point.x - center.x) - Math.atan2(start.y - center.y, start.x - center.x);
+        setTransformParameters({ ...parameters, angle: text(parsed.angle + (delta * 180) / Math.PI) });
+      }
+      if (kind === 'scale') {
+        const initial = Math.hypot(start.x - center.x, start.y - center.y);
+        if (initial > CAD_GEOMETRY_TOLERANCE)
+          setTransformParameters({
+            ...parameters,
+            scale: text(Math.max(0.001, (parsed.scale * Math.hypot(point.x - center.x, point.y - center.y)) / initial)),
+          });
+      }
+      if (kind === 'pivot') {
+        const snap = pickSketchPoint(shownSketch!, { x: event.clientX, y: event.clientY }, { project: projectPoint });
+        if (snap) point = snap.point;
+        const r = (parsed.angle * Math.PI) / 180,
+          worldDx = point.x - start.x,
+          worldDy = point.y - start.y;
+        const x = parsed.pivot.x + (Math.cos(r) * worldDx + Math.sin(r) * worldDy) / parsed.scale,
+          y = parsed.pivot.y + (-Math.sin(r) * worldDx + Math.cos(r) * worldDy) / parsed.scale;
+        const dx = parsed.pivot.x - x,
+          dy = parsed.pivot.y - y,
+          c = parsed.scale * Math.cos(r),
+          s = parsed.scale * Math.sin(r);
+        setTransformParameters({
+          ...parameters,
+          pivotX: text(x),
+          pivotY: text(y),
+          dx: text(parsed.translation.x + (1 - c) * dx + s * dy),
+          dy: text(parsed.translation.y - s * dx + (1 - c) * dy),
+        });
+      }
+      return;
+    }
+
+    if (chamferDrag.current) {
+      const matrix = svg.current?.getScreenCTM();
+      if (!matrix) return;
+      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+      const { side, origin, direction } = chamferDrag.current;
+      const distance = Math.max(0.001, (point.x - origin.x) * direction.x + (-point.y - origin.y) * direction.y);
+      setChamferDistances(previous =>
+        previous.map((value, index) => (index === side ? String(Math.round(distance * 1000) / 1000) : value))
+      );
+      return;
+    }
+
     contextPress.current = transitionSketchContextPress(contextPress.current, {
       type: 'move',
       pointerId: event.pointerId,
@@ -2185,6 +2901,28 @@ export function CadEditor({
         p = { x: movingPoint.origin.x + drop.point.x - point.x, y: movingPoint.origin.y + drop.point.y - point.y };
       }
     }
+    if (tool === 'centerPointArc' && pending.length === 2 && centerArcSweep.current) {
+      const center = pending[0]!;
+      if (Math.hypot(p.x - center.x, p.y - center.y) > 1e-6) {
+        const angle = Math.atan2(p.y - center.y, p.x - center.x),
+          previous = centerArcSweep.current;
+        previous.sweep += Math.atan2(Math.sin(angle - previous.last), Math.cos(angle - previous.last));
+        previous.last = angle;
+      }
+    }
+    if (polygonTool && pending.length === 2 && polygonCountGesture.current) {
+      const anchor = polygonCountGesture.current,
+        center = pending[0]!;
+      if (Number.isInteger(anchor.sides))
+        setPolygonSides(
+          String(
+            Math.max(
+              3,
+              Math.min(50, Math.round(anchor.sides + ((Math.hypot(p.x - center.x, p.y - center.y) - anchor.radius) * markerScale) / 12))
+            )
+          )
+        );
+    }
     setCursor(drop?.point ?? p);
     setDrawingCue(movingPoint?.snapPointId ? (snap && !event.shiftKey ? drop : null) : lastDrawingHint.current);
     const pointHit = sketch
@@ -2226,6 +2964,34 @@ export function CadEditor({
     void solveDrag(moving);
   };
   const pointerEnd = (cancel = false, event?: PointerEvent<SVGSVGElement>) => {
+    if (slotDrag.current) {
+      if (cancel) setSlotWidth(slotDrag.current.width);
+      slotDrag.current = null;
+      return;
+    }
+    if (circularDrag.current) {
+      if (cancel) setCircularParameters(circularDrag.current.parameters);
+      circularDrag.current = null;
+      return;
+    }
+    if (patternDrag.current) {
+      if (cancel) setLinearParameters(patternDrag.current.parameters);
+      patternDrag.current = null;
+      return;
+    }
+
+    if (transformDrag.current) {
+      if (cancel) setTransformParameters(transformDrag.current.parameters);
+      transformDrag.current = null;
+      return;
+    }
+
+    if (chamferDrag.current) {
+      if (cancel) setChamferDistances(chamferDrag.current.previous);
+      chamferDrag.current = null;
+      return;
+    }
+
     pan.current = null;
     if (contextPress.current.phase === 'pressed') {
       const context = transitionSketchContextPress(
@@ -2272,7 +3038,7 @@ export function CadEditor({
         setSelected(box.additive ? [...new Set([...box.selected, ...result.entityIds])] : result.entityIds);
         if (!box.additive) setSelectedConstraints([]);
       } else if (!cancel && !box.moved && !box.additive && tool === 'select' && !faceSketch && part) {
-        const entry = cutRegionAt(cutRegions(part), box.start);
+        const entry = cutRegionAt(topRegions(cutRegions(part)), box.start);
         if (entry) setRegionField({ entry, anchor: box.start });
       }
       return;
@@ -2318,15 +3084,23 @@ export function CadEditor({
     if (busy || solving || finishing.current || preparingDimension.current) return blocked('Wait for the current sketch check to finish.');
     const reason = !thicknessValid
       ? 'Enter a valid part thickness before finishing the sketch.'
-      : tool === 'fillet' && selected.length
-        ? 'Apply the fillet radius or press Escape before finishing the sketch.'
-        : modification.phase === 'mirror' && modification.entityIds.length
-          ? 'Choose the mirror line or press Escape before finishing the sketch.'
-          : modification.phase === 'extend' && modification.entityId
-            ? 'Place the extended endpoint or press Escape before finishing the sketch.'
-            : pending.length && !lineContinuation
-              ? 'Complete the current shape or press Escape before finishing the sketch.'
-              : null;
+      : tool === 'slot' && selected.length
+        ? 'Create the slot or press Escape before finishing the sketch.'
+        : (tool === 'linearPattern' || tool === 'circularPattern') && selected.length
+          ? 'Apply the pattern or press Escape before finishing the sketch.'
+          : tool === 'transform' && selected.length
+            ? 'Apply the transform or press Escape before finishing the sketch.'
+            : splitFirst
+              ? 'Choose the second split point or press Escape before finishing the sketch.'
+              : (tool === 'fillet' || tool === 'chamfer') && selected.length
+                ? 'Apply the corner preview or press Escape before finishing the sketch.'
+                : modification.phase === 'mirror' && modification.entityIds.length
+                  ? 'Choose the mirror line or press Escape before finishing the sketch.'
+                  : modification.phase === 'extend' && modification.entityId
+                    ? 'Place the extended endpoint or press Escape before finishing the sketch.'
+                    : pending.length && !lineContinuation
+                      ? 'Complete the current shape or press Escape before finishing the sketch.'
+                      : null;
     if (reason) {
       return blocked(reason);
     }
@@ -2387,6 +3161,15 @@ export function CadEditor({
       setBusy(false);
     }
   };
+  const sketchOnFace = (face: CadFaceRef) => {
+    if (!part || !onEditFaceSketch) return;
+    // Checked first: a blocked sketch command mustn't leave an empty face sketch behind.
+    const prepared = prepareDocument();
+    if (!prepared || !hasOutline(prepared, part.id)) return;
+    const added = addFaceSketch(prepared, part.id, face);
+    commit(added.document);
+    onEditFaceSketch(documentRef.current, part.id, added.sketchId);
+  };
   const valuePosition = (anchor: Point | null, desiredWidth = 216, topOffset = 12) => {
     const matrix = svg.current?.getScreenCTM();
     const drawing = svg.current?.closest('.cad-drawing')?.getBoundingClientRect();
@@ -2433,7 +3216,13 @@ export function CadEditor({
   const currentSolverResult = !solving && lastCheckedRevision.current === `${doc.id}:${doc.revision}`;
   const colorNotice = currentSolverResult ? constraintColorNotice(activeSketchStatus) : undefined;
   const entityStatus =
-    currentSolverResult && !drag.current && !filletPreview?.ok && activeSketchStatus?.status === 'solved'
+    currentSolverResult &&
+    !drag.current &&
+    !cornerPreview?.ok &&
+    !transformPreview?.ok &&
+    !linearPreview?.ok &&
+    !slotPreview?.ok &&
+    activeSketchStatus?.status === 'solved'
       ? activeSketchStatus.entityStatus
       : undefined;
   const stroke =
@@ -2469,8 +3258,17 @@ export function CadEditor({
         canRedo={session.future.length > 0}
         canFinish={
           faceSketch
-            ? !solving && !problems.length
-            : thicknessValid && !solving && !problems.length && numberOfShapes > 0 && !(tool === 'fillet' && selected.length)
+            ? !solving &&
+              !problems.length &&
+              !splitFirst &&
+              !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
+            : thicknessValid &&
+              !solving &&
+              !problems.length &&
+              numberOfShapes > 0 &&
+              !splitFirst &&
+              !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
+              !((tool === 'fillet' || tool === 'chamfer') && selected.length)
         }
         onTool={next => {
           if (next === 'dimension') beginDimension();
@@ -2584,17 +3382,9 @@ export function CadEditor({
                       if (prepared && hasOutline(prepared, part.id)) onEditFaceSketch(prepared, part.id, sketchId);
                     })
                   }
-                  onNew={
-                    onEditFaceSketch &&
-                    (() => {
-                      // Checked first: a blocked sketch command mustn't leave an empty face sketch behind.
-                      const prepared = prepareDocument();
-                      if (!prepared || !hasOutline(prepared, part.id)) return;
-                      const added = addFaceSketch(prepared, part.id, 'top');
-                      commit(added.document);
-                      onEditFaceSketch(documentRef.current, part.id, added.sketchId);
-                    })
-                  }
+                  onCutDepth={(cut, depth) => commit(setCutDepth(documentRef.current, part.id, cut.sketchId, cut.regionId, depth))}
+                  onMoveToTop={sketchId => commit(moveFaceSketch(documentRef.current, part.id, sketchId, 'top'))}
+                  onNew={onEditFaceSketch && (face => sketchOnFace(face))}
                 />
               )}
               <div className="cad-divider" />
@@ -2653,7 +3443,8 @@ export function CadEditor({
           )}
           <div className="cad-canvas-bar">
             <span>
-              <strong>TOP</strong> · {part?.name ?? 'Sketch'} <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
+              <strong>{faceSketch?.below ? 'BOTTOM' : 'TOP'}</strong> · {part?.name ?? 'Sketch'}{' '}
+              <span className="cad-muted">/ {faceSketch?.label ?? 'XY plane'}</span>
             </span>
             <div>
               {!faceSketch && (
@@ -2663,6 +3454,8 @@ export function CadEditor({
                   disabled={!partHasOutline}
                   onClick={() => {
                     if (!show3D) chooseTool('select');
+                    // Back on the drawing, its keys work straight away.
+                    else requestAnimationFrame(() => svg.current?.focus());
                     setShow3D(!show3D);
                   }}>
                   3D
@@ -2695,6 +3488,7 @@ export function CadEditor({
                 key={part.id}
                 part={part}
                 onChoose={(entry, depth) => commit(withRegionDepth(documentRef.current, part.id, entry, depth))}
+                onSketchFace={onEditFaceSketch && sketchOnFace}
               />
             </Suspense>
           )}
@@ -2749,7 +3543,9 @@ export function CadEditor({
               partId={part?.id}
               verified={
                 !solving &&
-                !(tool === 'fillet' && selected.length) &&
+                !splitFirst &&
+                !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
+                !((tool === 'slot' || tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
                 activeSketchStatus?.status === 'solved' &&
                 lastCheckedRevision.current === `${doc.id}:${doc.revision}`
               }
@@ -2759,6 +3555,17 @@ export function CadEditor({
                 data-face-outline
                 className="cad-face-outline"
                 d={faceSketch.outline.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                pointerEvents="none"
+              />
+            )}
+            {faceSketch?.floor && (
+              <path
+                data-face-floor
+                d={faceSketch.floor.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                fill="#c99a5b"
+                fillOpacity={0.25}
+                stroke="#7a5526"
+                strokeWidth={1 / markerScale}
                 pointerEvents="none"
               />
             )}
@@ -2789,7 +3596,7 @@ export function CadEditor({
                   ...hoveredConstraintEntities,
                   ...selectedConstraints.flatMap(id => associatedEntityIds(sketch, id)),
                 ]}
-                stroke={filletPreview?.ok ? '#858d96' : stroke}
+                stroke={cornerPreview?.ok || transformPreview?.ok || linearPreview?.ok || slotPreview?.ok ? '#858d96' : stroke}
                 entityStatus={entityStatus}
                 pixelScale={markerScale}
                 hoveredPointId={hoveredPoint}
@@ -2803,10 +3610,130 @@ export function CadEditor({
                 }}
               />
             )}
-            {tool === 'fillet' &&
-              filletPreview &&
-              !filletPreview.ok &&
-              filletPreview.cornerPointIds.map(id => {
+            {tool === 'slot' && slotWidthCircle?.type === 'circle' && slotWidthCenter?.type === 'point' && (
+              <SketchSlotWidthHandle
+                center={slotWidthCenter}
+                radius={slotWidthCircle.radius}
+                pixelScale={markerScale}
+                onStart={e => {
+                  slotDrag.current = { center: slotWidthCenter, width: slotWidth };
+                  svg.current?.setPointerCapture(e.pointerId);
+                  svg.current?.focus();
+                }}
+              />
+            )}
+            {tool === 'circularPattern' && selected.length > 0 && parsedCircular.ok && linearPreview?.ok && (
+              <SketchCircularPatternManipulator
+                center={parsedCircular.center}
+                anchor={patternAnchor}
+                count={parsedCircular.count}
+                angle={parsedCircular.angle}
+                closed={parsedCircular.closed}
+                pixelScale={markerScale}
+                onEdit={field => {
+                  circularFields.current[field]?.focus();
+                  circularFields.current[field]?.select();
+                }}
+                onStart={(kind, event) => {
+                  const matrix = svg.current?.getScreenCTM();
+                  if (!matrix) return;
+                  const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+                  circularDrag.current = {
+                    kind,
+                    start: { x: raw.x, y: -raw.y },
+                    parameters: circularParameters,
+                    last: Math.atan2(-raw.y - parsedCircular.center.y, raw.x - parsedCircular.center.x),
+                    sweep:
+                      ((parsedCircular.angle * Math.PI) / 180) *
+                      (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
+                  };
+                  svg.current?.setPointerCapture(event.pointerId);
+                  svg.current?.focus();
+                }}
+              />
+            )}
+            {tool === 'linearPattern' && selected.length > 0 && parsedLinear.ok && (
+              <SketchLinearPatternManipulator
+                anchor={patternAnchor}
+                steps={linearParameters.secondDirection ? [parsedLinear.stepX, parsedLinear.stepY] : [parsedLinear.stepX]}
+                counts={[parsedLinear.countX, parsedLinear.countY]}
+                pixelScale={markerScale}
+                onStart={(index, event) => {
+                  patternDrag.current = { index, anchor: patternAnchor, parameters: linearParameters };
+                  svg.current?.setPointerCapture(event.pointerId);
+                }}
+                onEdit={field => {
+                  patternFields.current[field]?.focus();
+                  patternFields.current[field]?.select();
+                }}
+              />
+            )}
+            {tool === 'transform' && selected.length > 0 && parsedTransform.ok && (
+              <SketchTransformManipulator
+                pivot={{
+                  x: parsedTransform.pivot.x + parsedTransform.translation.x,
+                  y: parsedTransform.pivot.y + parsedTransform.translation.y,
+                }}
+                pixelScale={markerScale}
+                onStart={(kind, event) => {
+                  const matrix = svg.current?.getScreenCTM();
+                  if (!matrix) return;
+                  const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+                  transformDrag.current = { kind, start: { x: raw.x, y: -raw.y }, parameters: transformParameters };
+                  svg.current?.setPointerCapture(event.pointerId);
+                }}
+              />
+            )}
+            {tool === 'split' && splitFirst && (
+              <circle
+                cx={splitFirst.point.x}
+                cy={-splitFirst.point.y}
+                r={5 / markerScale}
+                fill="#fff"
+                stroke="#2467d1"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="none"
+                data-split-first="true"
+              />
+            )}
+            {tool === 'chamfer' &&
+              chamferPreview?.ok &&
+              chamferPreview.dimensionIds.map((id, side) => {
+                const dimension = chamferPreview.sketch.constraints.find(c => c.id === id);
+                if (dimension?.type !== 'distance') return null;
+                const origin = chamferPreview.sketch.entities.find(e => e.id === dimension.pointAId);
+                const point = chamferPreview.sketch.entities.find(e => e.id === dimension.pointBId);
+                if (origin?.type !== 'point' || point?.type !== 'point') return null;
+                const length = Math.hypot(point.x - origin.x, point.y - origin.y);
+                return (
+                  <circle
+                    key={side}
+                    data-chamfer-handle={side}
+                    cx={point.x}
+                    cy={-point.y}
+                    r={6 / markerScale}
+                    fill="#fff"
+                    stroke="#2467d1"
+                    vectorEffect="non-scaling-stroke"
+                    style={{ cursor: 'move' }}
+                    onPointerDown={event => {
+                      event.stopPropagation();
+                      event.preventDefault();
+                      chamferDrag.current = {
+                        side,
+                        origin,
+                        direction: { x: (point.x - origin.x) / length, y: (point.y - origin.y) / length },
+                        previous: chamferDistances,
+                      };
+                      svg.current?.setPointerCapture(event.pointerId);
+                    }}
+                  />
+                );
+              })}
+            {(tool === 'fillet' || tool === 'chamfer') &&
+              cornerPreview &&
+              !cornerPreview.ok &&
+              cornerPreview.cornerPointIds.map(id => {
                 const point = sketch?.entities.find(entity => entity.type === 'point' && entity.id === id);
                 return point?.type === 'point' ? (
                   <circle
@@ -2822,9 +3749,9 @@ export function CadEditor({
                   />
                 ) : null;
               })}
-            {sketch && showConstraints && (
+            {annotationSketch && showConstraints && (
               <InlineConstraints
-                sketch={sketch}
+                sketch={annotationSketch}
                 scale={markerScale}
                 selectedConstraintIds={selectedConstraints}
                 conflictedConstraintIds={conflictedConstraints}
@@ -2839,16 +3766,17 @@ export function CadEditor({
                   svg.current?.focus();
                 }}
                 onHover={(_id, ids) => setHoveredConstraintEntities(ids)}
+                onEdit={editPattern}
               />
             )}
-            {sketch &&
-              sketch.constraints
+            {annotationSketch &&
+              annotationSketch.constraints
                 .filter(numeric)
                 .map(c => (
                   <DimensionGraphics
                     key={c.id}
                     constraint={c}
-                    sketch={sketch}
+                    sketch={annotationSketch}
                     pixelScale={markerScale}
                     selected={
                       selectedConstraints.includes(c.id) ||
@@ -2955,6 +3883,8 @@ export function CadEditor({
               cursor={cursor}
               curvePreview={curvePreview}
               tangent={chainPreview?.tangent}
+              polygonSides={Number(polygonSides)}
+              sweepIntent={centerArcSweep.current?.sweep}
               pixelScale={markerScale}
               construction={construction}
             />
@@ -3027,7 +3957,7 @@ export function CadEditor({
               key={regionField.entry.region.id}
               style={valuePosition(regionField.anchor, 280)}
               depth={regionField.entry.depth}
-              thickness={part.thickness}
+              thickness={part.thickness - regionField.entry.from}
               onClose={() => {
                 setRegionField(null);
                 svg.current?.focus();
@@ -3057,11 +3987,34 @@ export function CadEditor({
                 ...tools.map(t => ({
                   ...t,
                   description:
-                    t.id === 'ellipse' ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.' : undefined,
+                    t.id === 'circumscribedPolygon'
+                      ? 'Sketch a regular polygon with its vertices on a circumscribing construction circle.'
+                      : t.id === 'inscribedPolygon'
+                        ? 'Sketch a regular polygon around an inscribed construction circle.'
+                        : t.id === 'centerPointArc'
+                          ? 'Sketch an arc by defining its center, start, and end points.'
+                          : t.id === 'ellipse'
+                            ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.'
+                            : t.id === 'threePointCircle'
+                              ? 'Sketch a circle by defining three points along its circumference.'
+                              : t.id === 'alignedRectangle'
+                                ? 'Sketch a rectangle from an oriented first edge and its perpendicular extent.'
+                                : undefined,
                 })),
-                ...(['horizontal', 'vertical', 'coincident', 'midpoint', 'parallel', 'perpendicular', 'equal', 'tangent'] as const).map(
-                  id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })
-                ),
+                ...(
+                  [
+                    'horizontal',
+                    'vertical',
+                    'coincident',
+                    'concentric',
+                    'symmetric',
+                    'midpoint',
+                    'parallel',
+                    'perpendicular',
+                    'equal',
+                    'tangent',
+                  ] as const
+                ).map(id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })),
                 { id: 'construction', label: 'Construction geometry', key: 'Q' },
                 { id: 'fix', label: 'Fix / unfix', key: 'Shift+J' },
                 { id: 'fit', label: 'Zoom to fit', key: 'F' },
@@ -3083,6 +4036,174 @@ export function CadEditor({
                 svg.current?.focus();
               }}
             />
+          )}
+          {polygonTool && (
+            <form
+              className="cad-create-size"
+              onSubmit={event => {
+                event.preventDefault();
+                if (pending[1]) addShape(pending[1]);
+              }}>
+              <label>
+                Polygon sides{' '}
+                <input
+                  ref={polygonInput}
+                  aria-label="Polygon sides"
+                  type="number"
+                  min={3}
+                  max={50}
+                  step={1}
+                  value={polygonSides}
+                  onChange={event => {
+                    setPolygonSides(event.target.value);
+                    if (pending[0])
+                      polygonCountGesture.current = {
+                        sides: Number(event.target.value),
+                        radius: Math.hypot(cursor.x - pending[0].x, cursor.y - pending[0].y),
+                      };
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      chooseTool('select');
+                    }
+                  }}
+                />
+              </label>
+              <button type="submit" disabled={!pending[1]}>
+                Create polygon
+              </button>
+            </form>
+          )}
+          {tool === 'slot' && selected.length > 0 && (
+            <SketchSlotControls
+              width={slotWidth}
+              onWidth={setSlotWidth}
+              chain={slotChain}
+              onChain={setSlotChain}
+              inputRef={slotWidthField}
+              onApply={acceptSlot}
+              onCancel={() => {
+                chooseTool('select');
+                setSelected([]);
+              }}
+              error={slotPreview && !slotPreview.ok ? slotPreview.message : undefined}
+            />
+          )}
+          {tool === 'circularPattern' && selected.length > 0 && (
+            <SketchCircularPatternControls
+              parameters={circularParameters}
+              onChange={setCircularParameters}
+              onApply={acceptCircularPattern}
+              onCancel={() => {
+                chooseTool('select');
+                setSelected([]);
+              }}
+              error={linearPreview && !linearPreview.ok ? linearPreview.message : undefined}
+              previewLimited={parsedCircular.ok && parsedCircular.count > 10}
+              releasedCount={linearPreview?.ok ? linearPreview.releasedConstraintIds.length : 0}
+              onField={(key, element) => {
+                if (element) circularFields.current[key] = element;
+                else delete circularFields.current[key];
+              }}
+            />
+          )}
+          {tool === 'linearPattern' && selected.length > 0 && (
+            <SketchLinearPatternControls
+              parameters={linearParameters}
+              onChange={setLinearParameters}
+              onApply={acceptLinearPattern}
+              onCancel={() => {
+                chooseTool('select');
+                setSelected([]);
+              }}
+              error={linearPreview && !linearPreview.ok ? linearPreview.message : undefined}
+              releasedCount={linearPreview?.ok ? linearPreview.releasedConstraintIds.length : 0}
+              previewLimited={parsedLinear.ok && parsedLinear.countX * parsedLinear.countY > 10}
+              onField={(key, element) => {
+                if (element) patternFields.current[key] = element;
+                else delete patternFields.current[key];
+              }}
+            />
+          )}
+          {patternNotice && (
+            <div className="cad-create-size" role="status">
+              {patternNotice}
+            </div>
+          )}
+          {tool === 'transform' && selected.length > 0 && (
+            <SketchTransformControls
+              parameters={transformParameters}
+              onChange={next => {
+                if (next.pivotX !== transformParameters.pivotX || next.pivotY !== transformParameters.pivotY) {
+                  const parsed = parseTransformParameters(next);
+                  setTransformParameters(parsed.ok ? repositionTransformPivot(transformParameters, parsed.pivot) : next);
+                } else setTransformParameters(next);
+              }}
+              onApply={acceptTransform}
+              onCancel={() => {
+                chooseTool('select');
+                setSelected([]);
+              }}
+              error={transformPreview && !transformPreview.ok ? transformPreview.message : undefined}
+              releasedCount={transformPreview?.ok ? transformPreview.releasedConstraintIds.length : 0}
+            />
+          )}
+          {transformNotice && (
+            <div className="cad-create-size" role="status">
+              {transformNotice}
+            </div>
+          )}
+          {tool === 'split' && splitNotice && (
+            <div className="cad-create-size" role="status">
+              {splitNotice}
+            </div>
+          )}
+          {tool === 'chamfer' && selected.length > 0 && (
+            <form
+              className="cad-create-size cad-chamfer-editor"
+              onSubmit={event => {
+                event.preventDefault();
+                acceptChamfer();
+              }}>
+              {chamferDistances.map((value, index) => (
+                <label key={index}>
+                  Distance {index + 1}{' '}
+                  <CadValueInput
+                    aria-label={`Chamfer distance ${index + 1}`}
+                    inputMode="decimal"
+                    value={value}
+                    onChange={event =>
+                      setChamferDistances(previous => previous.map((text, i) => (i === index ? event.target.value : text)))
+                    }
+                    onKeyDown={event => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        chooseTool('select');
+                        setSelected([]);
+                      }
+                    }}
+                  />
+                </label>
+              ))}
+              <button type="submit" disabled={!chamferPreview?.ok}>
+                Apply chamfers
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  chooseTool('select');
+                  setSelected([]);
+                }}>
+                Cancel chamfers
+              </button>
+              {((chamferPreview && !chamferPreview.ok) || (chamferSelection && !chamferSelection.ok)) && (
+                <span role="alert" className="cad-error">
+                  {(chamferPreview && !chamferPreview.ok ? chamferPreview.message : undefined) ??
+                    (chamferSelection && !chamferSelection.ok ? chamferSelection.message : '')}
+                </span>
+              )}
+            </form>
           )}
           {tool === 'fillet' && selected.length > 0 && (
             <form

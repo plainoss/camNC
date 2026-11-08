@@ -7,12 +7,15 @@ import {
   createCadDocument,
   createCadPart,
   createPlateDocument,
+  pointInPolygon,
+  polygonArea,
   setCutDepth,
   solveCadDocument,
   type CadDocument,
 } from '@wbcnc/cad';
 import type { HoleChoice } from '@wbcnc/cam';
 import { describe, expect, it } from 'vitest';
+import { camPart, extractFeatures, flipPart } from '@wbcnc/cam';
 import { camWorker } from './camQueries';
 import { nativeCadModel } from './nativeCadModel';
 import { missingNativeHoleChoices } from './holeChoices';
@@ -167,16 +170,102 @@ describe('native CAD to CAM', () => {
       const edge = regionAt(added.document, added.sketchId, 95, 30);
       await expect(nativeCadModel(setCutDepth(added.document, partId, added.sketchId, edge.id, 'through'))).rejects.toThrow('edge');
     });
+  });
 
-    it('refuses underside cuts until CAM can machine them, so they’re never silently dropped', async () => {
+  describe('cuts from the underside', () => {
+    const regionAt = (document: CadDocument, sketchId: string, x: number, y: number) =>
+      cadSketchRegions(document.parts[0], sketchId)
+        .filter(region => pointInPolygon({ x, y }, region.points) && !region.holes.some(hole => pointInPolygon({ x, y }, hole)))
+        .sort((a, b) => Math.abs(polygonArea(a.points)) - Math.abs(polygonArea(b.points)))[0]!;
+    /** A through hole near the left, and a pocket from below near the right. */
+    function bothSides(depth = 4) {
       const base = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
-        partId = base.parts[0].id,
-        added = addFaceSketch(base, partId, 'underside'),
-        face = added.document.parts[0].features![0]!;
+        partId = base.parts[0].id;
+      base.parts[0].sketch = addCircle(base.parts[0].sketch, { x: 20, y: 30, radius: 6 });
+      const added = addFaceSketch(base, partId, 'underside'),
+        face = added.document.parts[0].features!.find(f => f.type === 'sketch')!;
       if (face.type !== 'sketch') throw new Error('Expected a sketch');
-      face.sketch = addCircle(face.sketch, { x: 50, y: 30, radius: 10 });
-      const region = regionAt(added.document, added.sketchId, 50, 30);
-      await expect(nativeCadModel(setCutDepth(added.document, partId, added.sketchId, region.id, 4))).rejects.toThrow('underside');
+      // Seen from below, X runs the other way, so this sits at x = 70 on the part.
+      face.sketch = addCircle(face.sketch, { x: -70, y: 30, radius: 10 });
+      const region = regionAt(added.document, added.sketchId, -70, 30);
+      return { document: setCutDepth(added.document, partId, added.sketchId, region.id, depth), partId };
+    }
+    const center = (paths: { x: number; y: number }[][]) => {
+      const points = paths.flat();
+      return { x: points.reduce((sum, p) => sum + p.x, 0) / points.length, y: points.reduce((sum, p) => sum + p.y, 0) / points.length };
+    };
+
+    it('leaves side A alone, and asks for a second side', async () => {
+      const { document, partId } = bothSides(),
+        { entries, model } = await nativeCadModel(document),
+        { features } = entries.get(partId)!;
+      expect(features.pockets).toEqual([]);
+      expect(features.throughHoles).toHaveLength(1);
+      expect(features.bottomFaces.map(face => face.z)).toEqual([4]);
+      expect(model.parts[0].summary.needsFlip).toBe(true);
+    });
+
+    it('gives side B the pocket where it lies after turning over, with holes lining up', async () => {
+      const { document, partId } = bothSides(),
+        { entries } = await nativeCadModel(document),
+        { x, y } = entries.get(partId)!.flipped!;
+      expect(x!.pockets.map(pocket => +pocket.floorZ.toFixed(3))).toEqual([8]);
+      expect(center(x!.pockets[0]!.strictRegion).x).toBeCloseTo(70, 0);
+      expect(center(y!.pockets[0]!.strictRegion).x).toBeCloseTo(30, 0);
+      expect(center(x!.throughHoles).x).toBeCloseTo(20, 0);
+      expect(center(y!.throughHoles).x).toBeCloseTo(80, 0);
+      expect(center(x!.throughHoles).y).toBeCloseTo(30, 0);
+    });
+
+    it('matches what the mesh extractor reads from the same part turned over', async () => {
+      const { document, partId } = bothSides(),
+        { entries } = await nativeCadModel(document),
+        { part, flipped, features } = entries.get(partId)!,
+        read = extractFeatures(flipPart(part, 'x').mesh, 12),
+        { pockets, throughHoles } = flipped!.x!;
+      expect(read.pockets.map(pocket => +pocket.floorZ.toFixed(2))).toEqual(pockets.map(pocket => +pocket.floorZ.toFixed(2)));
+      expect(read.pockets[0]!.area).toBeCloseTo(pockets[0]!.area, 0);
+      expect(center(read.pockets[0]!.strictRegion).x).toBeCloseTo(center(pockets[0]!.strictRegion).x, 0);
+      expect(read.throughHoles).toHaveLength(throughHoles.length);
+      expect(extractFeatures(part.mesh, 12).bottomFaces.map(face => +face.z.toFixed(2))).toEqual(features.bottomFaces.map(face => face.z));
+    });
+
+    it('cuts the pocket from side B without cutting through', async () => {
+      const { document, partId } = bothSides(),
+        { entries } = await nativeCadModel(document),
+        cam = camPart(entries.get(partId)!.flipped!.x!, { ...toCamSettings(kDefaultPlan), cutThrough: false });
+      expect(cam.operations.some(op => op.feature === 'pocket')).toBe(true);
+      expect(cam.operations.some(op => op.feature === 'outline')).toBe(false);
+    });
+
+    it('keeps a through cut from a pocket floor inside that pocket', async () => {
+      const base = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+        partId = base.parts[0].id;
+      base.parts[0].sketch = addCircle(base.parts[0].sketch, { x: 30, y: 30, radius: 10 });
+      const pocket = regionAt(base, base.parts[0].sketch.id, 30, 30),
+        pocketed = setCutDepth(base, partId, base.parts[0].sketch.id, pocket.id, 4),
+        cutId = pocketed.parts[0].features!.find(f => f.type === 'cut')!.id,
+        added = addFaceSketch(pocketed, partId, { floorOf: cutId }),
+        face = added.document.parts[0].features!.find(f => f.type === 'sketch')!;
+      if (face.type !== 'sketch') throw new Error('Expected a sketch');
+      // Reaches well past the pocket, to x = 55.
+      face.sketch = addRectangle(face.sketch, { x: 30, y: 25, width: 25, height: 10 });
+      const slot = regionAt(added.document, added.sketchId, 45, 30),
+        { entries } = await nativeCadModel(setCutDepth(added.document, partId, added.sketchId, slot.id, 'through')),
+        xs = entries
+          .get(partId)!
+          .features.throughHoles.flat()
+          .map(p => p.x);
+      expect(Math.max(...xs)).toBeLessThanOrEqual(40 + 0.01);
+    });
+
+    it('refuses cuts from the two faces that meet', async () => {
+      const { document, partId } = bothSides(8),
+        part = document.parts[0];
+      part.sketch = addCircle(part.sketch, { x: 70, y: 30, radius: 15 });
+      const pocket = regionAt(document, part.sketch.id, 70, 30),
+        meeting = setCutDepth(document, partId, part.sketch.id, pocket.id, 6);
+      await expect(nativeCadModel(meeting)).rejects.toThrow(/two faces meet/);
     });
   });
 });

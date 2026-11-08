@@ -1,5 +1,15 @@
 import { useRef, useState } from 'react';
-import { evaluateCadPart, faceSketchDocument, removeCadFeature, withFaceSketchDocument, type CadDocument } from '@wbcnc/cad';
+import {
+  cadFaceSketches,
+  evaluateCadFeatures,
+  faceIsUnderside,
+  flipUnderside,
+  evaluateCadPart,
+  faceSketchDocument,
+  removeCadFeature,
+  withFaceSketchDocument,
+  type CadDocument,
+} from '@wbcnc/cad';
 import { createFileRoute, Navigate, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { zodValidator } from '@tanstack/zod-adapter';
 import { z } from 'zod';
@@ -230,7 +240,14 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     setEditorEpoch(epoch => epoch + 1);
     setFaceEdit(null);
   };
-  const facePart = faceEdit && evaluateCadPart(faceEdit.base.parts.find(part => part.id === faceEdit.partId)!).part;
+  const facePartSource = faceEdit && faceEdit.base.parts.find(part => part.id === faceEdit.partId)!,
+    facePart = facePartSource && evaluateCadPart(facePartSource).part,
+    faceOn = facePartSource && cadFaceSketches(facePartSource).find(face => face.sketch.id === faceEdit!.sketchId)?.on,
+    faceBelow = !!facePartSource && !!faceOn && faceIsUnderside(facePartSource, faceOn),
+    faceFloor =
+      facePartSource && facePart && typeof faceOn === 'object'
+        ? evaluateCadFeatures(facePartSource, facePart).part.cuts?.find(cut => cut.id === (faceOn as { floorOf: string }).floorOf)?.outline
+        : undefined;
   return (
     <CamPage className="h-dvh">
       <CamJobBar job={initialJob} onStageNavigate={destination => void navigateStage(destination)} navigationPending={navigationPending} />
@@ -252,14 +269,24 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
           <CadEditor
             key={faceEdit.sketchId}
             document={faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId)}
-            faceSketch={{ outline: facePart.outline, label: 'Top face' }}
+            faceSketch={{
+              outline: faceBelow ? flipUnderside(facePart.outline) : facePart.outline,
+              floor: faceBelow && faceFloor ? flipUnderside(faceFloor) : faceFloor,
+              label: `${faceFloor ? 'Pocket floor' : faceBelow ? 'Underside' : 'Top face'}${faceBelow ? ', seen from below' : ''}`,
+              below: faceBelow,
+            }}
             onDraftChange={edited => {
               const merged = withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited);
               if (activeSession.current === session) syncCadSession(session, merged);
               draft(merged);
             }}
             onFinish={edited => leaveFaceSketch(withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited))}
-            onCancel={() => leaveFaceSketch(faceEdit.base)}
+            onCancel={() => {
+              const { base } = faceEdit;
+              // Cancel first saves the sketch as it was. Carrying on from that saved draft, rather than the copy taken on
+              // entry, keeps the next save's checkpoint in step with what's stored.
+              void queue.current.then(() => leaveFaceSketch(failure.current ? base : persisted.current.design!.draft));
+            }}
             saveStatus={status}
             notice={conflicted ? null : error}
             controller={editor}
@@ -268,6 +295,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
           <CadEditor
             key={editorEpoch}
             document={editorDocument}
+            startIn3D
             onEditFaceSketch={(base, partId, sketchId) => {
               draft(base);
               setFaceEdit({ base, partId, sketchId });

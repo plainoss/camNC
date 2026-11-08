@@ -19,6 +19,21 @@ export interface InlineConstraintsProps {
 
 export function ConstraintSymbol({ kind }: { kind: InlineConstraintKind }) {
   switch (kind) {
+    case 'slot':
+      return <path d="M-3-4h6a4 4 0 0 1 0 8h-6a4 4 0 0 1 0-8z" />;
+    case 'circularPattern':
+      return (
+        <>
+          <circle r="6" strokeDasharray="2 3" />
+          <circle cx="0" cy="-6" r="2" />
+          <circle cx="-5" cy="3" r="2" />
+          <circle cx="5" cy="3" r="2" />
+        </>
+      );
+    case 'linearPattern':
+      return <path d="M-7-5h4v4h-4zm6 0h4v4h-4zm6 0h4v4H5zM-7 2h4v4h-4zm6 0h4v4h-4zm6 0h4v4H5z" />;
+    case 'regularPolygon':
+      return <path d="m0-6 5 3v6l-5 3-5-3v-6z" />;
     case 'horizontal':
     case 'horizontalPoints':
       return <path d="M-5 0H5" />;
@@ -54,6 +69,7 @@ export function ConstraintSymbol({ kind }: { kind: InlineConstraintKind }) {
       return <path d="M-5-2H5M-5 2H5" />;
     case 'parallel':
       return <path d="M-5 5L-1-5M1 5L5-5" />;
+    case 'symmetricCurves':
     case 'symmetricPoints':
       return (
         <>

@@ -24,6 +24,7 @@ import {
   type CadSketchRegion,
   cadCuts,
   setCutSuppressed,
+  moveFaceSketch,
 } from './index';
 
 const inside = (point: CadPoint, loop: CadPoint[]) => {
@@ -297,14 +298,15 @@ describe('CAD face sketches', () => {
     const document = plate(),
       partId = document.parts[0]!.id,
       added = addFaceSketch(document, partId, 'underside'),
-      sketch = addCircle(faceSketch(added.document, added.sketchId), { x: 100, y: 60, radius: 15 }),
+      // Seen from below, X runs the other way, so x = -100 is x = 100 on the part.
+      sketch = addCircle(faceSketch(added.document, added.sketchId), { x: -100, y: 60, radius: 15 }),
       drawn = withFaceSketch(added.document, added.sketchId, sketch),
-      region = faceRegionAt(drawn, added.sketchId, { x: 100, y: 60 });
-    expect(evaluated(setCutDepth(drawn, partId, added.sketchId, region.id, 5)).part!.cuts![0]).toMatchObject({
-      side: 'underside',
-      from: 0,
-      to: 5,
-    });
+      region = faceRegionAt(drawn, added.sketchId, { x: -100, y: 60 }),
+      cut = evaluated(setCutDepth(drawn, partId, added.sketchId, region.id, 5)).part!.cuts![0]!;
+    expect(cut).toMatchObject({ side: 'underside', from: 0, to: 5 });
+    const xs = cut.outline.map(p => p.x);
+    expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(100, 1);
+    expect(polygonArea(cut.outline)).toBeGreaterThan(0);
   });
 
   it('reports a cut whose region stopped existing', () => {
@@ -392,6 +394,21 @@ describe('CAD feature format', () => {
     const added = addFaceSketch(document, part.id, 'top'),
       copy = withFaceSketch(added.document, added.sketchId, { ...part.sketch, id: added.sketchId });
     expect(evaluated(copy).errors).toContain('duplicate-id');
+  });
+});
+
+describe('moving a face sketch', () => {
+  it('rescues a sketch that lost its pocket floor', () => {
+    const start = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+      part = start.parts[0]!;
+    part.sketch = addCircle(part.sketch, { x: 50, y: 30, radius: 20 });
+    const region = cadSketchRegions(part, part.sketch.id).find(candidate => candidate.curveIds.length === 1)!,
+      pocket = setCutDepth(start, part.id, part.sketch.id, region.id, 4),
+      cut = cadCuts(pocket.parts[0]!)[0]!,
+      { document, sketchId } = addFaceSketch(pocket, part.id, { floorOf: cut.id }),
+      lost = removeCadFeature(document, part.id, cut.id);
+    expect(evaluateCadDocument(lost).diagnostics.map(d => d.code)).toContain('cut-face-lost');
+    expect(evaluateCadDocument(moveFaceSketch(lost, part.id, sketchId, 'top')).diagnostics.map(d => d.code)).not.toContain('cut-face-lost');
   });
 });
 

@@ -1,3 +1,5 @@
+import { reconcileSlot } from './slot';
+import { slotPrimitives, slotArcRuleOverrides } from './slotConstraint';
 import { Algorithm, GcsWrapper, init_planegcs_module, SolveStatus, type ModuleStatic, type SketchPrimitive } from '@salusoft89/planegcs';
 import { sketchTargets } from './featureModel';
 import { evaluateCadDocument } from './features';
@@ -31,6 +33,11 @@ import { migrateDimensionPlacements } from './dimensionPlacement';
 import { isFatalSolverError } from './solverFailure';
 import { invalidOffsetBranches, offsetNativePrimitives, offsetNativeSeed } from './offsetConstraint';
 import { entityPointIds } from './document';
+import { curveSymmetryPrimitives } from './symmetry';
+import { linearPatternPrimitives, patternReplicaIds } from './patternConstraint';
+import { reconcileLinearPattern, linearPatternReservationIssue } from './pattern';
+import { conditionPatternEllipseAxes } from './patternEllipse';
+import { compilePatternTopology } from './patternTopology';
 import { conditionEllipseAxes } from './ellipse';
 import { withSplineHandleSegments } from './splineHandles';
 
@@ -181,6 +188,46 @@ function solverConstraint(
 ): SketchPrimitive | SketchPrimitive[] {
   const id = c.id;
   switch (c.type) {
+    case 'slot':
+      return slotPrimitives(c, entities, constraints);
+    case 'circularPattern':
+    case 'linearPattern':
+      return linearPatternPrimitives(c, entities);
+    case 'symmetricCurves':
+      return curveSymmetryPrimitives(c, entities);
+    case 'regularPolygon':
+      if (c.mode === 'circumscribed') {
+        const circle = entities.get(c.circleId) as import('./types').CadCircleEntity;
+        return c.edgeIds.flatMap((edgeId, index): SketchPrimitive[] => [
+          { id: `${id}:spoke:${index}`, type: 'line', p1_id: circle.centerId, p2_id: (entities.get(edgeId) as CadLineEntity).startId },
+          { id: `${id}:vertex:${index}`, type: 'point_on_circle', p_id: (entities.get(edgeId) as CadLineEntity).startId, c_id: circle.id },
+          ...(index > 0
+            ? [
+                {
+                  id: `${id}:turn:${index}`,
+                  type: 'l2l_angle_ll' as const,
+                  l1_id: `${id}:spoke:${index - 1}`,
+                  l2_id: `${id}:spoke:${index}`,
+                  angle: (2 * Math.PI) / c.edgeIds.length,
+                },
+              ]
+            : []),
+        ]);
+      }
+      return c.edgeIds.flatMap((edgeId, index): SketchPrimitive[] => [
+        { id: `${id}:side:${index}`, type: 'tangent_lc', l_id: edgeId, c_id: c.circleId },
+        ...(index < c.edgeIds.length - 1
+          ? [
+              {
+                id: `${id}:turn:${index}`,
+                type: 'l2l_angle_ll' as const,
+                l1_id: edgeId,
+                l2_id: c.edgeIds[index + 1]!,
+                angle: (2 * Math.PI) / c.edgeIds.length,
+              },
+            ]
+          : []),
+      ]);
     case 'offset':
       return offsetNativePrimitives(c, offsetSeed, constraints);
     case 'symmetricPoints':
@@ -447,7 +494,71 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
     part.sketch = withSplineHandleSegments(part.sketch);
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);
   }
-  const diagnostics = validateCadDocument(next);
+  const patternDiagnostics: CadSolveResult['diagnostics'] = [];
+  for (const part of next.parts.flatMap(sketchTargets)) {
+    for (const slot of part.sketch.constraints.filter(c => c.type === 'slot')) {
+      try {
+        const result = reconcileSlot(part.sketch, slot);
+        if (result.ok) {
+          part.sketch.entities = result.sketch.entities;
+        } else
+          patternDiagnostics.push({
+            code: 'invalid-slot',
+            message: result.message,
+            severity: 'error',
+            partId: part.id,
+            constraintIds: [slot.id],
+          });
+      } catch {
+        patternDiagnostics.push({
+          code: 'invalid-slot',
+          message: 'Repair the saved slot data before solving.',
+          severity: 'error',
+          partId: part.id,
+          constraintIds: [slot.id],
+        });
+      }
+    }
+    const patterns = part.sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern');
+    const invalid = patterns.map(pattern => ({ pattern, issue: linearPatternReservationIssue(part.sketch, pattern) })).filter(v => v.issue);
+    if (invalid.length) {
+      for (const { pattern, issue } of invalid)
+        patternDiagnostics.push({
+          code: 'invalid-pattern',
+          message: issue!,
+          severity: 'error',
+          partId: part.id,
+          constraintIds: [pattern.id],
+        });
+      continue;
+    }
+    conditionPatternEllipseAxes(part.sketch);
+    for (const pattern of patterns) {
+      try {
+        const result = reconcileLinearPattern(part.sketch, pattern);
+        if (result.ok) {
+          part.sketch.entities = result.sketch.entities;
+          part.sketch.constraints = result.sketch.constraints;
+        } else
+          patternDiagnostics.push({
+            code: 'invalid-pattern',
+            message: result.message,
+            severity: 'error',
+            partId: part.id,
+            constraintIds: [pattern.id],
+          });
+      } catch {
+        patternDiagnostics.push({
+          code: 'invalid-pattern',
+          message: 'Repair the saved pattern data before solving.',
+          severity: 'error',
+          partId: part.id,
+          constraintIds: [pattern.id],
+        });
+      }
+    }
+  }
+  const diagnostics = [...patternDiagnostics, ...validateCadDocument(next)];
   const sketches: CadSolveResult['sketches'] = [];
   if (diagnostics.some(d => d.severity === 'error')) return { document: next, status: 'invalid', diagnostics, parts: [], sketches };
   const targets = options.drag ? (Array.isArray(options.drag) ? options.drag : [options.drag]) : [];
@@ -529,6 +640,14 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
         const geometry: SketchPrimitive[] = ordered.map(e => solverGeometry(offsetSeed.get(e.id) ?? e, points));
         const primitives: SketchPrimitive[] = [];
         const draggedIds = new Set(dragTargets.map(target => target.pointId));
+        const slotCaps = new Set([
+          ...part.sketch.constraints.flatMap(c => (c.type === 'slot' ? c.capIds : [])),
+          ...slotArcRuleOverrides(
+            part.sketch.constraints.filter(c => c.type === 'slot'),
+            entities
+          ),
+        ]);
+        const replicas = patternReplicaIds(part.sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern'));
         const retainedSplineHandles = new Set<string>();
         for (const e of ordered)
           if (e.type === 'spline' && [...e.fitPointIds, ...e.controlPointIds].some(id => draggedIds.has(id))) {
@@ -544,7 +663,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             );
         }
         for (const e of ordered)
-          if (e.type === 'spline') {
+          if (e.type === 'spline' && !replicas.has(e.id)) {
             const data = rationalCurveData(e, points),
               lo = data.knots[data.degree]!,
               hi = data.knots[data.poles.length]!;
@@ -560,7 +679,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             });
           }
         for (const e of ordered)
-          if (e.type === 'ellipse') {
+          if (e.type === 'ellipse' && !replicas.has(e.id)) {
             if (entityPointIds(e).every(id => points.get(id)?.fixed)) {
               // Fixed endpoints already determine the shape. Eight alignment equations
               // would overconstrain the sole remaining native radius parameter.
@@ -591,7 +710,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
               );
           }
         for (const e of ordered)
-          if (e.type === 'arc') {
+          if (e.type === 'arc' && !replicas.has(e.id) && !slotCaps.has(e.id)) {
             // With all three points fixed, four arc rules overconstrain three native arc parameters.
             // Keep one native radius equation so contradictory user dimensions remain detectable.
             primitives.push(
@@ -601,9 +720,13 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             );
           }
         const coincident = pointEquivalence(part.sketch.constraints);
+        const topology = compilePatternTopology(part.sketch);
+        primitives.push(...topology.primitives);
         primitives.push(
           ...part.sketch.constraints.flatMap(c =>
-            'value' in c && c.driven ? [] : solverConstraint(c, entities, coincident, part.sketch.constraints, offsetSeed)
+            (c.type === 'coincident' && topology.skipCoincidences.has(c.id)) || ('value' in c && c.driven)
+              ? []
+              : solverConstraint(c, entities, coincident, part.sketch.constraints, offsetSeed)
           )
         );
         for (const drag of dragTargets)
@@ -784,6 +907,16 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             break;
           }
         }
+        const sourceConstraintId = (nativeId: string) =>
+          part.sketch.constraints.find(
+            c =>
+              (c.type === 'regularPolygon' ||
+                c.type === 'symmetricCurves' ||
+                c.type === 'linearPattern' ||
+                c.type === 'circularPattern' ||
+                c.type === 'slot') &&
+              nativeId.startsWith(`${c.id}:`)
+          )?.id ?? nativeId;
         const status = conflicts.length ? 'conflict' : candidate ? 'solved' : 'invalid';
         sketches.push({ partId: part.id, dof: wrapper.gcs.dof(), status });
         if (status !== 'solved') {
@@ -799,7 +932,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             constraintIds:
               invalidOffsets.length && !conflicts.length
                 ? invalidOffsets
-                : conflicts.filter(id => part.sketch.constraints.some(c => c.id === id)),
+                : [...new Set(conflicts.map(sourceConstraintId).filter(id => part.sketch.constraints.some(c => c.id === id)))],
             entityIds: conflicts.flatMap(id => {
               const suffix = [':arc-rules', ':fixed-radius'].find(suffix => id.endsWith(suffix));
               return suffix ? [id.slice(0, -suffix.length)] : [];
@@ -818,7 +951,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
             message: 'Some constraints repeat relationships that are already defined.',
             severity: 'warning',
             partId: part.id,
-            constraintIds: redundant,
+            constraintIds: [...new Set(redundant.map(sourceConstraintId))],
           });
         if (wrapper.gcs.dof() > 0)
           diagnostics.push({

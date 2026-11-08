@@ -254,7 +254,12 @@ export async function inspectCadDocument(
     let toolpaths: CadToolpathSummary | undefined;
     if (evaluated) {
       if (evaluated.cuts?.some(cut => cut.side === 'underside'))
-        warnings.push({ code: 'cam-underside', message: 'Cuts on the underside can’t be machined yet.', part: part.name });
+        warnings.push({
+          code: 'cam-underside',
+          message:
+            'Cuts on the underside are cut from a second side, after turning the board over. This report covers the first side only.',
+          part: part.name,
+        });
       else {
         const profile = profileFeatures(evaluated);
         cam = { pockets: profile.features.pockets.length, throughHoles: profile.features.throughHoles.length };

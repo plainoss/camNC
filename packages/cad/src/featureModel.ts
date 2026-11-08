@@ -3,6 +3,20 @@ import type { CadCut, CadDiagnostic, CadFaceSketch, CadPart } from './types';
 export const cadFaceSketches = (part: CadPart): CadFaceSketch[] => (part.features ?? []).filter(f => f.type === 'sketch');
 export const cadCuts = (part: CadPart): CadCut[] => (part.features ?? []).filter(f => f.type === 'cut');
 
+/** Whether a face is the underside, or a pocket floor reached from it. */
+export function faceIsUnderside(part: CadPart, on: CadFaceSketch['on']): boolean {
+  if (typeof on !== 'object') return on === 'underside';
+  const cut = cadCuts(part).find(candidate => candidate.id === on.floorOf),
+    face = cut && cadFaceSketches(part).find(candidate => candidate.sketch.id === cut.sketchId);
+  return !!face && faceIsUnderside(part, face.on);
+}
+
+/**
+ * Underside sketches are drawn as the face is seen from below, so X runs the other way. This converts between that view
+ * and the part's own coordinates, in either direction, and keeps loops running the same way round.
+ */
+export const flipUnderside = <P extends { x: number; y: number }>(points: P[]): P[] => points.map(p => ({ ...p, x: -p.x })).reverse();
+
 /** The profile sketch first, then the face sketches, each as a part the sketch checks and the solver can walk. */
 export function sketchTargets(part: CadPart): CadPart[] {
   return [part, ...cadFaceSketches(part).map(face => ({ id: part.id, name: part.name, thickness: part.thickness, sketch: face.sketch }))];

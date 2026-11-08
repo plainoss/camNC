@@ -3,6 +3,10 @@ export * from './document';
 export * from './geometry';
 export * from './solver';
 export * from './fillet';
+export * from './chamfer';
+export * from './split';
+export * from './transform';
+export * from './pattern';
 export * from './curves';
 export * from './pointEquivalence';
 export * from './curveContacts';
@@ -25,3 +29,16 @@ export * from './offset';
 export * from './rectangleCorners';
 
 export * from './ellipse';
+
+export * from './threePointCircle';
+export * from './alignedRectangle';
+
+export * from './centerPointArc';
+
+export * from './polygon';
+
+export { reflectAcrossLine } from './symmetry';
+
+export * from './circularPattern';
+
+export * from './slot';

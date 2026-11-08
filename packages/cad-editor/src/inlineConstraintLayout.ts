@@ -34,6 +34,10 @@ const wrap = (a: number) => ((a % tau) + tau) % tau;
 const midpoint = (a: CadPoint, b: CadPoint) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const distance = (a: CadPoint, b: CadPoint) => Math.hypot(a.x - b.x, a.y - b.y);
 const labels: Record<InlineConstraintKind, string> = {
+  regularPolygon: 'Regular polygon',
+  linearPattern: 'Linear pattern',
+  circularPattern: 'Circular pattern',
+  slot: 'Slot',
   horizontal: 'Horizontal',
   horizontalPoints: 'Horizontal',
   vertical: 'Vertical',
@@ -48,6 +52,7 @@ const labels: Record<InlineConstraintKind, string> = {
   parallel: 'Parallel',
   perpendicular: 'Perpendicular',
   symmetricPoints: 'Symmetric',
+  symmetricCurves: 'Symmetric',
   fix: 'Fixed point',
 };
 

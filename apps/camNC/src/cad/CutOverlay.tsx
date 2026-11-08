@@ -1,11 +1,11 @@
 import type { CadPart } from '@wbcnc/cad';
 import { useId, useMemo } from 'react';
-import { cutRegionPath, cutRegions } from './cutRegions';
+import { cutRegionPath, cutRegions, topRegions } from './cutRegions';
 
 /** Shows each cut on the drawing, darker as it gets deeper. Parts without features draw nothing here. */
 export function CutOverlay({ part, millimetresPerPixel: scale }: { part: CadPart | undefined; millimetresPerPixel: number }) {
   const hatch = useId();
-  const entries = useMemo(() => (part?.features?.length ? cutRegions(part) : []), [part]);
+  const entries = useMemo(() => (part?.features?.length ? topRegions(cutRegions(part)) : []), [part]);
   if (!part || !entries.length) return null;
   return (
     <g data-cut-regions={part.id} pointerEvents="none" aria-hidden="true">

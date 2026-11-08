@@ -40,6 +40,9 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
     case 'rectangle':
       shape = <rect x="4" y="6" width="16" height="12" />;
       break;
+    case 'alignedRectangle':
+      shape = <path d="m3 14 12-9 6 8-12 9z" />;
+      break;
     case 'centerRectangle':
       shape = (
         <>
@@ -54,6 +57,16 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         <>
           <ellipse cx="12" cy="12" rx="9" ry="5" transform="rotate(-35 12 12)" />
           <circle cx="12" cy="12" r=".8" fill="currentColor" />
+        </>
+      );
+      break;
+    case 'threePointCircle':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+          <circle cx="12" cy="4" r="1.5" fill="currentColor" />
+          <circle cx="20" cy="12" r="1.5" fill="currentColor" />
         </>
       );
       break;
@@ -74,11 +87,35 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
         </>
       );
       break;
+    case 'centerPointArc':
+      shape = (
+        <>
+          <path d="M20 12a8 8 0 0 0-8-8M12 4v8h8" />
+          <circle cx="12" cy="12" r="1" fill="currentColor" />
+        </>
+      );
+      break;
     case 'tangentArc':
       shape = (
         <>
           <path d="M3 19h7a10 10 0 0 0 10-10V4" />
           <path d="M8 16v6" strokeDasharray="1 2" />
+        </>
+      );
+      break;
+    case 'circumscribedPolygon':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="10" />
+          <path d="m12 2 8.66 5v10L12 22l-8.66-5V7z" />
+        </>
+      );
+      break;
+    case 'inscribedPolygon':
+      shape = (
+        <>
+          <path d="m12 2 9 5v10l-9 5-9-5V7z" />
+          <circle cx="12" cy="12" r="7.5" />
         </>
       );
       break;
@@ -96,6 +133,51 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
           <path d="M3 18C8-4 14 28 21 6" />
           <circle cx="12" cy="12" r="3" fill="currentColor" />
           <path d="M12 6v12m-6-6h12" />
+        </>
+      );
+      break;
+    case 'slot':
+      shape = (
+        <>
+          <path d="M7 6h10a6 6 0 0 1 0 12H7A6 6 0 0 1 7 6z" />
+          <path d="M4 12h16" strokeDasharray="2 2" />
+        </>
+      );
+      break;
+    case 'circularPattern':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="8" strokeDasharray="2 3" />
+          <circle cx="12" cy="4" r="2" />
+          <circle cx="5" cy="16" r="2" />
+          <circle cx="19" cy="16" r="2" />
+        </>
+      );
+      break;
+    case 'linearPattern':
+      shape = <path d="M3 4h4v4H3zm7 0h4v4h-4zm7 0h4v4h-4zM3 15h4v4H3zm7 0h4v4h-4zm7 0h4v4h-4z" />;
+      break;
+    case 'transform':
+      shape = (
+        <>
+          <path d="M5 19V4m-3 3 3-3 3 3M5 19h15m-3-3 3 3-3 3M8 13a7 7 0 0 1 10-7l-1-3m1 3-3 1" />
+        </>
+      );
+      break;
+    case 'split':
+      shape = (
+        <>
+          <path d="M3 17 10 10m4 0 7-7" />
+          <circle cx="12" cy="10" r="2" />
+          <path d="M12 3v4m0 6v5" strokeDasharray="2 2" />
+        </>
+      );
+      break;
+    case 'chamfer':
+      shape = (
+        <>
+          <path d="M4 4v10l6 6h10" />
+          <path d="M4 20h16M4 4v16" strokeDasharray="2 3" />
         </>
       );
       break;
@@ -185,6 +267,22 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
     case 'vertical':
       shape = <path d="M12 4v16m-3-16h6m-6 16h6" />;
       break;
+    case 'symmetric':
+      shape = (
+        <>
+          <path d="M12 2v20" strokeDasharray="2 2" />
+          <path d="m3 7 5 5-5 5m18-10-5 5 5 5" />
+        </>
+      );
+      break;
+    case 'concentric':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="12" cy="12" r="4" />
+        </>
+      );
+      break;
     case 'coincident':
       shape = (
         <>
@@ -264,10 +362,12 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
   );
 }
 
-const constraints: { id: ConstraintCommandTool; label: string; key: string }[] = [
+const constraints: { id: ConstraintCommandTool; label: string; key?: string }[] = [
   { id: 'horizontal', label: 'Horizontal', key: 'H' },
   { id: 'vertical', label: 'Vertical', key: 'V' },
   { id: 'coincident', label: 'Coincident', key: 'I' },
+  { id: 'concentric', label: 'Concentric', key: 'Shift+O' },
+  { id: 'symmetric', label: 'Symmetric', key: 'Shift+Q' },
   { id: 'midpoint', label: 'Midpoint', key: 'Shift+M' },
   { id: 'parallel', label: 'Parallel', key: 'B' },
   { id: 'perpendicular', label: 'Perpendicular', key: 'Shift+L' },

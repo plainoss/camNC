@@ -58,9 +58,19 @@ export function beginCreationValues(
         }
       );
     }
-  } else if (tool === 'circle') {
+  } else if (tool === 'inscribedPolygon' || tool === 'circumscribedPolygon') {
+    const circle = entities.find(e => e.type === 'circle');
+    if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Polygon diameter' });
+  } else if (tool === 'centerPointArc') {
+    const arc = entities.find(e => e.type === 'arc');
+    if (arc) steps.push({ entityId: arc.id, mode: 'auto', label: 'Arc radius' });
+  } else if (tool === 'circle' || tool === 'threePointCircle') {
     const circle = entities.find(entity => entity.type === 'circle');
     if (circle) steps.push({ entityId: circle.id, mode: 'auto', label: 'Circle diameter' });
+  } else if (tool === 'alignedRectangle') {
+    const lines = entities.filter(e => e.type === 'line');
+    if (lines[0]) steps.push({ entityId: lines[0].id, mode: 'distance', label: 'Rectangle width' });
+    if (lines[1]) steps.push({ entityId: lines[1].id, mode: 'distance', label: 'Rectangle height' });
   } else if (tool === 'rectangle' || tool === 'centerRectangle') {
     const points = new Map(sketch.entities.flatMap(entity => (entity.type === 'point' ? [[entity.id, entity] as const] : [])));
     const lines = entities.filter(entity => entity.type === 'line');
@@ -130,7 +140,7 @@ export function creationValueAnchor(state: CreationValues, sketch: CadSketch, in
     return { x: mid.x - (sign * (b.y - a.y) * normalOffset) / length, y: mid.y + (sign * (b.x - a.x) * normalOffset) / length };
   }
   const entity = sketch.entities.find(entity => entity.id === step.entityId);
-  if (entity?.type !== 'circle') return null;
+  if (entity?.type !== 'circle' && entity?.type !== 'arc') return null;
   const center = sketch.entities.find(entityPoint => entityPoint.id === entity.centerId);
   if (center?.type !== 'point') return null;
   const angle = state.pointer ? Math.atan2(center.y - state.pointer.y, center.x - state.pointer.x) : Math.PI;

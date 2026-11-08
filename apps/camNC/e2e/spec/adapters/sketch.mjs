@@ -201,6 +201,13 @@ export async function createAdapter(page, url) {
   await page.getByRole('button', { name: /^New design/ }).click();
   const canvas = page.getByTestId('cad-canvas');
   await canvas.waitFor();
+  // Existing designs open on the part in 3D, and most steps work on the drawing.
+  const flatView = async () => {
+    const button = page.getByRole('button', { name: '3D', exact: true });
+    await button.waitFor();
+    if ((await button.getAttribute('aria-pressed')) === 'true') await button.click();
+    await canvas.waitFor();
+  };
   const jobId = new URL(page.url()).pathname.split('/')[2];
   let cursor = null;
 
@@ -335,13 +342,21 @@ export async function createAdapter(page, url) {
         return;
       case 'tool':
         return chooseTool(rest);
+      case 'flat':
+        return flatView();
       case 'click3d': {
-        // The camera frames the part, so the middle of the view is the middle of the part.
-        const box = await page.getByTestId('part-3d').boundingBox();
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 3 });
-        await page.waitForTimeout(150);
-        await page.mouse.down();
-        await page.mouse.up();
+        // The camera frames the part, so the middle of the view is the middle of the part. A busy machine can take a
+        // moment to have the view ready to pick, so click again until the region's depth field opens.
+        const view = page.getByTestId('part-3d'),
+          field = page.getByRole('group', { name: 'Cut depth' });
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const box = await view.boundingBox();
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 3 });
+          await page.waitForTimeout(150);
+          await page.mouse.down();
+          await page.mouse.up();
+          if (await field.waitFor({ timeout: 1000 }).then(() => true, () => false)) break;
+        }
         await page.waitForTimeout(80);
         return;
       }
@@ -463,7 +478,7 @@ export async function createAdapter(page, url) {
       }
       case 'edit':
         await page.getByText('Edit design', { exact: true }).first().click();
-        await canvas.waitFor();
+        await flatView();
         await page.waitForTimeout(400);
         return;
       case 'finish':
@@ -477,7 +492,7 @@ export async function createAdapter(page, url) {
         return;
       case 'design':
         await page.getByRole('link', { name: /Design/ }).first().click();
-        await canvas.waitFor();
+        await flatView();
         await page.waitForTimeout(250);
         return;
       default:

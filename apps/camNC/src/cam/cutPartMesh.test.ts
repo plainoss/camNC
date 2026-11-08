@@ -75,4 +75,33 @@ describe('the solid of a part with cuts', () => {
     expect(read.bottomFaces).toEqual([]);
     expect(read.slopedArea).toBe(0);
   });
+
+  describe('with cuts from the underside', () => {
+    const flat = (cuts: FlatCut[]) => featuresFromCuts({ ...profile(cuts), holes: [] }).features;
+    const plate = featuresFromCuts({ ...profile([]), holes: [] }).features;
+    // Heights in the underside's own view count down from its face, which is 18 here.
+    const below = (cuts: FlatCut[]) => featuresFromCuts({ ...profile(cuts), holes: [] }).features;
+
+    it('closes the solid around a pocket from below', () => {
+      const mesh = cutPartMesh(plate, below([cut('b', rect(60, 40, 40, 30), 5)]));
+      expect(volume(mesh) / (200 * 120 * 18 - 40 * 30 * 5)).toBeCloseTo(1, 3);
+    });
+
+    it('leaves an underside rabbet open at the edge', () => {
+      const mesh = cutPartMesh(plate, below([cut('b', rect(180, 0, 20, 120), 4)]));
+      expect(volume(mesh) / (200 * 120 * 18 - 20 * 120 * 4)).toBeCloseTo(1, 3);
+      // Nothing is left at the edge below the rabbet's height.
+      const { positions } = mesh;
+      for (let i = 0; i < positions.length; i += 9) {
+        const xs = [positions[i]!, positions[i + 3]!, positions[i + 6]!],
+          zs = [positions[i + 2]!, positions[i + 5]!, positions[i + 8]!];
+        if (xs.every(x => Math.abs(x - 200) < 1e-6)) expect(Math.min(...zs)).toBeGreaterThanOrEqual(4 - 1e-6);
+      }
+    });
+
+    it('still makes a closed solid with pockets from both faces', () => {
+      const mesh = cutPartMesh(flat([cut('a', rect(20, 20, 50, 40), 6)]), below([cut('b', rect(120, 40, 40, 30), 5)]));
+      expect(volume(mesh) / (200 * 120 * 18 - 50 * 40 * 6 - 40 * 30 * 5)).toBeCloseTo(1, 3);
+    });
+  });
 });

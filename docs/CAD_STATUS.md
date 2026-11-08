@@ -40,7 +40,8 @@ after geometry changes.
 
 Current limits and deferred work:
 
-- Cuts are set on the drawing, on the top face only. Sketching in the 3D view, pocket floors and the underside are in [the roadmap](CAD_ROADMAP.md).
+- Sketches go on the top face, the underside and pocket floors. The camera turns to face the surface, then the flat sketch editor opens. An underside sketch is drawn as seen from below, so its X runs the other way.
+- Underside cuts make a side B program from exact polygons. Cuts from the two faces that would meet are refused. No side B program from camNC has been cut on the machine.
 - Partial or open multi-edge Offset chains and rational-curve Offset are unsupported.
 - Mirror rejects conics, fit splines, and Bezier curves.
 - Rational curves can bound Trim or Extend operations, but cannot themselves be interval-trimmed or extended.

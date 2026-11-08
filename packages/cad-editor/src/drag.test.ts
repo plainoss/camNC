@@ -1,5 +1,6 @@
 import {
   addArc,
+  addInscribedPolygon,
   addLine,
   addEllipse,
   addConstraint,
@@ -57,4 +58,20 @@ describe('sketch drag intent', () => {
     expect(dragTargets(sketch, [curve.centerId], { x: 1, y: 2 })).toEqual([]);
     expect(dragTargets(sketch, [alias.id], { x: 1, y: 2 })).toHaveLength(1);
   });
+});
+
+it('translates a free regular polygon by its definition-circle center without resizing it', async () => {
+  const part = createCadPart();
+  part.sketch = addInscribedPolygon(part.sketch, { center: { x: 60, y: 70 }, point: { x: 80, y: 70 }, sides: 6 });
+  const circle = part.sketch.entities.find(e => e.type === 'circle')!;
+  const targets = dragTargets(part.sketch, [circle.centerId], { x: 10, y: 15 });
+  expect(targets).toHaveLength(13);
+  const solved = await solveCadDocument({ ...createCadDocument(), parts: [part] }, { drag: targets });
+  expect(solved.status, JSON.stringify(solved.diagnostics)).toBe('solved');
+  expect(solved.document.parts[0]!.sketch.entities.find(e => e.type === 'circle')!.radius).toBeCloseTo(20);
+  for (const p of part.sketch.entities.filter((e): e is CadPointEntity => e.type === 'point' && !e.fixed)) {
+    const next = solved.document.parts[0]!.sketch.entities.find(e => e.id === p.id) as CadPointEntity;
+    expect(next.x).toBeCloseTo(p.x + 10, 5);
+    expect(next.y).toBeCloseTo(p.y + 15, 5);
+  }
 });
