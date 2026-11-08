@@ -1,5 +1,5 @@
 import { addCircle, cadCuts, createPlateDocument, setCadVariable, type CadDimension, type CadDocument, type CadPart } from '@wbcnc/cad';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { endCadSession } from './session';
@@ -57,7 +57,7 @@ describe('design variables in the editor', () => {
     expect(screen.getByRole('img', { name: 'width - 2*board: That would flip this line over. It needs to stay above zero.' })).toBeTruthy();
     // The mark sits on the shelf only.
     expect(screen.getByRole('img', { name: /flip/ }).closest('button')!.textContent).toContain('Shelf');
-    fireEvent.click(screen.getByRole('button', { name: /Shelf/ }));
+    fireEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: /Shelf/ }));
     expect(await screen.findByText(/keeps its last good shape/)).toBeTruthy();
   });
 

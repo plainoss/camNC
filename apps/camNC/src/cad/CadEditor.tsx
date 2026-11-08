@@ -78,9 +78,6 @@ import {
   withFeatureVersion,
   type CadPoint,
   cadVariableProblems,
-  setPartPlacements,
-  addPartCopy,
-  removePartCopy,
   cadVariableScope,
 } from '@wbcnc/cad';
 import {
@@ -141,6 +138,7 @@ import { parseCadValue } from './valueExpressions';
 import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
+import { DesignStepsList } from './DesignStepsList';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
   createSketchContext,
@@ -251,7 +249,7 @@ const entityPointIds = (entity: CadEntity): string[] => {
   return curvePointIds(entity);
 };
 const PartView3D = lazy(() => import('./PartView3D'));
-const AssemblyView = lazy(() => import('./AssemblyView'));
+const WorkspaceView = lazy(() => import('./WorkspaceView'));
 /** A face sketch is drawn over the part's outline, so a part needs one first. */
 const hasOutline = (document: CadDocument, partId: string) => !!evaluateCadPart(document.parts.find(part => part.id === partId)!).part;
 function replacePart(document: CadDocument, partId: string, change: (part: CadPart) => CadPart): CadDocument {
@@ -298,8 +296,8 @@ export interface CadEditorProps {
   onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string) => void;
   /** Editing one face sketch, with the part's outline shown behind it. It can be open, and it isn't a profile. */
   faceSketch?: { outline: CadPoint[]; floor?: CadPoint[]; label: string; below?: boolean };
-  /** Open on the part in 3D, when it has an outline to show. */
-  startIn3D?: boolean;
+  /** Open in 3D, when there's an outline to show: the whole design, or with `'part'` the selected part on its own. */
+  startIn3D?: boolean | 'part';
 }
 
 /** Native editable source stays in one document while CAM remains a derived consumer of accepted revisions. */
@@ -419,14 +417,20 @@ export function CadEditor({
   const [rho, setRho] = useState('0.5');
   const [selectionBox, setSelectionBox] = useState<CadSelectionBox | null>(null);
   const [regionField, setRegionField] = useState<{ entry: CutRegion; anchor: Point } | null>(null);
-  const [show3D, setShow3D] = useState(!!startIn3D);
-  const [showAssembly, setShowAssembly] = useState(false);
+  const [show3D, setShow3D] = useState(startIn3D === 'part');
+  // Opening a design shows every part where it sits, once there's a part to show.
+  const [showWorkspace, setShowWorkspace] = useState(
+    () => startIn3D === true && doc.parts.some(candidate => hasOutline(doc, candidate.id))
+  );
   const sketchOnly = !!faceSketch;
   // Its region belongs to one part at one revision: applying it after either changed would write a stale cut.
   useEffect(() => setRegionField(null), [part?.id, doc.revision]);
   // Picking a drawing tool, by button or key, means going back to the drawing.
   useEffect(() => {
-    if (tool !== 'select') setShow3D(false);
+    if (tool !== 'select') {
+      setShow3D(false);
+      setShowWorkspace(false);
+    }
   }, [tool]);
   const partHasOutline = !!part && hasOutline(doc, part.id);
   const [contextMenu, setContextMenu] = useState<SketchContext | null>(null);
@@ -3312,6 +3316,27 @@ export function CadEditor({
             </div>
           )}
           {!faceSketch && <CadVariablesPanel document={doc} onChange={commit} />}
+          {!faceSketch && (
+            <DesignStepsList
+              document={doc}
+              selectedPartId={part?.id ?? null}
+              onStep={step => {
+                setPartId(step.partId);
+                setSelected([]);
+                chooseTool('select');
+                if (step.kind === 'sketch') {
+                  setShowWorkspace(false);
+                  setShow3D(false);
+                } else if (step.kind === 'cut') {
+                  setShowWorkspace(false);
+                  setShow3D(hasOutline(documentRef.current, step.partId));
+                } else if (step.kind === 'faceSketch' && onEditFaceSketch && step.sketchId) {
+                  const prepared = prepareDocument();
+                  if (prepared && hasOutline(prepared, step.partId)) onEditFaceSketch(prepared, step.partId, step.sketchId);
+                }
+              }}
+            />
+          )}
           <div className="cad-panel-heading" hidden={!!faceSketch}>
             <h2>Parts</h2>
             <button
@@ -3327,7 +3352,7 @@ export function CadEditor({
               ＋
             </button>
           </div>
-          <ul className="cad-part-list" hidden={!!faceSketch}>
+          <ul className="cad-part-list" aria-label="Parts" hidden={!!faceSketch}>
             {doc.parts.map(p => (
               <li key={p.id}>
                 <button
@@ -3486,9 +3511,9 @@ export function CadEditor({
             </p>
           )}
           <div className="cad-canvas-bar">
-            {showAssembly ? (
+            {showWorkspace ? (
               <span>
-                <strong>ASSEMBLY</strong> · {doc.parts.length === 1 ? 'one part' : `${doc.parts.length} parts`}
+                <strong>DESIGN</strong> · {doc.parts.length === 1 ? 'one part' : `${doc.parts.length} parts`}
               </span>
             ) : (
               <span>
@@ -3500,31 +3525,37 @@ export function CadEditor({
               {!faceSketch && (
                 <button
                   type="button"
-                  aria-pressed={showAssembly}
+                  aria-pressed={showWorkspace}
                   disabled={!doc.parts.length}
+                  title="Every part where it sits"
                   onClick={() => {
-                    if (!showAssembly) chooseTool('select');
-                    else requestAnimationFrame(() => svg.current?.focus());
-                    setShowAssembly(!showAssembly);
+                    chooseTool('select');
+                    setShowWorkspace(true);
                   }}>
-                  Assembly
+                  Workspace
                 </button>
               )}
-              {!faceSketch && !showAssembly && (
+              {!faceSketch && (
                 <button
                   type="button"
-                  aria-pressed={show3D}
-                  disabled={!partHasOutline}
+                  aria-pressed={show3D || showWorkspace}
+                  disabled={!partHasOutline && !showWorkspace}
+                  title={show3D || showWorkspace ? 'Back to the drawing' : 'This part in 3D'}
                   onClick={() => {
-                    if (!show3D) chooseTool('select');
-                    // Back on the drawing, its keys work straight away.
-                    else requestAnimationFrame(() => svg.current?.focus());
-                    setShow3D(!show3D);
+                    if (show3D || showWorkspace) {
+                      // Back on the drawing, its keys work straight away.
+                      requestAnimationFrame(() => svg.current?.focus());
+                      setShow3D(false);
+                      setShowWorkspace(false);
+                    } else {
+                      chooseTool('select');
+                      setShow3D(true);
+                    }
                   }}>
                   3D
                 </button>
               )}
-              {!show3D && !showAssembly && (
+              {!show3D && !showWorkspace && (
                 <>
                   <button type="button" onClick={() => fit()}>
                     Fit <kbd>F</kbd>
@@ -3545,26 +3576,25 @@ export function CadEditor({
               )}
             </div>
           </div>
-          {showAssembly && (
+          {showWorkspace && (
             <Suspense fallback={<div className="cad-part-view" />}>
-              <AssemblyView
+              <WorkspaceView
                 document={doc}
                 selectedId={part?.id ?? null}
                 onSelect={id => {
                   setPartId(id);
                   setSelected([]);
                 }}
-                onPlace={changes => commit(setPartPlacements(documentRef.current, changes))}
-                onAddCopy={(id, mirrored) => {
-                  const added = addPartCopy(documentRef.current, id, { mirrored });
-                  commit(added.document);
-                  return added.id;
+                onOpen={id => {
+                  setPartId(id);
+                  setSelected([]);
+                  setShowWorkspace(false);
+                  setShow3D(hasOutline(documentRef.current, id));
                 }}
-                onRemoveCopy={(id, copyId) => commit(removePartCopy(documentRef.current, id, copyId))}
               />
             </Suspense>
           )}
-          {!showAssembly && show3D && partHasOutline && part && (
+          {!showWorkspace && show3D && partHasOutline && part && (
             <Suspense fallback={<div className="cad-part-view" />}>
               <PartView3D
                 key={part.id}
@@ -3578,7 +3608,7 @@ export function CadEditor({
           <svg
             ref={svg}
             className={`cad-canvas cad-tool-${tool}`}
-            style={showAssembly || (show3D && partHasOutline) ? { display: 'none' } : undefined}
+            style={showWorkspace || (show3D && partHasOutline) ? { display: 'none' } : undefined}
             data-testid="cad-canvas"
             role="img"
             aria-label="2D sketch drawing canvas"

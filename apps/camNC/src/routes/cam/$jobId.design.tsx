@@ -68,6 +68,8 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   const [session, setSession] = useState(() => cadSession(initialJob.design!.draft));
   const [editorDocument, setEditorDocument] = useState(initialJob.design!.draft);
   const [editorEpoch, setEditorEpoch] = useState(0);
+  // Back from a face sketch, the editor opens on that part, where its new regions are cut.
+  const [returnToPart, setReturnToPart] = useState<string | null>(null);
   const [faceEdit, setFaceEdit] = useState<{ base: CadDocument; partId: string; sketchId: string } | null>(null);
   const [conflicted, setConflicted] = useState(!!session.conflict);
   const [recovering, setRecovering] = useState(false);
@@ -186,6 +188,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       failure.current = null;
       setSession(nextSession);
       setEditorDocument(current.design.draft);
+      setReturnToPart(null);
       setEditorEpoch(epoch => epoch + 1);
       setConflicted(false);
       setError(null);
@@ -237,6 +240,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     replaceCadSession(session, next, isNew ? null : base);
     endCadSession(faceSketchDocument(base, partId, sketchId).id);
     setEditorDocument(session.document);
+    setReturnToPart(partId);
     setEditorEpoch(epoch => epoch + 1);
     setFaceEdit(null);
   };
@@ -295,12 +299,12 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
           <CadEditor
             key={editorEpoch}
             document={editorDocument}
-            startIn3D
+            startIn3D={returnToPart ? 'part' : true}
             onEditFaceSketch={(base, partId, sketchId) => {
               draft(base);
               setFaceEdit({ base, partId, sketchId });
             }}
-            preferredPartId={context.part}
+            preferredPartId={returnToPart ?? context.part}
             onDraftChange={draft}
             onFinish={finish}
             onCancel={cancel}

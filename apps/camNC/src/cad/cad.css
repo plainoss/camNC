@@ -591,17 +591,55 @@
   padding: 12px;
   font-size: 13px;
 }
-.cad-command-search-heading { display: flex; gap: 8px; }
-.cad-command-search-heading input { flex: 1; min-width: 0; padding: 7px; }
-.cad-command-palette p { margin: 12px 0; }
-.cad-command-results { max-height: 280px; overflow: auto; margin-top: 8px; }
-.cad-command-results button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px; }
-.cad-command-results button span { flex: 1; }
-.cad-command-results button[aria-selected='true'] { background: #e6f0ff; }
-.cad-command-description { border-top: 1px solid #c8d3e1; padding-top: 12px; margin-top: 8px; }
-.cad-search-trigger { white-space: nowrap; margin-left: auto; }
-.cad-command-palette label { display: flex; align-items: center; gap: 6px; }
-.cad-editor [data-command-highlight='true'] { outline: 2px solid #2979df; outline-offset: 1px; }
+.cad-command-search-heading {
+  display: flex;
+  gap: 8px;
+}
+.cad-command-search-heading input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px;
+}
+.cad-command-palette p {
+  margin: 12px 0;
+}
+.cad-command-results {
+  max-height: 280px;
+  overflow: auto;
+  margin-top: 8px;
+}
+.cad-command-results button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+}
+.cad-command-results button span {
+  flex: 1;
+}
+.cad-command-results button[aria-selected='true'] {
+  background: #e6f0ff;
+}
+.cad-command-description {
+  border-top: 1px solid #c8d3e1;
+  padding-top: 12px;
+  margin-top: 8px;
+}
+.cad-search-trigger {
+  white-space: nowrap;
+  margin-left: auto;
+}
+.cad-command-palette label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cad-editor [data-command-highlight='true'] {
+  outline: 2px solid #2979df;
+  outline-offset: 1px;
+}
 .cad-dimension-editor {
   box-sizing: border-box;
   position: absolute;
@@ -856,7 +894,9 @@
   padding: 3px 5px;
   font: inherit;
 }
-.cad-modify-controls .cad-error { flex-basis: 100%; }
+.cad-modify-controls .cad-error {
+  flex-basis: 100%;
+}
 .cad-face-outline {
   fill: #eef1f3;
   stroke: #7f8c96;
@@ -904,16 +944,50 @@
   list-style: none;
 }
 
-.cad-quick-tools { top: 60px; left: 24px; right: auto; width: 230px; z-index: 4; }
-.cad-quick-tools button {display: flex; width: 100%; justify-content: space-between; text-align: left;}
-@media (max-width: 600px) { .cad-search-trigger kbd {display: none;} }
+.cad-quick-tools {
+  top: 60px;
+  left: 24px;
+  right: auto;
+  width: 230px;
+  z-index: 4;
+}
+.cad-quick-tools button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  text-align: left;
+}
+@media (max-width: 600px) {
+  .cad-search-trigger kbd {
+    display: none;
+  }
+}
 
-.cad-transform-editor { max-width: calc(100% - 30px); }
-.cad-transform-editor input[type='checkbox'] { width: auto; }
+.cad-transform-editor {
+  max-width: calc(100% - 30px);
+}
+.cad-transform-editor input[type='checkbox'] {
+  width: auto;
+}
 
-.cad-pattern-editor { max-width: calc(100% - 30px); }
-.cad-pattern-editor fieldset { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 6px; border: 1px solid #d7e1ec; }
-.cad-pattern-editor legend { padding: 0 4px; }
-.cad-pattern-editor input[type='checkbox'] { width: auto; }
+.cad-pattern-editor {
+  max-width: calc(100% - 30px);
+}
+.cad-pattern-editor fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid #d7e1ec;
+}
+.cad-pattern-editor legend {
+  padding: 0 4px;
+}
+.cad-pattern-editor input[type='checkbox'] {
+  width: auto;
+}
 
-.cad-slot-editor input[type='checkbox'] { width: 14px; height: 14px; }
+.cad-slot-editor input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+}

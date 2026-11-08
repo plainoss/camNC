@@ -13,6 +13,6 @@
 .cad-thickness-field .cad-thickness-error {
   color: #ac2929;
 }
-.cad-thickness-field input[aria-invalid="true"] {
+.cad-thickness-field input[aria-invalid='true'] {
   border-color: #ac2929;
 }
