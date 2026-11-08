@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FeatureDialog } from './FeatureDialog';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 import './partCutDialog.css';
+import { CadValueInput } from './CadValueInput';
 
 const kDefaultClearance = '0.2';
 
@@ -100,7 +101,8 @@ export function PartCutDialog({
       {box('targets', 'Targets', targets, setTargets)}
       <label className="cad-part-cut-clearance">
         Clearance
-        <input
+        <CadValueInput
+          bare
           value={text}
           aria-label="Clearance"
           spellCheck={false}

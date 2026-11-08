@@ -2,6 +2,7 @@ import type { CadPart, CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
 import { parseCadValue } from './valueExpressions';
 import './cadThicknessField.css';
+import { CadValueInput } from './CadValueInput';
 
 const kDefaultBit = '6';
 
@@ -51,7 +52,8 @@ export function CadReliefField({
         <label htmlFor={id} className="cad-number-field">
           for a bit of
           <span>
-            <input
+            <CadValueInput
+              bare
               id={id}
               value={text}
               spellCheck={false}

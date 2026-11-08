@@ -15,6 +15,7 @@ import { CadReliefField } from './CadReliefField';
 import { CadThicknessField } from './CadThicknessField';
 import { FeatureDialog } from './FeatureDialog';
 import { formatCadValue, parseCadValue } from './valueExpressions';
+import { CadValueInput } from './CadValueInput';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -172,7 +173,9 @@ export function TransformDialog({
         <label key={label} className="cad-number-field">
           {label}
           <span>
-            <input
+            <CadValueInput
+              bare
+              aria-label={label}
               value={text[axis]}
               spellCheck={false}
               aria-invalid={error ? true : undefined}

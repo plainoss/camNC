@@ -6,6 +6,8 @@ type Props = ComponentPropsWithoutRef<'input'> & {
   inputRef?: Ref<HTMLInputElement>;
   unit?: 'mm' | 'deg';
   unitClassName?: string;
+  /** Leaves out the unit beside the field, where its label already says it. */
+  bare?: boolean;
 };
 
 export function CadUnitSuffix({ text, unit = 'mm', className }: { text: string; unit?: 'mm' | 'deg'; className?: string }) {
@@ -28,7 +30,18 @@ function typeInto(input: HTMLInputElement, text: string, caret = text.length) {
  * lists the design's variables to use, with "New variable", and `#name = value` makes that variable and uses it, as
  * in the reference.
  */
-export function CadValueInput({ inputRef, unit = 'mm', unitClassName, value, defaultValue, onChange, onKeyDown, onBlur, ...props }: Props) {
+export function CadValueInput({
+  inputRef,
+  unit = 'mm',
+  unitClassName,
+  bare,
+  value,
+  defaultValue,
+  onChange,
+  onKeyDown,
+  onBlur,
+  ...props
+}: Props) {
   const fields = useContext(CadVariableFieldsContext);
   const own = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState(() => String(defaultValue ?? ''));
@@ -194,7 +207,7 @@ export function CadValueInput({ inputRef, unit = 'mm', unitClassName, value, def
           {problem}
         </span>
       )}
-      <CadUnitSuffix text={value === undefined ? draft : String(value)} unit={unit} className={unitClassName} />
+      {!bare && <CadUnitSuffix text={value === undefined ? draft : String(value)} unit={unit} className={unitClassName} />}
     </>
   );
 }

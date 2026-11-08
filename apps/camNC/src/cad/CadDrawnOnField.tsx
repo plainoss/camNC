@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { drawnOnName } from './drawnOnName';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 import './cadThicknessField.css';
+import { CadValueInput } from './CadValueInput';
 
 /** Where a drawn part starts from its plane or face, and which way it grows. The offset can use variables. */
 export function CadDrawnOnField({
@@ -46,7 +47,8 @@ export function CadDrawnOnField({
       <label htmlFor={id} className="cad-number-field">
         Offset
         <span>
-          <input
+          <CadValueInput
+            bare
             id={id}
             value={text}
             spellCheck={false}

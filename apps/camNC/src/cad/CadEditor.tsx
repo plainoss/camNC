@@ -2237,7 +2237,8 @@ export function CadEditor({
       return;
     }
     if (creationValues && part?.id === creationValues.partId && sketch && creationValueAt(creationValues, sketch)) {
-      if (/^[0-9.,-]$/.test(key)) {
+      // A digit starts typing the value, and so does `#` for a variable or `=` for an expression, as in the reference.
+      if (/^[0-9.,#=-]$/.test(key)) {
         event.preventDefault();
         setCreationValues({ ...creationValues, editing: true, text: key, selectAll: false });
         return;
