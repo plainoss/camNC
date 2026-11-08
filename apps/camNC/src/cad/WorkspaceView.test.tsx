@@ -8,13 +8,14 @@ afterEach(cleanup);
 const panel = (name: string): CadPart => ({ ...createPlateDocument({ width: 200, height: 100 }).parts[0]!, name });
 function setup(document: CadDocument, selectedId: string | null = null) {
   const select = vi.fn(),
-    open = vi.fn();
+    open = vi.fn(),
+    newPart = vi.fn();
   render(
     <div style={{ height: 500, display: 'flex' }}>
-      <WorkspaceView document={document} selectedId={selectedId} onSelect={select} onOpen={open} />
+      <WorkspaceView document={document} selectedId={selectedId} onSelect={select} onOpen={open} onNewPart={newPart} />
     </div>
   );
-  return { select, open };
+  return { select, open, newPart };
 }
 
 describe('the design workspace', () => {
@@ -44,5 +45,14 @@ describe('the design workspace', () => {
   it('names the parts it can’t show', () => {
     setup({ ...createCadDocument(), parts: [{ ...panel('Broken'), sketch: { id: 's', entities: [], constraints: [] } }, panel('Shelf')] });
     expect(screen.getByRole('status').textContent).toMatch(/^Not shown: Broken/);
+  });
+
+  it('starts a new part on a plane, and asks for a face otherwise', () => {
+    const { newPart } = setup({ ...createCadDocument(), parts: [panel('Side')] });
+    fireEvent.click(screen.getByRole('button', { name: 'New part' }));
+    expect(screen.getByRole('status').textContent).toBe('Click the face of a part to draw the new part on, or pick a plane. Esc cancels.');
+    fireEvent.click(screen.getByRole('button', { name: 'Right plane' }));
+    expect(newPart).toHaveBeenCalledWith({ plane: 'right' });
+    expect(screen.queryByRole('button', { name: 'Right plane' })).toBeNull();
   });
 });

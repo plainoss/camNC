@@ -2,7 +2,9 @@ import {
   evaluateCadFeatures,
   evaluateCadPart,
   mirrorEvaluatedPart,
+  CAD_IDENTITY_PLACEMENT,
   placementMatrix,
+  cadDrawnOnSupports,
   type CadDocument,
   type CadPart,
   type CadPlacement,
@@ -68,6 +70,10 @@ export function assemblyModel(document: CadDocument): AssemblyModel {
   );
   // The local mesh starts at the outline's lower corner; this puts it back in sketch coordinates.
   const local = ([x, y]: [number, number] = [0, 0]) => new Matrix4().makeTranslation(x, y, 0);
+  // A part others are drawn on stays where they were placed against it, at the origin, rather than in the row.
+  const supports = cadDrawnOnSupports(document);
+  for (const piece of pieces)
+    if (!piece.placement && !('copyId' in piece.instance) && supports.has(piece.instance.partId)) piece.placement = CAD_IDENTITY_PLACEMENT;
   const placedRight = pieces.reduce((right, { placement, shape }) => {
     if (!placement) return right;
     const matrix = new Matrix4().fromArray(placementMatrix(placement)).multiply(local(shape.info.sourceOrigin));

@@ -20,6 +20,7 @@ export * from './dimensionExpressions';
 export * from './valueExpressions';
 export * from './variables';
 export * from './placement';
+export * from './drawnOn';
 export * from './assemblyCollisions';
 export * from './copies';
 export * from './cornerRelief';
