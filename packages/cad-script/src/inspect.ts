@@ -12,7 +12,7 @@ import {
   type CadSketch,
   type EvaluatedCadPart,
 } from '@wbcnc/cad';
-import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest } from '@wbcnc/cam';
+import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
 export interface CadExpectation {
   /** Width and height of the outline, in mm. */
@@ -56,7 +56,7 @@ export interface CadReportPart {
     constraints: number;
   }[];
   /** Features CAM received. */
-  cam?: { pockets: number; throughHoles: number };
+  cam?: { pockets: number; throughHoles: number; undersidePockets?: number };
   /** Pieces CAM cuts when the part has copies, by name. Mirrored copies are cut as their own shape. */
   pieces?: { names: string[]; mirrored: string[] };
   /**
@@ -149,23 +149,33 @@ function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof pr
     clearHoles: true,
     tabs: DEFAULT_TABS,
     parts: [{ id: 'part', partId: source.partId, name: source.name, x: BOARD_MARGIN, y: BOARD_MARGIN, rotated: false }],
+    // Cuts from below come from a second side, after turning the board over, lined up by the camera as the app's default.
+    ...(profile.turned && { flip: { registration: 'camera' as const } }),
   };
   const plan = planBoard(
     board,
     {},
-    { part: () => ({ size: profile.size, features: profile.features }), underside: () => profile.features }
+    {
+      part: () => ({ size: profile.size, features: profile.features }),
+      underside: (_, rotated) => profile.turned?.(rotated ? 'y' : 'x') ?? profile.features,
+    }
   );
-  return {
-    bit: DEFAULT_SETTINGS.tools[0]!.diameter,
-    minutes: Math.round(plan.timeMin * 10) / 10,
-    operations: plan.ops.map(op => ({
-      label: op.label.replace(/^[^·]+ · /, ''),
+  const sideB = plan.sideB;
+  const operations = (from: PlanResult, prefix: string) =>
+    from.ops.map(op => ({
+      label: `${prefix}${op.label.replace(/^[^·]+ · /, '')}`,
       depth: round(op.zTop - op.zBottom),
       steps: op.depthSteps,
-    })),
-    warnings: plan.warnings,
+    }));
+  return {
+    bit: DEFAULT_SETTINGS.tools[0]!.diameter,
+    minutes: Math.round((plan.timeMin + (sideB?.timeMin ?? 0)) * 10) / 10,
+    operations: [...operations(plan, ''), ...(sideB ? operations(sideB, 'Side B: ') : [])],
+    warnings: [...plan.warnings, ...(sideB?.warnings ?? [])],
     blocked: [
       ...plan.safety,
+      ...(sideB?.safety ?? []),
+      ...(plan.flip?.problem ? [plan.flip.problem] : []),
       ...(plan.timeline ?? []).filter(event => event.block).map(event => event.message),
       ...(plan.hold ?? []).filter(hold => !hold.ok).map(hold => `${hold.part} isn’t held by enough tabs.`),
       ...(plan.holdClash?.length ? ['The bit would hit a hold-down.'] : []),
@@ -267,20 +277,17 @@ export async function inspectCadDocument(
     let cam: CadReportPart['cam'];
     let toolpaths: CadToolpathSummary | undefined;
     if (evaluated) {
-      if (evaluated.cuts?.some(cut => cut.side === 'underside'))
-        warnings.push({
-          code: 'cam-underside',
-          message:
-            'Cuts on the underside are cut from a second side, after turning the board over. This report covers the first side only.',
-          part: part.name,
-        });
-      else {
+      {
         const profile = profileFeatures(evaluated);
-        cam = { pockets: profile.features.pockets.length, throughHoles: profile.features.throughHoles.length };
-        if (profile.split)
+        cam = {
+          pockets: profile.features.pockets.length,
+          throughHoles: profile.features.throughHoles.length,
+          ...(profile.below && { undersidePockets: profile.below.pockets.length }),
+        };
+        if (profile.problem)
           errors.push({
-            code: 'cam-split',
-            message: 'These through cuts split the part. Use a separate part for each piece.',
+            code: profile.problem.includes('split the part') ? 'cam-split' : 'cam-sides',
+            message: profile.problem[0]!.toUpperCase() + profile.problem.slice(1),
             part: part.name,
           });
         else if (options.toolpaths !== false) {

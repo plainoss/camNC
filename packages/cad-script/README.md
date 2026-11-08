@@ -61,7 +61,7 @@ the parts. See `examples/` for more.
   below its face, in feature order) and `freedom`, within `tolerance` (0.01 mm). It
   doesn't check diameters or positions: read those from the report's cuts.
 - Cuts on `sketchOn({ floorOf: cut })` start at that pocket's floor.
-- `sketchOn('underside')` is drawn as the face is seen from below, so X runs the other way: a point at `x` on the part is at `-x` in the sketch. Its cuts come from a second side, which the report doesn't cover.
+- `sketchOn('underside')` is drawn as the face is seen from below, so X runs the other way: a point at `x` on the part is at `-x` in the sketch. Its cuts come from a second side, after turning the board over: the toolpath summary lists them as `Side B: …`.
 - Handles in the report, such as `7b8b`, work with `find` and `sketch` on that same
   revision of the design.
 - A script that stops with an error leaves the design as it was.

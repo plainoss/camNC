@@ -33,7 +33,8 @@ describe('profileFeatures', () => {
     expect(profile.offset).toEqual({ x: 50, y: 30 });
     expect(profile.size).toEqual([200, 120, 18]);
     expect(profile.features.throughHoles[0]![0]).toEqual({ x: 50, y: 30 });
-    expect(profile.split).toBe(false);
+    expect(profile.problem).toBeUndefined();
+    expect(profile.below).toBeNull();
   });
 
   it('turns clockwise loops counterclockwise', () => {
@@ -48,7 +49,40 @@ describe('profileFeatures', () => {
       holes: [],
       cuts: [{ id: 'slot', from: 0, to: 18, through: true, outline: rect(95, -5, 10, 130), islands: [] }],
     });
-    expect(profile.split).toBe(true);
+    expect(profile.problem).toMatch(/split the part/);
+  });
+
+  it('builds side B from cuts on the underside, turned over either way', () => {
+    const profile = profileFeatures({
+      thickness: 18,
+      outline: rect(0, 0, 200, 120),
+      holes: [],
+      cuts: [
+        { id: 'top', from: 0, to: 6, through: false, outline: rect(20, 20, 40, 40), islands: [] },
+        { id: 'cup', side: 'underside', from: 0, to: 10, through: false, outline: rect(150, 20, 30, 30), islands: [] },
+      ],
+    });
+    expect(profile.problem).toBeUndefined();
+    expect(profile.features.pockets.map(pocket => pocket.floorZ)).toEqual([12]);
+    expect(profile.features.bottomFaces).toEqual([{ z: 10, area: 900 }]);
+    expect(profile.below!.pockets.map(pocket => pocket.floorZ)).toEqual([8]);
+    // Turned about X the pocket keeps its x and mirrors in y; turned about Y, the other way round.
+    const xs = (features: ReturnType<NonNullable<typeof profile.turned>>) => features.pockets[0]!.strictRegion[0]!.map(p => p.x);
+    expect(Math.min(...xs(profile.turned!('x')))).toBeCloseTo(150);
+    expect(Math.min(...xs(profile.turned!('y')))).toBeCloseTo(20);
+  });
+
+  it('says when cuts from the two faces meet', () => {
+    const profile = profileFeatures({
+      thickness: 18,
+      outline: rect(0, 0, 200, 120),
+      holes: [],
+      cuts: [
+        { id: 'top', from: 0, to: 10, through: false, outline: rect(20, 20, 40, 40), islands: [] },
+        { id: 'under', side: 'underside', from: 0, to: 10, through: false, outline: rect(30, 30, 40, 40), islands: [] },
+      ],
+    });
+    expect(profile.problem).toMatch(/two faces meet/);
   });
 });
 

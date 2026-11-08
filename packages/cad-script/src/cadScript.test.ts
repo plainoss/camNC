@@ -436,17 +436,40 @@ describe('reporting problems', () => {
     expect(codes(report.warnings)).toContain('cut-outside-floor');
   });
 
-  it('says underside cuts go to a second side, which the report leaves out', async () => {
+  it('plans cuts on the underside as a second side, after turning the board over', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Plate');
-      part.profile.rect({ at: [0, 0], w: 100, h: 80 });
-      // Seen from below, X runs the other way.
-      const under = part.sketchOn('underside');
-      under.rect({ at: [-30, 10], w: 20, h: 20 });
-      part.cut(under.regionAt(-20, 20), { depth: 3 });
+      const door = d.part('Door', { thickness: 19 });
+      door.profile.rect({ at: [0, 0], w: 500, h: 300 });
+      const front = door.sketchOn('top');
+      front.rect({ at: [80, 80], w: 340, h: 140 });
+      door.cut(front.regionAt(250, 150), { depth: 3 });
+      // Hinge cups on the back. Seen from below, X runs the other way.
+      const back = door.sketchOn('underside');
+      back.circle({ at: [-22.5, 60], d: 35 });
+      back.circle({ at: [-22.5, 240], d: 35 });
+      for (const y of [60, 240]) door.cut(back.regionAt(-22.5, y), { depth: 13 });
     });
-    expect(codes(report.warnings)).toContain('cam-underside');
-    expect(report.parts[0]!.cam).toBeUndefined();
+    expect(report.errors).toEqual([]);
+    const door = report.parts[0]!;
+    expect(door.cam).toEqual({ pockets: 1, throughHoles: 0, undersidePockets: 1 });
+    const labels = door.toolpaths!.operations.map(op => op.label);
+    expect(labels.some(label => label.startsWith('Side B: ') && /13 deep/.test(label))).toBe(true);
+    expect(labels.some(label => !label.startsWith('Side B: ') && /3 deep/.test(label))).toBe(true);
+    expect(door.toolpaths!.blocked).toEqual([]);
+  });
+
+  it('says when cuts from the two faces meet', async () => {
+    const { report } = await editCad(null, d => {
+      const part = d.part('Plate', { thickness: 18 });
+      part.profile.rect({ at: [0, 0], w: 100, h: 80 });
+      const top = part.sketchOn('top');
+      top.rect({ at: [20, 20], w: 30, h: 30 });
+      part.cut(top.regionAt(35, 35), { depth: 10 });
+      const under = part.sketchOn('underside');
+      under.rect({ at: [-60, 25], w: 30, h: 30 });
+      part.cut(under.regionAt(-45, 40), { depth: 10 });
+    });
+    expect(codes(report.errors)).toContain('cam-sides');
   });
 
   it('gives the largest radius when a fillet does not fit', async () => {

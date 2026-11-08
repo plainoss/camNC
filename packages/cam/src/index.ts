@@ -5,7 +5,7 @@ export { extractFeatures } from './features';
 export type { PartFeatures, PocketFeature, Level } from './features';
 export { cutsMeet, featuresFromCuts, flippedProfile, profileFeatures } from './cutFeatures';
 export { union as unionPaths } from './geom';
-export type { FlatCut, FlatProfile, HoleSource } from './cutFeatures';
+export type { FlatCut, FlatProfile, HoleSource, SidedCut } from './cutFeatures';
 export {
   camPart,
   pocketOperation,
