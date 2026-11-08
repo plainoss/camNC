@@ -83,6 +83,8 @@ import {
   cadVariableProblems,
   drawnOnOutline,
   cadFaceFrame,
+  cadDrawnOnSupports,
+  CAD_IDENTITY_PLACEMENT,
   withFaceEdges,
   cadVariableScope,
   addPartCut,
@@ -210,6 +212,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
+import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
@@ -480,6 +483,9 @@ export function CadEditor({
   const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
   const [sketchTurn, setSketchTurn] = useState<SketchTurn>(straightOn);
+  // The edges of the parts behind a studio sketch, laid on its plane, and those picked to use in it with `u`.
+  const [partEdges, setPartEdges] = useState<PartEdge[]>([]);
+  const [pickedEdges, setPickedEdges] = useState<string[]>([]);
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   // A variable being added, or the one being changed.
@@ -2253,6 +2259,11 @@ export function CadEditor({
       setSketchTurn(normalTurn);
       return;
     }
+    if (key === 'u' && pickedEdges.length) {
+      event.preventDefault();
+      takeEdges();
+      return;
+    }
     if (modification.phase === 'offset' && modification.entityIds.length) {
       if (/^[0-9.,-]$/.test(key)) {
         event.preventDefault();
@@ -2439,6 +2450,15 @@ export function CadEditor({
     if (event.button !== 0 || !sketch) return;
     // Seen edge-on, a click can't say where on the plane it is.
     if (sketchBackdrop && edgeOn(sketchTurn)) return;
+    // A part's edge behind the sketch is picked to use in it, as the reference's Use takes it.
+    const edgeKey = (event.target as Element).closest('[data-part-edge]')?.getAttribute('data-part-edge');
+    if (edgeKey && tool === 'select') {
+      setPickedEdges(picked =>
+        picked.includes(edgeKey) ? picked.filter(key => key !== edgeKey) : event.shiftKey ? [...picked, edgeKey] : [edgeKey]
+      );
+      return;
+    }
+    if (pickedEdges.length) setPickedEdges([]);
     setCreationValues(null);
     setRegionField(null);
     if (conicEditing) {
@@ -3117,10 +3137,19 @@ export function CadEditor({
       // Its own size, which a turned drawing's box isn't.
       const width = svg.current!.clientWidth,
         height = svg.current!.clientHeight;
+      // A turned drawing moves along its own axes, so the move on screen is taken back through its turn.
+      let dx = event.clientX - v.x,
+        dy = event.clientY - v.y;
+      if (sketchBackdrop && sketchTurn !== straightOn) {
+        if (edgeOn(sketchTurn)) return;
+        const [a, b, c, d] = drawingMatrix(sketchTurn),
+          det = a * d - b * c;
+        [dx, dy] = [(d * dx - c * dy) / det, (a * dy - b * dx) / det];
+      }
       setView({
         ...v.view,
-        x: v.view.x - ((event.clientX - v.x) * v.view.w) / width,
-        y: v.view.y - ((event.clientY - v.y) * v.view.h) / height,
+        x: v.view.x - (dx * v.view.w) / width,
+        y: v.view.y - (dy * v.view.h) / height,
       });
     }
     const moving = drag.current;
@@ -3586,10 +3615,17 @@ export function CadEditor({
     const steps = designSteps(doc);
     const at = steps.findIndex(step => step.id === `${part.id}:sketch`);
     const before = at > 0 ? rolledBackTo(doc, steps[at - 1]!.id) : { ...doc, parts: [] };
+    // A part something is drawn on stays where the drawing is, even when what's drawn on it is only this sketch's part.
+    const supports = cadDrawnOnSupports(doc);
     return {
-      document: before.parts.some(candidate => candidate.id === part.id)
-        ? { ...before, parts: before.parts.filter(candidate => candidate.id !== part.id) }
-        : before,
+      document: {
+        ...before,
+        parts: before.parts
+          .filter(candidate => candidate.id !== part.id)
+          .map(candidate =>
+            !candidate.placement && supports.has(candidate.id) ? { ...candidate, placement: CAD_IDENTITY_PLACEMENT } : candidate
+          ),
+      },
       view: {
         origin,
         x: frame.x,
@@ -3602,8 +3638,30 @@ export function CadEditor({
       },
     };
   }, [studioSession, showWorkspace, show3D, part, canvasBox, doc, view, sketchTurn]);
-  // Each sketch opens looking straight at its plane.
-  useEffect(() => setSketchTurn(straightOn), [part?.id, showWorkspace]);
+  // Each sketch opens looking straight at its plane, with nothing of the parts behind it picked.
+  useEffect(() => {
+    setSketchTurn(straightOn);
+    setPickedEdges([]);
+  }, [part?.id, showWorkspace]);
+  // The parts' edges the drawing shows: all of them looking straight at the plane, and once turned, those in it, the
+  // only ones that still line up with what's seen.
+  const shownEdges = sketchBackdrop ? partEdges.filter(edge => edge.onPlane || sketchTurn === straightOn) : [];
+  /** `u`: the picked edges become the sketch's own, fixed where they are, to draw and constrain against. */
+  const takeEdges = () => {
+    if (!sketch) return;
+    let next = sketch;
+    for (const edge of partEdges.filter(candidate => pickedEdges.includes(candidate.key)))
+      next = addLine(next, { x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2 });
+    const before = new Set(sketch.entities.map(entity => entity.id));
+    const added = next.entities.filter(entity => !before.has(entity.id) && entity.type === 'line');
+    const ends = new Set(added.flatMap(line => (line.type === 'line' ? [line.startId, line.endId] : [])));
+    changeSketch({
+      ...next,
+      entities: next.entities.map(entity => (entity.type === 'point' && ends.has(entity.id) ? { ...entity, fixed: true } : entity)),
+    });
+    setPickedEdges([]);
+    setSelected(added.map(line => line.id));
+  };
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
   // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
@@ -4242,7 +4300,12 @@ export function CadEditor({
           {sketchBackdrop && canvasBox && (
             <Suspense fallback={null}>
               <div className="cad-sketch-backdrop-frame" style={canvasBox}>
-                <SketchBackdrop document={sketchBackdrop.document} view={sketchBackdrop.view} hiddenIds={hiddenParts} />
+                <SketchBackdrop
+                  document={sketchBackdrop.document}
+                  view={sketchBackdrop.view}
+                  hiddenIds={hiddenParts}
+                  onEdges={setPartEdges}
+                />
               </div>
             </Suspense>
           )}
@@ -4299,6 +4362,22 @@ export function CadEditor({
               </pattern>
             </defs>
             <rect x={view.x - view.w} y={view.y - view.h} width={view.w * 3} height={view.h * 3} fill={`url(#cad-grid-${doc.id})`} />
+            {shownEdges.length > 0 && (
+              <g className="cad-part-edges" aria-label="Edges of the parts behind the sketch">
+                {shownEdges.map(edge => (
+                  <line
+                    key={edge.key}
+                    data-part-edge={edge.key}
+                    className={pickedEdges.includes(edge.key) ? 'cad-part-edge is-picked' : 'cad-part-edge'}
+                    x1={edge.x1}
+                    y1={-edge.y1}
+                    x2={edge.x2}
+                    y2={-edge.y2}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))}
+              </g>
+            )}
             <SketchRegion
               document={doc}
               partId={part?.id}
@@ -5137,7 +5216,7 @@ export function CadEditor({
             </span>
             <span>
               {sketchBackdrop
-                ? 'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it'
+                ? 'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it · U uses a picked edge'
                 : 'Scroll to zoom · right-drag to pan'}
             </span>
             {sketch && (

@@ -431,6 +431,74 @@ it('doesn’t apply a field after its dialog is cancelled, and applies a dimensi
   );
 });
 
+it('keeps a part drawn on where its sketch is, behind that sketch, when nothing else is drawn on it', async () => {
+  const other = { ...createPlateDocument({ width: 50, height: 50, thickness: 20 }).parts[0]!, name: 'Other' };
+  other.placement = { position: [1000, 0, 0], rotation: [0, 0, 0, 1] };
+  const base = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, id: 'base', name: 'Base' };
+  base.drawnOn = { on: { plane: 'top' as const }, offset: 0 };
+  const lid = { ...createCadPart('Lid', 4), drawnOn: { on: { partId: base.id, face: 'top' as const }, offset: 0 } };
+  lid.sketch = addLine(lid.sketch, { x1: 10, y1: 10, x2: 100, y2: 10 });
+  const source: CadDocument = { ...createCadDocument(), parts: [other, base, { ...lid, thin: { depth: 50, midPlane: false } }] };
+  sessions.push(source.id);
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Lid/ }));
+  await screen.findByRole('dialog', { name: 'Sketch · Lid' });
+  await waitFor(() => expect(document.querySelectorAll('.cad-part-edge').length).toBeGreaterThanOrEqual(4), { timeout: 10_000 });
+  // The base's long sides, under the face outline at x 0 and 130, not off in a row beside the other part.
+  const xs = [...document.querySelectorAll('.cad-part-edge')]
+    .filter(edge => Math.abs(Number(edge.getAttribute('y1')) - Number(edge.getAttribute('y2'))) === 500)
+    .map(edge => Number(edge.getAttribute('x1')));
+  expect(xs.sort((a, b) => a - b)).toEqual([0, 130]);
+});
+
+it('uses an edge of a part behind a sketch in it, fixed where it is, after picking it and pressing U', async () => {
+  const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
+  side.drawnOn = { on: { plane: 'right' as const }, offset: 0 };
+  const shelf = { ...createCadPart('Shelf', 20), drawnOn: { on: { plane: 'front' as const }, offset: 0 } };
+  shelf.sketch = addLine(shelf.sketch, { x1: 20, y1: 200, x2: 380, y2: 200 });
+  const source: CadDocument = { ...createCadDocument(), parts: [side, { ...shelf, thin: { depth: 130, midPlane: false } }] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Shelf/ }));
+  await screen.findByRole('dialog', { name: 'Sketch · Shelf' });
+  // The side board, seen from the front, is a 20 mm wide strip 500 mm high.
+  await waitFor(() => expect(document.querySelectorAll('.cad-part-edge').length).toBeGreaterThanOrEqual(4), { timeout: 10_000 });
+  const edges = [...document.querySelectorAll<SVGLineElement>('.cad-part-edge')];
+  const tall = edges.find(edge => Math.abs(Number(edge.getAttribute('y1')) - Number(edge.getAttribute('y2'))) === 500)!;
+  expect(tall).toBeDefined();
+  const lines = () => latest().parts[1]!.sketch.entities.filter(entity => entity.type === 'line').length;
+  const before = lines();
+  fireEvent.pointerDown(tall, { button: 0, buttons: 1, pointerId: 1, clientX: 0, clientY: 0 });
+  fireEvent.pointerUp(tall, { button: 0, pointerId: 1 });
+  await waitFor(() => expect(tall.classList.contains('is-picked')).toBe(true));
+  await userEvent.keyboard('u');
+  await waitFor(() => expect(lines()).toBe(before + 1));
+  const sketch = latest().parts[1]!.sketch;
+  const used = sketch.entities.at(-1)!;
+  expect(used.type).toBe('line');
+  const ends = sketch.entities.filter(entity => used.type === 'line' && (entity.id === used.startId || entity.id === used.endId));
+  expect(ends.map(end => end.type === 'point' && [Math.abs(end.y), !!end.fixed])).toEqual(
+    expect.arrayContaining([
+      [0, true],
+      [500, true],
+    ])
+  );
+});
+
 it('shows the parts built before a sketch behind it, seen straight at its plane and turned by a right drag, and none of its own', async () => {
   const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
   side.drawnOn = { on: { plane: 'right' as const }, offset: 0 };
@@ -472,6 +540,17 @@ it('shows the parts built before a sketch behind it, seen straight at its plane 
   await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(false));
   await userEvent.keyboard('n');
   await waitFor(() => expect(canvas.style.transform).toBe('matrix(-1, 0, 0, 1, 0, 0)'));
+  // Seen from behind, a middle drag to the right still carries the drawing to the right.
+  const viewX = () => Number(canvas.getAttribute('viewBox')!.split(' ')[0]);
+  const x0 = viewX();
+  const middle = (type: string, dx: number, buttons: number) =>
+    canvas.dispatchEvent(
+      new PointerEvent(type, { bubbles: true, clientX: at.x + dx, clientY: at.y, button: 1, buttons, pointerId: 1, pointerType: 'mouse' })
+    );
+  middle('pointerdown', 0, 4);
+  middle('pointermove', 50, 4);
+  middle('pointerup', 50, 0);
+  await waitFor(() => expect(viewX()).toBeGreaterThan(x0));
   await userEvent.click(within(screen.getByRole('dialog', { name: 'Sketch · Back' })).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(document.querySelector('.cad-sketch-backdrop')).toBeNull());
 });

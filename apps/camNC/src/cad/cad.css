@@ -1192,3 +1192,16 @@
 .cad-canvas[data-sketch-turned] {
   outline: none;
 }
+/** The parts' edges behind a sketch: found by hovering, as the reference highlights them, and picked to use with U. */
+.cad-part-edge {
+  stroke: transparent;
+  stroke-width: 9px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.cad-part-edge:hover {
+  stroke: rgb(47 128 237 / 0.45);
+}
+.cad-part-edge.is-picked {
+  stroke: rgb(47 128 237 / 0.85);
+}
