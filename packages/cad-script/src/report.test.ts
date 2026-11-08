@@ -302,3 +302,27 @@ describe('report intact patterns', () => {
     expect(report.warnings.filter(warning => warning.code === 'pattern-copies-missing')).toEqual([]);
   });
 });
+
+describe('finger count variables', () => {
+  it('follows the variable after creating a finger split', async () => {
+    const created = await editCad(null, d => {
+      d.variable('n', '5');
+      const front = d.part('Front', { thickness: 18 });
+      front.profile.rect({ at: [0, 0], w: 300, h: 100 });
+      front.drawOn('front', { offset: -500, inward: true });
+      const side = d.part('Side', { thickness: 18 });
+      side.profile.rect({ at: [500, 0], w: 200, h: 100 });
+      side.drawOn('right', { offset: 282 });
+      d.cutParts(side, { with: front, split: { fingers: 'n' } });
+    });
+    expect(created.scriptError).toBeUndefined();
+    expect(created.report.errors).toEqual([]);
+    expect(created.document.partCuts![0]!.split).toEqual({ fingers: 5, fingersExpression: 'n' });
+    expect(created.report.parts.map(part => part.cuts.length)).toEqual([2, 3]);
+    const changed = await editCad(created.document, d => {
+      d.variable('n', '7');
+    });
+    expect(changed.report.errors).toEqual([]);
+    expect(changed.report.parts.map(part => part.cuts.length)).toEqual([3, 4]);
+  });
+});

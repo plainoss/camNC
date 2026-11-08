@@ -159,6 +159,7 @@ by the parts that fit them.
   cut.
 - `d.cutParts(a, { with: b, split: 'half' })` makes a half-lap where two parts cross,
   each losing half its height, and `split: { fingers: 5 }` a finger joint at a corner.
+  The finger count also accepts an expression, such as `split: { fingers: 'n' }`, and follows its variables.
   Draw both parts as plain boards: the step makes the slots, so a person changes the
   joint by its finger count, and the slots follow the boards' sizes.
 - `part.pattern({ axis: 'x', count: 'slats', spacing: '60mm' })` repeats a part in a row

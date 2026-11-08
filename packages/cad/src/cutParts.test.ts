@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { updatePartCut, withPartCuts } from './cutParts';
 import {
   cadStepReport,
+  cadVariableProblems,
+  removeCadVariable,
   addCircle,
   addLine,
   createCadPart,
@@ -498,6 +500,45 @@ function joint(split: 'half' | { fingers: number }, corner = false): CadDocument
 }
 
 describe('half-lap and finger joints', () => {
+  it('follows a finger count variable, preserves invalid counts, and tracks renamed expressions', async () => {
+    let document = joint({ fingers: 5 }, true);
+    Object.assign(document.partCuts![0]!.split!, { fingersExpression: '#n' });
+    document = (await variables(document, { n: '5' })).document;
+    expect((await solveCadDocument(document)).parts.map(part => part.cuts?.length)).toEqual([3, 2]);
+    document = (await variables(document, { n: '7' })).document;
+    expect(document.partCuts![0]!.split).toEqual({ fingers: 7, fingersExpression: '#n' });
+    expect((await solveCadDocument(document)).parts.map(part => part.cuts?.length)).toEqual([4, 3]);
+    for (const expression of ['2.5', '1', '3mm']) {
+      document = (await variables(document, { n: expression })).document;
+      expect(document.partCuts![0]!.split).toEqual({ fingers: 7, fingersExpression: '#n' });
+      expect(cadVariableProblems(document)).toEqual([
+        expect.objectContaining({ code: 'variable-value', severity: 'error', message: expect.stringContaining('Cut parts fingers #n:') }),
+      ]);
+    }
+    const id = document.variables![0]!.id;
+    const renamed = setCadVariable(document, { id, name: 'count', expression: '5' });
+    if ('error' in renamed) throw new Error(renamed.error);
+    document = renamed.document;
+    expect(document.partCuts![0]!.split).toEqual({ fingers: 5, fingersExpression: '#count' });
+    expect(removeCadVariable(document, id)).toEqual({ error: 'count is used in one place. Change those first.' });
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
+  });
+
+  it('validates and replaces finger expressions on creation and update', () => {
+    const document = joint('half');
+    const created = addPartCut(document, [], [], { value: 0 }, { fingers: 5, fingersExpression: 'n' });
+    expect(created.document.partCuts!.at(-1)!.split).toEqual({ fingers: 5, fingersExpression: 'n' });
+    const updated = updatePartCut(created.document, created.id, { split: { fingers: 3 } });
+    expect(updated.partCuts!.at(-1)!.split).toEqual({ fingers: 3 });
+    const invalid = JSON.parse(JSON.stringify(created.document));
+    invalid.partCuts.at(-1).split.fingersExpression = 5;
+    expect(() => parseCadDocument(invalid)).toThrow('Invalid CAD part cut');
+    expect(() => addPartCut(document, [], [], { value: 0 }, invalid.partCuts.at(-1).split)).toThrow('Invalid CAD part cut');
+    expect(() => updatePartCut(document, document.partCuts![0]!.id, { split: invalid.partCuts.at(-1).split })).toThrow(
+      'Invalid CAD part cut'
+    );
+  });
+
   it.each(['half', { fingers: 2 }] as const)('cuts opposite halves with clearance for %j and follows the overlap height', async split => {
     const document = joint(split);
     for (const height of [100, 140]) {
