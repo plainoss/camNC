@@ -121,9 +121,10 @@ describe('the left panel', () => {
     route.path = '/settings/bits';
     show();
     expect(panel().getByText<HTMLButtonElement>('Model').disabled).toBe(true);
+    expect(panel().getByText('Model').getAttribute('title')).toBe('Open a project first');
     expect(panel().getByText<HTMLButtonElement>('Plan').disabled).toBe(true);
     expect(panel().getByText('Machine').getAttribute('href')).toBe('/visualize/2DView');
-    expect(panel().getByText('CAM/CAD').getAttribute('href')).toBe('/cam');
+    expect(panel().getByText('Projects').getAttribute('href')).toBe('/cam');
   });
 
   it('takes the board shown to the machine, and Plan back to the board at the machine', () => {

@@ -15,7 +15,7 @@ vi.mock('@tanstack/react-router', () => ({
   useSearch: () => ({}),
   Link: ({ children, className }: { children: ReactNode; className?: string }) => <a className={className}>{children}</a>,
 }));
-vi.mock('@/components/page-header', () => ({ PageHeader: () => null }));
+vi.mock('@/components/page-header', () => ({ PageHeader: ({ title }: { title: string }) => <header>{title}</header> }));
 vi.mock('@wbcnc/ui/components/sonner', () => ({ toast: Object.assign(vi.fn(), { error: toastError }) }));
 vi.mock('@/cam/openModelFile', async importOriginal => ({
   ...(await importOriginal<typeof import('@/cam/openModelFile')>()),
@@ -34,6 +34,13 @@ const renderIndex = () =>
   );
 
 describe('CAM job list', () => {
+  it('titles the start page and its saved list as projects', async () => {
+    await createJob(new File(['x'], 'saved-project.step'));
+    renderIndex();
+    expect(screen.getByRole('banner').textContent).toBe('Projects');
+    expect(await screen.findByRole('heading', { name: 'Recent projects' })).toBeTruthy();
+  });
+
   it('says so when the picked file is not a model, and makes no job', async () => {
     const before = (await listJobs()).length;
     picked.file = new File(['hello'], 'notes.txt');

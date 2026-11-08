@@ -59,7 +59,7 @@ describe('app sidebar theme', () => {
       </SidebarProvider>
     );
     for (const name of [
-      'CAM/CAD',
+      'Projects',
       'Get started',
       'Connection',
       'Work area',

@@ -936,7 +936,7 @@ function Shell({
 }) {
   return (
     <CamPage className="min-h-dvh md:h-dvh">
-      {bar ?? <PageHeader title="CAM (beta)" />}
+      {bar ?? <PageHeader title="Projects" />}
       {message && <p className="m-8 text-muted-foreground">{message}</p>}
       {loading && (
         <div className="flex flex-1 items-center justify-center gap-2 text-muted-foreground">
