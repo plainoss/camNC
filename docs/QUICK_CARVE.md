@@ -62,7 +62,7 @@ Later:    6 → 7
 
 ### PRs 3–5: Carving jobs, the Carve step, Plan and the machine (one PR)
 
-- New carving card on the CAM/CAD page. The rail shows Carve, Plan, Machine.
+- New carving card on the Projects page. The rail shows Carve, Plan, Machine.
 - Lettering (font, text, height) or an SVG of filled shapes. Drag to place and
   drag a corner to resize. A Board tab sets size, thickness, material and holding.
 - Live preview of the carved board with flat bottoms marked. Hover reads depth

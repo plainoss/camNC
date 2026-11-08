@@ -4,7 +4,7 @@ import { mirrorEvaluatedPart } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
 import { evaluateCadFeatures } from './features';
-import { evaluateCadPart, polygonArea } from './geometry';
+import { evaluateCadPart, pointInPolygon, polygonArea } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
@@ -45,23 +45,6 @@ function square(a: CadPlacement, b: CadPlacement): boolean {
   });
 }
 
-/**
- * Where a housed part reaches into the part housing it, in that part's own frame, or why it can't be worked out. Both
- * parts need placing, square to each other.
- */
-function overlap(into: EvaluatedCadPart, intoAt: CadPlacement, housed: EvaluatedCadPart, housedAt: CadPlacement) {
-  const [hlo, hhi] = box(housed);
-  const corners = [0, 1, 2, 3, 4, 5, 6, 7].map(i =>
-    toLocal(intoAt, toWorld(housedAt, [i & 1 ? hhi[0] : hlo[0], i & 2 ? hhi[1] : hlo[1], i & 4 ? hhi[2] : hlo[2]]))
-  );
-  const [ilo, ihi] = box(into);
-  const lo = [0, 1, 2].map(a => Math.max(ilo[a]!, Math.min(...corners.map(c => c[a]!)))) as Vec3,
-    hi = [0, 1, 2].map(a => Math.min(ihi[a]!, Math.max(...corners.map(c => c[a]!)))) as Vec3;
-  if (lo.some((value, a) => hi[a]! - value < kSquare))
-    return { error: 'The housed part doesn’t reach into the other, so there’s nothing to cut.' };
-  return { lo, hi };
-}
-
 /** How much of a polygon lies inside a rectangle. */
 function areaWithin(polygon: CadPoint[], lo: Vec3, hi: Vec3): number {
   const edges: [(p: CadPoint) => number, (a: CadPoint, b: CadPoint) => CadPoint][] = [
@@ -83,22 +66,98 @@ function areaWithin(polygon: CadPoint[], lo: Vec3, hi: Vec3): number {
   return points.length < 3 ? 0 : Math.abs(polygonArea(points));
 }
 
+/** A box in one part's frame, seen in another's: both square to each other, so it's still a box. */
+function carry(from: CadPlacement, to: CadPlacement, [lo, hi]: [Vec3, Vec3]): [Vec3, Vec3] {
+  const corners = [0, 1, 2, 3, 4, 5, 6, 7].map(i =>
+    toLocal(to, toWorld(from, [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]]))
+  );
+  return [
+    [0, 1, 2].map(a => Math.min(...corners.map(c => c[a]!))) as Vec3,
+    [0, 1, 2].map(a => Math.max(...corners.map(c => c[a]!))) as Vec3,
+  ];
+}
+
 /**
- * Whether a tool is solid all through where it reaches into a target: its outline fills that region, and no hole or
- * cut of its own takes anything out of it. Only then is the region it cuts the box it fills.
+ * What a tool fills where it reaches into a target, as boxes in the target's frame: its outline within the target, in
+ * rectangles, as deep as it reaches. A shouldered tenon fills only its tenon there, and a comb one box per finger. A
+ * tool whose outline there isn't made of square corners and straight sides, or that has a cut of its own there, is
+ * refused.
  */
-function solidWithin(tool: EvaluatedCadPart, toolAt: CadPlacement, into: EvaluatedCadPart, intoAt: CadPlacement): boolean {
-  const found = overlap(tool, toolAt, into, intoAt);
-  if ('error' in found) return true;
-  const { lo, hi } = found;
-  const full = (hi[0] - lo[0]) * (hi[1] - lo[1]),
-    slack = Math.max(full * 1e-6, kSquare);
-  if (areaWithin(tool.outline, lo, hi) < full - slack) return false;
-  if (tool.holes.some(hole => areaWithin(hole, lo, hi) > slack)) return false;
-  return !(tool.cuts ?? []).some(cut => {
+function toolBoxes(
+  tool: EvaluatedCadPart,
+  toolAt: CadPlacement,
+  into: EvaluatedCadPart,
+  intoAt: CadPlacement
+): { boxes: [Vec3, Vec3][] } | { refused: string } {
+  const [tlo, thi] = box(tool);
+  const [rlo, rhi] = carry(intoAt, toolAt, box(into));
+  const lo = [0, 1, 2].map(a => Math.max(tlo[a]!, rlo[a]!)) as Vec3,
+    hi = [0, 1, 2].map(a => Math.min(thi[a]!, rhi[a]!)) as Vec3;
+  if (lo.some((value, a) => hi[a]! - value < kSquare)) return { boxes: [] };
+  // Split the reach into cells along every corner of the tool's outline and holes inside it, and keep the filled ones.
+  const stops = (values: number[], from: number, to: number) =>
+    [...new Set([from, to, ...values.filter(v => v > from + kSquare && v < to - kSquare)].map(v => Math.round(v * 1e6) / 1e6))].sort(
+      (a, b) => a - b
+    );
+  const loops = [tool.outline, ...tool.holes];
+  const xs = stops(
+      loops.flatMap(loop => loop.map(p => p.x)),
+      lo[0],
+      hi[0]
+    ),
+    ys = stops(
+      loops.flatMap(loop => loop.map(p => p.y)),
+      lo[1],
+      hi[1]
+    );
+  // A curved tool would split into slivers that aren't what it fills.
+  const curved = "isn't square-cornered and straight-sided";
+  if ((xs.length - 1) * (ys.length - 1) > 400) return { refused: curved };
+  const slack = Math.max((hi[0] - lo[0]) * (hi[1] - lo[1]) * 1e-6, kSquare);
+  // Each cell is all tool or none of it; one only partly filled means a slanted or curved side, which no box fits.
+  const filled: boolean[][] = [];
+  for (let j = 0; j + 1 < ys.length; j++) {
+    filled.push([]);
+    for (let i = 0; i + 1 < xs.length; i++) {
+      const cellLo: Vec3 = [xs[i]!, ys[j]!, 0],
+        cellHi: Vec3 = [xs[i + 1]!, ys[j + 1]!, 0];
+      const covered =
+        areaWithin(tool.outline, cellLo, cellHi) - tool.holes.reduce((sum, hole) => sum + areaWithin(hole, cellLo, cellHi), 0);
+      const cell = (cellHi[0] - cellLo[0]) * (cellHi[1] - cellLo[1]);
+      if (covered > slack && covered < cell - slack) return { refused: curved };
+      filled[j]!.push(covered >= cell - slack);
+    }
+  }
+  // Runs of filled cells along each row, then runs the same width stacked up into rectangles.
+  const rectangles: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  for (let j = 0; j + 1 < ys.length; j++) {
+    const y0 = ys[j]!,
+      y1 = ys[j + 1]!;
+    for (let i = 0; i + 1 < xs.length; i++) {
+      if (!filled[j]![i]) continue;
+      let k = i + 1;
+      while (k + 1 < xs.length && filled[j]![k]) k++;
+      const x0 = xs[i]!,
+        x1 = xs[k]!;
+      const below = rectangles.find(r => r.y1 === y0 && r.x0 === x0 && r.x1 === x1);
+      if (below) below.y1 = y1;
+      else rectangles.push({ x0, x1, y0, y1 });
+      i = k - 1;
+    }
+  }
+  const ownCut = (tool.cuts ?? []).some(cut => {
     const [bottom, top] = cut.side === 'top' ? [tool.thickness - cut.to, tool.thickness - cut.from] : [cut.from, cut.to];
     return top > lo[2] + kSquare && bottom < hi[2] - kSquare && areaWithin(cut.outline, lo, hi) > slack;
   });
+  if (ownCut) return { refused: 'has a cut of its own' };
+  return {
+    boxes: rectangles.map(r =>
+      carry(toolAt, intoAt, [
+        [r.x0, r.y0, lo[2]],
+        [r.x1, r.y1, hi[2]],
+      ])
+    ),
+  };
 }
 
 /**
@@ -119,7 +178,8 @@ export function applyPartCuts(
   const sources = new Map(document.parts.map(part => [part.id, part]));
   const supports = cadDrawnOnSupports(document);
   for (const step of document.partCuts ?? []) {
-    let made = 0;
+    let made = 0,
+      refused = false;
     const warn = (message: string) => diagnostics.push({ code: 'part-cut-unresolved', severity: 'warning', message });
     for (const targetId of step.targets)
       for (const toolId of step.tools) {
@@ -151,63 +211,86 @@ export function applyPartCuts(
         ];
         for (const { key, at, shape, name } of instances) {
           if (!square(intoAt, at)) {
+            refused = true;
             warn(`${name} isn't square to ${intoSource.name}, so it can't be cut from it yet.`);
             continue;
           }
-          const found = overlap(into, intoAt, shape, at);
-          if ('error' in found) continue;
-          if (!solidWithin(shape, at, into, intoAt)) {
-            warn(`${name} isn't a plain block where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
+          const found = toolBoxes(shape, at, into, intoAt);
+          if ('refused' in found) {
+            refused = true;
+            warn(`${name} ${found.refused} where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
             continue;
           }
-          const { lo, hi } = found,
-            t = into.thickness;
-          const fromTop = hi[2] >= t - kSquare,
-            fromBelow = lo[2] <= kSquare;
-          if (!fromTop && !fromBelow) {
-            warn(`${name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
-            continue;
-          }
-          // The clearance widens each side inside the part. A side that runs off its edge stays there, open.
-          const [ilo, ihi] = box(into),
+          const t = into.thickness,
+            [ilo, ihi] = box(into),
             c = step.clearance;
-          const x0 = lo[0] > ilo[0] + kSquare ? lo[0] - c : lo[0],
-            x1 = hi[0] < ihi[0] - kSquare ? hi[0] + c : hi[0],
-            y0 = lo[1] > ilo[1] + kSquare ? lo[1] - c : lo[1],
-            y1 = hi[1] < ihi[1] - kSquare ? hi[1] + c : hi[1];
-          const outline = [
-            { x: x0, y: y0 },
-            { x: x1, y: y0 },
-            { x: x1, y: y1 },
-            { x: x0, y: y1 },
-          ];
-          // The clearance deepens it too, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
-          const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
-            through = reach >= t - kSquare;
-          const relief = intoSource.cornerRelief
-            ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
-            : { points: outline, skipped: 0 };
-          if (relief.skipped)
-            warn(
-              `${relief.skipped} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
+          const reaches = found.boxes.map(([lo, hi]) => ({
+            lo: [0, 1, 2].map(a => Math.max(lo[a]!, ilo[a]!)) as Vec3,
+            hi: [0, 1, 2].map(a => Math.min(hi[a]!, ihi[a]!)) as Vec3,
+          }));
+          // Two rectangles of one tool that meet aren't widened into each other.
+          const meets = (index: number, axis: 0 | 1, at: number) =>
+            reaches.some(
+              (other, j) =>
+                j !== index &&
+                (Math.abs(other.lo[axis] - at) < kSquare || Math.abs(other.hi[axis] - at) < kSquare) &&
+                other.lo[1 - axis]! < reaches[index]!.hi[1 - axis]! - kSquare &&
+                other.hi[1 - axis]! > reaches[index]!.lo[1 - axis]! + kSquare
             );
-          const current = byId.get(targetId)!;
-          const cut: EvaluatedCadCut = {
-            id: `cut-parts:${step.id}:${toolId}${key}`,
-            regionId: `cut-parts:${step.id}:${toolId}${key}`,
-            side: fromTop ? 'top' : 'underside',
-            from: 0,
-            to: through ? t : reach,
-            through,
-            outline: relief.points,
-            islands: [],
-            opening: { x0, y0, x1, y1 },
-          };
-          byId.set(targetId, { ...current, cuts: [...(current.cuts ?? []), cut] });
-          made++;
+          reaches.forEach(({ lo, hi }, index) => {
+            const fromTop = hi[2] >= t - kSquare,
+              fromBelow = lo[2] <= kSquare;
+            if (!fromTop && !fromBelow) {
+              warn(`${name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
+              return;
+            }
+            // The clearance widens each side inside the part. A side that runs off its edge stays there, open.
+            const widen = (axis: 0 | 1, side: 'lo' | 'hi') => {
+              const at = side === 'lo' ? lo[axis] : hi[axis];
+              const inside = side === 'lo' ? at > ilo[axis] + kSquare : at < ihi[axis] - kSquare;
+              return inside && !meets(index, axis, at) ? (side === 'lo' ? at - c : at + c) : at;
+            };
+            const x0 = widen(0, 'lo'),
+              x1 = widen(0, 'hi'),
+              y0 = widen(1, 'lo'),
+              y1 = widen(1, 'hi');
+            const outline = [
+              { x: x0, y: y0 },
+              { x: x1, y: y0 },
+              { x: x1, y: y1 },
+              { x: x0, y: y1 },
+            ];
+            // The clearance deepens it too, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
+            const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
+              through = reach >= t - kSquare;
+            const relief = intoSource.cornerRelief
+              ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
+              : { points: outline, skipped: 0 };
+            if (relief.skipped)
+              warn(
+                `${relief.skipped} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
+              );
+            const current = byId.get(targetId)!;
+            // The first piece keeps the ID a tool's one cut always had.
+            const id = `cut-parts:${step.id}:${toolId}${key}${index ? `#${index}` : ''}`;
+            const cut: EvaluatedCadCut = {
+              id,
+              regionId: id,
+              side: fromTop ? 'top' : 'underside',
+              from: 0,
+              to: through ? t : reach,
+              through,
+              outline: relief.points,
+              islands: [],
+              opening: { x0, y0, x1, y1 },
+            };
+            byId.set(targetId, { ...current, cuts: [...(current.cuts ?? []), cut] });
+            made++;
+          });
         }
       }
-    if (!made && step.tools.length && step.targets.length)
+    // A tool that was refused reaches in; it says why itself.
+    if (!made && !refused && step.tools.length && step.targets.length)
       warn('A "cut parts" step cuts nothing: none of its tools reach into its targets.');
   }
   return { parts: parts.map(part => byId.get(part.partId)!), diagnostics };

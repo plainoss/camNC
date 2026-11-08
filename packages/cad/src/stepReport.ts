@@ -82,7 +82,9 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
         ),
       });
   }
-  const toolName = (id: string) => {
+  const toolName = (cutId: string) => {
+    // A tool that fills several rectangles makes a cut for each, numbered after the first.
+    const id = cutId.replace(/#\d+$/, '');
     const [partId, copyId] = id.split(':');
     const tool = byId.get(partId!);
     if (!tool) return 'a part that is gone';

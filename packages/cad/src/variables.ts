@@ -228,7 +228,8 @@ function depthOutcome(cut: CadCut, scope: CadValueScope): Outcome | null {
   if (!usesVariables(cut.depthExpression)) return null;
   const parsed = parseCadValue(cut.depthExpression, { unit: 'mm', variables: scope });
   if ('error' in parsed) return parsed;
-  return parsed.value < 0 ? { error: 'A cut can’t be less than nothing deep.' } : parsed;
+  if (parsed.value < 0) return { error: 'A cut can’t be less than nothing deep.' };
+  return parsed.value === 0 ? { error: 'A cut needs some depth.' } : parsed;
 }
 
 /** The part with each cut passed through `edit`, keeping objects that didn't change. */

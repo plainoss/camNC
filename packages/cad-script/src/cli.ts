@@ -32,12 +32,13 @@ console.log = console.error.bind(console);
 const options = parseArgs(process.argv.slice(2));
 const start = options.from ? parseCadDocument(JSON.parse(await readFile(options.from, 'utf8'))) : null;
 const finish = async (ok: boolean, output: object, document?: unknown, svg?: string) => {
-  print(JSON.stringify(output, null, 1));
   // A design that doesn't check out is never written where it could be imported by mistake.
   if (ok && options.out) await writeFile(options.out, `${JSON.stringify(document, null, 1)}\n`);
   else if (!ok && options.out) await rm(options.out, { force: true });
   if (svg && options.svg) await writeFile(options.svg, svg);
   else if (!ok && options.svg) await rm(options.svg, { force: true });
+  // Printed once the files are written, so a passing report means they're there.
+  print(JSON.stringify(output, null, 1));
   process.exitCode = ok ? 0 : 1;
 };
 
@@ -45,21 +46,23 @@ if (options.file) {
   const types = typeErrors(options.file);
   if (types.length) await finish(false, { ok: false, typeErrors: types });
   else {
-    const script = (await import(/* @vite-ignore */ pathToFileURL(options.file).href)).default as CadScript;
-    if (typeof script !== 'function') throw new Error('A design file must export default design(d => { ... }).');
-    const result = await editCad(start, script, { name: path.basename(options.file).replace(/\.cad\.ts$|\.ts$/, '') }).catch(
-      (error: unknown) => {
-        // A bug in the script, not a refusal by the API: the caller still reads JSON, with the line it happened on.
-        const where =
-          error instanceof Error
-            ? error.stack
-                ?.split('\n')
-                .find(line => line.includes(options.file!))
-                ?.trim()
-            : undefined;
-        return { thrown: `${error instanceof Error ? error.message : String(error)}${where ? ` (${where})` : ''}` };
-      }
-    );
+    // Loading the file runs its top level, which can throw as well as the design can.
+    const run = async () => {
+      const script = (await import(/* @vite-ignore */ pathToFileURL(options.file!).href)).default as CadScript;
+      if (typeof script !== 'function') throw new Error('A design file must export default design(d => { ... }).');
+      return editCad(start, script, { name: path.basename(options.file!).replace(/\.cad\.ts$|\.ts$/, '') });
+    };
+    const result = await run().catch((error: unknown) => {
+      // A bug in the script, not a refusal by the API: the caller still reads JSON, with the line it happened on.
+      const where =
+        error instanceof Error
+          ? error.stack
+              ?.split('\n')
+              .find(line => line.includes(options.file!))
+              ?.trim()
+          : undefined;
+      return { thrown: `${error instanceof Error ? error.message : String(error)}${where ? ` (${where})` : ''}` };
+    });
     if ('thrown' in result) await finish(false, { ok: false, scriptError: `The script threw: ${result.thrown}` });
     else {
       const scriptError = result.scriptError && { scriptError: result.scriptError };

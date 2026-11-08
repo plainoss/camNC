@@ -413,7 +413,7 @@ function Field({ label, id, children }: { label: string; id: string; children: R
 function Shell({ message, loading }: { message?: string; loading?: string }) {
   return (
     <CamPage className="min-h-dvh md:h-dvh">
-      <PageHeader title="CAM (beta)" />
+      <PageHeader title="Projects" />
       {message && <p className="m-8 text-muted-foreground">{message}</p>}
       {loading && (
         <div className="flex flex-1 items-center justify-center gap-2 text-muted-foreground">

@@ -308,6 +308,11 @@ export function extendSketchCurve(sketch: CadSketch, options: CadExtendOptions):
   if (sketchPatternOwner(sketch, options.entityId))
     return { ok: false, message: 'Remove the pattern relation before extending its finite geometry.' };
   const source = sketch.entities.find(entity => entity.id === options.entityId);
+  if (source?.faceEdge)
+    return {
+      ok: false,
+      message: 'The edges of the face this part is drawn on stay as they are. Draw your own geometry onto them instead.',
+    };
   if (source && isOwnedSplineHandle(source))
     return { ok: false, message: 'Spline tangent handles belong to their curve and cannot be extended separately.' };
   if (!source || (source.type !== 'line' && source.type !== 'arc'))

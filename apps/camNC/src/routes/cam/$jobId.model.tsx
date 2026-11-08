@@ -194,7 +194,7 @@ const kViewHints: Record<ModelView, string> = {
 function Shell({ bar, message, children }: { bar?: React.ReactNode; message?: string; children?: React.ReactNode }) {
   return (
     <CamPage className="min-h-dvh md:h-dvh">
-      {bar ?? <PageHeader title="CAM (beta)" />}
+      {bar ?? <PageHeader title="Projects" />}
       {message && <p className="m-8 text-muted-foreground">{message}</p>}
       {children}
     </CamPage>

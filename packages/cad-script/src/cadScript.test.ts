@@ -65,6 +65,30 @@ describe('expressions', () => {
     expect(count).toBe(17.5);
   });
 
+  it('works out floor, round, min, max and sqrt', async () => {
+    const values: number[] = [];
+    await editCad(null, d => {
+      d.variable('height', '720mm');
+      d.variable('pitch', '32mm');
+      values.push(d.value('floor((height - 160)/pitch)'), d.value('round(17.5)'));
+      values.push(d.value('min(height; 600mm)'), d.value('max(height, 600mm)'));
+      values.push(d.value('sqrt(300mm*300mm + 400mm*400mm)'));
+    });
+    expect(values).toEqual([17, 18, 600, 720, 500]);
+  });
+
+  it('refuses a cut whose depth a variable takes to zero', async () => {
+    const { scriptError } = await editCad(null, d => {
+      d.variable('board', '18mm');
+      const plate = d.part('Plate', { thickness: 'board' });
+      plate.profile.rect({ at: [0, 0], w: 100, h: 100 });
+      const top = plate.sketchOn('top');
+      top.rect({ at: [20, 20], w: 20, h: 20 });
+      plate.cut(top.regionAt(30, 30), { depth: 'board - 18mm' });
+    });
+    expect(scriptError).toBe("A cut needs some depth, not 0 mm from 'board - 18mm'.");
+  });
+
   it('patterns a rectangle as its edges', async () => {
     const { report } = await editCad(null, d => {
       const side = d.part('Side');
@@ -186,6 +210,20 @@ describe('corner relief', () => {
     expect(parts[0]!.outline).toHaveLength(4);
     // Relieved for a 6 mm bit, the 3.175 mm default cuts the bones fully.
     expect(codes(report.warnings)).not.toContain('relief-bit');
+  });
+
+  it('measures a dado as drawn, and says how far its bones reach', async () => {
+    const { report } = await editCad(null, d => {
+      const side = d.part('Side', { thickness: 18, relief: 6 });
+      side.profile.rect({ at: [0, 0], w: 300, h: 600 });
+      const dado = side.sketchOn('top');
+      dado.rect({ at: [20, 200], w: 260, h: 15 });
+      side.cut(dado.regionAt(150, 207), { depth: 6 });
+    });
+    expect(report.errors).toEqual([]);
+    const [cut] = report.parts[0]!.cuts;
+    expect(cut).toMatchObject({ at: [20, 200], size: [260, 15] });
+    expect(cut!.relieved![1]).toBeGreaterThan(15);
   });
 
   it('warns when the bones are smaller than the bit that cuts them', async () => {

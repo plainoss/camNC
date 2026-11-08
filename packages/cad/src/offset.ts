@@ -1,4 +1,4 @@
-import { newCadId } from './document';
+import { entityPointIds, newCadId } from './document';
 import { offsetSupport, projectOffsetSupport, intersectOffsetSupports, type OffsetSupport } from './offsetGeometry';
 import { tessellateCurve } from './curves';
 import { CAD_GEOMETRY_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
@@ -297,12 +297,24 @@ export function offsetSketch(sketch: CadSketch, options: CadOffsetOptions): CadO
     }
     addedCurves.push(...targets);
   }
+  // An offset of a face's edge is geometry of the drawing's own, as the face's edges themselves aren't.
+  const fromFace = new Set(
+    members.filter(member => sketch.entities.some(e => e.id === member.sourceId && e.faceEdge)).map(m => m.targetId)
+  );
+  const faceOffsets = new Set([...fromFace, ...addedCurves.filter(curve => fromFace.has(curve.id)).flatMap(entityPointIds)]);
+  const own = <E extends CadEntity>(entity: E): E => {
+    if (!faceOffsets.has(entity.id)) return entity;
+    const result = { ...entity };
+    delete result.faceEdge;
+    delete result.construction;
+    return result;
+  };
   const dimensionId = newCadId();
   return {
     ok: true,
     sketch: {
       ...sketch,
-      entities: [...sketch.entities, ...addedPoints, ...addedCurves],
+      entities: [...sketch.entities, ...addedPoints.map(own), ...addedCurves.map(own)],
       constraints: [...sketch.constraints, { id: dimensionId, type: 'offset', label: 'Offset', value: options.value, members }],
     },
     sourceIds: selected.map(curve => curve.id),

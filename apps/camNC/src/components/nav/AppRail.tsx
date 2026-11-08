@@ -92,7 +92,7 @@ export function AppRail() {
             activeOptions={{ exact: true }}
             activeProps={{ className: 'text-sidebar-foreground font-semibold' }}>
             <FolderOpen aria-hidden />
-            CAM/CAD
+            Projects
           </Link>
           <span className="my-1 h-px w-10 shrink-0 bg-sidebar-border" />
           {steps.map(step => (

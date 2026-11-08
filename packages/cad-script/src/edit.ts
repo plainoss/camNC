@@ -617,6 +617,8 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     },
     cut({ sketchId, regionId }, { depth }) {
       const mm = depth === 'through' ? depth : measure(depth, 'Depth');
+      if (mm !== 'through' && !(mm > 0))
+        fail(`A cut needs some depth, not ${mm} mm${typeof depth === 'string' ? ` from '${depth}'` : ''}.`);
       document = setCutDepth(
         document,
         partId,
