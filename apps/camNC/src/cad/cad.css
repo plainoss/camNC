@@ -1205,3 +1205,13 @@
 .cad-part-edge.is-picked {
   stroke: rgb(47 128 237 / 0.85);
 }
+/** While Use is on, the parts' edges show faintly, to be found and clicked. */
+.cad-using-edges .cad-part-edge {
+  stroke: rgb(47 128 237 / 0.18);
+}
+.cad-using-edges .cad-part-edge:hover {
+  stroke: rgb(47 128 237 / 0.6);
+}
+.cad-using-edges {
+  cursor: copy;
+}

@@ -503,6 +503,9 @@ export function CadEditor({
   // The edges of the parts behind a studio sketch, laid on its plane, and those picked to use in it with `u`.
   const [partEdges, setPartEdges] = useState<PartEdge[]>([]);
   const [pickedEdges, setPickedEdges] = useState<string[]>([]);
+  // Use, started with `u` and nothing picked: each part edge clicked goes into the sketch, until Escape or another tool.
+  const [usingEdges, setUsingEdges] = useState(false);
+  useEffect(() => setUsingEdges(false), [part?.id, showWorkspace]);
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   // A variable being added, or the one being changed.
@@ -1102,6 +1105,8 @@ export function CadEditor({
   };
   const chooseTool = (next: Tool) => {
     slotDrag.current = null;
+    // Choosing any tool, Select included, ends Use.
+    setUsingEdges(false);
     if (next === 'slot') {
       setSlotWidth('10');
       setSlotChain(false);
@@ -2290,9 +2295,24 @@ export function CadEditor({
       setSketchTurn(normalTurn);
       return;
     }
-    if (key === 'u' && pickedEdges.length) {
+    if (key === 'escape' && usingEdges) {
       event.preventDefault();
-      takeEdges();
+      setUsingEdges(false);
+      setMessage('Choose a drawing tool or select geometry.');
+      return;
+    }
+    // `u` uses the edges picked, or with none picked, starts Use: click edges to use them, as the reference teaches.
+    if (key === 'u' && sketchBackdrop) {
+      event.preventDefault();
+      if (pickedEdges.length) takeEdges();
+      else if (usingEdges) {
+        // U again ends Use, as choosing the tool again does in the reference.
+        setUsingEdges(false);
+        setMessage('Choose a drawing tool or select geometry.');
+      } else {
+        setUsingEdges(true);
+        setMessage('Use: click the edges of the parts to bring them into the sketch. Esc ends.');
+      }
       return;
     }
     if (modification.phase === 'offset' && modification.entityIds.length) {
@@ -2483,6 +2503,11 @@ export function CadEditor({
     if (sketchBackdrop && edgeOn(sketchTurn)) return;
     // A part's edge behind the sketch is picked to use in it, as the reference's Use takes it.
     const edgeKey = (event.target as Element).closest('[data-part-edge]')?.getAttribute('data-part-edge');
+    // Use is on: an edge clicked goes straight in, and a click anywhere else draws nothing.
+    if (usingEdges) {
+      if (edgeKey) takeEdges([edgeKey]);
+      return;
+    }
     if (edgeKey && tool === 'select') {
       setPickedEdges(picked =>
         picked.includes(edgeKey) ? picked.filter(key => key !== edgeKey) : event.shiftKey ? [...picked, edgeKey] : [edgeKey]
@@ -3731,10 +3756,10 @@ export function CadEditor({
   // only ones that still line up with what's seen.
   const shownEdges = sketchBackdrop ? partEdges.filter(edge => edge.onPlane || sketchTurn === straightOn) : [];
   /** `u`: the picked edges become the sketch's own, fixed where they are, to draw and constrain against. */
-  const takeEdges = () => {
+  const takeEdges = (keys = pickedEdges) => {
     if (!sketch) return;
     let next = sketch;
-    for (const edge of partEdges.filter(candidate => pickedEdges.includes(candidate.key)))
+    for (const edge of partEdges.filter(candidate => keys.includes(candidate.key)))
       next = addLine(next, { x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2 });
     const before = new Set(sketch.entities.map(entity => entity.id));
     const added = next.entities.filter(entity => !before.has(entity.id) && entity.type === 'line');
@@ -4424,7 +4449,7 @@ export function CadEditor({
           )}
           <svg
             ref={svg}
-            className={`cad-canvas cad-tool-${tool}${sketchBackdrop ? ' cad-canvas-over-parts' : ''}`}
+            className={`cad-canvas cad-tool-${tool}${sketchBackdrop ? ' cad-canvas-over-parts' : ''}${usingEdges ? ' cad-using-edges' : ''}`}
             style={
               showWorkspace || (show3D && partHasOutline)
                 ? { display: 'none' }
@@ -5329,7 +5354,7 @@ export function CadEditor({
             </span>
             <span>
               {sketchBackdrop
-                ? 'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it · U uses a picked edge'
+                ? 'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it · U uses parts’ edges'
                 : 'Scroll to zoom · right-drag to pan'}
             </span>
             {sketch && (
