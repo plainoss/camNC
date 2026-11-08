@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   assemblyReport,
+  addLine,
   createCadDocument,
+  createCadPart,
   createPlateDocument,
   evaluateCadDocument,
   setCadVariable,
@@ -58,5 +60,18 @@ describe('parts in the same place', () => {
       const clashes = assemblyReport(document, solved.parts)!.collisions.map(clash => clash.parts);
       expect(clashes).toEqual(expression === '600mm' ? [] : [['Shelf', 'Right side']]);
     }
+  });
+
+  it('finds an overlap along a slanted edge', () => {
+    let triangle = { ...createCadPart('Triangle', 18) };
+    for (const [x1, y1, x2, y2] of [
+      [0, 0, 100, 0],
+      [100, 0, 0, 100],
+      [0, 100, 0, 0],
+    ] as const)
+      triangle = { ...triangle, sketch: addLine(triangle.sketch, { x1, y1, x2, y2 }) };
+    const block = panel('Block', 20, 100, flat(80, 0, 0));
+    const document = { ...createCadDocument(), parts: [{ ...triangle, placement: flat(0, 0, 0) }, block] };
+    expect(report(document).collisions.map(clash => clash.parts)).toEqual([['Triangle', 'Block']]);
   });
 });

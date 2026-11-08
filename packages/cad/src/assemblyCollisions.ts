@@ -78,7 +78,22 @@ function place(part: EvaluatedCadPart, id: string, name: string, placement: CadP
     const k = back.findIndex(c => Math.abs(Math.abs(c) - 1) < 1e-9);
     return k < 0 ? null : own[k]!.map(value => placement.position[a]! + back[k]! * value);
   });
-  return { id, name, part, placement, lo, hi, ...(breaks.every(Boolean) && { breaks: breaks as [number[], number[], number[]] }) };
+  // A slanted edge, or a curve's facets, changes material between vertices, so such parts are sampled evenly instead.
+  const square = loops.every(loop =>
+    loop.every((p, i) => {
+      const q = loop[(i + 1) % loop.length]!;
+      return Math.abs(p.x - q.x) < 1e-9 || Math.abs(p.y - q.y) < 1e-9;
+    })
+  );
+  return {
+    id,
+    name,
+    part,
+    placement,
+    lo,
+    hi,
+    ...(square && breaks.every(Boolean) && { breaks: breaks as [number[], number[], number[]] }),
+  };
 }
 
 /** Where cell edges fall along one axis of the overlap: at the parts' feature edges, or evenly. */
