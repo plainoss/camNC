@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { withCarving } from './carving';
 import {
   boardRequest,
   instancesOf,
@@ -58,7 +59,7 @@ export function useJobBoards(job: CamJobV1 | null | undefined, model: ModelImpor
       return {
         board,
         nest,
-        request: boardRequest(board, nest, instances, { skin: plan.skin, holes: plan.holes, leaveOut: plan.leaveOut }),
+        request: withCarving(boardRequest(board, nest, instances, { skin: plan.skin, holes: plan.holes, leaveOut: plan.leaveOut }), job),
       };
     });
     const changed = JSON.stringify(boards.map(b => b.board)) !== JSON.stringify(job.boards ?? []);
