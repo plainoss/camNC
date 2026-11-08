@@ -87,6 +87,29 @@ describe('profileFeatures', () => {
   });
 });
 
+describe('counterbores', () => {
+  const circle = (cx: number, cy: number, r: number): PathD =>
+    Array.from({ length: 96 }, (_, i) => ({ x: cx + r * Math.cos((i * Math.PI) / 48), y: cy + r * Math.sin((i * Math.PI) / 48) }));
+
+  it('cuts a counterbore barely wider than its screw hole, using the hole’s space and staying inside its wall', () => {
+    const { features } = profileFeatures({
+      thickness: 18,
+      outline: rect(0, 0, 100, 60),
+      holes: [circle(50, 30, 2.25)],
+      cuts: [{ id: 'counterbore', from: 0, to: 3, through: false, outline: circle(50, 30, 5), islands: [] }],
+    });
+    const { operations, warnings } = camPart(features, { cutThrough: false });
+    expect(warnings.filter(w => w.includes('no tool fits'))).toEqual([]);
+    const pocket = operations.find(op => /pocket/i.test(op.name))!;
+    expect(pocket).toBeDefined();
+    const points = pocket.passes.flatMap(pass => pass.pts);
+    expect(Math.min(...points.map(q => q[2]))).toBeCloseTo(15, 6);
+    // The bit's edge never reaches past the counterbore's 5 mm radius.
+    const reach = Math.max(...points.filter(q => q[2] < 18).map(q => Math.hypot(q[0] - 50, q[1] - 30)));
+    expect(reach + 3.175 / 2).toBeLessThanOrEqual(5 + 0.02);
+  });
+});
+
 describe('open rebates', () => {
   it('cuts a rebate that runs off the part right out to its ends, without a corner warning', () => {
     // A cupboard side's rebates: across both ends and along the back edge, drawn past the part so they're open.

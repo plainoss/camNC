@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Vector3 } from 'three';
 import { playheadAt, type Playhead } from '@/visualize/stockSim/jobTimeline';
 import type { ToolShape } from '@/visualize/stockSim/toolShapes';
+import { parseToolInfo } from '@/visualize/guess-tools';
 import type { BoardRequest, CamPartInfo, PlanResult } from '../camTypes';
 import { Hint } from '../Hint';
 import { PartGhost, StockBox } from './BoardGhosts';
@@ -216,12 +217,18 @@ function Scene({
   const playhead = playheadAt(model.times, time);
   const selectedOps = useMemo(() => (selected === null ? [] : groupOpsOf(model, selected)), [model, selected]);
   const highlight = selected !== null ? model.groups[selected].color : '#ffffff';
+  // V-bits say so in the program's tool table (TAPER); every other bit is flat.
+  const tapers = useMemo(
+    () => new Map(parseToolInfo(plan.gcode).flatMap(t => (t.taper ? [[t.tool, t.taper] as const] : []))),
+    [plan.gcode]
+  );
   const toolShape = useCallback(
     (tool: number | undefined): ToolShape => {
       const d = (tool !== undefined && model.bits.get(tool)) || (plan.bits[0] ?? 3);
-      return { kind: 'flat', radius: d / 2 };
+      const taper = tool !== undefined ? tapers.get(tool) : undefined;
+      return taper ? { kind: 'vbit', radius: d / 2, halfAngle: taper } : { kind: 'flat', radius: d / 2 };
     },
-    [plan, model]
+    [plan, model, tapers]
   );
   const [w, h, top] = plan.size;
   const groupOps = useMemo(() => model.groups.map((_, n) => groupOpsOf(model, n)), [model]);

@@ -76,6 +76,15 @@ function partFace(part: CadPart, evaluated: EvaluatedCadPart, face: Extract<CadD
   return { origin: [a.x, a.y, 0], x: [d.x, d.y, 0], y: [0, 0, 1], z: [d.y, -d.x, 0], length };
 }
 
+/** Parts that others are drawn on. One with no placement of its own stays where they were placed against it. */
+export const cadDrawnOnSupports = (document: CadDocument): Set<string> =>
+  new Set(document.parts.flatMap(part => (part.drawnOn && 'partId' in part.drawnOn.on ? [part.drawnOn.on.partId] : [])));
+
+/** Where a part sits: its placement, or the origin for an unplaced part others are drawn on. */
+export function effectivePlacement(part: CadPart, supports: ReadonlySet<string>): CadPlacement | undefined {
+  return part.placement ?? (supports.has(part.id) ? CAD_IDENTITY_PLACEMENT : undefined);
+}
+
 /**
  * The placement of every part drawn on a plane or another part's face, worked out from that face as the parts are now,
  * so a part follows the one it's drawn on. Parts are placed in the order they depend on each other.
@@ -90,6 +99,8 @@ export function resolveDrawnPlacements(
   const shapes = new Map(evaluated.map(part => [part.partId, part]));
   const placed = new Map<string, CadPlacement | undefined>();
   const visiting = new Set<string>();
+  // Parts that couldn't be placed, so none drawn on them is placed against a stale frame.
+  const failed = new Set<string>();
   const place = (part: CadPart): CadPlacement | undefined => {
     if (placed.has(part.id)) return placed.get(part.id);
     if (!part.drawnOn) {
@@ -97,6 +108,8 @@ export function resolveDrawnPlacements(
       return part.placement;
     }
     const problem = (message: string) => {
+      if (failed.has(part.id)) return part.placement;
+      failed.add(part.id);
       diagnostics.push({ code: 'drawn-on-unresolved', severity: 'warning', partId: part.id, message: `${part.name}: ${message}` });
       placed.set(part.id, part.placement);
       return part.placement;
@@ -110,6 +123,7 @@ export function resolveDrawnPlacements(
       const support = byId.get(on.partId);
       if (!support) return problem('The part it was drawn on is gone.');
       const supportPlacement = place(support) ?? CAD_IDENTITY_PLACEMENT;
+      if (failed.has(support.id)) return problem(`${support.name} can’t be placed, so neither can this.`);
       const shape = shapes.get(support.id) ?? evaluateCadPart(support).part;
       if (!shape) return problem(`${support.name} can’t be worked out, so neither can where this goes.`);
       const face = partFace(support, shape, on.face);
@@ -168,8 +182,9 @@ export function partFaceAt(
   const back = [-placement.rotation[0], -placement.rotation[1], -placement.rotation[2], placement.rotation[3]];
   const local = rotateVector(back, [point[0] - placement.position[0], point[1] - placement.position[1], point[2] - placement.position[2]]);
   const facing = rotateVector(back, normal);
-  if (facing[2] > 0.99) return 'top';
-  if (facing[2] < -0.99) return 'underside';
+  // A pocket's floor looks the same way as the top, but isn't the face a part would sit on.
+  if (facing[2] > 0.99) return Math.abs(local[2] - part.thickness) < 0.5 ? 'top' : null;
+  if (facing[2] < -0.99) return Math.abs(local[2]) < 0.5 ? 'underside' : null;
   if (Math.abs(facing[2]) > 0.01) return null;
   const at = (id: string) => part.sketch.entities.find(entity => entity.id === id) as CadPoint | undefined;
   let best: { id: string; distance: number } | null = null;

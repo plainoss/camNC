@@ -107,18 +107,22 @@ export function PlanOperations({
 
 /** The bits this board uses, in order, and the pause between them. */
 function BitsLine({ plan }: { plan: PlanResult }) {
+  // A V-bit by its name: its diameter alone reads like a flat bit's.
+  const named = plan.programs.length === plan.bits.length ? plan.programs.map(p => (p.name && /V-bit/.test(p.name) ? p.name : null)) : [];
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/40 px-3 py-2 text-[13px]">
       {plan.bits.map((d, i) => (
-        <span key={d} className="flex items-center gap-2">
+        <span key={i} className="flex items-center gap-2">
           {i > 0 && <span className="text-muted-foreground">→ next program: swap bit, zero Z →</span>}
           <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
             ⌀
           </span>
-          <span className="font-medium">{d} mm flat</span>
+          <span className="font-medium">{named[i] ?? `${d} mm flat`}</span>
         </span>
       ))}
-      <span className="text-muted-foreground">· smallest bit first, inner features before outlines</span>
+      <span className="text-muted-foreground">
+        {named.some(Boolean) ? '· flat bottoms first, then the V-bit' : '· smallest bit first, inner features before outlines'}
+      </span>
     </p>
   );
 }

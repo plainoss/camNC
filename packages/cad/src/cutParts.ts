@@ -1,8 +1,9 @@
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
+import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { evaluateCadFeatures } from './features';
 import { evaluateCadPart, polygonArea } from './geometry';
-import { CAD_IDENTITY_PLACEMENT, rotateVector, type Vec3 } from './placement';
+import { rotateVector, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
 const conjugate = ([x, y, z, w]: readonly number[]) => [-x!, -y!, -z!, w!];
@@ -114,6 +115,7 @@ export function applyPartCuts(
   // A tool cuts with the shape it has before any step cuts it, so two parts can cut each other.
   const before = new Map(byId);
   const sources = new Map(document.parts.map(part => [part.id, part]));
+  const supports = cadDrawnOnSupports(document);
   for (const step of document.partCuts ?? []) {
     let made = 0;
     const warn = (message: string) => diagnostics.push({ code: 'part-cut-unresolved', severity: 'warning', message });
@@ -125,8 +127,10 @@ export function applyPartCuts(
         const into = byId.get(targetId),
           tool = before.get(toolId);
         if (!intoSource || !toolSource || !into || !tool) continue;
-        const intoAt = intoSource.placement ?? CAD_IDENTITY_PLACEMENT,
-          toolAt = toolSource.placement ?? CAD_IDENTITY_PLACEMENT;
+        const intoAt = effectivePlacement(intoSource, supports),
+          toolAt = effectivePlacement(toolSource, supports);
+        // A part that hasn't been placed isn't anywhere yet, so it reaches into nothing.
+        if (!intoAt || !toolAt) continue;
         if (!square(intoAt, toolAt)) {
           warn(`${toolSource.name} isn't square to ${intoSource.name}, so it can't be cut from it yet.`);
           continue;

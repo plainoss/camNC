@@ -116,6 +116,8 @@ export interface PlanResult {
   programs: {
     tool: number;
     diameter: number;
+    /** The bit's name, for people: "90° V-bit ⌀6". */
+    name?: string;
     gcode: string;
     timeMin: number;
     timing?: ProgramTimeEstimate;
@@ -234,9 +236,10 @@ export function planBoard(
     plan = {
       ...plan,
       flip: { registration: flip.registration, dowels: spec.dowels?.at, dowelDiameter: spec.dowels?.diameter, problem },
-      ...(b.operations.length && {
-        sideB: summarize(b, `Board ${board.name} side B`, size, settings, board.stockTop, board.name, sideRotation(board, true)),
-      }),
+      ...(b.operations.length
+        ? { sideB: summarize(b, `Board ${board.name} side B`, size, settings, board.stockTop, board.name, sideRotation(board, true)) }
+        : // With nothing it can cut, side B has no program, but why it has nothing still matters.
+          { warnings: [...plan.warnings, ...b.warnings.map(warning => `Side B: ${warning}`)] }),
     };
   }
   // The hold check runs on the board as laid out, before it's turned to lie like the stock on the bed.
@@ -549,6 +552,7 @@ export function summarize(
     return {
       tool: tool.number,
       diameter: tool.diameter,
+      ...(tool.name && { name: tool.name }),
       gcode,
       timeMin: timing.estimatedAutomaticSeconds / 60,
       timing,
