@@ -17,6 +17,7 @@ export type SketchTool =
   | 'trim'
   | 'extend'
   | 'offset'
+  | 'transform'
   | 'mirror'
   | 'dimension'
   | 'fillet'
@@ -58,6 +59,7 @@ export const sketchTools: readonly SketchToolDefinition[] = [
   { id: 'trim', label: 'Trim', key: 'M' },
   { id: 'extend', label: 'Extend', key: 'X' },
   { id: 'offset', label: 'Offset', key: 'O' },
+  { id: 'transform', label: 'Transform' },
   { id: 'mirror', label: 'Mirror' },
   { id: 'dimension', label: 'Dimension', key: 'D' },
 ];
@@ -65,7 +67,7 @@ export const sketchTools: readonly SketchToolDefinition[] = [
 const modifyTools = {
   id: 'modify',
   label: 'Modify tools',
-  tools: ['fillet', 'chamfer', 'split', 'trim', 'extend', 'offset', 'mirror'],
+  tools: ['fillet', 'chamfer', 'split', 'trim', 'extend', 'offset', 'mirror', 'transform'],
 } as const;
 
 /** Only the compact layout combines drawing commands; wide layouts retain their native families. */
