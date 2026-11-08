@@ -258,6 +258,20 @@ describe('the Carve step', () => {
     await waitFor(async () => expect(await text()).toMatchObject({ text: 'Board' }));
   });
 
+  it('selects an item by a click anywhere in its box, not only on its ink', async () => {
+    await open();
+    const svg = screen.getAllByTestId('carving-item')[0].closest('svg')!;
+    fireEvent.pointerDown(svg, { button: 0 });
+    expect(screen.queryByRole('toolbar')).toBeNull();
+    // The middle of "Welcome"'s box, between its letters' strokes or not.
+    const box = screen.getByTestId('carving-item-box').getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + 2, box.top + 2)!;
+    expect(hit.getAttribute('data-testid')).toBe('carving-item-box');
+    fireEvent.pointerDown(hit, { button: 0, pointerId: 1, clientX: box.left + 2, clientY: box.top + 2 });
+    fireEvent.pointerUp(svg, { pointerId: 1 });
+    expect(screen.getByRole('toolbar', { name: 'Lettering' })).toBeTruthy();
+  });
+
   it('adds text, selects items from the list and canvas, edits just the selection, and deletes it', async () => {
     const job = await open();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
@@ -452,12 +466,15 @@ describe('the Carve step', () => {
     await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 340, h: 140 }));
     expect(screen.getByRole('img', { name: /^Board 340 × 140 mm/ })).toBeTruthy();
 
-    // The top edge grows the board upwards; Shift takes single millimetres.
-    drag('h', 0, -23, true)();
+    // The bottom edge grows the board downwards, as on the Boards step; Shift takes single millimetres. The items keep
+    // their place below the top edge, so they move up from XY zero by as much.
+    const y = (await getJob(job.id))!.carving!.items[0].y;
+    drag('h', 0, 23, true)();
     await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 340, h: 163 }));
+    expect((await getJob(job.id))!.carving!.items[0].y).toBe(y + 23);
 
     // The corner takes both, and stops at the fields' least size.
-    drag('wh', -1000, 1000)();
+    drag('wh', -1000, -1000)();
     await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 20, h: 20 }));
 
     // Typed sizes move the edges.
@@ -488,8 +505,8 @@ describe('the Carve step', () => {
     const path = screen.getByTestId('carving-item');
     const grip = (g: string) => path.closest('svg')!.querySelector(`[data-resize="${g}"]`)!;
     const attr = (el: Element, name: string) => Number(el.getAttribute(name));
-    // The edges' grips reach a quarter of the board inwards at most: the top one ends 5 mm below the top edge.
-    expect(attr(grip('h'), 'y') + attr(grip('h'), 'height')).toBeCloseTo(5);
+    // The edges' grips reach a quarter of the board inwards at most: the bottom one starts 5 mm above the bottom edge.
+    expect(attr(grip('h'), 'y')).toBeCloseTo(20 - 5);
     expect(attr(grip('w'), 'x')).toBeCloseTo(1000 - 25);
     // And lie under the artwork, which takes the drag where they meet.
     for (const g of ['w', 'h']) expect(path.compareDocumentPosition(grip(g)) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();

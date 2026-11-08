@@ -215,7 +215,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
   });
-  const setBoard = (change: Partial<{ w: number; h: number; thickness: number; taped: boolean }>) => {
+  const setBoard = (change: Partial<{ w: number; h: number; thickness: number }>) => {
     if (!board) return;
     const w = change.w ?? size.w,
       h = change.h ?? size.h;
@@ -223,12 +223,14 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
       ...board,
       size: { fit: false, w, h },
       thickness: change.thickness ?? board.thickness,
-      ...(change.taped !== undefined && { taped: change.taped }),
     };
+    // The board's top edge stays where it is, as on the Boards step: a taller board grows downwards, so the items keep
+    // their place below the top while XY zero, the lower left corner, moves with the bottom edge.
+    const dy = h - saved.h;
     saveCarving(
       withItems(
         carving,
-        carving.items.map(item => ({ ...item, x: Math.min(item.x, w), y: Math.min(item.y, h) }))
+        carving.items.map(item => ({ ...item, x: Math.min(item.x, w), y: Math.max(0, Math.min(item.y + dy, h)) }))
       ),
       [next, ...(job.boards ?? []).slice(1)]
     );
@@ -330,7 +332,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     setResized({
       from: r.from,
       w: r.grip === 'h' ? r.from.w : to(r.from.w, e.clientX - r.x),
-      h: r.grip === 'w' ? r.from.h : to(r.from.h, r.y - e.clientY),
+      h: r.grip === 'w' ? r.from.h : to(r.from.h, e.clientY - r.y),
     });
     return true;
   };
@@ -369,7 +371,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const cone = vConeDepth(carving.vBit);
   const flatBit = (job.plan ?? kDefaultPlan).bit;
   const off = allBox && (allBox.x0 < 0 || allBox.y0 < 0 || allBox.x1 > size.w || allBox.y1 > size.h);
-  // While resizing, the view holds still around the lower left corner; it fits the board again once dropped.
+  // While resizing, the view holds still around the top left corner; it fits the board again once dropped.
   const frame = resized?.from ?? size;
   const pad = Math.max(frame.w, frame.h) * 0.06;
   const grip = Math.max(frame.w, frame.h) * 0.025;
@@ -394,7 +396,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
             tabIndex={0}
             aria-label={`Board ${size.w} × ${size.h} mm with the carving`}
             className="absolute inset-0 h-full w-full touch-none overflow-visible select-none"
-            viewBox={`${-pad} ${-pad + size.h - frame.h} ${frame.w + 2 * pad} ${frame.h + 2 * pad}`}
+            viewBox={`${-pad} ${-pad} ${frame.w + 2 * pad} ${frame.h + 2 * pad}`}
             onPointerDown={() => select(null)}
             onPointerMove={move}
             onPointerUp={end}
@@ -426,7 +428,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                   role="presentation"
                   data-resize="h"
                   x={0}
-                  y={-grip}
+                  y={size.h - Math.min(grip, size.h / 4)}
                   width={size.w}
                   height={grip + Math.min(grip, size.h / 4)}
                   className="cursor-ns-resize"
@@ -434,89 +436,116 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 />
               </g>
             )}
-            {carving.items.map(item => (
-              <path
-                key={item.id}
-                d={pathOf(placeItem(dragged?.id === item.id ? dragged : item), size.h)}
-                data-testid="carving-item"
-                aria-label={itemName(item)}
-                className="cursor-move fill-amber-800 stroke-amber-950 dark:fill-amber-500"
-                strokeWidth={0.15}
-                fillRule="nonzero"
-                onPointerDown={start('move', item)}
-              />
-            ))}
-            {box && shown && (
-              <g transform={`translate(${shown.x} ${size.h - shown.y}) rotate(${-shown.rotation})`}>
-                <rect
-                  x={box.x0}
-                  y={-box.y1}
-                  width={box.x1 - box.x0}
-                  height={box.y1 - box.y0}
-                  // The frame drags the selected item too, even where another item lies over it.
-                  className="cursor-move fill-transparent stroke-primary"
-                  strokeWidth={0.4}
-                  strokeDasharray="2 1.5"
-                  onPointerDown={start('move', shown)}
+            {/* While the board's bottom edge is dragged, the items stay with its top edge (`setBoard`). */}
+            <g transform={`translate(0 ${saved.h - size.h})`}>
+              {/* Each item's box takes a click anywhere inside it, not only on its ink; under all the ink, so ink still picks its own item. */}
+              {carving.items.map(item => {
+                const shownItem = dragged?.id === item.id ? dragged : item;
+                const b = bounds(shownItem.outline);
+                return (
+                  b && (
+                    <rect
+                      key={item.id}
+                      data-testid="carving-item-box"
+                      transform={`translate(${shownItem.x} ${size.h - shownItem.y}) rotate(${-shownItem.rotation})`}
+                      x={b.x0}
+                      y={-b.y1}
+                      width={b.x1 - b.x0}
+                      height={b.y1 - b.y0}
+                      className="cursor-move fill-transparent"
+                      onPointerDown={start('move', item)}
+                    />
+                  )
+                );
+              })}
+              {carving.items.map(item => (
+                <path
+                  key={item.id}
+                  d={pathOf(placeItem(dragged?.id === item.id ? dragged : item), size.h)}
+                  data-testid="carving-item"
+                  aria-label={itemName(item)}
+                  className="cursor-move fill-amber-800 stroke-amber-950 dark:fill-amber-500"
+                  strokeWidth={0.15}
+                  fillRule="nonzero"
+                  onPointerDown={start('move', item)}
                 />
-                <rect
-                  aria-label="Drag to resize"
-                  x={box.x1 - 2.5}
-                  y={-box.y0 - 2.5}
-                  width={5}
-                  height={5}
-                  className="cursor-nwse-resize fill-background stroke-primary"
-                  strokeWidth={0.5}
-                  onPointerDown={start('size', shown)}
-                />
-                <line x1={0} y1={-box.y1} x2={0} y2={-box.y1 - 8} className="pointer-events-none stroke-primary" strokeWidth={0.5} />
-                <circle
-                  aria-label="Drag to rotate"
-                  cx={0}
-                  cy={-box.y1 - 8}
-                  r={2.5}
-                  className="cursor-grab fill-background stroke-primary"
-                  strokeWidth={0.5}
-                  onPointerDown={start('rotate', shown)}
-                />
-                <text x={box.x0} y={-box.y1 - 2} className="pointer-events-none fill-primary text-[4px]">
-                  {(box.x1 - box.x0).toFixed(0)} × {(box.y1 - box.y0).toFixed(0)} mm
-                </text>
-              </g>
-            )}
+              ))}
+              {box && shown && (
+                <g transform={`translate(${shown.x} ${size.h - shown.y}) rotate(${-shown.rotation})`}>
+                  <rect
+                    x={box.x0}
+                    y={-box.y1}
+                    width={box.x1 - box.x0}
+                    height={box.y1 - box.y0}
+                    // The frame drags the selected item too, even where another item lies over it.
+                    className="cursor-move fill-transparent stroke-primary"
+                    strokeWidth={0.4}
+                    strokeDasharray="2 1.5"
+                    onPointerDown={start('move', shown)}
+                  />
+                  <rect
+                    aria-label="Drag to resize"
+                    x={box.x1 - 2.5}
+                    y={-box.y0 - 2.5}
+                    width={5}
+                    height={5}
+                    className="cursor-nwse-resize fill-background stroke-primary"
+                    strokeWidth={0.5}
+                    onPointerDown={start('size', shown)}
+                  />
+                  <line x1={0} y1={-box.y1} x2={0} y2={-box.y1 - 8} className="pointer-events-none stroke-primary" strokeWidth={0.5} />
+                  <circle
+                    aria-label="Drag to rotate"
+                    cx={0}
+                    cy={-box.y1 - 8}
+                    r={2.5}
+                    className="cursor-grab fill-background stroke-primary"
+                    strokeWidth={0.5}
+                    onPointerDown={start('rotate', shown)}
+                  />
+                  <text x={box.x0} y={-box.y1 - 2} className="pointer-events-none fill-primary text-[4px]">
+                    {(box.x1 - box.x0).toFixed(0)} × {(box.y1 - box.y0).toFixed(0)} mm
+                  </text>
+                </g>
+              )}
+            </g>
+            {/* As on the Boards step: grips just outside the right and bottom edges, and the corner between them. */}
             {board && (
-              <g data-testid="board-resize" className="fill-background stroke-amber-700">
+              <g data-testid="board-resize" className="fill-primary stroke-background">
                 <rect
                   className="pointer-events-none"
-                  x={size.w - grip / 3}
+                  x={size.w + grip * 0.35}
                   y={size.h / 2 - grip * 1.5}
-                  width={(grip * 2) / 3}
+                  width={grip * 0.5}
                   height={grip * 3}
-                  rx={grip / 3}
-                  strokeWidth={0.5}
+                  rx={grip * 0.25}
+                  strokeWidth={0.3}
                 />
                 <rect
                   className="pointer-events-none"
                   x={size.w / 2 - grip * 1.5}
-                  y={-grip / 3}
+                  y={size.h + grip * 0.35}
                   width={grip * 3}
-                  height={(grip * 2) / 3}
-                  rx={grip / 3}
-                  strokeWidth={0.5}
+                  height={grip * 0.5}
+                  rx={grip * 0.25}
+                  strokeWidth={0.3}
                 />
-                <rect
+                <circle
                   role="presentation"
                   data-resize="wh"
-                  x={size.w - grip / 2}
-                  y={-grip / 2}
-                  width={grip}
-                  height={grip}
-                  className="cursor-nesw-resize"
-                  strokeWidth={0.5}
+                  cx={size.w + grip * 0.6}
+                  cy={size.h + grip * 0.6}
+                  r={grip * 0.5}
+                  className="cursor-nwse-resize"
+                  strokeWidth={0.3}
                   onPointerDown={startResize('wh')}
                 />
                 {resized && (
-                  <text x={size.w} y={-grip - 1} textAnchor="end" className="fill-amber-800 stroke-none text-[4px] dark:fill-amber-300">
+                  <text
+                    x={size.w}
+                    y={size.h + grip * 1.6 + 4}
+                    textAnchor="end"
+                    className="fill-amber-800 stroke-none text-[4px] dark:fill-amber-300">
                     {size.w} × {size.h} mm
                   </text>
                 )}
@@ -701,9 +730,6 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               <NumberInput id="carve-board-t" value={thickness} min={3} max={100} unit="mm" onCommit={t => setBoard({ thickness: t })} />
             </Field>
           </div>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={!!board?.taped} onChange={e => setBoard({ taped: e.target.checked })} /> Tape under the board
-          </label>
           <p className="text-xs text-muted-foreground">
             Measure the board&rsquo;s thickness: Z0 is its underside, so a thicker board carves deeper and wider.
           </p>
