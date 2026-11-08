@@ -13,7 +13,7 @@ export function StepControl({ step, children, ...props }: { step: AppStep } & Co
     );
   if (step.disabled)
     return (
-      <button {...props} aria-label={label} type="button" disabled title="Open a job in CAM/CAD first">
+      <button {...props} aria-label={label} type="button" disabled title="Open a project first">
         {children}
       </button>
     );

@@ -39,7 +39,7 @@ type NavRoute = {
 
 const routes: NavRoute[] = [
   {
-    title: 'CAM/CAD',
+    title: 'Projects',
     to: '/cam',
     icon: Box,
     badge: 'Beta',
