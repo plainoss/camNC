@@ -22,6 +22,7 @@ export * from './variables';
 export * from './placement';
 export * from './drawnOn';
 export * from './cutParts';
+export * from './partPatterns';
 export * from './assemblyCollisions';
 export * from './copies';
 export * from './cornerRelief';

@@ -141,6 +141,30 @@ function clearanceOutcome(step: CadPartCut, scope: CadValueScope): Outcome | nul
   return parsed.value >= 0 ? parsed : { error: 'A clearance can’t be less than nothing.' };
 }
 
+/** A part pattern with its typed count and spacing worked out, or why one can't be. */
+function partPatternOutcome(
+  part: CadPart,
+  scope: CadValueScope
+): { count: number; spacing: number } | { error: string; expression: string } | null {
+  const pattern = part.pattern;
+  if (!pattern || (!usesVariables(pattern.countExpression) && !usesVariables(pattern.spacingExpression))) return null;
+  let { count, spacing } = pattern;
+  if (usesVariables(pattern.countExpression)) {
+    const parsed = parseCadValue(pattern.countExpression, { unit: 'scalar', variables: scope });
+    if ('error' in parsed) return { error: parsed.error, expression: pattern.countExpression };
+    // A count says how many fit, so a part-way result rounds down.
+    count = Math.floor(parsed.value + 1e-9);
+    if (count < 1 || count > 200)
+      return { error: 'A part pattern makes one to 200, counting the part itself.', expression: pattern.countExpression };
+  }
+  if (usesVariables(pattern.spacingExpression)) {
+    const parsed = parseCadValue(pattern.spacingExpression, { unit: 'mm', variables: scope });
+    if ('error' in parsed) return { error: parsed.error, expression: pattern.spacingExpression };
+    spacing = parsed.value;
+  }
+  return { count, spacing };
+}
+
 function reliefOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
   const expression = part.cornerRelief?.diameterExpression;
   if (!usesVariables(expression)) return null;
@@ -248,6 +272,9 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     const relief = reliefOutcome(sized, scope);
     if (relief && 'value' in relief && relief.value !== sized.cornerRelief!.diameter)
       sized = { ...sized, cornerRelief: { ...sized.cornerRelief!, diameter: relief.value } };
+    const pattern = partPatternOutcome(sized, scope);
+    if (pattern && 'count' in pattern && (pattern.count !== sized.pattern!.count || pattern.spacing !== sized.pattern!.spacing))
+      sized = { ...sized, pattern: { ...sized.pattern!, ...pattern } };
     sized = mapCuts(sized, cut => {
       const outcome = depthOutcome(cut, scope);
       return outcome && 'value' in outcome && outcome.value !== cut.depth ? { ...cut, depth: outcome.value } : cut;
@@ -295,6 +322,14 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
         severity: 'error',
         partId: part.id,
         message: `Corner relief ${part.cornerRelief!.diameterExpression}: ${relief.error}`,
+      });
+    const pattern = partPatternOutcome(part, scope);
+    if (pattern && 'error' in pattern)
+      problems.push({
+        code: 'variable-value',
+        severity: 'error',
+        partId: part.id,
+        message: `Part pattern ${pattern.expression}: ${pattern.error}`,
       });
     const offset = offsetOutcome(part, scope);
     if (offset && 'error' in offset)
@@ -393,6 +428,13 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
               }),
               ...(part.drawnOn?.offsetExpression && {
                 drawnOn: { ...part.drawnOn, offsetExpression: edit(part.drawnOn.offsetExpression) },
+              }),
+              ...(part.pattern && {
+                pattern: {
+                  ...part.pattern,
+                  ...(part.pattern.countExpression && { countExpression: edit(part.pattern.countExpression) }),
+                  ...(part.pattern.spacingExpression && { spacingExpression: edit(part.pattern.spacingExpression) }),
+                },
               }),
             },
             edit

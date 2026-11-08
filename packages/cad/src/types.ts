@@ -264,6 +264,8 @@ export interface CadPart {
   cornerRelief?: { diameter: number; diameterExpression?: string };
   /** More of the same part elsewhere in the assembly, each edited along with it. */
   copies?: CadPartCopy[];
+  /** Copies in a row, kept in `copies` as the pattern lays them out. */
+  pattern?: CadPartPattern;
   /** Ordered: a sketch can sit on the floor of an earlier cut. Parts without features are plain flat profiles. */
   features?: CadFeature[];
 }
@@ -294,6 +296,21 @@ export interface CadPartCopy {
   id: string;
   placement?: CadPlacement;
   mirrored?: boolean;
+  /** Its own name, rather than the part's with a number. */
+  name?: string;
+  /** The part pattern that made it, which places it and keeps it in step with the count. */
+  pattern?: string;
+}
+/** Copies of a part in a row along an axis, each `spacing` on from the last. */
+export interface CadPartPattern {
+  id: string;
+  axis: 'x' | 'y' | 'z';
+  /** How many in all, counting the part itself. */
+  count: number;
+  countExpression?: string;
+  /** mm from one to the next; a negative spacing goes the other way. */
+  spacing: number;
+  spacingExpression?: string;
 }
 /** The face a sketch is drawn on. All sketches share the part's x and y, seen from above, whichever face they're on. */
 export type CadFaceRef = 'top' | 'underside' | { floorOf: string };
@@ -339,6 +356,10 @@ export interface CadPartCut {
   id: string;
   tools: string[];
   targets: string[];
+  /**
+   * mm of room around each tool. It widens every side of the opening that lies inside the target, both across the
+   * tool and at a closed end, and deepens a blind cut by as much. A side that runs off the target's edge stays open.
+   */
   clearance: number;
   clearanceExpression?: string;
 }

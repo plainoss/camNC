@@ -721,8 +721,24 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (!copy || typeof copy !== 'object') throw new Error('Invalid CAD part copy');
         addId(copy.id);
         if (copy.mirrored !== undefined && typeof copy.mirrored !== 'boolean') throw new Error('Invalid CAD part copy');
+        if (copy.name !== undefined && typeof copy.name !== 'string') throw new Error('Invalid CAD part copy');
+        if (copy.pattern !== undefined && typeof copy.pattern !== 'string') throw new Error('Invalid CAD part copy');
         if (copy.placement !== undefined) checkPlacement(copy.placement);
       }
+    }
+    if (p.pattern !== undefined) {
+      const { id, axis, count, spacing, countExpression, spacingExpression } = p.pattern ?? ({} as NonNullable<CadPart['pattern']>);
+      if (
+        typeof id !== 'string' ||
+        !['x', 'y', 'z'].includes(axis) ||
+        !Number.isInteger(count) ||
+        count < 1 ||
+        count > 200 ||
+        !Number.isFinite(spacing) ||
+        (countExpression !== undefined && typeof countExpression !== 'string') ||
+        (spacingExpression !== undefined && typeof spacingExpression !== 'string')
+      )
+        throw new Error('Invalid CAD part pattern');
     }
     if (p.placement !== undefined) checkPlacement(p.placement);
     if (p.drawnOn !== undefined) {

@@ -1,6 +1,8 @@
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
+import { mirrorEvaluatedPart } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
+import { cadCopyName } from './partPatterns';
 import { evaluateCadFeatures } from './features';
 import { evaluateCadPart, polygonArea } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
@@ -130,57 +132,75 @@ export function applyPartCuts(
         const intoAt = effectivePlacement(intoSource, supports),
           toolAt = effectivePlacement(toolSource, supports);
         // A part that hasn't been placed isn't anywhere yet, so it reaches into nothing.
-        if (!intoAt || !toolAt) continue;
-        if (!square(intoAt, toolAt)) {
-          warn(`${toolSource.name} isn't square to ${intoSource.name}, so it can't be cut from it yet.`);
-          continue;
-        }
-        const found = overlap(into, intoAt, tool, toolAt);
-        if ('error' in found) continue;
-        if (!solidWithin(tool, toolAt, into, intoAt)) {
-          warn(`${toolSource.name} isn't a plain block where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
-          continue;
-        }
-        const { lo, hi } = found,
-          t = into.thickness;
-        const fromTop = hi[2] >= t - kSquare,
-          fromBelow = lo[2] <= kSquare;
-        if (!fromTop && !fromBelow) {
-          warn(`${toolSource.name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
-          continue;
-        }
-        // The clearance widens each side inside the part. A side that runs off its edge stays there, open.
-        const [ilo, ihi] = box(into),
-          c = step.clearance;
-        const x0 = lo[0] > ilo[0] + kSquare ? lo[0] - c : lo[0],
-          x1 = hi[0] < ihi[0] - kSquare ? hi[0] + c : hi[0],
-          y0 = lo[1] > ilo[1] + kSquare ? lo[1] - c : lo[1],
-          y1 = hi[1] < ihi[1] - kSquare ? hi[1] + c : hi[1];
-        const outline = [
-          { x: x0, y: y0 },
-          { x: x1, y: y0 },
-          { x: x1, y: y1 },
-          { x: x0, y: y1 },
+        if (!intoAt) continue;
+        // Each copy of a tool cuts where it sits, a mirrored one with its mirror image.
+        const instances = [
+          ...(toolAt ? [{ key: '', at: toolAt, shape: tool, name: toolSource.name }] : []),
+          ...(toolSource.copies ?? []).flatMap((copy, index) =>
+            copy.placement
+              ? [
+                  {
+                    key: `:${copy.id}`,
+                    at: copy.placement,
+                    shape: copy.mirrored ? mirrorEvaluatedPart(tool) : tool,
+                    name: cadCopyName(toolSource, index),
+                  },
+                ]
+              : []
+          ),
         ];
-        // The clearance deepens it too, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
-        const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
-          through = reach >= t - kSquare;
-        const relief = intoSource.cornerRelief
-          ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
-          : { points: outline, skipped: 0 };
-        const current = byId.get(targetId)!;
-        const cut: EvaluatedCadCut = {
-          id: `cut-parts:${step.id}:${toolId}`,
-          regionId: `cut-parts:${step.id}:${toolId}`,
-          side: fromTop ? 'top' : 'underside',
-          from: 0,
-          to: through ? t : reach,
-          through,
-          outline: relief.points,
-          islands: [],
-        };
-        byId.set(targetId, { ...current, cuts: [...(current.cuts ?? []), cut] });
-        made++;
+        for (const { key, at, shape, name } of instances) {
+          if (!square(intoAt, at)) {
+            warn(`${name} isn't square to ${intoSource.name}, so it can't be cut from it yet.`);
+            continue;
+          }
+          const found = overlap(into, intoAt, shape, at);
+          if ('error' in found) continue;
+          if (!solidWithin(shape, at, into, intoAt)) {
+            warn(`${name} isn't a plain block where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
+            continue;
+          }
+          const { lo, hi } = found,
+            t = into.thickness;
+          const fromTop = hi[2] >= t - kSquare,
+            fromBelow = lo[2] <= kSquare;
+          if (!fromTop && !fromBelow) {
+            warn(`${name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
+            continue;
+          }
+          // The clearance widens each side inside the part. A side that runs off its edge stays there, open.
+          const [ilo, ihi] = box(into),
+            c = step.clearance;
+          const x0 = lo[0] > ilo[0] + kSquare ? lo[0] - c : lo[0],
+            x1 = hi[0] < ihi[0] - kSquare ? hi[0] + c : hi[0],
+            y0 = lo[1] > ilo[1] + kSquare ? lo[1] - c : lo[1],
+            y1 = hi[1] < ihi[1] - kSquare ? hi[1] + c : hi[1];
+          const outline = [
+            { x: x0, y: y0 },
+            { x: x1, y: y0 },
+            { x: x1, y: y1 },
+            { x: x0, y: y1 },
+          ];
+          // The clearance deepens it too, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
+          const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
+            through = reach >= t - kSquare;
+          const relief = intoSource.cornerRelief
+            ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
+            : { points: outline, skipped: 0 };
+          const current = byId.get(targetId)!;
+          const cut: EvaluatedCadCut = {
+            id: `cut-parts:${step.id}:${toolId}${key}`,
+            regionId: `cut-parts:${step.id}:${toolId}${key}`,
+            side: fromTop ? 'top' : 'underside',
+            from: 0,
+            to: through ? t : reach,
+            through,
+            outline: relief.points,
+            islands: [],
+          };
+          byId.set(targetId, { ...current, cuts: [...(current.cuts ?? []), cut] });
+          made++;
+        }
       }
     if (!made && step.tools.length && step.targets.length)
       warn('A "cut parts" step cuts nothing: none of its tools reach into its targets.');

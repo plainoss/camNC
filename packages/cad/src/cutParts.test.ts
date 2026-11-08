@@ -7,6 +7,9 @@ import {
   createPlateDocument,
   parseCadDocument,
   removePartCut,
+  renamePartCopy,
+  setPartPattern,
+  cadPartsToCut,
   setCadVariable,
   solveCadDocument,
   type CadDimension,
@@ -121,5 +124,34 @@ describe('a shelf housed in two sides', () => {
     expect(end.diagnostics.map(d => d.message)).toContain(
       "Shelf isn't a plain block where it reaches into Left, so it can't be cut from it yet."
     );
+  });
+});
+
+describe('shelves patterned up the carcass', () => {
+  it('lays out as many shelves as the count says, each housed in both sides, and follows the count and spacing', async () => {
+    let document = carcass();
+    const shelf = document.parts[2]!.id;
+    document.parts[2]!.placement!.positionExpressions = ['board - housing', null, 'height - 620mm'];
+    document = setPartPattern(document, shelf, { axis: 'z', count: 2, countExpression: 'shelves', spacing: 0, spacingExpression: 'gap' });
+    const values = { height: '720mm', depth: '300mm', width: '600mm', board: '18mm', housing: '8mm', fit: '0.2mm' };
+    for (const [shelves, gap] of [
+      [3, 150],
+      [4, 120],
+    ] as const) {
+      const solved = await variables(document, { ...values, shelves: `${shelves}`, gap: `${gap}mm` });
+      document = solved.document;
+      const copies = document.parts[2]!.copies!;
+      expect(copies).toHaveLength(shelves - 1);
+      expect(copies.map(copy => copy.placement!.position[2])).toEqual(Array.from({ length: shelves - 1 }, (_, i) => 100 + (i + 1) * gap));
+      for (const side of solved.parts.slice(0, 2)) expect(side.cuts).toHaveLength(shelves);
+      expect(solved.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    }
+    // A copy can have a name of its own, which CAM cuts it by, and it keeps it as the pattern lays it out again.
+    const second = document.parts[2]!.copies![0]!.id;
+    document = renamePartCopy(document, shelf, second, 'Middle shelf');
+    const solved = await variables(document, { gap: '110mm' });
+    const names = cadPartsToCut(solved.document, solved.parts).find(entry => entry.part.partId === shelf)!.names;
+    expect(names).toEqual(['Shelf', 'Middle shelf', 'Shelf 3', 'Shelf 4']);
+    expect(parseCadDocument(JSON.parse(JSON.stringify(solved.document)))).toEqual(solved.document);
   });
 });
