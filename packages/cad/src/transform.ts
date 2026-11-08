@@ -53,6 +53,8 @@ export function transformSketchEntities(sketch: CadSketch, options: CadTransform
   const requested = [...new Set(options.entityIds)];
   if (!requested.length || requested.some(id => !entities.has(id))) return fail('Select sketch geometry to transform.');
   if (requested.includes(originId(sketch))) return fail('The sketch origin cannot be transformed. Select its attached geometry instead.');
+  if (requested.some(id => entities.get(id)!.faceEdge))
+    return fail('The edges of the face this is drawn on stay where that face is. Select only your own geometry.');
   if (
     requested.some(id => {
       const owner = splineHandleOwner(sketch, id);
@@ -110,7 +112,7 @@ export function transformSketchEntities(sketch: CadSketch, options: CadTransform
   const outsidePointIds = new Set(
     sketch.entities.filter(e => e.type !== 'point' && !isOwnedSplineHandle(e) && !sourceIds.has(e.id)).flatMap(entityPointIds)
   );
-  const shared = new Set([...pointIds].filter(id => id === originId(sketch) || outsidePointIds.has(id)));
+  const shared = new Set([...pointIds].filter(id => id === originId(sketch) || entities.get(id)?.faceEdge || outsidePointIds.has(id)));
   const ids = new Map<string, string>();
   for (const id of pointIds) ids.set(id, options.copy || shared.has(id) ? newCadId() : id);
   for (const id of sourceIds) if (!pointIds.has(id)) ids.set(id, options.copy ? newCadId() : id);
@@ -155,7 +157,8 @@ export function transformSketchEntities(sketch: CadSketch, options: CadTransform
     let entity = remapCadReferences(structuredClone(source), ids);
     if (entity.type === 'point') {
       entity = { ...entity, ...turn(source as CadPointEntity) };
-      if (id === originId(sketch)) delete entity.fixed;
+      if (id === originId(sketch) || source.faceEdge) delete entity.fixed;
+      delete entity.faceEdge;
       if (requested.includes(id)) entity.standalone = true;
       if (![entity.x, entity.y].every(Number.isFinite)) return fail('The transformed points are outside the supported geometry range.');
     }

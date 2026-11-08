@@ -193,7 +193,8 @@ export function isSplineTangentHandle(sketch: CadSketch, entityId: string): bool
 
 /** Deleting a point removes dependent curves; deleting a curve removes only unused points. */
 export function removeEntity(sketch: CadSketch, id: string): CadSketch {
-  if (id === originId(sketch)) return sketch;
+  // The origin, and the edges of the face the part is drawn on, are where the sketch starts from.
+  if (id === originId(sketch) || sketch.entities.some(e => e.id === id && e.faceEdge)) return sketch;
   // Endpoint tangent handles belong to the fit spline definition. They remain
   // editable/dimensionable, but deleting a handle must never delete its curve.
   if (isSplineTangentHandle(sketch, id)) return sketch;

@@ -7,6 +7,8 @@ export interface CadPoint {
 interface EntityBase {
   id: string;
   construction?: boolean;
+  /** An edge of the face the part is drawn on, kept where that face is. It can't be edited, only drawn onto. */
+  faceEdge?: boolean;
 }
 export interface CadPointEntity extends EntityBase, CadPoint {
   type: 'point';
