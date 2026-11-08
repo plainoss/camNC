@@ -4,20 +4,15 @@ permissions:
 
 # Builds the Tauri desktop app (apps/camnc-desktop) for macOS (Apple silicon), Windows and Linux.
 # - Pull requests that touch it get an unsigned Linux build. The `desktop-all-platforms` label builds macOS and Windows too.
-# - Every push to main that touches the app is released as `desktop-v0.1.<run number>`. Installed apps find it through the
+# - Main is built nightly, and on manual runs, and released as `desktop-v0.1.<run number>`. A night with no app change
+#   since the last release builds nothing. Installed apps find it through the
 #   `latest.json` of the rolling `desktop-latest` release and update themselves. Releasing needs the updater signing key
 #   in the TAURI_SIGNING_PRIVATE_KEY secret; without it, main only builds.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'apps/camNC/**'
-      - 'apps/camnc-desktop/**'
-      - 'packages/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/desktop.yml'
+  # Nightly instead of on every merge, which used more runner time than any other workflow but CI.
+  schedule:
+    - cron: '0 2 * * *'
   pull_request:
     branches:
       - main
@@ -45,10 +40,25 @@ jobs:
     outputs:
       include: ${{ steps.pick.outputs.include }}
     steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'schedule'
+        with:
+          fetch-depth: 0
       - id: pick
         env:
           ALL: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'desktop-all-platforms') }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # A nightly run with nothing new for the app since the last release builds nothing.
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then
+            last=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .target_commitish 2>/dev/null || true)
+            if [ -n "$last" ] && git diff --quiet "$last" HEAD -- apps/camNC apps/camnc-desktop packages pnpm-lock.yaml \
+              .github/workflows/desktop.yml; then
+              echo "No app change since $last."
+              echo "include=[]" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
           macos='{"platform":"macos-latest","target":"aarch64-apple-darwin","bundles":"app,dmg"}'
           windows='{"platform":"windows-latest","target":"x86_64-pc-windows-msvc","bundles":"nsis"}'
           # The AppImage step of tauri-cli 3.0.0-alpha.5 (quick-sharun) hung for over an hour in CI, so Linux ships as
@@ -59,6 +69,7 @@ jobs:
 
   build:
     needs: platforms
+    if: needs.platforms.outputs.include != '[]'
     strategy:
       fail-fast: false
       matrix:

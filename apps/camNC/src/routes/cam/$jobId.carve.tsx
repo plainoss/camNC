@@ -342,6 +342,7 @@ const centred = (carving: CarvingV1, size: { w: number; h: number }) => {
 };
 
 function ArtFields({ art, onArt }: { art: CarvingArt; onArt: (art: CarvingArt) => void }) {
+  const svgInput = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(art.kind === 'text' ? art.text : 'Welcome');
   // Typing outlines again once it pauses.
   useEffect(() => {
@@ -359,7 +360,11 @@ function ArtFields({ art, onArt }: { art: CarvingArt; onArt: (art: CarvingArt) =
             role="tab"
             aria-selected={art.kind === kind}
             className={cn('rounded px-3 py-1', art.kind === kind ? 'bg-background shadow-sm' : 'text-muted-foreground')}
-            onClick={() => kind === 'text' && art.kind !== 'text' && onArt({ kind: 'text', text, font })}>
+            onClick={() => {
+              if (kind === art.kind) return;
+              if (kind === 'text') onArt({ kind: 'text', text, font });
+              else svgInput.current?.click();
+            }}>
             {kind === 'text' ? 'Lettering' : 'SVG'}
           </button>
         ))}
@@ -379,11 +384,14 @@ function ArtFields({ art, onArt }: { art: CarvingArt; onArt: (art: CarvingArt) =
       <Field label={art.kind === 'svg' ? 'Another SVG' : 'Or an SVG file'} id="carve-svg">
         <Input
           id="carve-svg"
+          ref={svgInput}
           type="file"
           accept=".svg,image/svg+xml"
           onChange={e => {
             const file = e.target.files?.[0];
             if (file) void file.text().then(svg => onArt({ kind: 'svg', svg, fileName: file.name }));
+            // Choosing the same file again still counts.
+            e.target.value = '';
           }}
         />
       </Field>

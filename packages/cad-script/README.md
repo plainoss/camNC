@@ -144,6 +144,10 @@ by the parts that fit them.
   a left and right pair that aren't alike, `mirrored: true` is the mirror image across the
   sketch's y axis. `name` gives it its own name, such as `'Right side'`. The report lists
   the pieces CAM cuts under each part's `pieces`.
+- `copy()` returns that copy, and `pattern()` its copies (the part itself not among
+  them), each with its `name`. A copy can be a `cutParts` tool on its own: with three
+  shelves, `d.cutParts(side, { with: copies[0] })` houses only the middle one. With the
+  part itself as the tool, the part and every copy cut.
 - `part.place({ at, x: '+y', y: '+z' })` places a part by hand when it isn't drawn on a
   plane or face.
 - The report's `assembly` lists each part's box, and an error `parts-collide` says where

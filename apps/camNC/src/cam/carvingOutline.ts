@@ -115,6 +115,17 @@ function canvas(w: number, h: number) {
   return ctx;
 }
 
+const kUnreadableSvg = 'This SVG could not be read. Use filled shapes, without linked images or fonts.';
+
+/** Absolute SVG lengths in CSS pixels; relative or missing dimensions do not define a viewport. */
+function svgLengthPx(length: string | null): number | undefined {
+  const match = length?.trim().match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(px|mm|cm|in|pt|pc|q)?$/i);
+  if (!match) return undefined;
+  const pxPerUnit: Record<string, number> = { px: 1, mm: 96 / 25.4, cm: 96 / 2.54, in: 96, pt: 96 / 72, pc: 16, q: 96 / 101.6 };
+  const px = Number(match[1]) * pxPerUnit[match[2]?.toLowerCase() ?? 'px'];
+  return Number.isFinite(px) && px > 0 ? px : undefined;
+}
+
 async function svgImage(svg: string): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
   try {
@@ -123,7 +134,7 @@ async function svgImage(svg: string): Promise<HTMLImageElement> {
     await img.decode();
     return img;
   } catch {
-    throw new Error('This SVG could not be read. Use filled shapes, without linked images or fonts.');
+    throw new Error(kUnreadableSvg);
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -158,12 +169,34 @@ export async function outlineArt(art: CarvingArt, height: number): Promise<{ reg
     const region = maskOutline(inkMask(ctx.getImageData(0, 0, w, h).data, w, h), w, h, ppm);
     return { region, width, height };
   }
-  const img = await svgImage(art.svg);
-  const aspect = (img.naturalWidth || 1) / (img.naturalHeight || 1);
+  const doc = new DOMParser().parseFromString(art.svg, 'image/svg+xml');
+  if (doc.querySelector('parsererror')) throw new Error(kUnreadableSvg);
+  const svg = doc.documentElement;
+  if (svg.localName !== 'svg' || (svg.namespaceURI && svg.namespaceURI !== 'http://www.w3.org/2000/svg'))
+    throw new Error('This file is not an SVG. Choose an SVG file.');
+  const viewBox = svg
+    .getAttribute('viewBox')
+    ?.trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  const validViewBox = viewBox?.length === 4 && viewBox.every(Number.isFinite) && viewBox[2] > 0 && viewBox[3] > 0;
+  const viewportWidth = svgLengthPx(svg.getAttribute('width'));
+  const viewportHeight = svgLengthPx(svg.getAttribute('height'));
+  const hasViewport = viewportWidth !== undefined && viewportHeight !== undefined;
+  const sourceWidth = hasViewport ? viewportWidth : validViewBox ? viewBox[2] : undefined;
+  const sourceHeight = hasViewport ? viewportHeight : validViewBox ? viewBox[3] : undefined;
+  if (sourceWidth === undefined || sourceHeight === undefined) throw new Error(kUnreadableSvg);
+  if (!validViewBox) svg.setAttribute('viewBox', `0 0 ${sourceWidth} ${sourceHeight}`);
+  const aspect = sourceWidth / sourceHeight;
   const width = height * aspect;
   const ppm = Math.min(kPxPerMm, Math.sqrt(kMaxPixels / ((width + 2) * (height + 2))));
   const w = Math.max(1, Math.round(width * ppm)),
     h = Math.max(1, Math.round(height * ppm));
+  // Give the image an explicit pixel viewport: intrinsic sizes may be missing or use physical/percentage units.
+  svg.setAttribute('width', `${w}px`);
+  svg.setAttribute('height', `${h}px`);
+  if (!svg.namespaceURI) svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const img = await svgImage(new XMLSerializer().serializeToString(svg));
   const ctx = canvas(w, h);
   ctx.drawImage(img, 0, 0, w, h);
   return { region: maskOutline(inkMask(ctx.getImageData(0, 0, w, h).data, w, h), w, h, ppm), width, height };
