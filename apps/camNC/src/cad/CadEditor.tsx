@@ -3745,7 +3745,9 @@ export function CadEditor({
     const target = featureDialog?.kind === 'extrude' ? doc.parts.find(candidate => candidate.id === featureDialog.partId) : undefined;
     if (!studioSession || !target || target.thin) return [];
     const regions = sketchRegions(target.sketch, CAD_CHORD_TOLERANCE);
-    if (regions.length < 2 && !target.regions?.length) return [];
+    // One region is worth showing too when the sketch as a whole can't be the part, as with a stray line beside it.
+    const wholeFails = !target.regions?.length && evaluateCadPart(target).diagnostics.some(diagnostic => diagnostic.severity === 'error');
+    if (!regions.length || (regions.length < 2 && !target.regions?.length && !wholeFails)) return [];
     const frame = cadFaceFrame(doc, target.drawnOn?.on ?? { plane: 'top' });
     if ('error' in frame) return [];
     // Shown on the face the extrude ends at, so the part's own body doesn't hide them.

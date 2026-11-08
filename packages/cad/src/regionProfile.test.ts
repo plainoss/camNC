@@ -33,3 +33,18 @@ describe('a part extruded from picked regions', () => {
     expect(evaluateCadPart({ ...part, regions: regions.map(region => region.id) }).diagnostics[0]!.code).toBe('region-count');
   });
 });
+
+describe('the holes of a region', () => {
+  it('are named by the curves around them, as the whole sketch’s loops are', () => {
+    const part = createCadPart('Board', 18);
+    let sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 100, height: 50 });
+    sketch = addRectangle(sketch, { x: 20, y: 10, width: 20, height: 20 });
+    sketch = addLine(sketch, { x1: 100, y1: 25, x2: 140, y2: 25 });
+    const regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE);
+    const outer = regions.find(region => region.holes.length === 1)!;
+    const island = regions.find(region => region !== outer)!;
+    const evaluated = evaluateCadPart({ ...part, sketch, regions: [outer.id] }).part!;
+    const hole = evaluated.loops.find(loop => loop.kind === 'hole')!;
+    expect([...hole.entityIds].sort()).toEqual([...island.curveIds].sort());
+  });
+});

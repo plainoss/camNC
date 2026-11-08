@@ -1,4 +1,4 @@
-import { CAD_CHORD_TOLERANCE } from './geometry';
+import { CAD_CHORD_TOLERANCE, polygonArea } from './geometry';
 import { sketchRegions } from './sketchRegions';
 import type { CadDiagnostic, CadPart, EvaluatedCadPart } from './types';
 
@@ -15,6 +15,24 @@ export function regionProfile(part: CadPart & { regions: string[] }): { part?: E
     return problem('region-missing', `A region picked for ${part.name} is no longer in its sketch. Pick its regions again.`);
   if (picked.length !== 1) return problem('region-count', 'Pick one region of the sketch for the part.');
   const region = picked[0]!;
+  // Each island is another region's outline: its curves name the hole, as a whole sketch's loops do, so a pocket set on
+  // that loop still finds it.
+  const box = (points: { x: number; y: number }[]) =>
+    [
+      Math.min(...points.map(p => p.x)),
+      Math.min(...points.map(p => p.y)),
+      Math.max(...points.map(p => p.x)),
+      Math.max(...points.map(p => p.y)),
+    ]
+      .map(value => Math.round(value * 1000))
+      .join();
+  const holeCurves = (hole: { x: number; y: number }[]) =>
+    regions.find(
+      candidate =>
+        candidate !== region &&
+        box(candidate.points) === box(hole) &&
+        Math.abs(Math.abs(polygonArea(candidate.points)) - Math.abs(polygonArea(hole))) < 1e-3
+    )?.curveIds ?? [];
   return {
     part: {
       partId: part.id,
@@ -29,7 +47,15 @@ export function regionProfile(part: CadPart & { regions: string[] }): { part?: E
           points: region.points,
           kind: 'outer',
         },
-        ...region.holes.map((points, index) => ({ id: `${part.id}:profile:hole${index}`, entityIds: [], points, kind: 'hole' as const })),
+        ...region.holes.map((points, index) => {
+          const entityIds = holeCurves(points);
+          return {
+            id: entityIds.length ? `${part.id}:profile:${[...entityIds].sort().join(':')}` : `${part.id}:profile:hole${index}`,
+            entityIds,
+            points,
+            kind: 'hole' as const,
+          };
+        }),
       ],
     },
     diagnostics: [],
