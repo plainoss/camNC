@@ -3,12 +3,7 @@ import { design } from '@wbcnc/cad-script';
 /** A rounded tray with a deeper recess sketched on the first pocket's floor. */
 export default design(d => {
   const tray = d.part('Tray', { thickness: 24 });
-  const outline = tray.profile.polygon([
-    [0, 0],
-    [260, 0],
-    [260, 160],
-    [0, 160],
-  ]);
+  const outline = tray.profile.rect({ at: [0, 0], w: 260, h: 160 });
   tray.profile.fillet(outline.corners, 12);
   const top = tray.sketchOn('top');
   top.rect({ at: [15, 15], w: 230, h: 130 });

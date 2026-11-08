@@ -332,6 +332,23 @@ describe('renderCadSvg', () => {
     expect(svg).not.toMatch(/NaN|Infinity/);
   });
 
+  it('keeps a hole inside a pocket visible and labels a round cut inside itself', async () => {
+    const { parts } = await editCad(null, d => {
+      const part = d.part('Coaster', { thickness: 10 });
+      part.profile.circle({ at: [45, 45], d: 90 });
+      part.profile.rect({ at: [35, 35], w: 20, h: 20 });
+      const top = part.sketchOn('top');
+      top.circle({ at: [45, 45], d: 80 });
+      part.cut(top.regionAt(80, 45), { depth: 2 });
+    });
+    const svg = renderCadSvg(parts);
+    expect(svg).toMatch(/<path d="[^"]*" clip-path="url\(#material-0\)"/);
+    const [, x, y] = svg.match(/<text x="([\d.]+)" y="([\d.]+)" font-size="[\d.]+">2 mm/)!;
+    // The coaster sits 4 units in from the drawing's edge, and the label must lie inside the recess.
+    const unit = 90 / 40;
+    expect(Math.hypot(+x! - (4 * unit + 45), +y! - (4 * unit + 45))).toBeLessThan(40);
+  });
+
   it('draws nothing for nothing', () => {
     expect(renderCadSvg([])).not.toMatch(/NaN|Infinity|<path/);
   });
