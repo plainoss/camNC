@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cadFaceSketches, parseCadDocument, setCadVariable } from '@wbcnc/cad';
+import { cadFaceSketches, parseCadDocument, setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { design, editCad, inspectCadDocument, renderCadSvg, shortHandles, type CadScript } from './index';
 import { typeErrors } from './typecheck';
@@ -74,6 +74,98 @@ describe('expressions', () => {
     });
     expect(report.errors).toEqual([]);
     expect(report.parts[0]!.sketches[1]!.entities.filter(entity => entity.type === 'line')).toHaveLength(12);
+  });
+});
+
+describe('review cases', () => {
+  const change = (document: CadDocument, name: string, expression: string) => {
+    const variable = document.variables!.find(candidate => candidate.name === name)!;
+    const changed = setCadVariable(document, { id: variable.id, name, expression });
+    if ('error' in changed) throw new Error(changed.error);
+    return changed.document;
+  };
+
+  it('keeps a hole that starts on the origin following its expression', async () => {
+    const { document } = await editCad(null, d => {
+      d.variable('offset', '0mm');
+      const plate = d.part('Plate');
+      plate.profile.rect({ at: [-50, -50], w: 100, h: 100 });
+      plate.profile.circle({ at: ['offset', 0], d: 8 });
+    });
+    const { parts } = await inspectCadDocument(change(document, 'offset', '20mm'), new Map(), { toolpaths: false });
+    const hole = parts[0]!.holes[0]!;
+    expect(Math.min(...hole.map(p => p.x)) + 4).toBeCloseTo(20, 3);
+  });
+
+  it('keeps a path vertex that starts on the origin following its expression', async () => {
+    const { document } = await editCad(null, d => {
+      d.variable('offset', '0mm');
+      d.part('Plate').profile.path([0, 'offset']).lineTo([100, 'offset']).lineTo([100, 'offset + 50']).lineTo([0, 'offset + 50']).close();
+    });
+    const { report } = await inspectCadDocument(change(document, 'offset', '10mm'), new Map(), { toolpaths: false });
+    expect(report.parts[0]!.outline).toEqual({ at: [0, 10], size: [100, 50] });
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+  });
+
+  it('follows a step written backwards', async () => {
+    const { document } = await editCad(null, d => {
+      d.variable('pitch', '32mm');
+      const side = d.part('Side');
+      side.profile.rect({ at: [0, 0], w: 100, h: 400 });
+      const pins = side.sketchOn('top');
+      pins.pattern([pins.circle({ at: [50, 300], d: 5 })], { count: 3, step: [0, '-pitch'] });
+    });
+    const { report } = await inspectCadDocument(change(document, 'pitch', '40mm'), new Map(), { toolpaths: false });
+    expect(report.errors).toEqual([]);
+    const ys = report.parts[0]!.sketches[1]!.entities.flatMap(e => (e.type === 'circle' ? [(e as { at: number[] }).at[1]] : []));
+    expect(ys.sort()).toEqual([220, 260, 300]);
+  });
+
+  it('splits a half circle into quarters even when asked for the long way round', async () => {
+    const { report } = await editCad(null, d => {
+      d.part('Slot').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5, large: true }).lineTo([0, 5]).close();
+    });
+    expect(report.parts[0]!.outline).toEqual({ at: [0, 0], size: [42.5, 5] });
+  });
+
+  it("measures a cut against its own sketch's curves only", async () => {
+    const { report } = await editCad(null, d => {
+      const plate = d.part('Plate');
+      plate.profile.rect({ at: [0, 0], w: 100, h: 100 });
+      const pocket = plate.sketchOn('top');
+      pocket.circle({ at: [50, 50], d: 20 });
+      plate.cut(pocket.regionAt(50, 50), { depth: 5 });
+      plate.sketchOn('top').circle({ at: [50.2, 50], d: 20 });
+    });
+    expect(report.parts[0]!.cuts[0]!.size).toEqual([20, 20]);
+  });
+
+  it('measures a pocket made from a profile loop against the profile sketch', async () => {
+    const { report } = await editCad(null, d => {
+      const plate = d.part('Plate');
+      plate.profile.rect({ at: [0, 0], w: 100, h: 100 });
+      // A slot with round ends, which come out short when only their chords are measured.
+      plate.profile
+        .path([40, 45])
+        .lineTo([60, 45])
+        .arcTo([60, 55], { tangent: true })
+        .lineTo([40, 55])
+        .arcTo([40, 45], { tangent: true })
+        .close();
+      plate.cut(plate.profile.regionAt(50, 50), { depth: 5 });
+    });
+    expect(report.parts[0]!.cuts[0]!.size).toEqual([30, 10]);
+  });
+
+  it('warns when a cut on the underside fits no tool, though side B then has nothing to cut', async () => {
+    const { report } = await editCad(null, d => {
+      const plate = d.part('Plate');
+      plate.profile.rect({ at: [0, 0], w: 100, h: 80 });
+      const under = plate.sketchOn('underside');
+      under.circle({ at: [-50, 40], d: 2 });
+      plate.cut(under.regionAt(-50, 40), { depth: 3 });
+    });
+    expect(codes(report.warnings)).toContain('toolpath-missing');
   });
 });
 

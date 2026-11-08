@@ -247,6 +247,30 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       current().entities.find((e): e is CadPointEntity => e.type === 'point' && Math.hypot(e.x - x, e.y - y) < 1e-7)!;
     const isPlaced = (pointId: string) =>
       current().constraints.some(c => (c.type === 'positionX' || c.type === 'positionY') && c.pointId === pointId);
+    /**
+     * A point of its own where `owners` meet the fixed origin. Drawing reuses the origin when a point lands on it, which
+     * would pin a position that's meant to follow an expression.
+     */
+    const detach = (pointId: string, owners: readonly string[]): CadRef => {
+      const origin = current().entities.find((e): e is CadPointEntity => e.id === pointId)!;
+      const own = { id: newCadId(), type: 'point' as const, x: origin.x, y: origin.y };
+      const swap = (id: string) => (id === pointId ? own.id : id);
+      apply(sketch => ({
+        ...sketch,
+        entities: [
+          ...sketch.entities.map(e => {
+            if (!owners.includes(e.id)) return e;
+            if (e.type === 'line') return { ...e, startId: swap(e.startId), endId: swap(e.endId) };
+            if (e.type === 'arc') return { ...e, startId: swap(e.startId), endId: swap(e.endId), centerId: swap(e.centerId) };
+            if (e.type === 'circle') return { ...e, centerId: swap(e.centerId) };
+            return e;
+          }),
+          own,
+        ],
+      }));
+      return { id: own.id };
+    };
+    const typed = (at: LenXy) => at.some(value => typeof value === 'string');
     const place = (point: CadRef, [x, y]: LenXy) => {
       constrain({ type: 'positionX', pointId: point.id, value: measure(x, 'X'), label: 'X', ...expressionOf(x) });
       constrain({ type: 'positionY', pointId: point.id, value: measure(y, 'Y'), label: 'Y', ...expressionOf(y) });
@@ -275,6 +299,12 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
             addCircle(sketch, { x: measure(x, 'X'), y: measure(y, 'Y'), radius: diameter / 2, dimensioned: true, positioned: true }),
           { diameter: d, positionX: x, positionY: y }
         ).find(e => e.type === 'circle')!;
+        const origin = current().entities.find(e => e.id === circle.centerId);
+        if (origin?.type === 'point' && origin.fixed && typed([x, y])) {
+          const center = detach(circle.centerId, [circle.id]);
+          place(center, [x, y]);
+          return { id: circle.id, center };
+        }
         return { id: circle.id, center: { id: circle.centerId } };
       },
       polygon(points) {
@@ -339,8 +369,10 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
                 const middle = { x: (from.x + target.x) / 2, y: (from.y + target.y) / 2 },
                   out = { x: from.x - middle.x, y: from.y - middle.y };
                 const top = how.clockwise ? { x: middle.x + out.y, y: middle.y - out.x } : { x: middle.x - out.y, y: middle.y + out.x };
-                edit.arcTo([top.x, top.y], how);
-                return edit.arcTo(to, how);
+                // Each half is a quarter turn, so the short way round.
+                const quarter = { ...how, large: false };
+                edit.arcTo([top.x, top.y], quarter);
+                return edit.arcTo(to, quarter);
               }
             }
             const end = arrive(to, target);
@@ -394,9 +426,17 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
             open();
             if (Math.hypot(cursor.x - start.x, cursor.y - start.y) > 1e-6) edit.lineTo(from);
             closed = true;
-            const corners = vertices.map(vertex => pointNear([vertex.at.x, vertex.at.y]));
-            vertices.forEach((vertex, i) => {
-              if (!corners[i]!.fixed && !isPlaced(corners[i]!.id)) place(corners[i]!, vertex.typed);
+            const corners = vertices.map(vertex => {
+              const point: CadRef & { fixed?: boolean } = pointNear([vertex.at.x, vertex.at.y]);
+              const corner =
+                point.fixed && typed(vertex.typed)
+                  ? detach(
+                      point.id,
+                      edges.map(edge => edge.id)
+                    )
+                  : point;
+              if (!('fixed' in corner && corner.fixed) && !isPlaced(corner.id)) place(corner, vertex.typed);
+              return corner;
             });
             return { edges, corners };
           },
@@ -451,11 +491,13 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         const counted = (value: Len) => Math.floor(measure(value, 'Count', 'scalar') + 1e-9);
         const stepped = (value: LenXy) => {
           const [x, y] = [measure(value[0], 'Step x'), measure(value[1], 'Step y')];
-          const typed = value.filter((part): part is string => typeof part === 'string');
+          const written = value.filter((part): part is string => typeof part === 'string');
           // The model keeps a step's direction and lets an expression set its length, so only one axis can carry it.
-          if (typed.length && (typed.length > 1 || (x !== 0 && y !== 0)))
+          if (written.length && (written.length > 1 || (x !== 0 && y !== 0)))
             fail(`A step that follows variables runs along one axis, such as [0, 'pitch'], not [${value.join(', ')}].`);
-          return { vector: { x, y }, ...(typed[0] && { spacing: typed[0] }) };
+          // A spacing is a length: a step written `-pitch` runs backwards a pitch at a time.
+          const length = x + y;
+          return { vector: { x, y }, ...(written[0] && { spacing: length < 0 ? `-(${written[0]})` : written[0] }) };
         };
         const along = stepped(step),
           across = rows && stepped(rows.step);
