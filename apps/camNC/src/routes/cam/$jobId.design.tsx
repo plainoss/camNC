@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   cadFaceSketches,
   evaluateCadFeatures,
@@ -19,6 +19,12 @@ import { CamPage } from '@/cam/CamPage';
 import { CamJobBar, type CamStageDestination } from '@/cam/CamJobBar';
 import { camKeys, useCamJob } from '@/cam/camQueries';
 import { acceptDesign, saveDesignDraft } from '@/cam/cadDesign';
+import {
+  acknowledgePendingDesignDraft,
+  discardPendingDesignDraft,
+  keepPendingDesignDraft,
+  pendingDesignDraft,
+} from '@/cam/designDraftRecovery';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { CadEditor, type CadEditorController } from '@/cad/CadEditor';
 import { acknowledgeCadSession, cadSession, endCadSession, replaceCadSession, syncCadSession } from '@/cad/session';
@@ -65,7 +71,19 @@ function DesignStep() {
 function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context: DesignContext }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [session, setSession] = useState(() => cadSession(initialJob.design!.draft));
+  const [recovery] = useState(() => pendingDesignDraft(initialJob.id, initialJob.design!.draft));
+  const [session, setSession] = useState(() => {
+    const session = cadSession(initialJob.design!.draft);
+    if (recovery) {
+      syncCadSession(session, recovery.document);
+      if (recovery.conflict) {
+        acknowledgeCadSession(session, recovery.checkpoint);
+        session.conflict = { incoming: initialJob.design!.draft };
+      }
+    }
+    return session;
+  });
+  // The editor joins the recovered session using its durable checkpoint, so it does not acknowledge unsaved work.
   const [editorDocument, setEditorDocument] = useState(initialJob.design!.draft);
   const [editorEpoch, setEditorEpoch] = useState(0);
   // Back from a face sketch, the editor opens on that part, where its new regions are cut.
@@ -98,11 +116,14 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   const show = (job: CamJobV1) => {
     persisted.current = job;
     acknowledgeCadSession(session, job.design!.draft);
+    acknowledgePendingDesignDraft(job.id, job.design!.draft);
     queryClient.setQueryData(camKeys.job(job.id), job);
     void queryClient.invalidateQueries({ queryKey: camKeys.jobs });
   };
   const draft = (document: CadDocument) => {
     if (recoveryInProgress.current || activeSession.current !== session) return;
+    if (!keepPendingDesignDraft(initialJob.id, session.saved, document))
+      setError('Reload recovery is unavailable. Wait for Draft saved before reloading.');
     setStatus('Saving draft…');
     queue.current = queue.current
       .then(async () => {
@@ -110,6 +131,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
         const source = JSON.stringify(persisted.current.design!.draft);
         if (source !== JSON.stringify(document) || source !== JSON.stringify(session.saved))
           show(await saveDesignDraft(persisted.current, document, session.saved));
+        else acknowledgePendingDesignDraft(initialJob.id, document);
         failure.current = null;
         setError(null);
         setStatus('Draft saved');
@@ -123,6 +145,11 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
         setStatus('Draft could not be saved');
       });
   };
+  useEffect(() => {
+    if (recovery && !recovery.conflict) draft(recovery.document);
+    // Resume the interrupted queue once on opening, using the durable source as the optimistic checkpoint.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const finish = async (document: CadDocument) => {
     draft(document);
     await queue.current;
@@ -179,6 +206,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       await queue.current;
       const current = await getJob(initialJob.id);
       if (!current?.design) throw new Error('This design no longer exists. Save your local sketch as a copy.');
+      discardPendingDesignDraft(initialJob.id);
       endCadSession(session.document.id);
       if (faceEdit) endCadSession(faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId).id);
       setFaceEdit(null);

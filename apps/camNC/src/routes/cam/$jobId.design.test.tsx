@@ -5,6 +5,7 @@ import { useImperativeHandle, useRef, type ComponentType, type Ref } from 'react
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { acknowledgeCadSession, cadSession, commitCadSession, endCadSession } from '@/cad/session';
+import { keepPendingDesignDraft, pendingDesignDraft } from '@/cam/designDraftRecovery';
 import type { CadEditorController } from '@/cad/CadEditor';
 import type { CamStageDestination } from '@/cam/CamJobBar';
 import { Route } from './$jobId.design';
@@ -122,6 +123,7 @@ vi.mock('@/cad/CadEditor', () => ({
 
 const Design = (Route as unknown as { options: { component: ComponentType } }).options.component;
 beforeEach(() => {
+  sessionStorage.clear();
   vi.clearAllMocks();
   const document = createPlateDocument();
   state.job = {
@@ -151,6 +153,53 @@ const open = () =>
   );
 
 describe('returning from a design edit', () => {
+  it('recovers the newest edit when reloading interrupts an older queued save', async () => {
+    const saved = state.job!.design!.draft;
+    state.save.mockImplementation(() => new Promise<CamJobV1>(() => {}));
+    const view = open();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
+    const latest = { ...saved, revision: saved.revision + 2 };
+    expect(pendingDesignDraft(state.job!.id, saved)?.document).toEqual(latest);
+    expect(state.save).toHaveBeenCalledTimes(1);
+    view.unmount();
+    endCadSession(saved.id);
+    state.save.mockImplementation(async (job: CamJobV1, document: CadDocument) => ({
+      ...job,
+      design: { ...job.design!, draft: document },
+    }));
+    open();
+    expect(JSON.parse(screen.getByTestId('editor-document').textContent!)).toEqual(latest);
+    await waitFor(() => expect(pendingDesignDraft(state.job!.id, saved)).toBeNull());
+    expect(state.save.mock.lastCall![1]).toEqual(latest);
+  });
+
+  it('resumes the latest draft after reloading before its IndexedDB save', async () => {
+    const saved = state.job!.design!.draft;
+    const latest = { ...saved, name: 'Last edit before reload', revision: saved.revision + 1 };
+    keepPendingDesignDraft(state.job!.id, saved, latest);
+    open();
+    expect(JSON.parse(screen.getByTestId('editor-document').textContent!)).toEqual(latest);
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    const [base, document, checkpoint] = state.save.mock.calls[0]!;
+    expect(base.id).toBe(state.job!.id);
+    expect(JSON.stringify(document)).toBe(JSON.stringify(latest));
+    expect(JSON.stringify(checkpoint)).toBe(JSON.stringify(saved));
+    await waitFor(() => expect(pendingDesignDraft(state.job!.id, saved)).toBeNull());
+  });
+
+  it('requires recovery when another view changed the source before reload', async () => {
+    const saved = state.job!.design!.draft;
+    const latest = { ...saved, name: 'Unsaved local edit' };
+    keepPendingDesignDraft(state.job!.id, saved, latest);
+    state.job = { ...state.job!, design: { ...state.job!.design!, draft: { ...saved, name: 'Changed elsewhere' } } };
+    open();
+    expect(JSON.parse(screen.getByTestId('editor-document').textContent!)).toEqual(latest);
+    expect(screen.getByRole('button', { name: 'Save sketch copy' })).toBeTruthy();
+    expect(state.save).not.toHaveBeenCalled();
+    expect(cadSession(state.job!.design!.draft).saved).toEqual(saved);
+  });
   it.each(['boards', 'plan', 'machine'] as const)('Finish and Cancel preserve the %s context and board', async returnTo => {
     state.search = { returnTo, board: 'board-b', part: state.job!.design!.draft.parts[0].id };
     open();
