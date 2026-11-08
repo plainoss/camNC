@@ -3,8 +3,8 @@ import { CamPage } from '@/cam/CamPage';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { NumberInput } from '@/cam/NumberInput';
 import { LetteringFontPicker } from '@/cam/LetteringFontPicker';
-import { carvingProblem, kVBits, type CarvingArt, type CarvingV1 } from '@/cam/carving';
-import { outlineArt, placeRegion } from '@/cam/carvingOutline';
+import { carvingProblem, itemName, kVBits, placeItem, withItems, type CarvingArt, type CarvingItemV1, type CarvingV1 } from '@/cam/carving';
+import { outlineArt } from '@/cam/carvingOutline';
 import { useCamJob, useSaveCamJob } from '@/cam/camQueries';
 import type { BoardV1 } from '@/cam/boards';
 import type { CamJobV1 } from '@/cam/jobDb';
@@ -15,7 +15,7 @@ import { Button } from '@wbcnc/ui/components/button';
 import { Input } from '@wbcnc/ui/components/input';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { cn } from '@wbcnc/ui/lib/utils';
-import { AlertTriangle, ListOrdered } from 'lucide-react';
+import { AlertTriangle, Image, ListOrdered, Trash2, Type } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/carve')({ component: CarveStep });
@@ -50,7 +50,7 @@ function CarveStep() {
   if (isPending) return <Shell loading="Opening the carving…" />;
   if (!job) return <Shell message="This job doesn't exist (any more)." />;
   if (!job.carving) return <Shell message="This job is not a carving." />;
-  return <CarveEditor job={job} carving={job.carving} board={job.boards?.[0]} />;
+  return <CarveEditor key={job.id} job={job} carving={job.carving} board={job.boards?.[0]} />;
 }
 
 function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV1; board?: BoardV1 }) {
@@ -60,48 +60,152 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const [resized, setResized] = useState<{ w: number; h: number; from: { w: number; h: number } } | null>(null);
   const size = resized ? { w: resized.w, h: resized.h } : saved;
   const thickness = board?.thickness ?? 18;
-  // While dragging, the moved artwork is shown before it's saved.
-  const [dragged, setDragged] = useState<{ x: number; y: number; height: number } | null>(null);
-  const [outlining, setOutlining] = useState(false);
-  const [pendingArt, setPendingArt] = useState<CarvingArt | null>(null);
-  const [artReset, setArtReset] = useState(0);
-  const art = pendingArt ?? carving.art;
-  const [error, setError] = useState<string | null>(null);
-  const shown = dragged ?? carving;
-  const region = dragged
-    ? carving.region.map(loop =>
-        loop.map(p => ({
-          x: shown.x + ((p.x - carving.x) * shown.height) / carving.height,
-          y: shown.y + ((p.y - carving.y) * shown.height) / carving.height,
-        }))
-      )
-    : carving.region;
+  const [selectedId, setSelectedId] = useState<string | null>(carving.items[0]?.id ?? null);
+  // While dragging, the item is shown before it's saved.
+  const [dragged, setDragged] = useState<CarvingItemV1 | null>(null);
+  const [pending, setPending] = useState<Record<string, Pick<CarvingItemV1, 'art' | 'height'>>>({});
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  const [adding, setAdding] = useState(0);
+  const [artResets, setArtResets] = useState<Record<string, number>>({});
+  const selected = carving.items.find(item => item.id === selectedId);
+  const editing = selected && { ...selected, ...pending[selected.id] };
+  const shown = dragged ?? selected;
+  const outlining = Object.keys(pending).length > 0 || adding > 0;
+  const lastFont = useRef(carving.items.findLast(item => item.art.kind === 'text')?.art);
+  const svgInput = useRef<HTMLInputElement>(null);
+  const replaceId = useRef<string | null>(null);
+  // The browser's file chooser can take a moment to appear, so the SVG button shows it is opening until the chooser closes.
+  const [choosing, setChoosing] = useState(false);
+  useEffect(() => {
+    if (!choosing) return;
+    const input = svgInput.current;
+    const done = () => setChoosing(false);
+    // Cancelling fires `cancel`; browsers without it return focus to the window when the chooser closes.
+    input?.addEventListener('cancel', done);
+    window.addEventListener('focus', done);
+    return () => {
+      input?.removeEventListener('cancel', done);
+      window.removeEventListener('focus', done);
+    };
+  }, [choosing]);
+  const chooseSvg = (replace: string | null) => {
+    replaceId.current = replace;
+    setChoosing(true);
+    svgInput.current?.click();
+  };
+  const outlineRuns = useRef(new Map<string, number>());
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const saveCarving = (next: CarvingV1, boards = job.boards) => save.mutate({ ...job, carving: next, boards });
-  // Outlines are drawn again whenever the artwork or its size changes; the latest request wins.
-  const outlineRun = useRef(0);
-  const redraw = async (next: Omit<CarvingV1, 'region'>) => {
-    const run = ++outlineRun.current;
-    setPendingArt(next.art);
-    setOutlining(true);
+  const updateItem = (id: string, change: Partial<CarvingItemV1>) =>
+    save.mutateCurrent(current => {
+      if (!current.carving) return null;
+      return {
+        ...current,
+        carving: withItems(
+          current.carving,
+          current.carving.items.map(item => (item.id === id ? { ...item, ...change } : item))
+        ),
+      };
+    });
+  // Only artwork and height need new outlines. Each item's latest request wins, keeping later moves and other items.
+  const redraw = async (next: CarvingItemV1) => {
+    const run = (outlineRuns.current.get(next.id) ?? 0) + 1;
+    outlineRuns.current.set(next.id, run);
+    setPending(pending => ({ ...pending, [next.id]: { art: next.art, height: next.height } }));
     try {
       const { region } = await outlineArt(next.art, next.height);
-      if (run !== outlineRun.current) return;
-      setError(null);
-      saveCarving({ ...next, region: placeRegion(region, next.x, next.y) });
-      setPendingArt(null);
+      if (!mounted.current || run !== outlineRuns.current.get(next.id)) return;
+      setErrors(errors => ({ ...errors, [next.id]: undefined }));
+      updateItem(next.id, { art: next.art, height: next.height, outline: region });
+      if (next.art.kind === 'text') lastFont.current = next.art;
     } catch (e) {
-      if (run === outlineRun.current) {
-        setError(e instanceof Error ? e.message : String(e));
-        setPendingArt(null);
-        // Discard draft text too, without replaying its debounce against the saved font.
-        setArtReset(reset => reset + 1);
-      }
+      if (!mounted.current || run !== outlineRuns.current.get(next.id)) return;
+      setErrors(errors => ({ ...errors, [next.id]: e instanceof Error ? e.message : String(e) }));
+      // Discard draft text too, without replaying its debounce against the saved font.
+      setArtResets(resets => ({ ...resets, [next.id]: (resets[next.id] ?? 0) + 1 }));
     } finally {
-      if (run === outlineRun.current) setOutlining(false);
+      if (mounted.current && run === outlineRuns.current.get(next.id))
+        setPending(pending => {
+          const rest = { ...pending };
+          delete rest[next.id];
+          return rest;
+        });
     }
   };
-  const setArt = (art: CarvingArt) => void redraw({ ...carving, art });
+  // New items are outlined before they're added, so a file that can't be read adds nothing.
+  const addItem = async (art: CarvingArt) => {
+    const height = art.kind === 'text' ? 20 : Math.min(40, size.h);
+    setAdding(n => n + 1);
+    try {
+      const { region } = await outlineArt(art, height);
+      if (!mounted.current) return;
+      setErrors(errors => ({ ...errors, adding: undefined }));
+      const id = crypto.randomUUID();
+      save.mutateCurrent(current => {
+        if (!current.carving) return null;
+        const item: CarvingItemV1 = { id, art, height, ...freeSpot(current.carving.items, region, size), rotation: 0, outline: region };
+        return { ...current, carving: withItems(current.carving, [...current.carving.items, item]) };
+      });
+      setSelectedId(id);
+      if (art.kind === 'text') lastFont.current = art;
+    } catch (e) {
+      if (mounted.current) setErrors(errors => ({ ...errors, adding: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      if (mounted.current) setAdding(n => n - 1);
+    }
+  };
+  const deleteItem = (id: string) => {
+    outlineRuns.current.set(id, (outlineRuns.current.get(id) ?? 0) + 1);
+    setPending(pending => {
+      const rest = { ...pending };
+      delete rest[id];
+      return rest;
+    });
+    setErrors(errors => {
+      const rest = { ...errors };
+      delete rest[id];
+      return rest;
+    });
+    if (selectedId === id) setSelectedId(null);
+    drag.current = null;
+    setDragged(null);
+    save.mutateCurrent(current =>
+      !current.carving
+        ? null
+        : {
+            ...current,
+            carving: withItems(
+              current.carving,
+              current.carving.items.filter(item => item.id !== id)
+            ),
+          }
+    );
+  };
+  useEffect(() => {
+    const keydown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedId(null);
+        drag.current = null;
+        setDragged(null);
+      }
+      const target = e.target;
+      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"]'))
+        return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+        e.preventDefault();
+        deleteItem(selectedId);
+      }
+    };
+    window.addEventListener('keydown', keydown);
+    return () => window.removeEventListener('keydown', keydown);
+  });
   const setBoard = (change: Partial<{ w: number; h: number; thickness: number; taped: boolean }>) => {
     if (!board) return;
     const w = change.w ?? size.w,
@@ -112,14 +216,16 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
       thickness: change.thickness ?? board.thickness,
       ...(change.taped !== undefined && { taped: change.taped }),
     };
-    const moved = { ...carving, x: Math.min(carving.x, w), y: Math.min(carving.y, h) };
     saveCarving(
-      { ...moved, region: carving.region.map(loop => loop.map(p => ({ x: p.x + moved.x - carving.x, y: p.y + moved.y - carving.y }))) },
+      withItems(
+        carving,
+        carving.items.map(item => ({ ...item, x: Math.min(item.x, w), y: Math.min(item.y, h) }))
+      ),
       [next, ...(job.boards ?? []).slice(1)]
     );
   };
 
-  // Drag the artwork to move it, its corner to size it.
+  // Drag an item to move it, its corner to size it, or the handle above it to rotate it.
   const svg = useRef<SVGSVGElement>(null);
   const toMm = (e: { clientX: number; clientY: number }) => {
     const m = svg.current?.getScreenCTM();
@@ -127,32 +233,53 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
     return { x: p.x, y: size.h - p.y };
   };
-  const drag = useRef<{ mode: 'move' | 'size'; from: { x: number; y: number } } | null>(null);
-  const box = bounds(region);
-  const start = (mode: 'move' | 'size') => (e: ReactPointerEvent) => {
+  const drag = useRef<{
+    mode: 'move' | 'size' | 'rotate';
+    from: { x: number; y: number };
+    item: CarvingItemV1;
+    preview: CarvingItemV1;
+    pointerId: number;
+  } | null>(null);
+  const box = shown && bounds(shown.outline);
+  const start = (mode: 'move' | 'size' | 'rotate', item: CarvingItemV1) => (e: ReactPointerEvent) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    (e.target as Element).setPointerCapture(e.pointerId);
-    drag.current = { mode, from: toMm(e) };
-    setDragged({ x: carving.x, y: carving.y, height: carving.height });
+    svg.current?.focus();
+    svg.current?.setPointerCapture(e.pointerId);
+    setSelectedId(item.id);
+    drag.current = { mode, from: toMm(e), item, preview: item, pointerId: e.pointerId };
+    setDragged(item);
   };
   const move = (e: ReactPointerEvent) => {
     if (moveResize(e)) return;
     const d = drag.current;
-    if (!d) return;
-    const at = toMm(e);
+    if (!d || e.pointerId !== d.pointerId) return;
+    const at = toMm(e),
+      item = d.item;
+    let preview = item;
     if (d.mode === 'move')
-      setDragged({
-        x: Math.max(0, Math.min(size.w, carving.x + at.x - d.from.x)),
-        y: Math.max(0, Math.min(size.h, carving.y + at.y - d.from.y)),
-        height: carving.height,
-      });
-    else {
-      // The corner moves away from the centre: the artwork grows as much as the corner's farther axis.
-      const was = Math.max(Math.abs(d.from.x - carving.x), 1),
-        now = Math.max(Math.abs(at.x - carving.x), 1);
-      setDragged({ x: carving.x, y: carving.y, height: Math.max(5, Math.min(size.h, Math.round(carving.height * (now / was)))) });
+      preview = {
+        ...item,
+        x: Math.max(0, Math.min(size.w, item.x + at.x - d.from.x)),
+        y: Math.max(0, Math.min(size.h, item.y + at.y - d.from.y)),
+      };
+    else if (d.mode === 'size') {
+      const was = Math.max(Math.hypot(d.from.x - item.x, d.from.y - item.y), 1);
+      const now = Math.hypot(at.x - item.x, at.y - item.y);
+      const height = Math.max(5, Math.min(size.h, Math.round((item.height * now) / was)));
+      preview = {
+        ...item,
+        height,
+        outline: item.outline.map(loop => loop.map(p => ({ x: (p.x * height) / item.height, y: (p.y * height) / item.height }))),
+      };
+    } else {
+      const angle =
+        item.rotation + ((Math.atan2(at.y - item.y, at.x - item.x) - Math.atan2(d.from.y - item.y, d.from.x - item.x)) * 180) / Math.PI;
+      preview = { ...item, rotation: rotationOf(e.shiftKey ? angle : Math.round(angle / 15) * 15) };
     }
+    d.preview = preview;
+    setDragged(preview);
   };
   // Drag the board's right or top edge, or the corner between them, to size it: XY zero, lower left, stays.
   const resize = useRef<{ grip: BoardGrip; x: number; y: number; pxPerMm: number; from: { w: number; h: number } } | null>(null);
@@ -189,24 +316,27 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     if (endResize()) return;
     const d = drag.current;
     drag.current = null;
-    if (!d || !dragged) return setDragged(null);
-    if (d.mode === 'move') {
-      const dx = dragged.x - carving.x,
-        dy = dragged.y - carving.y;
-      saveCarving({
-        ...carving,
-        x: dragged.x,
-        y: dragged.y,
-        region: carving.region.map(loop => loop.map(p => ({ x: p.x + dx, y: p.y + dy }))),
-      });
-    } else if (dragged.height !== carving.height) void redraw({ ...carving, art, height: dragged.height });
+    setDragged(null);
+    if (!d) return;
+    if (d.mode === 'size') {
+      if (d.preview.height !== d.item.height) void redraw({ ...d.item, ...pending[d.item.id], height: d.preview.height });
+    } else if (d.preview !== d.item) updateItem(d.item.id, { x: d.preview.x, y: d.preview.y, rotation: d.preview.rotation });
+  };
+  const cancel = () => {
+    resize.current = null;
+    setResized(null);
+    drag.current = null;
     setDragged(null);
   };
-
+  const region = carving.items.flatMap(item => placeItem(dragged?.id === item.id ? dragged : item));
+  const allBox = bounds(region);
+  // A file that couldn't be added is reported, but doesn't stop the items already there from being planned.
+  const { adding: addError, ...itemErrors } = errors;
+  const error = Object.values(itemErrors).find(Boolean);
   const problem = error ?? (board ? carvingProblem(carving, board) : 'This carving has no board.');
   const cone = vConeDepth(carving.vBit);
   const flatBit = (job.plan ?? kDefaultPlan).bit;
-  const off = box && (box.x0 < 0 || box.y0 < 0 || box.x1 > size.w || box.y1 > size.h);
+  const off = allBox && (allBox.x0 < 0 || allBox.y0 < 0 || allBox.x1 > size.w || allBox.y1 > size.h);
   // While resizing, the view holds still around the lower left corner; it fits the board again once dropped.
   const frame = resized?.from ?? size;
   const pad = Math.max(frame.w, frame.h) * 0.06;
@@ -229,12 +359,15 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
           <svg
             ref={svg}
             role="img"
+            tabIndex={0}
             aria-label={`Board ${size.w} × ${size.h} mm with the carving`}
             className="absolute inset-0 h-full w-full touch-none overflow-visible select-none"
             viewBox={`${-pad} ${-pad + size.h - frame.h} ${frame.w + 2 * pad} ${frame.h + 2 * pad}`}
+            onPointerDown={() => setSelectedId(null)}
             onPointerMove={move}
             onPointerUp={end}
-            onPointerCancel={end}>
+            onPointerCancel={cancel}
+            onLostPointerCapture={cancel}>
             <rect
               x={0}
               y={0}
@@ -269,36 +402,52 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 />
               </g>
             )}
-            <path
-              d={pathOf(region, size.h)}
-              data-testid="carving-outline"
-              className="cursor-move fill-amber-800 stroke-amber-950 dark:fill-amber-500"
-              strokeWidth={0.15}
-              fillRule="nonzero"
-              onPointerDown={start('move')}
-            />
-            {box && (
-              <g>
+            {carving.items.map(item => (
+              <path
+                key={item.id}
+                d={pathOf(placeItem(dragged?.id === item.id ? dragged : item), size.h)}
+                data-testid="carving-item"
+                aria-label={itemName(item)}
+                className="cursor-move fill-amber-800 stroke-amber-950 dark:fill-amber-500"
+                strokeWidth={0.15}
+                fillRule="nonzero"
+                onPointerDown={start('move', item)}
+              />
+            ))}
+            {box && shown && (
+              <g transform={`translate(${shown.x} ${size.h - shown.y}) rotate(${-shown.rotation})`}>
                 <rect
                   x={box.x0}
-                  y={size.h - box.y1}
+                  y={-box.y1}
                   width={box.x1 - box.x0}
                   height={box.y1 - box.y0}
-                  className="pointer-events-none fill-none stroke-primary"
+                  // The frame drags the selected item too, even where another item lies over it.
+                  className="cursor-move fill-transparent stroke-primary"
                   strokeWidth={0.4}
                   strokeDasharray="2 1.5"
+                  onPointerDown={start('move', shown)}
                 />
                 <rect
                   aria-label="Drag to resize"
                   x={box.x1 - 2.5}
-                  y={size.h - box.y0 - 2.5}
+                  y={-box.y0 - 2.5}
                   width={5}
                   height={5}
                   className="cursor-nwse-resize fill-background stroke-primary"
                   strokeWidth={0.5}
-                  onPointerDown={start('size')}
+                  onPointerDown={start('size', shown)}
                 />
-                <text x={box.x0} y={size.h - box.y1 - 2} className="fill-primary text-[4px]">
+                <line x1={0} y1={-box.y1} x2={0} y2={-box.y1 - 8} className="pointer-events-none stroke-primary" strokeWidth={0.5} />
+                <circle
+                  aria-label="Drag to rotate"
+                  cx={0}
+                  cy={-box.y1 - 8}
+                  r={2.5}
+                  className="cursor-grab fill-background stroke-primary"
+                  strokeWidth={0.5}
+                  onPointerDown={start('rotate', shown)}
+                />
+                <text x={box.x0} y={-box.y1 - 2} className="pointer-events-none fill-primary text-[4px]">
                   {(box.x1 - box.x0).toFixed(0)} × {(box.y1 - box.y0).toFixed(0)} mm
                 </text>
               </g>
@@ -353,30 +502,115 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
           )}
         </div>
         <aside className="flex w-full shrink-0 flex-col gap-4 overflow-auto border-l p-4 text-sm md:w-80">
-          <ArtFields key={artReset} art={art} onArt={setArt} />
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Height (mm)" id="carve-height">
-              <NumberInput
-                id="carve-height"
-                value={carving.height}
-                min={5}
-                max={size.h}
-                unit="mm"
-                onCommit={height => void redraw({ ...carving, art, height })}
+          <div className="grid gap-2">
+            <h3 className="font-medium">Add</h3>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void addItem({ kind: 'text', text: 'Text', font: lastFont.current?.kind === 'text' ? lastFont.current.font : 'serif' })
+                }>
+                <Type /> Text
+              </Button>
+              <Button variant="outline" size="sm" aria-busy={choosing} onClick={() => chooseSvg(null)}>
+                {choosing ? <LoadingSpinner className="size-4" aria-label="Opening file chooser" /> : <Image />} SVG
+              </Button>
+            </div>
+            <div className="sr-only">
+              <label htmlFor="carve-svg">SVG file</label>
+              <input
+                id="carve-svg"
+                ref={svgInput}
+                tabIndex={-1}
+                type="file"
+                accept=".svg,image/svg+xml"
+                onChange={e => {
+                  const file = e.target.files?.[0],
+                    id = replaceId.current;
+                  const replacing = carving.items.find(item => item.id === id);
+                  if (!file) setChoosing(false);
+                  else
+                    void file
+                      .text()
+                      .then(svg => {
+                        const art: CarvingArt = { kind: 'svg', svg, fileName: file.name };
+                        if (replacing) void redraw({ ...replacing, ...pending[replacing.id], art });
+                        else void addItem(art);
+                      })
+                      .finally(() => setChoosing(false));
+                  // Choosing the same file again still counts.
+                  e.target.value = '';
+                }}
               />
-            </Field>
-            <Field label="Deepest (mm)" id="carve-depth">
-              <NumberInput
-                id="carve-depth"
-                value={carving.maxDepth}
-                min={0.2}
-                max={thickness - 1}
-                minExclusive
-                unit="mm"
-                onCommit={maxDepth => saveCarving({ ...carving, maxDepth })}
-              />
-            </Field>
+            </div>
           </div>
+          <ul aria-label="Items" className="grid gap-1">
+            {carving.items.map(item => (
+              <li key={item.id} className={cn('flex items-center rounded-md', selectedId === item.id && 'bg-muted')}>
+                <button
+                  className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left"
+                  aria-pressed={selectedId === item.id}
+                  onClick={() => setSelectedId(item.id)}>
+                  {item.art.kind === 'text' ? <Type className="size-4 shrink-0" /> : <Image className="size-4 shrink-0" />}
+                  <span className="truncate">{itemName(item)}</span>
+                </button>
+                <Button variant="ghost" size="icon" aria-label={`Delete ${itemName(item)}`} onClick={() => deleteItem(item.id)}>
+                  <Trash2 />
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {editing ? (
+            <div key={editing.id} className="grid gap-4">
+              <ArtFields
+                key={artResets[editing.id] ?? 0}
+                art={editing.art}
+                onArt={art => {
+                  if (art.kind === 'text') lastFont.current = art;
+                  void redraw({ ...editing, art });
+                }}
+                onReplace={() => chooseSvg(editing.id)}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Height (mm)" id="carve-height">
+                  <NumberInput
+                    id="carve-height"
+                    value={editing.height}
+                    min={5}
+                    max={size.h}
+                    unit="mm"
+                    onCommit={height => void redraw({ ...editing, height })}
+                  />
+                </Field>
+                <Field label="Rotation (°)" id="carve-rotation">
+                  <NumberInput
+                    id="carve-rotation"
+                    value={editing.rotation}
+                    unit="°"
+                    onCommit={rotation => updateItem(editing.id, { rotation: rotationOf(rotation) })}
+                  />
+                </Field>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => updateItem(editing.id, centred(editing, size))}>
+                Centre on the board
+              </Button>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">Select an item on the board to edit it, or add one.</p>
+          )}
+          <hr />
+          <Field label="Deepest (mm)" id="carve-depth">
+            <NumberInput
+              id="carve-depth"
+              value={carving.maxDepth}
+              min={0.2}
+              max={thickness - 1}
+              minExclusive
+              unit="mm"
+              onCommit={maxDepth => saveCarving({ ...carving, maxDepth })}
+            />
+          </Field>
           <Field label="V-bit" id="carve-bit">
             <select
               id="carve-bit"
@@ -407,9 +641,6 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               <span className="block text-xs text-muted-foreground">Otherwise the V-bit clears them: one bit, slower.</span>
             </span>
           </label>
-          <Button variant="outline" size="sm" onClick={() => saveCarving({ ...carving, ...centred(carving, size) })}>
-            Centre on the board
-          </Button>
           <hr />
           <h3 className="font-medium">Board</h3>
           <div className="grid grid-cols-3 gap-2">
@@ -429,10 +660,10 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
           <p className="text-xs text-muted-foreground">
             Measure the board&rsquo;s thickness: Z0 is its underside, so a thicker board carves deeper and wider.
           </p>
-          {(problem || off) && (
+          {(problem || off || addError) && (
             <p role="alert" className="flex gap-2 text-amber-600">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              {problem ?? 'The artwork reaches past the board: move it or make it smaller.'}
+              {problem ?? addError ?? 'The artwork reaches past the board: move it or make it smaller.'}
             </p>
           )}
         </aside>
@@ -441,95 +672,57 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   );
 }
 
-const centred = (carving: CarvingV1, size: { w: number; h: number }) => {
-  const box = bounds(carving.region);
-  if (!box) return {};
-  const dx = size.w / 2 - (box.x0 + box.x1) / 2,
-    dy = size.h / 2 - (box.y0 + box.y1) / 2;
-  return { x: carving.x + dx, y: carving.y + dy, region: carving.region.map(loop => loop.map(p => ({ x: p.x + dx, y: p.y + dy }))) };
+const rotationOf = (degrees: number) => ((degrees % 360) + 360) % 360;
+
+/**
+ * Where a new item goes: the board's centre, or the nearest place straight above or below it, in 5 mm steps, where it
+ * stays on the board and clear of the items already there. The centre when there's no such place.
+ */
+function freeSpot(items: CarvingItemV1[], outline: Loop[], size: { w: number; h: number }) {
+  const x = size.w / 2;
+  const own = bounds(outline);
+  if (!own) return { x, y: size.h / 2 };
+  const taken = items.map(item => bounds(placeItem(item))).filter(box => !!box);
+  const gap = 2;
+  const fits = (y: number) => {
+    const box = { x0: x + own.x0, x1: x + own.x1, y0: y + own.y0, y1: y + own.y1 };
+    if (box.y0 < 0 || box.y1 > size.h) return false;
+    return taken.every(t => box.x1 + gap <= t.x0 || t.x1 + gap <= box.x0 || box.y1 + gap <= t.y0 || t.y1 + gap <= box.y0);
+  };
+  for (let d = 0; d <= size.h / 2; d += 5) for (const y of [size.h / 2 - d, size.h / 2 + d]) if (fits(y)) return { x, y };
+  return { x, y: size.h / 2 };
+}
+
+const centred = (item: CarvingItemV1, size: { w: number; h: number }) => {
+  const box = bounds(placeItem(item));
+  if (!box) return { x: size.w / 2, y: size.h / 2 };
+  return { x: item.x + size.w / 2 - (box.x0 + box.x1) / 2, y: item.y + size.h / 2 - (box.y0 + box.y1) / 2 };
 };
 
-function ArtFields({ art, onArt }: { art: CarvingArt; onArt: (art: CarvingArt) => void }) {
-  const svgInput = useRef<HTMLInputElement>(null);
-  // The browser's file chooser can take a moment to appear, so the SVG tab shows it is opening until the chooser closes.
-  const [choosing, setChoosing] = useState(false);
-  useEffect(() => {
-    if (!choosing) return;
-    const input = svgInput.current;
-    const done = () => setChoosing(false);
-    // Cancelling fires `cancel`; browsers without it return focus to the window when the chooser closes.
-    input?.addEventListener('cancel', done);
-    window.addEventListener('focus', done);
-    return () => {
-      input?.removeEventListener('cancel', done);
-      window.removeEventListener('focus', done);
-    };
-  }, [choosing]);
-  const [text, setText] = useState(art.kind === 'text' ? art.text : 'Welcome');
+function ArtFields({ art, onArt, onReplace }: { art: CarvingArt; onArt: (art: CarvingArt) => void; onReplace: () => void }) {
+  const [text, setText] = useState(art.kind === 'text' ? art.text : '');
   // Typing outlines again once it pauses.
   useEffect(() => {
     if (art.kind !== 'text' || text === art.text) return;
     const t = setTimeout(() => onArt({ ...art, text }), 300);
     return () => clearTimeout(t);
   }, [text, art, onArt]);
-  const font = art.kind === 'text' ? art.font : 'serif';
-  return (
+  return art.kind === 'text' ? (
     <>
-      <div role="tablist" className="inline-flex self-start rounded-md bg-muted p-0.5">
-        {(['text', 'svg'] as const).map(kind => (
-          <button
-            key={kind}
-            role="tab"
-            aria-selected={art.kind === kind}
-            aria-busy={kind === 'svg' && choosing}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded px-3 py-1 transition-colors hover:text-foreground active:bg-background/60',
-              art.kind === kind ? 'bg-background shadow-sm' : kind === 'svg' && choosing ? 'text-foreground' : 'text-muted-foreground'
-            )}
-            onClick={() => {
-              if (kind === art.kind) return;
-              if (kind === 'text') onArt({ kind: 'text', text, font });
-              else {
-                setChoosing(true);
-                svgInput.current?.click();
-              }
-            }}>
-            {kind === 'svg' && choosing && <LoadingSpinner className="size-3" aria-label="Opening file chooser" />}
-            {kind === 'text' ? 'Lettering' : 'SVG'}
-          </button>
-        ))}
-      </div>
-      {art.kind === 'text' ? (
-        <>
-          <Field label="Text" id="carve-text">
-            <Input id="carve-text" value={text} maxLength={60} onChange={e => setText(e.target.value)} />
-          </Field>
-          <Field label="Font" id="carve-font">
-            <LetteringFontPicker font={font} onChange={font => onArt({ ...art, text, font })} />
-          </Field>
-        </>
-      ) : (
-        <p className="text-muted-foreground">{art.fileName}</p>
-      )}
-      <Field label={art.kind === 'svg' ? 'Another SVG' : 'Or an SVG file'} id="carve-svg">
-        <Input
-          id="carve-svg"
-          ref={svgInput}
-          type="file"
-          accept=".svg,image/svg+xml"
-          onChange={e => {
-            const file = e.target.files?.[0];
-            if (!file) return setChoosing(false);
-            void file
-              .text()
-              .then(svg => onArt({ kind: 'svg', svg, fileName: file.name }))
-              .finally(() => setChoosing(false));
-            // Choosing the same file again still counts.
-            e.target.value = '';
-          }}
-        />
+      <Field label="Text" id="carve-text">
+        <Input id="carve-text" value={text} maxLength={60} onChange={e => setText(e.target.value)} />
+      </Field>
+      <Field label="Font" id="carve-font">
+        <LetteringFontPicker font={art.font} onChange={font => onArt({ ...art, text, font })} />
       </Field>
     </>
+  ) : (
+    <div className="grid gap-2">
+      <p className="text-muted-foreground">{art.fileName}</p>
+      <Button variant="outline" size="sm" onClick={onReplace}>
+        Replace SVG
+      </Button>
+    </div>
   );
 }
 

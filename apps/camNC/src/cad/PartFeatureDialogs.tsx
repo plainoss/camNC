@@ -56,16 +56,18 @@ export function ExtrudeDialog({
         return next;
       })
     );
+  /** Takes the typed depth, or says why not. Whether it was taken. */
   const applyDepth = () => {
     const parsed = parseCadValue(depthText, { unit: 'mm', variables });
-    if ('error' in parsed) return setDepthError(parsed.error);
-    if (parsed.value <= 0) return setDepthError('A thin board needs some depth.');
-    setDepthError(null);
+    const refused = 'error' in parsed ? parsed.error : parsed.value <= 0 ? 'A thin board needs some depth.' : null;
+    setDepthError(refused);
+    if ('error' in parsed || refused) return false;
     setThin({
       ...part.thin,
       depth: parsed.value,
       ...(parsed.expression ? { depthExpression: parsed.expression } : { depthExpression: undefined }),
     });
+    return true;
   };
   return (
     <FeatureDialog title={`Extrude · ${part.name}`} okDisabled={!thicknessValid || !!depthError} onOk={onOk} onCancel={onCancel}>
@@ -124,7 +126,11 @@ export function ExtrudeDialog({
                 onChange={event => setDepthText(event.target.value)}
                 onBlur={applyDepth}
                 onKeyDown={event => {
-                  if (event.key === 'Enter') applyDepth();
+                  // A depth that isn't taken keeps the dialog open to fix it, rather than Enter keeping the old one.
+                  if (event.key === 'Enter' && !applyDepth()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }
                 }}
               />
             </span>

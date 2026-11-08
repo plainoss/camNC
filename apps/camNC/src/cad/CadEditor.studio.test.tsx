@@ -338,6 +338,21 @@ it('makes a variable from `#name = value` in a field and uses it there, and list
   expect(thickness).toHaveProperty('value', '#board');
 });
 
+it('keeps a value typed as `#name = value` when the tick is clicked straight after', async () => {
+  const { latest } = await studio();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
+  await userEvent.clear(thickness);
+  await userEvent.type(thickness, '#board = 19 mm');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull());
+  expect(latest().variables?.map(variable => variable.name)).toEqual(['board']);
+  expect(latest().parts[0]!.thickness).toBe(19);
+  expect(latest().parts[0]!.thicknessExpression).toMatch(/board/);
+});
+
 it('closes a one-line sketch as a thin board, set in the Extrude dialog’s Thin tab', async () => {
   const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
   side.drawnOn = { on: { plane: 'right' as const }, offset: 0 };
@@ -361,6 +376,12 @@ it('closes a one-line sketch as a thin board, set in the Extrude dialog’s Thin
   const extrude = await screen.findByRole('dialog', { name: 'Extrude · Back' });
   expect(within(extrude).getByRole('tab', { name: 'Thin' }).getAttribute('aria-selected')).toBe('true');
   const depth = within(extrude).getByRole('textbox', { name: 'Depth' });
+  // A depth that can't be taken keeps the dialog open to fix it.
+  await userEvent.clear(depth);
+  await userEvent.type(depth, '0{Enter}');
+  expect(await within(extrude).findByRole('alert')).toBeDefined();
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  expect(screen.getByRole('dialog', { name: 'Extrude · Back' })).toBe(extrude);
   await userEvent.clear(depth);
   await userEvent.type(depth, '380{Enter}');
   await waitFor(() => expect(latest().parts[1]!.thin).toEqual({ depth: 380, midPlane: true }));

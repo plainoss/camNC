@@ -1,5 +1,6 @@
 import type { CamJobV1 } from './jobDb';
 import { physicalSheetIdOf } from './boards';
+import { withItems, type CarvingV1 } from './carving';
 
 const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
 
@@ -53,6 +54,26 @@ function rebaseBoards(base: Boards, next: Boards, current: Boards): Boards {
   return [...kept, ...next.filter(b => !inBase.has(b.id) && !known.has(b.id))];
 }
 
+/** Merge independent item edits without restoring an item deleted by another save. */
+function rebaseCarving(base: CarvingV1, next: CarvingV1, current: CarvingV1): CarvingV1 {
+  const before = new Map(base.items.map(item => [item.id, item]));
+  const after = new Map(next.items.map(item => [item.id, item]));
+  const items = current.items.flatMap(item => {
+    const was = before.get(item.id),
+      now = after.get(item.id);
+    if (was && !now) return [];
+    if (!was || !now) return [item];
+    const merged = rebaseFields(was, now, item);
+    // The outline is drawn from the art at its height: keep the three together.
+    if (!same(was.art, now.art) || was.height !== now.height || !same(was.outline, now.outline))
+      Object.assign(merged, { art: now.art, height: now.height, outline: now.outline });
+    return [merged];
+  });
+  const known = new Set(current.items.map(item => item.id));
+  items.push(...next.items.filter(item => !before.has(item.id) && !known.has(item.id)));
+  return withItems(rebaseFields(base, next, current), items);
+}
+
 /**
  * A save is built from the job as last rendered (`base`), but another save may have come after that render (a drop, then
  * the blur of a size field, before React renders again). Saved as it is, `next` would undo that one. This applies only what
@@ -67,5 +88,7 @@ export function rebaseJob(base: CamJobV1, next: CamJobV1, current: CamJobV1): Ca
   const boards = same(baseBoards, nextBoards)
     ? currentBoards
     : nextBoards && rebaseBoards(baseBoards ?? [], nextBoards, currentBoards ?? []);
+  if (base.carving && next.carving && current.carving && !same(base.carving, next.carving))
+    rest.carving = rebaseCarving(base.carving, next.carving, current.carving);
   return { ...rest, ...(boards && { boards }) } as CamJobV1;
 }

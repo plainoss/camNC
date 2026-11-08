@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { fieldsSettled } from './variableFields';
 import './featureDialog.css';
 
 /**
@@ -26,6 +27,14 @@ export function FeatureDialog({
   children: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
+  // As of the latest render: a field's Enter may have just found its value wrong, which shows a frame later.
+  const latest = useRef({ okDisabled, onOk });
+  latest.current = { okDisabled, onOk };
+  /** Keeps the step once its fields have applied what was typed, such as a variable made in one on leaving it. */
+  const ok = () =>
+    void fieldsSettled().then(() => {
+      if (!latest.current.okDisabled) latest.current.onOk();
+    });
   // Opening it puts the keyboard in its first field, as a dialog should.
   useEffect(() => {
     if (autoFocus) frame.current?.querySelector<HTMLElement>('input, select, button:not(.cad-feature-dialog-head button)')?.focus();
@@ -48,12 +57,12 @@ export function FeatureDialog({
         if (typing || event.key === 'Escape' || event.key === 'Enter') event.stopPropagation();
         if (event.key === 'Escape') onCancel();
         // A field applies its value on Enter first, then the dialog is done.
-        else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox' && !okDisabled)
-          requestAnimationFrame(onOk);
+        else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox')
+          requestAnimationFrame(ok);
       }}>
       <div className="cad-feature-dialog-head">
         <h3>{title}</h3>
-        <button type="button" className="cad-feature-ok" aria-label={okLabel} title={okLabel} disabled={okDisabled} onClick={onOk}>
+        <button type="button" className="cad-feature-ok" aria-label={okLabel} title={okLabel} disabled={okDisabled} onClick={ok}>
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M3 8.5 6.5 12 13 4.5" />
           </svg>

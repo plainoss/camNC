@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type Ref } from 'react';
 import { cadValueHasUnit } from './valueExpressions';
-import { useCadVariableFields, variableDefinition, variablePrefix } from './variableFields';
+import { settleField, useCadVariableFields, variableDefinition, variablePrefix } from './variableFields';
 
 type Props = ComponentPropsWithoutRef<'input'> & {
   inputRef?: Ref<HTMLInputElement>;
@@ -60,9 +60,21 @@ export function CadValueInput({
       mounted.current = false;
     };
   }, []);
-  /** Runs once the new variable is in scope: two frames on, and only while the field is still there. */
+  /**
+   * Runs once the new variable is in scope: two frames on, and only while the field is still there. A dialog the field
+   * is in waits for it before it's done.
+   */
   const later = (run: () => void) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => mounted.current && own.current?.isConnected && run()));
+    settleField(
+      new Promise(resolve =>
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            if (mounted.current && own.current?.isConnected) run();
+            resolve();
+          })
+        )
+      )
+    );
   const options = menu
     ? [
         ...(fields?.variables ?? []).filter(variable => variable.name.toLowerCase().startsWith(menu.typed.toLowerCase())),
