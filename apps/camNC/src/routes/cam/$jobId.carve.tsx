@@ -244,6 +244,31 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               className="fill-amber-200 stroke-amber-700 dark:fill-amber-900/60"
               strokeWidth={0.6}
             />
+            {/* The edges' grips, under the artwork, so a narrow board's edge never takes the artwork's drag. */}
+            {board && (
+              <g className="fill-transparent">
+                <rect
+                  role="presentation"
+                  data-resize="w"
+                  x={size.w - Math.min(grip, size.w / 4)}
+                  y={0}
+                  width={grip + Math.min(grip, size.w / 4)}
+                  height={size.h}
+                  className="cursor-ew-resize"
+                  onPointerDown={startResize('w')}
+                />
+                <rect
+                  role="presentation"
+                  data-resize="h"
+                  x={0}
+                  y={-grip}
+                  width={size.w}
+                  height={grip + Math.min(grip, size.h / 4)}
+                  className="cursor-ns-resize"
+                  onPointerDown={startResize('h')}
+                />
+              </g>
+            )}
             <path
               d={pathOf(region, size.h)}
               data-testid="carving-outline"
@@ -280,26 +305,6 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
             )}
             {board && (
               <g data-testid="board-resize" className="fill-background stroke-amber-700">
-                <rect
-                  role="presentation"
-                  data-resize="w"
-                  x={size.w - grip}
-                  y={0}
-                  width={2 * grip}
-                  height={size.h}
-                  className="cursor-ew-resize fill-transparent stroke-none"
-                  onPointerDown={startResize('w')}
-                />
-                <rect
-                  role="presentation"
-                  data-resize="h"
-                  x={0}
-                  y={-grip}
-                  width={size.w}
-                  height={2 * grip}
-                  className="cursor-ns-resize fill-transparent stroke-none"
-                  onPointerDown={startResize('h')}
-                />
                 <rect
                   className="pointer-events-none"
                   x={size.w - grip / 3}

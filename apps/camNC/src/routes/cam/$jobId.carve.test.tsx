@@ -1,4 +1,4 @@
-import { createCarvingJob, getJob } from '@/cam/jobDb';
+import { createCarvingJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { ensureWebFont, loadFontCatalog } from '@/cam/webFonts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -212,6 +212,32 @@ describe('the Carve step', () => {
     const right = svg.querySelector('[data-resize="w"]')!.getBoundingClientRect();
     const board = svg.querySelector('rect')!.getBoundingClientRect();
     expect(right.left + right.width / 2).toBeCloseTo(board.right, 0);
+  });
+
+  it('moves the artwork on a narrow board instead of sizing the board', async () => {
+    const job = await open();
+    const field = (id: string) => document.getElementById(id) as HTMLInputElement;
+    const type = async (id: string, value: string, saved: (job: CamJobV1 | null) => unknown) => {
+      fireEvent.change(field(id), { target: { value } });
+      fireEvent.blur(field(id));
+      await waitFor(async () => expect(saved(await getJob(job.id))).toBe(Number(value)));
+    };
+    // Each saved before the next, as a slower outline would save over a board size typed meanwhile.
+    await type('carve-height', '10', j => j?.carving?.height);
+    const board = (j: CamJobV1 | null) => {
+      const size = j?.boards?.[0].size;
+      return size?.fit === false ? size : null;
+    };
+    await type('carve-board-w', '1000', j => board(j)?.w);
+    await type('carve-board-h', '20', j => board(j)?.h);
+    const path = screen.getByTestId('carving-outline');
+    const grip = (g: string) => path.closest('svg')!.querySelector(`[data-resize="${g}"]`)!;
+    const attr = (el: Element, name: string) => Number(el.getAttribute(name));
+    // The edges' grips reach a quarter of the board inwards at most: the top one ends 5 mm below the top edge.
+    expect(attr(grip('h'), 'y') + attr(grip('h'), 'height')).toBeCloseTo(5);
+    expect(attr(grip('w'), 'x')).toBeCloseTo(1000 - 25);
+    // And lie under the artwork, which takes the drag where they meet.
+    for (const g of ['w', 'h']) expect(path.compareDocumentPosition(grip(g)) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
   it('warns when the depth is deeper than the V-bit’s cone', async () => {
