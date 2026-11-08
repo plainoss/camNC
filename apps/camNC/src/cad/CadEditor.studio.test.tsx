@@ -218,3 +218,13 @@ it('says why a variable in use can’t be deleted, and edits a variable from an 
   expect(await screen.findByRole('dialog', { name: '#a' })).toBeDefined();
   expect(screen.queryByRole('dialog', { name: 'Sketch · Plate' })).toBeNull();
 });
+
+it('closes an open variable dialog when another step is started', async () => {
+  await studio();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Variable/ }));
+  expect(screen.getByRole('dialog', { name: 'Variable' })).toBeDefined();
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  expect(await screen.findByRole('dialog', { name: 'Extrude · Plate' })).toBeDefined();
+  expect(screen.queryByRole('dialog', { name: 'Variable' })).toBeNull();
+});

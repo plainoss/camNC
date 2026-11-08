@@ -110,14 +110,14 @@ export function carryDesignTabs(
       // A mirrored copy is cut as a part of its own, the mirror image of its part across the sketch's y axis. Its tabs
       // follow that part's curves, mirrored.
       const sourceId = partId.split(':')[0]!,
-        mirrored = partId !== sourceId && partId === mirroredPartId(sourceId);
+        mirrored = partId.startsWith(mirroredPartId(sourceId));
       const flip = (p: CadPoint): CadPoint => (mirrored ? { x: -p.x, y: p.y } : p);
       const shape = (shapes: Map<string, EvaluatedCadPart>) => {
-        const found = shapes.get(mirrored ? sourceId : partId);
+        const found = shapes.get(sourceId);
         return found && mirrored ? mirrorEvaluatedPart(found) : found;
       };
-      const oldPart = oldParts.get(mirrored ? sourceId : partId),
-        nextPart = newParts.get(mirrored ? sourceId : partId);
+      const oldPart = oldParts.get(sourceId),
+        nextPart = newParts.get(sourceId);
       const oldShape = shape(oldShapes),
         nextShape = shape(newShapes);
       if (!oldPart || !nextPart || !oldShape || !nextShape) continue;

@@ -32,10 +32,18 @@ describe('CAM boards.settings step', () => {
   it('auto-fill optimizes for fewest boards unless the job says least wood', async () => {
     const job = await openKinderregal();
     showAll();
-    // Tabs only where they hold: no tab marked red on the drawings once the programs are made.
-    const tabs = () => document.querySelectorAll('line[class*="stroke-amber"]').length;
+    // Tabs on one board alone don't establish that both occupied boards are shown.
+    // Wait for the full summary before reading the result or changing the objective.
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Layout result' }).textContent).toMatch(/^2 boards, \d+ % yield$/), {
+      timeout: 60_000,
+    });
+    // Tabs only where they hold: check both programs, not just the first one to finish.
     const floating = () => [...document.querySelectorAll('circle > title')].filter(t => /this tab holds nothing/.test(t.textContent ?? ''));
-    await waitFor(() => expect(tabs()).toBeGreaterThan(0), { timeout: 60_000 });
+    for (const board of ['A', 'B']) {
+      await waitFor(() => expect(drawing(board).querySelectorAll('line[class*="stroke-amber"]').length).toBeGreaterThan(0), {
+        timeout: 60_000,
+      });
+    }
     expect(floating()).toHaveLength(0);
     const group = within(screen.getByRole('group', { name: 'Auto-fill optimizes for' }));
     expect(screen.getByText('Auto-fill prefers:')).toBeTruthy();

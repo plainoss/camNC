@@ -465,13 +465,18 @@ describe('CAM boards layout', () => {
     const job = await open();
     await suggestHolds();
     await waitFor(async () => expect((await saved(job.id)).fixtures?.length).toBeGreaterThanOrEqual(3), { timeout: 10_000 });
+    // Persistence can finish before the drawing reflects the suggested holds.
+    const count = (await saved(job.id)).fixtures!.length;
+    await waitFor(() => expect(drawing('Board A')!.querySelectorAll('[data-hold]')).toHaveLength(count), { timeout: 10_000 });
     const clamp = await waitFor(() => {
       const c = drawing('Board A')!.querySelector('[data-hold="clamp"]');
       expect(c).toBeTruthy();
       return c!;
     });
     fireEvent.contextMenu(clamp);
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Clamp and screw sizes…' }));
+    // The menu exists before its focus scope is ready. Wait for it to take focus before selecting its dialog action.
+    await waitFor(() => expect(screen.getByRole('menu').contains(document.activeElement)).toBe(true), { timeout: 10_000 });
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Clamp and screw sizes…' }));
     expect(await screen.findByRole('figure', { name: 'What the clamp sizes mean' }, { timeout: 10_000 })).toBeTruthy();
     expect(screen.getByRole('figure', { name: 'What the screw sizes mean' })).toBeTruthy();
   }, 90_000);

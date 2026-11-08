@@ -232,11 +232,13 @@ export async function createAdapter(page, url) {
     return [x, y];
   };
   const settle = async () => {
+    // Checking and saving can take more than 5 s on a loaded runner, including when reopening an accepted design.
+    // Keep waiting on the editor's actual readiness rather than giving each scenario a pause or retry.
     await page
       .waitForFunction(() => {
         const status = document.querySelector('.cad-status')?.textContent ?? '';
         return !/Checking|Saving/.test(status) && document.querySelector('.cad-editor')?.getAttribute('aria-busy') !== 'true';
-      }, undefined, { timeout: 5000 });
+      }, undefined, { timeout: 30_000 });
     await page.waitForTimeout(60);
   };
   // After a reload the design editor is back once its canvas is drawn and it has finished checking the design. A fixed
@@ -246,6 +248,9 @@ export async function createAdapter(page, url) {
       // It may come back showing the 3D view, with the sketch canvas there but hidden.
       await page.getByTestId('cad-canvas').waitFor({ state: 'attached' });
       await settle();
+    } else if (/\/boards$/.test(new URL(page.url()).pathname)) {
+      // An accepted design reopens on Boards. Its stage links are present even while the board is still loading.
+      await page.getByRole('region', { name: /^Board .+ drawing$/ }).first().waitFor({ timeout: 30_000 });
     } else await page.waitForTimeout(1500);
   };
   const leaveTool = async () => {
