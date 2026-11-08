@@ -140,7 +140,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         });
     }
   };
-  // Text typed within the debounce is committed before another selection unmounts its editor.
+  // Text typed within the debounce is committed before its editor unmounts: another selection, or a drag that hides the bar.
   const flushDraft = useRef<(() => void) | null>(null);
   const select = (id: string | null) => {
     if (id !== selectedId) flushDraft.current?.();
@@ -275,6 +275,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     e.stopPropagation();
     svg.current?.focus();
     svg.current?.setPointerCapture(e.pointerId);
+    flushDraft.current?.();
     select(item.id);
     drag.current = { mode, from: toMm(e), item, preview: item, pointerId: e.pointerId };
     setDragged(item);
@@ -316,6 +317,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     e.preventDefault();
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
+    flushDraft.current?.();
     resize.current = { grip, x: e.clientX, y: e.clientY, pxPerMm: svg.current?.getScreenCTM()?.a || 1, from: saved };
     setResized({ ...saved, from: saved });
   };
@@ -347,7 +349,9 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     setDragged(null);
     if (!d) return;
     if (d.mode === 'size') {
-      if (d.preview.height !== d.item.height) void redraw({ ...d.item, ...pending[d.item.id], height: d.preview.height });
+      // The artwork as saved now: text committed as the drag began may have been outlined since.
+      const now = carving.items.find(item => item.id === d.item.id) ?? d.item;
+      if (d.preview.height !== d.item.height) void redraw({ ...now, ...pending[d.item.id], height: d.preview.height });
     } else if (d.preview !== d.item) updateItem(d.item.id, { x: d.preview.x, y: d.preview.y, rotation: d.preview.rotation });
   };
   const cancel = () => {

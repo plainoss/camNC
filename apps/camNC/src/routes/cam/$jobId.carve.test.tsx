@@ -226,6 +226,38 @@ describe('the Carve step', () => {
     });
   });
 
+  it('keeps text typed just before a drag hides the bar', async () => {
+    const job = await open();
+    const svg = screen.getByTestId('carving-item').closest('svg')!;
+    const at = (x: number, y: number) => {
+      const p = new DOMPoint(x, 140 - y).matrixTransform(svg.getScreenCTM()!);
+      return { clientX: p.x, clientY: p.y, pointerId: 1, button: 0 };
+    };
+    const text = async () => (await getJob(job.id))!.carving!.items[0].art;
+    // Moving the selected item: the selection stays, but the bar unmounts while dragging.
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Moved' } });
+    fireEvent.pointerDown(screen.getByTestId('carving-item'), at(150, 70));
+    fireEvent.pointerMove(svg, at(160, 70));
+    fireEvent.pointerUp(svg, at(160, 70));
+    await waitFor(async () => expect(await text()).toMatchObject({ text: 'Moved' }));
+    // Sizing it by the corner: the release outlines again, with the text typed before the drag.
+    await waitFor(() => expect(screen.queryByText('Outlining…')).toBeNull());
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Sized' } });
+    fireEvent.pointerDown(screen.getByLabelText('Drag to resize'), at(190, 55));
+    fireEvent.pointerMove(svg, at(220, 40));
+    await waitFor(() => expect(screen.queryByText('Outlining…')).toBeNull());
+    fireEvent.pointerUp(svg, at(220, 40));
+    // The text was outlined during the drag; the release's outline must not bring back the earlier text.
+    await waitFor(() => expect(screen.queryByText('Outlining…')).toBeNull());
+    expect(await text()).toMatchObject({ text: 'Sized' });
+    expect((await getJob(job.id))!.carving!.items[0].height).toBeGreaterThan(30);
+    // Sizing the board.
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Board' } });
+    fireEvent.pointerDown(svg.querySelector('[data-resize="w"]')!, { clientX: 0, clientY: 0, pointerId: 1, button: 0 });
+    fireEvent.pointerUp(svg, { clientX: 0, clientY: 0, pointerId: 1 });
+    await waitFor(async () => expect(await text()).toMatchObject({ text: 'Board' }));
+  });
+
   it('adds text, selects items from the list and canvas, edits just the selection, and deletes it', async () => {
     const job = await open();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
