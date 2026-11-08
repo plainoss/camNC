@@ -310,7 +310,7 @@ it('opens a new design in the studio, asking for its first sketch’s plane', as
   expect(change.mock.calls.at(-1)![0].parts[0]!.drawnOn).toEqual({ on: { plane: 'right' }, offset: 0 });
 });
 
-it('sketches on a base plane picked before Sketch, as on one picked after it', async () => {
+it('sketches on a base plane picked before Sketch or Shift+S, as on one picked after it', async () => {
   const { latest } = await studio();
   const features = await screen.findByRole('region', { name: 'Features' });
   const planes = within(features).getByRole('list', { name: 'Default geometry' });
@@ -325,9 +325,22 @@ it('sketches on a base plane picked before Sketch, as on one picked after it', a
   await waitFor(() => expect(latest().parts.at(-1)!.drawnOn).toEqual({ on: { plane: 'front' }, offset: 0 }));
   // Cancelled, the waiting sketch's cross leaves nothing started.
   await userEvent.click(within(sketch).getByRole('button', { name: 'Cancel' }));
-  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Sketch/ }));
-  const waiting = await screen.findByRole('dialog', { name: 'Sketch' });
-  await userEvent.click(within(waiting).getByRole('button', { name: 'Cancel' }));
+  // Shift+S starts a sketch too: on the plane picked, or waiting for one.
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull());
+  await userEvent.click(
+    within(within(screen.getByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' })).getByRole('button', {
+      name: /Right/,
+    })
+  );
+  await userEvent.keyboard('{Shift>}S{/Shift}');
+  const onRight = await screen.findByRole('dialog', { name: /^Sketch · / });
+  expect(onRight.textContent).toMatch(/right plane/i);
+  await userEvent.click(within(onRight).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull());
+  screen.getByTestId('workspace-3d').focus();
+  await userEvent.keyboard('{Shift>}S{/Shift}');
+  expect(await screen.findByRole('dialog', { name: 'Sketch' })).toBeDefined();
+  await userEvent.click(within(screen.getByRole('dialog', { name: 'Sketch' })).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
 });
 

@@ -27,6 +27,7 @@ export default function WorkspaceView({
   hiddenIds,
   selectedPlane,
   onSelectPlane,
+  onSelectFace,
   children,
 }: {
   document: CadDocument;
@@ -50,6 +51,8 @@ export default function WorkspaceView({
   /** A base plane picked to draw the next sketch on, and picking one outside of choosing. */
   selectedPlane?: BasePlane | null;
   onSelectPlane?: (plane: BasePlane) => void;
+  /** The face of the part last clicked, for a sketch started next to be drawn on, as the reference sketches on a selection. */
+  onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
 }) {
@@ -69,12 +72,19 @@ export default function WorkspaceView({
   useEffect(() => {
     if (choosing) frame.current?.focus();
   }, [choosing]);
-  const pickFace = (pick: ModelFacePick) => {
+  /** The face of a part a click landed on, as a new part can be drawn on it. */
+  const faceAt = (pick: ModelFacePick) => {
     const instance = model.instances[pick.index]!;
-    if (instance.copyId) return setNotice('Draw on the part itself rather than a copy of it.');
+    if (instance.copyId) return null;
     const part = document.parts.find(candidate => candidate.id === instance.partId)!;
     const face = partFaceAt(part, model.placements.get(instanceKey(instance))!, pick.point, pick.normal);
-    if (!face) return setNotice('Pick a flat face: a part’s top, its underside, or one of its straight edges.');
+    return face ? { part, face } : null;
+  };
+  const pickFace = (pick: ModelFacePick) => {
+    if (model.instances[pick.index]!.copyId) return setNotice('Draw on the part itself rather than a copy of it.');
+    const found = faceAt(pick);
+    if (!found) return setNotice('Pick a flat face: a part’s top, its underside, or one of its straight edges.');
+    const { part, face } = found;
     setChoosing(false);
     setNotice(null);
     onNewPart?.({ partId: part.id, face });
@@ -158,8 +168,11 @@ export default function WorkspaceView({
             onNewPart?.({ plane });
           } else onSelectPlane?.(plane);
         }}
-        onSelect={(_, index) => {
+        onSelect={(_, index, pick) => {
           const partId = model.instances[index]!.partId;
+          // The face clicked is picked too, for a sketch started next to be drawn on it.
+          const found = pick && faceAt(pick);
+          onSelectFace?.(found ? { partId: found.part.id, face: found.face } : null);
           const now = Date.now();
           if (lastClick.current?.partId === partId && now - lastClick.current.at < kDoubleClickMs) {
             lastClick.current = null;

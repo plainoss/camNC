@@ -7,6 +7,7 @@ import {
   withPartCuts,
   cadDrawnOnSupports,
   cadCopyName,
+  resolveDrawnPlacements,
   type CadDocument,
   type CadPart,
   type CadPlacement,
@@ -44,7 +45,10 @@ export interface AssemblyModel {
  * Every part and copy as a mesh where it sits in the assembly. Pieces without a placement lie flat in a row beside the
  * placed ones, so a new design shows something sensible before anything is placed.
  */
-export function assemblyModel(document: CadDocument, hidden: ReadonlySet<string> = new Set()): AssemblyModel {
+export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = new Set()): AssemblyModel {
+  // Where each part drawn on a plane or face is, from that face as it is now: a step changed without solving, such as a
+  // thickness in the Extrude dialog, would otherwise leave the parts on it where it used to be.
+  const document = resolveDrawnPlacements(given).document;
   type Shape = ReturnType<typeof nativePart>;
   type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; copies: Shape[] };
   const built = document.parts.map((part): Built => {

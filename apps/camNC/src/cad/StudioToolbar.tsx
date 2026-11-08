@@ -7,7 +7,7 @@ const kCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactN
   {
     id: 'sketch',
     label: 'Sketch',
-    hint: 'Sketch a new part on a plane or on a part’s face',
+    hint: 'Sketch a new part on a plane or on a part’s face (Shift S): on the one picked, or pick one next',
     glyph: <path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />,
   },
   {

@@ -1,6 +1,6 @@
 import { Edges, Html, OrbitControls } from '@react-three/drei';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
@@ -103,12 +103,22 @@ function Body({
   );
 }
 
-/** Point the camera at the box from the front-right, above (Z up), and orbit around its center. */
-export function FitCamera({ box }: { box: THREE.Box3 }) {
+/**
+ * Point the camera at the box from the front-right, above (Z up), and orbit around its center. It does so once there's
+ * something to see and again when `fitKey` changes, such as on switching to the exploded view, but never because what's
+ * shown changed: hiding a part or editing one leaves the camera where it is, as in the reference.
+ */
+export function FitCamera({ box, fitKey }: { box: THREE.Box3; fitKey?: string }) {
   const camera = useThree(s => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree(s => s.controls) as OrbitControlsImpl | null;
   const aspect = useThree(s => s.size.width / s.size.height);
+  const fitted = useRef<{ key?: string; controls: OrbitControlsImpl | null } | null>(null);
   useEffect(() => {
+    // Nothing to see yet, or no size to see it at.
+    if (box.isEmpty() || !(aspect > 0) || !Number.isFinite(aspect)) return;
+    // Fitted already, for this key and with the controls that orbit it.
+    if (fitted.current && fitted.current.key === fitKey && fitted.current.controls === controls) return;
+    fitted.current = { key: fitKey, controls };
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const radius = Math.max(size.x / Math.min(aspect, 1.6), size.y, size.z) * 0.62;
@@ -123,7 +133,7 @@ export function FitCamera({ box }: { box: THREE.Box3 }) {
       controls.target.copy(center);
       controls.update();
     }
-  }, [box, camera, controls, aspect]);
+  }, [box, camera, controls, aspect, fitKey]);
   return null;
 }
 
@@ -215,7 +225,8 @@ export function ModelViewport({
   selectedIndexes?: number[];
   /** Parts drawn as wrong, such as ones sharing space with another. */
   warnIds?: string[];
-  onSelect: (partId: string, index: number) => void;
+  /** A part clicked, with the face of it that was clicked. */
+  onSelect: (partId: string, index: number, face?: ModelFacePick) => void;
   onPickFace?: (pick: ModelFacePick) => void;
   onMissed?: () => void;
   /** Looks straight at a sketch's plane, following its drawing, in place of the orbiting camera. */
@@ -262,18 +273,20 @@ export function ModelViewport({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meshes, matrices, shownPlanes.length, planeSize, assembled]);
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
-    if (!onPickFace || !e.face) return onSelect(mesh.partId, index);
+    if (!e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.
     const point = e.point.clone().applyMatrix4(matrix.clone().invert()),
       normal = e.face.normal.clone().normalize().toArray();
-    onPickFace({ partId: mesh.partId, index, point: snapToFace(mesh.positions, point.toArray(), normal), normal });
+    const face = { partId: mesh.partId, index, point: snapToFace(mesh.positions, point.toArray(), normal), normal };
+    if (onPickFace) onPickFace(face);
+    else onSelect(mesh.partId, index, face);
   };
   return (
     <Canvas camera={{ fov: 30 }} dpr={[1, 2]} onPointerMissed={() => onMissed?.()}>
       <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
       <directionalLight position={[300, -500, 800]} intensity={1.8} />
       <directionalLight position={[-400, 300, 200]} intensity={0.4} />
-      {sketchView ? <SketchCamera view={sketchView} model={assembled} /> : <FitCamera box={box} />}
+      {sketchView ? <SketchCamera view={sketchView} model={assembled} /> : <FitCamera box={box} fitKey={view} />}
       <group>
         {meshes.map((m, i) => (
           <Body

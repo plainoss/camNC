@@ -483,6 +483,8 @@ export function CadEditor({
   const [choosingFace, setChoosingFace] = useState(startsBlank);
   // A base plane picked in the studio, in its view or feature list, for the next sketch to be drawn on.
   const [selectedPlane, setSelectedPlane] = useState<BasePlane | null>(null);
+  // The face of the part last clicked in the studio, which the next sketch is drawn on, as with a picked plane.
+  const [selectedFace, setSelectedFace] = useState<Extract<CadDrawnOn['on'], { partId: string }> | null>(null);
   // Where the drawing sits in its pane, for the parts shown behind a sketch to line up with it.
   const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
@@ -2203,6 +2205,20 @@ export function CadEditor({
       return;
     }
     if (editable(event.target)) return;
+    // Shift+S starts a sketch, on the plane or face picked if there is one, as in the reference.
+    if (
+      studioSession &&
+      showWorkspace &&
+      event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      event.key.toLowerCase() === 's'
+    ) {
+      event.preventDefault();
+      if (!busy) studioCommand('sketch');
+      return;
+    }
     // The studio has no drawing tools: a sketch's shortcuts only work in an open sketch. Undo and redo still do.
     if (studioSession && showWorkspace && !event.ctrlKey && !event.metaKey) return;
     const key = event.key.toLowerCase();
@@ -3539,6 +3555,7 @@ export function CadEditor({
       setSelectedPlane(null);
       return newPartOn({ plane });
     }
+    setSelectedFace(null);
     setSelectedPlane(picked => (picked === plane ? null : plane));
   };
   const studioCommand = (command: StudioCommand) => {
@@ -3549,10 +3566,12 @@ export function CadEditor({
     if (command === 'sketch') {
       setFeatureDialog(null);
       setPartCutting(null);
-      // A plane picked first is drawn on straight away, as the reference sketches on what's selected.
-      if (selectedPlane && !choosingFace) {
+      // A plane or face picked first is drawn on straight away, as the reference sketches on what's selected.
+      const picked = !choosingFace && (selectedPlane ? { plane: selectedPlane } : selectedFace);
+      if (picked) {
         setSelectedPlane(null);
-        return newPartOn({ plane: selectedPlane });
+        setSelectedFace(null);
+        return newPartOn(picked);
       }
       setChoosingFace(!choosingFace);
     } else if (command === 'transform') {
@@ -4272,7 +4291,11 @@ export function CadEditor({
                   : { onCutParts: () => setPartCutting({}) })}
                 onNewPart={newPartOn}
                 selectedPlane={selectedPlane}
-                onSelectPlane={pickPlane}>
+                onSelectPlane={pickPlane}
+                onSelectFace={on => {
+                  setSelectedFace(on);
+                  if (on) setSelectedPlane(null);
+                }}>
                 {studioSession && choosingFace && (
                   // A new sketch waits for its plane, as the reference's sketch dialog does: a plane or a face picked
                   // in the view, or a plane in the feature list.
