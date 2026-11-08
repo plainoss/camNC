@@ -1,6 +1,7 @@
 import { newCadId, originId } from './document';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
+import { relieveCorners } from './cornerRelief';
 import { patternMaster } from './pattern';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type {
@@ -142,8 +143,9 @@ const MIN_CUT_AREA = 1;
 
 /**
  * The regions a pattern's copies make of a region drawn by its original: found by mapping the region's curves through
- * each copy's IDs. Copies whose region isn't there, as a pattern shrinks, are left out. A region of a copy has none,
- * so a cut given to one copy stays on it.
+ * each copy's IDs. Curves the pattern doesn't own, such as the part's outline that closes a groove running off it, stay
+ * as they are. Copies whose region isn't there, as a pattern shrinks, are left out. A region of a copy has none, so a
+ * cut given to one copy stays on it.
  */
 function patternCopyRegions(
   sketch: CadSketch,
@@ -153,11 +155,12 @@ function patternCopyRegions(
   for (const pattern of sketch.constraints) {
     if (pattern.type !== 'linearPattern' && pattern.type !== 'circularPattern') continue;
     const own = patternMaster(pattern);
-    if (!own || !region.curveIds.every(id => Object.values(own.idMap).includes(id))) continue;
+    if (!own) continue;
     const seedOf = new Map(Object.entries(own.idMap).map(([seed, id]) => [id, seed]));
+    if (!region.curveIds.some(id => seedOf.has(id))) continue;
     return pattern.instances.flatMap(instance => {
       if (instance === own) return [];
-      const mapped = region.curveIds.map(id => instance.idMap[seedOf.get(id)!]);
+      const mapped = region.curveIds.map(id => (seedOf.has(id) ? instance.idMap[seedOf.get(id)!] : id));
       if (mapped.some(id => !id)) return [];
       const copy = regions.find(candidate => sameIds(candidate.curveIds, mapped as string[]));
       return copy ? [{ region: copy, key: `${instance.x},${instance.y}` }] : [];
@@ -173,6 +176,21 @@ const sameIds = (a: string[], b: string[]) => a.length === b.length && [...a].so
  * so parts without features evaluate exactly as they always have.
  */
 export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
+  const cut = cutFeatures(part, profile);
+  if (!part.cornerRelief) return cut;
+  const { part: next, skipped } = relieveCorners(cut.part, part.cornerRelief.diameter);
+  const diagnostics = [...cut.diagnostics];
+  if (skipped)
+    diagnostics.push({
+      code: 'corner-relief-skipped',
+      severity: 'warning',
+      partId: part.id,
+      message: `${skipped === 1 ? 'One corner is' : `${skipped} corners are`} too tight for a ${part.cornerRelief.diameter} mm bone and stay square.`,
+    });
+  return { part: next, diagnostics };
+}
+
+function cutFeatures(part: CadPart, profile: EvaluatedCadPart): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
   if (!part.features?.length) return { part: profile, diagnostics: [] };
   const diagnostics: CadDiagnostic[] = [];
   const error = (code: string, message: string, entityIds?: string[]) =>

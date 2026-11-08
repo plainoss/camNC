@@ -58,6 +58,12 @@ export function validateTool(tool: Tool, field = 'tool'): void {
   ] as const)
     if (tool[key] !== undefined) positiveValue(`${field}.${key}`, tool[key]);
   if (tool.flutes !== undefined && !Number.isInteger(tool.flutes)) fail(`${field}.flutes`, 'must be an integer');
+  if (tool.shape !== undefined && tool.shape !== 'flat' && tool.shape !== 'v') fail(`${field}.shape`, 'must be flat or v');
+  if (tool.shape === 'v') {
+    if (tool.angle === undefined || !(tool.angle > 0 && tool.angle < 180)) fail(`${field}.angle`, 'must be between 0 and 180 degrees');
+    if (tool.tipDiameter !== undefined && !(tool.tipDiameter >= 0 && tool.tipDiameter < tool.diameter))
+      fail(`${field}.tipDiameter`, 'must be at least 0 and smaller than the diameter');
+  }
   if (tool.stepover !== undefined && tool.stepover > tool.diameter) fail(`${field}.stepover`, 'must not exceed the tool diameter');
   if (tool.stepover !== undefined && tool.stepover < 0.001) fail(`${field}.stepover`, 'must be at least 0.001 mm');
 }

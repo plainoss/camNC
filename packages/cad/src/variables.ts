@@ -133,6 +133,14 @@ function dimensionOutcome(constraint: CadConstraint, scope: CadValueScope): Outc
   return { value: parsed.value };
 }
 
+function reliefOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
+  const expression = part.cornerRelief?.diameterExpression;
+  if (!usesVariables(expression)) return null;
+  const parsed = parseCadValue(expression, { unit: 'mm', variables: scope });
+  if ('error' in parsed) return parsed;
+  return parsed.value > 0 ? parsed : { error: 'A bit needs to be wider than nothing.' };
+}
+
 function thicknessOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
   if (!usesVariables(part.thicknessExpression)) return null;
   const parsed = parseCadValue(part.thicknessExpression, { unit: 'mm', variables: scope });
@@ -219,6 +227,9 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     const thickness = thicknessOutcome(part, scope);
     let sized = thickness && 'value' in thickness && thickness.value !== part.thickness ? { ...part, thickness: thickness.value } : part;
     sized = mapPlacements(sized, placement => followPlacement(placement, scope));
+    const relief = reliefOutcome(sized, scope);
+    if (relief && 'value' in relief && relief.value !== sized.cornerRelief!.diameter)
+      sized = { ...sized, cornerRelief: { ...sized.cornerRelief!, diameter: relief.value } };
     sized = mapCuts(sized, cut => {
       const outcome = depthOutcome(cut, scope);
       return outcome && 'value' in outcome && outcome.value !== cut.depth ? { ...cut, depth: outcome.value } : cut;
@@ -252,6 +263,14 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
         severity: 'error',
         partId: part.id,
         message: `Thickness ${part.thicknessExpression}: ${thickness.error}`,
+      });
+    const relief = reliefOutcome(part, scope);
+    if (relief && 'error' in relief)
+      problems.push({
+        code: 'variable-value',
+        severity: 'error',
+        partId: part.id,
+        message: `Corner relief ${part.cornerRelief!.diameterExpression}: ${relief.error}`,
       });
     for (const feature of part.features ?? []) {
       const outcome = feature.type === 'cut' ? depthOutcome(feature, scope) : null;
@@ -322,7 +341,13 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
       mapSketches(
         mapCuts(
           withPlacementExpressions(
-            part.thicknessExpression ? { ...part, thicknessExpression: edit(part.thicknessExpression) } : part,
+            {
+              ...part,
+              ...(part.thicknessExpression && { thicknessExpression: edit(part.thicknessExpression) }),
+              ...(part.cornerRelief?.diameterExpression && {
+                cornerRelief: { ...part.cornerRelief, diameterExpression: edit(part.cornerRelief.diameterExpression) },
+              }),
+            },
             edit
           ),
           cut => (cut.depthExpression ? { ...cut, depthExpression: edit(cut.depthExpression) } : cut)

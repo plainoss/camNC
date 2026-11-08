@@ -16,3 +16,27 @@
 .cad-thickness-field input[aria-invalid='true'] {
   border-color: #ac2929;
 }
+
+.cad-relief-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.cad-relief-field > label:first-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cad-relief-field .cad-thickness-hint,
+.cad-relief-field .cad-thickness-error {
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+.cad-relief-field .cad-thickness-hint {
+  color: #52647d;
+}
+.cad-relief-field .cad-thickness-error {
+  color: #ac2929;
+}

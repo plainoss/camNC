@@ -85,7 +85,47 @@ export interface CadReport {
 
 const round = (value: number) => Math.round(value * 1000) / 1000;
 const xy = (p: CadPoint) => [round(p.x), round(p.y)];
-function bounds(points: readonly CadPoint[]) {
+/** Where each arc and circle in a part's sketches reaches furthest along x and y. */
+function curveExtremes(part: CadPart): CadPoint[] {
+  return [part.sketch, ...cadFaceSketches(part).map(face => face.sketch)].flatMap(sketch => {
+    const points = new Map(sketch.entities.flatMap(e => (e.type === 'point' ? [[e.id, e] as const] : [])));
+    return sketch.entities.flatMap(e => {
+      if (e.type !== 'circle' && e.type !== 'arc') return [];
+      const center = points.get(e.centerId);
+      if (!center) return [];
+      const extremes = [0, 1, 2, 3].map(quarter => ({
+        angle: (quarter * Math.PI) / 2,
+        x: center.x + e.radius * Math.cos((quarter * Math.PI) / 2),
+        y: center.y + e.radius * Math.sin((quarter * Math.PI) / 2),
+      }));
+      if (e.type === 'circle') return extremes;
+      const start = points.get(e.startId),
+        end = points.get(e.endId);
+      if (!start || !end) return [];
+      const turn = (angle: number) => ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const from = Math.atan2(start.y - center.y, start.x - center.x),
+        sweep = turn(Math.atan2(end.y - center.y, end.x - center.x) - from);
+      // Arcs run counterclockwise from start to end.
+      return extremes.filter(extreme => turn(extreme.angle - from) <= sweep + 1e-9);
+    });
+  });
+}
+
+function distanceToLoop(p: CadPoint, loop: readonly CadPoint[]) {
+  return Math.min(
+    ...loop.map((a, i) => {
+      const b = loop[(i + 1) % loop.length]!,
+        dx = b.x - a.x,
+        dy = b.y - a.y;
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+    })
+  );
+}
+
+/** A loop's box. Curves are drawn as chords that fall short of them, so the extremes of arcs on the loop count too. */
+function bounds(loop: readonly CadPoint[], curves: readonly CadPoint[] = []) {
+  const points = [...loop, ...curves.filter(p => distanceToLoop(p, loop) < 0.5)];
   const xs = points.map(p => p.x),
     ys = points.map(p => p.y);
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
@@ -253,8 +293,9 @@ export async function inspectCadDocument(
       entities: reportEntities(sketch),
       constraints: sketch.constraints.length,
     }));
+    const extremes = curveExtremes(part);
     const cuts = (evaluated?.cuts ?? []).map(cut => {
-      const { at, size } = bounds(cut.outline);
+      const { at, size } = bounds(cut.outline, extremes);
       return { ref: cutHandle(cut.id), side: cut.side, from: round(cut.from), to: round(cut.to), through: cut.through, at, size };
     });
     // CAM clips a floor cut to its pocket without a word, so the drawing and the part would disagree.
@@ -304,7 +345,7 @@ export async function inspectCadDocument(
         }
       }
     }
-    const box = evaluated && bounds(evaluated.outline);
+    const box = evaluated && bounds(evaluated.outline, extremes);
     const names = (id: string) => toCut.find(entry => entry.part.partId === id)?.names ?? [];
     const pieces = part.copies?.length ? { names: names(part.id), mirrored: names(mirroredPartId(part.id)) } : undefined;
     const report: CadReportPart = {

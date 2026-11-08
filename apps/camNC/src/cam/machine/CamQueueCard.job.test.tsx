@@ -10,6 +10,7 @@ import { camKeys, camWorker, modelKey } from '../camQueries';
 import { createJob, saveJob, type CamJobV1 } from '../jobDb';
 import { getJob } from '../jobDb';
 import { moveHold, useBedEdit } from './bedEdit';
+import { BedToolbar } from './BedToolbar';
 import { CamBedEditor } from './CamBedEditor';
 import { useCamMachine } from './camMachine';
 import { CamQueueCard } from './CamQueueCard';
@@ -44,6 +45,8 @@ async function takeJob(edit: (boards: CamJobV1['boards'] & object) => CamJobV1['
       <TooltipProvider>
         <CamQueueCard />
         <CamBedEditor />
+        {/* Drawn beside the board in the top view's canvas. */}
+        <BedToolbar />
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -24,6 +24,7 @@ import {
   type TabSettings,
 } from './toolpaths';
 import { CamInputError } from './validation';
+import { carvingOperations, type BoardCarving } from './vcarve';
 
 /**
  * How the parts are held while cutting. `tabs` / `tabs-guided`: tabs into stock that reaches the board's edge (removed
@@ -94,6 +95,8 @@ export interface BoardSpec {
    * its edges (a fence, a fixture).
    */
   holdPoints?: HoldPoint[];
+  /** Artwork V-carved into the top, before any part is cut: the board is still whole. */
+  carvings?: BoardCarving[];
 }
 
 /** What holds the stock, for the hold checks: the hold points (none: nothing), the tape, or (neither) the board's edge. */
@@ -463,6 +466,12 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>): Part
     const pins = dowelOperations(board, board.dowels, settings);
     warnings.push(...fluteWarnings(pins, stockTop));
     operations.push(...pins.map(op => transformOperation(op, turn)));
+  }
+  // Carvings next, also on the whole board: each one's flat bit, then its V-bit.
+  for (const carving of board.carvings ?? []) {
+    const carved = carvingOperations(carving, stockTop, settings);
+    warnings.push(...carved.flatMap(op => op.warnings ?? []).map(w => `${carving.name}: ${w}`));
+    operations.push(...carved.map(op => transformOperation(op, turn)));
   }
   let pos = { x: 0, y: 0 };
   // Per bit, inner features before outlines. When every part keeps a layer until the end, the inner features of every

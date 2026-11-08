@@ -25,10 +25,14 @@ function parseArgs(args: string[]) {
   return options;
 }
 
+// The solver logs as it works. Its messages go to stderr, so stdout is the report and nothing else.
+const print = console.log.bind(console);
+console.log = console.error.bind(console);
+
 const options = parseArgs(process.argv.slice(2));
 const start = options.from ? parseCadDocument(JSON.parse(await readFile(options.from, 'utf8'))) : null;
 const finish = async (ok: boolean, output: object, document?: unknown, svg?: string) => {
-  console.log(JSON.stringify(output, null, 1));
+  print(JSON.stringify(output, null, 1));
   // A design that doesn't check out is never written where it could be imported by mistake.
   if (ok && options.out) await writeFile(options.out, `${JSON.stringify(document, null, 1)}\n`);
   if (svg && options.svg) await writeFile(options.svg, svg);

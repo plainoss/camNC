@@ -139,6 +139,7 @@ import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
 import { DesignStepsList } from './DesignStepsList';
+import { CadReliefField } from './CadReliefField';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
   createSketchContext,
@@ -3412,6 +3413,21 @@ export function CadEditor({
                     replacePart(doc, part.id, p => {
                       const next = { ...p, thickness, thicknessExpression };
                       if (thicknessExpression === undefined) delete next.thicknessExpression;
+                      return next;
+                    })
+                  )
+                }
+              />
+              <CadReliefField
+                key={`${part.id}:relief`}
+                relief={part.cornerRelief}
+                variables={variableScope}
+                onDone={() => svg.current?.focus()}
+                onChange={cornerRelief =>
+                  commit(
+                    replacePart(documentRef.current, part.id, p => {
+                      const next = { ...p, cornerRelief };
+                      if (!cornerRelief) delete next.cornerRelief;
                       return next;
                     })
                   )
