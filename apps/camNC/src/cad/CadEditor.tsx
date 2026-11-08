@@ -2121,7 +2121,8 @@ export function CadEditor({
     }
     if ((event.ctrlKey || event.metaKey) && key === 'a') {
       event.preventDefault();
-      const ids = sketch?.entities.filter(e => e.type !== 'point').map(e => e.id) ?? [];
+      // Everything drawn, not the edges of the face it's drawn on, so it can all be moved or patterned.
+      const ids = sketch?.entities.filter(e => e.type !== 'point' && !e.faceEdge).map(e => e.id) ?? [];
       if (tool === 'transform' && !selected.length) setTransformParameters(initialTransformParameters(transformSelectionCenter(ids)));
       setSelected(ids);
       return;

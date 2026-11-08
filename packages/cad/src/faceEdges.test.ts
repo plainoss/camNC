@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   addConstraint,
+  chamferLineCorners,
+  extendSketchCurve,
+  filletLineCorners,
+  mirrorSketchEntities,
+  offsetSketch,
+  splitSketchCurve,
   createCadDocument,
   createPlateDocument,
   evaluateCadPart,
@@ -123,5 +129,51 @@ describe('the edges of the face a part is drawn on', () => {
     const kept = after.entities.find(e => e.id === corner.id) as CadPointEntity;
     expect(kept).toMatchObject({ x: 100, y: 100, fixed: true, construction: true });
     expect(after.entities.filter(e => e.id.includes(':face:'))).toHaveLength(1);
+  });
+
+  it('can’t be split, extended, filleted or chamfered, but can be offset or mirrored into geometry of the drawing’s own', async () => {
+    const bottom = plate('Bottom', '100mm', '100mm', 18, { on: { plane: 'top' }, offset: 0 });
+    const top = plate('Top', '100mm', '100mm', 6, { on: { partId: bottom.id, face: 'top' }, offset: 0 });
+    const document: CadDocument = { ...createCadDocument(), parts: [bottom, top] };
+    const sketch = withFaceEdges(document, top);
+    const edge = sketch.entities.find(e => e.type === 'line' && e.faceEdge)!;
+    const corner = sketch.entities.find(e => e.type === 'point' && e.faceEdge)!;
+    const refused = 'The edges of the face this part is drawn on stay as they are. Draw your own geometry onto them instead.';
+    expect(splitSketchCurve(sketch, edge.id, [0.5])).toEqual({ ok: false, message: refused });
+    expect(extendSketchCurve(sketch, { entityId: edge.id, end: 'end', target: { x: 500, y: 500 } })).toMatchObject({
+      ok: false,
+      message: refused,
+    });
+    // Fillets only take profile corners, which a face's never are.
+    expect(filletLineCorners(sketch, { cornerPointIds: [corner.id], radius: 5 }).ok).toBe(false);
+    expect(chamferLineCorners(sketch, { cornerPointIds: [corner.id], distanceA: 5, distanceB: 5 })).toMatchObject({
+      ok: false,
+      message: refused,
+    });
+    for (const result of [
+      offsetSketch(sketch, { entityIds: [edge.id], value: 10 }),
+      mirrorSketchEntities(sketch, { entityIds: [edge.id], axisId: sketch.entities.find(e => e.type === 'line' && !e.faceEdge)!.id }),
+    ]) {
+      if (!result.ok) throw new Error(result.message);
+      const made = result.sketch.entities.filter(e => !sketch.entities.some(old => old.id === e.id));
+      expect(made.length).toBeGreaterThan(0);
+      expect(made.some(e => e.faceEdge)).toBe(false);
+      // The outline isn't one closed loop yet, but the sketch solves.
+      const solved = await solveCadDocument({ ...document, parts: [bottom, { ...top, sketch: result.sketch }] });
+      expect(solved.diagnostics.filter(d => d.code.startsWith('solver'))).toEqual([]);
+      expect(solved.sketches.find(state => state.partId === top.id)?.status).toBe('solved');
+    }
+  });
+
+  it('doesn’t put back an edge whose ID the drawing’s own geometry already has', () => {
+    const bottom = plate('Bottom', '100mm', '100mm', 18, { on: { plane: 'top' }, offset: 0 });
+    const top = plate('Top', '100mm', '100mm', 6, { on: { partId: bottom.id, face: 'top' }, offset: 0 });
+    const document: CadDocument = { ...createCadDocument(), parts: [bottom, top] };
+    const sketch = withFaceEdges(document, top);
+    const edge = sketch.entities.find(e => e.type === 'line' && e.faceEdge)!;
+    // As a piece split off it in an older version would have been.
+    const taken = { ...sketch, entities: sketch.entities.map(e => (e.id === edge.id ? { ...e, faceEdge: undefined } : e)) };
+    const synced = withFaceEdges(document, { ...top, sketch: taken });
+    expect(synced.entities.filter(e => e.id === edge.id)).toHaveLength(1);
   });
 });
