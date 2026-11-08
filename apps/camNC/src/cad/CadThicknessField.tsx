@@ -2,6 +2,7 @@ import { CAD_THICKNESS_RANGE, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
 import { parseCadValue } from './valueExpressions';
 import { CadValueInput } from './CadValueInput';
+import { variableDefinition } from './variableFields';
 import './cadThicknessField.css';
 
 export interface CadThicknessFieldProps {
@@ -31,7 +32,9 @@ export function CadThicknessField({ value, expression, variables, onCommit, onDo
   const previousValue = useRef(typed);
   const validityCallback = useRef(onValidityChange);
   const lastValidity = useRef<boolean | undefined>(undefined);
-  const valid = !('error' in thicknessValue(text, variables));
+  // `#name = value` is taken as its value, which the field uses once it has made the variable.
+  const definition = variableDefinition(text);
+  const valid = !('error' in thicknessValue(definition ? definition.expression : text, variables));
   useEffect(() => {
     validityCallback.current = onValidityChange;
     if (lastValidity.current !== valid) {

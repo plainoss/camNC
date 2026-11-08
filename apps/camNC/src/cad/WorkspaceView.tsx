@@ -28,6 +28,7 @@ export default function WorkspaceView({
   choosing: choosingProp,
   onChoosingChange,
   highlightIds,
+  hiddenIds,
   children,
 }: {
   document: CadDocument;
@@ -46,12 +47,14 @@ export default function WorkspaceView({
   onChoosingChange?: (choosing: boolean) => void;
   /** Parts shown picked in place of the selected one, such as a cut-parts step's tools and targets. */
   highlightIds?: readonly string[];
+  /** Parts hidden from the view, as the parts list's eye toggles them. */
+  hiddenIds?: ReadonlySet<string>;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const lastClick = useRef<{ partId: string; at: number } | null>(null);
-  const model = useMemo(() => assemblyModel(document), [document]);
+  const model = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
   const clashes = useMemo(() => assemblyReport(document, evaluateCadDocument(document).parts)?.collisions ?? [], [document]);
   const [view, setView] = useState<ModelView>('assembled');
   // Choosing what a new part is drawn on: a plane, or a face clicked in the view.

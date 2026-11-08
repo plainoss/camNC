@@ -19,6 +19,17 @@ const publish = (fields: CadVariableFields | null) => {
   listeners.forEach(listener => listener());
 };
 
+// What fields still have to apply, such as a variable made in one, before a dialog that holds them is done.
+let settling: Promise<void> = Promise.resolve();
+
+/** Has a dialog wait for `applying` before it's done. */
+export const settleField = (applying: Promise<void>) => {
+  settling = Promise.all([settling, applying]).then(() => {});
+};
+
+/** Once every field has applied what was typed in it. */
+export const fieldsSettled = () => settling;
+
 /** Offers the editor's variables to every value field while it's open. */
 export function useProvideCadVariableFields(fields: CadVariableFields) {
   useEffect(() => {

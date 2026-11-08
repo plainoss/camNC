@@ -226,6 +226,18 @@ Workspace:  14 → 15 → 16 → 17 → 18 → 19
 
 - Draw on the face in the 3D view itself, with the other parts' edges to snap to.
 
+## Known workflow gaps in the Part Studio
+
+The studio follows a parametric part studio's workflow. Where it still differs, to be closed later:
+
+- **Extrude takes the whole sketch.** A part's extrude pushes out its whole outline. Picking which of a sketch's
+  regions to extrude, and extruding several regions into separate parts, is not there yet.
+- **Extrude has no New / Add / Remove / Intersect, and no end types.** Every extrude makes a new part, Blind to its
+  thickness (or Thin to its depth). Removing material is done with Cut parts and with face sketches' cut depths.
+- **Sketching happens in a flat editor**, not in place in the 3D view.
+- **Pattern and Transform directions are typed axes**, not an edge or face picked in the view.
+- **Booleans only subtract** (Cut parts); there is no union or intersect, since parts are boards.
+
 ## Not in this plan
 
 - Sketching on edges, and angled joints.

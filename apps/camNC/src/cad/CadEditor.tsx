@@ -73,6 +73,7 @@ import {
   moveFaceSketch,
   removeCadFeature,
   removeCadVariable,
+  cadCopyName,
   setCadVariable,
   type CadFaceRef,
   setCutDepth,
@@ -274,6 +275,11 @@ const entityPointIds = (entity: CadEntity): string[] => {
 const PartView3D = lazy(() => import('./PartView3D'));
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
 /** A face sketch is drawn over the part's outline, so a part needs one first. */
+/** A sketch of one straight line and nothing else, as a board drawn edge-on is. */
+const isSingleLine = (part: CadPart) => {
+  const curves = part.sketch.entities.filter(entity => entity.type !== 'point' && !entity.construction);
+  return curves.length === 1 && curves[0]!.type === 'line';
+};
 /** A part with nothing drawn yet, such as a new design's first: the studio asks what it's sketched on first. */
 const isBlank = (part: CadPart) => !part.drawnOn && part.sketch.entities.every(entity => entity.type === 'point' && entity.fixed);
 const hasOutline = (document: CadDocument, partId: string) => !!evaluateCadPart(document.parts.find(part => part.id === partId)!).part;
@@ -467,6 +473,8 @@ export function CadEditor({
   const [featureDialog, setFeatureDialog] = useState<{ kind: 'extrude' | 'pattern'; partId: string; before: CadDocument } | null>(null);
   // Picking the plane or face a new part is sketched on.
   const [choosingFace, setChoosingFace] = useState(startsBlank);
+  // Parts hidden from the studio's view by their eye in the parts list.
+  const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   // A variable being added, or the one being changed.
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
@@ -3311,6 +3319,11 @@ export function CadEditor({
   };
   /** Back to the studio from a sketch: keeping it, or leaving the design as it was before it opened. */
   const closeSketch = (keep: boolean) => {
+    if (keep && part && studioSession && part.drawnOn && !part.thin && isSingleLine(part)) {
+      // Drawn as one line: it's a thin board, set up in its Extrude dialog next.
+      commit(replacePart(documentRef.current, part.id, p => ({ ...p, thin: { depth: 100, midPlane: true } })));
+      extrudeAfterSketch.current = part.id;
+    }
     if (keep) {
       // A value still being typed, such as a dimension, is part of the sketch being kept.
       const error =
@@ -3517,19 +3530,99 @@ export function CadEditor({
   const chainPreview = sketch && chainGeometry(sketch, chain);
   const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
   const acceptanceNotice = notice ?? finishError;
+  // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
+  const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
   // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
-  const sketchCanFinish = faceSketch
-    ? !solving &&
-      !problems.length &&
-      !splitFirst &&
-      !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
-    : thicknessValid &&
-      !solving &&
-      !problems.length &&
-      numberOfShapes > 0 &&
-      !splitFirst &&
-      !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
-      !((tool === 'fillet' || tool === 'chamfer') && selected.length);
+  const sketchCanFinish = edgeOnBoard
+    ? !solving
+    : faceSketch
+      ? !solving &&
+        !problems.length &&
+        !splitFirst &&
+        !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
+      : thicknessValid &&
+        !solving &&
+        !problems.length &&
+        numberOfShapes > 0 &&
+        !splitFirst &&
+        !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
+        !((tool === 'fillet' || tool === 'chamfer') && selected.length);
+  // The parts, each with an eye to show or hide it in the view. In the studio they sit at the bottom left, below the
+  // features, as in the reference.
+  const partsPanel = (
+    <>
+      <div className="cad-panel-heading" hidden={!!faceSketch}>
+        <h2>Parts ({studioSession ? doc.parts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0) : doc.parts.length})</h2>
+        {!studioSession && (
+          <button
+            type="button"
+            aria-label="Add part"
+            onClick={() => {
+              const added = createCadPart(`Part ${doc.parts.length + 1}`, part?.thickness ?? 18);
+              commit({ ...doc, parts: [...doc.parts, added] });
+              setPartId(added.id);
+              setSelected([]);
+              chooseTool('select');
+            }}>
+            ＋
+          </button>
+        )}
+      </div>
+      <ul className="cad-part-list" aria-label="Parts" hidden={!!faceSketch}>
+        {doc.parts
+          .flatMap(p => [
+            { key: p.id, part: p, name: p.name },
+            // In the studio every copy is a part of its own in the list, as the reference lists them, with its own eye.
+            ...(studioSession
+              ? (p.copies ?? []).map((copy, index) => ({ key: `${p.id}/${copy.id}`, part: p, name: cadCopyName(p, index) }))
+              : []),
+          ])
+          .map(({ key, part: p, name }) => (
+            <li key={key}>
+              <button
+                type="button"
+                aria-pressed={key === part?.id}
+                onClick={() => {
+                  if (partCutting && showWorkspace) return pickForCut(p.id);
+                  setPartId(p.id);
+                  setSelected([]);
+                  chooseTool('select');
+                }}>
+                <span aria-hidden="true">▱</span>
+                <span>{name}</span>
+                {key === p.id && partTrouble(p.id) && (
+                  <span className="cad-part-trouble" role="img" aria-label={partTrouble(p.id)!} title={partTrouble(p.id)!}>
+                    ⚠
+                  </span>
+                )}
+                <small>{p.thickness} mm</small>
+              </button>
+              {studioSession && (
+                <button
+                  type="button"
+                  className="cad-part-eye"
+                  aria-label={`${hiddenParts.has(key) ? 'Show' : 'Hide'} ${name}`}
+                  title={hiddenParts.has(key) ? 'Show in the view' : 'Hide in the view'}
+                  aria-pressed={!hiddenParts.has(key)}
+                  onClick={() =>
+                    setHiddenParts(previous => {
+                      const next = new Set(previous);
+                      if (next.has(key)) next.delete(key);
+                      else next.add(key);
+                      return next;
+                    })
+                  }>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                    {hiddenParts.has(key) ? <path d="M4 4l16 16" /> : <circle cx="12" cy="12" r="3" />}
+                  </svg>
+                </button>
+              )}
+            </li>
+          ))}
+      </ul>
+    </>
+  );
   return (
     <div
       ref={root}
@@ -3624,45 +3717,7 @@ export function CadEditor({
           )}
           {!faceSketch && !studioSession && <CadVariablesPanel document={doc} onChange={commit} />}
           {!faceSketch && !studioSession && <DesignStepsList document={doc} selectedPartId={part?.id ?? null} onStep={openStep} />}
-          <div className="cad-panel-heading" hidden={!!faceSketch}>
-            <h2>Parts</h2>
-            <button
-              type="button"
-              aria-label="Add part"
-              onClick={() => {
-                const added = createCadPart(`Part ${doc.parts.length + 1}`, part?.thickness ?? 18);
-                commit({ ...doc, parts: [...doc.parts, added] });
-                setPartId(added.id);
-                setSelected([]);
-                chooseTool('select');
-              }}>
-              ＋
-            </button>
-          </div>
-          <ul className="cad-part-list" aria-label="Parts" hidden={!!faceSketch}>
-            {doc.parts.map(p => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  aria-pressed={p.id === part?.id}
-                  onClick={() => {
-                    if (partCutting && showWorkspace) return pickForCut(p.id);
-                    setPartId(p.id);
-                    setSelected([]);
-                    chooseTool('select');
-                  }}>
-                  <span aria-hidden="true">▱</span>
-                  <span>{p.name}</span>
-                  {partTrouble(p.id) && (
-                    <span className="cad-part-trouble" role="img" aria-label={partTrouble(p.id)!} title={partTrouble(p.id)!}>
-                      ⚠
-                    </span>
-                  )}
-                  <small>{p.thickness} mm</small>
-                </button>
-              </li>
-            ))}
-          </ul>
+          {!studioSession && partsPanel}
           {part && !faceSketch && !(studioSession && showWorkspace) && (
             <div className="cad-properties">
               <h3>{part.name} · Sketch</h3>
@@ -3832,6 +3887,11 @@ export function CadEditor({
                   </button>
                 )}
             </div>
+          )}
+          {studioSession && (
+            <section className="cad-parts-panel" aria-label="Parts panel">
+              {partsPanel}
+            </section>
           )}
         </aside>
         <main className="cad-drawing">
@@ -4016,6 +4076,7 @@ export function CadEditor({
                   setSelected([]);
                 }}
                 highlightIds={partCutting ? cutPicked : undefined}
+                hiddenIds={hiddenParts}
                 onOpen={id => {
                   if (partCutting) return pickForCut(id);
                   if (studioSession) return openSketch(id);

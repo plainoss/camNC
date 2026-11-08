@@ -45,8 +45,50 @@ export function ExtrudeDialog({
 }: PartDialogProps & { onEditSketch: () => void }) {
   // A thickness that can't be used keeps the dialog open until it's fixed or cancelled.
   const [thicknessValid, setThicknessValid] = useState(true);
+  const [depthError, setDepthError] = useState<string | null>(null);
+  const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? formatCadValue(part.thin.depth)) : '100');
+  const setThin = (thin: CadPart['thin'] | null) =>
+    onChange(document =>
+      changePart(document, part.id, p => {
+        const next = { ...p };
+        if (thin) next.thin = thin;
+        else delete next.thin;
+        return next;
+      })
+    );
+  /** Takes the typed depth, or says why not. Whether it was taken. */
+  const applyDepth = () => {
+    const parsed = parseCadValue(depthText, { unit: 'mm', variables });
+    const refused = 'error' in parsed ? parsed.error : parsed.value <= 0 ? 'A thin board needs some depth.' : null;
+    setDepthError(refused);
+    if ('error' in parsed || refused) return false;
+    setThin({
+      ...part.thin,
+      depth: parsed.value,
+      ...(parsed.expression ? { depthExpression: parsed.expression } : { depthExpression: undefined }),
+    });
+    return true;
+  };
   return (
-    <FeatureDialog title={`Extrude · ${part.name}`} okDisabled={!thicknessValid} onOk={onOk} onCancel={onCancel}>
+    <FeatureDialog title={`Extrude · ${part.name}`} okDisabled={!thicknessValid || !!depthError} onOk={onOk} onCancel={onCancel}>
+      {part.drawnOn && (
+        // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
+        <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
+          <button type="button" role="tab" aria-selected={!part.thin} onClick={() => setThin(null)}>
+            Solid
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!!part.thin}
+            onClick={() => {
+              const parsed = parseCadValue(depthText, { unit: 'mm', variables });
+              setThin({ depth: 'error' in parsed || parsed.value <= 0 ? 100 : parsed.value, midPlane: true });
+            }}>
+            Thin
+          </button>
+        </div>
+      )}
       <div className="cad-feature-selection">
         <small>Sketch to extrude</small>
         <span>{part.name}’s sketch</span>
@@ -70,6 +112,45 @@ export function ExtrudeDialog({
           )
         }
       />
+      {part.thin && (
+        <>
+          <label className="cad-number-field">
+            Depth
+            <span>
+              <CadValueInput
+                bare
+                aria-label="Depth"
+                value={depthText}
+                spellCheck={false}
+                aria-invalid={depthError ? true : undefined}
+                onChange={event => setDepthText(event.target.value)}
+                onBlur={applyDepth}
+                onKeyDown={event => {
+                  // A depth that isn't taken keeps the dialog open to fix it, rather than Enter keeping the old one.
+                  if (event.key === 'Enter' && !applyDepth()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }
+                }}
+              />
+            </span>
+            mm
+          </label>
+          {depthError && (
+            <p role="alert" className="cad-thickness-error">
+              {depthError}
+            </p>
+          )}
+          <label>
+            <input
+              type="checkbox"
+              checked={!!part.thin.midPlane}
+              onChange={event => setThin({ ...part.thin!, midPlane: event.target.checked })}
+            />
+            Mid plane
+          </label>
+        </>
+      )}
       {part.drawnOn && (
         <CadDrawnOnField
           key={`${part.id}:drawn-on`}

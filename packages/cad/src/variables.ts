@@ -180,6 +180,13 @@ function offsetOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
   return 'error' in parsed ? parsed : { value: parsed.value };
 }
 
+function thinDepthOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
+  if (!part.thin || !usesVariables(part.thin.depthExpression)) return null;
+  const parsed = parseCadValue(part.thin.depthExpression, { unit: 'mm', variables: scope });
+  if ('error' in parsed) return parsed;
+  return parsed.value > 0 ? parsed : { error: 'A thin board needs some depth.' };
+}
+
 function thicknessOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
   if (!usesVariables(part.thicknessExpression)) return null;
   const parsed = parseCadValue(part.thicknessExpression, { unit: 'mm', variables: scope });
@@ -273,6 +280,8 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     const offset = offsetOutcome(sized, scope);
     if (offset && 'value' in offset && offset.value !== sized.drawnOn!.offset)
       sized = { ...sized, drawnOn: { ...sized.drawnOn!, offset: offset.value } };
+    const depth = thinDepthOutcome(sized, scope);
+    if (depth && 'value' in depth && depth.value !== sized.thin!.depth) sized = { ...sized, thin: { ...sized.thin!, depth: depth.value } };
     const relief = reliefOutcome(sized, scope);
     if (relief && 'value' in relief && relief.value !== sized.cornerRelief!.diameter)
       sized = { ...sized, cornerRelief: { ...sized.cornerRelief!, diameter: relief.value } };
@@ -318,6 +327,14 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
         severity: 'error',
         partId: part.id,
         message: `Thickness ${part.thicknessExpression}: ${thickness.error}`,
+      });
+    const depth = thinDepthOutcome(part, scope);
+    if (depth && 'error' in depth)
+      problems.push({
+        code: 'variable-value',
+        severity: 'error',
+        partId: part.id,
+        message: `Depth ${part.thin!.depthExpression}: ${depth.error}`,
       });
     const relief = reliefOutcome(part, scope);
     if (relief && 'error' in relief)
@@ -430,6 +447,7 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
               ...(part.cornerRelief?.diameterExpression && {
                 cornerRelief: { ...part.cornerRelief, diameterExpression: edit(part.cornerRelief.diameterExpression) },
               }),
+              ...(part.thin?.depthExpression && { thin: { ...part.thin, depthExpression: edit(part.thin.depthExpression) } }),
               ...(part.drawnOn?.offsetExpression && {
                 drawnOn: { ...part.drawnOn, offsetExpression: edit(part.drawnOn.offsetExpression) },
               }),

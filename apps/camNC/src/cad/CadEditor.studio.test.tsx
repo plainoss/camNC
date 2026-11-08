@@ -1,5 +1,6 @@
 import {
   addCircle,
+  addLine,
   cadSketchRegions,
   createCadDocument,
   createCadPart,
@@ -280,6 +281,10 @@ it('copies a part with a transform, and edits the copy from its feature', async 
   await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate 2/ }));
   dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
   expect(within(dialog).getAllByRole('textbox')[0]).toHaveProperty('value', '250');
+  // The copy is a part of its own in the parts list, with its own eye.
+  const panel = screen.getByRole('region', { name: 'Parts panel' });
+  expect(within(panel).getByRole('heading').textContent).toBe('Parts (2)');
+  expect(within(panel).getByRole('button', { name: 'Hide Plate 2' })).toBeDefined();
 });
 
 it('opens a new design in the studio, asking for its first sketch’s plane', async () => {
@@ -331,6 +336,74 @@ it('makes a variable from `#name = value` in a field and uses it there, and list
   expect(options.map(option => option.textContent)).toEqual(['#board19 mm', 'New variable']);
   await userEvent.keyboard('{Enter}');
   expect(thickness).toHaveProperty('value', '#board');
+});
+
+it('keeps a value typed as `#name = value` when the tick is clicked straight after', async () => {
+  const { latest } = await studio();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
+  await userEvent.clear(thickness);
+  await userEvent.type(thickness, '#board = 19 mm');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull());
+  expect(latest().variables?.map(variable => variable.name)).toEqual(['board']);
+  expect(latest().parts[0]!.thickness).toBe(19);
+  expect(latest().parts[0]!.thicknessExpression).toMatch(/board/);
+});
+
+it('closes a one-line sketch as a thin board, set in the Extrude dialog’s Thin tab', async () => {
+  const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
+  side.drawnOn = { on: { plane: 'right' as const }, offset: 0 };
+  const back = { ...createCadPart('Back', 4), drawnOn: { on: { partId: side.id, face: 'top' as const }, offset: -10 } };
+  back.sketch = addLine(back.sketch, { x1: 10, y1: 0, x2: 10, y2: 500 });
+  const source: CadDocument = { ...createCadDocument(), parts: [side, back] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Back/ }));
+  const sketch = await screen.findByRole('dialog', { name: 'Sketch · Back' });
+  await waitFor(() => expect(within(sketch).getByRole('button', { name: '✓ Finish sketch' })).toHaveProperty('disabled', false));
+  await userEvent.click(within(sketch).getByRole('button', { name: '✓ Finish sketch' }));
+  const extrude = await screen.findByRole('dialog', { name: 'Extrude · Back' });
+  expect(within(extrude).getByRole('tab', { name: 'Thin' }).getAttribute('aria-selected')).toBe('true');
+  const depth = within(extrude).getByRole('textbox', { name: 'Depth' });
+  // A depth that can't be taken keeps the dialog open to fix it.
+  await userEvent.clear(depth);
+  await userEvent.type(depth, '0{Enter}');
+  expect(await within(extrude).findByRole('alert')).toBeDefined();
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  expect(screen.getByRole('dialog', { name: 'Extrude · Back' })).toBe(extrude);
+  await userEvent.clear(depth);
+  await userEvent.type(depth, '380{Enter}');
+  await waitFor(() => expect(latest().parts[1]!.thin).toEqual({ depth: 380, midPlane: true }));
+  // Enter in a field keeps the step, as the tick does.
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Back' })).toBeNull());
+  // Solid takes it back to a face pushed out by its thickness.
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Back/ }));
+  await userEvent.click(within(await screen.findByRole('dialog', { name: 'Extrude · Back' })).getByRole('tab', { name: 'Solid' }));
+  await waitFor(() => expect(latest().parts[1]!.thin).toBeUndefined());
+});
+
+it('lists the parts at the bottom of the sidebar, each with an eye to hide it in the view', async () => {
+  await studio();
+  const panel = await screen.findByRole('region', { name: 'Parts panel' });
+  const sidebar = panel.closest('aside')!;
+  // Below the features, as the sidebar's last section.
+  expect(sidebar.lastElementChild).toBe(panel);
+  const eye = within(panel).getByRole('button', { name: 'Hide Plate' });
+  await userEvent.click(eye);
+  expect(within(panel).getByRole('button', { name: 'Show Plate' }).getAttribute('aria-pressed')).toBe('false');
+  await userEvent.click(within(panel).getByRole('button', { name: 'Show Plate' }));
+  expect(within(panel).getByRole('button', { name: 'Hide Plate' })).toBeDefined();
 });
 
 it('doesn’t apply a field after its dialog is cancelled, and applies a dimension through its form after #name = value', async () => {
