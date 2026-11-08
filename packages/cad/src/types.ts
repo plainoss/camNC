@@ -356,6 +356,7 @@ export interface CadDocument {
  */
 export interface CadPartCut {
   id: string;
+  /** Part IDs cut with the part and all its copies; `<partId>:<copyId>` cuts with only that copy, as placed and mirrored. */
   tools: string[];
   targets: string[];
   /**
