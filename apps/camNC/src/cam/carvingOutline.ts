@@ -116,6 +116,15 @@ function canvas(w: number, h: number) {
 
 const kUnreadableSvg = 'This SVG could not be read. Use filled shapes, without linked images or fonts.';
 
+/** Absolute SVG lengths in CSS pixels; relative or missing dimensions do not define a viewport. */
+function svgLengthPx(length: string | null): number | undefined {
+  const match = length?.trim().match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(px|mm|cm|in|pt|pc|q)?$/i);
+  if (!match) return undefined;
+  const pxPerUnit: Record<string, number> = { px: 1, mm: 96 / 25.4, cm: 96 / 2.54, in: 96, pt: 96 / 72, pc: 16, q: 96 / 101.6 };
+  const px = Number(match[1]) * pxPerUnit[match[2]?.toLowerCase() ?? 'px'];
+  return Number.isFinite(px) && px > 0 ? px : undefined;
+}
+
 async function svgImage(svg: string): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
   try {
@@ -168,10 +177,12 @@ export async function outlineArt(art: CarvingArt, height: number): Promise<{ reg
     .split(/[\s,]+/)
     .map(Number);
   const validViewBox = viewBox?.length === 4 && viewBox.every(Number.isFinite) && viewBox[2] > 0 && viewBox[3] > 0;
-  const sourceWidth = validViewBox ? viewBox[2] : parseFloat(svg.getAttribute('width') ?? '');
-  const sourceHeight = validViewBox ? viewBox[3] : parseFloat(svg.getAttribute('height') ?? '');
-  if (!Number.isFinite(sourceWidth) || !Number.isFinite(sourceHeight) || sourceWidth <= 0 || sourceHeight <= 0)
-    throw new Error(kUnreadableSvg);
+  const viewportWidth = svgLengthPx(svg.getAttribute('width'));
+  const viewportHeight = svgLengthPx(svg.getAttribute('height'));
+  const hasViewport = viewportWidth !== undefined && viewportHeight !== undefined;
+  const sourceWidth = hasViewport ? viewportWidth : validViewBox ? viewBox[2] : undefined;
+  const sourceHeight = hasViewport ? viewportHeight : validViewBox ? viewBox[3] : undefined;
+  if (sourceWidth === undefined || sourceHeight === undefined) throw new Error(kUnreadableSvg);
   if (!validViewBox) svg.setAttribute('viewBox', `0 0 ${sourceWidth} ${sourceHeight}`);
   const aspect = sourceWidth / sourceHeight;
   const width = height * aspect;
