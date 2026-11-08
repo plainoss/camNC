@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { cadValueHasUnit, formatCadValue, parseCadValue } from './valueExpressions';
+import {
+  cadExpressionNames,
+  cadValueHasUnit,
+  cadVariableNameError,
+  formatCadValue,
+  parseCadValue,
+  renameCadExpressionVariable,
+} from './valueExpressions';
 
 function value(text: string, unit: 'mm' | 'deg' = 'mm') {
   const parsed = parseCadValue(text, { unit });
@@ -151,6 +158,122 @@ describe('CAD value expressions', () => {
     expect(parseCadValue('('.repeat(40) + '1' + ')'.repeat(40))).toHaveProperty('error');
     expect(parseCadValue('1+'.repeat(300) + '1')).toHaveProperty('error');
     expect(parseCadValue('constructor.constructor("return 1")()')).toHaveProperty('error');
+  });
+});
+
+describe('CAD expression functions', () => {
+  const variables = {
+    w: { value: 800, kind: 'length' },
+    h: { value: 600, kind: 'length' },
+    depth: { value: 4.6, kind: 'length' },
+    tilt: { value: 12.6, kind: 'angle' },
+    a: { value: 7, kind: 'number' },
+    b: { value: 3, kind: 'number' },
+  } as const;
+  const parse = (text: string) => parseCadValue(text, { variables });
+
+  it('rounds base units and preserves length and angle dimensions', () => {
+    expect(parse('floor(w / 3)')).toMatchObject({ value: 266 });
+    expect(parse('ROUND(depth)')).toMatchObject({ value: 5 });
+    expect(parse('floor(1.5cm)')).toMatchObject({ value: 15 });
+    expect(parseCadValue('round(tilt)', { unit: 'deg', variables })).toMatchObject({ value: 13 });
+    expect(parseCadValue('floor(tilt)', { unit: 'deg', variables })).toMatchObject({ value: 12 });
+    expect(parseCadValue('round(1.6)', { unit: 'scalar' })).toMatchObject({ value: 2 });
+    expect(parse('floor(tilt)')).toHaveProperty('error');
+  });
+
+  it('selects two or more values, promoting plain numbers like sums', () => {
+    expect(parse('max(depth, 5, 2)')).toMatchObject({ value: 5 });
+    expect(parse('min(5; depth; 2)')).toMatchObject({ value: 2 });
+    expect(parse('MAX(w, h)')).toMatchObject({ value: 800 });
+    expect(parseCadValue('min(tilt; 10)', { unit: 'deg', variables })).toMatchObject({ value: 10 });
+    expect(parse('min(2mm; 1in)')).toMatchObject({ value: 2 });
+    for (const text of ['min(w; tilt)', 'max(1in; 2)', 'max(w; w/w)', 'min(w; 1/2)']) expect(parse(text), text).toHaveProperty('error');
+  });
+
+  it.each([
+    ['min(a, b)', 3],
+    ['min(a,b)', 3],
+    ['min(a,123)', 7],
+    ['min(1.5, 2)', 1.5],
+    ['min(1,5; 2)', 1.5],
+    ['max(1,5; 2)', 2],
+    ['min(a; max(b, 4))', 4],
+    ['min((1,5); 2)', 1.5],
+  ])('separates arguments and decimal marks in %s', (text, expected) => {
+    expect(parse(String(text))).toMatchObject({ value: expected });
+  });
+
+  it('explains ambiguous single arguments and preserves comma safety elsewhere', () => {
+    for (const text of ['min(1,5)', 'max(2,25)'])
+      expect(parse(text)).toMatchObject({ error: expect.stringContaining('Separate values with ", " or ";"') });
+    for (const text of ['min(1,125; 2)', 'max(1,125)'])
+      expect(parse(text)).toMatchObject({ error: expect.stringContaining('Ambiguous comma group') });
+    for (const text of [',123', '0,125', '1;2', '1,2,3']) expect(parse(text), text).toHaveProperty('error');
+    expect(parse('18,5')).toMatchObject({ value: 18.5 });
+  });
+
+  it('takes square roots of scalars and squared lengths, with larger squared intermediates', () => {
+    expect(parseCadValue('SqRt(9)', { unit: 'scalar' })).toMatchObject({ value: 3 });
+    expect(parse('sqrt(w*w + h*h)')).toMatchObject({ value: 1000 });
+    expect(parse('sqrt(max(w*w; h*h))')).toMatchObject({ value: 800 });
+    expect(parse('sqrt(floor(w*w))')).toMatchObject({ value: 800 });
+    expect(parse('sqrt(w*w - h*h)')).toMatchObject({ value: Math.sqrt(280000) });
+    expect(parse('(w*w)/w')).toMatchObject({ value: 800 });
+    expect(parse('sqrt(2mm * 8mm)')).toMatchObject({ value: 4 });
+    expect(parse('sqrt(w*w*2)')).toMatchObject({ value: Math.sqrt(1280000) });
+    expect(parse('sqrt(100000mm*100000mm)')).toMatchObject({ value: 100000 });
+    expect(parse('w*w')).toMatchObject({ error: expect.stringContaining('squared length') });
+    for (const text of [
+      'w*w',
+      'w*w*w',
+      'tilt*tilt',
+      'tilt*w',
+      'sqrt(w)',
+      'sqrt(tilt)',
+      'sqrt(-1)',
+      'sqrt(w*w)*200',
+      'sqrt(100000mm*100000mm + 1mm*1mm)',
+      'w*w + 1',
+      'w/(w*w)',
+    ])
+      expect(parse(text), text).toHaveProperty('error');
+  });
+
+  it('rejects missing parentheses, unknown functions, invalid arity and excessive nesting', () => {
+    for (const name of ['floor', 'round', 'min', 'max', 'sqrt']) {
+      expect(parse(name + ' 2')).toMatchObject({ error: expect.stringContaining('(') });
+      expect(parse(name + '()')).toHaveProperty('error');
+    }
+    expect(parse('mystery(1)')).toEqual({ error: 'Unknown function: mystery.' });
+    for (const text of [
+      'floor(1; 2)',
+      'round(1; 2)',
+      'sqrt(1; 2)',
+      'max(1)',
+      'min(a,)',
+      'min(a, b',
+      'min(5,e2)',
+      'sqrt('.repeat(34) + '1' + ')'.repeat(34),
+    ])
+      expect(parse(text), text).toHaveProperty('error');
+    expect(parse('floor('.repeat(32) + '1' + ')'.repeat(32))).toMatchObject({ value: 1 });
+    expect(parse('max(' + Array(128).fill('1').join(', ') + ')')).toMatchObject({ error: 'This expression is too long.' });
+    expect(parse('2@')).toMatchObject({ error: expect.stringMatching(/functions.*;/) });
+  });
+
+  it('treats a function name as a call only before parentheses, so variables may share it', () => {
+    const scope = { ...variables, round: { value: 6, kind: 'length' } } as const;
+    for (const name of ['floor', 'ROUND', 'min', 'Max', 'sqrt']) {
+      expect(cadVariableNameError(name)).toBeNull();
+      expect(renameCadExpressionVariable(name + '(w)', name, 'other')).toBe(name + '(w)');
+    }
+    expect(parseCadValue('round + round(depth)', { variables: scope })).toMatchObject({ value: 11 });
+    expect(parseCadValue('max(round, 2)', { variables: scope })).toMatchObject({ value: 6 });
+    expect(cadExpressionNames('round(w) + round')).toEqual(['w', 'round']);
+    expect(renameCadExpressionVariable('round(round) + round', 'round', 'radius')).toBe('round(radius) + radius');
+    expect(cadExpressionNames('max(#depth, floor(w / 3)) + sqrt(h*h)')).toEqual(['depth', 'w', 'h']);
+    expect(renameCadExpressionVariable('max(#depth, floor(depth))', 'depth', 'cut')).toBe('max(#cut, floor(cut))');
   });
 });
 

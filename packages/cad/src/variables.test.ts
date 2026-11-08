@@ -215,6 +215,9 @@ describe('design variables', () => {
     document = variable(document, 'housing', '8mm', id);
     expect(cadCuts(document.parts[0]!)[0]).toMatchObject({ depth: 8, depthExpression: 'housing' });
     expect(evaluateCadDocument(document).parts[0]!.cuts![0]).toMatchObject({ to: 8 });
+    document = variable(document, 'housing', '0mm', id);
+    expect(cadCuts(document.parts[0]!)[0]!.depth).toBe(8);
+    expect(cadVariableProblems(document).map(p => p.message)).toEqual(['Cut depth housing: A cut needs some depth.']);
     document = variable(document, 'housing', '-2mm', id);
     expect(cadCuts(document.parts[0]!)[0]!.depth).toBe(8);
     expect(cadVariableProblems(document).map(p => p.message)).toEqual(['Cut depth housing: A cut can’t be less than nothing deep.']);
