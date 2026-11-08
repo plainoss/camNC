@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assemblyReport,
   createCadDocument,
+  evaluateCadDocument,
   createPlateDocument,
   parseCadDocument,
   partFaceAt,
@@ -91,6 +93,33 @@ describe('parts drawn on planes and faces', () => {
     const { diagnostics } = resolveDrawnPlacements({ ...createCadDocument(), parts: [top] });
     expect(diagnostics.map(d => d.message)).toEqual(['Top: The part it was drawn on is gone.']);
   });
+
+  it('leaves two parts drawn on each other where they were, rather than stacking them up', () => {
+    const a = { ...plate('A', '100mm', '100mm', 18, { on: { partId: 'b', face: 'top' }, offset: 0 }), id: 'a' };
+    const b = { ...plate('B', '100mm', '100mm', 18, { on: { partId: 'a', face: 'top' }, offset: 0 }), id: 'b' };
+    a.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    b.placement = { position: [100, 0, 0], rotation: [0, 0, 0, 1] };
+    const document = { ...createCadDocument(), parts: [a, b] };
+    const once = resolveDrawnPlacements(document);
+    expect(once.document.parts.map(part => part.placement!.position)).toEqual([
+      [0, 0, 0],
+      [100, 0, 0],
+    ]);
+    expect(once.diagnostics).toHaveLength(2);
+    expect(resolveDrawnPlacements(once.document).document.parts.map(part => part.placement!.position)).toEqual([
+      [0, 0, 0],
+      [100, 0, 0],
+    ]);
+  });
+
+  it('finds a part grown into the unplaced part it’s drawn on taking up the same space', () => {
+    const base = plate('Base', '100mm', '100mm', 18, { on: { plane: 'top' }, offset: 0 });
+    delete base.drawnOn;
+    delete base.placement;
+    const inset = plate('Inset', '50mm', '50mm', 6, { on: { partId: base.id, face: 'top' }, offset: 0, inward: true });
+    const document = resolveDrawnPlacements({ ...createCadDocument(), parts: [base, inset] }).document;
+    expect(assemblyReport(document, evaluateCadDocument(document).parts)!.collisions.map(c => c.parts)).toEqual([['Base', 'Inset']]);
+  });
 });
 
 describe('finding the face a click landed on', () => {
@@ -102,5 +131,7 @@ describe('finding the face a click landed on', () => {
     expect(partFaceAt(side, placed, [0, 50, 50], [-1, 0, 0])).toBe('underside');
     expect(partFaceAt(side, placed, [10, 0, 50], [0, -1, 0])).toEqual({ edge: leftEdge(side) });
     expect(partFaceAt(side, placed, [10, 0, 50], [0, -0.7, 0.7])).toBeNull();
+    // A pocket floor halfway through looks the same way as the top, but isn't a face a part sits on.
+    expect(partFaceAt(side, placed, [10, 50, 50], [1, 0, 0])).toBeNull();
   });
 });

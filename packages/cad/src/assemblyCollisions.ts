@@ -1,5 +1,6 @@
 import { pointInPolygon } from './geometry';
 import { mirrorEvaluatedPart } from './copies';
+import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { rotateVector } from './placement';
 import type { CadDocument, CadPlacement, EvaluatedCadPart } from './types';
 
@@ -127,6 +128,7 @@ function collide(a: Placed, b: Placed): CadAssemblyReport['collisions'][number] 
 
 /** Where the placed parts sit, and where any two of them would need the same material. Unplaced parts aren't in it. */
 export function assemblyReport(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadAssemblyReport | undefined {
+  const supports = cadDrawnOnSupports(document);
   const placed = document.parts.flatMap(source => {
     const part = parts.find(candidate => candidate.partId === source.id);
     if (!part?.outline.length) return [];
@@ -136,7 +138,8 @@ export function assemblyReport(document: CadDocument, parts: readonly EvaluatedC
         ? [place(copy.mirrored ? mirrorEvaluatedPart(part) : part, source.id, `${source.name} ${index + 2}`, copy.placement)]
         : []
     );
-    return [...(source.placement ? [place(part, source.id, source.name, source.placement)] : []), ...copies];
+    const at = effectivePlacement(source, supports);
+    return [...(at ? [place(part, source.id, source.name, at)] : []), ...copies];
   });
   if (!placed.length) return undefined;
   const collisions: CadAssemblyReport['collisions'] = [];
