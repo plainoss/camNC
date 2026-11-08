@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { profileFeatures } from './cutFeatures';
 import { camBoard, holdOptionsOf, holdsOnParts, jobHoldClashes, splitByBit, type BoardSpec } from './board';
 import type { PartFeatures } from './features';
 import { postProgram, toGcode } from './gcode';
@@ -135,6 +136,26 @@ describe('the middle of a through hole', () => {
     const programs = splitByBit(cam).map(p => ({ ...p, gcode: postProgram(p).gcode, diameter: 3.175 }));
     expect(jobHoldClashes(b, cam.stockTop, programs)).toEqual([]);
     expect(holdTimeline(cam, b, holdOptionsOf(b, { tools: [tool(3.175)] })).filter(e => e.kind === 'pivot')).toEqual([]);
+  });
+
+  it('a screwed middle stays out of a counterbore around its hole', () => {
+    const { features } = profileFeatures({
+      thickness: T,
+      outline: rect(0, 0, 300, 120),
+      holes: [circle(150, 60, 50)],
+      cuts: [{ id: 'counterbore', from: 0, to: 3, through: false, outline: circle(150, 60, 70), islands: [] }],
+    });
+    const screw = (x: number, y: number) => ({ x, y, kind: 'screw' as const, d: 10 });
+    const b = board(features, {
+      w: 380,
+      h: 200,
+      holdPoints: [screw(190, 100), screw(8, 8), screw(372, 8), screw(372, 192), screw(8, 192)],
+    });
+    Object.assign(b.parts[0], { x: 40, y: 40 });
+    const cam = camBoard(b, { tools: [tool(3.175)] });
+    expect(cam.holeMiddles?.[0].state).toBe('screwed');
+    const programs = splitByBit(cam).map(p => ({ ...p, gcode: postProgram(p).gcode, diameter: 3.175 }));
+    expect(jobHoldClashes(b, cam.stockTop, programs)).toEqual([]);
   });
 
   it('a hold in a hole is not on a part of several outlines, a hold on any of them is', () => {

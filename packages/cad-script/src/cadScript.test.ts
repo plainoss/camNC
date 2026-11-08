@@ -361,11 +361,10 @@ describe('toolpath summary', () => {
       door.expect({ pockets: 2 });
       const rack = d.part('Rack', { thickness: 19 });
       rack.profile.rect({ at: [0, 0], w: 200, h: 100 });
-      rack.profile.circle({ at: [100, 50], d: 5 });
       const face = rack.sketchOn('top');
-      face.circle({ at: [100, 50], d: 10 });
-      // CAM keeps out of the screw hole, which leaves a ring too narrow for the default 3.175 mm bit.
-      rack.cut(face.regionAt(104, 50), { depth: 1.5 });
+      // A 2 mm pocket: the default 3.175 mm bit doesn't fit in it.
+      face.circle({ at: [100, 50], d: 2 });
+      rack.cut(face.regionAt(100, 50), { depth: 1.5 });
     });
     expect(report.errors).toEqual([]);
     expect(report.warnings.filter(warning => warning.code === 'toolpath-missing').map(warning => warning.part)).toEqual(['Rack']);
