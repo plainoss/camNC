@@ -54,7 +54,8 @@ file unless it writes a new SVG for that run. See `examples/` for more.
 - `d.part(name, { relief: 'bit' })`, or `part.relief(...)`, puts dogbones in the part's
   inside corners for a bit of that diameter, so mortises and finger joints close. Corners
   on the outline of a pocket that runs off the part stay square. The check warns with
-  `relief-bit` when the bit it plans with is wider than the relief.
+  `relief-bit` when the bit it plans with is wider than the relief. The report gives a
+  cut's size as drawn, and its size with the bones as `relieved` when they make it wider.
 - `pattern(items, { count, step: [dx, dy], rows? })` repeats curves, or a whole `rect` or
   `path`, in linked copies, such as a row of shelf-pin holes. Cutting the first copy's region cuts them all, including
   copies the pattern gains later. A count can be an expression, rounded down to say how
