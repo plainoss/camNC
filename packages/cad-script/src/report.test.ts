@@ -27,6 +27,24 @@ describe('report sizes', () => {
   });
 });
 
+describe('report pieces', () => {
+  it('lists copies a tool reaches differently with the rest of the part', async () => {
+    const { report } = await editCad(null, d => {
+      const panel = d.part('Panel', { thickness: 18 });
+      panel.profile.rect({ at: [0, 0], w: 200, h: 100 });
+      panel.place({ at: [0, 0, 0] });
+      panel.copy({ at: [0, 0, 100] });
+      panel.copy({ at: [1000, 0, 0] });
+      const pin = d.part('Pin', { thickness: 18 });
+      pin.profile.rect({ at: [0, 0], w: 20, h: 20 });
+      pin.place({ at: [90, 40, 10] });
+      d.cutParts(panel, { with: [pin], clearance: 0 });
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.parts[0]!.pieces).toEqual({ names: ['Panel', 'Panel 2', 'Panel 3'], mirrored: [] });
+  });
+});
+
 describe('report holes', () => {
   it('counts profile holes and through cuts, including pattern copies and floor cuts, once each', async () => {
     const { report } = await editCad(null, d => {
