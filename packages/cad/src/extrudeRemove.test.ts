@@ -28,15 +28,21 @@ describe('Extrude → Remove', () => {
     expect(evaluateCadDocument(document).parts[0]!.cuts).toHaveLength(1);
   });
 
-  it('cuts a notch drawn against the edge, leaving the rest of the board', () => {
+  it('cuts a notch drawn against the edge as a pocket, leaving the rest of the board, and refuses cutting it through', () => {
     const source = design(sketch => {
       let next = addLine(sketch, { x1: 0, y1: 40, x2: 30, y2: 40 });
       next = addLine(next, { x1: 30, y1: 40, x2: 30, y2: 60 });
       return addLine(next, { x1: 30, y1: 60, x2: 0, y2: 60 });
     });
-    const result = extrudeRemove(source, source.parts[1]!.id, 'through');
+    const result = extrudeRemove(source, source.parts[1]!.id, 6);
     if ('error' in result) throw new Error(result.error);
-    expect(cadCuts(result.document.parts[0]!).map(cut => cut.depth)).toEqual(['through']);
+    expect(cadCuts(result.document.parts[0]!).map(cut => cut.depth)).toEqual([6]);
+    // Through, it would change the board's outline, which CAM holds the board by: that's refused, as cuts are.
+    expect(extrudeRemove(source, source.parts[1]!.id, 'through')).toEqual({
+      error: 'A through cut can’t reach the part’s edge. Change the profile instead, or use a separate part.',
+    });
+    // A pocket deeper than the board is refused rather than quietly cut through.
+    expect(extrudeRemove(source, source.parts[1]!.id, 30)).toHaveProperty('error');
   });
 
   it('keeps a depth typed with variables, and refuses what it can’t cut', () => {

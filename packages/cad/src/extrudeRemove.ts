@@ -1,6 +1,6 @@
 import { newCadId } from './document';
-import { cadSketchRegions, setCutDepth, withFeatureVersion } from './features';
-import { polygonArea } from './geometry';
+import { cadSketchRegions, evaluateCadFeatures, setCutDepth, withFeatureVersion } from './features';
+import { evaluateCadPart, polygonArea } from './geometry';
 import type { CadCutDepth, CadDocument, CadEntity } from './types';
 
 /**
@@ -57,5 +57,10 @@ export function extrudeRemove(
     parts: document.parts.flatMap(candidate => (candidate.id === part.id ? [] : candidate.id === support.id ? [board] : [candidate])),
   });
   for (const region of cut) next = setCutDepth(next, support.id, sketch.id, region.id, depth, depthExpression);
+  // The board has to take the cuts, as CAM machines it: a through cut can't reach its edge, nor a pocket go through.
+  const cutBoard = next.parts.find(candidate => candidate.id === support.id)!;
+  const profile = evaluateCadPart(cutBoard).part;
+  const refused = profile && evaluateCadFeatures(cutBoard, profile).diagnostics.find(diagnostic => diagnostic.severity === 'error');
+  if (refused) return { error: refused.message };
   return { document: next };
 }
