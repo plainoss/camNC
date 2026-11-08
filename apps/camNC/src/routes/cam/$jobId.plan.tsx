@@ -16,6 +16,7 @@ import { orderBoardQueue } from '@wbcnc/cam/board';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { Hint } from '@/cam/Hint';
 import { PlanSettingsPanel } from '@/cam/plan/PlanSettingsPanel';
+import { PlanningProgress } from '@/cam/plan/PlanningProgress';
 import { ProgramDownloads } from '@/cam/plan/ProgramDownloads';
 import { PlanOperations, type EditProps } from '@/cam/plan/PlanOperations';
 import { usePlanLayout, type PlanTab } from '@/cam/plan/planLayoutStore';
@@ -360,8 +361,8 @@ function PlanStep() {
               No executable parts on this board. Include excluded parts again or repair their placement on Boards.
             </p>
           ) : !result ? (
-            <div className="flex flex-1 items-center justify-center gap-2 text-muted-foreground">
-              <LoadingSpinner className="size-4" /> Computing toolpaths…
+            <div className="flex flex-1 items-center justify-center">
+              <PlanningProgress boardId={current.board.id} />
             </div>
           ) : (
             <div role="status" className="flex flex-col gap-1 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-[13px]">
@@ -473,13 +474,23 @@ function PlanWorkspace({
       <main className="flex min-w-0 flex-col gap-3 p-3 md:min-h-0 md:flex-1 md:p-4">
         {above}
         {plan && playback ? (
-          <PlanView3D
-            plan={plan}
-            board={board}
-            parts={parts}
-            playback={playback}
-            className={cn('transition-opacity md:min-h-0 md:flex-1', fetching && 'opacity-60')}
-          />
+          <div className="relative flex flex-col md:min-h-0 md:flex-1">
+            <PlanView3D
+              plan={plan}
+              board={board}
+              parts={parts}
+              playback={playback}
+              className={cn('transition-opacity md:min-h-0 md:flex-1', fetching && 'opacity-60')}
+            />
+            {/* The programs shown are the last ones while new ones are computed. */}
+            {fetching && (
+              <PlanningProgress
+                boardId={board.id}
+                after={1000}
+                className="absolute top-12 left-1/2 -translate-x-1/2 rounded-lg border bg-background/95 p-3 shadow-sm"
+              />
+            )}
+          </div>
         ) : (
           status
         )}

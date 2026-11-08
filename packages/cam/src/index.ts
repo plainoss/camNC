@@ -95,6 +95,7 @@ export type { BoardSide, EdgeFit, Fixture, SettleBoard, SettlePart, Settled, Spo
 export { sideBSpec, dowelClearance, dowelProblem, dowelSpots, dowelOperations } from './flip';
 export type { FlipRegistration, DowelSpec, TurnedOver } from './flip';
 export type { HoldOptions, PartHold, TabHold, HoldEvent } from './hold';
+export type { OnProgress } from './progress';
 export {
   camBoard,
   boardBits,
