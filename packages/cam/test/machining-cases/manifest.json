@@ -307,7 +307,7 @@
       "inputFile": "controlled-pocket-island.input.json",
       "inputSha256": "6b3f1ce54e833520b4807a153db11b1acfeb91bea90203fa5a2113b5ca278c0b",
       "warnings": [
-        "pocket z=3.5: 21.8mm² left in corners/narrow spots with D=3.175",
+        "pocket z=3.5: 2.2mm² left in corners/narrow spots with D=3.175",
         "2 roughing loops left for cleanup because the requested turn radius does not fit",
         "1 controlled pocket entry locations require full-width entry; ramp feed and stepdown remain separate limits",
         "Planar material-rate limits exclude axial removal in 40 descending moves; ramp/plunge feed and stepdown apply separately"
@@ -315,8 +315,8 @@
       "programs": [
         {
           "file": "controlled-pocket-island.nc",
-          "sha256": "586b6678753a5c4e139ba9f3cda27ccab70e75a563dc4a9088f122fc8d92273f",
-          "bytes": 2122,
+          "sha256": "37cda21a575ed9e337bd9426c0a1dfdba26c26b45952eb7fc9a5ecda394e8be8",
+          "bytes": 2121,
           "operations": 1,
           "passes": 2,
           "toolNumbers": [
@@ -324,7 +324,7 @@
           ],
           "setup": {
             "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-d920a53d5d654249",
+            "planFingerprint": "cam-plan-v1-096d145a7f4826be",
             "programName": "controlled-pocket-island",
             "units": "mm",
             "origin": {
@@ -419,13 +419,13 @@
               ]
             },
             "warnings": [
-              "pocket z=3.5: 21.8mm² left in corners/narrow spots with D=3.175",
+              "pocket z=3.5: 2.2mm² left in corners/narrow spots with D=3.175",
               "2 roughing loops left for cleanup because the requested turn radius does not fit",
               "1 controlled pocket entry locations require full-width entry; ramp feed and stepdown remain separate limits",
               "Planar material-rate limits exclude axial removal in 40 descending moves; ramp/plunge feed and stepdown apply separately"
             ],
             "statistics": {
-              "bytes": 2122,
+              "bytes": 2121,
               "executableBlocks": 96,
               "motionBlocks": 88,
               "arcBlocks": 8,
@@ -1288,12 +1288,12 @@
       "inputFile": "tool-width-threshold.input.json",
       "inputSha256": "a40a4f027bfc7b678a30ebdc052cc9b10f52138b2473e0f91dec341ad3799483",
       "warnings": [
-        "pocket z=2.5: 170.0mm² left in corners/narrow spots with D=3.175"
+        "pocket z=2.5: 154.5mm² left in corners/narrow spots with D=3.175"
       ],
       "programs": [
         {
           "file": "tool-width-threshold.nc",
-          "sha256": "5781765c2475c43928f0e709c09308f4c098d03ab416ef2d11a81e8a27a6970e",
+          "sha256": "e6643bc0e22944756aaa830764326fbaa3af48a50bb29b751dc57b83a3c177fc",
           "bytes": 889,
           "operations": 1,
           "passes": 1,
@@ -1302,7 +1302,7 @@
           ],
           "setup": {
             "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-f9a4edca618fc05e",
+            "planFingerprint": "cam-plan-v1-5e46381948491b9d",
             "programName": "tool-width-threshold",
             "units": "mm",
             "origin": {
@@ -1398,7 +1398,7 @@
               ]
             },
             "warnings": [
-              "pocket z=2.5: 170.0mm² left in corners/narrow spots with D=3.175"
+              "pocket z=2.5: 154.5mm² left in corners/narrow spots with D=3.175"
             ],
             "statistics": {
               "bytes": 889,

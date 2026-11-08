@@ -274,8 +274,8 @@
       "metrics": [
         {
           "file": "default-open-pocket-400x12x9-d6.nc",
-          "sha256": "a0ac62c921f762b730b3d32a8f7c44bfa7247c788cf40d533d8a701c83288797",
-          "bytes": 3527,
+          "sha256": "9f6bbe89a46201d383089bf54c7bf2211631249980633689c523919427ff761b",
+          "bytes": 3526,
           "executableBlocks": 148,
           "motionBlocks": 140,
           "arcBlocks": 48,
@@ -347,8 +347,8 @@
       "metrics": [
         {
           "file": "default-open-pocket-400x40x3-d6.nc",
-          "sha256": "9fa43d498c0b2de5113ece146708c86b5a684b44d2f6ca957df3a2e7dd56d0d3",
-          "bytes": 3191,
+          "sha256": "c05da4ad662ec2220b7efc5554679bfaf9e0e0466e3365480580d165c228ff0f",
+          "bytes": 3190,
           "executableBlocks": 127,
           "motionBlocks": 119,
           "arcBlocks": 38,

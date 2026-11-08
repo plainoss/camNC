@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { profileFeatures } from './cutFeatures';
 import { DEFAULT_TABS } from './settings';
+import { camPart } from './toolpaths';
 import { planBoard, type BoardPartSource, type BoardRequest } from './plan';
 import type { PathD } from './geom';
 
@@ -49,6 +50,21 @@ describe('profileFeatures', () => {
       cuts: [{ id: 'slot', from: 0, to: 18, through: true, outline: rect(95, -5, 10, 130), islands: [] }],
     });
     expect(profile.split).toBe(true);
+  });
+});
+
+describe('open rebates', () => {
+  it('cuts a rebate that runs off the part right out to its ends, without a corner warning', () => {
+    // A cupboard side's rebates: across both ends and along the back edge, drawn past the part so they're open.
+    const rebate = (id: string, outline: ReturnType<typeof rect>) => ({ id, from: 0, to: 8, through: false, outline, islands: [] });
+    const { features } = profileFeatures({
+      thickness: 18,
+      outline: rect(0, 0, 300, 720),
+      holes: [],
+      cuts: [rebate('bottom', rect(-5, -5, 310, 23)), rebate('top', rect(-5, 702, 310, 23)), rebate('back', rect(294, -5, 11, 730))],
+    });
+    const { warnings } = camPart(features, { cutThrough: false });
+    expect(warnings.filter(w => w.includes('left in corners'))).toEqual([]);
   });
 });
 
