@@ -173,6 +173,47 @@ describe('the Carve step', () => {
     });
   });
 
+  it('sizes the board by dragging its edges, in 10 mm steps, with the fields following', async () => {
+    const job = await open();
+    const svg = screen.getByTestId('carving-outline').closest('svg')!;
+    const field = (label: string) =>
+      screen.getByLabelText(label, { selector: '#carve-board-' + label[0].toLowerCase() }) as HTMLInputElement;
+    const drag = (grip: string, dx: number, dy: number, shiftKey = false) => {
+      // 1 mm on the board in screen pixels, as the view is now.
+      const px = svg.getScreenCTM()!.a;
+      const handle = svg.querySelector(`[data-resize="${grip}"]`)!;
+      const r = handle.getBoundingClientRect();
+      const from = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1 };
+      fireEvent.pointerDown(handle, from);
+      fireEvent.pointerMove(svg, { ...from, clientX: from.clientX + dx * px, clientY: from.clientY + dy * px, shiftKey });
+      return () => fireEvent.pointerUp(svg, from);
+    };
+
+    // The right edge: the width, shown in its field while dragging, saved when dropped.
+    const drop = drag('w', 43, 0);
+    expect(field('Width').value).toBe('340');
+    expect(field('Height').value).toBe('140');
+    drop();
+    await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 340, h: 140 }));
+    expect(screen.getByRole('img', { name: /^Board 340 × 140 mm/ })).toBeTruthy();
+
+    // The top edge grows the board upwards; Shift takes single millimetres.
+    drag('h', 0, -23, true)();
+    await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 340, h: 163 }));
+
+    // The corner takes both, and stops at the fields' least size.
+    drag('wh', -1000, 1000)();
+    await waitFor(async () => expect((await getJob(job.id))?.boards?.[0].size).toEqual({ fit: false, w: 20, h: 20 }));
+
+    // Typed sizes move the edges.
+    fireEvent.change(field('Width'), { target: { value: '250' } });
+    fireEvent.blur(field('Width'));
+    await waitFor(() => expect(screen.getByRole('img', { name: /^Board 250 × 20 mm/ })).toBeTruthy());
+    const right = svg.querySelector('[data-resize="w"]')!.getBoundingClientRect();
+    const board = svg.querySelector('rect')!.getBoundingClientRect();
+    expect(right.left + right.width / 2).toBeCloseTo(board.right, 0);
+  });
+
   it('warns when the depth is deeper than the V-bit’s cone', async () => {
     await open();
     expect(screen.getByText(/get a flat bottom/).textContent).not.toMatch(/cone is only/);
