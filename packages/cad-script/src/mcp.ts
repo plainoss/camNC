@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -9,17 +9,34 @@ import { z } from 'zod';
 const packageDir = fileURLToPath(new URL('../', import.meta.url));
 const examplesDir = path.join(packageDir, 'examples');
 
-/** Runs the check CLI in a process of its own, so every check imports the script afresh and a crash can't take the server. */
-function runCheck(file: string, out: string, svg: string): Promise<string> {
+/**
+ * Runs the check CLI in a process of its own, so every check imports the script afresh and a crash can't take the server.
+ * Its report, and whether the design checked out and was written.
+ */
+function runCheck(file: string, out: string, svg: string): Promise<{ report: string; ok: boolean }> {
   return new Promise((resolve, reject) => {
     execFile(
       process.execPath,
       ['node_modules/vite-node/vite-node.mjs', '--config', 'vite.config.ts', 'src/cli.ts', file, '--out', out, '--svg', svg],
       { cwd: packageDir, maxBuffer: 64 * 1024 * 1024 },
       (error, stdout, stderr) => {
-        // The CLI exits 1 for a design that doesn't check out, and still prints its report.
-        if (stdout.trim()) resolve(stdout);
-        else reject(new Error(stderr.trim() || error?.message || 'The check printed nothing.'));
+        // The solver logs to stderr too, so the error is the last line that names one.
+        const lines = stderr.trim().split('\n');
+        const failure =
+          lines
+            .filter(line => /Error\b/.test(line))
+            .at(-1)
+            ?.trim() ??
+          (lines.at(-1) || error?.message || 'nothing printed');
+        let report: { ok?: unknown };
+        try {
+          report = JSON.parse(stdout) as { ok?: unknown };
+        } catch {
+          return reject(new Error(`The check stopped without a report: ${failure}`));
+        }
+        // The CLI exits 1 for a design that doesn't check out, with its report. After a passing report, it failed writing.
+        if (report.ok === true && error) return reject(new Error(`The design checked out, but writing it failed: ${failure}`));
+        resolve({ report: stdout, ok: report.ok === true && !error });
       }
     );
   });
@@ -83,8 +100,9 @@ export function createCadScriptServer(dir: string) {
       const { script, document, drawing } = files(name);
       await mkdir(dir, { recursive: true });
       if (source !== undefined) await writeFile(script, source);
-      const report = await runCheck(script, document, drawing);
-      const ok = (JSON.parse(report) as { ok?: boolean }).ok === true;
+      // Whatever happens to this check, the last revision's files can't be mistaken for this one's.
+      await Promise.all([document, drawing].map(file => rm(file, { force: true }).catch(() => undefined)));
+      const { report, ok } = await runCheck(script, document, drawing);
       const written = ok ? `Wrote ${document} and ${drawing}.` : `${document} was not written.`;
       return {
         content: [

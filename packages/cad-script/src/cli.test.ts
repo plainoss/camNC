@@ -41,6 +41,7 @@ async function outputs() {
 it.each([
   ['typeErrors', "export default () => { const value: number = 'invalid'; };"],
   ['scriptError', "export default () => { throw new Error('script bug'); };"],
+  ['scriptError', "throw new Error('top-level bug');\nexport default () => {};"],
 ])(
   'removes stale outputs after a %s failure and tolerates missing outputs',
   async (field, source) => {

@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,6 +57,27 @@ it('checks a design and writes it for CAM, then removes it when an edit breaks i
   expect(broken.isError).toBe(true);
   expect(JSON.parse(texts(broken)[0]!)).toMatchObject({ ok: false, typeErrors: [expect.stringMatching(/^line 1:/)] });
   await expect(access(path.join(dir, 'plate.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+}, 60_000);
+
+it('removes the last revision when a script throws before it runs', async () => {
+  const plate = await readFile(path.join(packageDir, 'examples/plate.cad.ts'), 'utf8');
+  expect((await client.callTool({ name: 'check_design', arguments: { name: 'thrown', source: plate } })).isError).toBe(false);
+  const result = await client.callTool({
+    name: 'check_design',
+    arguments: { name: 'thrown', source: "throw new Error('top-level bug');\nexport default () => {};\n" },
+  });
+  expect(result.isError).toBe(true);
+  expect(texts(result).join('\n')).toContain('top-level bug');
+  await expect(access(path.join(dir, 'thrown.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  await expect(access(path.join(dir, 'thrown.svg'))).rejects.toMatchObject({ code: 'ENOENT' });
+}, 60_000);
+
+it("says so when a design checks out but can't be written", async () => {
+  const plate = await readFile(path.join(packageDir, 'examples/plate.cad.ts'), 'utf8');
+  await mkdir(path.join(dir, 'blocked.json'));
+  const result = await client.callTool({ name: 'check_design', arguments: { name: 'blocked', source: plate } });
+  expect(result.isError).toBe(true);
+  expect(texts(result).join('\n')).toMatch(/EISDIR/);
 }, 60_000);
 
 it('refuses a name that would reach outside its folder', async () => {
