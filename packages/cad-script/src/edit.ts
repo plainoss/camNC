@@ -108,6 +108,11 @@ export interface PartEdit {
   /** The outline sketch. Its outer loop is the part's shape, and inner loops are through-holes unless given a depth. */
   readonly profile: SketchEdit;
   thickness(mm: Len): void;
+  /**
+   * Relieves the part's inside corners with dogbones for a bit of this diameter, so square-cornered joints close. Corners
+   * on the outline of a pocket that runs off the part stay square. `null` takes the relief off.
+   */
+  relief(diameter: Len | null): void;
   sketchOn(face: CadFacePick): SketchEdit;
   /** An existing face sketch, by its handle in the report. */
   sketch(handle: string): SketchEdit;
@@ -134,7 +139,7 @@ export interface CadPlaceOptions {
 }
 export interface DesignEdit {
   /** Finds a part by name, or adds it. New parts are 18 mm thick unless `thickness` says otherwise. */
-  part(name: string, options?: { thickness?: Len }): PartEdit;
+  part(name: string, options?: { thickness?: Len; relief?: Len }): PartEdit;
   /** Adds a variable, or changes the one with this name, and returns its name. Later values can use it in expressions. */
   variable(name: string, expression: string): string;
   /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
@@ -554,6 +559,18 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         ...(typeof mm === 'string' && { thicknessExpression: mm }),
       }));
     },
+    relief(diameter) {
+      if (diameter === null) {
+        replacePart(partId, ({ cornerRelief: _, ...part }) => part);
+        return;
+      }
+      const value = measure(diameter, 'Relief');
+      if (!(value > 0)) fail(`Corner relief needs a positive bit diameter, not ${value}.`);
+      replacePart(partId, part => ({
+        ...part,
+        cornerRelief: { diameter: value, ...(typeof diameter === 'string' && { diameterExpression: diameter }) },
+      }));
+    },
     sketchOn(face) {
       const on: CadFaceRef = typeof face === 'object' ? { floorOf: face.floorOf.id } : face;
       const result = addFaceSketch(document, partId, on);
@@ -605,12 +622,14 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         if (existing) {
           const edit = partEdit(existing.id);
           if (options?.thickness !== undefined) edit.thickness(options.thickness);
+          if (options?.relief !== undefined) edit.relief(options.relief);
           return edit;
         }
         const part = { ...createCadPart(name, 18), id: newCadId() };
         document = { ...document, parts: [...document.parts, part] };
         const edit = partEdit(part.id);
         if (options?.thickness !== undefined) edit.thickness(options.thickness);
+        if (options?.relief !== undefined) edit.relief(options.relief);
         return edit;
       },
       variable(name, expression) {

@@ -178,7 +178,7 @@ function reportEntities(sketch: CadSketch): CadReportEntity[] {
 /** Room around the part on its board, mm: enough for the bit and the tabs. */
 const BOARD_MARGIN = 20;
 
-function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof profileFeatures>): CadToolpathSummary {
+function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof profileFeatures>, cornerRelief?: number): CadToolpathSummary {
   const [w, h] = profile.size;
   const board: BoardRequest = {
     id: 'check',
@@ -198,7 +198,7 @@ function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof pr
     board,
     {},
     {
-      part: () => ({ size: profile.size, features: profile.features }),
+      part: () => ({ size: profile.size, features: profile.features, ...(cornerRelief && { cornerRelief }) }),
       underside: (_, rotated) => profile.turned?.(rotated ? 'y' : 'x') ?? profile.features,
     }
   );
@@ -340,10 +340,12 @@ export async function inspectCadDocument(
             part: part.name,
           });
         else if (options.toolpaths !== false) {
-          toolpaths = toolpathSummary(evaluated, profile);
+          toolpaths = toolpathSummary(evaluated, profile, part.cornerRelief?.diameter);
           // CAM leaves out what no tool fits, so the part wouldn't come out as drawn.
           const dropped = toolpaths.warnings.find(warning => warning.includes('no tool fits'));
           if (dropped) warnings.push({ code: 'toolpath-missing', message: `A cut wouldn't be machined: ${dropped}`, part: part.name });
+          const unrelieved = toolpaths.warnings.find(warning => warning.includes('relieved for'));
+          if (unrelieved) warnings.push({ code: 'relief-bit', message: unrelieved, part: part.name });
           if (toolpaths.blocked.length)
             warnings.push({
               code: 'toolpath-blocked',

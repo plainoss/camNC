@@ -57,6 +57,15 @@ describe('native CAD to CAM', () => {
     expect(holeX(1)).toBeCloseTo(74, 6);
   });
 
+  it('passes the bit diameter a design relieved its corners for on to planning, mirror images included', async () => {
+    let document = createPlateDocument({ width: 100, height: 60, thickness: 12 });
+    const part = document.parts[0];
+    part.cornerRelief = { diameter: 6 };
+    document = addPartCopy(document, part.id, { mirrored: true }).document;
+    const { entries } = await nativeCadModel(document);
+    expect([...entries.values()].map(entry => entry.cornerRelief)).toEqual([6, 6]);
+  });
+
   it('generates a complete cutting program in the existing CAM worker without model-file bytes', async () => {
     const document = createPlateDocument({ width: 100, height: 60, thickness: 12 });
     const key = `${document.id}:native`;
