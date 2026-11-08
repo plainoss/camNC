@@ -1,4 +1,5 @@
 import {
+  addRectangle,
   addCircle,
   addLine,
   cadSketchRegions,
@@ -308,6 +309,54 @@ it('opens a new design in the studio, asking for its first sketch’s plane', as
   expect(sketch.textContent).toMatch(/right plane/);
   await waitFor(() => expect(change.mock.calls.at(-1)?.[0].parts).toHaveLength(1));
   expect(change.mock.calls.at(-1)![0].parts[0]!.drawnOn).toEqual({ on: { plane: 'right' }, offset: 0 });
+});
+
+it('cuts a sketch on a board’s top into it with Extrude → Remove, and makes it a part again with New', async () => {
+  const board = { ...createPlateDocument({ width: 200, height: 100, thickness: 18 }).parts[0]!, id: 'board', name: 'Board' };
+  board.drawnOn = { on: { plane: 'top' as const }, offset: 0 };
+  const pocket = { ...createCadPart('Pocket', 18), drawnOn: { on: { partId: board.id, face: 'top' as const }, offset: 0 } };
+  pocket.sketch = addRectangle(pocket.sketch, { x: 50, y: 30, width: 40, height: 20 });
+  const source: CadDocument = { ...createCadDocument(), parts: [board, pocket] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Pocket/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Pocket' });
+  const operation = within(dialog).getByRole('tablist', { name: 'Extrude operation' });
+  await userEvent.click(within(operation).getByRole('tab', { name: 'Remove' }));
+  // The pocket is cut into the board, 6 mm deep to start with, and is no longer a part.
+  await waitFor(() => expect(latest().parts.map(part => part.name)).toEqual(['Board']));
+  const cuts = () => (latest().parts[0]!.features ?? []).filter(feature => feature.type === 'cut');
+  expect(cuts().map(cut => cut.type === 'cut' && cut.depth)).toEqual([6]);
+  const depth = within(dialog).getByRole('textbox', { name: 'Cut depth' });
+  await userEvent.clear(depth);
+  await userEvent.type(depth, '8');
+  await userEvent.tab();
+  await waitFor(() => expect(cuts().map(cut => cut.type === 'cut' && cut.depth)).toEqual([8]));
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'through');
+  await waitFor(() => expect(cuts().map(cut => cut.type === 'cut' && cut.depth)).toEqual(['through']));
+  // New makes it a part again, as it was.
+  await userEvent.click(within(operation).getByRole('tab', { name: 'New' }));
+  await waitFor(() => expect(latest().parts.map(part => part.name)).toEqual(['Board', 'Pocket']));
+  expect(cuts()).toEqual([]);
+  // Removed and kept, the board is left with its cut, listed as a step of its own.
+  await userEvent.click(within(operation).getByRole('tab', { name: 'Remove' }));
+  await waitFor(() => expect(latest().parts).toHaveLength(1));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Pocket' })).toBeNull());
+  expect(latest().parts.map(part => part.name)).toEqual(['Board']);
+  expect(
+    within(features)
+      .getAllByRole('button')
+      .some(button => /Cut/.test(button.textContent ?? ''))
+  ).toBe(true);
 });
 
 it('sketches on a base plane picked before Sketch, as on one picked after it', async () => {
