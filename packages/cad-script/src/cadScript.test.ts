@@ -397,6 +397,40 @@ describe('part studio', () => {
     expect(report.parts.find(part => part.name === 'Leg')!.cuts.map(cut => cut.ref)).toEqual(['Rail']);
   });
 
+  it('cuts with one copy of a part, from a pattern or placed by hand', async () => {
+    let names: string[] = [];
+    const { report } = await editCad(null, d => {
+      const leg = d.part('Leg', { thickness: 18 });
+      leg.profile.rect({ at: [0, 0], w: 200, h: 400 });
+      leg.drawOn('front');
+      // Rails across the leg at three heights, and one more off to the side.
+      const rail = d.part('Rail', { thickness: 18 });
+      rail.profile.rect({ at: [-50, -40], w: 300, h: 40 });
+      rail.drawOn('top', { offset: '100mm' });
+      const [, middle] = rail.pattern({ axis: 'z', count: 3, spacing: '100mm' });
+      const spare = rail.copy({ at: [0, 1000, 0], name: 'Spare rail' });
+      d.cutParts(leg, { with: [middle!, spare] });
+      // The copy placed by hand comes first among the rail's copies, so the middle rail is Rail 4.
+      names = [middle!.name, spare.name];
+    });
+    expect(names).toEqual(['Rail 4', 'Spare rail']);
+    // Only the middle rail reaches into the leg; the spare is elsewhere and the others aren't tools.
+    const openings = report.steps!.flatMap(step => (step.kind === 'partCut' ? step.cuts : []));
+    expect(openings.map(cut => [cut.target, cut.tool])).toEqual([['Leg', 'Rail 4']]);
+  });
+
+  it('returns no copies from a pattern of one', async () => {
+    let copies: readonly unknown[] = [0];
+    const { ok } = await editCad(null, d => {
+      const slat = d.part('Slat', { thickness: 12 });
+      slat.profile.rect({ at: [0, 0], w: 40, h: 600 });
+      slat.drawOn('top');
+      copies = slat.pattern({ axis: 'x', count: 1, spacing: '60mm' });
+    });
+    expect(ok).toBe(true);
+    expect(copies).toEqual([]);
+  });
+
   it('repeats a part in a row that follows a variable', async () => {
     const { report } = await editCad(null, d => {
       d.variable('slats', '5');

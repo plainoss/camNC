@@ -36,6 +36,8 @@ import {
   type CadSketch,
   type EvaluatedCadPart,
   type NewCadConstraint,
+  cadCopyName,
+  resolvePartPatterns,
 } from '@wbcnc/cad';
 import { inspectCadDocument, type CadExpectation, type CadReport } from './inspect';
 
@@ -142,9 +144,10 @@ export interface PartEdit {
   place(options: CadPlaceOptions): void;
   /**
    * Another of this part, placed like `place`. A mirrored copy is the part's mirror image across its sketch's y axis
-   * (x becomes -x), for a left and right pair that aren't alike; CAM cuts it as a part of its own.
+   * (x becomes -x), for a left and right pair that aren't alike; CAM cuts it as a part of its own. It can be a
+   * `cutParts` tool by itself.
    */
-  copy(options: CadPlaceOptions & { mirrored?: boolean; name?: string }): void;
+  copy(options: CadPlaceOptions & { mirrored?: boolean; name?: string }): PartCopy;
   /**
    * A face of this part to draw another part on: `'top'`, `'underside'`, or the edge face looking a way in the studio,
    * such as `'+x'`. It's found now, by where the part is, and kept by what it is, so it stays the same face when the part
@@ -157,8 +160,16 @@ export interface PartEdit {
    * the face's normal. `check` reports each face's frame in words.
    */
   drawOn(on: CadPlane | CadPartFace, options?: { offset?: Len; inward?: boolean }): void;
-  /** Copies of the part in a row along a studio axis, `spacing` apart. The count and spacing can follow variables. */
-  pattern(options: { axis: 'x' | 'y' | 'z'; count: Len; spacing: Len }): void;
+  /**
+   * Copies of the part in a row along a studio axis, `spacing` apart. The count and spacing can follow variables. Each
+   * copy can be a `cutParts` tool by itself; one the count later drops cuts nothing, and the check warns.
+   */
+  pattern(options: { axis: 'x' | 'y' | 'z'; count: Len; spacing: Len }): readonly PartCopy[];
+}
+/** One copy of a part, to cut with on its own. As a `cutParts` tool, the part itself cuts with every copy. */
+export interface PartCopy {
+  readonly id: string;
+  readonly name: string;
 }
 export interface CadPlaceOptions {
   at: readonly [Len, Len, Len];
@@ -175,7 +186,10 @@ export interface DesignEdit {
    * rebates and mortises that follow both parts. The clearance grows every side of an opening inside the target and
    * deepens a blind one; a side that runs off the target's edge stays open.
    */
-  cutParts(targets: PartEdit | readonly PartEdit[], options: { with: PartEdit | readonly PartEdit[]; clearance?: Len }): void;
+  cutParts(
+    targets: PartEdit | readonly PartEdit[],
+    options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len }
+  ): void;
   /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
   value(expression: Len): number;
 }
@@ -251,6 +265,15 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     document = { ...document, parts: document.parts.map(part => (part.id === partId ? edit(part) : part)) };
   };
   const partOf = (partId: string) => document.parts.find(part => part.id === partId)!;
+  // A cut-parts tool `<partId>:<copyId>` cuts with that one copy.
+  // An unnamed copy is named by its place among the part's copies, which later copies can change.
+  const copyHandle = (partId: string, copyId: string): PartCopy => ({
+    id: `${partId}:${copyId}`,
+    get name() {
+      const part = partOf(partId);
+      return cadCopyName(part, part.copies?.findIndex(copy => copy.id === copyId) ?? -1);
+    },
+  });
   const sketchOf = (partId: string, sketchId: string): CadSketch => {
     const part = partOf(partId);
     return part.sketch.id === sketchId ? part.sketch : cadFaceSketches(part).find(face => face.sketch.id === sketchId)!.sketch;
@@ -648,6 +671,9 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         ...part,
         copies: part.copies?.map(copy => (copy.id === added.id ? { ...copy, placement, ...(name && { name }) } : copy)),
       }));
+      // Copies placed by hand go ahead of a pattern's, as they will in the design, so names read now stay right.
+      document = resolvePartPatterns(document);
+      return copyHandle(partId, added.id);
     },
     face(which) {
       if (which === 'top' || which === 'underside') return { partId, face: which };
@@ -679,6 +705,8 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         ...(typeof count === 'string' && { countExpression: count }),
         ...(typeof spacing === 'string' && { spacingExpression: spacing }),
       });
+      // A pattern of one makes no copies, and the part may have none.
+      return (partOf(partId).copies ?? []).filter(copy => copy.pattern).map(copy => copyHandle(partId, copy.id));
     },
   });
 
@@ -707,7 +735,8 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         return name;
       },
       cutParts(targets, { with: tools, clearance = 0 }) {
-        const ids = (parts: PartEdit | readonly PartEdit[]) => ('id' in parts ? [parts.id] : parts.map(part => part.id));
+        const ids = (parts: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]) =>
+          'id' in parts ? [parts.id] : parts.map(part => part.id);
         const value = measure(clearance, 'Clearance');
         if (value < 0) fail(`A clearance can't be negative: ${value} mm.`);
         document = addPartCut(document, ids(tools), ids(targets), {
