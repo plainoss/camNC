@@ -284,15 +284,16 @@ function VisualizeComponent() {
           <div className="pointer-events-none absolute inset-0 flex h-app flex-col">
             <CamMachineHeader
               title={viewModeTitle(view)}
-              tools={<ViewSwitcher view={view} hasToolpath={!!toolpath} onSelect={selectView} />}
+              tools={
+                <div className="flex items-center gap-1">
+                  <ViewSwitcher view={view} hasToolpath={!!toolpath} onSelect={selectView} />
+                  {isTop && <CamTopViewShow />}
+                </div>
+              }
               actions={<VisualizeToolbar />}
             />
-            {isTop && (
-              <div className="pointer-events-none flex flex-wrap items-start gap-2 px-2 pt-2 [&>*]:pointer-events-auto">
-                <CamBedEditor />
-                <CamTopViewShow />
-              </div>
-            )}
+            {/* Its tools are drawn beside the board (`CamBedLayer`): nothing floats over the camera image. */}
+            {isTop && <CamBedEditor />}
             {!isTop && toolpath && (
               <div className="relative min-h-0 flex-1">
                 <div className="absolute top-2 right-2 bottom-12 flex flex-col items-end">

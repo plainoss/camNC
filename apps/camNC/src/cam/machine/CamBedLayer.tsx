@@ -24,6 +24,7 @@ import {
   type Axis,
   type BedNote,
 } from './bedEdit';
+import { BedToolbar, kBedButton } from './BedToolbar';
 import { isManufacturingLocked, useCamMachine, type BoardOverlay } from './camMachine';
 
 type P2 = { x: number; y: number };
@@ -125,7 +126,7 @@ function Note({ note }: { note: BedNote }) {
  * Placing the board in the top view: a drag anywhere on it moves the whole board with its program (Shift: along X or
  * Y only), the knob above it turns it about its middle. A tap selects the screw, clamp or part there: it gets a move
  * handle (only the handle moves it, so a stray drag never does) and a small bar to remove it or change it in the CAM
- * job. Add mode: a tap adds a screw or clamp there.
+ * job. Nothing selected, the board's own bar sits under it: Add and Undo. Add mode: a tap adds a screw or clamp there.
  */
 export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverlay; offset: P2; running: boolean }) {
   'use no memo';
@@ -212,6 +213,19 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
   const partStatus = part && partAt ? bed.check(part.id, partAt) : null;
   const holdHits = movedHold ? hitsPath(movedHold, deg, overlay.path, overlay.bit ?? 6, overlay.stockTop ?? 0) : false;
   const canMove = editable && (!!hold || !!part?.movable);
+  const itemBar = !!selected && !!box && !!name && !item;
+  // The board's corner lowest on screen (leftmost of a tie), in the board frame: the board turns under its bar.
+  const low = (
+    [
+      { x: 0, y: 0 },
+      { x: overlay.w, y: 0 },
+      { x: overlay.w, y: overlay.h },
+      { x: 0, y: overlay.h },
+    ] as P2[]
+  ).reduce((a, b) => {
+    const [ta, tb] = [turn(a, deg), turn(b, deg)];
+    return tb.y < ta.y - 1e-6 || (Math.abs(tb.y - ta.y) <= 1e-6 && tb.x < ta.x) ? b : a;
+  });
   const handleAt = box && { x: box.x + box.w + (hold ? 10 : -box.w / 2), y: box.y + box.h + (hold ? 10 : -box.h / 2) };
 
   const onHandleDown = (e: ThreeEvent<PointerEvent>) => {
@@ -319,19 +333,14 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
         </group>
       )}
 
-      {/* Its bar: remove it, or change it in the CAM job. */}
-      {selected && box && name && !item && (
+      {/* Its bar: remove it, or change it in the CAM job; Undo. */}
+      {itemBar && (
         <CanvasLabel position={[box.x, box.y, 0.6]} offset={[0, 12]} maxWidth={384} interactive zIndexRange={[30, 0]}>
-          <div
-            role="toolbar"
-            aria-label={name}
-            onPointerDown={e => e.stopPropagation()}
-            className="dark flex max-w-full flex-wrap items-center gap-0.5 rounded-md border bg-background/95 p-0.5 text-xs text-foreground shadow-md">
-            <span className="px-1.5 font-medium">{name}</span>
+          <BedToolbar item={name}>
             {hold && editable && selected.kind === 'hold' && (
               <button
                 title="Remove it (Delete)"
-                className="flex items-center gap-1 rounded px-1.5 py-1 hover:bg-muted"
+                className={kBedButton}
                 onClick={() => {
                   apply?.(removeHold(holds, selected.i, bed.boardId));
                   useBedEdit.getState().setSelected(null);
@@ -341,17 +350,24 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
             )}
             <button
               title="Change this board's layout, parts and holds in the CAM job's Boards step"
-              className="flex items-center gap-1 rounded px-1.5 py-1 hover:bg-muted"
+              className={kBedButton}
               onClick={() => bed.openInCam('layout')}>
               <Pencil className="size-3.5" /> Layout in CAM
             </button>
             <button
               title="Change this board's toolpaths in the CAM job's Plan step"
-              className="flex items-center gap-1 rounded px-1.5 py-1 hover:bg-muted"
+              className={kBedButton}
               onClick={() => bed.openInCam('toolpaths')}>
               <Pencil className="size-3.5" /> Toolpaths in CAM
             </button>
-          </div>
+          </BedToolbar>
+        </CanvasLabel>
+      )}
+
+      {/* Nothing selected: the board's own bar, under its lower left corner as seen on screen. */}
+      {!itemBar && !item && (
+        <CanvasLabel position={[low.x, low.y, 0.6]} offset={[0, 12]} maxWidth={420} interactive zIndexRange={[30, 0]}>
+          <BedToolbar />
         </CanvasLabel>
       )}
 
