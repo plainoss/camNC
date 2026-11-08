@@ -432,7 +432,8 @@ it('keeps a value typed as `#name = value` when the tick is clicked straight aft
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull());
   expect(latest().variables?.map(variable => variable.name)).toEqual(['board']);
-  expect(latest().parts[0]!.thickness).toBe(19);
+  // The design takes the thickness once the variable is in it, which can be a solve after the dialog closed.
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(19));
   expect(latest().parts[0]!.thicknessExpression).toMatch(/board/);
 });
 
