@@ -7,6 +7,7 @@ import {
   placementMatrix,
   placePoint,
   rotateVector,
+  turnAbout,
   setPartPlacements,
   type CadPlacement,
   type Vec3,
@@ -47,6 +48,15 @@ describe('putting one face against another', () => {
     );
     close(facing(moved, [0, 0, -1]), [-1, 0, 0]);
     close(placePoint(moved, [50, 50, 0]), [300, 0, 0]);
+  });
+
+  it('turns a placed part a quarter turn about the face it sits on, keeping the contact point', () => {
+    const placed = placeAgainst(undefined, { point: [0, 0, 0], normal: [0, 0, -1] }, { point: [10, 10, 18], normal: [0, 0, 1] });
+    const turned = turnAbout(placed, [10, 10, 18], [0, 0, 1], 90);
+    close(placePoint(turned, [0, 0, 0]), [10, 10, 18]);
+    close(placePoint(turned, [1, 0, 0]), [10, 11, 18]);
+    expect(turned.rotation).toEqual([0, 0, Math.SQRT1_2, Math.SQRT1_2]);
+    expect(turnAbout(turned, [10, 10, 18], [0, 0, 1], 90).rotation).toEqual([0, 0, 1, 0]);
   });
 
   it('gives the same matrix as placing points one at a time', () => {

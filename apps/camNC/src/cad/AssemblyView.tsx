@@ -1,4 +1,4 @@
-import { placeAgainst, type CadDocument, type CadPlacementChange } from '@wbcnc/cad';
+import { placeAgainst, turnAbout, type CadDocument, type CadPlacementChange } from '@wbcnc/cad';
 import { useMemo, useRef, useState } from 'react';
 import { ModelViewport, type ModelFacePick, type ModelView } from '@/cam/model/ModelViewport';
 import { assemblyModel } from './assemblyModel';
@@ -32,6 +32,8 @@ export default function AssemblyView({
   // Placing: first the face to move, then the face it goes against.
   const [placing, setPlacing] = useState<{ moving?: ModelFacePick } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // The face a part was last put against, so it can be turned about it in quarter turns.
+  const [against, setAgainst] = useState<(ModelFacePick & { moved: string }) | null>(null);
   const canPlace = model.meshes.length >= 2 && view !== 'flat';
   const selected = document.parts.find(part => part.id === selectedId);
   const stop = () => {
@@ -55,6 +57,7 @@ export default function AssemblyView({
       // A part laid out in the row stays where it was shown, rather than shuffling along as the row changes.
       ...(target && !target.placement ? [{ partId: target.id, placement: model.placements.get(target.id) }] : []),
     ]);
+    setAgainst({ ...pick, moved: placing.moving.partId });
     stop();
   };
   const status =
@@ -110,8 +113,25 @@ export default function AssemblyView({
           }}>
           Put against…
         </button>
+        {against && against.moved === selectedId && !placing && (
+          <button
+            type="button"
+            title="Turn the part a quarter turn on the face it was put against"
+            onClick={() =>
+              onPlace([
+                { partId: against.moved, placement: turnAbout(model.placements.get(against.moved), against.point, against.normal, 90) },
+              ])
+            }>
+            Turn 90°
+          </button>
+        )}
         {selected?.placement && !placing && (
-          <button type="button" onClick={() => onPlace([{ partId: selected.id, placement: undefined }])}>
+          <button
+            type="button"
+            onClick={() => {
+              setAgainst(null);
+              onPlace([{ partId: selected.id, placement: undefined }]);
+            }}>
             Lay out again
           </button>
         )}

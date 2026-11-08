@@ -75,6 +75,19 @@ export function placementMatrix(placement: CadPlacement | undefined): number[] {
   return [...x, 0, ...y, 0, ...z, 0, ...position, 1];
 }
 
+/** The placement turned by `degrees` about an axis through `point`, counterclockwise looking against `axis`. */
+export function turnAbout(current: CadPlacement | undefined, point: Vec3, axis: Vec3, degrees: number): CadPlacement {
+  const { position, rotation } = current ?? CAD_IDENTITY_PLACEMENT;
+  const [x, y, z] = unit(axis),
+    half = (degrees * Math.PI) / 360,
+    turn: Quat = [x * Math.sin(half), y * Math.sin(half), z * Math.sin(half), Math.cos(half)];
+  const offset = rotateVector(turn, [position[0] - point[0], position[1] - point[1], position[2] - point[2]]);
+  return {
+    position: offset.map((value, i) => tidy(value + point[i]!)) as Vec3,
+    rotation: multiply(turn, rotation as Quat).map(snap) as Quat,
+  };
+}
+
 /** A face of a placed part, as clicked: a point on it and the direction it faces, both in assembly space. */
 export interface CadFacePick {
   point: Vec3;

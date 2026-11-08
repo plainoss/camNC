@@ -5,11 +5,12 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { modelGeometry } from './modelGeometry';
+import { snapToFace } from './faceSnap';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
 import { kOrbitDamping } from '@/lib/orbitDamping';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
-/** A face clicked on a part, in the model's own space: where, and the way it faces. */
+/** A face clicked on a part, in the model's own space: its nearest corner or its middle, and the way it faces. */
 export interface ModelFacePick {
   partId: string;
   point: [number, number, number];
@@ -119,8 +120,9 @@ export function ModelViewport({
   const pick = (mesh: BodyMesh, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
     if (!onPickFace || !e.face) return onSelect(mesh.partId);
     // Back from where the view drew it to where the part sits in the model.
-    const point = e.point.clone().applyMatrix4(matrix.clone().invert());
-    onPickFace({ partId: mesh.partId, point: point.toArray(), normal: e.face.normal.clone().normalize().toArray() });
+    const point = e.point.clone().applyMatrix4(matrix.clone().invert()),
+      normal = e.face.normal.clone().normalize().toArray();
+    onPickFace({ partId: mesh.partId, point: snapToFace(mesh.positions, point.toArray(), normal), normal });
   };
   return (
     <Canvas camera={{ fov: 30 }} dpr={[1, 2]} onPointerMissed={() => onMissed?.()}>
