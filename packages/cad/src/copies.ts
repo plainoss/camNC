@@ -1,4 +1,5 @@
 import { newCadId } from './document';
+import { cadCopyName } from './partPatterns';
 import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadPart } from './types';
 
 /** Adds another of a part, laid out with the unplaced parts until it's placed. */
@@ -64,8 +65,9 @@ export interface CadPartToCut {
  */
 export function cadPartsToCut(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadPartToCut[] {
   return parts.flatMap(part => {
-    const copies = document.parts.find(source => source.id === part.partId)?.copies ?? [];
-    const named = (index: number) => (index ? `${part.name} ${index + 1}` : part.name);
+    const source = document.parts.find(candidate => candidate.id === part.partId);
+    const copies = source?.copies ?? [];
+    const named = (index: number) => (index ? cadCopyName(source ?? part, index - 1) : part.name);
     const same = [0, ...copies.flatMap((copy, i) => (copy.mirrored ? [] : [i + 1]))].map(named),
       mirrored = copies.flatMap((copy, i) => (copy.mirrored ? [named(i + 1)] : []));
     return [

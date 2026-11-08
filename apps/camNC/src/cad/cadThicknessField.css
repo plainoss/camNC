@@ -41,19 +41,22 @@
   color: #ac2929;
 }
 
-.cad-relief-field {
+.cad-relief-field,
+.cad-part-pattern-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
 }
-.cad-relief-field > label:first-child {
+.cad-relief-field > label:first-child,
+.cad-part-pattern-field > label:first-child {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .cad-relief-field .cad-thickness-hint,
-.cad-relief-field .cad-thickness-error {
+.cad-relief-field .cad-thickness-error,
+.cad-part-pattern-field .cad-thickness-error {
   margin: 0;
   font-size: 0.6875rem;
   line-height: 1.4;
@@ -61,6 +64,23 @@
 .cad-relief-field .cad-thickness-hint {
   color: #52647d;
 }
-.cad-relief-field .cad-thickness-error {
+.cad-relief-field .cad-thickness-error,
+.cad-part-pattern-field .cad-thickness-error {
   color: #ac2929;
+}
+
+.cad-copy-names {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.cad-copy-names summary {
+  cursor: pointer;
+  color: #52647d;
+}
+.cad-copy-names input {
+  margin-top: 4px;
+  width: 100%;
+  box-sizing: border-box;
 }

@@ -83,6 +83,8 @@ import {
   addPartCut,
   updatePartCut,
   removePartCut,
+  setPartPattern,
+  renamePartCopy,
 } from '@wbcnc/cad';
 import {
   useEffect,
@@ -147,6 +149,8 @@ import { PartCutDialog } from './PartCutDialog';
 import { CadDrawnOnField } from './CadDrawnOnField';
 import { drawnOnName } from './drawnOnName';
 import { CadReliefField } from './CadReliefField';
+import { CadPartPatternField } from './CadPartPatternField';
+import { CadCopyNames } from './CadCopyNames';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
   createSketchContext,
@@ -3341,6 +3345,8 @@ export function CadEditor({
                 if (step.kind === 'sketch') {
                   setShowWorkspace(false);
                   setShow3D(false);
+                } else if (step.kind === 'pattern' || step.kind === 'copy') {
+                  setShowWorkspace(true);
                 } else if (step.kind === 'partCut') {
                   setShowWorkspace(true);
                   setPartCutting({ id: step.partCutId });
@@ -3459,6 +3465,14 @@ export function CadEditor({
                   )
                 }
               />
+              <CadPartPatternField
+                key={`${part.id}:pattern`}
+                pattern={part.pattern}
+                variables={variableScope}
+                onDone={() => svg.current?.focus()}
+                onChange={pattern => commit(setPartPattern(documentRef.current, part.id, pattern))}
+              />
+              <CadCopyNames part={part} onRename={(copyId, name) => commit(renamePartCopy(documentRef.current, part.id, copyId, name))} />
               {variableProblems
                 .filter(problem => problem.partId === part.id)
                 .map((problem, index) => (

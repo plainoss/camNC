@@ -6,6 +6,7 @@ import {
   placementMatrix,
   withPartCuts,
   cadDrawnOnSupports,
+  cadCopyName,
   type CadDocument,
   type CadPart,
   type CadPlacement,
@@ -62,7 +63,7 @@ export function assemblyModel(document: CadDocument): AssemblyModel {
       ? [
           { instance: { partId: entry.part.id, name: entry.part.name }, placement: entry.part.placement, shape: entry.shape },
           ...(entry.part.copies ?? []).map((copy, index) => ({
-            instance: { partId: entry.part.id, copyId: copy.id, name: `${entry.part.name} ${index + 2}` },
+            instance: { partId: entry.part.id, copyId: copy.id, name: cadCopyName(entry.part, index) },
             placement: copy.placement,
             shape: copy.mirrored ? entry.mirrored! : entry.shape,
           })),

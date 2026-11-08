@@ -32,6 +32,7 @@ import { refreshDimensionMeasurement } from './dimensions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
 import { applyCadVariables } from './variables';
 import { resolveDrawnPlacements } from './drawnOn';
+import { resolvePartPatterns } from './partPatterns';
 import { isFatalSolverError } from './solverFailure';
 import { invalidOffsetBranches, offsetNativePrimitives, offsetNativeSeed } from './offsetConstraint';
 import { entityPointIds } from './document';
@@ -1051,13 +1052,16 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
     };
   }
   if (options.sketchOnly) return { document: next, status: 'solved', diagnostics, parts: [], sketches };
-  const evaluated = evaluateCadDocument(next);
-  diagnostics.push(...evaluated.diagnostics);
-  // Parts drawn on others go where those parts now are.
+  let evaluated = evaluateCadDocument(next);
+  // Parts drawn on others go where those parts now are, and patterns lay their copies out from there.
   const resolved = resolveDrawnPlacements(next, evaluated.parts);
   diagnostics.push(...resolved.diagnostics);
+  const placed = resolvePartPatterns(resolved.document);
+  // Parts cut by others are cut where those others now sit.
+  if (placed !== next && placed.partCuts?.length) evaluated = evaluateCadDocument(placed);
+  diagnostics.push(...evaluated.diagnostics);
   return {
-    document: resolved.document,
+    document: placed,
     status: diagnostics.some(d => d.severity === 'error') ? 'invalid' : 'solved',
     diagnostics,
     parts: evaluated.parts,

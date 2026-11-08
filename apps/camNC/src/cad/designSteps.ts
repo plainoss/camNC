@@ -1,9 +1,9 @@
-import { cadFaceSketches, faceIsUnderside, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { cadCopyName, cadFaceSketches, faceIsUnderside, type CadDocument, type CadPart } from '@wbcnc/cad';
 
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
   id: string;
-  kind: 'sketch' | 'extrude' | 'faceSketch' | 'cut' | 'copy' | 'partCut';
+  kind: 'sketch' | 'extrude' | 'faceSketch' | 'cut' | 'copy' | 'pattern' | 'partCut';
   label: string;
   /** A short reading of the step's main value, such as a thickness or depth. */
   detail?: string;
@@ -81,14 +81,23 @@ export function designSteps(document: CadDocument): DesignStep[] {
         });
       }
     }
-    (part.copies ?? []).forEach((copy, index) =>
+    (part.copies ?? []).forEach((copy, index) => {
+      if (!copy.pattern)
+        steps.push({
+          id: copy.id,
+          kind: 'copy',
+          label: `${copy.mirrored ? 'Mirrored copy' : 'Copy'} · ${cadCopyName(part, index)}`,
+          partId: part.id,
+        });
+    });
+    if (part.pattern)
       steps.push({
-        id: copy.id,
-        kind: 'copy',
-        label: `${copy.mirrored ? 'Mirrored copy' : 'Copy'} · ${part.name} ${index + 2}`,
+        id: part.pattern.id,
+        kind: 'pattern',
+        label: `Pattern · ${part.name} × ${part.pattern.count} along ${part.pattern.axis}`,
+        detail: `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing)}`,
         partId: part.id,
-      })
-    );
+      });
     return [...steps, ...(after.get(partIndex) ?? [])];
   });
 }

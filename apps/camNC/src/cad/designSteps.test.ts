@@ -1,4 +1,13 @@
-import { addCircle, addPartCopy, addPartCut, cadSketchRegions, createCadPart, createPlateDocument, setCutDepth } from '@wbcnc/cad';
+import {
+  addCircle,
+  addPartCopy,
+  addPartCut,
+  setPartPattern,
+  cadSketchRegions,
+  createCadPart,
+  createPlateDocument,
+  setCutDepth,
+} from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
 import { designSteps } from './designSteps';
 
@@ -37,6 +46,22 @@ describe('the design’s steps', () => {
       ['partCut', 'Cut Side with Back', 'clearance fit = 0.2 mm'],
       ['sketch', 'Sketch · Shelf', undefined],
       ['extrude', 'Extrude · Shelf', '18 mm'],
+    ]);
+  });
+
+  it('shows a part pattern as one step, not a copy step for each copy it lays out', () => {
+    let document = createPlateDocument({ width: 300, height: 100, thickness: 12 });
+    const divider = document.parts[0]!;
+    divider.name = 'Divider';
+    divider.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    document = addPartCopy(document, divider.id).document;
+    document = setPartPattern(document, divider.id, { axis: 'y', count: 4, countExpression: 'dividers', spacing: 80 });
+    expect(document.parts[0]!.copies).toHaveLength(4);
+    expect(designSteps(document).map(step => [step.kind, step.label, step.detail])).toEqual([
+      ['sketch', 'Sketch · Divider', undefined],
+      ['extrude', 'Extrude · Divider', '12 mm'],
+      ['copy', 'Copy · Divider 2', undefined],
+      ['pattern', 'Pattern · Divider × 4 along y', 'spacing 80 mm'],
     ]);
   });
 });
