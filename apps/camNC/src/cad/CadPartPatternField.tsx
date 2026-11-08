@@ -2,6 +2,7 @@ import { CAD_MAX_PART_PATTERN, type CadPartPattern, type CadValueScope } from '@
 import { useEffect, useId, useRef, useState } from 'react';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 import './cadThicknessField.css';
+import { CadValueInput } from './CadValueInput';
 
 type Pattern = Omit<CadPartPattern, 'id'>;
 const kStart: Pattern = { axis: 'x', count: 2, spacing: 100 };
@@ -93,7 +94,8 @@ export function CadPartPatternField({
           <label htmlFor={`${id}-count`} className="cad-number-field">
             How many
             <span>
-              <input
+              <CadValueInput
+                bare
                 id={`${id}-count`}
                 value={count}
                 spellCheck={false}
@@ -107,7 +109,8 @@ export function CadPartPatternField({
           <label htmlFor={`${id}-spacing`} className="cad-number-field">
             Spacing
             <span>
-              <input
+              <CadValueInput
+                bare
                 id={`${id}-spacing`}
                 value={spacing}
                 spellCheck={false}

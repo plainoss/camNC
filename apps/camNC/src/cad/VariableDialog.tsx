@@ -1,5 +1,6 @@
 import { setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { useId, useState } from 'react';
+import { CadValueInput } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
 
 /**
@@ -39,7 +40,8 @@ export function VariableDialog({
       <label className="cad-number-field" htmlFor={`${id}-value`}>
         Value
         <span>
-          <input
+          <CadValueInput
+            bare
             id={`${id}-value`}
             value={expression}
             spellCheck={false}

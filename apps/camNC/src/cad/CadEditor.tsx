@@ -73,6 +73,7 @@ import {
   moveFaceSketch,
   removeCadFeature,
   removeCadVariable,
+  setCadVariable,
   type CadFaceRef,
   setCutDepth,
   setCutSuppressed,
@@ -143,7 +144,7 @@ import {
   type TransformParameters,
   type TransformDragKind,
 } from './transformParameters';
-import { parseCadValue } from './valueExpressions';
+import { formatCadValue, parseCadValue } from './valueExpressions';
 import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
@@ -208,6 +209,7 @@ import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureLis
 import { VariableDialog } from './VariableDialog';
 import { rolledBackTo, type DesignStep } from './designSteps';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
+import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -514,6 +516,28 @@ export function CadEditor({
   const documentRef = useRef(doc);
   // Every value field can use the design's variables by name.
   const variableScope = useMemo(() => cadVariableScope(doc), [doc]);
+  // What every value field offers after `#`, and how it makes a variable from `#name = value`.
+  const variableFields = useMemo<CadVariableFields>(
+    () => ({
+      variables: (doc.variables ?? []).map(variable => {
+        const result = variableScope[variable.name];
+        const unitText = result?.kind === 'length' ? ' mm' : result?.kind === 'angle' ? '°' : '';
+        return { name: variable.name, shown: result ? `${formatCadValue(result.value)}${unitText}` : variable.expression };
+      }),
+      define: (name, expression) => {
+        const current = documentRef.current;
+        const existing = current.variables?.find(variable => variable.name === name);
+        const result = setCadVariable(current, { ...(existing && { id: existing.id }), name, expression });
+        if ('error' in result) return result.error;
+        commit(result.document);
+        return null;
+      },
+    }),
+    // commit and documentRef are stable for the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [doc.variables, variableScope]
+  );
+  useProvideCadVariableFields(variableFields);
   // The step being edited in its dialog. Like the reference, the studio shows the design only as far as that step.
   const rollbackStep =
     !studioSession || !showWorkspace
@@ -2214,7 +2238,8 @@ export function CadEditor({
       return;
     }
     if (creationValues && part?.id === creationValues.partId && sketch && creationValueAt(creationValues, sketch)) {
-      if (/^[0-9.,-]$/.test(key)) {
+      // A digit starts typing the value, and so does `#` for a variable or `=` for an expression, as in the reference.
+      if (/^[0-9.,#=-]$/.test(key)) {
         event.preventDefault();
         setCreationValues({ ...creationValues, editing: true, text: key, selectAll: false });
         return;

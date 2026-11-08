@@ -306,3 +306,54 @@ it('opens a new design in the studio, asking for its first sketch’s plane', as
   await waitFor(() => expect(change.mock.calls.at(-1)?.[0].parts).toHaveLength(1));
   expect(change.mock.calls.at(-1)![0].parts[0]!.drawnOn).toEqual({ on: { plane: 'right' }, offset: 0 });
 });
+
+it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {
+  const { latest } = await studio();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  let dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  let thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
+  await userEvent.clear(thickness);
+  await userEvent.type(thickness, '#board = 19 mm{Enter}');
+  await waitFor(() => expect(latest().variables?.map(variable => [variable.name, variable.expression])).toEqual([['board', '19 mm']]));
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(19));
+  expect(latest().parts[0]!.thicknessExpression).toMatch(/board/);
+
+  // Typing # offers the design's variables, and picking one puts it in the field.
+  dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' }).catch(async () => {
+    await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+    return screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  });
+  thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
+  await userEvent.clear(thickness);
+  await userEvent.type(thickness, '#bo');
+  const options = within(screen.getByRole('listbox', { name: 'Variables' })).getAllByRole('option');
+  expect(options.map(option => option.textContent)).toEqual(['#board19 mm', 'New variable']);
+  await userEvent.keyboard('{Enter}');
+  expect(thickness).toHaveProperty('value', '#board');
+});
+
+it('doesn’t apply a field after its dialog is cancelled, and applies a dimension through its form after #name = value', async () => {
+  const { latest } = await studio();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
+  await userEvent.clear(thickness);
+  await userEvent.type(thickness, '#board = 19 mm');
+  // Leaving the field for the cross: the variable is made, but the cancelled step stays as it was.
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await new Promise(resolve => setTimeout(resolve, 200));
+  expect(latest().parts[0]!.thickness).toBe(18);
+
+  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Plate/ }));
+  await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  await userEvent.dblClick(await screen.findByRole('button', { name: /^Edit Width: 200 mm/ }));
+  const width = await screen.findByRole('textbox', { name: /Width/ });
+  await userEvent.clear(width);
+  await userEvent.type(width, '#span = 150 mm{Enter}');
+  await waitFor(() => expect(latest().variables?.find(variable => variable.name === 'span')?.expression).toBe('150 mm'));
+  await waitFor(() =>
+    expect(latest().parts[0]!.sketch.constraints.find(constraint => constraint.label === 'Width')).toMatchObject({ value: 150 })
+  );
+});
