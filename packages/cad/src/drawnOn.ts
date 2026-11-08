@@ -204,3 +204,136 @@ export function partFaceAt(
   }
   return best ? { edge: best.id } : null;
 }
+
+/** A face as the studio sees it: its sketch's origin, which ways the sketch's x and y run, and which way it looks. */
+export interface CadFaceFrame {
+  origin: Vec3;
+  x: Vec3;
+  y: Vec3;
+  normal: Vec3;
+  /** An edge face's length along its x. */
+  length?: number;
+}
+/** A direction along one of the studio's axes. */
+export type CadAxisDirection = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
+
+const kDirections: Record<CadAxisDirection, Vec3> = {
+  '+x': [1, 0, 0],
+  '-x': [-1, 0, 0],
+  '+y': [0, 1, 0],
+  '-y': [0, -1, 0],
+  '+z': [0, 0, 1],
+  '-z': [0, 0, -1],
+};
+const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+/** The axis direction a vector points along, if it points along one. */
+const directionOf = (v: Vec3) =>
+  (Object.keys(kDirections) as CadAxisDirection[]).find(direction => dot(kDirections[direction], v) > 1 - 1e-6);
+const onOutline = (p: CadPoint, outline: CadPoint[]) =>
+  outline.some((a, i) => {
+    const b = outline[(i + 1) % outline.length]!;
+    const dx = b.x - a.x,
+      dy = b.y - a.y,
+      length = Math.hypot(dx, dy);
+    if (length < 1e-9) return Math.hypot(p.x - a.x, p.y - a.y) < 1e-6;
+    const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / (length * length);
+    return t > -1e-9 && t < 1 + 1e-9 && Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / length < 1e-6;
+  });
+
+/** Where a part sits for reading its faces: as placed, or at the origin while it isn't placed yet. */
+const readingPlacement = (document: CadDocument, part: CadPart) =>
+  effectivePlacement(part, cadDrawnOnSupports(document)) ?? CAD_IDENTITY_PLACEMENT;
+
+/**
+ * Where a plane or a part's face is in the studio, as a sketch drawn on it sees it. Read from the document as solved.
+ *
+ * - The top plane's x and y are the studio's x and y. The front plane's x is the studio's +x and its y is +z, looking
+ *   towards -y. The right plane's x is +y and its y is +z, looking towards +x. All start at the studio's origin.
+ * - A part's top is its own sketch lifted to its thickness. Its underside is seen from below, starting at the sketch's
+ *   origin, with x along the part's -x.
+ * - An edge face starts where its outline line starts, walking the outline counterclockwise as seen from the top, at
+ *   the part's underside. Its x runs along the line that way, its y up the thickness, and it looks outwards.
+ */
+export function cadFaceFrame(document: CadDocument, on: CadDrawnOn['on']): CadFaceFrame | { error: string } {
+  const frame = (f: Frame): CadFaceFrame => ({
+    origin: f.origin.map(tidy) as Vec3,
+    x: f.x.map(tidy) as Vec3,
+    y: f.y.map(tidy) as Vec3,
+    normal: f.z.map(tidy) as Vec3,
+    ...(f.length !== undefined && { length: f.length }),
+  });
+  if ('plane' in on) return frame(kPlanes[on.plane]);
+  const part = document.parts.find(candidate => candidate.id === on.partId);
+  if (!part) return { error: 'That part is gone.' };
+  const shape = evaluateCadPart(part).part;
+  if (!shape) return { error: `${part.name} can’t be worked out until its sketch is fixed.` };
+  const face = partFace(part, shape, on.face);
+  if (typeof face === 'string') return { error: `${part.name}: ${face}` };
+  return frame({ ...carried(readingPlacement(document, part), face), ...(face.length !== undefined && { length: face.length }) });
+}
+
+/** Every flat face of a part a new part can be drawn on, with where it is in the studio. */
+function partFaces(document: CadDocument, part: CadPart) {
+  const shape = evaluateCadPart(part).part;
+  if (!shape) return null;
+  const faces: { face: Extract<CadDrawnOn['on'], { partId: string }>['face']; frame: CadFaceFrame }[] = [];
+  const add = (face: (typeof faces)[number]['face']) => {
+    const frame = cadFaceFrame(document, { partId: part.id, face });
+    if (!('error' in frame)) faces.push({ face, frame });
+  };
+  add('top');
+  add('underside');
+  const at = (id: string) => part.sketch.entities.find(entity => entity.id === id) as CadPoint | undefined;
+  for (const entity of part.sketch.entities) {
+    if (entity.type !== 'line' || entity.construction) continue;
+    const a = at(entity.startId),
+      b = at(entity.endId);
+    if (a && b && onOutline(a, shape.outline) && onOutline(b, shape.outline)) add({ edge: entity.id });
+  }
+  return faces;
+}
+
+/**
+ * The face of a part that looks in a direction of the studio, for drawing on it by what it is rather than by an ID.
+ * Of several faces looking the same way, such as a notched edge, it's the one furthest out. When no face looks that
+ * way, the error lists the ways its faces do look.
+ */
+export function cadFaceFacing(
+  document: CadDocument,
+  partId: string,
+  direction: CadAxisDirection
+): { face: Extract<CadDrawnOn['on'], { partId: string }>['face'] } | { error: string } {
+  const part = document.parts.find(candidate => candidate.id === partId);
+  if (!part) return { error: 'That part is gone.' };
+  const faces = partFaces(document, part);
+  if (!faces) return { error: `${part.name} can’t be worked out until its sketch is fixed.` };
+  const want = kDirections[direction];
+  const facing = faces
+    .filter(({ frame }) => dot(frame.normal, want) > 1 - 1e-6)
+    .sort((a, b) => dot(b.frame.origin, want) - dot(a.frame.origin, want));
+  if (facing.length) return { face: facing[0]!.face };
+  const named = faces.map(({ face, frame }) => {
+    const way = directionOf(frame.normal);
+    return face === 'top' || face === 'underside' ? `${way ?? 'slanted'} (${face})` : way;
+  });
+  const ways = [...new Set(named.filter(Boolean))];
+  const slanted = named.filter(way => way === undefined).length;
+  return {
+    error: `${part.name} has no face pointing ${direction}. Its faces point ${ways.join(', ')}${slanted ? `, plus ${slanted} slanted` : ''}.`,
+  };
+}
+
+/** A plane or face named as a person reads it, by the way it looks in the studio: "Side's +z face", "Side's top (+x)". */
+export function cadFaceName(document: CadDocument, on: CadDrawnOn['on']): string {
+  if ('plane' in on) return `the ${on.plane} plane`;
+  const part = document.parts.find(candidate => candidate.id === on.partId);
+  if (!part) return 'a part that is gone';
+  const frame = cadFaceFrame(document, on);
+  if ('error' in frame) return `${part.name}'s missing edge`;
+  if (on.face === 'top' || on.face === 'underside') {
+    const looks = directionOf(frame.normal);
+    return looks ? `${part.name}'s ${on.face} (${looks})` : `${part.name}'s ${on.face}`;
+  }
+  const way = directionOf(frame.normal);
+  return way ? `${part.name}'s ${way} face` : `${part.name}'s slanted edge face`;
+}

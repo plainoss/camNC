@@ -1,0 +1,101 @@
+import { describe, expect, it } from 'vitest';
+import {
+  addLine,
+  addPartCut,
+  cadFaceFacing,
+  cadFaceFrame,
+  cadFaceName,
+  cadStepReport,
+  createCadDocument,
+  createCadPart,
+  createPlateDocument,
+  setPartPattern,
+  solveCadDocument,
+  type CadDrawnOn,
+  type CadPart,
+} from './index';
+
+const plate = (name: string, width: number, height: number, drawnOn: CadDrawnOn): CadPart => ({
+  ...createPlateDocument({ width, height, thickness: 18 }).parts[0]!,
+  name,
+  drawnOn,
+});
+
+describe('reading faces by the way they look', () => {
+  // Standing on the right plane, the side's sketch x runs along +y, its y up +z, and its top looks along +x.
+  const side = plate('Side', 300, 720, { on: { plane: 'right' }, offset: 0 });
+
+  it('finds each face of a standing side by direction, and names it back', async () => {
+    const { document } = await solveCadDocument({ ...createCadDocument(), parts: [side] });
+    const facing = (direction: '+x' | '-x' | '+y' | '-y' | '+z' | '-z') => {
+      const found = cadFaceFacing(document, side.id, direction);
+      if ('error' in found) throw new Error(found.error);
+      return cadFaceName(document, { partId: side.id, face: found.face });
+    };
+    expect(['+x', '-x', '+y', '-y', '+z', '-z'].map(d => facing(d as '+x'))).toEqual([
+      "Side's top (+x)",
+      "Side's underside (-x)",
+      "Side's +y face",
+      "Side's -y face",
+      "Side's +z face",
+      "Side's -z face",
+    ]);
+    const top = cadFaceFacing(document, side.id, '+z');
+    expect(cadFaceFrame(document, { partId: side.id, ...(top as { face: { edge: string } }) })).toEqual({
+      // The top edge, walked counterclockwise from the sketch's top right corner towards its top left.
+      origin: [0, 300, 720],
+      x: [0, -1, 0],
+      y: [1, 0, 0],
+      normal: [0, 0, 1],
+      length: 300,
+    });
+    expect(cadFaceFrame(document, { plane: 'front' })).toEqual({ origin: [0, 0, 0], x: [1, 0, 0], y: [0, 0, 1], normal: [0, -1, 0] });
+  });
+
+  it('lists the ways a part’s faces do look when none looks the way asked', () => {
+    let triangle = { ...createCadPart('Gusset', 18) };
+    for (const [x1, y1, x2, y2] of [
+      [0, 0, 100, 0],
+      [100, 0, 0, 100],
+      [0, 100, 0, 0],
+    ] as const)
+      triangle = { ...triangle, sketch: addLine(triangle.sketch, { x1, y1, x2, y2 }) };
+    const document = { ...createCadDocument(), parts: [triangle] };
+    expect(cadFaceFacing(document, triangle.id, '+y')).toEqual({
+      error: 'Gusset has no face pointing +y. Its faces point +z (top), -z (underside), -y, -x, plus 1 slanted.',
+    });
+  });
+});
+
+describe('the step report', () => {
+  it('says what each step refers to and what it came to: the face, the copies and every opening', async () => {
+    const side = plate('Side', 300, 720, { on: { plane: 'right' }, offset: 0 });
+    // A shelf 250 deep on the top plane, raised to 300 mm, running through the side's thickness.
+    const shelf = plate('Shelf', 500, 250, { on: { plane: 'top' }, offset: 300 });
+    let document = { ...createCadDocument(), parts: [side, shelf] };
+    document = addPartCut(document, [shelf.id], [side.id], { value: 0.2 }).document;
+    document = setPartPattern(document, shelf.id, { axis: 'z', count: 2, spacing: 200 });
+    const solved = await solveCadDocument(document);
+    const report = cadStepReport(solved.document, solved.parts);
+    expect(report.map(entry => (entry.kind === 'partCut' ? entry.kind : `${entry.kind} ${entry.part}`))).toEqual([
+      'drawnOn Side',
+      'drawnOn Shelf',
+      'pattern Shelf',
+      'partCut',
+    ]);
+    expect(report[1]).toMatchObject({ on: 'the top plane', offset: 300, placement: { position: [0, 0, 300] } });
+    expect(report[2]).toMatchObject({ count: 2, spacing: 200, copies: [{ name: 'Shelf 2', position: [0, 0, 500] }] });
+    // In the side's sketch, x runs along the shelf's depth from the open front, and y up across its thickness.
+    expect(report[3]).toEqual({
+      kind: 'partCut',
+      stepId: solved.document.partCuts![0]!.id,
+      tools: ['Shelf'],
+      targets: ['Side'],
+      clearance: 0.2,
+      cuts: [
+        { target: 'Side', tool: 'Shelf', side: 'top', width: 250.2, length: 18.4, depth: 18, through: true, at: { x: 0, y: 299.8 } },
+        { target: 'Side', tool: 'Shelf 2', side: 'top', width: 250.2, length: 18.4, depth: 18, through: true, at: { x: 0, y: 499.8 } },
+      ],
+    });
+  });
+});
