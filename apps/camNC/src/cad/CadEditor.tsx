@@ -528,7 +528,7 @@ export function CadEditor({
     return parsedTransform.ok ? transformSketchEntities(sketch, { ...parsedTransform, entityIds: selected }) : parsedTransform;
   }, [sketch, tool, selected, parsedTransform]);
   const parsedCircular = useMemo(() => parseCircularPatternParameters(circularParameters), [circularParameters]);
-  const parsedLinear = useMemo(() => parseLinearPatternParameters(linearParameters), [linearParameters]);
+  const parsedLinear = useMemo(() => parseLinearPatternParameters(linearParameters, variableScope), [linearParameters, variableScope]);
   const linearPreview = useMemo(() => {
     if (!sketch || !selected.length) return null;
     if (tool === 'circularPattern')
@@ -1668,7 +1668,8 @@ export function CadEditor({
       existing.countX === parsedLinear.countX &&
       existing.countY === parsedLinear.countY &&
       Math.hypot(existing.stepX.x - parsedLinear.stepX.x, existing.stepX.y - parsedLinear.stepX.y) < CAD_GEOMETRY_TOLERANCE &&
-      Math.hypot(existing.stepY.x - parsedLinear.stepY.x, existing.stepY.y - parsedLinear.stepY.y) < CAD_GEOMETRY_TOLERANCE;
+      Math.hypot(existing.stepY.x - parsedLinear.stepY.x, existing.stepY.y - parsedLinear.stepY.y) < CAD_GEOMETRY_TOLERANCE &&
+      JSON.stringify(existing.expressions ?? null) === JSON.stringify(parsedLinear.expressions ?? null);
     if (same) {
       const id = existing.id;
       chooseTool('select');

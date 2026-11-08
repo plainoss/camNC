@@ -1,5 +1,5 @@
-import type { CadLinearPattern, CadSketchPattern, CadPoint, CadSketch } from '@wbcnc/cad';
-import { entityPointIds, patternSourceIds } from '@wbcnc/cad';
+import type { CadLinearPattern, CadLinearPatternExpressions, CadSketchPattern, CadPoint, CadSketch, CadValueScope } from '@wbcnc/cad';
+import { cadExpressionNames, entityPointIds, patternSourceIds } from '@wbcnc/cad';
 import { parseCadValue } from './valueExpressions';
 export interface LinearPatternParameters {
   countX: string;
@@ -21,19 +21,30 @@ export const initialLinearPatternParameters = (): LinearPatternParameters => ({
 });
 export function linearPatternParameters(pattern: CadLinearPattern): LinearPatternParameters {
   return {
-    countX: String(pattern.countX),
-    countY: String(pattern.countY > 1 ? pattern.countY : 2),
-    spacingX: String(Math.hypot(pattern.stepX.x, pattern.stepX.y)),
-    spacingY: String(Math.hypot(pattern.stepY.x, pattern.stepY.y)),
+    countX: pattern.expressions?.countX ?? String(pattern.countX),
+    countY: pattern.expressions?.countY ?? String(pattern.countY > 1 ? pattern.countY : 2),
+    spacingX: pattern.expressions?.spacingX ?? String(Math.hypot(pattern.stepX.x, pattern.stepX.y)),
+    spacingY: pattern.expressions?.spacingY ?? String(Math.hypot(pattern.stepY.x, pattern.stepY.y)),
     angleX: String((Math.atan2(pattern.stepX.y, pattern.stepX.x) * 180) / Math.PI),
     angleY: String((Math.atan2(pattern.stepY.y, pattern.stepY.x) * 180) / Math.PI),
     secondDirection: pattern.countY > 1,
   };
 }
-export function parseLinearPatternParameters(parameters: LinearPatternParameters) {
+/** Counts and spacings may use the design's variables; those are kept as typed so the pattern follows them. */
+export function parseLinearPatternParameters(parameters: LinearPatternParameters, variables?: CadValueScope) {
+  const expressions: CadLinearPatternExpressions = {};
   const read = (key: Exclude<keyof LinearPatternParameters, 'secondDirection'>, unit: 'mm' | 'deg' | 'scalar') => {
-    const result = parseCadValue(parameters[key], { unit });
+    const result = parseCadValue(parameters[key], { unit, variables });
     if ('error' in result) throw new Error(result.error);
+    if (
+      (key === 'countX' || key === 'countY' || key === 'spacingX' || key === 'spacingY') &&
+      result.expression &&
+      cadExpressionNames(result.expression).length
+    ) {
+      expressions[key] = result.expression;
+      // A count from variables says how many fit, so it rounds down, as the pattern does when they change.
+      if (key === 'countX' || key === 'countY') return Math.floor(result.value + 1e-9);
+    }
     return result.value;
   };
   const vector = (spacing: number, angle: number) => {
@@ -49,6 +60,7 @@ export function parseLinearPatternParameters(parameters: LinearPatternParameters
       countY: parameters.secondDirection ? read('countY', 'scalar') : 1,
       stepX: vector(read('spacingX', 'mm'), read('angleX', 'deg')),
       stepY: vector(read('spacingY', 'mm'), read('angleY', 'deg')),
+      ...(Object.keys(expressions).length && { expressions }),
     };
   } catch (error) {
     return { ok: false as const, message: error instanceof Error ? error.message : String(error) };

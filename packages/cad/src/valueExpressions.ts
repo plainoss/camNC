@@ -229,10 +229,10 @@ export function parseCadValue(
         const subtract = operator('-');
         index++;
         let right = product(depth);
-        // A plain number added to a variable is in the field's own unit: `depth + 10` is 10 mm more. With a typed unit,
-        // as in `2 + 1in`, the plain number stays ambiguous and still needs its own.
+        // A plain number added to a variable is in that variable's base unit: `depth + 10` is 10 mm more, wherever it's
+        // typed. With a typed unit, as in `2 + 1in`, the plain number stays ambiguous and still needs its own.
         const plain = (q: Quantity) => !q.dimension && !q.explicitUnits && !q.fraction;
-        const named = (q: Quantity) => q.dimension === expectedDimension && q.dimension !== null && !q.typedUnit;
+        const named = (q: Quantity) => q.dimension !== null && !q.typedUnit;
         if (plain(left) && named(right)) left = { ...left, dimension: right.dimension };
         if (plain(right) && named(left)) right = { ...right, dimension: left.dimension };
         if (left.dimension !== right.dimension && (left.fraction || right.fraction))
