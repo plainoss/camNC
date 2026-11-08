@@ -208,6 +208,24 @@ describe('the Carve step', () => {
     });
   });
 
+  it('keeps text typed just before the selection changes', async () => {
+    const job = await open();
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    await waitFor(() => expect(screen.getAllByTestId('carving-item')).toHaveLength(2));
+    // Within the debounce: picking another item from the list unmounts the editor.
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Second' } });
+    fireEvent.click(screen.getByRole('button', { name: '"Welcome"' }));
+    // And clicking the empty board.
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'First' } });
+    fireEvent.pointerDown(screen.getAllByTestId('carving-item')[0].closest('svg')!, { button: 0 });
+    expect(screen.queryByLabelText('Text')).toBeNull();
+    await waitFor(async () => {
+      const items = (await getJob(job.id))!.carving!.items;
+      expect(items.map(item => item.art)).toMatchObject([{ text: 'First' }, { text: 'Second' }]);
+      expect(items[0].outline).not.toEqual(job.carving!.items[0].outline);
+    });
+  });
+
   it('adds text, selects items from the list and canvas, edits just the selection, and deletes it', async () => {
     const job = await open();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
