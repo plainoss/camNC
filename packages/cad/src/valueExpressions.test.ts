@@ -42,6 +42,26 @@ describe('CAD value expressions', () => {
       });
   });
 
+  it.each([
+    ['(width/3 - 3*board/2 - 10mm)/penPitch', 5.09375],
+    ['floor((width/3 - 3*board/2 - 10mm)/penPitch)', 5],
+    ['round((width/3 - 3*board/2 - 10mm)/penPitch)', 5],
+    ['min((width/3 - 3*board/2 - 10mm)/penPitch; 6)', 5.09375],
+    ['max((width/3 - 3*board/2 - 10mm)/penPitch; 6)', 6],
+  ])('accepts cancelled length units in the scalar expression %s', (text, expected) => {
+    const variables = {
+      width: { value: 600, kind: 'length' },
+      board: { value: 18, kind: 'length' },
+      penPitch: { value: 32, kind: 'length' },
+    } as const;
+    expect(parseCadValue(text, { unit: 'scalar', variables })).toEqual({ value: expected, expression: text });
+    expect(parseCadValue('(width - 10mm)/penPitch', { unit: 'mm', variables })).toHaveProperty('error');
+  });
+
+  it('keeps unitless ratios out of length fields and mixed length sums', () => {
+    for (const text of ['10mm/2mm', '1 + 1in/1mm', '1mm + 1in/1mm']) expect(parseCadValue(text), text).toHaveProperty('error');
+  });
+
   it('supports arithmetic precedence, signed values, fractions, parentheses and optional equals', () => {
     expect(value('20+30')).toEqual({ value: 50, expression: '20+30' });
     expect(value('=50')).toEqual({ value: 50, expression: '=50' });
