@@ -1,7 +1,7 @@
-import { pointInPolygon, polygonArea } from './geometry';
+import { CAD_CHORD_TOLERANCE, pointInPolygon, polygonArea } from './geometry';
 import type { CadPoint, EvaluatedCadPart } from './types';
 
-/** A corner bends less than this, in degrees, is a curve's facet, not a corner a bit can't reach. */
+/** Minimum corner turn, in degrees, worth relieving. */
 const kMinTurn = 10;
 /** Arc points per full turn of a bone. */
 const kArcSteps = 48;
@@ -10,6 +10,32 @@ const sub = (a: CadPoint, b: CadPoint) => ({ x: a.x - b.x, y: a.y - b.y });
 const length = (v: CadPoint) => Math.hypot(v.x, v.y);
 const unit = (v: CadPoint) => ({ x: v.x / length(v), y: v.y / length(v) });
 const dot = (a: CadPoint, b: CadPoint) => a.x * b.x + a.y * b.y;
+const turnAngle = (a: CadPoint, b: CadPoint) => (Math.atan2(a.x * b.y - a.y * b.x, dot(a, b)) * 180) / Math.PI;
+
+/** Loops have no per-edge curve metadata. Three equal chords with equal turns identify a circular facet run. */
+function facetTurns(loop: CadPoint[]): number[] {
+  const edges = loop.map((p, i) => sub(loop[(i + 1) % loop.length]!, p)),
+    lengths = edges.map(length),
+    turns = edges.map((edge, i) => turnAngle(edge, edges[(i + 1) % loop.length]!)),
+    facets = loop.map(() => 0);
+  for (let i = 0; i < loop.length; i++) {
+    const j = (i + 1) % loop.length,
+      k = (i + 2) % loop.length,
+      turn = turns[i]!,
+      size = lengths[i]!;
+    if (
+      size > 0 &&
+      Math.abs(turn) > 1e-6 &&
+      Math.abs(turn) <= 45 + 1e-6 &&
+      Math.abs(turn - turns[j]!) < 1e-5 &&
+      [lengths[j]!, lengths[k]!].every(value => Math.abs(value - size) < 1e-7 + size * 1e-5) &&
+      // The sagitta must match the accuracy used to tessellate sketch arcs, not a coarse polygon's corners.
+      (size / 2) * Math.tan((Math.abs(turn) * Math.PI) / 720) <= CAD_CHORD_TOLERANCE + 1e-7
+    )
+      facets[i] = facets[j] = facets[k] = turn;
+  }
+  return facets;
+}
 
 function onSegment(p: CadPoint, a: CadPoint, b: CadPoint): boolean {
   const ab = sub(b, a),
@@ -32,7 +58,8 @@ function relieveLoop(
   fits: (bone: CadPoint[]) => boolean = () => true
 ) {
   const counterclockwise = polygonArea(points) > 0,
-    loop = counterclockwise ? points : [...points].reverse();
+    loop = counterclockwise ? points : [...points].reverse(),
+    facets = facetTurns(loop);
   const out: CadPoint[] = [];
   let skipped = 0;
   loop.forEach((p, i) => {
@@ -42,7 +69,8 @@ function relieveLoop(
       outward = sub(b, p),
       d1 = unit(inward),
       d2 = unit(outward),
-      turn = (Math.atan2(d1.x * d2.y - d1.y * d2.x, dot(d1, d2)) * 180) / Math.PI;
+      // A chord differs from the arc's endpoint tangent by half its turning angle.
+      turn = turnAngle(d1, d2) - (facets[(i + loop.length - 1) % loop.length]! + facets[i]!) / 2;
     // On a counterclockwise loop, a left turn is a corner of what's inside it.
     const cutCorner = cutInside ? turn > kMinTurn : turn < -kMinTurn;
     if (!cutCorner || keep(p)) return out.push(p);

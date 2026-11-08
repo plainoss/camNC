@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addArc,
+  addCircle,
   addFaceSketch,
   addLine,
   addRectangle,
@@ -8,6 +10,7 @@ import {
   createPlateDocument,
   evaluateCadDocument,
   pointInPolygon,
+  relieveCorners,
   setCadVariable,
   setCutDepth,
   type CadDocument,
@@ -31,6 +34,59 @@ const relieved = (document: CadDocument, diameter: number) => {
 };
 
 describe('inside corners relieved for a round bit', () => {
+  it('leaves a grid of 36 round holes unchanged without tight-corner warnings', () => {
+    const document = createPlateDocument({ width: 100, height: 100 });
+    const part = document.parts[0]!;
+    for (let row = 0; row < 6; row++)
+      for (let column = 0; column < 6; column++)
+        part.sketch = addCircle(part.sketch, { x: 10 + column * 15, y: 10 + row * 15, radius: 2.5 });
+    const original = evaluateCadDocument(document);
+    expect(original.diagnostics).toEqual([]);
+    expect(original.parts[0]!.holes).toHaveLength(36);
+    const result = relieved(document, 3.175);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.parts[0]!.holes).toEqual(original.parts[0]!.holes);
+    expect(result.parts[0]!.loops).toEqual(original.parts[0]!.loops);
+  });
+
+  it.each([2.5, 0.05])('leaves a tangent slot with radius %s unchanged', radius => {
+    const document = createPlateDocument({ width: 100, height: 60 });
+    const part = document.parts[0]!;
+    part.sketch = addLine(part.sketch, { x1: 30, y1: 30 - radius, x2: 70, y2: 30 - radius });
+    part.sketch = addArc(part.sketch, { cx: 70, cy: 30, radius, startAngle: -Math.PI / 2, endAngle: Math.PI / 2 });
+    part.sketch = addLine(part.sketch, { x1: 70, y1: 30 + radius, x2: 30, y2: 30 + radius });
+    part.sketch = addArc(part.sketch, { cx: 30, cy: 30, radius, startAngle: Math.PI / 2, endAngle: (3 * Math.PI) / 2 });
+    const original = evaluateCadDocument(document);
+    expect(original.diagnostics).toEqual([]);
+    expect(original.parts[0]!.holes).toHaveLength(1);
+    const result = relieved(document, 3.175);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.parts[0]!.holes).toEqual(original.parts[0]!.holes);
+    expect(result.parts[0]!.loops).toEqual(original.parts[0]!.loops);
+    const reversed = {
+      ...original.parts[0]!,
+      holes: original.parts[0]!.holes.map(hole => [...hole].reverse()),
+      loops: original.parts[0]!.loops.map(loop => ({ ...loop, points: [...loop.points].reverse() })),
+    };
+    expect(relieveCorners(reversed, 3.175)).toEqual({ part: reversed, skipped: 0 });
+  });
+
+  it('still relieves both real corners where a line meets a semicircle at an angle', () => {
+    const document = createPlateDocument({ width: 100, height: 60 });
+    const part = document.parts[0]!;
+    part.sketch = addArc(part.sketch, { cx: 50, cy: 30, radius: 10, startAngle: -Math.PI / 2, endAngle: Math.PI / 2 });
+    part.sketch = addLine(part.sketch, { x1: 50, y1: 40, x2: 50, y2: 20 });
+    const original = evaluateCadDocument(document);
+    expect(original.diagnostics).toEqual([]);
+    const result = relieved(document, 0.1);
+    expect(result.diagnostics).toEqual([]);
+    const hole = result.parts[0]!.holes[0]!;
+    expect(hole.length).toBeGreaterThan(original.parts[0]!.holes[0]!.length);
+    const removed = original.parts[0]!.holes[0]!.filter(p => !hole.some(q => q.x === p.x && q.y === p.y));
+    expect(removed).toHaveLength(2);
+    expect(removed.every(p => Math.abs(p.x - 50) < 1e-8 && Math.abs(Math.abs(p.y - 30) - 10) < 1e-8)).toBe(true);
+  });
+
   it('puts a bone in each corner of a square hole, big enough for the bit to reach the corner', () => {
     const document = createPlateDocument({ width: 100, height: 60 });
     document.parts[0]!.sketch = addRectangle(document.parts[0]!.sketch, { x: 30, y: 20, width: 40, height: 20 });
