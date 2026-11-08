@@ -172,4 +172,21 @@ describe('design variables', () => {
     expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(applyCadVariables(document));
     expect(() => parseCadDocument({ ...document, variables: [{ id: 'v', name: 'mm', expression: '1' }] })).toThrow('variable name');
   });
+
+  it('moves a placed part whose position uses a variable, and renames carry into it', () => {
+    let document: CadDocument = { ...createCadDocument(), parts: [plate('Right side', 'depth')] };
+    document.parts[0]!.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1], positionExpressions: ['width - board', null, null] };
+    document = variable(variable(variable(document, 'board', '18mm'), 'depth', '300mm'), 'width', '600mm');
+    expect(document.parts[0]!.placement!.position).toEqual([582, 0, 0]);
+    const width = document.variables!.find(v => v.name === 'width')!.id;
+    document = variable(document, 'carcass', '800mm', width);
+    expect(document.parts[0]!.placement).toMatchObject({ position: [782, 0, 0], positionExpressions: ['carcass - board', null, null] });
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document))).parts[0]!.placement).toEqual(document.parts[0]!.placement);
+    const board = document.variables!.find(v => v.name === 'board')!.id;
+    document = variable(document, 'board', '5deg', board);
+    expect(document.parts[0]!.placement!.position).toEqual([782, 0, 0]);
+    expect(cadVariableProblems(document).map(p => p.message)).toContain(
+      'Position x carcass - board: Put units on each added value, or put the whole sum in parentheses before its unit.'
+    );
+  });
 });

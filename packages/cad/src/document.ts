@@ -688,6 +688,9 @@ export function parseCadDocument(input: unknown): CadDocument {
         throw new Error('Invalid CAD placement');
       [...position, ...rotation].forEach(number);
       if (Math.abs(Math.hypot(...rotation) - 1) > 1e-6) throw new Error('Invalid CAD placement');
+      const typed = p.placement.positionExpressions;
+      if (typed !== undefined && (!Array.isArray(typed) || typed.length !== 3 || typed.some(e => e !== null && typeof e !== 'string')))
+        throw new Error('Invalid CAD placement');
     }
     if (d.version === 1 && p.features !== undefined) throw new Error('Invalid CAD document');
     if (p.features !== undefined && !Array.isArray(p.features)) throw new Error('Invalid CAD features');

@@ -1,7 +1,16 @@
-import { placeAgainst, turnAbout, type CadDocument, type CadPlacementChange } from '@wbcnc/cad';
+import {
+  cadVariableScope,
+  placeAgainst,
+  turnAbout,
+  type CadDocument,
+  type CadPlacement,
+  type CadPlacementChange,
+  type CadValueScope,
+} from '@wbcnc/cad';
 import { useMemo, useRef, useState } from 'react';
 import { ModelViewport, type ModelFacePick, type ModelView } from '@/cam/model/ModelViewport';
 import { assemblyModel } from './assemblyModel';
+import { formatCadValue, parseCadValue } from './valueExpressions';
 
 const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
@@ -9,6 +18,68 @@ const kViews: { view: ModelView; label: string }[] = [
   { view: 'flat', label: 'Laid flat' },
 ];
 const always = () => true;
+const kAxes = ['X', 'Y', 'Z'] as const;
+
+/** One position axis of a part, typed as a number or as an expression using the design's variables. */
+function PositionField({
+  axis,
+  placement,
+  variables,
+  onPlace,
+  onError,
+}: {
+  axis: 0 | 1 | 2;
+  placement: CadPlacement;
+  variables: CadValueScope;
+  onPlace: (placement: CadPlacement) => void;
+  /** Why the typed position can't be used, or null once it can. */
+  onError: (message: string | null) => void;
+}) {
+  const typed = placement.positionExpressions?.[axis] ?? formatCadValue(placement.position[axis]);
+  const [text, setText] = useState(typed);
+  const [error, setError] = useState<string | null>(null);
+  const save = () => {
+    if (text === typed) return true;
+    const parsed = parseCadValue(text, { unit: 'mm', variables });
+    if ('error' in parsed) {
+      setError(parsed.error);
+      onError(`Position ${kAxes[axis]}: ${parsed.error}`);
+      return false;
+    }
+    const position = [...placement.position] as CadPlacement['position'];
+    position[axis] = parsed.value;
+    const expressions = [...(placement.positionExpressions ?? [null, null, null])] as NonNullable<CadPlacement['positionExpressions']>;
+    expressions[axis] = parsed.expression ?? null;
+    const next: CadPlacement = { ...placement, position, positionExpressions: expressions };
+    if (expressions.every(expression => expression === null)) delete next.positionExpressions;
+    setError(null);
+    onError(null);
+    onPlace(next);
+    return true;
+  };
+  return (
+    <label className="cad-assembly-position" title={`Where the part's origin sits along ${kAxes[axis]}, in mm. Variables work here.`}>
+      {kAxes[axis]}
+      <input
+        value={text}
+        aria-label={`Position ${kAxes[axis]}`}
+        aria-invalid={error ? true : undefined}
+        spellCheck={false}
+        onChange={event => setText(event.target.value)}
+        onBlur={save}
+        onKeyDown={event => {
+          if (event.key === 'Enter' && save()) event.currentTarget.blur();
+          if (event.key === 'Escape') {
+            setText(typed);
+            setError(null);
+            onError(null);
+            event.currentTarget.blur();
+          }
+        }}
+      />
+    </label>
+  );
+}
 
 /**
  * Every part of the design together. "Put against" moves a part so a face of it sits flat on a face of another part:
@@ -36,6 +107,14 @@ export default function AssemblyView({
   const [against, setAgainst] = useState<(ModelFacePick & { moved: string }) | null>(null);
   const canPlace = model.meshes.length >= 2 && view !== 'flat';
   const selected = document.parts.find(part => part.id === selectedId);
+  const selectedPlacement = selected && model.placements.get(selected.id);
+  const variables = useMemo(() => cadVariableScope(document), [document]);
+  /** A quarter turn about an assembly axis through the part's origin, so a position typed for it still holds. */
+  const turnSelected = (axis: [number, number, number]) => {
+    const turned = turnAbout(selectedPlacement, selectedPlacement!.position, axis, 90);
+    setAgainst(null);
+    onPlace([{ partId: selected!.id, placement: { ...selectedPlacement!, rotation: turned.rotation } }]);
+  };
   const stop = () => {
     setPlacing(null);
     setNotice(null);
@@ -124,6 +203,33 @@ export default function AssemblyView({
             }>
             Turn 90°
           </button>
+        )}
+        {selected && selectedPlacement && !placing && view !== 'flat' && (
+          <div className="cad-assembly-positions" role="group" aria-label={`Position of ${selected.name}`}>
+            {([0, 1, 2] as const).map(axis => (
+              <PositionField
+                key={`${selected.id}:${axis}:${selectedPlacement.positionExpressions?.[axis] ?? selectedPlacement.position[axis]}`}
+                axis={axis}
+                placement={selectedPlacement}
+                variables={variables}
+                onPlace={placement => onPlace([{ partId: selected.id, placement }])}
+                onError={setNotice}
+              />
+            ))}
+          </div>
+        )}
+        {selected && selectedPlacement && !placing && view !== 'flat' && (
+          <div role="group" aria-label={`Turn ${selected.name}`}>
+            {kAxes.map((name, i) => (
+              <button
+                key={name}
+                type="button"
+                title={`Turn a quarter turn about ${name}, around the part's origin`}
+                onClick={() => turnSelected([i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0])}>
+                ⟲{name}
+              </button>
+            ))}
+          </div>
         )}
         {selected?.placement && !placing && (
           <button

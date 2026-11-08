@@ -256,6 +256,8 @@ export interface CadPart {
 export interface CadPlacement {
   position: [number, number, number];
   rotation: [number, number, number, number];
+  /** Each position as typed, kept when it uses design variables so the part follows them, as dimensions do. */
+  positionExpressions?: [string | null, string | null, string | null];
 }
 /** The face a sketch is drawn on. All sketches share the part's x and y, seen from above, whichever face they're on. */
 export type CadFaceRef = 'top' | 'underside' | { floorOf: string };

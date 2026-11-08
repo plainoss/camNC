@@ -50,4 +50,46 @@ describe('the assembly view', () => {
     setup({ ...createCadDocument(), parts: [empty, panel('Shelf')] });
     expect(screen.getByRole('status').textContent).toMatch(/^Not shown: Broken/);
   });
+
+  it('places a part by typing a position that uses variables', () => {
+    const side: CadPart = { ...panel('Right side'), placement: { position: [0, 0, 0], rotation: [0, 0, 0, 1] } };
+    const document: CadDocument = {
+      ...createCadDocument(),
+      variables: [
+        { id: 'w', name: 'width', expression: '600mm' },
+        { id: 'b', name: 'board', expression: '18mm' },
+      ],
+      parts: [side, panel('Shelf')],
+    };
+    const { place } = setup(document, side.id);
+    const x = screen.getByRole('textbox', { name: 'Position X' });
+    fireEvent.change(x, { target: { value: 'width - boards' } });
+    fireEvent.keyDown(x, { key: 'Enter' });
+    expect(screen.getByRole('status').textContent).toBe("Position X: There's no variable called boards.");
+    expect(place).not.toHaveBeenCalled();
+    fireEvent.change(x, { target: { value: 'width - board' } });
+    fireEvent.keyDown(x, { key: 'Enter' });
+    expect(place).toHaveBeenCalledWith([
+      { partId: side.id, placement: { position: [582, 0, 0], rotation: [0, 0, 0, 1], positionExpressions: ['width - board', null, null] } },
+    ]);
+  });
+
+  it('turns a part about its own origin, keeping the position typed for it', () => {
+    const side: CadPart = {
+      ...panel('Side'),
+      placement: { position: [582, 0, 0], rotation: [0, 0, 0, 1], positionExpressions: ['width - board', null, null] },
+    };
+    const { place } = setup({ ...createCadDocument(), parts: [side, panel('Shelf')] }, side.id);
+    fireEvent.click(screen.getByRole('button', { name: '⟲Y' }));
+    expect(place).toHaveBeenCalledWith([
+      {
+        partId: side.id,
+        placement: {
+          position: [582, 0, 0],
+          rotation: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
+          positionExpressions: ['width - board', null, null],
+        },
+      },
+    ]);
+  });
 });

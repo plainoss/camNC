@@ -285,7 +285,7 @@
   max-width: 115px;
 }
 .cad-number-field input {
-  width: 84px;
+  width: 116px;
 }
 .cad-divider {
   border-bottom: 1px solid #dde4ed;
@@ -419,6 +419,27 @@
 .cad-assembly-tools button[aria-pressed='true'] {
   background: #ede9fe;
   border-color: #8b5cf6;
+}
+.cad-assembly-positions {
+  display: flex;
+  gap: 6px;
+}
+.cad-assembly-position {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #52647d;
+}
+.cad-assembly-position input {
+  width: 116px;
+  padding: 4px 6px;
+  border: 1px solid #b9c4cd;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.cad-assembly-position input[aria-invalid='true'] {
+  border-color: #ac2929;
 }
 .cad-part-view > p {
   position: absolute;
