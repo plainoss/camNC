@@ -7,10 +7,17 @@ export interface SelectionField<K extends string> {
   key: K;
   label: string;
   value: number;
+  /** Shown after the field; millimetres unless said. */
+  unit?: string;
+  min?: number;
+  max?: number;
+  /** The field's accessible name, when the label beside it is too short to stand alone. */
+  name?: string;
 }
 
 /**
- * What can be done to the one thing selected on the drawing, floating beside it: its sizes, delete, and a menu with the rest.
+ * What can be done to the one thing selected on the drawing, floating beside it: its sizes, any controls of its own
+ * (`children`), delete, and a menu with the rest.
  * After a size is changed, a row offers the same for the others (`scopes`), so an edit never reaches further than asked.
  */
 export function SelectionBar<K extends string>({
@@ -25,6 +32,7 @@ export function SelectionBar<K extends string>({
   onDelete,
   deleteLabel,
   menu,
+  children,
 }: {
   /** Tells the fields of one selected thing from another's. */
   id: string;
@@ -41,6 +49,8 @@ export function SelectionBar<K extends string>({
   onDelete?: () => void;
   deleteLabel: string;
   menu: { label: string; icon?: ReactNode; onSelect: () => void }[];
+  /** Controls of its own, after the fields. */
+  children?: ReactNode;
 }) {
   const bar = useRef<HTMLDivElement>(null);
   const [offer, setOffer] = useState<{ key: K; label: string; value: number } | null>(null);
@@ -84,16 +94,19 @@ export function SelectionBar<K extends string>({
               id={`${id}-${f.key}`}
               value={f.value}
               digits={1}
-              min={0.1}
-              unit="mm"
+              min={f.min ?? 0.1}
+              max={f.max}
+              unit={f.unit ?? 'mm'}
+              aria-label={f.name}
               className="h-6 w-14 px-1 text-right font-mono text-xs"
               onCommit={value => {
                 if (onField(f.key, value) !== false) setOffer({ key: f.key, label: f.label, value });
               }}
             />
-            mm
+            {f.unit ?? 'mm'}
           </label>
         ))}
+        {children}
         {onDelete && (
           <button
             type="button"
