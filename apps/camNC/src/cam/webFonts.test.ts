@@ -56,6 +56,8 @@ it('encodes family names, accepts CSS without subset comments, and sorts by rece
   expect(fetcher.mock.calls[0][0]).toBe('https://fonts.googleapis.com/css2?family=Font+With+%26+Spaces:wght@700&display=swap');
   clock.mockReturnValue(now + 200);
   await ensureWebFont(second, { fetch: fetcher });
+  // Used again in a later session.
+  resetWebFontsForTests();
   clock.mockReturnValue(now + 300);
   await ensureWebFont(first, { fetch: fetcher });
   expect((await fontsOnDevice()).slice(0, 2)).toEqual([first, second]);

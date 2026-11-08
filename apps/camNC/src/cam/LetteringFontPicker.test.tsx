@@ -9,7 +9,7 @@ vi.mock('./webFonts', async importOriginal => ({
 }));
 afterEach(cleanup);
 
-it('searches the catalog and selects the family’s default weight, with built-ins always available', async () => {
+it('searches the catalog and selects the family’s default weight', async () => {
   const onChange = vi.fn();
   render(
     <>
@@ -20,23 +20,29 @@ it('searches the catalog and selects the family’s default weight, with built-i
   fireEvent.click(screen.getByRole('combobox', { name: 'Font' }));
   fireEvent.change(screen.getByRole('combobox', { name: 'Search fonts' }), { target: { value: 'LoB' } });
   const lobster = await screen.findByRole('option', { name: 'Lobster' });
-  for (const name of ['Sans, bold', 'Serif, bold', 'Slab']) expect(screen.getByRole('option', { name })).toBeTruthy();
+  // Built-ins that don't match are hidden, so Enter picks the best match.
+  expect(screen.queryByRole('option', { name: 'Sans, bold' })).toBeNull();
   fireEvent.click(lobster);
   expect(onChange).toHaveBeenCalledWith({ family: 'Lobster', weight: 400 });
   await waitFor(() => expect(screen.queryByRole('option', { name: 'Lobster' })).toBeNull());
 });
 
-it('filters by category, caps results, and keeps built-ins under every filter', async () => {
+it('filters by category and caps results, built-ins included', async () => {
   render(<LetteringFontPicker font="sans" onChange={vi.fn()} />);
   fireEvent.click(screen.getByRole('combobox', { name: 'Font' }));
   await screen.findByRole('option', { name: 'Open Sans' });
+  for (const name of ['Sans, bold', 'Serif, bold', 'Slab']) expect(screen.getByRole('option', { name })).toBeTruthy();
   expect(screen.getAllByRole('option').length).toBeLessThanOrEqual(83);
   expect(screen.getByText('On this device')).toBeTruthy();
   fireEvent.change(screen.getByRole('combobox', { name: 'Search fonts' }), { target: { value: 'lobster' } });
   await screen.findByRole('option', { name: 'Lobster' });
   fireEvent.click(screen.getByRole('button', { name: 'Mono' }));
   expect(screen.queryByRole('option', { name: 'Lobster' })).toBeNull();
-  expect(screen.getByRole('option', { name: 'Sans, bold' })).toBeTruthy();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Search fonts' }), { target: { value: '' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Serif' }));
+  expect(screen.getByRole('option', { name: 'Slab' })).toBeTruthy();
+  expect(screen.queryByRole('option', { name: 'Sans, bold' })).toBeNull();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Search fonts' }), { target: { value: 'lobster' } });
   fireEvent.click(screen.getByRole('button', { name: 'Display' }));
   expect(await screen.findByRole('option', { name: 'Lobster' })).toBeTruthy();
 });

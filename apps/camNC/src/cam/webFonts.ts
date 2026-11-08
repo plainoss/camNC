@@ -126,6 +126,8 @@ export async function ensureWebFont(font: WebFont, opts: { fetch?: typeof fetch 
         })
       );
       for (const face of faces) fonts.add(face);
+      // Kept, or marked as just used, for the next session and offline use.
+      await storeFont({ ...record, usedAt: Date.now() }).catch(() => {});
       return record;
     })().catch(() => {
       loaded.delete(key);
@@ -133,8 +135,7 @@ export async function ensureWebFont(font: WebFont, opts: { fetch?: typeof fetch 
     });
     loaded.set(key, pending);
   }
-  const record = await pending;
-  await storeFont({ ...record, usedAt: Date.now() }).catch(() => {});
+  await pending;
 }
 
 export async function fontsOnDevice(): Promise<WebFont[]> {

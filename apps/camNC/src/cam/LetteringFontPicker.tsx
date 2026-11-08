@@ -16,6 +16,7 @@ import {
 
 type Font = CarvingFont | WebFont;
 const categories = { all: 'All', sans: 'Sans', serif: 'Serif', display: 'Display', handwriting: 'Handwriting', mono: 'Mono' } as const;
+const builtInCategories: Record<CarvingFont, FontCategory> = { sans: 'sans', serif: 'serif', slab: 'serif' };
 const previews = new Set<string>();
 
 function FontName({ font }: { font: Font }) {
@@ -79,6 +80,10 @@ export function LetteringFontPicker({ id = 'carve-font', font, onChange }: { id?
 
   const matches = (family: string) => family.toLowerCase().includes(search.trim().toLowerCase());
   const inCategory = (family: string) => category === 'all' || catalog.find(row => row.family === family)?.category === category;
+  // Filtered too, so Enter picks the best match rather than the first built-in.
+  const builtIns = (Object.keys(kCarvingFonts) as CarvingFont[]).filter(
+    key => matches(kCarvingFonts[key].label) && (category === 'all' || builtInCategories[key] === category)
+  );
   const cached = device.filter(f => matches(f.family) && inCategory(f.family)).slice(0, 80);
   const google = catalog.filter(f => matches(f.family) && (category === 'all' || f.category === category)).slice(0, 80 - cached.length);
   const weights = web ? (catalog.find(row => row.family === font.family)?.weights ?? [font.weight]) : [];
@@ -126,14 +131,16 @@ export function LetteringFontPicker({ id = 'carve-font', font, onChange }: { id?
               ))}
             </div>
             <CommandList>
-              <CommandGroup heading="Built in">
-                {(Object.keys(kCarvingFonts) as CarvingFont[]).map(key => (
-                  <CommandItem key={key} value={key} onSelect={() => select(key)}>
-                    <FontName font={key} />
-                    {checked(key) && <Check className="ml-auto" />}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              {!!builtIns.length && (
+                <CommandGroup heading="Built in">
+                  {builtIns.map(key => (
+                    <CommandItem key={key} value={key} onSelect={() => select(key)}>
+                      <FontName font={key} />
+                      {checked(key) && <Check className="ml-auto" />}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
               {!!cached.length && (
                 <CommandGroup heading="On this device">
                   {cached.map(f => (
