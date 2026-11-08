@@ -260,6 +260,11 @@ export interface CadPart {
    * the 3D view and machining until Extrude makes a part of it.
    */
   extrude?: false;
+  /**
+   * The regions of the sketch extruded, by their stable IDs. Left out, the whole sketch is: its outer outline, with the
+   * loops inside it as holes.
+   */
+  regions?: string[];
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
   placement?: CadPlacement;
   /** What the part was drawn on. When it's set, the placement follows from it, so the part moves with that face. */

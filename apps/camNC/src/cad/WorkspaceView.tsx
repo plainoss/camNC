@@ -1,6 +1,6 @@
 import { assemblyReport, evaluateCadDocument, isCadPart, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ModelViewport, type ModelFacePick, type ModelView } from '@/cam/model/ModelViewport';
+import { ModelViewport, type ModelFacePick, type ModelView, type ViewRegion } from '@/cam/model/ModelViewport';
 import { assemblyModel, instanceKey } from './assemblyModel';
 import { basePlaneViews, type BasePlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
@@ -30,6 +30,8 @@ export default function WorkspaceView({
   onSelectPlane,
   onSelectFace,
   picked,
+  regions,
+  onPickRegion,
   children,
 }: {
   document: CadDocument;
@@ -57,6 +59,9 @@ export default function WorkspaceView({
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
   /** The name of the plane or face picked for the next sketch, said in the status line so the pick isn't hidden. */
   picked?: string | null;
+  /** A sketch's regions to pick for its extrude, while its Extrude dialog is open. */
+  regions?: ViewRegion[];
+  onPickRegion?: (id: string) => void;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
 }) {
@@ -176,6 +181,8 @@ export default function WorkspaceView({
         onPickFace={choosing ? pickFace : undefined}
         planes={onNewPart ? planes : undefined}
         sketchLines={sketchLines}
+        regions={regions}
+        onPickRegion={onPickRegion}
         onPickPlane={id => {
           const plane = id as BasePlane;
           // Picked while choosing, the new part is drawn on it; otherwise it's picked for the next sketch, as a face is.

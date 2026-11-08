@@ -22,6 +22,7 @@ import { pointEquivalence } from './pointEquivalence';
 import { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 import { dimensionValueError } from './dimensionValues';
 import { isOwnedSplineHandle, splineHandleIssue } from './splineHandles';
+import { regionProfile } from './regionProfile';
 export { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 /** Absolute chord error, mm; analytic sketch geometry is retained in the source. */
 export const CAD_CHORD_TOLERANCE = 0.01;
@@ -432,6 +433,7 @@ export function evaluateCadPart(part: CadPart): { part?: EvaluatedCadPart; diagn
       diagnostics: [],
     };
   }
+  if (part.regions?.length) return regionProfile(part as CadPart & { regions: string[] });
   const diagnostics: CadDiagnostic[] = [];
   const error = (code: string, message: string, entityIds?: string[]) =>
     diagnostics.push({ code, message, severity: 'error', partId: part.id, entityIds });

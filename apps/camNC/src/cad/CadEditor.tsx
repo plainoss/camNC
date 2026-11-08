@@ -84,6 +84,8 @@ import {
   cadVariableProblems,
   drawnOnOutline,
   cadFaceFrame,
+  sketchRegions,
+  CAD_CHORD_TOLERANCE,
   isCadPart,
   cadDrawnOnSupports,
   CAD_IDENTITY_PLACEMENT,
@@ -214,6 +216,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import type { BasePlane } from './basePlanes';
+import type { ViewRegion } from '@/cam/model/ModelViewport';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
@@ -3637,8 +3640,11 @@ export function CadEditor({
     } else if (command === 'extrude' && part?.extrude === false) {
       // Extruding a sketch makes a part of it; cancelling leaves the sketch as it was. One line is a board edge-on.
       const before = documentRef.current;
+      // A sketch that can't be a part as a whole can still have a region picked from it; with none, it says why.
       const problem =
-        !(part.drawnOn && isSingleLine(part)) && evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
+        !(part.drawnOn && isSingleLine(part)) &&
+        !sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).length &&
+        evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
       if (problem) return setStudioRefusal(`Can’t extrude this sketch yet: ${problem.message}`);
       commit(
         replacePart(before, part.id, p => {
@@ -3734,6 +3740,37 @@ export function CadEditor({
   const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
   const acceptanceNotice = notice ?? finishError;
   // The parts already built, behind an open sketch in the studio, seen straight at its plane as the drawing is.
+  // The regions of the sketch being extruded, to pick in the view as the reference's Extrude does, when it has more than one.
+  const extrudeRegions = useMemo((): ViewRegion[] => {
+    const target = featureDialog?.kind === 'extrude' ? doc.parts.find(candidate => candidate.id === featureDialog.partId) : undefined;
+    if (!studioSession || !target || target.thin) return [];
+    const regions = sketchRegions(target.sketch, CAD_CHORD_TOLERANCE);
+    if (regions.length < 2 && !target.regions?.length) return [];
+    const frame = cadFaceFrame(doc, target.drawnOn?.on ?? { plane: 'top' });
+    if ('error' in frame) return [];
+    // Shown on the face the extrude ends at, so the part's own body doesn't hide them.
+    const along = (target.drawnOn?.offset ?? 0) + (target.drawnOn?.inward ? 0.1 : target.thickness + 0.1);
+    const origin = frame.origin.map((value, axis) => value + frame.normal[axis]! * along) as [number, number, number];
+    return regions.map(region => ({
+      id: region.id,
+      frame: { origin, x: frame.x, y: frame.y, normal: frame.normal },
+      outline: region.points,
+      holes: region.holes,
+      picked: !!target.regions?.includes(region.id),
+    }));
+  }, [studioSession, featureDialog, doc]);
+  /** A region clicked while extruding: the part is that region, or the whole sketch again when it's clicked twice. */
+  const pickRegion = (regionId: string) => {
+    if (!featureDialog) return;
+    commit(
+      replacePart(documentRef.current, featureDialog.partId, p => {
+        if (!p.regions?.includes(regionId)) return { ...p, regions: [regionId] };
+        const whole = { ...p };
+        delete whole.regions;
+        return whole;
+      })
+    );
+  };
   const sketchBackdrop = useMemo(() => {
     if (!studioSession || showWorkspace || show3D || !part || !canvasBox?.width || !canvasBox.height) return null;
     const on = part.drawnOn?.on ?? { plane: 'top' as const };
@@ -4361,6 +4398,8 @@ export function CadEditor({
                 selectedPlane={selectedPlane}
                 onSelectPlane={pickPlane}
                 picked={selectedPlane ? drawnOnName(doc, { plane: selectedPlane }) : selectedFace ? drawnOnName(doc, selectedFace) : null}
+                regions={extrudeRegions}
+                onPickRegion={extrudeRegions.length ? pickRegion : undefined}
                 onSelectFace={on => {
                   setSelectedFace(on);
                   if (on) setSelectedPlane(null);

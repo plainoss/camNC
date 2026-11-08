@@ -23,6 +23,55 @@ export interface ViewPlane {
   highlighted?: boolean;
 }
 
+/** A region of a sketch shown to be picked for an extrude, on the sketch's plane. */
+export interface ViewRegion {
+  id: string;
+  /** The sketch's plane: points of the region are in its x and y. */
+  frame: { origin: [number, number, number]; x: [number, number, number]; y: [number, number, number]; normal: [number, number, number] };
+  outline: { x: number; y: number }[];
+  holes: { x: number; y: number }[][];
+  picked: boolean;
+}
+
+function Region({ region, model, onPick }: { region: ViewRegion; model: THREE.Matrix4; onPick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const geometry = useMemo(() => {
+    const shape = new THREE.Shape(region.outline.map(p => new THREE.Vector2(p.x, p.y)));
+    shape.holes = region.holes.map(hole => new THREE.Path(hole.map(p => new THREE.Vector2(p.x, p.y))));
+    return new THREE.ShapeGeometry(shape);
+  }, [region]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  const matrix = useMemo(() => {
+    const v = (a: [number, number, number]) => new THREE.Vector3(...a);
+    const { frame } = region;
+    return model.clone().multiply(new THREE.Matrix4().makeBasis(v(frame.x), v(frame.y), v(frame.normal)).setPosition(v(frame.origin)));
+  }, [region, model]);
+  return (
+    <mesh
+      geometry={geometry}
+      matrixAutoUpdate={false}
+      matrix={matrix}
+      renderOrder={2}
+      onPointerOver={event => {
+        event.stopPropagation();
+        setHovered(true);
+      }}
+      onPointerOut={() => setHovered(false)}
+      onClick={event => {
+        event.stopPropagation();
+        if (event.delta <= 4) onPick();
+      }}>
+      <meshBasicMaterial
+        color={region.picked ? '#2f80ed' : '#1f6fc5'}
+        transparent
+        opacity={region.picked ? 0.45 : hovered ? 0.3 : 0.12}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+}
+
 const kPlane = '#d08a3c';
 const kPlaneHighlight = '#2f80ed';
 
@@ -214,6 +263,8 @@ export function ModelViewport({
   planes = [],
   onPickPlane,
   sketchLines = [],
+  regions = [],
+  onPickRegion,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -237,6 +288,9 @@ export function ModelViewport({
   onPickPlane?: (id: string) => void;
   /** Finished sketches not yet extruded, as polylines in the model, shown on their planes. */
   sketchLines?: [number, number, number][][];
+  /** A sketch's regions to pick for an extrude, and picking one. */
+  regions?: ViewRegion[];
+  onPickRegion?: (id: string) => void;
 }) {
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
   const assembled = useMemo(() => centerAssembled(meshes), [meshes]);
@@ -317,6 +371,9 @@ export function ModelViewport({
           ))}
         </group>
       )}
+      {view === 'assembled' &&
+        onPickRegion &&
+        regions.map(region => <Region key={region.id} region={region} model={assembled} onPick={() => onPickRegion(region.id)} />)}
       {shownPlanes.map(plane => (
         <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
       ))}
