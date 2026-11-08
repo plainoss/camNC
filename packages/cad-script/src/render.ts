@@ -1,4 +1,5 @@
 import type { CadPoint, EvaluatedCadPart } from '@wbcnc/cad';
+import { isEdgeNotch } from './notch';
 
 const n = (value: number) => +value.toFixed(3);
 const loop = (points: readonly CadPoint[], dx: number, dy: number) => `M${points.map(p => `${n(p.x + dx)} ${n(dy - p.y)}`).join('L')}Z`;
@@ -28,12 +29,13 @@ export function renderCadSvg(parts: readonly EvaluatedCadPart[]): string {
     out.push(`<clipPath id="material-${i}"><path d="${material}" clip-rule="evenodd"/></clipPath>`);
     const unlabelled = new Map<string, number>();
     for (const cut of part.cuts ?? []) {
+      const notch = isEdgeNotch(cut, part.outline);
       const shade = cut.through ? 1 : Math.min(1, cut.to / part.thickness);
       const islands = cut.islands.map(island => loop(island, dx, dy)).join('');
       out.push(
-        `<path d="${loop(cut.outline, dx, dy)}${islands}" clip-path="url(#material-${i})" fill="${cut.through ? '#fff' : '#3b6ea5'}" fill-opacity="${n(0.25 + 0.6 * shade)}" fill-rule="evenodd" stroke="#1d3f66" stroke-width="${n(unit / 8)}"${cut.side === 'underside' ? ` stroke-dasharray="${n(unit)}"` : ''}/>`
+        `<path${notch ? ' class="notch"' : ''} d="${loop(cut.outline, dx, dy)}${islands}" clip-path="url(#material-${i})" fill="${cut.through ? '#fff' : '#3b6ea5'}" fill-opacity="${notch ? 1 : n(0.25 + 0.6 * shade)}" fill-rule="evenodd" stroke="#1d3f66" stroke-width="${n(unit / 8)}"${cut.side === 'underside' ? ` stroke-dasharray="${n(unit)}"` : ''}/>`
       );
-      const depth = cut.through ? 'through' : `${n(cut.to)} mm`;
+      const depth = notch ? 'notch' : cut.through ? 'through' : `${n(cut.to)} mm`;
       const xs = cut.outline.map(p => Math.max(box.x0, Math.min(box.x1, p.x))),
         ys = cut.outline.map(p => Math.max(box.y0, Math.min(box.y1, p.y)));
       // A label wouldn't fit in a small cut, such as a row of pin holes: those are counted above the part's name.

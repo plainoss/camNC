@@ -1,5 +1,6 @@
 import {
   boardBits,
+  boardWork,
   camBoard,
   holdOptionsOf,
   holdsOnParts,
@@ -18,6 +19,7 @@ import { holdCheck, holdTimeline } from './hold';
 import type { HoldPoint } from './holdPoints';
 import { readGcode } from './analyze';
 import { checkGcodeSafety, checkProgramSafety } from './safety';
+import { progressOver, type OnProgress } from './progress';
 import { DEFAULT_TABS } from './settings';
 import { setupSheet, type SetupSummary } from './setupSummary';
 import { freePartsProgram, kDefaultSkin } from './tabPlan';
@@ -204,14 +206,30 @@ export interface BoardRequest {
   carvings?: BoardCarving[];
 }
 
+/** The tab hold check's share of the work of planning a board, per unit of its parts' work. */
+const kHoldCheckShare = 0.1;
+
 /** One program for a whole board: its parts at their nested positions, operations grouped by bit. */
 export function planBoard(
   board: BoardRequest,
   settings: Partial<CamSettings>,
   source: BoardPartSource,
-  { perPart = false } = {}
+  { perPart = false, onProgress }: { perPart?: boolean; onProgress?: OnProgress } = {}
 ): PlanResult {
   const spec = boardSpec(board, source);
+  // The steps, weighed by how long they took on boards of parts and carvings: laying out side A (and again unturned,
+  // for the hold checks, when the board is turned on the bed), its G-code and checks, side B the same, and whether
+  // everything stays put.
+  const work = onProgress ? boardWork(spec) : { parts: 0, carvings: 0, checks: 0 };
+  const sideA = work.parts + work.carvings + work.checks;
+  const post = 0.35 * sideA;
+  const sideB = board.flip ? work.parts + work.checks : 0;
+  const postB = 0.35 * sideB;
+  const unturned = board.rotationDeg ? sideA : 0;
+  const holds = (0.7 + kHoldCheckShare) * work.parts;
+  const progress = progressOver(onProgress, sideA + post + sideB + postB + unturned + holds);
+  // Started: the caller counts the time from here.
+  onProgress?.(0);
   const flip = board.flip;
   // On dowels: side A drills the pins (and their mirrors) where there's room on the board.
   let problem: string | undefined;
@@ -223,7 +241,8 @@ export function planBoard(
     else
       problem ??= `No room for two ⌀${diameter} dowel pins clear of the parts: make the board bigger, or re-align with the camera instead.`;
   }
-  const cam = camBoard(spec, settings);
+  const cam = camBoard(spec, settings, progress.step(sideA));
+  progress.done(sideA);
   // Corners relieved for a smaller bit than the board is cut with still come out rounded, and a joint won't close.
   const widest = Math.max(0, ...cam.operations.map(op => op.tool.diameter));
   const warned = new Set<string>();
@@ -238,23 +257,48 @@ export function planBoard(
   // The second side cuts the undersides: the warning that they need one is answered.
   if (flip) cam.warnings = cam.warnings.filter(w => !w.includes('flipped'));
   const size: [number, number, number] = [board.w, board.h, board.stockTop];
-  let plan = summarize(cam, `Board ${board.name}`, size, settings, board.thickness, board.name, sideRotation(board, false));
+  let plan = summarize(
+    cam,
+    `Board ${board.name}`,
+    size,
+    settings,
+    board.thickness,
+    board.name,
+    sideRotation(board, false),
+    progress.step(post)
+  );
+  progress.done(post);
   if (flip) {
     const b = camBoard(
       sideBSpec({ ...spec, carvings: undefined, rotationDeg: sideRotation(board, true) }, p => undersideOf(source, p.id, board, p.rotated)),
-      { ...settings, cutThrough: false }
+      { ...settings, cutThrough: false },
+      progress.step(sideB)
     );
+    progress.done(sideB);
     plan = {
       ...plan,
       flip: { registration: flip.registration, dowels: spec.dowels?.at, dowelDiameter: spec.dowels?.diameter, problem },
       ...(b.operations.length
-        ? { sideB: summarize(b, `Board ${board.name} side B`, size, settings, board.stockTop, board.name, sideRotation(board, true)) }
+        ? {
+            sideB: summarize(
+              b,
+              `Board ${board.name} side B`,
+              size,
+              settings,
+              board.stockTop,
+              board.name,
+              sideRotation(board, true),
+              progress.step(postB)
+            ),
+          }
         : // With nothing it can cut, side B has no program, but why it has nothing still matters.
           { warnings: [...plan.warnings, ...b.warnings.map(warning => `Side B: ${warning}`)] }),
     };
   }
   // The hold check runs on the board as laid out, before it's turned to lie like the stock on the bed.
-  const flat = board.rotationDeg ? camBoard({ ...spec, rotationDeg: 0 }, settings) : cam;
+  progress.done(postB);
+  const flat = board.rotationDeg ? camBoard({ ...spec, rotationDeg: 0 }, settings, progress.step(unturned)) : cam;
+  progress.done(unturned);
   const holding = (cam.holding ?? []).map(h => ({
     name: h.name,
     how: h.how,
@@ -280,6 +324,7 @@ export function planBoard(
       }
     : {};
   plan = { ...plan, ...stability(flat, spec, settings), ...clashes, ...(release.length && { release }) };
+  progress.done(holds - kHoldCheckShare * work.parts);
   // A skin (or the layer on the tape) holds every part until the end.
   if (board.holdDown === 'skin' || board.holdDown === 'fixture-tape')
     return {
@@ -546,10 +591,14 @@ export function summarize(
   settings: Partial<CamSettings>,
   partTop = cam.stockTop,
   board?: string,
-  rotationDeg = 0
+  rotationDeg = 0,
+  onProgress?: OnProgress
 ): PlanResult {
   const split = splitByBit(cam);
-  const programs = split.map(p => {
+  // Writing each program's G-code and timing it, then checking it: both about as long as it has points.
+  const points = split.map(p => p.operations.reduce((sum, op) => sum + op.passes.reduce((n, pass) => n + pass.pts.length, 0), 0));
+  const progress = progressOver(onProgress, 2 * points.reduce((sum, n) => sum + n, 0));
+  const programs = split.map((p, i) => {
     const tool = p.operations[0].tool;
     const { gcode, setup } = postProgram(p, {
       partName: split.length > 1 ? `${name}, bit T${tool.number} D=${tool.diameter}` : name,
@@ -560,6 +609,7 @@ export function summarize(
     });
     const timing = estimateProgramTime(gcode);
     setup.timing = timing;
+    progress.done(points[i]);
     return {
       tool: tool.number,
       diameter: tool.diameter,
@@ -572,15 +622,17 @@ export function summarize(
     };
   });
   const ops = opSummaries(cam, partTop);
-  const safety = programs.flatMap((p, i) =>
-    checkProgramSafety(split[i], p.gcode, {
+  const safety = programs.flatMap((p, i) => {
+    const issues = checkProgramSafety(split[i], p.gcode, {
       stockTop: cam.stockTop,
       size: [size[0], size[1]],
       rotationDeg,
       minZ: settings.finalZ ?? -0.3,
       toolRadius: p.diameter / 2,
-    }).map(issue => issue.message)
-  );
+    }).map(issue => issue.message);
+    progress.done(points[i]);
+    return issues;
+  });
   // The whole job, for the preview and the totals.
   const moves = programs.flatMap(p => readGcode(p.gcode));
   return {

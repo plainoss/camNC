@@ -141,6 +141,15 @@ function clearanceOutcome(step: CadPartCut, scope: CadValueScope): Outcome | nul
   return parsed.value >= 0 ? parsed : { error: 'A clearance can’t be less than nothing.' };
 }
 
+function fingersOutcome(step: CadPartCut, scope: CadValueScope): Outcome | null {
+  if (typeof step.split !== 'object' || !usesVariables(step.split.fingersExpression)) return null;
+  const parsed = parseCadValue(step.split.fingersExpression, { unit: 'scalar', variables: scope });
+  if ('error' in parsed) return parsed;
+  return Number.isInteger(parsed.value) && parsed.value >= 2
+    ? parsed
+    : { error: 'A finger joint needs a whole number of fingers, at least 2.' };
+}
+
 /** A part pattern with its typed count and spacing worked out, or why one can't be. */
 function partPatternOutcome(
   part: CadPart,
@@ -306,7 +315,11 @@ export function applyCadVariables(document: CadDocument): CadDocument {
   });
   const partCuts = document.partCuts?.map(step => {
     const outcome = clearanceOutcome(step, scope);
-    return outcome && 'value' in outcome && outcome.value !== step.clearance ? { ...step, clearance: outcome.value } : step;
+    let next = outcome && 'value' in outcome && outcome.value !== step.clearance ? { ...step, clearance: outcome.value } : step;
+    const fingers = fingersOutcome(step, scope);
+    if (typeof step.split === 'object' && fingers && 'value' in fingers && fingers.value !== step.split.fingers)
+      next = { ...next, split: { ...step.split, fingers: fingers.value } };
+    return next;
   });
   const cutsChanged = partCuts?.some((step, index) => step !== document.partCuts![index]);
   if (parts.every((part, index) => part === document.parts[index]) && !cutsChanged) return document;
@@ -410,6 +423,13 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
         severity: 'error',
         message: `Cut parts clearance ${step.clearanceExpression}: ${outcome.error}`,
       });
+    const fingers = fingersOutcome(step, scope);
+    if (fingers && 'error' in fingers && typeof step.split === 'object')
+      problems.push({
+        code: 'variable-value',
+        severity: 'error',
+        message: `Cut parts fingers ${step.split.fingersExpression}: ${fingers.error}`,
+      });
   }
   return problems;
 }
@@ -434,9 +454,14 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
   return {
     ...document,
     variables: document.variables?.map(variable => ({ ...variable, expression: edit(variable.expression) })),
-    partCuts: document.partCuts?.map(step =>
-      step.clearanceExpression ? { ...step, clearanceExpression: edit(step.clearanceExpression) } : step
-    ),
+    partCuts: document.partCuts?.map(step => ({
+      ...step,
+      ...(step.clearanceExpression && { clearanceExpression: edit(step.clearanceExpression) }),
+      ...(typeof step.split === 'object' &&
+        step.split.fingersExpression && {
+          split: { ...step.split, fingersExpression: edit(step.split.fingersExpression) },
+        }),
+    })),
     parts: document.parts.map(part =>
       mapSketches(
         mapCuts(
