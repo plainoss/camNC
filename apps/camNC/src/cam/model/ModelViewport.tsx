@@ -88,6 +88,8 @@ export interface SketchView {
   center: [number, number];
   width: number;
   height: number;
+  /** The view's right, up and toward-the-viewer directions in the sketch's frame, once it's turned off straight on. */
+  turned?: { right: [number, number, number]; up: [number, number, number]; back: [number, number, number] };
 }
 
 function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 }) {
@@ -102,11 +104,18 @@ function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 
     const at = v(view.origin).addScaledVector(v(view.x), view.center[0]).addScaledVector(v(view.y), view.center[1]).applyMatrix4(model);
     // Far enough out along the plane's normal to see everything in front of it, looking back at it.
     const reach = 20000;
-    camera.position.copy(at).addScaledVector(v(view.normal), reach);
-    camera.up.copy(v(view.y));
+    // A direction given in the sketch's frame, in the model's.
+    const along = ([a, b, c]: [number, number, number]) =>
+      v(view.x).multiplyScalar(a).addScaledVector(v(view.y), b).addScaledVector(v(view.normal), c);
+    camera.position.copy(at).addScaledVector(view.turned ? along(view.turned.back) : v(view.normal), reach);
+    camera.up.copy(view.turned ? along(view.turned.up) : v(view.y));
     camera.lookAt(at);
-    camera.left = -view.width / 2;
-    camera.right = view.width / 2;
+    // A face's frame can be mirrored, its x × y facing away from its normal: the picture is mirrored with it, as its
+    // drawing is.
+    const right = view.turned ? along(view.turned.right) : v(view.x);
+    const mirrored = v([1, 0, 0]).applyQuaternion(camera.quaternion).dot(right) < 0;
+    camera.left = ((mirrored ? 1 : -1) * view.width) / 2;
+    camera.right = ((mirrored ? -1 : 1) * view.width) / 2;
     camera.top = view.height / 2;
     camera.bottom = -view.height / 2;
     camera.near = 1;

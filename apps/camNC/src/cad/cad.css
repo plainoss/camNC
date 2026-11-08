@@ -1164,19 +1164,21 @@
   stroke-linecap: round;
 }
 /** The parts already built, behind an open sketch's drawing, which stays on top and transparent. */
+/**
+ * Under the drawing, which comes after it and is positioned too, and under the pane's menus and notices, without
+ * stacking anything of its own over them.
+ */
 .cad-sketch-backdrop-frame {
   position: absolute;
-  z-index: 0;
   pointer-events: none;
+}
+.cad-drawing > .cad-canvas-over-parts {
+  position: relative;
 }
 .cad-sketch-backdrop,
 .cad-sketch-backdrop canvas {
   width: 100%;
   height: 100%;
-}
-.cad-drawing > .cad-canvas {
-  position: relative;
-  z-index: 1;
 }
 /** Over the parts behind it, the face being drawn on shows by its outline, and the sketch's regions let the parts through. */
 .cad-canvas-over-parts .cad-face-outline {
@@ -1185,4 +1187,8 @@
 }
 .cad-canvas-over-parts .cad-sketch-region {
   fill-opacity: 0.45;
+}
+/** A turned drawing's own box isn't on screen as a box; the parts behind it show where it is. */
+.cad-canvas[data-sketch-turned] {
+  outline: none;
 }

@@ -410,7 +410,7 @@ it('doesn’t apply a field after its dialog is cancelled, and applies a dimensi
   );
 });
 
-it('shows the parts built before a sketch behind it, seen straight at its plane, and none of its own', async () => {
+it('shows the parts built before a sketch behind it, seen straight at its plane and turned by a right drag, and none of its own', async () => {
   const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
   side.drawnOn = { on: { plane: 'right' as const }, offset: 0 };
   const back = { ...createCadPart('Back', 4), drawnOn: { on: { partId: side.id, face: 'top' as const }, offset: -10 } };
@@ -429,7 +429,28 @@ it('shows the parts built before a sketch behind it, seen straight at its plane,
   await screen.findByRole('dialog', { name: 'Sketch · Back' });
   await waitFor(() => expect(document.querySelector('.cad-sketch-backdrop canvas')).not.toBeNull(), { timeout: 10_000 });
   // The drawing stays on top, and the face it's drawn on shows by its outline over the part.
-  expect(screen.getByTestId('cad-canvas').classList.contains('cad-canvas-over-parts')).toBe(true);
+  const canvas = screen.getByTestId('cad-canvas');
+  expect(canvas.classList.contains('cad-canvas-over-parts')).toBe(true);
+  // A right drag turns the view, drawing and parts together; the camera never turns by itself.
+  expect(canvas.hasAttribute('data-sketch-turned')).toBe(false);
+  const box = canvas.getBoundingClientRect(),
+    at = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  const pointer = (type: string, dx: number, buttons: number) =>
+    canvas.dispatchEvent(
+      new PointerEvent(type, { bubbles: true, clientX: at.x + dx, clientY: at.y, button: 2, buttons, pointerId: 1, pointerType: 'mouse' })
+    );
+  pointer('pointerdown', 0, 2);
+  for (const dx of [20, 40, 60]) pointer('pointermove', dx, 2);
+  pointer('pointerup', 60, 0);
+  await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(true));
+  expect(canvas.style.transform).toMatch(/^matrix\(/);
+  expect(screen.queryByRole('menu')).toBeNull();
+  // n looks straight at the plane again, and once more, at its other side.
+  canvas.focus();
+  await userEvent.keyboard('n');
+  await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(false));
+  await userEvent.keyboard('n');
+  await waitFor(() => expect(canvas.style.transform).toBe('matrix(-1, 0, 0, 1, 0, 0)'));
   await userEvent.click(within(screen.getByRole('dialog', { name: 'Sketch · Back' })).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(document.querySelector('.cad-sketch-backdrop')).toBeNull());
 });

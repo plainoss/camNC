@@ -210,6 +210,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
+import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 import './cad.css';
@@ -477,6 +478,8 @@ export function CadEditor({
   const [choosingFace, setChoosingFace] = useState(startsBlank);
   // Where the drawing sits in its pane, for the parts shown behind a sketch to line up with it.
   const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
+  const [sketchTurn, setSketchTurn] = useState<SketchTurn>(straightOn);
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   // A variable being added, or the one being changed.
@@ -495,9 +498,17 @@ export function CadEditor({
     if (!element) return;
     const measure = () =>
       setCanvasBox(previous => {
+        // A turned drawing's box isn't its size, but it turns about its middle.
         const box = element.getBoundingClientRect(),
-          pane = (element.parentElement as HTMLElement).getBoundingClientRect();
-        const next = { left: box.left - pane.left, top: box.top - pane.top, width: box.width, height: box.height };
+          pane = (element.parentElement as HTMLElement).getBoundingClientRect(),
+          width = element.clientWidth,
+          height = element.clientHeight;
+        const next = {
+          left: box.left + box.width / 2 - width / 2 - pane.left,
+          top: box.top + box.height / 2 - height / 2 - pane.top,
+          width,
+          height,
+        };
         return previous && JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
       });
     measure();
@@ -537,7 +548,8 @@ export function CadEditor({
   const drag = useRef<DragGesture | null>(null);
   const annotationDrag = useRef<AnnotationGesture | null>(null);
   const boxGesture = useRef<BoxGesture | null>(null);
-  const pan = useRef<{ x: number; y: number; view: View } | null>(null);
+  // A right or middle drag: it pans, or over the parts behind a studio sketch, a right drag turns the view.
+  const pan = useRef<{ x: number; y: number; view: View; turn?: SketchTurn } | null>(null);
   const solveSequence = useRef(0);
   const lastCheckedRevision = useRef('');
   const documentRef = useRef(doc);
@@ -2235,6 +2247,12 @@ export function CadEditor({
       return;
     }
     if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+    // `n` looks straight at the sketch's plane, and again, at its other side, as in the reference.
+    if (key === 'n' && sketchBackdrop) {
+      event.preventDefault();
+      setSketchTurn(normalTurn);
+      return;
+    }
     if (modification.phase === 'offset' && modification.entityIds.length) {
       if (/^[0-9.,-]$/.test(key)) {
         event.preventDefault();
@@ -2414,11 +2432,13 @@ export function CadEditor({
           position: { x: event.clientX, y: event.clientY },
           target: contextTarget(event.target as Element, { x: event.clientX, y: event.clientY }),
         }).state;
-      pan.current = { x: event.clientX, y: event.clientY, view };
+      pan.current = { x: event.clientX, y: event.clientY, view, turn: event.button === 2 && sketchBackdrop ? sketchTurn : undefined };
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
     if (event.button !== 0 || !sketch) return;
+    // Seen edge-on, a click can't say where on the plane it is.
+    if (sketchBackdrop && edgeOn(sketchTurn)) return;
     setCreationValues(null);
     setRegionField(null);
     if (conicEditing) {
@@ -3090,13 +3110,17 @@ export function CadEditor({
               : null
         : null
     );
-    if (pan.current && (contextPress.current.phase !== 'pressed' || contextPress.current.moved)) {
-      const box = svg.current!.getBoundingClientRect();
+    if (pan.current?.turn && (contextPress.current.phase !== 'pressed' || contextPress.current.moved))
+      setSketchTurn(turnedBy(pan.current.turn, event.clientX - pan.current.x, event.clientY - pan.current.y));
+    else if (pan.current && (contextPress.current.phase !== 'pressed' || contextPress.current.moved)) {
       const v = pan.current;
+      // Its own size, which a turned drawing's box isn't.
+      const width = svg.current!.clientWidth,
+        height = svg.current!.clientHeight;
       setView({
         ...v.view,
-        x: v.view.x - ((event.clientX - v.x) * v.view.w) / box.width,
-        y: v.view.y - ((event.clientY - v.y) * v.view.h) / box.height,
+        x: v.view.x - ((event.clientX - v.x) * v.view.w) / width,
+        y: v.view.y - ((event.clientY - v.y) * v.view.h) / height,
       });
     }
     const moving = drag.current;
@@ -3574,9 +3598,12 @@ export function CadEditor({
         center: [view.x + view.w / 2, -(view.y + view.h / 2)] as [number, number],
         width: canvasBox.width / scale,
         height: canvasBox.height / scale,
+        turned: sketchTurn === straightOn ? undefined : turnAxes(sketchTurn),
       },
     };
-  }, [studioSession, showWorkspace, show3D, part, canvasBox, doc, view]);
+  }, [studioSession, showWorkspace, show3D, part, canvasBox, doc, view, sketchTurn]);
+  // Each sketch opens looking straight at its plane.
+  useEffect(() => setSketchTurn(straightOn), [part?.id, showWorkspace]);
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
   // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
@@ -4222,7 +4249,14 @@ export function CadEditor({
           <svg
             ref={svg}
             className={`cad-canvas cad-tool-${tool}${sketchBackdrop ? ' cad-canvas-over-parts' : ''}`}
-            style={showWorkspace || (show3D && partHasOutline) ? { display: 'none' } : undefined}
+            style={
+              showWorkspace || (show3D && partHasOutline)
+                ? { display: 'none' }
+                : sketchBackdrop && sketchTurn !== straightOn
+                  ? { transform: `matrix(${drawingMatrix(sketchTurn).join(', ')}, 0, 0)`, transformOrigin: 'center' }
+                  : undefined
+            }
+            data-sketch-turned={sketchBackdrop && sketchTurn !== straightOn ? '' : undefined}
             data-testid="cad-canvas"
             role="img"
             aria-label="2D sketch drawing canvas"
@@ -5101,7 +5135,11 @@ export function CadEditor({
             <span>
               {rounded(cursor.x)}, {rounded(cursor.y)} mm
             </span>
-            <span>Scroll to zoom · right-drag to pan</span>
+            <span>
+              {sketchBackdrop
+                ? 'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it'
+                : 'Scroll to zoom · right-drag to pan'}
+            </span>
             {sketch && (
               <SelectionReadout
                 sketch={sketch}
