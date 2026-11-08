@@ -1605,6 +1605,16 @@ function planHoleMiddle(
   return { middle, ...(cleared && { clearing }) };
 }
 
+/**
+ * A through hole in a pocket's floor gets cut away anyway, so the bit may use its space. Without it, a counterbore
+ * only a little wider than its screw hole leaves a ring narrower than the bit, and isn't cut at all.
+ */
+function withOpenHoles(pocket: PartFeatures['pockets'][number], holes: PathsD): PartFeatures['pockets'][number] {
+  const outer = pocket.strictRegion.filter(path => areaD(path) > 0);
+  const inside = holes.length && outer.length ? intersect(holes, outer) : [];
+  return inside.length ? { ...pocket, strictRegion: union(pocket.strictRegion, inside) } : pocket;
+}
+
 export function camPart(features: PartFeatures, settings: Partial<CamSettings> = {}, context: PartPlanningContext = {}): PartCam {
   const s: CamSettings = { ...DEFAULT_SETTINGS, ...settings };
   validateCamSettings(s);
@@ -1624,7 +1634,8 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
   let prevTool: Tool | undefined;
   let previousContained = false;
   let previousRegion: PathsD | undefined;
-  features.pockets.forEach((p, i) => {
+  features.pockets.forEach((pocket, i) => {
+    const p = withOpenHoles(pocket, features.throughHoles);
     const contained = context.containedPockets?.has(i);
     // Open to the edge: run the bit 1mm past the edge into the waste, whatever its size. A bit only has to fit
     // that extended region (a 6mm bit cuts a 3.5mm rabbet).
