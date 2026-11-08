@@ -27,6 +27,7 @@ export default function WorkspaceView({
   onCutParts,
   choosing: choosingProp,
   onChoosingChange,
+  highlightIds,
   children,
 }: {
   document: CadDocument;
@@ -43,6 +44,8 @@ export default function WorkspaceView({
    */
   choosing?: boolean;
   onChoosingChange?: (choosing: boolean) => void;
+  /** Parts shown picked in place of the selected one, such as a cut-parts step's tools and targets. */
+  highlightIds?: readonly string[];
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
 }) {
@@ -71,7 +74,9 @@ export default function WorkspaceView({
     setNotice(null);
     onNewPart?.({ partId: part.id, face });
   };
-  const selectedIndexes = model.instances.flatMap((instance, index) => (instance.partId === selectedId ? [index] : []));
+  const selectedIndexes = model.instances.flatMap((instance, index) =>
+    (highlightIds ? highlightIds.includes(instance.partId) : instance.partId === selectedId) ? [index] : []
+  );
   const status = notice
     ? notice
     : choosing

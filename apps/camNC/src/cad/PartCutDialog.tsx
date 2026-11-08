@@ -1,20 +1,25 @@
 import type { CadDocument, CadPartCut, CadValueScope } from '@wbcnc/cad';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FeatureDialog } from './FeatureDialog';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 import './partCutDialog.css';
 
 const kDefaultClearance = '0.2';
 
+type Box = 'tools' | 'targets';
+
 /**
- * One "cut parts" step: which parts are cut out of which, with how much room around them. The clearance can use
- * variables, such as a design's tolerance.
+ * One "cut parts" step, as the reference's subtracting boolean: the parts that cut (tools) and the parts they're cut
+ * out of (targets), each picked into its box by clicking parts in the view or the parts list, and how much room is
+ * left around them. The clearance can use variables, such as a design's tolerance.
  */
 export function PartCutDialog({
   document,
   step,
   tool,
   variables,
+  pick,
+  onPicked,
   onSave,
   onRemove,
   onClose,
@@ -25,6 +30,10 @@ export function PartCutDialog({
   /** The part a new step starts out cutting with, such as the selected one. */
   tool?: string;
   variables?: CadValueScope;
+  /** The last part clicked, added to the box being filled or taken out of it. `seq` tells two clicks apart. */
+  pick?: { partId: string; seq: number } | null;
+  /** The parts in both boxes, for the view to show. */
+  onPicked?: (picked: { tools: string[]; targets: string[] }) => void;
   onSave: (change: { tools: string[]; targets: string[]; clearance: number; clearanceExpression?: string }) => void;
   onRemove?: () => void;
   onClose: () => void;
@@ -32,9 +41,20 @@ export function PartCutDialog({
   const fit = ['tolerance', 'tollerance', 'clearance', 'fit'].find(name => variables && Object.hasOwn(variables, name));
   const [tools, setTools] = useState<string[]>(step?.tools ?? (tool ? [tool] : []));
   const [targets, setTargets] = useState<string[]>(step?.targets ?? []);
+  // A new step has its tool already, so the targets are picked next.
+  const [active, setActive] = useState<Box>(step || !tool ? 'tools' : 'targets');
   const [text, setText] = useState(step ? (step.clearanceExpression ?? formatCadValue(step.clearance)) : (fit ?? kDefaultClearance));
   const [error, setError] = useState<string | null>(null);
   const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter(candidate => candidate !== id) : [...list, id]);
+  const seen = useRef(pick?.seq);
+  useEffect(() => {
+    if (!pick || pick.seq === seen.current) return;
+    seen.current = pick.seq;
+    if (active === 'tools') setTools(list => toggle(list, pick.partId));
+    else setTargets(list => toggle(list, pick.partId));
+    setError(null);
+  }, [pick, active]);
+  useEffect(() => onPicked?.({ tools, targets }), [tools, targets, onPicked]);
   const save = () => {
     if (!tools.length || !targets.length) return setError('Pick at least one part to cut out, and one to cut it from.');
     if (tools.every(id => targets.every(target => target === id))) return setError('A part can’t be cut out of itself.');
@@ -43,24 +63,41 @@ export function PartCutDialog({
     if (parsed.value < 0) return setError('A clearance can’t be less than nothing.');
     onSave({ tools, targets, clearance: parsed.value, clearanceExpression: parsed.expression });
   };
-  const list = (label: string, chosen: string[], choose: (ids: string[]) => void) => (
-    <fieldset>
-      <legend>{label}</legend>
-      {document.parts.map(part => (
-        <label key={part.id}>
-          <input type="checkbox" checked={chosen.includes(part.id)} onChange={() => choose(toggle(chosen, part.id))} />
-          {part.name}
-        </label>
-      ))}
-    </fieldset>
+  const name = (id: string) => document.parts.find(part => part.id === id)?.name ?? 'a removed part';
+  const box = (which: Box, label: string, chosen: string[], choose: (ids: string[]) => void) => (
+    <div
+      className="cad-feature-selection cad-part-cut-box"
+      role="group"
+      aria-label={label}
+      data-active={active === which || undefined}
+      onClick={() => setActive(which)}>
+      <small>{label}</small>
+      {chosen.length ? (
+        <ul>
+          {chosen.map(id => (
+            <li key={id}>
+              {name(id)}
+              <button
+                type="button"
+                aria-label={`Take ${name(id)} out of ${label.toLowerCase()}`}
+                onClick={event => {
+                  event.stopPropagation();
+                  choose(chosen.filter(candidate => candidate !== id));
+                }}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <span className="cad-feature-hint">{active === which ? 'Click parts in the view or the parts list' : 'None yet'}</span>
+      )}
+    </div>
   );
   return (
     <FeatureDialog title="Cut parts" okLabel={step ? 'Save' : 'Cut'} onOk={save} onCancel={onClose} className="cad-part-cut-dialog">
-      <p className="cad-feature-hint">
-        Cuts the first parts out of the second wherever they reach into them, as when a back sits in a groove.
-      </p>
-      {list('Cut these', tools, setTools)}
-      {list('out of these', targets, setTargets)}
+      {box('tools', 'Tools', tools, setTools)}
+      {box('targets', 'Targets', targets, setTargets)}
       <label className="cad-part-cut-clearance">
         Clearance
         <input

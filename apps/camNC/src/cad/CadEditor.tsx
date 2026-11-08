@@ -95,6 +95,7 @@ import {
   useLayoutEffect,
   useImperativeHandle,
   useMemo,
+  useCallback,
   useRef,
   useState,
   type KeyboardEvent,
@@ -448,6 +449,14 @@ export function CadEditor({
   const studioSession = startIn3D !== undefined && !faceSketch;
   // A "cut parts" step being added, or the one being changed.
   const [partCutting, setPartCutting] = useState<{ id?: string } | null>(null);
+  // A part clicked while a cut-parts step is open, which goes into the box being filled, and what both boxes hold.
+  const [cutPick, setCutPick] = useState<{ partId: string; seq: number } | null>(null);
+  const [cutPicked, setCutPicked] = useState<string[]>([]);
+  const showCutPicked = useCallback(
+    ({ tools, targets }: { tools: string[]; targets: string[] }) => setCutPicked([...tools, ...targets]),
+    []
+  );
+  const pickForCut = (partId: string) => setCutPick(previous => ({ partId, seq: (previous?.seq ?? 0) + 1 }));
   // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
   const [featureDialog, setFeatureDialog] = useState<{ kind: 'extrude' | 'pattern'; partId: string; before: CadDocument } | null>(null);
   // Picking the plane or face a new part is sketched on.
@@ -3565,6 +3574,7 @@ export function CadEditor({
                   type="button"
                   aria-pressed={p.id === part?.id}
                   onClick={() => {
+                    if (partCutting && showWorkspace) return pickForCut(p.id);
                     setPartId(p.id);
                     setSelected([]);
                     chooseTool('select');
@@ -3910,10 +3920,13 @@ export function CadEditor({
                 document={shownDocument}
                 selectedId={part?.id ?? null}
                 onSelect={id => {
+                  if (partCutting) return pickForCut(id);
                   setPartId(id);
                   setSelected([]);
                 }}
+                highlightIds={partCutting ? cutPicked : undefined}
                 onOpen={id => {
+                  if (partCutting) return pickForCut(id);
                   if (studioSession) return openSketch(id);
                   setPartId(id);
                   setSelected([]);
@@ -3957,6 +3970,8 @@ export function CadEditor({
                     step={doc.partCuts?.find(step => step.id === partCutting.id)}
                     tool={part?.id}
                     variables={variableScope}
+                    pick={cutPick}
+                    onPicked={showCutPicked}
                     onClose={() => setPartCutting(null)}
                     onRemove={
                       partCutting.id
