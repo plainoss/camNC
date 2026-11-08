@@ -1,6 +1,16 @@
 import { dimensionValueError } from './dimensionValues';
 import { newCadId } from './document';
-import type { CadConstraint, CadCut, CadDiagnostic, CadDocument, CadPart, CadPlacement, CadSketch, CadVariable } from './types';
+import type {
+  CadConstraint,
+  CadCut,
+  CadDiagnostic,
+  CadDocument,
+  CadLinearPattern,
+  CadPart,
+  CadPlacement,
+  CadSketch,
+  CadVariable,
+} from './types';
 import {
   cadExpressionNames,
   cadVariableNameError,
@@ -67,6 +77,45 @@ export function cadVariableValues(document: CadDocument): { scope: Record<string
 export const cadVariableScope = (document: CadDocument): CadValueScope => cadVariableValues(document).scope;
 
 const usesVariables = (expression: string | undefined): expression is string => !!expression && cadExpressionNames(expression).length > 0;
+
+const kPatternCounts = ['countX', 'countY'] as const,
+  kPatternSpacings = [
+    ['spacingX', 'stepX'],
+    ['spacingY', 'stepY'],
+  ] as const;
+
+/** A linear pattern with its typed counts and spacings worked out, or why they can't be. */
+function patternOutcome(
+  constraint: CadConstraint,
+  scope: CadValueScope
+): { pattern: CadLinearPattern } | { error: string; expression: string } | null {
+  if (constraint.type !== 'linearPattern' || !constraint.expressions) return null;
+  const typed = constraint.expressions;
+  if (!Object.values(typed).some(expression => usesVariables(expression))) return null;
+  const pattern = { ...constraint };
+  for (const key of kPatternCounts) {
+    const expression = typed[key];
+    if (!usesVariables(expression)) continue;
+    const parsed = parseCadValue(expression, { unit: 'scalar', variables: scope });
+    if ('error' in parsed) return { error: parsed.error, expression };
+    // A count says how many fit, so a part-way result rounds down.
+    pattern[key] = Math.floor(parsed.value + 1e-9);
+    if (pattern[key] < 1) return { error: 'That leaves no room for even one.', expression };
+  }
+  for (const [key, step] of kPatternSpacings) {
+    const expression = typed[key];
+    if (!usesVariables(expression)) continue;
+    const parsed = parseCadValue(expression, { unit: 'mm', variables: scope });
+    if ('error' in parsed) return { error: parsed.error, expression };
+    const length = Math.hypot(pattern[step].x, pattern[step].y);
+    if (parsed.value <= 0 || length === 0) return { error: 'A pattern’s spacing needs to be more than nothing.', expression };
+    pattern[step] = { x: (pattern[step].x / length) * parsed.value, y: (pattern[step].y / length) * parsed.value };
+  }
+  const total = pattern.countX * pattern.countY;
+  if (total < 2 || total > 200)
+    return { error: 'A pattern needs two to 200 copies, counting the first.', expression: typed.countX ?? typed.countY ?? '' };
+  return { pattern };
+}
 
 function dimensionOutcome(constraint: CadConstraint, scope: CadValueScope): Outcome | null {
   if (!('value' in constraint) || constraint.driven || !usesVariables(constraint.expression)) return null;
@@ -176,6 +225,9 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     });
     return mapSketches(sized, sketch =>
       mapConstraints(sketch, constraint => {
+        const following = patternOutcome(constraint, scope);
+        if (following && 'pattern' in following)
+          return JSON.stringify(following.pattern) === JSON.stringify(constraint) ? constraint : following.pattern;
         const outcome = dimensionOutcome(constraint, scope);
         return outcome && 'value' in outcome && outcome.value !== (constraint as { value: number }).value
           ? ({ ...constraint, value: outcome.value } as CadConstraint)
@@ -223,6 +275,15 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
         });
     for (const sketch of [part.sketch, ...(part.features ?? []).flatMap(feature => (feature.type === 'sketch' ? [feature.sketch] : []))])
       for (const constraint of sketch.constraints) {
+        const following = patternOutcome(constraint, scope);
+        if (following && 'error' in following)
+          problems.push({
+            code: 'variable-value',
+            severity: 'error',
+            partId: part.id,
+            constraintIds: [constraint.id],
+            message: `Pattern ${following.expression}: ${following.error}`,
+          });
         const outcome = dimensionOutcome(constraint, scope);
         if (outcome && 'error' in outcome)
           problems.push({
@@ -268,7 +329,16 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
         ),
         sketch =>
           mapConstraints(sketch, constraint =>
-            'expression' in constraint && constraint.expression ? { ...constraint, expression: edit(constraint.expression) } : constraint
+            'expression' in constraint && constraint.expression
+              ? { ...constraint, expression: edit(constraint.expression) }
+              : constraint.type === 'linearPattern' && constraint.expressions
+                ? {
+                    ...constraint,
+                    expressions: Object.fromEntries(
+                      Object.entries(constraint.expressions).map(([key, expression]) => [key, expression && edit(expression)])
+                    ),
+                  }
+                : constraint
           )
       )
     ),

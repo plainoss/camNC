@@ -4,7 +4,15 @@ import { constraintEntityIds, entityPointIds, newCadId, originId } from './docum
 import { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 import { isOwnedSplineHandle, splineHandleId, splineHandleOwner, withSplineHandleSegments } from './splineHandles';
 import { remapCadReferences, transformSketchEntities } from './transform';
-import type { CadEntity, CadSketchPattern, CadPatternInstance, CadPoint, CadPointEntity, CadSketch } from './types';
+import type {
+  CadEntity,
+  CadLinearPatternExpressions,
+  CadSketchPattern,
+  CadPatternInstance,
+  CadPoint,
+  CadPointEntity,
+  CadSketch,
+} from './types';
 
 const cellKey = (x: number, y: number) => `${x}:${y}`;
 export function patternInstanceOffset(pattern: CadSketchPattern, instance: Pick<CadPatternInstance, 'x' | 'y'>): CadPoint {
@@ -29,6 +37,8 @@ export interface CadLinearPatternOptions {
   countY?: number;
   stepX: CadPoint;
   stepY?: CadPoint;
+  /** Counts and spacings as typed, kept when they use design variables. Editing a pattern replaces them. */
+  expressions?: CadLinearPatternExpressions;
   patternId?: string;
   previewLimit?: number;
 }
@@ -273,7 +283,15 @@ export function linearPatternSketchEntities(sketch: CadSketch, options: CadLinea
       if (rebased.pattern.type !== 'linearPattern') return { ok: false, message: 'Select a linear pattern.' };
       base = rebased.pattern;
     }
-    group = { ...base, countX: options.countX, countY: options.countY ?? 1, stepX: options.stepX, stepY: options.stepY ?? { x: 0, y: 40 } };
+    const { expressions: _typed, ...kept } = base;
+    group = {
+      ...kept,
+      countX: options.countX,
+      countY: options.countY ?? 1,
+      stepX: options.stepX,
+      stepY: options.stepY ?? { x: 0, y: 40 },
+      ...(options.expressions && { expressions: options.expressions }),
+    };
   } else {
     const entities = new Map(sketch.entities.map(e => [e.id, e])),
       ids = new Set(options.entityIds ?? []);
@@ -307,6 +325,7 @@ export function linearPatternSketchEntities(sketch: CadSketch, options: CadLinea
       countY: options.countY ?? 1,
       stepX: options.stepX,
       stepY: options.stepY ?? { x: 0, y: 40 },
+      ...(options.expressions && { expressions: options.expressions }),
       instances: [{ x: 0, y: 0, idMap, activeIds: [] }],
       exclusions: [],
       label: 'Linear pattern',

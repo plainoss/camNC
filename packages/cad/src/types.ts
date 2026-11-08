@@ -145,6 +145,15 @@ export interface CadLinearPattern extends CadPatternBase {
   type: 'linearPattern';
   stepX: CadPoint;
   stepY: CadPoint;
+  /** Counts and spacings as typed, kept when they use design variables so the pattern follows them. */
+  expressions?: CadLinearPatternExpressions;
+}
+/** A count rounds down, so it can say how many fit. A spacing keeps its direction and sets its length in mm. */
+export interface CadLinearPatternExpressions {
+  countX?: string;
+  countY?: string;
+  spacingX?: string;
+  spacingY?: string;
 }
 export interface CadCircularPattern extends CadPatternBase {
   type: 'circularPattern';

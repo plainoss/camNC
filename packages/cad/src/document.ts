@@ -832,8 +832,20 @@ export function parseCadDocument(input: unknown): CadDocument {
           )
             throw new Error('Invalid linear pattern data.');
           [c.masterX, c.masterY, c.countX, c.countY].forEach(number);
-          if (c.type === 'linearPattern') [c.stepX.x, c.stepX.y, c.stepY.x, c.stepY.y].forEach(number);
-          else {
+          if (c.type === 'linearPattern') {
+            [c.stepX.x, c.stepX.y, c.stepY.x, c.stepY.y].forEach(number);
+            const typed = c.expressions;
+            if (
+              typed !== undefined &&
+              (!typed ||
+                typeof typed !== 'object' ||
+                Object.entries(typed).some(
+                  ([key, value]) =>
+                    !['countX', 'countY', 'spacingX', 'spacingY'].includes(key) || (value !== undefined && typeof value !== 'string')
+                ))
+            )
+              throw new Error('Invalid pattern expressions');
+          } else {
             number(c.angle);
             if (typeof c.centerId !== 'string' || typeof c.closed !== 'boolean')
               throw new Error('Invalid circular pattern center or sweep.');
