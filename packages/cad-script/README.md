@@ -67,7 +67,8 @@ file unless it writes a new SVG for that run. See `examples/` for more.
 - `relate` takes `coincident`, `horizontal`, `vertical`, `parallel`, `perpendicular`,
   `equal`, `tangent`, `midpoint`, `symmetric` or `concentric`. Ends drawn at the same
   coordinates are already joined.
-- `expect` checks `size`, `thickness`, `holes`, `pockets` (cuts that aren't through,
+- `expect` checks `size`, `thickness`, `holes` (holes in the profile and through cuts
+  from either face or a pocket floor, each pattern copy counted), `pockets` (cuts that aren't through,
   each pattern copy counted), `depths` (each cut's floor below its face, in feature
   order, pattern copies included) and `freedom`, within `tolerance` (0.01 mm). It doesn't
   check diameters or positions: read those from the report's cuts. Sizes are measured to
