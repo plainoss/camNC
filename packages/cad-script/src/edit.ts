@@ -62,12 +62,17 @@ export interface SketchEdit {
   circle(options: { at: LenXy; d: Len }): CadRef & { center: CadRef };
   /** A closed loop through these points, each placed so the loop is fully constrained. Corners can then be filleted. */
   polygon(points: readonly Xy[]): { edges: CadRef[]; corners: CadRef[] };
+  /**
+   * A closed outline of lines and arcs, drawn from `from` and finished with `close()`. Every vertex is placed and each
+   * arc has its radius or a tangency, so the loop comes out fully constrained.
+   */
+  path(from: LenXy): PathEdit;
   /** A single segment with no dimensions, which leaves it free to be constrained. */
   line(from: Xy, to: Xy): CadRef & { start: CadRef; end: CadRef };
   /** Counterclockwise around `at` from `from` degrees to `to` degrees. */
   arc(options: { at: Xy; r: number; from: number; to: number }): CadRef & { center: CadRef; start: CadRef; end: CadRef };
-  /** Rounds corners that join two lines, sharing one radius. */
-  fillet(corners: readonly CadRef[], r: number): CadRef[];
+  /** Rounds corners that join two lines, sharing one radius, which can be an expression. */
+  fillet(corners: readonly CadRef[], r: Len): CadRef[];
   /** A geometric relation between curves or points, under the same rules as the sketch editor's tools. */
   relate(relation: ConstraintCommandTool, ...items: CadRef[]): void;
   distance(a: CadRef, b: CadRef, value: Len, axis?: 'x' | 'y'): void;
@@ -78,11 +83,24 @@ export interface SketchEdit {
    * copies' regions with `regionAt`. A count can be an expression, rounded down to say how many fit, such as
    * `'(height - 2*margin)/pitch + 1'`. A step along one axis can be one too, such as `[0, 'pitch']`.
    */
-  pattern(items: readonly CadRef[], options: { count: Len; step: LenXy; rows?: { count: Len; step: LenXy } }): void;
+  pattern(
+    items: readonly (CadRef | { edges: readonly CadRef[] | Record<string, CadRef> })[],
+    options: { count: Len; step: LenXy; rows?: { count: Len; step: LenXy } }
+  ): void;
   /** Looks up a handle from the report. */
   find(handle: string): CadRef;
   /** The innermost region at a point, as a click picks it. Resolved now to a stable ID, so solving can't move the pick. */
   regionAt(x: number, y: number): CadRegionRef;
+}
+export interface PathEdit {
+  lineTo(to: LenXy): PathEdit;
+  /**
+   * An arc to `to`. With `r`, it turns counterclockwise unless `clockwise`, the short way round unless `large`. With
+   * `tangent`, it carries on smoothly from the segment before it, and its radius follows from where it ends.
+   */
+  arcTo(to: LenXy, how: { r: Len; clockwise?: boolean; large?: boolean } | { tangent: true }): PathEdit;
+  /** Joins the end back to the start with a line, unless it's already there. */
+  close(): { edges: CadRef[]; corners: CadRef[] };
 }
 export interface PartEdit {
   readonly id: string;
@@ -119,7 +137,7 @@ export interface DesignEdit {
   part(name: string, options?: { thickness?: Len }): PartEdit;
   /** Adds a variable, or changes the one with this name, and returns its name. Later values can use it in expressions. */
   variable(name: string, expression: string): string;
-  /** An expression's value now, in mm, for what can't follow variables yet, such as pattern counts. */
+  /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
   value(expression: Len): number;
 }
 export type CadScript = (design: DesignEdit) => void;
@@ -233,7 +251,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       constrain({ type: 'positionX', pointId: point.id, value: measure(x, 'X'), label: 'X', ...expressionOf(x) });
       constrain({ type: 'positionY', pointId: point.id, value: measure(y, 'Y'), label: 'Y', ...expressionOf(y) });
     };
-    return {
+    const self: SketchEdit = {
       id: sketchId,
       rect({ w, h, at, center }) {
         const width = measure(w, 'Width'),
@@ -271,6 +289,120 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         });
         return { edges, corners };
       },
+      path(from) {
+        type P = { x: number; y: number };
+        const at = (point: LenXy): P => ({ x: measure(point[0], 'X'), y: measure(point[1], 'Y') });
+        const start = at(from);
+        const vertices: { at: P; typed: LenXy }[] = [{ at: start, typed: from }];
+        const edges: CadRef[] = [];
+        let cursor = start;
+        // Which way the last segment leaves its end, for a tangent arc after it.
+        let heading: P | undefined;
+        let closed = false;
+        const unit = (v: P) => {
+          const length = Math.hypot(v.x, v.y);
+          return { x: v.x / length, y: v.y / length };
+        };
+        const left = (v: P) => ({ x: -v.y, y: v.x });
+        const open = () => {
+          if (closed) fail('This path is already closed.');
+        };
+        const arrive = (to: LenXy, point: P) => {
+          if (Math.hypot(point.x - cursor.x, point.y - cursor.y) < 1e-6) fail(`The path is already at ${to.join(', ')}.`);
+          const back = Math.hypot(point.x - start.x, point.y - start.y) < 1e-6;
+          // Ending on the start reuses its point, so the loop closes.
+          const end = back ? start : point;
+          if (!back) vertices.push({ at: point, typed: to });
+          return end;
+        };
+        const edit: PathEdit = {
+          lineTo(to) {
+            open();
+            const end = arrive(to, at(to));
+            const line = added(sketch => addLine(sketch, { x1: cursor.x, y1: cursor.y, x2: end.x, y2: end.y })).find(
+              e => e.type === 'line'
+            )!;
+            edges.push({ id: line.id });
+            heading = unit({ x: end.x - cursor.x, y: end.y - cursor.y });
+            cursor = end;
+            return edit;
+          },
+          arcTo(to, how) {
+            open();
+            const from = cursor,
+              target = at(to);
+            if (!('tangent' in how)) {
+              const r = measure(how.r, 'Radius'),
+                half = Math.hypot(target.x - from.x, target.y - from.y) / 2;
+              // A half circle's radius says nothing its ends don't, which leaves it free: draw it as two quarters.
+              if (Math.abs(r - half) < 1e-6 * Math.max(1, r)) {
+                const middle = { x: (from.x + target.x) / 2, y: (from.y + target.y) / 2 },
+                  out = { x: from.x - middle.x, y: from.y - middle.y };
+                const top = how.clockwise ? { x: middle.x + out.y, y: middle.y - out.x } : { x: middle.x - out.y, y: middle.y + out.x };
+                edit.arcTo([top.x, top.y], how);
+                return edit.arcTo(to, how);
+              }
+            }
+            const end = arrive(to, target);
+            const chord = { x: end.x - from.x, y: end.y - from.y },
+              length = Math.hypot(chord.x, chord.y);
+            let center: P, clockwise: boolean;
+            if ('tangent' in how) {
+              if (!heading) fail('A tangent arc needs a segment before it to carry on from.');
+              const normal = left(heading!);
+              const across = normal.x * chord.x + normal.y * chord.y;
+              if (Math.abs(across) < 1e-9 * length) fail(`${to.join(', ')} is straight ahead: use lineTo.`);
+              // The center lies on the normal at the start, as far from the end as from the start.
+              const k = (length * length) / (2 * across);
+              center = { x: from.x + normal.x * k, y: from.y + normal.y * k };
+              clockwise = k < 0;
+            } else {
+              const r = measure(how.r, 'Radius');
+              if (!(r >= length / 2 - 1e-9))
+                fail(`A ${r} mm radius can't reach ${to.join(', ')}: it needs at least ${+(length / 2).toFixed(3)} mm.`);
+              clockwise = !!how.clockwise;
+              const rise = Math.sqrt(Math.max(0, r * r - (length * length) / 4));
+              // The short way round, the center lies on the side the arc turns towards.
+              const side = (clockwise ? -1 : 1) * (how.large ? -1 : 1);
+              const normal = left(unit(chord));
+              center = { x: from.x + chord.x / 2 + side * normal.x * rise, y: from.y + chord.y / 2 + side * normal.y * rise };
+            }
+            const radius = Math.hypot(from.x - center.x, from.y - center.y);
+            const angle = (p: P) => Math.atan2(p.y - center.y, p.x - center.x);
+            // Arcs run counterclockwise, so a clockwise one is drawn from its end.
+            const [a, b] = clockwise ? [end, from] : [from, end];
+            const made = added(sketch => addArc(sketch, { cx: center.x, cy: center.y, radius, startAngle: angle(a), endAngle: angle(b) }));
+            const arc = made.find(e => e.type === 'arc')!;
+            // Two arcs of an S-curve can share a center. One point for both would tie them twice over, so each gets its own.
+            if (!made.some(e => e.id === arc.centerId)) {
+              const own = { id: newCadId(), type: 'point' as const, x: center.x, y: center.y };
+              apply(sketch => ({
+                ...sketch,
+                entities: [...sketch.entities.map(e => (e.id === arc.id ? { ...arc, centerId: own.id } : e)), own],
+              }));
+            }
+            const previous = edges.at(-1);
+            edges.push({ id: arc.id });
+            if ('tangent' in how) self.relate('tangent', previous!, { id: arc.id });
+            else constrain({ type: 'radius', entityId: arc.id, value: radius, ...expressionOf(how.r) });
+            const out = { x: end.x - center.x, y: end.y - center.y };
+            heading = unit(clockwise ? { x: out.y, y: -out.x } : left(out));
+            cursor = end;
+            return edit;
+          },
+          close() {
+            open();
+            if (Math.hypot(cursor.x - start.x, cursor.y - start.y) > 1e-6) edit.lineTo(from);
+            closed = true;
+            const corners = vertices.map(vertex => pointNear([vertex.at.x, vertex.at.y]));
+            vertices.forEach((vertex, i) => {
+              if (!corners[i]!.fixed && !isPlaced(corners[i]!.id)) place(corners[i]!, vertex.typed);
+            });
+            return { edges, corners };
+          },
+        };
+        return edit;
+      },
       line(from, to) {
         const line = added(sketch => addLine(sketch, { x1: from[0], y1: from[1], x2: to[0], y2: to[1] })).find(e => e.type === 'line')!;
         return { id: line.id, start: { id: line.startId }, end: { id: line.endId } };
@@ -283,12 +415,17 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         return { id: arc.id, center: { id: arc.centerId }, start: { id: arc.startId }, end: { id: arc.endId } };
       },
       fillet(corners, r) {
-        const result = filletLineCorners(current(), { cornerPointIds: corners.map(corner => corner.id), radius: r });
+        const result = filletLineCorners(current(), { cornerPointIds: corners.map(corner => corner.id), radius: measure(r, 'Radius') });
         if (!result.ok)
           return fail(
             `${result.message}${result.maximumRadius === undefined ? '' : ` The largest radius that fits is ${+result.maximumRadius.toFixed(3)} mm.`}`
           );
-        apply(() => result.sketch);
+        const before = new Set(current().constraints.map(c => c.id));
+        // The fillet's one radius dimension carries the expression; its other arcs are equal to it.
+        apply(() => ({
+          ...result.sketch,
+          constraints: result.sketch.constraints.map(c => (before.has(c.id) || c.type !== 'radius' ? c : { ...c, ...expressionOf(r) })),
+        }));
         return result.arcIds.map(id => ({ id }));
       },
       relate(relation, ...items) {
@@ -329,7 +466,8 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
           ...(across?.spacing && { spacingY: across.spacing }),
         };
         const result = linearPatternSketchEntities(current(), {
-          entityIds: items.map(item => item.id),
+          // A rectangle or path counts as its edges.
+          entityIds: items.flatMap(item => ('edges' in item ? Object.values(item.edges).map(edge => edge.id) : [item.id])),
           countX: counted(count),
           stepX: along.vector,
           ...(rows && { countY: counted(rows.count), stepY: across!.vector }),
@@ -358,6 +496,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         );
       },
     };
+    return self;
   };
 
   const partEdit = (partId: string): PartEdit => ({
@@ -439,7 +578,15 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         document = result.document;
         return name;
       },
-      value: expression => measure(expression, 'Value'),
+      value(expression) {
+        // A count or ratio, such as `'(height - 2*margin)/pitch'`, has no unit.
+        if (
+          typeof expression === 'string' &&
+          !('error' in parseCadValue(expression, { unit: 'scalar', variables: cadVariableScope(document) }))
+        )
+          return measure(expression, 'Value', 'scalar');
+        return measure(expression, 'Value');
+      },
     } satisfies DesignEdit,
     document: () => document,
   };

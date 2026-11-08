@@ -1,6 +1,6 @@
 (camNC CAM)
 (tool-width-threshold)
-(Plan: cam-plan-v1-f9a4edca618fc05e)
+(Plan: cam-plan-v1-5e46381948491b9d)
 (Post: fluidnc. Safe Z9. Retract Z6)
 (Planned bounds: X4.588..25.413 Y17.588..17.637 Z2.5..4)
 (Stock: 30 x 24 x 4 mm)
@@ -8,7 +8,7 @@
 ( Tools Table:)
 (  T1 D=3.175 CR=0 - ZMIN=2.5 - synthetic flat end mill )
 ( )
-(WARNING: pocket z=2.5: 170.0mm² left in corners/narrow spots with D=3.175)
+(WARNING: pocket z=2.5: 154.5mm² left in corners/narrow spots with D=3.175)
 G21 G90 G94 G17
 G40 G49 G80
 G0 Z9

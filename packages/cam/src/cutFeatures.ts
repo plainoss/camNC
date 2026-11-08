@@ -109,20 +109,31 @@ export function featuresFromCuts(
 
 type Point = { x: number; y: number };
 
+/** A cut as CAD hands it over: from the top unless it says it's from the underside. */
+export interface SidedCut extends FlatCut {
+  side?: 'top' | 'underside';
+}
+
 /**
  * A flat part's features from its profile in any position, as CAM takes it: moved so its corner is at the origin, loops
- * counterclockwise. `split` says the through cuts leave more than one piece, which CAM can't hold.
+ * counterclockwise. Cuts from the underside become side B's features. `problem` says why CAM can't hold the part.
  */
-export function profileFeatures(source: { thickness: number; outline: Point[]; holes: Point[][]; cuts?: FlatCut[] }): {
+export function profileFeatures(source: { thickness: number; outline: Point[]; holes: Point[][]; cuts?: readonly SidedCut[] }): {
+  /** Side A's features, with side B's pockets as bottom faces. */
   features: PartFeatures;
-  /** For each through hole, what made it, when there are cuts. */
+  /** Side B's pockets with depths from the underside, as cut, when there are any. */
+  below: PartFeatures | null;
+  /** Side B's features for the part turned over about X, or about Y when it lies rotated. */
+  turned?: (axis: 'x' | 'y') => PartFeatures;
+  /** For each through hole, what made it, when there are cuts from the top. */
   holeSources?: HoleSource[];
   offset: Point;
   size: [number, number, number];
-  split: boolean;
+  problem?: string;
 } {
   const x0 = Math.min(...source.outline.map(p => p.x));
   const y0 = Math.min(...source.outline.map(p => p.y));
+  const offset = { x: x0, y: y0 };
   const point = (p: Point) => ({ x: p.x - x0, y: p.y - y0 });
   const area = (loop: Point[]) =>
     loop.reduce((sum, p, i) => {
@@ -134,22 +145,7 @@ export function profileFeatures(source: { thickness: number; outline: Point[]; h
   const inner = source.holes.map(h => positive(h.map(point)));
   const size: [number, number, number] = [Math.max(...outer.map(p => p.x)), Math.max(...outer.map(p => p.y)), source.thickness];
   const footprint = [outer, ...inner.map(h => [...h].reverse())];
-  if (source.cuts?.length) {
-    const cut = featuresFromCuts({
-      thickness: source.thickness,
-      outline: outer,
-      holes: inner,
-      cuts: source.cuts.map(c => ({ ...c, outline: c.outline.map(point), islands: c.islands.map(island => island.map(point)) })),
-    });
-    return {
-      features: cut.features,
-      holeSources: cut.holeSources,
-      offset: { x: x0, y: y0 },
-      size,
-      split: cut.features.outlines.length !== 1,
-    };
-  }
-  const features: PartFeatures = {
+  const plainFeatures: PartFeatures = {
     thickness: source.thickness,
     footprint,
     outlines: [outer],
@@ -159,7 +155,43 @@ export function profileFeatures(source: { thickness: number; outline: Point[]; h
     bottomFaces: [],
     slopedArea: 0,
   };
-  return { features, offset: { x: x0, y: y0 }, size, split: false };
+  const failed = (problem: string) => ({ features: plainFeatures, below: null, offset, size, problem });
+  const flat = ({ side: _side, ...c }: SidedCut): FlatCut => ({
+    ...c,
+    outline: c.outline.map(point),
+    islands: c.islands.map(island => island.map(point)),
+  });
+  const cuts = source.cuts ?? [];
+  // A through cut is the same hole from either face, so it belongs to the first side, which cuts through.
+  const fromBelow = cuts.filter(c => c.side === 'underside' && !c.through).map(flat);
+  const aboveCuts = cuts.filter(c => c.side !== 'underside' || c.through);
+  // A floor's through cut only reaches as far as its pocket does. From below, that would have to be worked out on side B
+  // first, which this doesn't do yet.
+  if (aboveCuts.some(c => c.side === 'underside' && c.from > 0))
+    return failed("a through cut from an underside pocket's floor can't be machined yet. Cut it from the underside itself.");
+  const fromAbove = aboveCuts.map(c => ({ ...flat(c), from: c.side === 'underside' ? 0 : c.from }));
+  const profile = { thickness: source.thickness, outline: outer, holes: inner };
+  const cut = fromAbove.length ? featuresFromCuts({ ...profile, cuts: fromAbove }) : null;
+  // CAD refuses a through cut that reaches the edge, but cuts from separate sketches can still add up to a split.
+  if (cut && cut.features.outlines.length !== 1) return failed('these through cuts split the part. Use a separate part for each piece.');
+  const plain = cut?.features ?? plainFeatures;
+  const below = fromBelow.length ? featuresFromCuts({ ...profile, holes: plain.throughHoles, cuts: fromBelow }).features : null;
+  if (below && cutsMeet(plain, below)) return failed('cuts from the two faces meet. Make them shallower, or cut through.');
+  const features: PartFeatures = below
+    ? { ...plain, bottomFaces: below.pockets.map(pocket => ({ z: source.thickness - pocket.floorZ, area: pocket.area })) }
+    : plain;
+  return {
+    features,
+    below,
+    // Side B reads these exact polygons, rather than extracting them from a mesh as it does for imported models.
+    ...(below && {
+      turned: (axis: 'x' | 'y') =>
+        featuresFromCuts(flippedProfile({ ...profile, holes: plain.throughHoles, cuts: fromBelow }, axis, [size[0], size[1]])).features,
+    }),
+    ...(cut && { holeSources: cut.holeSources }),
+    offset,
+    size,
+  };
 }
 
 /**

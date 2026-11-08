@@ -12,7 +12,7 @@ import {
   type CadSketch,
   type EvaluatedCadPart,
 } from '@wbcnc/cad';
-import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest } from '@wbcnc/cam';
+import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
 export interface CadExpectation {
   /** Width and height of the outline, in mm. */
@@ -56,7 +56,7 @@ export interface CadReportPart {
     constraints: number;
   }[];
   /** Features CAM received. */
-  cam?: { pockets: number; throughHoles: number };
+  cam?: { pockets: number; throughHoles: number; undersidePockets?: number };
   /** Pieces CAM cuts when the part has copies, by name. Mirrored copies are cut as their own shape. */
   pieces?: { names: string[]; mirrored: string[] };
   /**
@@ -85,7 +85,47 @@ export interface CadReport {
 
 const round = (value: number) => Math.round(value * 1000) / 1000;
 const xy = (p: CadPoint) => [round(p.x), round(p.y)];
-function bounds(points: readonly CadPoint[]) {
+/** Where each arc and circle in a part's sketches reaches furthest along x and y. */
+function curveExtremes(part: CadPart): CadPoint[] {
+  return [part.sketch, ...cadFaceSketches(part).map(face => face.sketch)].flatMap(sketch => {
+    const points = new Map(sketch.entities.flatMap(e => (e.type === 'point' ? [[e.id, e] as const] : [])));
+    return sketch.entities.flatMap(e => {
+      if (e.type !== 'circle' && e.type !== 'arc') return [];
+      const center = points.get(e.centerId);
+      if (!center) return [];
+      const extremes = [0, 1, 2, 3].map(quarter => ({
+        angle: (quarter * Math.PI) / 2,
+        x: center.x + e.radius * Math.cos((quarter * Math.PI) / 2),
+        y: center.y + e.radius * Math.sin((quarter * Math.PI) / 2),
+      }));
+      if (e.type === 'circle') return extremes;
+      const start = points.get(e.startId),
+        end = points.get(e.endId);
+      if (!start || !end) return [];
+      const turn = (angle: number) => ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const from = Math.atan2(start.y - center.y, start.x - center.x),
+        sweep = turn(Math.atan2(end.y - center.y, end.x - center.x) - from);
+      // Arcs run counterclockwise from start to end.
+      return extremes.filter(extreme => turn(extreme.angle - from) <= sweep + 1e-9);
+    });
+  });
+}
+
+function distanceToLoop(p: CadPoint, loop: readonly CadPoint[]) {
+  return Math.min(
+    ...loop.map((a, i) => {
+      const b = loop[(i + 1) % loop.length]!,
+        dx = b.x - a.x,
+        dy = b.y - a.y;
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+    })
+  );
+}
+
+/** A loop's box. Curves are drawn as chords that fall short of them, so the extremes of arcs on the loop count too. */
+function bounds(loop: readonly CadPoint[], curves: readonly CadPoint[] = []) {
+  const points = [...loop, ...curves.filter(p => distanceToLoop(p, loop) < 0.5)];
   const xs = points.map(p => p.x),
     ys = points.map(p => p.y);
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
@@ -149,23 +189,33 @@ function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof pr
     clearHoles: true,
     tabs: DEFAULT_TABS,
     parts: [{ id: 'part', partId: source.partId, name: source.name, x: BOARD_MARGIN, y: BOARD_MARGIN, rotated: false }],
+    // Cuts from below come from a second side, after turning the board over, lined up by the camera as the app's default.
+    ...(profile.turned && { flip: { registration: 'camera' as const } }),
   };
   const plan = planBoard(
     board,
     {},
-    { part: () => ({ size: profile.size, features: profile.features }), underside: () => profile.features }
+    {
+      part: () => ({ size: profile.size, features: profile.features }),
+      underside: (_, rotated) => profile.turned?.(rotated ? 'y' : 'x') ?? profile.features,
+    }
   );
-  return {
-    bit: DEFAULT_SETTINGS.tools[0]!.diameter,
-    minutes: Math.round(plan.timeMin * 10) / 10,
-    operations: plan.ops.map(op => ({
-      label: op.label.replace(/^[^·]+ · /, ''),
+  const sideB = plan.sideB;
+  const operations = (from: PlanResult, prefix: string) =>
+    from.ops.map(op => ({
+      label: `${prefix}${op.label.replace(/^[^·]+ · /, '')}`,
       depth: round(op.zTop - op.zBottom),
       steps: op.depthSteps,
-    })),
-    warnings: plan.warnings,
+    }));
+  return {
+    bit: DEFAULT_SETTINGS.tools[0]!.diameter,
+    minutes: Math.round((plan.timeMin + (sideB?.timeMin ?? 0)) * 10) / 10,
+    operations: [...operations(plan, ''), ...(sideB ? operations(sideB, 'Side B: ') : [])],
+    warnings: [...plan.warnings, ...(sideB?.warnings ?? [])],
     blocked: [
       ...plan.safety,
+      ...(sideB?.safety ?? []),
+      ...(plan.flip?.problem ? [plan.flip.problem] : []),
       ...(plan.timeline ?? []).filter(event => event.block).map(event => event.message),
       ...(plan.hold ?? []).filter(hold => !hold.ok).map(hold => `${hold.part} isn’t held by enough tabs.`),
       ...(plan.holdClash?.length ? ['The bit would hit a hold-down.'] : []),
@@ -243,8 +293,9 @@ export async function inspectCadDocument(
       entities: reportEntities(sketch),
       constraints: sketch.constraints.length,
     }));
+    const extremes = curveExtremes(part);
     const cuts = (evaluated?.cuts ?? []).map(cut => {
-      const { at, size } = bounds(cut.outline);
+      const { at, size } = bounds(cut.outline, extremes);
       return { ref: cutHandle(cut.id), side: cut.side, from: round(cut.from), to: round(cut.to), through: cut.through, at, size };
     });
     // CAM clips a floor cut to its pocket without a word, so the drawing and the part would disagree.
@@ -267,20 +318,17 @@ export async function inspectCadDocument(
     let cam: CadReportPart['cam'];
     let toolpaths: CadToolpathSummary | undefined;
     if (evaluated) {
-      if (evaluated.cuts?.some(cut => cut.side === 'underside'))
-        warnings.push({
-          code: 'cam-underside',
-          message:
-            'Cuts on the underside are cut from a second side, after turning the board over. This report covers the first side only.',
-          part: part.name,
-        });
-      else {
+      {
         const profile = profileFeatures(evaluated);
-        cam = { pockets: profile.features.pockets.length, throughHoles: profile.features.throughHoles.length };
-        if (profile.split)
+        cam = {
+          pockets: profile.features.pockets.length,
+          throughHoles: profile.features.throughHoles.length,
+          ...(profile.below && { undersidePockets: profile.below.pockets.length }),
+        };
+        if (profile.problem)
           errors.push({
-            code: 'cam-split',
-            message: 'These through cuts split the part. Use a separate part for each piece.',
+            code: profile.problem.includes('split the part') ? 'cam-split' : 'cam-sides',
+            message: profile.problem[0]!.toUpperCase() + profile.problem.slice(1),
             part: part.name,
           });
         else if (options.toolpaths !== false) {
@@ -297,7 +345,7 @@ export async function inspectCadDocument(
         }
       }
     }
-    const box = evaluated && bounds(evaluated.outline);
+    const box = evaluated && bounds(evaluated.outline, extremes);
     const names = (id: string) => toCut.find(entry => entry.part.partId === id)?.names ?? [];
     const pieces = part.copies?.length ? { names: names(part.id), mirrored: names(mirroredPartId(part.id)) } : undefined;
     const report: CadReportPart = {

@@ -24,7 +24,7 @@ pnpm --silent --filter @wbcnc/cad-script check path/to/part.cad.ts --svg part.sv
 
 This type-checks the file, runs it, solves and prints a JSON report: errors, warnings,
 each part's size, cuts, sketches with their free movement, what CAM received, and a
-toolpath summary. It
+toolpath summary. Stdout is only the report; the solver's own messages go to stderr. It
 exits non-zero if anything is wrong. Paths are relative to where you run it.
 
 Options: `--from <document.json>` edits an existing design, or reports on it if no
@@ -43,9 +43,15 @@ the parts. See `examples/` for more.
 - Use `rect` for a rectangle: it's dimensioned by width and height, which is what a person
   edits later. `polygon` pins each vertex by its position, so `freedom: 0` doesn't make
   it regular. Both return `corners`, in vertex order, and `fillet(corners, r)` rounds
-  them in any sketch.
-- `pattern(items, { count, step: [dx, dy], rows? })` repeats curves in linked copies, such
-  as a row of shelf-pin holes. Cutting the first copy's region cuts them all, including
+  them in any sketch. The radius can be an expression.
+- `path([x, y]).lineTo([x, y]).arcTo([x, y], { r }).close()` draws any outline of lines
+  and arcs. An arc with `r` turns counterclockwise unless `clockwise`, the short way
+  round unless `large`. One with `tangent: true` carries on smoothly from the segment
+  before it, which makes slots and wavy edges. Vertices can be expressions, such as
+  `['board + 0.2mm', 'height/2']`, so joints follow the variables. Every vertex is placed,
+  so the loop comes out fully constrained.
+- `pattern(items, { count, step: [dx, dy], rows? })` repeats curves, or a whole `rect` or
+  `path`, in linked copies, such as a row of shelf-pin holes. Cutting the first copy's region cuts them all, including
   copies the pattern gains later. A count can be an expression, rounded down to say how
   many fit, and a step along one axis can be one too:
   `count: '(height - 2*margin)/pitch + 1', step: [0, 'pitch']`.
@@ -56,12 +62,13 @@ the parts. See `examples/` for more.
 - `relate` takes `coincident`, `horizontal`, `vertical`, `parallel`, `perpendicular`,
   `equal`, `tangent`, `midpoint`, `symmetric` or `concentric`. Ends drawn at the same
   coordinates are already joined.
-- `expect` checks `size`, `thickness`, `holes`, `pockets` (cuts that aren't through),
-  `depths` (each cut's floor
-  below its face, in feature order) and `freedom`, within `tolerance` (0.01 mm). It
-  doesn't check diameters or positions: read those from the report's cuts.
+- `expect` checks `size`, `thickness`, `holes`, `pockets` (cuts that aren't through,
+  each pattern copy counted), `depths` (each cut's floor below its face, in feature
+  order, pattern copies included) and `freedom`, within `tolerance` (0.01 mm). It doesn't
+  check diameters or positions: read those from the report's cuts. Sizes are measured to
+  where curves reach, not to the chords they're drawn with.
 - Cuts on `sketchOn({ floorOf: cut })` start at that pocket's floor.
-- `sketchOn('underside')` is drawn as the face is seen from below, so X runs the other way: a point at `x` on the part is at `-x` in the sketch. Its cuts come from a second side, which the report doesn't cover.
+- `sketchOn('underside')` is drawn as the face is seen from below, so X runs the other way: a point at `x` on the part is at `-x` in the sketch. Its cuts come from a second side, after turning the board over: the toolpath summary lists them as `Side B: …`.
 - Handles in the report, such as `7b8b`, work with `find` and `sketch` on that same
   revision of the design.
 - A script that stops with an error leaves the design as it was.
@@ -76,7 +83,9 @@ See `examples/cupboard.cad.ts`.
   it in the app. A plain number next to a variable takes that variable's unit:
   `'depth + 10'` is mm.
 - Cut depths (`{ depth: 'board/2' }`) and positions in `part.place` follow variables too.
-  `d.value('board + margin')` works an expression out now, for a script's own loops.
+  `d.value('board + margin')` works an expression out now, for a script's own loops. A
+  count or ratio without units, such as `d.value('(height - 160)/pitch')`, comes back as a
+  plain number.
 - `part.place({ at: [x, y, z], x: '+y', y: '+z' })` puts the part's sketch origin at `at`
   and says which way its sketch x and y point. The assembly's X runs left to right, Y
   front to back and Z up, and the part's thickness points along x × y. The report's

@@ -15,18 +15,13 @@ const plate: CadScript = d => {
 const codes = (issues: { code: string }[]) => issues.map(issue => issue.code);
 
 describe('example parts', () => {
-  it.each(['plate', 'shelf-side', 'tray', 'bracket', 'cupboard'])(
-    '%s meets what it expects of itself',
-    async name => {
-      const { default: script } = await import(`../examples/${name}.cad.ts`);
-      const result = await editCad(null, script);
-      expect(result.report.errors).toEqual([]);
-      expect(result.ok).toBe(true);
-      expect(typeErrors(path.join(examples, `${name}.cad.ts`))).toEqual([]);
-      // The first file pays for warming up the type checker.
-    },
-    20_000
-  );
+  it.each(['plate', 'shelf-side', 'tray', 'bracket', 'cupboard'])('%s meets what it expects of itself', async name => {
+    const { default: script } = await import(`../examples/${name}.cad.ts`);
+    const result = await editCad(null, script);
+    expect(result.report.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(typeErrors(path.join(examples, `${name}.cad.ts`))).toEqual([]);
+  });
 
   it('covers every example file', async () => {
     expect((await readdir(examples)).sort()).toEqual([
@@ -46,6 +41,144 @@ describe('example parts', () => {
       [8, 14],
     ]);
     expect(report.parts[0]!.cam).toEqual({ pockets: 2, throughHoles: 0 });
+  });
+});
+
+describe('expressions', () => {
+  it('lets a fillet radius follow a variable', async () => {
+    const { document } = await editCad(null, d => {
+      d.variable('round', '40mm');
+      const top = d.part('Top').profile.rect({ at: [0, 0], w: 400, h: 300 });
+      d.part('Top').profile.fillet(top.corners.slice(2), 'round');
+    });
+    const radius = document.parts[0]!.sketch.constraints.find(c => c.type === 'radius')!;
+    expect('expression' in radius && [radius.value, radius.expression]).toEqual([40, 'round']);
+  });
+
+  it('works out a count as a plain number', async () => {
+    let count = 0;
+    await editCad(null, d => {
+      d.variable('height', '720mm');
+      d.variable('pitch', '32mm');
+      count = d.value('(height - 160)/pitch');
+    });
+    expect(count).toBe(17.5);
+  });
+
+  it('patterns a rectangle as its edges', async () => {
+    const { report } = await editCad(null, d => {
+      const side = d.part('Side');
+      side.profile.rect({ at: [0, 0], w: 300, h: 900 });
+      const dados = side.sketchOn('top');
+      dados.pattern([dados.rect({ at: [20, 200], w: 260, h: 18 })], { count: 3, step: [0, 250] });
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.parts[0]!.sketches[1]!.entities.filter(entity => entity.type === 'line')).toHaveLength(12);
+  });
+});
+
+describe('paths', () => {
+  it('draws a slot of tangent arcs, fully constrained', async () => {
+    const { ok, report } = await editCad(null, d => {
+      const part = d.part('Slot plate');
+      part.profile
+        .path([0, 0])
+        .lineTo([100, 0])
+        .arcTo([100, 20], { tangent: true })
+        .lineTo([0, 20])
+        .arcTo([0, 0], { tangent: true })
+        .close();
+    });
+    expect(report.errors).toEqual([]);
+    expect(ok).toBe(true);
+    // The ends bulge 10 mm past the straight sides.
+    expect(report.parts[0]!.outline).toEqual({ at: [-10, 0], size: [120, 20] });
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+  });
+
+  it('draws arcs of a given radius either way round, and keeps the radius as an expression', async () => {
+    const { report, document } = await editCad(null, d => {
+      d.variable('round', '30mm');
+      const part = d.part('Bracket');
+      // A quarter-round corner: up the right side, then round to the top.
+      part.profile.path([0, 0]).lineTo([100, 0]).lineTo([100, 70]).arcTo([70, 100], { r: 'round' }).lineTo([0, 100]).close();
+      // A clockwise scallop cut into the bottom edge of a second part.
+      d.part('Shelf').profile.path([0, 0]).arcTo([60, 0], { r: 40, clockwise: true }).lineTo([60, 50]).lineTo([0, 50]).close();
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.parts[0]!.outline).toEqual({ at: [0, 0], size: [100, 100] });
+    expect(report.parts.map(part => part.sketches[0]!.freedom)).toEqual([0, 0]);
+    const radius = document.parts[0]!.sketch.constraints.find(c => c.type === 'radius')!;
+    expect('expression' in radius && radius.expression).toBe('round');
+    // Clockwise from left to right, the arc bows up into the shelf: its centre is below the edge, and it rises 13.5 mm.
+    const scallop = report.parts[1]!.sketches[0]!.entities.find(entity => entity.type === 'arc') as { at: number[]; r: number };
+    expect(scallop.at[1]).toBeCloseTo(-Math.sqrt(40 ** 2 - 30 ** 2), 3);
+    expect(report.parts[1]!.outline!.size).toEqual([60, 50]);
+    expect(report.parts[1]!.outline!.at.map(Math.abs)).toEqual([0, 0]);
+  });
+
+  it('draws a wavy edge of arcs that run into each other smoothly', async () => {
+    const { report } = await editCad(null, d => {
+      const path = d.part('Coat rack').profile.path([0, 0]).arcTo([150, 0], { r: 300 });
+      for (let x = 300; x <= 900; x += 150) path.arcTo([x, 0], { tangent: true });
+      path.lineTo([900, 130]).lineTo([0, 130]).close();
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+  });
+
+  it('draws a half circle of a given radius fully constrained, through its top', async () => {
+    const { report } = await editCad(null, d => {
+      d.part('Keyhole').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5 }).lineTo([0, 5]).close();
+    });
+    expect(report.warnings).toEqual([]);
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+    expect(report.parts[0]!.outline).toEqual({ at: [0, 0], size: [42.5, 5] });
+  });
+
+  it('draws S-curves whose halves share a center without repeating a constraint', async () => {
+    const { report } = await editCad(null, d => {
+      const path = d.part('Wave').profile.path([0, 0]);
+      // Each half leaves its crest level, so the halves on either side of a crest turn about the same center.
+      let previous: [number, number] = [0, 0];
+      for (const next of [
+        [100, 20],
+        [200, -20],
+        [300, 20],
+      ] as [number, number][]) {
+        const middle: [number, number] = [(previous[0] + next[0]) / 2, (previous[1] + next[1]) / 2];
+        const [dx, dy] = [middle[0] - previous[0], middle[1] - previous[1]];
+        const r = (dx * dx + dy * dy) / (2 * Math.abs(dy)),
+          rising = dy > 0;
+        path.arcTo(middle, { r, clockwise: !rising }).arcTo(next, { r, clockwise: rising });
+        previous = next;
+      }
+      path.lineTo([300, 120]).lineTo([0, 120]).close();
+    });
+    expect(report.warnings).toEqual([]);
+    expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
+  });
+
+  it('reports sizes from where curves reach, not from the chords they are drawn with', async () => {
+    const { report } = await editCad(null, d => {
+      const part = d.part('Rack');
+      part.profile.path([0, 0]).arcTo([300, 0], { r: 400 }).lineTo([300, 115]).lineTo([0, 115]).close();
+      const top = part.sketchOn('top');
+      top.circle({ at: [150, 60], d: 14 });
+      part.cut(top.regionAt(150, 60), { depth: 5 });
+    });
+    // The arch dips 400 - √(400² - 150²) below the bottom.
+    expect(report.parts[0]!.outline!.size[1]).toBeCloseTo(115 + 400 - Math.sqrt(400 ** 2 - 150 ** 2), 2);
+    expect(report.parts[0]!.cuts[0]!.size).toEqual([14, 14]);
+  });
+
+  it('says what went wrong', async () => {
+    const tooSmall = await editCad(null, d => d.part('A').profile.path([0, 0]).arcTo([100, 0], { r: 20 }));
+    expect(tooSmall.scriptError).toBe("A 20 mm radius can't reach 100, 0: it needs at least 50 mm.");
+    const ahead = await editCad(null, d => d.part('A').profile.path([0, 0]).lineTo([50, 0]).arcTo([100, 0], { tangent: true }));
+    expect(ahead.scriptError).toBe('100, 0 is straight ahead: use lineTo.');
+    const first = await editCad(null, d => d.part('A').profile.path([0, 0]).arcTo([100, 0], { tangent: true }));
+    expect(first.scriptError).toBe('A tangent arc needs a segment before it to carry on from.');
   });
 });
 
@@ -436,17 +569,40 @@ describe('reporting problems', () => {
     expect(codes(report.warnings)).toContain('cut-outside-floor');
   });
 
-  it('says underside cuts go to a second side, which the report leaves out', async () => {
+  it('plans cuts on the underside as a second side, after turning the board over', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Plate');
-      part.profile.rect({ at: [0, 0], w: 100, h: 80 });
-      // Seen from below, X runs the other way.
-      const under = part.sketchOn('underside');
-      under.rect({ at: [-30, 10], w: 20, h: 20 });
-      part.cut(under.regionAt(-20, 20), { depth: 3 });
+      const door = d.part('Door', { thickness: 19 });
+      door.profile.rect({ at: [0, 0], w: 500, h: 300 });
+      const front = door.sketchOn('top');
+      front.rect({ at: [80, 80], w: 340, h: 140 });
+      door.cut(front.regionAt(250, 150), { depth: 3 });
+      // Hinge cups on the back. Seen from below, X runs the other way.
+      const back = door.sketchOn('underside');
+      back.circle({ at: [-22.5, 60], d: 35 });
+      back.circle({ at: [-22.5, 240], d: 35 });
+      for (const y of [60, 240]) door.cut(back.regionAt(-22.5, y), { depth: 13 });
     });
-    expect(codes(report.warnings)).toContain('cam-underside');
-    expect(report.parts[0]!.cam).toBeUndefined();
+    expect(report.errors).toEqual([]);
+    const door = report.parts[0]!;
+    expect(door.cam).toEqual({ pockets: 1, throughHoles: 0, undersidePockets: 1 });
+    const labels = door.toolpaths!.operations.map(op => op.label);
+    expect(labels.some(label => label.startsWith('Side B: ') && /13 deep/.test(label))).toBe(true);
+    expect(labels.some(label => !label.startsWith('Side B: ') && /3 deep/.test(label))).toBe(true);
+    expect(door.toolpaths!.blocked).toEqual([]);
+  });
+
+  it('says when cuts from the two faces meet', async () => {
+    const { report } = await editCad(null, d => {
+      const part = d.part('Plate', { thickness: 18 });
+      part.profile.rect({ at: [0, 0], w: 100, h: 80 });
+      const top = part.sketchOn('top');
+      top.rect({ at: [20, 20], w: 30, h: 30 });
+      part.cut(top.regionAt(35, 35), { depth: 10 });
+      const under = part.sketchOn('underside');
+      under.rect({ at: [-60, 25], w: 30, h: 30 });
+      part.cut(under.regionAt(-45, 40), { depth: 10 });
+    });
+    expect(codes(report.errors)).toContain('cam-sides');
   });
 
   it('gives the largest radius when a fillet does not fit', async () => {

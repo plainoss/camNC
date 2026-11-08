@@ -40,6 +40,8 @@ that the model can't say, and in what CAM does with it.
   model's collision check, used by the report and the app's Assembly view, flags two
   parts needing the same material, with rebates and dados counted as empty. A shelf
   1 mm into a side shows up with its exact overlap.
+- **Paths.** Outlines of lines and arcs, with tangent arcs for slots and wavy edges,
+  fully constrained without hand-written relations.
 - **Patterns.** Linked rows of holes, such as 32 mm shelf pins. Their count and pitch
   can follow variables, and one cut on the first hole cuts every copy, so a taller
   cupboard gets more pins, all cut.
@@ -48,7 +50,8 @@ that the model can't say, and in what CAM does with it.
   rules out the drift the hand-mirrored cabinet sides showed.
 - **Checks.** Types, the solver, feature rules, `expect` for sizes, holes, pockets and
   depths, and a toolpath summary per part. The summary has the operations, time, CAM
-  warnings, blocked jobs and cuts no tool fits.
+  warnings, blocked jobs and cuts no tool fits. A part with cuts on its back is planned
+  on both sides, with the same side B features the app uses.
 - **Into the app.** The checked `.json` opens as a new job with its variables, parts and
   placements.
 
@@ -69,36 +72,30 @@ Grouped by where the fix belongs.
 
 ### CAM (`packages/cam`)
 
-1. **Cuts that run off the edge.** Rebates and through grooves drawn past the part get
-   "left in corners" warnings at their open ends, which suggests a lip is left there.
-   Verify on a test cut.
-2. **No drilling.** Pin holes, dowel holes and hinge cups are milled as pockets with the
+1. **No drilling.** Pin holes, dowel holes and hinge cups are milled as pockets with the
    3.175 mm bit.
-3. **A hole inside a counterbore is treated as an island,** so a narrow counterbore gets
+2. **A hole inside a counterbore is treated as an island,** so a narrow counterbore gets
    no tool at all.
-4. **Warnings give heights from the board's bottom** ("z=12" for a 6 mm pocket), and
+3. **Warnings give heights from the board's bottom** ("z=12" for a 6 mm pocket), and
    corner warnings don't say where.
-5. **Outline inside corners** in finger joints and notches get no warning, though a
+4. **Outline inside corners** in finger joints and notches get no warning, though a
    round bit leaves them rounded.
+
+Rebates and grooves drawn past the part used to warn about material "left in corners".
+That material was in the waste past the edge, not on the part: CAM already runs open
+pockets out of the edge. The warning now counts only the part.
 
 ### cad-script
 
-1. **Underside cuts drop the part from the summary.** The app now plans a second side,
-   and the report should too.
-2. **No path builder.** Shapes with arcs need relations the model can get singular, such
-   as a half circle with a vertical tangent.
-3. **The drawing is for reading only.** Labels can still crowd on dense parts.
+1. **The drawing is for reading only.** Labels can still crowd on dense parts.
 
 ## Next, in order
 
 1. **Inside-corner relief** as an option on rectangles, polygons and outlines, sized
    from the bit, with a CAM warning for outline corners left round.
-2. **Open-ended cuts in CAM,** checked against the physical test cut.
-3. **Two-sided parts in the report:** move the app's side B feature building into
-   `packages/cam`, as board planning was, and summarise both sides.
-4. **Joints and fits** (roadmap PR 10). The assembly check is ready to confirm them.
-5. **Drilling operations** for holes up to the bit's size and for hinge cups.
-6. **A path builder** in cad-script, then a second furniture run to measure the change
-   in tries and lines.
+2. **Joints and fits** (roadmap PR 10). The assembly check is ready to confirm them.
+3. **Drilling operations** for holes up to the bit's size and for hinge cups.
+4. **A second furniture run** with the path builder, copies and variables, to measure
+   the change in tries and lines.
 
 Results from that second run belong in this file.

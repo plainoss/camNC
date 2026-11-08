@@ -1,9 +1,6 @@
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { useStore } from '@/store/store';
-import { Button } from '@wbcnc/ui/components/button';
 import { toast } from '@wbcnc/ui/components/sonner';
-import { cn } from '@wbcnc/ui/lib/utils';
-import { Plus, Undo2 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Vector3 } from 'three';
@@ -38,7 +35,7 @@ interface Undo {
 /**
  * Editing the CAM job's board in the top view (outside the 3D canvas): saves what the overlay changes (holds moved,
  * added, removed; the board's spot on the bed when its outline is dragged), keeps the overlay's holds up to date as
- * the board is planned again, and the tools to switch what a tap does, with Undo.
+ * the board is planned again, and the tools to switch what a tap does, with Undo, drawn beside the board (`BedTools`).
  */
 export function CamBedEditor() {
   const jobId = useCamMachine(s => s.jobId);
@@ -70,7 +67,7 @@ function Editor() {
     const before = Object.fromEntries(Object.keys(edit.patch).map(k => [k, b[k as keyof BoardV1]])) as Partial<BoardV1>;
     updateBoard(edit.boardId, edit.patch);
     if (silent) return;
-    // Said next to what changed (`CamBedLayer`), not in a corner; Undo is in the toolbar and on ⌘Z.
+    // Said next to what changed (`CamBedLayer`), not in a corner; Undo is beside the board and on ⌘Z.
     undo.current = [...undo.current.slice(-19), { boardId: edit.boardId, what: edit.what, before }];
     setUndoCount(undo.current.length);
   };
@@ -289,10 +286,12 @@ function Editor() {
     [busy, locked]
   );
 
-  if (!overlay || !current || !board || overlay.boardId !== board.id) return null;
-  const holdsHere = !!overlay.holds && overlay.side !== 'b';
-  const clamp = (overlay.holdLike?.kind ?? overlay.holds?.[0]?.kind) === 'clamp';
+  // The tools, beside the board in the top view (`CamBedLayer`): Add, Undo and what a tap or drag does now.
+  const shown = !!overlay && !!current && !!board && overlay.boardId === board.id;
+  const holdsHere = !!overlay?.holds && overlay.side !== 'b';
+  const clamp = (overlay?.holdLike?.kind ?? overlay?.holds?.[0]?.kind) === 'clamp';
   const name = clamp ? 'clamp' : 'screw';
+  const blocked = busy || !!locked;
   const note = busy
     ? (lockReason ?? 'This setup is protected.')
     : locked
@@ -302,33 +301,19 @@ function Editor() {
         : selected
           ? `Drag the handle to move it${selected.kind === 'hold' ? ', Delete removes it' : ''}${jogKeys ? '' : ', arrow keys nudge it'}. Esc deselects.`
           : `Drag to move the board (Shift: X or Y only), the knob turns it. Tap a ${holdsHere ? name : 'part'} to select it.`;
-  return (
-    <div
-      role="toolbar"
-      aria-label={`Edit board ${board.name}`}
-      className="dark pointer-events-auto flex flex-wrap items-center gap-1 rounded-lg border bg-background/90 p-1 text-foreground shadow-md backdrop-blur">
-      {holdsHere && (
-        <Button
-          size="sm"
-          variant={mode === 'add' ? 'default' : 'ghost'}
-          aria-pressed={mode === 'add'}
-          title={`Tap the board where another ${name} goes.`}
-          disabled={busy || !!locked}
-          onClick={() => setMode(mode === 'add' ? 'move' : 'add')}>
-          <Plus />
-          Add {name}
-        </Button>
-      )}
-      <Button
-        size="sm"
-        variant="ghost"
-        title="Undo the last change here (⌘Z)"
-        disabled={busy || !!locked || !undo.current.length}
-        onClick={undoLast}>
-        <Undo2 />
-        Undo
-      </Button>
-      <span className={cn('px-2 text-xs text-muted-foreground', (busy || locked) && 'text-amber-300')}>{note}</span>
-    </div>
-  );
+  const canUndo = !blocked && undo.current.length > 0;
+  const undoRef = useRef(undoLast);
+  undoRef.current = undoLast;
+  const setTools = useBedEdit(s => s.setTools);
+  const toolsKey = JSON.stringify([shown, board?.name, holdsHere && name, canUndo, note, blocked]);
+  useEffect(() => {
+    setTools(
+      shown && board
+        ? { board: board.name, hold: holdsHere ? name : null, undo: canUndo ? () => undoRef.current() : null, note, blocked }
+        : null
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toolsKey]);
+  useEffect(() => () => setTools(null), [setTools]);
+  return null;
 }
