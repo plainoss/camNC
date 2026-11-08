@@ -45,7 +45,10 @@ the parts. See `examples/` for more.
   it regular. Both return `corners`, in vertex order, and `fillet(corners, r)` rounds
   them in any sketch.
 - `pattern(items, { count, step: [dx, dy], rows? })` repeats curves in linked copies, such
-  as a row of shelf-pin holes. Pick each copy's region with `regionAt` to cut it.
+  as a row of shelf-pin holes. Cutting the first copy's region cuts them all, including
+  copies the pattern gains later. A count can be an expression, rounded down to say how
+  many fit, and a step along one axis can be one too:
+  `count: '(height - 2*margin)/pitch + 1', step: [0, 'pitch']`.
 - `regionAt(x, y)` picks the innermost region at a point, as a click does. It only sees
   that sketch's own lines, so a profile hole doesn't split a region on `top`.
 - `cut(region, { depth })` takes mm, or `'through'` for a hole. A through cut can't reach
@@ -70,9 +73,10 @@ See `examples/cupboard.cad.ts`.
 - `d.variable('board', '18mm')` adds a design variable, or changes the one with that
   name. A length can then be an expression: `w: 'width - 2*board'`, `thickness: 'board'`.
   The expression is saved, so the part keeps following the variable when someone changes
-  it in the app. A plain number next to a variable is mm: `'depth + 10'`.
+  it in the app. A plain number next to a variable takes that variable's unit:
+  `'depth + 10'` is mm.
 - Cut depths (`{ depth: 'board/2' }`) and positions in `part.place` follow variables too.
-  Pattern counts and steps don't yet: use `d.value('height')` to work one out.
+  `d.value('board + margin')` works an expression out now, for a script's own loops.
 - `part.place({ at: [x, y, z], x: '+y', y: '+z' })` puts the part's sketch origin at `at`
   and says which way its sketch x and y point. The assembly's X runs left to right, Y
   front to back and Z up, and the part's thickness points along x × y. The report's

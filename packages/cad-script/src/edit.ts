@@ -75,9 +75,10 @@ export interface SketchEdit {
   place(point: CadRef, at: LenXy): void;
   /**
    * Copies of these curves in a row, and in rows when `rows` is given, linked so they keep the first one's shape. Pick the
-   * copies' regions with `regionAt`. The count and step don't follow variables yet.
+   * copies' regions with `regionAt`. A count can be an expression, rounded down to say how many fit, such as
+   * `'(height - 2*margin)/pitch + 1'`. A step along one axis can be one too, such as `[0, 'pitch']`.
    */
-  pattern(items: readonly CadRef[], options: { count: number; step: Xy; rows?: { count: number; step: Xy } }): void;
+  pattern(items: readonly CadRef[], options: { count: Len; step: LenXy; rows?: { count: Len; step: LenXy } }): void;
   /** Looks up a handle from the report. */
   find(handle: string): CadRef;
   /** The innermost region at a point, as a click picks it. Resolved now to a stable ID, so solving can't move the pick. */
@@ -173,9 +174,9 @@ function rotationTo(ex: readonly number[], ey: readonly number[]): CadPlacement[
 
 function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpectation[]>) {
   let document = start;
-  const measure = (value: Len, what: string): number => {
+  const measure = (value: Len, what: string, unit: 'mm' | 'scalar' = 'mm'): number => {
     if (typeof value === 'number') return value;
-    const result = parseCadValue(value, { unit: 'mm', variables: cadVariableScope(document) });
+    const result = parseCadValue(value, { unit, variables: cadVariableScope(document) });
     return 'error' in result ? fail(`${what} "${value}": ${result.error}`) : result.value;
   };
   const expressionOf = (value: Len) => (typeof value === 'string' ? { expression: value } : {});
@@ -310,11 +311,29 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       },
       place,
       pattern(items, { count, step, rows }) {
+        const counted = (value: Len) => Math.floor(measure(value, 'Count', 'scalar') + 1e-9);
+        const stepped = (value: LenXy) => {
+          const [x, y] = [measure(value[0], 'Step x'), measure(value[1], 'Step y')];
+          const typed = value.filter((part): part is string => typeof part === 'string');
+          // The model keeps a step's direction and lets an expression set its length, so only one axis can carry it.
+          if (typed.length && (typed.length > 1 || (x !== 0 && y !== 0)))
+            fail(`A step that follows variables runs along one axis, such as [0, 'pitch'], not [${value.join(', ')}].`);
+          return { vector: { x, y }, ...(typed[0] && { spacing: typed[0] }) };
+        };
+        const along = stepped(step),
+          across = rows && stepped(rows.step);
+        const expressions = {
+          ...(typeof count === 'string' && { countX: count }),
+          ...(along.spacing && { spacingX: along.spacing }),
+          ...(typeof rows?.count === 'string' && { countY: rows.count }),
+          ...(across?.spacing && { spacingY: across.spacing }),
+        };
         const result = linearPatternSketchEntities(current(), {
           entityIds: items.map(item => item.id),
-          countX: count,
-          stepX: { x: step[0], y: step[1] },
-          ...(rows && { countY: rows.count, stepY: { x: rows.step[0], y: rows.step[1] } }),
+          countX: counted(count),
+          stepX: along.vector,
+          ...(rows && { countY: counted(rows.count), stepY: across!.vector }),
+          ...(Object.keys(expressions).length && { expressions }),
         });
         if (!result.ok) return fail(result.message);
         apply(() => result.sketch);

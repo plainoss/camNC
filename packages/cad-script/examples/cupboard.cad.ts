@@ -16,6 +16,9 @@ export const cupboard =
     // How far a panel reaches into a side's rebate.
     d.variable('housing', '8mm');
     d.variable('pin', '5mm');
+    // The 32 mm system: pin rows start this far above the bottom panel and stop as far below the top.
+    d.variable('pitch', '32mm');
+    d.variable('margin', '80mm');
     const housing = d.value('housing');
 
     // The sides: sketch x runs front to back, y bottom to top, and the top face is the inside.
@@ -31,21 +34,21 @@ export const cupboard =
       const back = part.sketchOn('top');
       back.rect({ at: ['depth - back', -5], w: 'back + 5mm', h: 'height + 10mm' });
       part.cut(back.regionAt(d.value('depth') - d.value('back') / 2, d.value('height') / 2), { depth: 'housing' });
-      // Pin rows 37 mm in from the front and from the back's rebate, centred on the height so both sides are alike.
+      // Pin rows 37 mm in from the front and from the back's rebate, from the bottom up, as many as fit.
       const pins = part.sketchOn('top');
-      const count = Math.floor((d.value('height') - 2 * d.value('board') - 160) / 32) + 1;
-      const first = (d.value('height') - (count - 1) * 32) / 2;
-      const gap = d.value('depth') - d.value('back') - 74;
-      pins.pattern([pins.circle({ at: [37, first], d: 'pin' })], { count, step: [0, 32], rows: { count: 2, step: [gap, 0] } });
-      for (let row = 0; row < 2; row++)
-        for (let i = 0; i < count; i++) part.cut(pins.regionAt(37 + row * gap, first + i * 32), { depth: 12 });
+      pins.pattern([pins.circle({ at: [37, 'board + margin'], d: 'pin' })], {
+        count: '(height - 2*board - 2*margin)/pitch + 1',
+        step: [0, 'pitch'],
+        rows: { count: 2, step: ['depth - back - 74mm', 0] },
+      });
+      // Cutting the first pin cuts every copy, including those the pattern gains when the height changes.
+      part.cut(pins.regionAt(37, d.value('board + margin')), { depth: 12 });
       part.expect({ size: [d.value('depth'), d.value('height')], thickness: d.value('board'), freedom: 0 });
-      return { part, pinAt: (i: number) => first + i * 32, count };
+      return part;
     })();
-    side.part.place({ at: [0, 0, 0], x: '+y', y: '+z' });
-    // The right side is the same part turned over end for end, so its inside faces left. The pins are centred on the
-    // height, so it needs no mirror image.
-    side.part.copy({ at: ['width', 0, 'height'], x: '+y', y: '-z' });
+    side.place({ at: [0, 0, 0], x: '+y', y: '+z' });
+    // The right side is the left's mirror image: its inside faces left, with the front and the pins where they are.
+    side.copy({ at: ['width', 0, 0], x: '-y', y: '+z', mirrored: true });
 
     // Top and bottom: sketch x runs left to right, y front to back. They stop at the back panel.
     const panel = (name: string): PartEdit => {
@@ -61,11 +64,10 @@ export const cupboard =
     back.profile.rect({ at: [0, 0], w: 'width - 2*board + 2*housing', h: 'height' });
     back.place({ at: ['board - housing', 'depth', 0], x: '+x', y: '+z' });
 
-    // The shelf has 1 mm to spare at each side and 10 mm at the back, and rests on the middle pins.
+    // The shelf has 1 mm to spare at each side and 10 mm at the back, and rests on the sixth pins up.
     const shelf = d.part('Shelf', { thickness: 'board' });
     shelf.profile.rect({ at: [0, 0], w: 'width - 2*board - 2mm', h: 'depth - back - 10mm' });
-    const rest = side.pinAt(Math.floor(side.count / 2)) + d.value('pin') / 2;
-    shelf.place({ at: ['board + 1mm', 0, rest] });
+    shelf.place({ at: ['board + 1mm', 0, 'board + margin + 5*pitch + pin/2'] });
     shelf.expect({ freedom: 0 });
   };
 
