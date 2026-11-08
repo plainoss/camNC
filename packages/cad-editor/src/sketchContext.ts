@@ -126,7 +126,9 @@ export function selectedSketchContextTarget(sketch: CadSketch, selection: Sketch
 }
 
 const editableEntities = (sketch: CadSketch, ids: readonly string[]) =>
-  sketch.entities.filter(entity => ids.includes(entity.id) && entity.id !== originId(sketch) && !isSplineTangentHandle(sketch, entity.id));
+  sketch.entities.filter(
+    entity => ids.includes(entity.id) && entity.id !== originId(sketch) && !entity.faceEdge && !isSplineTangentHandle(sketch, entity.id)
+  );
 
 /** Construction is one command for the selected group, including a consistent mixed-selection toggle. */
 export function toggleContextConstruction(sketch: CadSketch, ids: readonly string[]): CadSketch {

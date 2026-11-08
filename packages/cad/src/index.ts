@@ -21,6 +21,7 @@ export * from './valueExpressions';
 export * from './variables';
 export * from './placement';
 export * from './drawnOn';
+export * from './faceEdges';
 export * from './cutParts';
 export * from './partPatterns';
 export * from './stepReport';

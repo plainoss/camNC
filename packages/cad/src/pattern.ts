@@ -142,6 +142,7 @@ export function reconcileLinearPattern(sketch: CadSketch, pattern: CadSketchPatt
   const owned = new Set(group.instances.filter(i => i !== master).flatMap(i => i.activeIds));
   const outsideUses = new Set(next.entities.filter(e => !owned.has(e.id)).flatMap(entityPointIds));
   outsideUses.add(originId(sketch));
+  for (const entity of next.entities) if (entity.type === 'point' && entity.faceEdge) outsideUses.add(entity.id);
   next.entities = next.entities.filter(e => !owned.has(e.id));
   const usedCells = new Set<string>(),
     active = new Set<string>(),
@@ -295,7 +296,7 @@ export function linearPatternSketchEntities(sketch: CadSketch, options: CadLinea
   } else {
     const entities = new Map(sketch.entities.map(e => [e.id, e])),
       ids = new Set(options.entityIds ?? []);
-    if (!ids.size || [...ids].some(id => !entities.has(id) || id === originId(sketch)))
+    if (!ids.size || [...ids].some(id => !entities.has(id) || id === originId(sketch) || entities.get(id)!.faceEdge))
       return { ok: false, message: 'Select sketch geometry to pattern.' };
     if (
       [...ids].some(id => {

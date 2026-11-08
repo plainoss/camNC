@@ -32,6 +32,7 @@ import { refreshDimensionMeasurement } from './dimensions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
 import { applyCadVariables } from './variables';
 import { resolveDrawnPlacements } from './drawnOn';
+import { withFaceEdges } from './faceEdges';
 import { resolvePartPatterns } from './partPatterns';
 import { isFatalSolverError } from './solverFailure';
 import { invalidOffsetBranches, offsetNativePrimitives, offsetNativeSeed } from './offsetConstraint';
@@ -491,6 +492,26 @@ function solvedCurveEquationsHold(part: CadPart): boolean {
 }
 
 /** Solve a detached revision. Callers retain their accepted model while an invalid draft is edited. */
+/** Parts in an order where each comes after the part it's drawn on. */
+function supportsFirst(parts: CadPart[]): CadPart[] {
+  const byId = new Map(parts.map(part => [part.id, part]));
+  const depth = new Map<string, number>();
+  const depthOf = (part: CadPart, seen = new Set<string>()): number => {
+    const known = depth.get(part.id);
+    if (known !== undefined) return known;
+    const on = part.drawnOn?.on;
+    const support = on && 'partId' in on ? byId.get(on.partId) : undefined;
+    seen.add(part.id);
+    const value = support && !seen.has(support.id) ? depthOf(support, seen) + 1 : 0;
+    depth.set(part.id, value);
+    return value;
+  };
+  return parts
+    .map((part, index) => ({ part, index, depth: depthOf(part) }))
+    .sort((a, b) => a.depth - b.depth || a.index - b.index)
+    .map(({ part }) => part);
+}
+
 export async function solveCadDocument(document: CadDocument, options: CadSolveOptions = {}): Promise<CadSolveResult> {
   // Values that use variables follow them before anything is solved.
   const next = migrateDimensionPlacements(applyCadVariables(document));
@@ -591,8 +612,10 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
     nativePromise = modulePromise!;
     let module = await nativePromise;
     nativeModule = module;
-    // Solving replaces each sketch's contents in place, so the face sketches update through their targets.
-    for (const part of next.parts.flatMap(sketchTargets)) {
+    // Solving replaces each sketch's contents in place, so the face sketches update through their targets. A part
+    // drawn on another is solved after it, with that face's edges where they now are, so what's tied to them follows.
+    for (const part of supportsFirst(next.parts).flatMap(sketchTargets)) {
+      if (part.drawnOn) part.sketch = withFaceEdges(next, part);
       const fixedConflicts = fixedConstraintConflicts(part);
       if (fixedConflicts.length) {
         diagnostics.push(...fixedConflicts);
