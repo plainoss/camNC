@@ -149,8 +149,11 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     setArtResets(resets =>
       Object.fromEntries([...(was?.items ?? []), ...(back.carving?.items ?? [])].map(i => [i.id, (resets[i.id] ?? 0) + 1]))
     );
+    // So do drags under way, of an item or of the board's edges: their release would save over what's restored.
     drag.current = null;
     setDragged(null);
+    resize.current = null;
+    setResized(null);
     setHistorySize(n => n + 1);
     save.mutateCurrent(current => ({ ...current, carving: back.carving, boards: back.boards }));
   };
