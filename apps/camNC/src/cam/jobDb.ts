@@ -1,6 +1,6 @@
 import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
-import { carvingBoard, kCarvingBoard, kDefaultVBit, type CarvingV1 } from './carving';
-import { outlineArt, placeRegion } from './carvingOutline';
+import { carvingBoard, carvingRegion, kCarvingBoard, kDefaultVBit, normalizeCarving, type CarvingV1 } from './carving';
+import { outlineArt } from './carvingOutline';
 import { rebaseJob } from './rebaseJob';
 import type { BoardV1, StockBoardV1 } from './boards';
 import type { NestObjective } from './autoNest';
@@ -215,6 +215,7 @@ export async function createCarvingJob(name = 'Untitled carving'): Promise<CamJo
   const x = kCarvingBoard.w / 2,
     y = kCarvingBoard.h / 2;
   const { region } = await outlineArt(art, height);
+  const items = [{ id: crypto.randomUUID(), art, height, x, y, rotation: 0, outline: region }];
   return saveJobIn(context, {
     v: 1,
     id: crypto.randomUUID(),
@@ -223,7 +224,7 @@ export async function createCarvingJob(name = 'Untitled carving'): Promise<CamJo
     createdAt: now,
     updatedAt: now,
     parts: [],
-    carving: { art, height, x, y, maxDepth: 3, vBit: kDefaultVBit, clearWithFlat: true, region: placeRegion(region, x, y) },
+    carving: { items, maxDepth: 3, vBit: kDefaultVBit, clearWithFlat: true, region: carvingRegion(items) },
     boards: [carvingBoard(kCarvingBoard)],
   });
 }
@@ -256,18 +257,27 @@ export function listJobs(): Promise<CamJobV1[]> {
   return listJobsIn(captureStorageContext());
 }
 
+const normalizeJob = (job: CamJobV1): CamJobV1 => (job.carving ? { ...job, carving: normalizeCarving(job.carving) } : job);
+
 async function listJobsIn(context: StorageContext): Promise<CamJobV1[]> {
-  if (context === 'rehearsal') return structuredClone([...rehearsalJobs.values()]).sort((a, b) => b.updatedAt - a.updatedAt);
+  if (context === 'rehearsal')
+    return structuredClone([...rehearsalJobs.values()])
+      .map(normalizeJob)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
   const db = await openDb(context);
   const jobs = await request(db.transaction(kJobs).objectStore(kJobs).getAll() as IDBRequest<CamJobV1[]>);
-  return jobs.sort((a, b) => b.updatedAt - a.updatedAt);
+  return jobs.map(normalizeJob).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function getJob(id: string): Promise<CamJobV1 | null> {
   const context = captureStorageContext();
-  if (context === 'rehearsal') return structuredClone(rehearsalJobs.get(id) ?? null);
+  if (context === 'rehearsal') {
+    const job = rehearsalJobs.get(id);
+    return job ? normalizeJob(structuredClone(job)) : null;
+  }
   const db = await openDb(context);
-  return (await request(db.transaction(kJobs).objectStore(kJobs).get(id) as IDBRequest<CamJobV1 | undefined>)) ?? null;
+  const job = await request(db.transaction(kJobs).objectStore(kJobs).get(id) as IDBRequest<CamJobV1 | undefined>);
+  return job ? normalizeJob(job) : null;
 }
 
 export async function getModelBytes(id: string): Promise<Uint8Array | null> {
@@ -322,7 +332,7 @@ async function updateJobForModelIn(
 ): Promise<CamJobV1 | null> {
   const apply = (current: CamJobV1 | undefined) => {
     if (!current || modelKey(current) !== modelKey(source)) return null;
-    const next = update(current);
+    const next = update(normalizeJob(current));
     return next && { ...next, updatedAt: Date.now() };
   };
   if (context === 'rehearsal') {

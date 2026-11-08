@@ -1,4 +1,4 @@
-import type { BoardCarving, BoardRequest, LibraryTool } from '@wbcnc/cam';
+import { unionPaths, type BoardCarving, type BoardRequest, type LibraryTool } from '@wbcnc/cam';
 import type { BoardV1 } from './boards';
 import type { CamJobV1 } from './jobDb';
 import { kDefaultPlan, type PlanSettingsV1 } from './planSettings';
@@ -23,25 +23,59 @@ export const fontLabel = (font: CarvingFont | WebFont): string =>
 
 export type CarvingArt = { kind: 'text'; text: string; font: CarvingFont | WebFont } | { kind: 'svg'; svg: string; fileName: string };
 
-/** A carving job: one board, artwork V-carved into its top. */
-export interface CarvingV1 {
+type Loop = { x: number; y: number }[];
+
+export interface CarvingItemV1 {
+  id: string;
   art: CarvingArt;
-  /** Height of the artwork's ink, mm; its width follows. */
+  /** Height of the artwork's ink, mm, before rotation; its width follows. */
   height: number;
-  /** The artwork's centre, mm from the board's lower left corner. */
+  /** Centre on the board, mm from the lower left corner, Y up. */
   x: number;
   y: number;
+  /** Degrees counter-clockwise, in [0, 360). */
+  rotation: number;
+  /** Centred on (0, 0), unrotated; drawn again only when art or height changes. */
+  outline: Loop[];
+}
+
+/** A carving job: one board, artwork V-carved into its top. */
+export interface CarvingV1 {
+  items: CarvingItemV1[];
   /** Deepest cut below the top, mm. */
   maxDepth: number;
   /** The V-bit (`shape: 'v'`). */
   vBit: LibraryTool;
   /** Clear flat bottoms with the job's flat bit first; otherwise the V-bit clears them. */
   clearWithFlat: boolean;
-  /**
-   * The artwork's outlines on the board, mm (Y up), as last drawn: what Plan cuts. Drawn again from `art` whenever it,
-   * its size or its place change.
-   */
-  region: { x: number; y: number }[][];
+  /** Union of every item's placed outline, mm, Y up: what Plan cuts. */
+  region: Loop[];
+}
+
+/** Rotate about the artwork's centre, then move it onto the board. */
+export function placeItem(item: CarvingItemV1): Loop[] {
+  const angle = (item.rotation * Math.PI) / 180;
+  const c = Math.cos(angle),
+    s = Math.sin(angle);
+  return item.outline.map(loop => loop.map(p => ({ x: item.x + p.x * c - p.y * s, y: item.y + p.x * s + p.y * c })));
+}
+
+export const carvingRegion = (items: CarvingItemV1[]): Loop[] => unionPaths(items.flatMap(placeItem));
+export const itemName = (item: CarvingItemV1): string => (item.art.kind === 'text' ? `"${item.art.text}"` : item.art.fileName);
+export const withItems = (carving: CarvingV1, items: CarvingItemV1[]): CarvingV1 => ({ ...carving, items, region: carvingRegion(items) });
+
+type LegacyCarving = Omit<CarvingV1, 'items'> & Pick<CarvingItemV1, 'art' | 'height' | 'x' | 'y'>;
+
+/** Older jobs saved one placed artwork directly on the carving. Keep its saved outlines and position. */
+export function normalizeCarving(raw: CarvingV1 | LegacyCarving): CarvingV1 {
+  if ('items' in raw) return raw;
+  const { art, height, x, y, ...carving } = raw;
+  return {
+    ...carving,
+    items: [
+      { id: 'carving-1', art, height, x, y, rotation: 0, outline: raw.region.map(loop => loop.map(p => ({ x: p.x - x, y: p.y - y }))) },
+    ],
+  };
 }
 
 /** V-bits offered for carving: the largest that fits the collet is ⌀8. Cutting data is cautious, for hardwood. */
@@ -66,7 +100,7 @@ export const hasWork = (request: Pick<BoardRequest, 'parts' | 'carvings'>) => re
 export function boardCarving(carving: CarvingV1, plan: Pick<PlanSettingsV1, 'bit'>): BoardCarving {
   return {
     id: 'carving',
-    name: carving.art.kind === 'text' ? `"${carving.art.text}"` : carving.art.fileName,
+    name: carving.items.length === 1 ? itemName(carving.items[0]) : `${carving.items.length} items`,
     region: carving.region,
     tool: carving.vBit,
     maxDepth: carving.maxDepth,
@@ -98,7 +132,8 @@ export function carvingBoard(size: { w: number; h: number; thickness: number }):
 
 /** Problems that stop the carving from being planned, for people. */
 export function carvingProblem(carving: CarvingV1, board: Pick<BoardV1, 'thickness'>): string | null {
-  if (carving.art.kind === 'text' && !carving.art.text.trim()) return 'Type something to carve.';
+  if (!carving.items.length) return 'Add text or an SVG to carve.';
+  if (carving.items.some(item => item.art.kind === 'text' && !item.art.text.trim())) return 'Type something to carve.';
   if (!carving.region.length) return 'The artwork has no filled shapes to carve.';
   if (carving.maxDepth >= board.thickness) return `The depth must be less than the board's ${board.thickness} mm.`;
   return null;
