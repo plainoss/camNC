@@ -489,7 +489,7 @@ it('keeps a part drawn on where its sketch is, behind that sketch, when nothing 
   expect(xs.sort((a, b) => a - b)).toEqual([0, 130]);
 });
 
-it('uses an edge of a part behind a sketch in it, fixed where it is, after picking it and pressing U', async () => {
+it('uses an edge of a part behind a sketch in it, fixed where it is, picked then U, or U then clicked', async () => {
   const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
   side.drawnOn = { on: { plane: 'right' as const }, offset: 0 };
   const shelf = { ...createCadPart('Shelf', 20), drawnOn: { on: { plane: 'front' as const }, offset: 0 } };
@@ -529,6 +529,23 @@ it('uses an edge of a part behind a sketch in it, fixed where it is, after picki
       [500, true],
     ])
   );
+  // Tool first, as the reference teaches: U with nothing picked, then each edge clicked goes in, until Escape.
+  await userEvent.keyboard('u');
+  await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(true));
+  const other = [...document.querySelectorAll<SVGLineElement>('.cad-part-edge')].find(
+    edge => edge !== tall && Math.abs(Number(edge.getAttribute('y1')) - Number(edge.getAttribute('y2'))) === 500
+  )!;
+  fireEvent.pointerDown(other, { button: 0, buttons: 1, pointerId: 1, clientX: 0, clientY: 0 });
+  fireEvent.pointerUp(other, { button: 0, pointerId: 1 });
+  await waitFor(() => expect(lines()).toBe(before + 2));
+  expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(true);
+  await userEvent.keyboard('{Escape}');
+  await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(false));
+  // U again ends it too.
+  await userEvent.keyboard('u');
+  await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(true));
+  await userEvent.keyboard('u');
+  await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(false));
 });
 
 it('shows the parts built before a sketch behind it, seen straight at its plane and turned by a right drag, and none of its own', async () => {
