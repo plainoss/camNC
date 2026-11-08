@@ -101,3 +101,12 @@
   border-radius: 2px;
   background: #9aa7b6;
 }
+/** The base planes, listed before the features as the reference's default geometry. */
+.cad-default-geometry {
+  list-style: none;
+  margin: 0 0 2px;
+  padding: 0 7px;
+}
+.cad-editor .cad-default-geometry button[aria-pressed='true'] {
+  background: #dbe8f8;
+}

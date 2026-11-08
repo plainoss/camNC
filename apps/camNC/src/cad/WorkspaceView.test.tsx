@@ -49,13 +49,15 @@ describe('the design workspace', () => {
     expect(screen.getByRole('status').textContent).toMatch(/^Not shown: Broken/);
   });
 
-  it('starts a new part on a plane, and asks for a face otherwise', () => {
+  it('asks for a plane or a face for a new part in the view, with no plane buttons, and Escape stops asking', () => {
     const { newPart } = setup({ ...createCadDocument(), parts: [panel('Side')] });
     fireEvent.click(screen.getByRole('button', { name: 'New part' }));
     expect(screen.getByRole('status').textContent).toBe('Click the face of a part to draw the new part on, or pick a plane. Esc cancels.');
-    fireEvent.click(screen.getByRole('button', { name: 'Right plane' }));
-    expect(newPart).toHaveBeenCalledWith({ plane: 'right' });
-    expect(screen.queryByRole('button', { name: 'Right plane' })).toBeNull();
+    // The planes are picked where they are in the view, as the reference shows them.
+    expect(screen.queryByRole('button', { name: /plane/i })).toBeNull();
+    fireEvent.keyDown(screen.getByTestId('workspace-3d'), { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'New part' }).getAttribute('aria-pressed')).toBe('false');
+    expect(newPart).not.toHaveBeenCalled();
   });
 
   it('starts a step cutting parts once there are two', () => {

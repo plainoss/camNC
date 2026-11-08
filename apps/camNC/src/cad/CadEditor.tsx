@@ -63,6 +63,7 @@ import {
   type CadDimension,
   type CadDimensionMode,
   type CadDocument,
+  type CadDrawnOn,
   type CadEntity,
   type CadPart,
   type CadSketch,
@@ -211,6 +212,7 @@ import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
+import type { BasePlane } from './basePlanes';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
@@ -479,6 +481,8 @@ export function CadEditor({
   const [featureDialog, setFeatureDialog] = useState<{ kind: 'extrude' | 'pattern'; partId: string; before: CadDocument } | null>(null);
   // Picking the plane or face a new part is sketched on.
   const [choosingFace, setChoosingFace] = useState(startsBlank);
+  // A base plane picked in the studio, in its view or feature list, for the next sketch to be drawn on.
+  const [selectedPlane, setSelectedPlane] = useState<BasePlane | null>(null);
   // Where the drawing sits in its pane, for the parts shown behind a sketch to line up with it.
   const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
@@ -3497,6 +3501,46 @@ export function CadEditor({
     setShowWorkspace(true);
     setTransformDialog({ partId, ...(copyId && { copyId }) });
   };
+  /** Starts a new part drawn on a base plane or a part's face, and opens its sketch. */
+  const newPartOn = (on: CadDrawnOn['on']) => {
+    const before = documentRef.current;
+    // A design's board thickness, when it names one, is what a new part is made from.
+    const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variableScope, name));
+    const added = createCadPart(
+      `Part ${documentRef.current.parts.length + 1}`,
+      board ? variableScope[board]!.value : (part?.thickness ?? 18)
+    );
+    // A design's blank first part is the one sketched, rather than a second beside it.
+    const blank = documentRef.current.parts.length === 1 && isBlank(documentRef.current.parts[0]!);
+    const base = blank ? documentRef.current.parts[0]! : added;
+    const placed = { ...base, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
+    // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
+    const drawn = { ...placed, sketch: withFaceEdges(documentRef.current, placed) };
+    commit({
+      ...documentRef.current,
+      revision: documentRef.current.revision + 1,
+      parts: blank ? [drawn] : [...documentRef.current.parts, drawn],
+    });
+    setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
+    if (studioSession) {
+      extrudeAfterSketch.current = drawn.id;
+      return openSketch(drawn.id, before);
+    }
+    setPartId(drawn.id);
+    setSelected([]);
+    setShowWorkspace(false);
+    setShow3D(false);
+    requestAnimationFrame(() => svg.current?.focus());
+  };
+  /** A base plane clicked in the view or the feature list: drawn on while choosing, otherwise picked for the next sketch. */
+  const pickPlane = (plane: BasePlane) => {
+    if (choosingFace) {
+      setChoosingFace(false);
+      setSelectedPlane(null);
+      return newPartOn({ plane });
+    }
+    setSelectedPlane(picked => (picked === plane ? null : plane));
+  };
   const studioCommand = (command: StudioCommand) => {
     setStudioRefusal(null);
     // Starting one step closes any other step's dialog.
@@ -3505,6 +3549,11 @@ export function CadEditor({
     if (command === 'sketch') {
       setFeatureDialog(null);
       setPartCutting(null);
+      // A plane picked first is drawn on straight away, as the reference sketches on what's selected.
+      if (selectedPlane && !choosingFace) {
+        setSelectedPlane(null);
+        return newPartOn({ plane: selectedPlane });
+      }
       setChoosingFace(!choosingFace);
     } else if (command === 'transform') {
       if (part) openTransform(part.id);
@@ -3845,6 +3894,7 @@ export function CadEditor({
               onAction={featureAction}
               rollback={rollbackStep}
               onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
+              {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
             />
           )}
           {!faceSketch && !studioSession && <CadVariablesPanel document={doc} onChange={commit} />}
@@ -4220,36 +4270,25 @@ export function CadEditor({
                 {...(studioSession
                   ? { choosing: choosingFace, onChoosingChange: setChoosingFace }
                   : { onCutParts: () => setPartCutting({}) })}
-                onNewPart={on => {
-                  const before = documentRef.current;
-                  // A design's board thickness, when it names one, is what a new part is made from.
-                  const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variableScope, name));
-                  const added = createCadPart(
-                    `Part ${documentRef.current.parts.length + 1}`,
-                    board ? variableScope[board]!.value : (part?.thickness ?? 18)
-                  );
-                  // A design's blank first part is the one sketched, rather than a second beside it.
-                  const blank = documentRef.current.parts.length === 1 && isBlank(documentRef.current.parts[0]!);
-                  const base = blank ? documentRef.current.parts[0]! : added;
-                  const placed = { ...base, ...(board && { thicknessExpression: board }), drawnOn: { on, offset: 0 } };
-                  // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
-                  const drawn = { ...placed, sketch: withFaceEdges(documentRef.current, placed) };
-                  commit({
-                    ...documentRef.current,
-                    revision: documentRef.current.revision + 1,
-                    parts: blank ? [drawn] : [...documentRef.current.parts, drawn],
-                  });
-                  setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
-                  if (studioSession) {
-                    extrudeAfterSketch.current = drawn.id;
-                    return openSketch(drawn.id, before);
-                  }
-                  setPartId(drawn.id);
-                  setSelected([]);
-                  setShowWorkspace(false);
-                  setShow3D(false);
-                  requestAnimationFrame(() => svg.current?.focus());
-                }}>
+                onNewPart={newPartOn}
+                selectedPlane={selectedPlane}
+                onSelectPlane={pickPlane}>
+                {studioSession && choosingFace && (
+                  // A new sketch waits for its plane, as the reference's sketch dialog does: a plane or a face picked
+                  // in the view, or a plane in the feature list.
+                  <FeatureDialog
+                    title="Sketch"
+                    okLabel="Pick a plane or face first"
+                    okDisabled
+                    onOk={() => {}}
+                    onCancel={() => setChoosingFace(false)}
+                    autoFocus={false}>
+                    <div className="cad-feature-selection" data-active="">
+                      <small>Sketch plane</small>
+                      <span>Pick a plane or a face</span>
+                    </div>
+                  </FeatureDialog>
+                )}
                 {partCutting && (
                   <PartCutDialog
                     key={partCutting.id ?? 'new'}

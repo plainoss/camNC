@@ -1,5 +1,6 @@
 import { cadVariableValues, type CadDocument } from '@wbcnc/cad';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { kBasePlanes, type BasePlane } from './basePlanes';
 import { designSteps, type DesignStep } from './designSteps';
 import { formatCadValue } from './valueExpressions';
 import './featureList.css';
@@ -47,6 +48,8 @@ export function FeatureList({
   onAction,
   onRename,
   rollback,
+  selectedPlane,
+  onPickPlane,
 }: {
   document: CadDocument;
   selectedPartId: string | null;
@@ -56,6 +59,9 @@ export function FeatureList({
   onRename: (partId: string, name: string) => void;
   /** The step being edited: the ones after it are greyed out, as the design is shown only that far. */
   rollback?: string | null;
+  /** The base plane picked, in the list or the view, and picking one, as the reference lists them first. */
+  selectedPlane?: BasePlane | null;
+  onPickPlane?: (plane: BasePlane) => void;
 }) {
   const { scope } = cadVariableValues(document);
   const blank = new Set(
@@ -101,6 +107,18 @@ export function FeatureList({
       <div className="cad-panel-heading">
         <h2>Features ({entries.length})</h2>
       </div>
+      {onPickPlane && (
+        <ul className="cad-default-geometry" aria-label="Default geometry">
+          {kBasePlanes.map(({ plane, label: name }) => (
+            <li key={plane}>
+              <button type="button" aria-pressed={selectedPlane === plane} onClick={() => onPickPlane(plane)}>
+                <span aria-hidden="true">▱</span>
+                <span>{name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <ol>
         {entries.map((entry, index) => {
           const step = entry.kind === 'step' ? entry.step : null;

@@ -1,6 +1,6 @@
-import { OrbitControls } from '@react-three/drei';
+import { Edges, Html, OrbitControls } from '@react-three/drei';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
@@ -10,6 +10,56 @@ import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
 import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
+
+/** A plane shown in the view to draw on, as a translucent square with its name at a corner. */
+export interface ViewPlane {
+  id: string;
+  label: string;
+  origin: [number, number, number];
+  x: [number, number, number];
+  y: [number, number, number];
+  normal: [number, number, number];
+  /** Drawn stronger, as when it's picked or its row in the feature list is. */
+  highlighted?: boolean;
+}
+
+const kPlane = '#d08a3c';
+const kPlaneHighlight = '#2f80ed';
+
+function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number; model: THREE.Matrix4; onPick?: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const matrix = useMemo(() => {
+    const v = (a: [number, number, number]) => new THREE.Vector3(...a);
+    // A square centred on the plane's origin, the size of the model or a little more.
+    return model.clone().multiply(new THREE.Matrix4().makeBasis(v(plane.x), v(plane.y), v(plane.normal)).setPosition(v(plane.origin)));
+  }, [plane, model]);
+  const strong = hovered || plane.highlighted;
+  const color = strong ? kPlaneHighlight : kPlane;
+  return (
+    <mesh
+      matrixAutoUpdate={false}
+      matrix={matrix}
+      renderOrder={1}
+      onPointerOver={event => {
+        event.stopPropagation();
+        if (onPick) setHovered(true);
+      }}
+      onPointerOut={() => setHovered(false)}
+      onClick={event => {
+        event.stopPropagation();
+        if (event.delta <= 4) onPick?.();
+      }}>
+      <planeGeometry args={[size, size]} />
+      <meshBasicMaterial color={color} transparent opacity={strong ? 0.22 : 0.1} side={THREE.DoubleSide} depthWrite={false} />
+      <Edges color={color} />
+      <Html
+        position={[-size / 2, size / 2, 0]}
+        style={{ pointerEvents: 'none', color, font: '11px system-ui, sans-serif', whiteSpace: 'nowrap', userSelect: 'none' }}>
+        {plane.label}
+      </Html>
+    </mesh>
+  );
+}
 /** A face clicked on a part, in the model's own space: its nearest corner or its middle, and the way it faces. */
 export interface ModelFacePick {
   partId: string;
@@ -151,6 +201,8 @@ export function ModelViewport({
   onPickFace,
   onMissed,
   sketchView,
+  planes = [],
+  onPickPlane,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -168,6 +220,9 @@ export function ModelViewport({
   onMissed?: () => void;
   /** Looks straight at a sketch's plane, following its drawing, in place of the orbiting camera. */
   sketchView?: SketchView;
+  /** Planes to show as designed, such as the base planes a sketch can be drawn on. */
+  planes?: ViewPlane[];
+  onPickPlane?: (id: string) => void;
 }) {
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
   const assembled = useMemo(() => centerAssembled(meshes), [meshes]);
@@ -176,7 +231,36 @@ export function ModelViewport({
     () => (view === 'flat' ? flat : view === 'exploded' ? exploded : meshes.map(() => assembled)),
     [view, flat, exploded, assembled, meshes]
   );
-  const box = useMemo(() => boundsOf(meshes, matrices), [meshes, matrices]);
+  // Base planes a little larger than the model, as the reference shows them, and a sensible size before there's one.
+  const planeSize = useMemo(() => {
+    const size = boundsOf(
+      meshes,
+      meshes.map(() => assembled)
+    ).getSize(new THREE.Vector3());
+    return Math.max(100, Math.max(size.x, size.y, size.z) * 0.75);
+  }, [meshes, assembled]);
+  const shownPlanes = view === 'assembled' ? planes : [];
+  const box = useMemo(() => {
+    const fit = boundsOf(meshes, matrices);
+    if (!shownPlanes.length) return fit;
+    // The planes are in view too, so a design with no parts yet still shows them.
+    const corner = new THREE.Vector3();
+    for (const plane of shownPlanes)
+      for (const [a, b] of [
+        [-1, -1],
+        [1, 1],
+      ])
+        fit.expandByPoint(
+          corner
+            .set(...plane.origin)
+            .addScaledVector(new THREE.Vector3(...plane.x), (a! * planeSize) / 2)
+            .addScaledVector(new THREE.Vector3(...plane.y), (b! * planeSize) / 2)
+            .applyMatrix4(assembled)
+        );
+    return fit;
+    // The planes' identity changes with their highlight, which shouldn't move the camera.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meshes, matrices, shownPlanes.length, planeSize, assembled]);
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
     if (!onPickFace || !e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.
@@ -210,6 +294,9 @@ export function ModelViewport({
           />
         ))}
       </group>
+      {shownPlanes.map(plane => (
+        <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
+      ))}
       {!sketchView && <OrbitControls makeDefault dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />}
     </Canvas>
   );

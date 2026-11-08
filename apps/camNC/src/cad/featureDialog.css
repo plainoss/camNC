@@ -136,3 +136,12 @@
   color: #174f8f;
   font-weight: 600;
 }
+/** A selection box waiting to be filled, as the reference marks the one the next click goes to. */
+.cad-feature-selection[data-active] {
+  border-color: #2f80ed;
+  box-shadow: 0 0 0 1px #2f80ed;
+}
+.cad-feature-selection[data-active] span {
+  color: #50739b;
+  font-style: italic;
+}
