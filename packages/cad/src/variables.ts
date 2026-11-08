@@ -133,6 +133,14 @@ function dimensionOutcome(constraint: CadConstraint, scope: CadValueScope): Outc
   return { value: parsed.value };
 }
 
+function reliefOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
+  const expression = part.cornerRelief?.diameterExpression;
+  if (!usesVariables(expression)) return null;
+  const parsed = parseCadValue(expression, { unit: 'mm', variables: scope });
+  if ('error' in parsed) return parsed;
+  return parsed.value > 0 ? parsed : { error: 'A bit needs to be wider than nothing.' };
+}
+
 function offsetOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
   const expression = part.drawnOn?.offsetExpression;
   if (!usesVariables(expression)) return null;
@@ -229,6 +237,9 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     const offset = offsetOutcome(sized, scope);
     if (offset && 'value' in offset && offset.value !== sized.drawnOn!.offset)
       sized = { ...sized, drawnOn: { ...sized.drawnOn!, offset: offset.value } };
+    const relief = reliefOutcome(sized, scope);
+    if (relief && 'value' in relief && relief.value !== sized.cornerRelief!.diameter)
+      sized = { ...sized, cornerRelief: { ...sized.cornerRelief!, diameter: relief.value } };
     sized = mapCuts(sized, cut => {
       const outcome = depthOutcome(cut, scope);
       return outcome && 'value' in outcome && outcome.value !== cut.depth ? { ...cut, depth: outcome.value } : cut;
@@ -262,6 +273,14 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
         severity: 'error',
         partId: part.id,
         message: `Thickness ${part.thicknessExpression}: ${thickness.error}`,
+      });
+    const relief = reliefOutcome(part, scope);
+    if (relief && 'error' in relief)
+      problems.push({
+        code: 'variable-value',
+        severity: 'error',
+        partId: part.id,
+        message: `Corner relief ${part.cornerRelief!.diameterExpression}: ${relief.error}`,
       });
     const offset = offsetOutcome(part, scope);
     if (offset && 'error' in offset)
@@ -343,6 +362,9 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
             {
               ...part,
               ...(part.thicknessExpression && { thicknessExpression: edit(part.thicknessExpression) }),
+              ...(part.cornerRelief?.diameterExpression && {
+                cornerRelief: { ...part.cornerRelief, diameterExpression: edit(part.cornerRelief.diameterExpression) },
+              }),
               ...(part.drawnOn?.offsetExpression && {
                 drawnOn: { ...part.drawnOn, offsetExpression: edit(part.drawnOn.offsetExpression) },
               }),

@@ -142,6 +142,7 @@ import { CadVariablesPanel } from './CadVariablesPanel';
 import { DesignStepsList } from './DesignStepsList';
 import { CadDrawnOnField } from './CadDrawnOnField';
 import { drawnOnName } from './drawnOnName';
+import { CadReliefField } from './CadReliefField';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
   createSketchContext,
@@ -3434,6 +3435,21 @@ export function CadEditor({
                   onChange={drawnOn => commit(replacePart(documentRef.current, part.id, p => ({ ...p, drawnOn })))}
                 />
               )}
+              <CadReliefField
+                key={`${part.id}:relief`}
+                relief={part.cornerRelief}
+                variables={variableScope}
+                onDone={() => svg.current?.focus()}
+                onChange={cornerRelief =>
+                  commit(
+                    replacePart(documentRef.current, part.id, p => {
+                      const next = { ...p, cornerRelief };
+                      if (!cornerRelief) delete next.cornerRelief;
+                      return next;
+                    })
+                  )
+                }
+              />
               {variableProblems
                 .filter(problem => problem.partId === part.id)
                 .map((problem, index) => (
