@@ -82,6 +82,7 @@ import {
   type CadPoint,
   cadVariableProblems,
   drawnOnOutline,
+  cadFaceFrame,
   withFaceEdges,
   cadVariableScope,
   addPartCut,
@@ -208,7 +209,7 @@ import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
-import { rolledBackTo, type DesignStep } from './designSteps';
+import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 import './cad.css';
@@ -274,6 +275,7 @@ const entityPointIds = (entity: CadEntity): string[] => {
 };
 const PartView3D = lazy(() => import('./PartView3D'));
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
+const SketchBackdrop = lazy(() => import('./SketchBackdrop'));
 /** A face sketch is drawn over the part's outline, so a part needs one first. */
 /** A sketch of one straight line and nothing else, as a board drawn edge-on is. */
 const isSingleLine = (part: CadPart) => {
@@ -473,6 +475,8 @@ export function CadEditor({
   const [featureDialog, setFeatureDialog] = useState<{ kind: 'extrude' | 'pattern'; partId: string; before: CadDocument } | null>(null);
   // Picking the plane or face a new part is sketched on.
   const [choosingFace, setChoosingFace] = useState(startsBlank);
+  // Where the drawing sits in its pane, for the parts shown behind a sketch to line up with it.
+  const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   // A variable being added, or the one being changed.
@@ -486,6 +490,21 @@ export function CadEditor({
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
   // A part sketched new, whose extrude opens once its sketch is closed. A new design's first part is one.
   const extrudeAfterSketch = useRef<string | null>(null);
+  useEffect(() => {
+    const element = svg.current;
+    if (!element) return;
+    const measure = () =>
+      setCanvasBox(previous => {
+        const box = element.getBoundingClientRect(),
+          pane = (element.parentElement as HTMLElement).getBoundingClientRect();
+        const next = { left: box.left - pane.left, top: box.top - pane.top, width: box.width, height: box.height };
+        return previous && JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
+      });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [showWorkspace, show3D]);
   // A sketch opened from the studio takes the keyboard once its drawing shows, so its shortcuts work straight away.
   useEffect(() => {
     if (studioSession && !showWorkspace && !show3D) svg.current?.focus();
@@ -3530,6 +3549,34 @@ export function CadEditor({
   const chainPreview = sketch && chainGeometry(sketch, chain);
   const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
   const acceptanceNotice = notice ?? finishError;
+  // The parts already built, behind an open sketch in the studio, seen straight at its plane as the drawing is.
+  const sketchBackdrop = useMemo(() => {
+    if (!studioSession || showWorkspace || show3D || !part || !canvasBox?.width || !canvasBox.height) return null;
+    const on = part.drawnOn?.on ?? { plane: 'top' as const };
+    const frame = cadFaceFrame(doc, on);
+    if ('error' in frame) return null;
+    const offset = part.drawnOn?.offset ?? 0;
+    const origin = frame.origin.map((value, axis) => value + frame.normal[axis]! * offset) as [number, number, number];
+    // The drawing keeps its view box whole, so its shorter side shows more than the box.
+    const scale = Math.min(canvasBox.width / view.w, canvasBox.height / view.h);
+    const steps = designSteps(doc);
+    const at = steps.findIndex(step => step.id === `${part.id}:sketch`);
+    const before = at > 0 ? rolledBackTo(doc, steps[at - 1]!.id) : { ...doc, parts: [] };
+    return {
+      document: before.parts.some(candidate => candidate.id === part.id)
+        ? { ...before, parts: before.parts.filter(candidate => candidate.id !== part.id) }
+        : before,
+      view: {
+        origin,
+        x: frame.x,
+        y: frame.y,
+        normal: frame.normal,
+        center: [view.x + view.w / 2, -(view.y + view.h / 2)] as [number, number],
+        width: canvasBox.width / scale,
+        height: canvasBox.height / scale,
+      },
+    };
+  }, [studioSession, showWorkspace, show3D, part, canvasBox, doc, view]);
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
   // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
@@ -4165,9 +4212,16 @@ export function CadEditor({
               />
             </Suspense>
           )}
+          {sketchBackdrop && canvasBox && (
+            <Suspense fallback={null}>
+              <div className="cad-sketch-backdrop-frame" style={canvasBox}>
+                <SketchBackdrop document={sketchBackdrop.document} view={sketchBackdrop.view} hiddenIds={hiddenParts} />
+              </div>
+            </Suspense>
+          )}
           <svg
             ref={svg}
-            className={`cad-canvas cad-tool-${tool}`}
+            className={`cad-canvas cad-tool-${tool}${sketchBackdrop ? ' cad-canvas-over-parts' : ''}`}
             style={showWorkspace || (show3D && partHasOutline) ? { display: 'none' } : undefined}
             data-testid="cad-canvas"
             role="img"

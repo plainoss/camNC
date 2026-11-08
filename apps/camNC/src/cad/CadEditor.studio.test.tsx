@@ -409,3 +409,27 @@ it('doesn’t apply a field after its dialog is cancelled, and applies a dimensi
     expect(latest().parts[0]!.sketch.constraints.find(constraint => constraint.label === 'Width')).toMatchObject({ value: 150 })
   );
 });
+
+it('shows the parts built before a sketch behind it, seen straight at its plane, and none of its own', async () => {
+  const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
+  side.drawnOn = { on: { plane: 'right' as const }, offset: 0 };
+  const back = { ...createCadPart('Back', 4), drawnOn: { on: { partId: side.id, face: 'top' as const }, offset: -10 } };
+  back.sketch = addLine(back.sketch, { x1: 10, y1: 0, x2: 10, y2: 500 });
+  const source: CadDocument = { ...createCadDocument(), parts: [side, { ...back, thin: { depth: 380, midPlane: true } }] };
+  sessions.push(source.id);
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  expect(document.querySelector('.cad-sketch-backdrop')).toBeNull();
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Back/ }));
+  await screen.findByRole('dialog', { name: 'Sketch · Back' });
+  await waitFor(() => expect(document.querySelector('.cad-sketch-backdrop canvas')).not.toBeNull(), { timeout: 10_000 });
+  // The drawing stays on top, and the face it's drawn on shows by its outline over the part.
+  expect(screen.getByTestId('cad-canvas').classList.contains('cad-canvas-over-parts')).toBe(true);
+  await userEvent.click(within(screen.getByRole('dialog', { name: 'Sketch · Back' })).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(document.querySelector('.cad-sketch-backdrop')).toBeNull());
+});
