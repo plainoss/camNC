@@ -167,7 +167,7 @@ it.each(['toolbar', 'Boards stage'] as const)(
     const view = render(app());
     await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
     // Existing designs open in the studio, and this test edits the drawing.
-    await userEvent.click(within(screen.getByRole('region', { name: 'Steps' })).getByRole('button', { name: /Sketch ·/ }));
+    await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch ·/ }));
     await userEvent.dblClick(screen.getByRole('button', { name: 'Edit Width: 120 mm' }));
     await userEvent.fill(screen.getByRole('textbox', { name: 'Width mm' }), '140');
     if (action === 'toolbar') {
@@ -216,7 +216,7 @@ it.each(['toolbar', 'Boards stage'] as const)(
     render(app());
     await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
     // Existing designs open in the studio, and this test edits the drawing.
-    await userEvent.click(within(screen.getByRole('region', { name: 'Steps' })).getByRole('button', { name: /Sketch ·/ }));
+    await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch ·/ }));
     expect(screen.getByRole('button', { name: 'Edit Width: 140 mm' })).toBeDefined();
     await userEvent.click(screen.getByRole('button', { name: 'Undo (Ctrl or Command Z)' }));
     await waitFor(async () => {

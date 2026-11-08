@@ -1,0 +1,92 @@
+.cad-feature-list {
+  border-bottom: 1px solid #dde4ed;
+  padding-bottom: 8px;
+}
+.cad-feature-list ol {
+  list-style: none;
+  margin: 0;
+  padding: 0 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 55vh;
+  overflow: auto;
+}
+.cad-editor .cad-feature-list button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 4px;
+  width: 100%;
+  min-height: 0;
+  text-align: left;
+  align-items: baseline;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  font-size: 12px;
+  user-select: none;
+}
+.cad-editor .cad-feature-list button:hover {
+  background: #eef2f7;
+}
+.cad-editor .cad-feature-list button[aria-current='true'] {
+  background: #dbe8f8;
+}
+.cad-feature-list button > span:first-child {
+  color: #6b7c91;
+  font-size: 10.5px;
+  text-align: center;
+}
+.cad-feature-list button > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cad-feature-list small {
+  grid-column: 2;
+  color: #6b7c91;
+  font-size: 10.5px;
+}
+.cad-feature-rename {
+  width: calc(100% - 4px);
+  margin: 1px 2px;
+  padding: 2px 6px;
+  border: 1px solid #2c6fbf;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.cad-feature-menu {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px 0;
+  border: 1px solid #c3cedb;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 6px 20px #24324733;
+}
+.cad-editor .cad-feature-menu button {
+  min-height: 0;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.cad-editor .cad-feature-menu button:hover,
+.cad-editor .cad-feature-menu button:focus-visible {
+  background: #e8eef6;
+  outline: none;
+}
+.cad-editor .cad-feature-menu button[aria-disabled='true'] {
+  color: #a0abb8;
+  cursor: default;
+}
+.cad-editor .cad-feature-menu button[aria-disabled='true']:hover {
+  background: none;
+}

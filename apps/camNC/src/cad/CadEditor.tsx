@@ -72,6 +72,7 @@ import {
   evaluateCadPart,
   moveFaceSketch,
   removeCadFeature,
+  removeCadVariable,
   type CadFaceRef,
   setCutDepth,
   setCutSuppressed,
@@ -202,6 +203,9 @@ import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { FeatureDialog } from './FeatureDialog';
+import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
+import { VariableDialog } from './VariableDialog';
+import type { DesignStep } from './designSteps';
 import { ExtrudeDialog, PartPatternDialog } from './PartFeatureDialogs';
 import './cad.css';
 
@@ -448,6 +452,8 @@ export function CadEditor({
   const [featureDialog, setFeatureDialog] = useState<{ kind: 'extrude' | 'pattern'; partId: string; before: CadDocument } | null>(null);
   // Picking the plane or face a new part is sketched on.
   const [choosingFace, setChoosingFace] = useState(false);
+  // A variable being added, or the one being changed.
+  const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   const sketchBefore = useRef<CadDocument | null>(null);
   // A part sketched new, whose extrude opens once its sketch is closed. A new design's first part is one.
@@ -2092,6 +2098,8 @@ export function CadEditor({
       return;
     }
     if (editable(event.target)) return;
+    // The studio has no drawing tools: a sketch's shortcuts only work in an open sketch. Undo and redo still do.
+    if (studioSession && showWorkspace && !event.ctrlKey && !event.metaKey) return;
     const key = event.key.toLowerCase();
     if (polygonTool && !event.ctrlKey && !event.metaKey && !event.altKey) {
       if (key === 'enter' && pending.length === 2) {
@@ -3262,11 +3270,74 @@ export function CadEditor({
     extrudeAfterSketch.current = null;
     if (keep && fresh && hasOutline(documentRef.current, fresh)) openFeature('extrude', fresh);
   };
+  /** Opens what a step of the design made: its sketch, its dialog, or its part in 3D. */
+  const openStep = (step: DesignStep) => {
+    // In the studio a step opens its dialog, and a sketch opens to be drawn on, as the reference does.
+    if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
+    if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
+    if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
+    setPartId(step.partId);
+    setSelected([]);
+    chooseTool('select');
+    if (step.kind === 'sketch') {
+      setShowWorkspace(false);
+      setShow3D(false);
+    } else if (step.kind === 'pattern' || step.kind === 'copy') {
+      setShowWorkspace(true);
+    } else if (step.kind === 'partCut') {
+      setShowWorkspace(true);
+      setPartCutting({ id: step.partCutId });
+    } else if (step.kind === 'cut' || step.kind === 'extrude') {
+      setShowWorkspace(false);
+      setShow3D(hasOutline(documentRef.current, step.partId));
+    } else if (step.kind === 'faceSketch' && onEditFaceSketch && step.sketchId) {
+      const prepared = prepareDocument();
+      if (prepared && hasOutline(prepared, step.partId)) onEditFaceSketch(prepared, step.partId, step.sketchId);
+    }
+  };
+  /** A row of the studio's feature list: edited, deleted, suppressed, or its sketch opened. */
+  const featureAction = (entry: FeatureEntry, action: FeatureAction) => {
+    const current = documentRef.current;
+    if (entry.kind === 'variable') {
+      if (action === 'edit') {
+        setFeatureDialog(null);
+        setPartCutting(null);
+        return setVariableDialog({ id: entry.id });
+      }
+      if (action === 'delete') {
+        const result = removeCadVariable(current, entry.id);
+        return 'error' in result ? setMessage(result.error) : commit(result.document);
+      }
+      return;
+    }
+    const { step } = entry;
+    if (action === 'edit') return openStep(step);
+    if (action === 'editSketch') return openSketch(step.partId);
+    if (action === 'suppress' && step.kind === 'cut' && step.cutId) {
+      const cut = current.parts.find(candidate => candidate.id === step.partId)?.features?.find(feature => feature.id === step.cutId);
+      return commit(setCutSuppressed(current, step.partId, step.cutId, !(cut?.type === 'cut' && cut.suppressed)));
+    }
+    if (action !== 'delete') return;
+    setFeatureDialog(null);
+    if (step.kind === 'sketch' || step.kind === 'extrude') {
+      // A part is its sketch pushed out, so deleting either deletes the part.
+      const parts = current.parts.filter(candidate => candidate.id !== step.partId);
+      commit(withFeatureVersion({ ...current, parts }));
+      setPartId(parts[0]?.id ?? '');
+    } else if (step.kind === 'pattern') commit(setPartPattern(current, step.partId, null));
+    else if (step.kind === 'partCut' && step.partCutId) commit(removePartCut(current, step.partCutId));
+    else if (step.kind === 'cut' && step.cutId) commit(removeCadFeature(current, step.partId, step.cutId));
+  };
   const studioCommand = (command: StudioCommand) => {
     if (command === 'sketch') {
       setFeatureDialog(null);
       setPartCutting(null);
       setChoosingFace(!choosingFace);
+    } else if (command === 'variable') {
+      setFeatureDialog(null);
+      setPartCutting(null);
+      setChoosingFace(false);
+      setVariableDialog({});
     } else if (command === 'cutParts') {
       setFeatureDialog(null);
       setChoosingFace(false);
@@ -3380,14 +3451,14 @@ export function CadEditor({
       {studioSession && showWorkspace ? (
         <StudioToolbar
           busy={busy}
-          active={choosingFace ? 'sketch' : partCutting ? 'cutParts' : (featureDialog?.kind ?? null)}
+          active={choosingFace ? 'sketch' : partCutting ? 'cutParts' : variableDialog ? 'variable' : (featureDialog?.kind ?? null)}
           disabled={{
             ...(!partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first' }),
             ...(doc.parts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
           }}
           canUndo={session.past.length > 0}
           canRedo={session.future.length > 0}
-          canFinish={thicknessValid && !solving && !problems.length && !featureDialog && !partCutting}
+          canFinish={thicknessValid && !solving && !problems.length && !featureDialog && !partCutting && !variableDialog}
           onCommand={studioCommand}
           onUndo={() => navigateHistory()}
           onRedo={() => navigateHistory(true)}
@@ -3434,37 +3505,22 @@ export function CadEditor({
               </p>
             </div>
           )}
-          {!faceSketch && <CadVariablesPanel document={doc} onChange={commit} />}
-          {!faceSketch && (
-            <DesignStepsList
+          {studioSession && (
+            <FeatureList
               document={doc}
               selectedPartId={part?.id ?? null}
-              onStep={step => {
-                // In the studio a step opens its dialog, and a sketch opens to be drawn on, as the reference does.
-                if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
-                if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
-                if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
-                setPartId(step.partId);
-                setSelected([]);
-                chooseTool('select');
-                if (step.kind === 'sketch') {
-                  setShowWorkspace(false);
-                  setShow3D(false);
-                } else if (step.kind === 'pattern' || step.kind === 'copy') {
-                  setShowWorkspace(true);
-                } else if (step.kind === 'partCut') {
-                  setShowWorkspace(true);
-                  setPartCutting({ id: step.partCutId });
-                } else if (step.kind === 'cut' || step.kind === 'extrude') {
-                  setShowWorkspace(false);
-                  setShow3D(hasOutline(documentRef.current, step.partId));
-                } else if (step.kind === 'faceSketch' && onEditFaceSketch && step.sketchId) {
-                  const prepared = prepareDocument();
-                  if (prepared && hasOutline(prepared, step.partId)) onEditFaceSketch(prepared, step.partId, step.sketchId);
+              onSelect={entry => {
+                if (entry.kind === 'step') {
+                  setPartId(entry.step.partId);
+                  setSelected([]);
                 }
               }}
+              onAction={featureAction}
+              onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
             />
           )}
+          {!faceSketch && !studioSession && <CadVariablesPanel document={doc} onChange={commit} />}
+          {!faceSketch && !studioSession && <DesignStepsList document={doc} selectedPartId={part?.id ?? null} onStep={openStep} />}
           <div className="cad-panel-heading" hidden={!!faceSketch}>
             <h2>Parts</h2>
             <button
@@ -3625,17 +3681,19 @@ export function CadEditor({
                 />
               )}
               <div className="cad-divider" />
-              <label className="cad-show-constraints">
-                <input
-                  type="checkbox"
-                  checked={showConstraints}
-                  onChange={event => {
-                    setShowConstraints(event.target.checked);
-                    setHoveredConstraintEntities([]);
-                  }}
-                />
-                Show constraints
-              </label>
+              {!studioSession && (
+                <label className="cad-show-constraints">
+                  <input
+                    type="checkbox"
+                    checked={showConstraints}
+                    onChange={event => {
+                      setShowConstraints(event.target.checked);
+                      setHoveredConstraintEntities([]);
+                    }}
+                  />
+                  Show constraints
+                </label>
+              )}
               {(tool === 'dimension' || placingDimension || dimension !== null) && (
                 <>
                   <label className="cad-dimension-mode" htmlFor="cad-dimension-mode">
@@ -3678,6 +3736,18 @@ export function CadEditor({
               {acceptanceNotice}
             </p>
           )}
+          {showWorkspace && variableDialog && (
+            <VariableDialog
+              key={variableDialog.id ?? 'new'}
+              document={doc}
+              variableId={variableDialog.id}
+              onSave={next => {
+                commit(next);
+                setVariableDialog(null);
+              }}
+              onCancel={() => setVariableDialog(null)}
+            />
+          )}
           {showWorkspace &&
             featureDialog &&
             (() => {
@@ -3711,6 +3781,17 @@ export function CadEditor({
                 <small>Sketch plane</small>
                 <span>{part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'Top plane'}</span>
               </div>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showConstraints}
+                  onChange={event => {
+                    setShowConstraints(event.target.checked);
+                    setHoveredConstraintEntities([]);
+                  }}
+                />
+                Show constraints
+              </label>
             </FeatureDialog>
           )}
           <div className="cad-canvas-bar">
@@ -4807,7 +4888,7 @@ export function CadEditor({
           )}
         </span>
         <span className="cad-instruction" role="status">
-          {acceptanceNotice ? '' : message}
+          {acceptanceNotice || (studioSession && showWorkspace) ? '' : message}
         </span>
         <span>{saveStatus ?? 'Draft'}</span>
       </footer>
