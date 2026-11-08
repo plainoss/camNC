@@ -2,6 +2,7 @@ import { assemblyReport, evaluateCadDocument, partFaceAt, type CadDocument, type
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ModelViewport, type ModelFacePick, type ModelView } from '@/cam/model/ModelViewport';
 import { assemblyModel, instanceKey } from './assemblyModel';
+import { basePlaneViews, type BasePlane } from './basePlanes';
 
 const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
@@ -9,11 +10,6 @@ const kViews: { view: ModelView; label: string }[] = [
   { view: 'flat', label: 'Laid flat' },
 ];
 const always = () => true;
-const kPlanes: { plane: 'top' | 'front' | 'right'; label: string }[] = [
-  { plane: 'top', label: 'Top plane' },
-  { plane: 'front', label: 'Front plane' },
-  { plane: 'right', label: 'Right plane' },
-];
 /** Two clicks this close together open a part, rather than selecting it twice. */
 const kDoubleClickMs = 400;
 
@@ -29,6 +25,8 @@ export default function WorkspaceView({
   onChoosingChange,
   highlightIds,
   hiddenIds,
+  selectedPlane,
+  onSelectPlane,
   children,
 }: {
   document: CadDocument;
@@ -49,6 +47,9 @@ export default function WorkspaceView({
   highlightIds?: readonly string[];
   /** Parts hidden from the view, as the parts list's eye toggles them. */
   hiddenIds?: ReadonlySet<string>;
+  /** A base plane picked to draw the next sketch on, and picking one outside of choosing. */
+  selectedPlane?: BasePlane | null;
+  onSelectPlane?: (plane: BasePlane) => void;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
 }) {
@@ -57,6 +58,7 @@ export default function WorkspaceView({
   const model = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
   const clashes = useMemo(() => assemblyReport(document, evaluateCadDocument(document).parts)?.collisions ?? [], [document]);
   const [view, setView] = useState<ModelView>('assembled');
+  const planes = useMemo(() => basePlaneViews(document, selectedPlane), [document, selectedPlane]);
   // Choosing what a new part is drawn on: a plane, or a face clicked in the view.
   const [ownChoosing, setOwnChoosing] = useState(false);
   const controlled = choosingProp !== undefined;
@@ -131,21 +133,6 @@ export default function WorkspaceView({
             Cut parts
           </button>
         )}
-        {choosing && (
-          <div role="group" aria-label="Draw on a plane">
-            {kPlanes.map(option => (
-              <button
-                key={option.plane}
-                type="button"
-                onClick={() => {
-                  setChoosing(false);
-                  onNewPart?.({ plane: option.plane });
-                }}>
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
         {selectedId && !choosing && !controlled && (
           <button type="button" onClick={() => onOpen(selectedId)}>
             Open {document.parts.find(part => part.id === selectedId)?.name ?? 'part'}
@@ -161,6 +148,16 @@ export default function WorkspaceView({
         warnIds={clashes.flatMap(clash => clash.partIds)}
         milled={always}
         onPickFace={choosing ? pickFace : undefined}
+        planes={onNewPart ? planes : undefined}
+        onPickPlane={id => {
+          const plane = id as BasePlane;
+          // Picked while choosing, the new part is drawn on it; otherwise it's picked for the next sketch, as a face is.
+          if (choosing) {
+            setChoosing(false);
+            setNotice(null);
+            onNewPart?.({ plane });
+          } else onSelectPlane?.(plane);
+        }}
         onSelect={(_, index) => {
           const partId = model.instances[index]!.partId;
           const now = Date.now();

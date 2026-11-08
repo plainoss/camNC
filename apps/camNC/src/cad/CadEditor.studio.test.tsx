@@ -114,13 +114,7 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
   await userEvent.type(within(dialog).getByRole('textbox', { name: /Value/ }), '19 mm');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   const features = screen.getByRole('region', { name: 'Features' });
-  await waitFor(() =>
-    expect(
-      within(features)
-        .getAllByRole('button')
-        .map(button => button.textContent)[0]
-    ).toMatch(/#board = 19 mm/)
-  );
+  await waitFor(() => expect([...features.querySelectorAll('ol button')].map(button => button.textContent)[0]).toMatch(/#board = 19 mm/));
   expect(latest().variables?.map(variable => variable.name)).toEqual(['board']);
 
   // Double-clicking it opens it again.
@@ -303,13 +297,38 @@ it('opens a new design in the studio, asking for its first sketch’s plane', as
       .getByRole('button', { name: /Sketch/ })
       .getAttribute('aria-pressed')
   ).toBe('true');
-  // The blank part isn't a feature until it's sketched.
-  expect(within(screen.getByRole('region', { name: 'Features' })).queryAllByRole('button')).toEqual([]);
-  await userEvent.click(await screen.findByRole('button', { name: 'Right plane' }));
+  // The blank part isn't a feature until it's sketched; the base planes are listed before the features.
+  const features = screen.getByRole('region', { name: 'Features' });
+  expect(features.querySelectorAll('ol button')).toHaveLength(0);
+  // The sketch waits for its plane, picked in the view or the list.
+  const waiting = await screen.findByRole('dialog', { name: 'Sketch' });
+  expect(waiting.textContent).toMatch(/Pick a plane or a face/);
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Right/ }));
   const sketch = await screen.findByRole('dialog', { name: 'Sketch · Part 1' });
   expect(sketch.textContent).toMatch(/right plane/);
   await waitFor(() => expect(change.mock.calls.at(-1)?.[0].parts).toHaveLength(1));
   expect(change.mock.calls.at(-1)![0].parts[0]!.drawnOn).toEqual({ on: { plane: 'right' }, offset: 0 });
+});
+
+it('sketches on a base plane picked before Sketch, as on one picked after it', async () => {
+  const { latest } = await studio();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  const planes = within(features).getByRole('list', { name: 'Default geometry' });
+  // Picking a plane with nothing started only selects it; picking it again lets it go.
+  await userEvent.click(within(planes).getByRole('button', { name: /Front/ }));
+  expect(within(planes).getByRole('button', { name: /Front/ }).getAttribute('aria-pressed')).toBe('true');
+  expect(screen.queryByRole('dialog', { name: /Sketch/ })).toBeNull();
+  const toolbar = screen.getByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Sketch/ }));
+  const sketch = await screen.findByRole('dialog', { name: /^Sketch · / });
+  expect(sketch.textContent).toMatch(/front plane/i);
+  await waitFor(() => expect(latest().parts.at(-1)!.drawnOn).toEqual({ on: { plane: 'front' }, offset: 0 }));
+  // Cancelled, the waiting sketch's cross leaves nothing started.
+  await userEvent.click(within(sketch).getByRole('button', { name: 'Cancel' }));
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Sketch/ }));
+  const waiting = await screen.findByRole('dialog', { name: 'Sketch' });
+  await userEvent.click(within(waiting).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
 });
 
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {
