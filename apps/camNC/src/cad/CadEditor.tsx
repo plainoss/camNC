@@ -207,7 +207,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { rolledBackTo, type DesignStep } from './designSteps';
-import { ExtrudeDialog, PartPatternDialog } from './PartFeatureDialogs';
+import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -465,6 +465,8 @@ export function CadEditor({
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
+  // A part being copied by a transform, or the transformed copy being changed.
+  const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string } | null>(null);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
@@ -3248,6 +3250,7 @@ export function CadEditor({
   const openFeature = (kind: 'extrude' | 'pattern', partId: string) => {
     setPartCutting(null);
     setVariableDialog(null);
+    setTransformDialog(null);
     setChoosingFace(false);
     setPartId(partId);
     setSelected([]);
@@ -3264,6 +3267,7 @@ export function CadEditor({
     sketchBefore.current = before;
     setFeatureDialog(null);
     setVariableDialog(null);
+    setTransformDialog(null);
     setPartCutting(null);
     setChoosingFace(false);
     setPartId(partId);
@@ -3299,6 +3303,10 @@ export function CadEditor({
     // In the studio a step opens its dialog, and a sketch opens to be drawn on, as the reference does.
     if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
     if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
+    if (studioSession && step.kind === 'copy') {
+      const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
+      if (copy?.offset) return openTransform(step.partId, copy.id);
+    }
     if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
     // A cut opens its part's sketch view from the studio: cancelling there goes back to the design as it is now.
     if (studioSession && step.kind === 'cut') sketchBefore.current = documentRef.current;
@@ -3334,6 +3342,7 @@ export function CadEditor({
         }
         setFeatureDialog(null);
         setPartCutting(null);
+        setTransformDialog(null);
         return setVariableDialog({ id: entry.id });
       }
       if (action === 'delete') {
@@ -3361,14 +3370,26 @@ export function CadEditor({
     else if (step.kind === 'partCut' && step.partCutId) commit(removePartCut(current, step.partCutId));
     else if (step.kind === 'cut' && step.cutId) commit(removeCadFeature(current, step.partId, step.cutId));
   };
+  const openTransform = (partId: string, copyId?: string) => {
+    setFeatureDialog(null);
+    setPartCutting(null);
+    setVariableDialog(null);
+    setChoosingFace(false);
+    setPartId(partId);
+    setShowWorkspace(true);
+    setTransformDialog({ partId, ...(copyId && { copyId }) });
+  };
   const studioCommand = (command: StudioCommand) => {
     setStudioRefusal(null);
     // Starting one step closes any other step's dialog.
     setVariableDialog(null);
+    setTransformDialog(null);
     if (command === 'sketch') {
       setFeatureDialog(null);
       setPartCutting(null);
       setChoosingFace(!choosingFace);
+    } else if (command === 'transform') {
+      if (part) openTransform(part.id);
     } else if (command === 'variable') {
       setFeatureDialog(null);
       setPartCutting(null);
@@ -3487,14 +3508,26 @@ export function CadEditor({
       {studioSession && showWorkspace ? (
         <StudioToolbar
           busy={busy}
-          active={choosingFace ? 'sketch' : partCutting ? 'cutParts' : variableDialog ? 'variable' : (featureDialog?.kind ?? null)}
+          active={
+            choosingFace
+              ? 'sketch'
+              : partCutting
+                ? 'cutParts'
+                : variableDialog
+                  ? 'variable'
+                  : transformDialog
+                    ? 'transform'
+                    : (featureDialog?.kind ?? null)
+          }
           disabled={{
-            ...(!partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first' }),
+            ...(!partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
             ...(doc.parts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
           }}
           canUndo={session.past.length > 0}
           canRedo={session.future.length > 0}
-          canFinish={thicknessValid && !solving && !problems.length && !featureDialog && !partCutting && !variableDialog}
+          canFinish={
+            thicknessValid && !solving && !problems.length && !featureDialog && !partCutting && !variableDialog && !transformDialog
+          }
           onCommand={studioCommand}
           onUndo={() => navigateHistory()}
           onRedo={() => navigateHistory(true)}
@@ -3779,6 +3812,25 @@ export function CadEditor({
               {studioRefusal}
             </p>
           )}
+          {showWorkspace &&
+            transformDialog &&
+            (() => {
+              const target = doc.parts.find(candidate => candidate.id === transformDialog.partId);
+              return target ? (
+                <TransformDialog
+                  key={`${target.id}:${transformDialog.copyId ?? 'new'}`}
+                  document={doc}
+                  part={target}
+                  copyId={transformDialog.copyId}
+                  variables={variableScope}
+                  onSave={next => {
+                    commit(next);
+                    setTransformDialog(null);
+                  }}
+                  onCancel={() => setTransformDialog(null)}
+                />
+              ) : null;
+            })()}
           {showWorkspace && variableDialog && (
             <VariableDialog
               key={variableDialog.id ?? 'new'}

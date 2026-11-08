@@ -256,3 +256,20 @@ it('keeps steps already set when a cut’s sketch view is cancelled', async () =
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   expect(latest().parts[0]!.thickness).toBe(24);
 });
+
+it('copies a part with a transform, and edits the copy from its feature', async () => {
+  const { latest } = await studio();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  let dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  const x = within(dialog).getAllByRole('textbox')[0]!;
+  await userEvent.clear(x);
+  await userEvent.type(x, '250');
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Mirror image' }));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.copies?.[0]).toMatchObject({ mirrored: true, offset: { position: [250, 0, 0] } }));
+  const features = screen.getByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate 2/ }));
+  dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  expect(within(dialog).getAllByRole('textbox')[0]).toHaveProperty('value', '250');
+});

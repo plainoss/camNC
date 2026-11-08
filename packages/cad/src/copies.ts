@@ -1,22 +1,53 @@
 import { newCadId } from './document';
-import { cadCopyName } from './partPatterns';
+import { cadCopyName, resolvePartPatterns } from './partPatterns';
 import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
 /** Adds another of a part, laid out with the unplaced parts until it's placed. */
 export function addPartCopy(
   document: CadDocument,
   partId: string,
-  options: { mirrored?: boolean } = {}
+  options: { mirrored?: boolean; offset?: CadPartCopy['offset'] } = {}
 ): { document: CadDocument; id: string } {
-  const copy: CadPartCopy = { id: newCadId(), ...(options.mirrored && { mirrored: true }) };
+  const copy: CadPartCopy = {
+    id: newCadId(),
+    ...(options.mirrored && { mirrored: true }),
+    ...(options.offset && { offset: options.offset }),
+  };
   return {
     id: copy.id,
-    document: {
+    document: resolvePartPatterns({
       ...document,
       revision: document.revision + 1,
       parts: document.parts.map(part => (part.id === partId ? { ...part, copies: [...(part.copies ?? []), copy] } : part)),
-    },
+    }),
   };
+}
+
+/** Changes how far a transformed copy is moved from its part, and whether it's the part's mirror image. */
+export function setPartCopyOffset(
+  document: CadDocument,
+  partId: string,
+  copyId: string,
+  change: { offset: NonNullable<CadPartCopy['offset']>; mirrored?: boolean }
+): CadDocument {
+  return resolvePartPatterns({
+    ...document,
+    revision: document.revision + 1,
+    parts: document.parts.map(part =>
+      part.id !== partId
+        ? part
+        : {
+            ...part,
+            copies: part.copies?.map(copy => {
+              if (copy.id !== copyId) return copy;
+              const next: CadPartCopy = { ...copy, offset: change.offset };
+              if (change.mirrored) next.mirrored = true;
+              else delete next.mirrored;
+              return next;
+            }),
+          }
+    ),
+  });
 }
 
 /** Removes one copy of a part, leaving the part and its other copies. */

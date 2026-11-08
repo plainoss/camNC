@@ -302,6 +302,11 @@ export interface CadPartCopy {
   name?: string;
   /** The part pattern that made it, which places it and keeps it in step with the count. */
   pattern?: string;
+  /**
+   * How far it's moved from the part along the studio's axes, as a transform copies a part. Its placement follows from
+   * it, so it moves with the part. The position can use variables; the rotation is unused.
+   */
+  offset?: CadPlacement;
 }
 /** Copies of a part in a row along an axis, each `spacing` on from the last. */
 export interface CadPartPattern {

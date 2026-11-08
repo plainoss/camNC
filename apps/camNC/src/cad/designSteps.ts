@@ -13,6 +13,8 @@ export interface DesignStep {
   cutId?: string;
   /** The "cut parts" step it stands for. */
   partCutId?: string;
+  /** The copy it made. */
+  copyId?: string;
 }
 
 const typed = (expression: string | undefined, value: number) =>
@@ -86,8 +88,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
         steps.push({
           id: copy.id,
           kind: 'copy',
-          label: `${copy.mirrored ? 'Mirrored copy' : 'Copy'} · ${cadCopyName(part, index)}`,
+          label: `${copy.offset ? 'Transform' : copy.mirrored ? 'Mirrored copy' : 'Copy'} · ${cadCopyName(part, index)}`,
           partId: part.id,
+          copyId: copy.id,
         });
     });
     if (part.pattern)
