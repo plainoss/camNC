@@ -523,9 +523,8 @@ describe('variables and assembly', () => {
     const changed = setCadVariable(pinned, { id: width.id, name: 'width', expression: '900mm' });
     if ('error' in changed) throw new Error(changed.error);
     const { report } = await inspectCadDocument(changed.document, new Map(), { toolpaths: false });
-    expect(report.assembly!.collisions.map(c => c.parts.join(' / '))).toEqual(
-      expect.arrayContaining(['Right side / Bottom', 'Right side / Top', 'Right side / Back', 'Right side / Shelf'])
-    );
+    // The panels that reach the stranded side cut it where it now stands; the shelf, which isn't a tool, still hits it.
+    expect(report.assembly!.collisions.map(c => c.parts.join(' / '))).toEqual(expect.arrayContaining(['Right side / Shelf']));
     expect(report.errors.map(error => error.code)).toContain('parts-collide');
   });
 

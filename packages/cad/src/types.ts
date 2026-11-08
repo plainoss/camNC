@@ -397,6 +397,8 @@ export interface EvaluatedCadPart {
   loops: EvaluatedCadLoop[];
   /** Cuts beyond the through-holes above, in feature order. Absent on plain profiles. */
   cuts?: EvaluatedCadCut[];
+  /** Complete cut sets for copies that differ, in the original's sketch frame before mirroring. Missing copies use `cuts`. */
+  copyCuts?: Record<string, EvaluatedCadCut[]>;
 }
 export interface EvaluatedCadCut {
   id: string;

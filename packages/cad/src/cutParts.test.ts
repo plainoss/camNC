@@ -92,6 +92,101 @@ describe('a shelf housed in two sides', () => {
     expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
   });
 
+  it('houses a mirrored side on its own inner face, in assembly and CAM', async () => {
+    const document = carcass();
+    const [left, right, shelf] = document.parts;
+    left!.copies = [
+      {
+        id: 'right',
+        name: 'Right',
+        mirrored: true,
+        placement: { ...right!.placement!, positionExpressions: ['width', null, 'height'] },
+      },
+    ];
+    document.parts = [left!, shelf!];
+    document.partCuts![0]!.targets = [left!.id];
+    const solved = await variables(document, {
+      height: '720mm',
+      depth: '300mm',
+      width: '600mm',
+      board: '18mm',
+      housing: '8mm',
+      fit: '0.2mm',
+    });
+    const side = solved.parts[0]!;
+    expect(side.cuts).toHaveLength(1);
+    expect(side.cuts![0]!.side).toBe('underside');
+    expect(side.cuts![0]!.opening!.x0).toBeCloseTo(359.8, 6);
+    expect(side.cuts![0]!.opening!.x1).toBeCloseTo(378.2, 6);
+    expect(side.copyCuts?.right).toHaveLength(1);
+    expect(side.copyCuts!.right![0]!.side).toBe('top');
+    expect(side.copyCuts!.right![0]!.opening!.x0).toBeCloseTo(341.8, 6);
+    expect(side.copyCuts!.right![0]!.opening!.x1).toBeCloseTo(360.2, 6);
+    expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+    expect(withPartCuts(solved.document, evaluateCadPart(solved.document.parts[0]!).part!)).toEqual(side);
+    const pieces = cadPartsToCut(solved.document, solved.parts).filter(
+      entry => entry.names.includes('Left') || entry.names.includes('Right')
+    );
+    expect(pieces.map(entry => entry.names)).toEqual([['Left'], ['Right']]);
+    expect(pieces.map(entry => entry.part.cuts?.length)).toEqual([1, 1]);
+    expect(pieces.map(entry => entry.part.cuts![0]!.side)).toEqual(['underside', 'top']);
+    expect(pieces[1]!.part.cuts![0]!.opening!.x0).toBeCloseTo(-360.2, 6);
+  });
+
+  it('keeps own cuts on unreached copies and groups copies by their cuts', async () => {
+    const document = carcass();
+    const left = document.parts[0]!;
+    left.copies = [
+      { id: 'same', placement: { ...left.placement! } },
+      { id: 'away', placement: { position: [2000, 0, 0], rotation: kStanding } },
+      { id: 'away2', placement: { position: [3000, 0, 0], rotation: kStanding } },
+    ];
+    const solved = await variables(document, {
+      height: '720mm',
+      depth: '300mm',
+      width: '600mm',
+      board: '18mm',
+      housing: '8mm',
+      fit: '0.2mm',
+    });
+    const side = solved.parts[0]!;
+    expect(side.copyCuts).toEqual({ away: [], away2: [] });
+    const pieces = cadPartsToCut(solved.document, [side]);
+    expect(pieces.map(entry => entry.names)).toEqual([
+      ['Left', 'Left 2'],
+      ['Left 3', 'Left 4'],
+    ]);
+    expect(pieces.map(entry => entry.part.cuts?.length ?? 0)).toEqual([1, 0]);
+    const own: EvaluatedCadCut = { ...side.cuts![0]!, id: 'feature', regionId: 'feature' };
+    const profile = { ...evaluateCadPart(solved.document.parts[0]!).part!, cuts: [own] };
+    const cut = withPartCuts(solved.document, profile);
+    expect(cut.copyCuts?.away).toEqual([own]);
+    expect(cut.copyCuts?.away2).toEqual([own]);
+  });
+
+  it('cuts patterned targets at their placements even when the original is out of reach', async () => {
+    let document = carcass();
+    const left = document.parts[0]!;
+    left.placement!.positionExpressions = ['board - 1000mm', null, '0'];
+    document = setPartPattern(document, left.id, { axis: 'x', count: 3, spacing: 1000 });
+    const solved = await variables(document, {
+      height: '720mm',
+      depth: '300mm',
+      width: '600mm',
+      board: '18mm',
+      housing: '8mm',
+      fit: '0.2mm',
+    });
+    const side = solved.parts[0]!;
+    const [reached, away] = solved.document.parts[0]!.copies!;
+    expect(side.cuts).toBeUndefined();
+    expect(side.copyCuts?.[reached!.id]).toHaveLength(1);
+    expect(side.copyCuts?.[away!.id]).toBeUndefined();
+    expect(side.copyCuts![reached!.id]![0]!.id).toBe(`cut-parts:${document.partCuts![0]!.id}:${document.parts[2]!.id}`);
+    expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+    expect(cadPartsToCut(solved.document, [side]).map(entry => entry.names)).toEqual([['Left', 'Left 3'], ['Left 2']]);
+  });
+
   it('cuts nothing where the shelf doesn’t reach, and says so when it reaches nowhere', async () => {
     let document = carcass();
     // A shelf narrower than the gap, set 1 mm in from the left side, reaches neither side.
