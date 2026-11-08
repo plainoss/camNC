@@ -222,6 +222,11 @@ export async function inspectCadDocument(
     const faces = cadFaceSketches(part);
     const statusesOf = statuses.filter(status => status.partId === part.id);
     const featureHandles = shortHandles((part.features ?? []).map(f => f.id));
+    // A pattern copy's cut is its original's, with the copy's place in the pattern after a ~.
+    const cutHandle = (id: string) => {
+      const [base, copy] = id.split('~');
+      return `${featureHandles.get(base!) ?? base}${copy === undefined ? '' : `~${copy}`}`;
+    };
     const sketchHandles = shortHandles(faces.map(face => face.sketch.id));
     const sketches = [
       { sketch: part.sketch, ref: 'profile', on: 'profile' as const },
@@ -240,7 +245,7 @@ export async function inspectCadDocument(
     }));
     const cuts = (evaluated?.cuts ?? []).map(cut => {
       const { at, size } = bounds(cut.outline);
-      return { ref: featureHandles.get(cut.id)!, side: cut.side, from: round(cut.from), to: round(cut.to), through: cut.through, at, size };
+      return { ref: cutHandle(cut.id), side: cut.side, from: round(cut.from), to: round(cut.to), through: cut.through, at, size };
     });
     // CAM clips a floor cut to its pocket without a word, so the drawing and the part would disagree.
     for (const cut of evaluated?.cuts ?? []) {

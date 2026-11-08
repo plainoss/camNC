@@ -59,8 +59,8 @@ describe('variables and assembly', () => {
     expect(report.assembly!.collisions).toEqual([]);
     expect(box(report, 'Side')).toEqual({ name: 'Side', at: [0, 0, 0], size: [18, 300, 720] });
     expect(box(report, 'Side 2')).toEqual({ name: 'Side 2', at: [582, 0, 0], size: [18, 300, 720] });
-    // The right side is a copy of the left, so CAM cuts the same shape twice.
-    expect(report.parts.find(part => part.name === 'Side')!.pieces).toEqual({ names: ['Side', 'Side 2'], mirrored: [] });
+    // The right side is the left's mirror image, which CAM cuts as a shape of its own.
+    expect(report.parts.find(part => part.name === 'Side')!.pieces).toEqual({ names: ['Side'], mirrored: ['Side 2'] });
     expect(box(report, 'Back')).toEqual({ name: 'Back', at: [10, 294, 0], size: [580, 6, 720] });
   });
 
@@ -103,6 +103,39 @@ describe('variables and assembly', () => {
     expect(box(report, 'Side 2')).toMatchObject({ at: [881, 0, 0], size: [19, 300, 720] });
     expect(box(report, 'Top').at).toEqual([10, 0, 701]);
     expect(report.assembly!.collisions).toEqual([]);
+  });
+
+  it('grows and cuts the pin rows with the height and keeps the shelf on its pin', async () => {
+    const { cupboard } = await import('../examples/cupboard.cad');
+    const { document } = await editCad(null, cupboard());
+    const height = document.variables!.find(variable => variable.name === 'height')!;
+    const changed = setCadVariable(document, { id: height.id, name: 'height', expression: '900mm' });
+    if ('error' in changed) throw new Error(changed.error);
+    const { report } = await inspectCadDocument(changed.document, new Map(), { toolpaths: false });
+    expect(report.errors).toEqual([]);
+    const pins = report.parts.find(part => part.name === 'Side')!.sketches[3]!;
+    // (900 - 36 - 160)/32 + 1 = 23 a row, up from 17.
+    expect(pins.entities.filter(entity => entity.type === 'circle')).toHaveLength(46);
+    // One cut on the first pin covers every copy, including the twelve the taller sides gain.
+    const pinCuts = report.parts.find(part => part.name === 'Side')!.cuts.filter(cut => cut.to === 12);
+    expect(pinCuts).toHaveLength(46);
+    expect(Math.max(...pinCuts.map(cut => cut.at[1]!))).toBeCloseTo(98 + 22 * 32 - 2.5, 1);
+    expect(pins.freedom).toBe(0);
+    expect(box(report, 'Top').at).toEqual([10, 0, 882]);
+    expect(box(report, 'Shelf').at).toEqual([19, 0, 260.5]);
+    expect(report.assembly!.collisions).toEqual([]);
+  });
+
+  it('drops the pins a shorter cupboard loses, cuts and all', async () => {
+    const { cupboard } = await import('../examples/cupboard.cad');
+    const { document } = await editCad(null, cupboard());
+    const height = document.variables!.find(variable => variable.name === 'height')!;
+    const changed = setCadVariable(document, { id: height.id, name: 'height', expression: '400mm' });
+    if ('error' in changed) throw new Error(changed.error);
+    const { report } = await inspectCadDocument(changed.document, new Map(), { toolpaths: false });
+    expect(report.errors).toEqual([]);
+    // (400 - 36 - 160)/32 + 1 = 7 a row.
+    expect(report.parts.find(part => part.name === 'Side')!.cuts.filter(cut => cut.to === 12)).toHaveLength(14);
   });
 
   it('reports parts whose numeric placement no longer fits after a change', async () => {
