@@ -16,7 +16,7 @@ import { Input } from '@wbcnc/ui/components/input';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { AlertTriangle, Image, ListOrdered, Trash2, Type } from 'lucide-react';
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/carve')({ component: CarveStep });
 
@@ -139,6 +139,12 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         });
     }
   };
+  // Text typed within the debounce is committed before another selection unmounts its editor.
+  const flushDraft = useRef<(() => void) | null>(null);
+  const select = (id: string | null) => {
+    if (id !== selectedId) flushDraft.current?.();
+    setSelectedId(id);
+  };
   // New items are outlined before they're added, so a file that can't be read adds nothing.
   const addItem = async (art: CarvingArt) => {
     const height = art.kind === 'text' ? 20 : Math.min(40, size.h);
@@ -153,7 +159,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         const item: CarvingItemV1 = { id, art, height, ...freeSpot(current.carving.items, region, size), rotation: 0, outline: region };
         return { ...current, carving: withItems(current.carving, [...current.carving.items, item]) };
       });
-      setSelectedId(id);
+      select(id);
       if (art.kind === 'text') lastFont.current = art;
     } catch (e) {
       if (mounted.current) setErrors(errors => ({ ...errors, adding: e instanceof Error ? e.message : String(e) }));
@@ -191,7 +197,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   useEffect(() => {
     const keydown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setSelectedId(null);
+        select(null);
         drag.current = null;
         setDragged(null);
       }
@@ -247,7 +253,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     e.stopPropagation();
     svg.current?.focus();
     svg.current?.setPointerCapture(e.pointerId);
-    setSelectedId(item.id);
+    select(item.id);
     drag.current = { mode, from: toMm(e), item, preview: item, pointerId: e.pointerId };
     setDragged(item);
   };
@@ -363,7 +369,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
             aria-label={`Board ${size.w} × ${size.h} mm with the carving`}
             className="absolute inset-0 h-full w-full touch-none overflow-visible select-none"
             viewBox={`${-pad} ${-pad + size.h - frame.h} ${frame.w + 2 * pad} ${frame.h + 2 * pad}`}
-            onPointerDown={() => setSelectedId(null)}
+            onPointerDown={() => select(null)}
             onPointerMove={move}
             onPointerUp={end}
             onPointerCancel={cancel}
@@ -551,7 +557,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 <button
                   className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left"
                   aria-pressed={selectedId === item.id}
-                  onClick={() => setSelectedId(item.id)}>
+                  onClick={() => select(item.id)}>
                   {item.art.kind === 'text' ? <Type className="size-4 shrink-0" /> : <Image className="size-4 shrink-0" />}
                   <span className="truncate">{itemName(item)}</span>
                 </button>
@@ -571,6 +577,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                   void redraw({ ...editing, art });
                 }}
                 onReplace={() => chooseSvg(editing.id)}
+                flush={flushDraft}
               />
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Height (mm)" id="carve-height">
@@ -699,14 +706,34 @@ const centred = (item: CarvingItemV1, size: { w: number; h: number }) => {
   return { x: item.x + size.w / 2 - (box.x0 + box.x1) / 2, y: item.y + size.h / 2 - (box.y0 + box.y1) / 2 };
 };
 
-function ArtFields({ art, onArt, onReplace }: { art: CarvingArt; onArt: (art: CarvingArt) => void; onReplace: () => void }) {
+function ArtFields({
+  art,
+  onArt,
+  onReplace,
+  flush,
+}: {
+  art: CarvingArt;
+  onArt: (art: CarvingArt) => void;
+  onReplace: () => void;
+  /** Set while typed text waits for its debounce: commits it at once. */
+  flush: RefObject<(() => void) | null>;
+}) {
   const [text, setText] = useState(art.kind === 'text' ? art.text : '');
   // Typing outlines again once it pauses.
   useEffect(() => {
     if (art.kind !== 'text' || text === art.text) return;
-    const t = setTimeout(() => onArt({ ...art, text }), 300);
-    return () => clearTimeout(t);
-  }, [text, art, onArt]);
+    const commit = () => {
+      clearTimeout(t);
+      flush.current = null;
+      onArt({ ...art, text });
+    };
+    const t = setTimeout(commit, 300);
+    flush.current = commit;
+    return () => {
+      clearTimeout(t);
+      if (flush.current === commit) flush.current = null;
+    };
+  }, [text, art, onArt, flush]);
   return art.kind === 'text' ? (
     <>
       <Field label="Text" id="carve-text">
