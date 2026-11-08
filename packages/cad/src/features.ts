@@ -3,7 +3,7 @@ import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './feat
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
 import { relieveCorners } from './cornerRelief';
 import { applyPartCuts } from './cutParts';
-import { patternMaster } from './pattern';
+import { patternInstanceOffset, patternMaster } from './pattern';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type {
   CadCut,
@@ -163,11 +163,33 @@ function patternCopyRegions(
       if (instance === own) return [];
       const mapped = region.curveIds.map(id => (seedOf.has(id) ? instance.idMap[seedOf.get(id)!] : id));
       if (mapped.some(id => !id)) return [];
-      const copy = regions.find(candidate => sameIds(candidate.curveIds, mapped as string[]));
+      // Regions on both sides of a patterned line share its curves, so the copy must also be the original moved.
+      const step = patternInstanceOffset(pattern, instance);
+      const copy = regions.find(
+        candidate =>
+          sameIds(candidate.curveIds, mapped as string[]) && sameShape(region, candidate, pattern.type === 'linearPattern' ? step : null)
+      );
       return copy ? [{ region: copy, key: `${instance.x},${instance.y}` }] : [];
     });
   }
   return [];
+}
+
+/** Whether a region could be another one moved by `step`, or turned somewhere when there's no step: the same area, and the same extent shifted. */
+function sameShape(original: CadSketchRegion, candidate: CadSketchRegion, step: CadPoint | null): boolean {
+  const area = (region: CadSketchRegion) =>
+    Math.abs(polygonArea(region.points)) - region.holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0);
+  if (Math.abs(area(original) - area(candidate)) > 1e-3 * Math.max(1, area(original))) return false;
+  if (!step) return true;
+  const extent = (points: CadPoint[]) => [
+    Math.min(...points.map(p => p.x)),
+    Math.min(...points.map(p => p.y)),
+    Math.max(...points.map(p => p.x)),
+    Math.max(...points.map(p => p.y)),
+  ];
+  const [x0, y0, x1, y1] = extent(original.points),
+    moved = [x0! + step.x, y0! + step.y, x1! + step.x, y1! + step.y];
+  return extent(candidate.points).every((value, i) => Math.abs(value - moved[i]!) < 1e-3);
 }
 
 const sameIds = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
