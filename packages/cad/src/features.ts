@@ -1,6 +1,7 @@
 import { newCadId, originId } from './document';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
+import { relieveCorners } from './cornerRelief';
 import { patternInstanceOffset, patternMaster } from './pattern';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type {
@@ -197,6 +198,21 @@ const sameIds = (a: string[], b: string[]) => a.length === b.length && [...a].so
  * so parts without features evaluate exactly as they always have.
  */
 export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
+  const cut = cutFeatures(part, profile);
+  if (!part.cornerRelief) return cut;
+  const { part: next, skipped } = relieveCorners(cut.part, part.cornerRelief.diameter);
+  const diagnostics = [...cut.diagnostics];
+  if (skipped)
+    diagnostics.push({
+      code: 'corner-relief-skipped',
+      severity: 'warning',
+      partId: part.id,
+      message: `${skipped === 1 ? 'One corner is' : `${skipped} corners are`} too tight for a ${part.cornerRelief.diameter} mm bone and stay square.`,
+    });
+  return { part: next, diagnostics };
+}
+
+function cutFeatures(part: CadPart, profile: EvaluatedCadPart): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
   if (!part.features?.length) return { part: profile, diagnostics: [] };
   const diagnostics: CadDiagnostic[] = [];
   const error = (code: string, message: string, entityIds?: string[]) =>

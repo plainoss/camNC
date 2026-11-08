@@ -22,6 +22,7 @@ export * from './variables';
 export * from './placement';
 export * from './assemblyCollisions';
 export * from './copies';
+export * from './cornerRelief';
 
 export * from './dimensionValues';
 export * from './dimensionCreation';
