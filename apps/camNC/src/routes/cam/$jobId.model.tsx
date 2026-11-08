@@ -164,7 +164,7 @@ function ModelStep() {
             </div>
             <span className="grow" />
             <span className="text-xs text-muted-foreground">
-              {view === 'flat' ? 'Each part is turned so its machined side faces up. ' : ''}Drag to orbit.
+              {view === 'flat' ? 'Each part is turned so its machined side faces up. ' : ''}Right-drag to turn, middle-drag to pan.
             </span>
           </div>
           <div className="min-h-0 flex-1">
