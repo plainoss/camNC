@@ -295,6 +295,37 @@ describe('the Carve step', () => {
     expect(undo.disabled).toBe(false);
   });
 
+  it('drops a board resize under way when undoing, keeping redo', async () => {
+    const job = await open();
+    const redo = screen.getByRole('button', { name: 'Redo' }) as HTMLButtonElement;
+    const path = screen.getByTestId('carving-item');
+    const svg = path.closest('svg')!;
+    const px = () => svg.getScreenCTM()!.a;
+    const r = path.getBoundingClientRect();
+    const from = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1 };
+    fireEvent.pointerDown(path, from);
+    fireEvent.pointerMove(svg, { ...from, clientX: from.clientX + 20 * px() });
+    fireEvent.pointerUp(svg, from);
+    const x0 = job.carving!.items[0].x;
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].x - x0).toBeCloseTo(20, 0));
+
+    const width = () => (screen.getByLabelText('Width', { selector: '#carve-board-w' }) as HTMLInputElement).value;
+    const edge = svg.querySelector('[data-resize="w"]')!.getBoundingClientRect();
+    const grip = { clientX: edge.left + edge.width / 2, clientY: edge.top + edge.height / 2, pointerId: 1 };
+    fireEvent.pointerDown(svg.querySelector('[data-resize="w"]')!, grip);
+    fireEvent.pointerMove(svg, { ...grip, clientX: grip.clientX + 43 * px() });
+    expect(width()).toBe('340');
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toEqual(job.carving!.items));
+    expect(width()).toBe('300');
+    // The release finds no resize left to save.
+    fireEvent.pointerMove(svg, { ...grip, clientX: grip.clientX + 60 * px() });
+    fireEvent.pointerUp(svg, grip);
+    expect(width()).toBe('300');
+    expect((await getJob(job.id))!.boards![0].size).toEqual({ fit: false, w: 300, h: 140 });
+    expect(redo.disabled).toBe(false);
+  });
+
   it('edits text on the board itself after a double-click, keeping it on Enter and dropping it on Escape', async () => {
     const job = await open();
     const path = screen.getByTestId('carving-item');
