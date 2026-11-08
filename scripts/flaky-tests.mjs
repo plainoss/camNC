@@ -38,7 +38,17 @@ export function issueTitle(test) {
 const gh = (args, input) => execFileSync('gh', args, { encoding: 'utf8', input, maxBuffer: 64 * 1024 * 1024 });
 const api = (path, jq) => gh(['api', path, ...(jq ? ['--jq', jq] : [])]).trim();
 
-function main() {
+// `gh api` refuses a response with terminal escape sequences, and test logs are full of colours, so fetch logs directly.
+async function jobLog(repo, id) {
+  const token = process.env.GH_TOKEN || gh(['auth', 'token']).trim();
+  const res = await fetch(`https://api.github.com/repos/${repo}/actions/jobs/${id}/logs`, {
+    headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json' },
+  });
+  if (!res.ok) throw new Error(`logs of job ${id}: HTTP ${res.status}`);
+  return res.text();
+}
+
+async function main() {
   const repo = process.env.GITHUB_REPOSITORY;
   const run = { id: process.env.RUN_ID, event: process.env.RUN_EVENT, conclusion: process.env.RUN_CONCLUSION };
   run.attempt = Number(process.env.RUN_ATTEMPT);
@@ -62,7 +72,7 @@ function main() {
     '[.jobs[] | select(.conclusion == "failure" and .name != "Run tests") | {id, name}]'));
   const flakes = new Map();
   for (const job of jobs) {
-    const tests = parseFailures(gh(['api', `repos/${repo}/actions/jobs/${job.id}/logs`]));
+    const tests = parseFailures(await jobLog(repo, job.id));
     // A job that hung or failed outside a test still gets one issue, under its own name.
     for (const test of tests.length ? tests : [`${job.name} (no failing test in its log)`]) flakes.set(test, job.name);
   }
@@ -107,4 +117,4 @@ function closeDuplicates(repo, title) {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();
