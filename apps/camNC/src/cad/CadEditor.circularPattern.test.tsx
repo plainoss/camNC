@@ -139,3 +139,24 @@ it('edits a reloaded circular pattern from its icon and keeps exclusions through
   expect(fixture.latest().entities.some(e => e.id === copy)).toBe(false);
   expect(fixture.latest().entities.filter(e => e.type === 'circle')).toHaveLength(3);
 });
+
+it('preserves a reloaded clockwise closed pattern when applying unchanged controls', async () => {
+  const doc = createPlateDocument({ width: 120, height: 80 });
+  doc.parts[0]!.sketch = addCircle(doc.parts[0]!.sketch, { x: 40, y: 40, radius: 5 });
+  const circle = doc.parts[0]!.sketch.entities.find(e => e.type === 'circle')!;
+  const initial = circularPatternSketchEntities(doc.parts[0]!.sketch, {
+    entityIds: [circle.id],
+    count: 3,
+    angle: -360,
+    closed: true,
+    center: { x: 60, y: 40 },
+  });
+  if (!initial.ok) throw new Error(initial.message);
+  doc.parts[0]!.sketch = initial.sketch;
+  const { canvas, latest } = await setup(false, false, JSON.parse(JSON.stringify(doc)));
+  fireEvent.doubleClick(canvas.querySelector(`[data-constraint-id="${initial.patternId}"]`)!);
+  fireEvent.keyDown(canvas, { key: 'Enter' });
+  const group = latest().constraints.find(c => c.id === initial.patternId)!;
+  expect(group).toMatchObject({ type: 'circularPattern', angle: -360, closed: true });
+  expect(screen.getByRole('button', { name: /^Undo/ })).toBeDisabled();
+});

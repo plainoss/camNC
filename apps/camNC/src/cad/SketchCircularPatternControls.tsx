@@ -54,7 +54,15 @@ export function SketchCircularPatternControls({
             onChange({
               ...parameters,
               closed: e.target.checked,
-              angle: e.target.checked ? '360' : parameters.angle === '360' ? '180' : parameters.angle,
+              angle: e.target.checked
+                ? Number(parameters.angle) < 0
+                  ? '-360'
+                  : '360'
+                : Math.abs(Number(parameters.angle)) === 360
+                  ? Number(parameters.angle) < 0
+                    ? '-180'
+                    : '180'
+                  : parameters.angle,
             })
           }
         />

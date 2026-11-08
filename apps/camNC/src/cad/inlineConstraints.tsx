@@ -20,6 +20,14 @@ export interface InlineConstraintsProps {
 export function ConstraintSymbol({ kind }: { kind: InlineConstraintKind }) {
   switch (kind) {
     case 'circularPattern':
+      return (
+        <>
+          <circle r="6" strokeDasharray="2 3" />
+          <circle cx="0" cy="-6" r="2" />
+          <circle cx="-5" cy="3" r="2" />
+          <circle cx="5" cy="3" r="2" />
+        </>
+      );
     case 'linearPattern':
       return <path d="M-7-5h4v4h-4zm6 0h4v4h-4zm6 0h4v4H5zM-7 2h4v4h-4zm6 0h4v4h-4zm6 0h4v4H5z" />;
     case 'regularPolygon':

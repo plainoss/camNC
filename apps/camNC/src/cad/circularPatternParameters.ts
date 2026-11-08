@@ -34,7 +34,7 @@ export function parseCircularPatternParameters(parameters: CircularPatternParame
     return {
       ok: true as const,
       count: read(parameters.count, 'scalar'),
-      angle: parameters.closed ? 360 : read(parameters.angle, 'deg'),
+      angle: parameters.closed ? (read(parameters.angle, 'deg') < 0 ? -360 : 360) : read(parameters.angle, 'deg'),
       closed: parameters.closed,
       center: { x: read(parameters.centerX, 'mm'), y: read(parameters.centerY, 'mm') },
     };
