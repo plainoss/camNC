@@ -497,7 +497,9 @@ export async function createAdapter(page, url) {
       case 'goto':
         await settle();
         // Leaving the design takes the sketch along as a part, as Extrude makes one of it.
-        if (/Boards|Plan|Machine/.test(rest) && (await page.getByRole('dialog', { name: /^Sketch ·/ }).isVisible())) {
+        // A sketch that can't be finished stays open, for leaving to say why.
+        const finishSketch = page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: /Finish sketch/ });
+        if (/Boards|Plan|Machine/.test(rest) && (await finishSketch.isVisible()) && (await finishSketch.isEnabled())) {
           await closeSketch();
           await extrudeSketch();
         }
