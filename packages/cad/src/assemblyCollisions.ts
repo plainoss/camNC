@@ -1,5 +1,5 @@
 import { pointInPolygon } from './geometry';
-import { mirrorEvaluatedPart } from './copies';
+import { evaluatedPartCopy } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
 import { rotateVector } from './placement';
@@ -156,7 +156,7 @@ export function assemblyReport(document: CadDocument, parts: readonly EvaluatedC
     if (!part?.outline.length) return [];
     // Copies are named as CAM names them: the part's name, then a number.
     const copies = (source.copies ?? []).flatMap((copy, index) =>
-      copy.placement ? [place(copy.mirrored ? mirrorEvaluatedPart(part) : part, source.id, cadCopyName(source, index), copy.placement)] : []
+      copy.placement ? [place(evaluatedPartCopy(part, copy), source.id, cadCopyName(source, index), copy.placement)] : []
     );
     const at = effectivePlacement(source, supports);
     return [...(at ? [place(part, source.id, source.name, at)] : []), ...copies];

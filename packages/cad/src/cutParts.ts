@@ -1,6 +1,6 @@
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
-import { mirrorEvaluatedPart } from './copies';
+import { mirrorEvaluatedPart, sameCadCuts } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
 import { evaluateCadFeatures } from './features';
@@ -177,10 +177,29 @@ export function applyPartCuts(
   const before = new Map(byId);
   const sources = new Map(document.parts.map(part => [part.id, part]));
   const supports = cadDrawnOnSupports(document);
+  const targets = new Map(
+    parts.map(part => [
+      part.partId,
+      [
+        { key: '', at: sources.get(part.partId) && effectivePlacement(sources.get(part.partId)!, supports), shape: part, mirrored: false },
+        ...(sources.get(part.partId)?.copies ?? []).map(copy => ({
+          key: copy.id,
+          at: copy.placement,
+          shape: copy.mirrored ? mirrorEvaluatedPart(part) : part,
+          mirrored: !!copy.mirrored,
+        })),
+      ],
+    ])
+  );
   for (const step of document.partCuts ?? []) {
     let made = 0,
       refused = false;
-    const warn = (message: string) => diagnostics.push({ code: 'part-cut-unresolved', severity: 'warning', message });
+    // Each copy of a target is cut on its own, so the same problem is said once per step, not once per copy.
+    const said = new Set<string>();
+    const warn = (message: string) => {
+      if (!said.has(message)) diagnostics.push({ code: 'part-cut-unresolved', severity: 'warning', message });
+      said.add(message);
+    };
     // A tool `<partId>:<copyId>` cuts with that one copy; a copy that's gone is said once, not once per target.
     const goneCopies = new Set<string>();
     for (const targetId of step.targets)
@@ -189,118 +208,129 @@ export function applyPartCuts(
         if (partId === targetId) continue;
         const intoSource = sources.get(targetId),
           toolSource = sources.get(partId);
-        const into = byId.get(targetId),
-          tool = before.get(partId);
-        if (!intoSource || !toolSource || !into || !tool) continue;
+        const tool = before.get(partId);
+        if (!intoSource || !toolSource || !tool) continue;
         if (copyId !== undefined && !toolSource.copies?.some(copy => copy.id === copyId)) {
           refused = true;
           if (!goneCopies.has(toolId)) warn(`The copy of ${toolSource.name} this step cuts with no longer exists.`);
           goneCopies.add(toolId);
           continue;
         }
-        const intoAt = effectivePlacement(intoSource, supports),
-          toolAt = effectivePlacement(toolSource, supports);
-        // A part that hasn't been placed isn't anywhere yet, so it reaches into nothing.
-        if (!intoAt) continue;
-        // Each copy of a tool cuts where it sits, a mirrored one with its mirror image.
-        const instances = [
-          ...(copyId === undefined && toolAt ? [{ key: '', at: toolAt, shape: tool, name: toolSource.name }] : []),
-          ...(toolSource.copies ?? []).flatMap((copy, index) =>
-            (copyId === undefined || copy.id === copyId) && copy.placement
-              ? [
-                  {
-                    key: `:${copy.id}`,
-                    at: copy.placement,
-                    shape: copy.mirrored ? mirrorEvaluatedPart(tool) : tool,
-                    name: cadCopyName(toolSource, index),
-                  },
-                ]
-              : []
-          ),
-        ];
-        for (const { key, at, shape, name } of instances) {
-          if (!square(intoAt, at)) {
-            refused = true;
-            warn(`${name} isn't square to ${intoSource.name}, so it can't be cut from it yet.`);
-            continue;
-          }
-          const found = toolBoxes(shape, at, into, intoAt);
-          if ('refused' in found) {
-            refused = true;
-            warn(`${name} ${found.refused} where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
-            continue;
-          }
-          const t = into.thickness,
-            [ilo, ihi] = box(into),
-            c = step.clearance;
-          const reaches = found.boxes.map(([lo, hi]) => ({
-            lo: [0, 1, 2].map(a => Math.max(lo[a]!, ilo[a]!)) as Vec3,
-            hi: [0, 1, 2].map(a => Math.min(hi[a]!, ihi[a]!)) as Vec3,
-          }));
-          // Two rectangles of one tool that meet aren't widened into each other.
-          const meets = (index: number, axis: 0 | 1, at: number) =>
-            reaches.some(
-              (other, j) =>
-                j !== index &&
-                (Math.abs(other.lo[axis] - at) < kSquare || Math.abs(other.hi[axis] - at) < kSquare) &&
-                other.lo[1 - axis]! < reaches[index]!.hi[1 - axis]! - kSquare &&
-                other.hi[1 - axis]! > reaches[index]!.lo[1 - axis]! + kSquare
-            );
-          reaches.forEach(({ lo, hi }, index) => {
-            const fromTop = hi[2] >= t - kSquare,
-              fromBelow = lo[2] <= kSquare;
-            if (!fromTop && !fromBelow) {
-              warn(`${name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
-              return;
+        for (const target of targets.get(targetId) ?? []) {
+          const into = target.shape,
+            intoAt = target.at;
+          const toolAt = effectivePlacement(toolSource, supports);
+          // A part that hasn't been placed isn't anywhere yet, so it reaches into nothing.
+          if (!intoAt) continue;
+          // Each copy of a tool cuts where it sits, a mirrored one with its mirror image.
+          const instances = [
+            ...(copyId === undefined && toolAt ? [{ key: '', at: toolAt, shape: tool, name: toolSource.name }] : []),
+            ...(toolSource.copies ?? []).flatMap((copy, index) =>
+              (copyId === undefined || copy.id === copyId) && copy.placement
+                ? [
+                    {
+                      key: `:${copy.id}`,
+                      at: copy.placement,
+                      shape: copy.mirrored ? mirrorEvaluatedPart(tool) : tool,
+                      name: cadCopyName(toolSource, index),
+                    },
+                  ]
+                : []
+            ),
+          ];
+          for (const { key, at, shape, name } of instances) {
+            if (!square(intoAt, at)) {
+              refused = true;
+              warn(`${name} isn't square to ${intoSource.name}, so it can't be cut from it yet.`);
+              continue;
             }
-            // The clearance widens each side inside the part. A side that runs off its edge stays there, open.
-            const widen = (axis: 0 | 1, side: 'lo' | 'hi') => {
-              const at = side === 'lo' ? lo[axis] : hi[axis];
-              const inside = side === 'lo' ? at > ilo[axis] + kSquare : at < ihi[axis] - kSquare;
-              return inside && !meets(index, axis, at) ? (side === 'lo' ? at - c : at + c) : at;
-            };
-            const x0 = widen(0, 'lo'),
-              x1 = widen(0, 'hi'),
-              y0 = widen(1, 'lo'),
-              y1 = widen(1, 'hi');
-            const outline = [
-              { x: x0, y: y0 },
-              { x: x1, y: y0 },
-              { x: x1, y: y1 },
-              { x: x0, y: y1 },
-            ];
-            // The clearance deepens it too, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
-            const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
-              through = reach >= t - kSquare;
-            const relief = intoSource.cornerRelief
-              ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
-              : { points: outline, skipped: 0 };
-            if (relief.skipped)
-              warn(
-                `${relief.skipped} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
+            const found = toolBoxes(shape, at, into, intoAt);
+            if ('refused' in found) {
+              refused = true;
+              warn(`${name} ${found.refused} where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
+              continue;
+            }
+            const t = into.thickness,
+              [ilo, ihi] = box(into),
+              c = step.clearance;
+            const reaches = found.boxes.map(([lo, hi]) => ({
+              lo: [0, 1, 2].map(a => Math.max(lo[a]!, ilo[a]!)) as Vec3,
+              hi: [0, 1, 2].map(a => Math.min(hi[a]!, ihi[a]!)) as Vec3,
+            }));
+            // Two rectangles of one tool that meet aren't widened into each other.
+            const meets = (index: number, axis: 0 | 1, at: number) =>
+              reaches.some(
+                (other, j) =>
+                  j !== index &&
+                  (Math.abs(other.lo[axis] - at) < kSquare || Math.abs(other.hi[axis] - at) < kSquare) &&
+                  other.lo[1 - axis]! < reaches[index]!.hi[1 - axis]! - kSquare &&
+                  other.hi[1 - axis]! > reaches[index]!.lo[1 - axis]! + kSquare
               );
-            const current = byId.get(targetId)!;
-            // The first piece keeps the ID a tool's one cut always had.
-            const id = `cut-parts:${step.id}:${partId}${key}${index ? `#${index}` : ''}`;
-            const cut: EvaluatedCadCut = {
-              id,
-              regionId: id,
-              side: fromTop ? 'top' : 'underside',
-              from: 0,
-              to: through ? t : reach,
-              through,
-              outline: relief.points,
-              islands: [],
-              opening: { x0, y0, x1, y1 },
-            };
-            byId.set(targetId, { ...current, cuts: [...(current.cuts ?? []), cut] });
-            made++;
-          });
+            reaches.forEach(({ lo, hi }, index) => {
+              const fromTop = hi[2] >= t - kSquare,
+                fromBelow = lo[2] <= kSquare;
+              if (!fromTop && !fromBelow) {
+                warn(`${name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
+                return;
+              }
+              // The clearance widens each side inside the part. A side that runs off its edge stays there, open.
+              const widen = (axis: 0 | 1, side: 'lo' | 'hi') => {
+                const at = side === 'lo' ? lo[axis] : hi[axis];
+                const inside = side === 'lo' ? at > ilo[axis] + kSquare : at < ihi[axis] - kSquare;
+                return inside && !meets(index, axis, at) ? (side === 'lo' ? at - c : at + c) : at;
+              };
+              const x0 = widen(0, 'lo'),
+                x1 = widen(0, 'hi'),
+                y0 = widen(1, 'lo'),
+                y1 = widen(1, 'hi');
+              const outline = [
+                { x: x0, y: y0 },
+                { x: x1, y: y0 },
+                { x: x1, y: y1 },
+                { x: x0, y: y1 },
+              ];
+              // The clearance deepens it too, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
+              const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
+                through = reach >= t - kSquare;
+              const relief = intoSource.cornerRelief
+                ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
+                : { points: outline, skipped: 0 };
+              if (relief.skipped)
+                warn(
+                  `${relief.skipped} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
+                );
+              const current = target.shape;
+              // The first piece keeps the ID a tool's one cut always had.
+              const id = `cut-parts:${step.id}:${partId}${key}${index ? `#${index}` : ''}`;
+              const cut: EvaluatedCadCut = {
+                id,
+                regionId: id,
+                side: fromTop ? 'top' : 'underside',
+                from: 0,
+                to: through ? t : reach,
+                through,
+                outline: relief.points,
+                islands: [],
+                opening: { x0, y0, x1, y1 },
+              };
+              target.shape = { ...current, cuts: [...(current.cuts ?? []), cut] };
+              made++;
+            });
+          }
         }
       }
     // A tool that was refused reaches in; it says why itself.
     if (!made && !refused && step.tools.length && step.targets.length)
       warn('A "cut parts" step cuts nothing: none of its tools reach into its targets.');
+  }
+  for (const [id, instances] of targets) {
+    const original = instances[0]!.shape;
+    const copyCuts: Record<string, EvaluatedCadCut[]> = {};
+    for (const copy of instances.slice(1)) {
+      const cuts = (copy.mirrored ? mirrorEvaluatedPart(copy.shape) : copy.shape).cuts ?? [];
+      if (!sameCadCuts(original.cuts, cuts)) copyCuts[copy.key] = cuts;
+    }
+    byId.set(id, { ...original, ...(Object.keys(copyCuts).length && { copyCuts }) });
   }
   return { parts: parts.map(part => byId.get(part.partId)!), diagnostics };
 }

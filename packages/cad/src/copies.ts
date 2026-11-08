@@ -1,6 +1,6 @@
 import { newCadId } from './document';
 import { cadCopyName } from './partPatterns';
-import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadPart } from './types';
+import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
 /** Adds another of a part, laid out with the unplaced parts until it's placed. */
 export function addPartCopy(
@@ -48,7 +48,12 @@ export function mirrorEvaluatedPart(part: EvaluatedCadPart): EvaluatedCadPart {
     holes: part.holes.map(mirrorLoop),
     loops: part.loops.map(loop => ({ ...loop, points: mirrorLoop(loop.points) })),
     ...(part.cuts && {
-      cuts: part.cuts.map(cut => ({ ...cut, outline: mirrorLoop(cut.outline), islands: cut.islands.map(mirrorLoop) })),
+      cuts: part.cuts.map(cut => ({
+        ...cut,
+        outline: mirrorLoop(cut.outline),
+        islands: cut.islands.map(mirrorLoop),
+        ...(cut.opening && { opening: { ...cut.opening, x0: -cut.opening.x1, x1: -cut.opening.x0 } }),
+      })),
     }),
   };
 }
@@ -59,20 +64,58 @@ export interface CadPartToCut {
   names: string[];
 }
 
+/** Whether two cut sets remove the same material, regardless of tool IDs or loop starting points. */
+export function sameCadCuts(a: readonly EvaluatedCadCut[] = [], b: readonly EvaluatedCadCut[] = []): boolean {
+  const round = (n: number) => Math.round(n * 1e6) / 1e6;
+  const loopKey = (loop: CadPoint[]) => {
+    const points = loop.map(p => [round(p.x), round(p.y)]);
+    return points.map((_, i) => JSON.stringify([...points.slice(i), ...points.slice(0, i)])).sort()[0];
+  };
+  const key = (cuts: readonly EvaluatedCadCut[]) =>
+    JSON.stringify(
+      cuts
+        .map(cut => ({
+          side: cut.side,
+          from: round(cut.from),
+          to: round(cut.to),
+          through: cut.through,
+          outline: loopKey(cut.outline),
+          islands: cut.islands.map(loopKey).sort(),
+        }))
+        .map(cut => JSON.stringify(cut))
+        .sort()
+    );
+  return key(a) === key(b);
+}
+
+/** A copy's own cuts, mirrored with its shape only after selecting cuts in the original's frame. */
+export function evaluatedPartCopy(part: EvaluatedCadPart, copy: CadPartCopy): EvaluatedCadPart {
+  const own = part.copyCuts?.[copy.id];
+  const shape = own ? { ...part, cuts: own } : part;
+  return copy.mirrored ? mirrorEvaluatedPart(shape) : shape;
+}
+
 /**
- * What gets cut: each part with its plain copies, and its mirror image for any mirrored copies. Pieces are named as the
- * assembly names them, the part's name and then a number for each further copy.
+ * What gets cut: pieces grouped by their cuts and whether they are mirrored, named as the assembly names them.
  */
 export function cadPartsToCut(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadPartToCut[] {
   return parts.flatMap(part => {
     const source = document.parts.find(candidate => candidate.id === part.partId);
-    const copies = source?.copies ?? [];
-    const named = (index: number) => (index ? cadCopyName(source ?? part, index - 1) : part.name);
-    const same = [0, ...copies.flatMap((copy, i) => (copy.mirrored ? [] : [i + 1]))].map(named),
-      mirrored = copies.flatMap((copy, i) => (copy.mirrored ? [named(i + 1)] : []));
-    return [
-      { part, names: same },
-      ...(mirrored.length ? [{ part: { ...mirrorEvaluatedPart(part), name: `${part.name} (mirrored)` }, names: mirrored }] : []),
-    ];
+    const groups: (CadPartToCut & { mirrored?: boolean })[] = [{ part, names: [part.name] }];
+    for (const [index, copy] of (source?.copies ?? []).entries()) {
+      const shape = evaluatedPartCopy(part, copy);
+      const group = groups.find(entry => !!entry.mirrored === !!copy.mirrored && sameCadCuts(entry.part.cuts, shape.cuts));
+      const name = cadCopyName(source!, index);
+      if (group) group.names.push(name);
+      else {
+        const id = groups.some(entry => entry.part.partId === shape.partId) ? `${shape.partId}:copy:${copy.id}` : shape.partId;
+        groups.push({
+          part: { ...shape, partId: id, name: copy.mirrored ? `${part.name} (mirrored)` : part.name },
+          names: [name],
+          mirrored: !!copy.mirrored,
+        });
+      }
+    }
+    return groups.map(({ part, names }) => ({ part, names }));
   });
 }

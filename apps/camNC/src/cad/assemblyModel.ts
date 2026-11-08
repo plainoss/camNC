@@ -1,7 +1,7 @@
 import {
   evaluateCadFeatures,
   evaluateCadPart,
-  mirrorEvaluatedPart,
+  evaluatedPartCopy,
   CAD_IDENTITY_PLACEMENT,
   placementMatrix,
   withPartCuts,
@@ -46,14 +46,21 @@ export interface AssemblyModel {
  */
 export function assemblyModel(document: CadDocument): AssemblyModel {
   type Shape = ReturnType<typeof nativePart>;
-  type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; mirrored?: Shape };
+  type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; copies: Shape[] };
   const built = document.parts.map((part): Built => {
     const { part: profile } = evaluateCadPart(part);
     if (!profile) return { part, problem: 'Its sketch needs fixing first.' };
     try {
       const evaluated: EvaluatedCadPart = withPartCuts(document, evaluateCadFeatures(part, profile).part);
-      const mirrored = part.copies?.some(copy => copy.mirrored) ? nativePart(mirrorEvaluatedPart(evaluated)) : undefined;
-      return { part, shape: nativePart(evaluated), ...(mirrored && { mirrored }) };
+      const shape = nativePart(evaluated);
+      // A copy is meshed on its own only when it's mirrored or cut differently; the rest share the part's mesh.
+      let mirrored: Shape | undefined;
+      const copies = (part.copies ?? []).map(copy => {
+        if (evaluated.copyCuts?.[copy.id]) return nativePart(evaluatedPartCopy(evaluated, copy));
+        if (copy.mirrored) return (mirrored ??= nativePart(evaluatedPartCopy(evaluated, copy)));
+        return shape;
+      });
+      return { part, shape, copies };
     } catch (cause) {
       return { part, problem: cause instanceof Error ? cause.message : String(cause) };
     }
@@ -65,7 +72,7 @@ export function assemblyModel(document: CadDocument): AssemblyModel {
           ...(entry.part.copies ?? []).map((copy, index) => ({
             instance: { partId: entry.part.id, copyId: copy.id, name: cadCopyName(entry.part, index) },
             placement: copy.placement,
-            shape: copy.mirrored ? entry.mirrored! : entry.shape,
+            shape: entry.copies[index]!,
           })),
         ]
       : []
