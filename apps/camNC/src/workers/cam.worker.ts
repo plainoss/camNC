@@ -30,6 +30,8 @@ interface ModelEntry {
   part: FlatPart;
   features: PartFeatures;
   flipped?: Partial<Record<'x' | 'y', PartFeatures>>;
+  /** The bit diameter a native design relieved its inside corners for. */
+  cornerRelief?: number;
 }
 const models = new Map<string, Map<string, ModelEntry>>();
 
@@ -122,7 +124,7 @@ function partSource(key: string): BoardPartSource {
   return {
     part: partId => {
       const entry = loaded(key, partId);
-      return { size: entry.part.size, features: entry.features };
+      return { size: entry.part.size, features: entry.features, ...(entry.cornerRelief && { cornerRelief: entry.cornerRelief }) };
     },
     underside(partId, rotated) {
       const entry = loaded(key, partId);

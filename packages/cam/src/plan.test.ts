@@ -126,6 +126,19 @@ describe('open rebates', () => {
 });
 
 describe('planBoard', () => {
+  it('warns when a part is relieved for a smaller bit than the board is cut with', () => {
+    const profile = profileFeatures({ thickness: 18, outline: rect(0, 0, 200, 120), holes: [] });
+    const relieved = (cornerRelief: number): BoardPartSource => ({
+      part: () => ({ size: profile.size, features: profile.features, cornerRelief }),
+      underside: () => profile.features,
+    });
+    const tight = planBoard(board(), {}, relieved(2)).warnings.filter(w => w.includes('relieved'));
+    expect(tight).toEqual([
+      'Plate: its inside corners are relieved for a ⌀2 bit, but this board is cut with a ⌀3.175 bit, so they stay rounded.',
+    ]);
+    expect(planBoard(board(), {}, relieved(6)).warnings.filter(w => w.includes('relieved'))).toEqual([]);
+  });
+
   it('plans a part on a board without the app: programs, numbers and safety checks', () => {
     const profile = profileFeatures({
       thickness: 18,
