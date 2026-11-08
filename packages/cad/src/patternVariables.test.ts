@@ -44,6 +44,19 @@ async function side() {
 }
 
 describe('patterns that follow variables', () => {
+  it.each(['(width/3 - 3*board/2 - 10mm)/penPitch', 'floor((width/3 - 3*board/2 - 10mm)/penPitch)'])(
+    'evaluates %s as a pattern count',
+    async expression => {
+      let document = await side();
+      document = variable(variable(variable(document, 'width', '600mm'), 'board', '18mm'), 'penPitch', '32mm');
+      pattern(document).expressions!.countX = expression;
+      document = (await solveCadDocument(document)).document;
+      expect(cadVariableProblems(document)).toEqual([]);
+      expect(pattern(document).countX).toBe(5);
+      expect(circles(document)).toBe(5);
+    }
+  );
+
   it('fits as many pins as the height allows, and the pitch sets their spacing', async () => {
     let document = await side();
     expect(pattern(document)).toMatchObject({ countX: 21, stepX: { x: 0, y: 32 } });

@@ -3952,7 +3952,7 @@ export function CadEditor({
             ...(part?.extrude === false
               ? { pattern: 'Extrude the sketch first', transform: 'Extrude the sketch first' }
               : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
-            ...(doc.parts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
+            ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
           }}
           canUndo={session.past.length > 0}
           canRedo={session.future.length > 0}
