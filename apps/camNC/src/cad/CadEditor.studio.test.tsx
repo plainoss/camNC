@@ -1,4 +1,6 @@
 import {
+  sketchRegions,
+  CAD_CHORD_TOLERANCE,
   addRectangle,
   addCircle,
   addLine,
@@ -357,6 +359,32 @@ it('cuts a sketch on a board’s top into it with Extrude → Remove, and makes 
       .getAllByRole('button')
       .some(button => /Cut/.test(button.textContent ?? ''))
   ).toBe(true);
+});
+
+it('waits for a region to be picked when extruding a sketch that isn’t one outline', async () => {
+  const shelf = { ...createCadPart('Shelf', 18), drawnOn: { on: { plane: 'top' as const }, offset: 0 }, extrude: false as const };
+  shelf.sketch = addRectangle(shelf.sketch, { x: 0, y: 0, width: 100, height: 50 });
+  shelf.sketch = addLine(shelf.sketch, { x1: 30, y1: 0, x2: 30, y2: 50 });
+  const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
+  const source: CadDocument = { ...createCadDocument(), parts: [side, shelf] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.click(within(features).getByRole('button', { name: /Sketch · Shelf/ }));
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Extrude/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Shelf' });
+  // Split in two, the sketch isn't one outline: Extrude waits for a region.
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/Pick a region/);
+  expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true);
+  const regions = sketchRegions(latest().parts[1]!.sketch, CAD_CHORD_TOLERANCE);
+  expect(regions).toHaveLength(2);
 });
 
 it('sketches on a base plane picked before Sketch or Shift+S, as on one picked after it', async () => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   addPartCopy,
+  evaluateCadPart,
   setPartCopyOffset,
   setPartPattern,
   renamePartCopy,
@@ -81,6 +82,8 @@ export function ExtrudeDialog({
   // A thickness that can't be used keeps the dialog open until it's fixed or cancelled.
   const [thicknessValid, setThicknessValid] = useState(true);
   const [depthError, setDepthError] = useState<string | null>(null);
+  // A sketch that isn't one outline extrudes the region picked from it in the view; until then there's nothing to make.
+  const profileError = part.thin ? undefined : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
   const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? formatCadValue(part.thin.depth)) : '100');
   const setThin = (thin: CadPart['thin'] | null) =>
     onChange(document =>
@@ -107,7 +110,7 @@ export function ExtrudeDialog({
   return (
     <FeatureDialog
       title={`Extrude · ${part.name}`}
-      okDisabled={removal ? !!removeError : !thicknessValid || !!depthError}
+      okDisabled={removal ? !!removeError : !thicknessValid || !!depthError || !!profileError}
       onOk={onOk}
       onCancel={onCancel}>
       {onRemoval && (
@@ -198,13 +201,18 @@ export function ExtrudeDialog({
               </button>
             </div>
           )}
-          <div className="cad-feature-selection">
+          <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
             <small>Sketch to extrude</small>
-            <span>{part.name}’s sketch</span>
+            <span>{part.regions?.length ? `A region of ${part.name}’s sketch` : `${part.name}’s sketch`}</span>
             <button type="button" onClick={onEditSketch}>
               Edit sketch
             </button>
           </div>
+          {profileError && (
+            <p role="alert" className="cad-thickness-error">
+              {part.regions?.length ? profileError.message : 'Pick a region of the sketch in the view.'}
+            </p>
+          )}
           <CadThicknessField
             key={`${part.id}:thickness`}
             value={part.thickness}

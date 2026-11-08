@@ -163,7 +163,7 @@
   },
   {
     "id": "sketch/finish/blocks-crossing-profile",
-    "title": "A self-crossing outline finishes as a sketch, but Extrude refuses it and says why",
+    "title": "A self-crossing outline finishes as a sketch, and Extrude waits for a region to be picked from it",
     "evidence": "design only valid profiles can be cut",
     "steps": [
       "key l",
@@ -183,14 +183,14 @@
       "key Shift+E",
       {
         "expect": {
-          "pageText": "extrude this sketch"
+          "pageText": "Pick a region"
         }
       }
     ]
   },
   {
     "id": "sketch/finish/blocks-two-outlines",
-    "title": "Two separate outlines finish as a sketch, but extruding them into one part is refused",
+    "title": "Two separate outlines finish as a sketch, and Extrude waits for one of them to be picked",
     "evidence": "design one outer boundary per flat part, from the approved plan",
     "steps": [
       "rect 20,30 80,90",
@@ -204,7 +204,7 @@
       "key Shift+E",
       {
         "expect": {
-          "pageText": "extrude this sketch"
+          "pageText": "Pick a region"
         }
       }
     ]
