@@ -23,7 +23,16 @@ import { setupSheet, type SetupSummary } from './setupSummary';
 import { freePartsProgram, kDefaultSkin } from './tabPlan';
 import { tabRemovalProgram, type TabStop } from './tabRemoval';
 import { estimateProgramTime, type ProgramTimeEstimate } from './timing';
-import { DEFAULT_SETTINGS, stepdownFor, type CamSettings, type HoleChoice, type HoleMiddle, type PartCam } from './toolpaths';
+import type { BoardCarving } from './vcarve';
+import {
+  DEFAULT_SETTINGS,
+  stepdownFor,
+  type CamSettings,
+  type HoleChoice,
+  type HoleMiddle,
+  type Operation,
+  type PartCam,
+} from './toolpaths';
 
 // Plans a board of parts as the app cuts it: the programs, their numbers and safety checks, what holds the parts, and
 // what's left for after the cutting. Parts come from `BoardPartSource`, so a caller decides how features are made and
@@ -41,8 +50,8 @@ export interface OpSummary {
   name: string;
   /** For people: "Pocket 4.2 deep", "Outline: rough + final pass". */
   label: string;
-  kind: 'pocket' | 'profile';
-  tool: { number: number; diameter: number };
+  kind: Operation['kind'];
+  tool: { number: number; diameter: number; shape?: 'flat' | 'v'; angle?: number };
   zTop: number;
   zBottom: number;
   /** Distinct depths the operation cuts at (pocket stepdowns, outline roughing + final). */
@@ -189,6 +198,8 @@ export interface BoardRequest {
   flip?: { registration: FlipRegistration; dowelDiameter?: number };
   /** Bottom skin thickness, mm. */
   skin?: number;
+  /** Artwork V-carved into side A's top before any part is cut. */
+  carvings?: BoardCarving[];
 }
 
 /** One program for a whole board: its parts at their nested positions, operations grouped by bit. */
@@ -217,7 +228,7 @@ export function planBoard(
   let plan = summarize(cam, `Board ${board.name}`, size, settings, board.thickness, board.name, sideRotation(board, false));
   if (flip) {
     const b = camBoard(
-      sideBSpec({ ...spec, rotationDeg: sideRotation(board, true) }, p => undersideOf(source, p.id, board, p.rotated)),
+      sideBSpec({ ...spec, carvings: undefined, rotationDeg: sideRotation(board, true) }, p => undersideOf(source, p.id, board, p.rotated)),
       { ...settings, cutThrough: false }
     );
     plan = {
@@ -585,7 +596,11 @@ function opSummaries(cam: PartCam, partTop: number): OpSummary[] {
       // The title's depths are from the part's top; a thicker stock (allowance) doesn't change them.
       label: label(op.name, partTop, op.title),
       kind: op.kind,
-      tool: { number: op.tool.number, diameter: op.tool.diameter },
+      tool: {
+        number: op.tool.number,
+        diameter: op.tool.diameter,
+        ...(op.tool.shape === 'v' && { shape: 'v' as const, angle: op.tool.angle }),
+      },
       zTop,
       zBottom: minOf(zs),
       depthSteps: levels.size,

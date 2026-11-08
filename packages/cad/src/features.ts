@@ -142,8 +142,9 @@ const MIN_CUT_AREA = 1;
 
 /**
  * The regions a pattern's copies make of a region drawn by its original: found by mapping the region's curves through
- * each copy's IDs. Copies whose region isn't there, as a pattern shrinks, are left out. A region of a copy has none,
- * so a cut given to one copy stays on it.
+ * each copy's IDs. Curves the pattern doesn't own, such as the part's outline that closes a groove running off it, stay
+ * as they are. Copies whose region isn't there, as a pattern shrinks, are left out. A region of a copy has none, so a
+ * cut given to one copy stays on it.
  */
 function patternCopyRegions(
   sketch: CadSketch,
@@ -153,11 +154,12 @@ function patternCopyRegions(
   for (const pattern of sketch.constraints) {
     if (pattern.type !== 'linearPattern' && pattern.type !== 'circularPattern') continue;
     const own = patternMaster(pattern);
-    if (!own || !region.curveIds.every(id => Object.values(own.idMap).includes(id))) continue;
+    if (!own) continue;
     const seedOf = new Map(Object.entries(own.idMap).map(([seed, id]) => [id, seed]));
+    if (!region.curveIds.some(id => seedOf.has(id))) continue;
     return pattern.instances.flatMap(instance => {
       if (instance === own) return [];
-      const mapped = region.curveIds.map(id => instance.idMap[seedOf.get(id)!]);
+      const mapped = region.curveIds.map(id => (seedOf.has(id) ? instance.idMap[seedOf.get(id)!] : id));
       if (mapped.some(id => !id)) return [];
       const copy = regions.find(candidate => sameIds(candidate.curveIds, mapped as string[]));
       return copy ? [{ region: copy, key: `${instance.x},${instance.y}` }] : [];
