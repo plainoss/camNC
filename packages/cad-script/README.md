@@ -91,6 +91,10 @@ file unless it writes a new SVG for that run. See `examples/` for more.
   follow variables too. `d.value('board + margin')` works an expression out now, for a
   script's own loops. A count or ratio without units, such as
   `d.value('(height - 160)/pitch')`, comes back as a plain number.
+- Expressions can call `floor`, `round`, `min`, `max` and `sqrt`: `'floor(width/40)'`
+  fingers, `'min(depth; 600mm)'`, `'sqrt(w*w + h*h)'` for a diagonal. Separate `min` and
+  `max` arguments with `;` or `, `. A cut whose depth works out to zero or less stops the
+  script.
 
 ## Building a piece in the studio
 

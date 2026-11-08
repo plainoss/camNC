@@ -65,6 +65,30 @@ describe('expressions', () => {
     expect(count).toBe(17.5);
   });
 
+  it('works out floor, round, min, max and sqrt', async () => {
+    const values: number[] = [];
+    await editCad(null, d => {
+      d.variable('height', '720mm');
+      d.variable('pitch', '32mm');
+      values.push(d.value('floor((height - 160)/pitch)'), d.value('round(17.5)'));
+      values.push(d.value('min(height; 600mm)'), d.value('max(height, 600mm)'));
+      values.push(d.value('sqrt(300mm*300mm + 400mm*400mm)'));
+    });
+    expect(values).toEqual([17, 18, 600, 720, 500]);
+  });
+
+  it('refuses a cut whose depth a variable takes to zero', async () => {
+    const { scriptError } = await editCad(null, d => {
+      d.variable('board', '18mm');
+      const plate = d.part('Plate', { thickness: 'board' });
+      plate.profile.rect({ at: [0, 0], w: 100, h: 100 });
+      const top = plate.sketchOn('top');
+      top.rect({ at: [20, 20], w: 20, h: 20 });
+      plate.cut(top.regionAt(30, 30), { depth: 'board - 18mm' });
+    });
+    expect(scriptError).toBe("A cut needs some depth, not 0 mm from 'board - 18mm'.");
+  });
+
   it('patterns a rectangle as its edges', async () => {
     const { report } = await editCad(null, d => {
       const side = d.part('Side');
