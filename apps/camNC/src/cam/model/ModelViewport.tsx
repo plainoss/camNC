@@ -184,6 +184,12 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
     if (fitted.current && fitted.current.key === fitKey && fitted.current.controls === controls && fitted.current.seq === viewRequest?.seq)
       return;
     fitted.current = { key: fitKey, controls, seq: viewRequest?.seq };
+    if (controls?.enableDamping) {
+      // Finish any orbit or pan still easing out, so it doesn't carry on from the view placed here.
+      controls.enableDamping = false;
+      controls.update();
+      controls.enableDamping = true;
+    }
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const radius = Math.max(size.x / Math.min(aspect, 1.6), size.y, size.z) * 0.62;

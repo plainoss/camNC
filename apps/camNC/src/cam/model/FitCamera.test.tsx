@@ -104,3 +104,20 @@ it('fits the whole model while keeping the current viewing direction and up vect
   expect(seen!.getWorldDirection(new THREE.Vector3()).distanceTo(direction)).toBeLessThan(1e-10);
   expect(seen!.up.toArray()).toEqual(up.toArray());
 });
+
+it('drops an orbit still easing out when a view is asked for', async () => {
+  const view = render(<View size={100} fitKey="assembled" viewRequest={{ name: 'iso', seq: 1 }} />);
+  await waitFor(() => expect(controls?.target.toArray()).toEqual([50, 50, 50]));
+  // A quick drag leaves rotation for damping to apply over the next frames.
+  const element = controls!.domElement!;
+  const at = (type: string, x: number) =>
+    element.dispatchEvent(new PointerEvent(type, { pointerId: 1, button: 0, buttons: 1, clientX: x, clientY: 150, bubbles: true }));
+  at('pointerdown', 100);
+  at('pointermove', 180);
+  at('pointermove', 260);
+  at('pointerup', 260);
+  view.rerender(<View size={100} fitKey="assembled" viewRequest={{ name: 'top', seq: 2 }} />);
+  await waitFor(() => expect(seen!.getWorldDirection(new THREE.Vector3()).z).toBeLessThan(-0.99));
+  for (let frame = 0; frame < 20; frame++) await new Promise(resolve => requestAnimationFrame(resolve));
+  expect(seen!.getWorldDirection(new THREE.Vector3()).distanceTo(new THREE.Vector3(0, 0, -1))).toBeLessThan(1e-6);
+});
