@@ -1,4 +1,13 @@
-import { createCadDocument, createPlateDocument, evaluateCadDocument, setPartPlacements, type CadDocument, type CadPart } from '@wbcnc/cad';
+import {
+  addCircle,
+  addPartCopy,
+  createCadDocument,
+  createPlateDocument,
+  evaluateCadDocument,
+  setPartPlacements,
+  type CadDocument,
+  type CadPart,
+} from '@wbcnc/cad';
 import { Box3, Matrix4, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { BodyMesh } from '@/cam/camTypes';
@@ -62,5 +71,28 @@ describe('the assembly', () => {
     const { meshes } = assemblyModel(touching);
     const [side, shelf] = explodeAssembled(meshes).map((matrix, i) => bounds(meshes[i]!, matrix));
     expect(shelf!.min.x - side!.max.x).toBeGreaterThan(50);
+  });
+
+  it('shows each copy as a piece of its own, a mirrored one as the mirror image', () => {
+    let document: CadDocument = { ...createCadDocument(), parts: [panel('Side', 300, 600)] };
+    const side = document.parts[0]!;
+    side.sketch = addCircle(side.sketch, { x: 50, y: 300, radius: 10 });
+    document = addPartCopy(document, side.id).document;
+    document = addPartCopy(document, side.id, { mirrored: true }).document;
+    const model = assemblyModel(document);
+    expect(model.instances.map(instance => instance.name)).toEqual(['Side', 'Side 2', 'Side 3']);
+    expect(model.instances.map(instance => !!instance.copyId)).toEqual([false, true, true]);
+    // Each laid flat, the hole is 50 mm from the left of the side and of its plain copy, and from the right of the mirror image.
+    const holeX = (mesh: BodyMesh) => {
+      const flat = new Matrix4().fromArray(mesh.flat),
+        v = new Vector3(),
+        xs: number[] = [];
+      for (let i = 0; i < mesh.positions.length; i += 3) {
+        v.fromArray(mesh.positions, i).applyMatrix4(flat);
+        if (Math.abs(v.y - 300) < 1e-6 && v.x > 0 && v.x < 300) xs.push(v.x);
+      }
+      return Math.min(...xs) + 10;
+    };
+    expect(model.meshes.map(holeX).map(x => Math.round(x))).toEqual([50, 50, 250]);
   });
 });

@@ -113,20 +113,31 @@ export function placeAgainst(current: CadPlacement | undefined, moving: CadFaceP
 
 export interface CadPlacementChange {
   partId: string;
+  /** One of the part's copies, rather than the part itself. */
+  copyId?: string;
   /** None lays the part out with the unplaced parts again. */
   placement: CadPlacement | undefined;
 }
 
-/** The document with parts placed, as one edit. Placement is its own edit, so it never touches a part's shape. */
+const placed = <T extends { placement?: CadPlacement }>(item: T, placement: CadPlacement | undefined): T => {
+  const next = { ...item, placement };
+  if (!placement) delete next.placement;
+  return next;
+};
+
+/** The document with parts and copies placed, as one edit. Placement is its own edit, so it never touches a part's shape. */
 export function setPartPlacements(document: CadDocument, changes: CadPlacementChange[]): CadDocument {
-  const byPart = new Map(changes.map(change => [change.partId, change.placement]));
   return {
     ...document,
     revision: document.revision + 1,
     parts: document.parts.map(part => {
-      if (!byPart.has(part.id)) return part;
-      const next = { ...part, placement: byPart.get(part.id) };
-      if (!next.placement) delete next.placement;
+      const own = changes.filter(change => change.partId === part.id);
+      if (!own.length) return part;
+      let next = part;
+      for (const change of own)
+        next = change.copyId
+          ? { ...next, copies: next.copies?.map(copy => (copy.id === change.copyId ? placed(copy, change.placement) : copy)) }
+          : placed(next, change.placement);
       return next;
     }),
   };

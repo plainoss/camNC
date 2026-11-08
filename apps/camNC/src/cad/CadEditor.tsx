@@ -79,6 +79,8 @@ import {
   type CadPoint,
   cadVariableProblems,
   setPartPlacements,
+  addPartCopy,
+  removePartCopy,
   cadVariableScope,
 } from '@wbcnc/cad';
 import {
@@ -3552,6 +3554,12 @@ export function CadEditor({
                   setSelected([]);
                 }}
                 onPlace={changes => commit(setPartPlacements(documentRef.current, changes))}
+                onAddCopy={(id, mirrored) => {
+                  const added = addPartCopy(documentRef.current, id, { mirrored });
+                  commit(added.document);
+                  return added.id;
+                }}
+                onRemoveCopy={(id, copyId) => commit(removePartCopy(documentRef.current, id, copyId))}
               />
             </Suspense>
           )}

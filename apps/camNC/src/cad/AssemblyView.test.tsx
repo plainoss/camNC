@@ -8,13 +8,22 @@ afterEach(cleanup);
 const panel = (name: string) => ({ ...createPlateDocument({ width: 200, height: 100 }).parts[0]!, name });
 function setup(document: CadDocument, selectedId: string | null = null) {
   const place = vi.fn(),
-    select = vi.fn();
+    select = vi.fn(),
+    addCopy = vi.fn(() => 'new-copy'),
+    removeCopy = vi.fn();
   render(
     <div style={{ height: 500, display: 'flex' }}>
-      <AssemblyView document={document} selectedId={selectedId} onSelect={select} onPlace={place} />
+      <AssemblyView
+        document={document}
+        selectedId={selectedId}
+        onSelect={select}
+        onPlace={place}
+        onAddCopy={addCopy}
+        onRemoveCopy={removeCopy}
+      />
     </div>
   );
-  return { place, select };
+  return { place, select, addCopy, removeCopy };
 }
 
 describe('the assembly view', () => {
@@ -108,5 +117,16 @@ describe('the assembly view', () => {
     expect(screen.getByRole('status').textContent).toBe(
       'Bottom and Shelf take up the same space. Move one, or check the sizes they follow.'
     );
+  });
+
+  it('adds a copy or a mirrored copy of the selected part', () => {
+    const side = panel('Side');
+    const { addCopy } = setup({ ...createCadDocument(), parts: [side, panel('Shelf')] }, side.id);
+    fireEvent.click(screen.getByRole('button', { name: 'Add copy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add mirrored copy' }));
+    expect(addCopy.mock.calls).toEqual([
+      [side.id, false],
+      [side.id, true],
+    ]);
   });
 });

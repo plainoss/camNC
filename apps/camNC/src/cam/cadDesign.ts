@@ -1,4 +1,4 @@
-import { migrateDimensionPlacements, type CadDocument } from '@wbcnc/cad';
+import { cadPartsToCut, migrateDimensionPlacements, type CadDocument } from '@wbcnc/cad';
 import { solveCadDocument } from '../cad/solveCad';
 import { updateJobForModel, type CamJobV1 } from './jobDb';
 import { carryDesignTabs } from './designTabAnchors';
@@ -38,30 +38,32 @@ export async function acceptDesign(base: CamJobV1, document: CadDocument): Promi
       solved.diagnostics.find(d => d.severity === 'error')?.message || 'Draw at least one closed part before continuing to Boards.'
     );
   const before = base.design.accepted ? await solveCadDocument(base.design.accepted) : null;
-  const partGeometryKeys = Object.fromEntries(
-    await Promise.all(solved.parts.map(async part => [part.partId, await designGeometryKey(part)]))
-  );
+  // Mirrored copies are parts of their own to CAM, and plain copies add to a part's quantity.
+  const toCut = cadPartsToCut(solved.document, solved.parts),
+    cut = toCut.map(entry => entry.part),
+    cutBefore = before ? cadPartsToCut(before.document, before.parts).map(entry => entry.part) : [];
+  const partGeometryKeys = Object.fromEntries(await Promise.all(cut.map(async part => [part.partId, await designGeometryKey(part)])));
   const saved = await updateJobForModel(base, current => {
     if (!current.design || !same(current.design.draft, base.design!.draft)) return null;
-    const previous = new Map(before?.parts.map(p => [p.partId, p]) ?? []);
+    const previous = new Map(cutBefore.map(p => [p.partId, p]));
     const partRevisions = { ...current.design.partRevisions };
-    for (const part of solved.parts) {
+    for (const part of cut) {
       const oldPart = previous.get(part.partId);
       if (!oldPart || designGeometryFingerprint(oldPart) !== designGeometryFingerprint(part))
         partRevisions[part.partId] = (partRevisions[part.partId] ?? 0) + 1;
     }
-    const present = new Set(solved.document.parts.map(p => p.id));
+    const present = new Set(cut.map(p => p.partId));
     for (const id of previous.keys()) if (!present.has(id)) partRevisions[id] = (partRevisions[id] ?? 0) + 1;
     const known = new Map(current.parts.map(p => [p.id, p]));
-    const nativeParts = solved.parts.map(p => ({
+    const nativeParts = toCut.map(({ part: p, names }) => ({
       id: p.partId,
       name: p.name,
-      quantity: known.get(p.partId)?.quantity ?? 1,
+      quantity: names.length,
       milled: known.get(p.partId)?.milled ?? true,
     }));
     // Missing part records remain available to repair existing board references.
     const ids = new Set(nativeParts.map(p => p.id));
-    const holeChoiceIssues = missingNativeHoleChoices(solved.parts, current.plan?.holes);
+    const holeChoiceIssues = missingNativeHoleChoices(cut, current.plan?.holes);
     const acceptedGeometry = { ...current, design: { ...current.design, partRevisions, partGeometryKeys } };
     const boardSourceKeys = Object.fromEntries(
       (current.boards ?? []).map(board => [

@@ -1,4 +1,5 @@
 import { pointInPolygon } from './geometry';
+import { mirrorEvaluatedPart } from './copies';
 import { rotateVector } from './placement';
 import type { CadDocument, CadPlacement, EvaluatedCadPart } from './types';
 
@@ -128,7 +129,14 @@ function collide(a: Placed, b: Placed): CadAssemblyReport['collisions'][number] 
 export function assemblyReport(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadAssemblyReport | undefined {
   const placed = document.parts.flatMap(source => {
     const part = parts.find(candidate => candidate.partId === source.id);
-    return source.placement && part?.outline.length ? [place(part, source.id, source.name, source.placement)] : [];
+    if (!part?.outline.length) return [];
+    // Copies are named as CAM names them: the part's name, then a number.
+    const copies = (source.copies ?? []).flatMap((copy, index) =>
+      copy.placement
+        ? [place(copy.mirrored ? mirrorEvaluatedPart(part) : part, source.id, `${source.name} ${index + 2}`, copy.placement)]
+        : []
+    );
+    return [...(source.placement ? [place(part, source.id, source.name, source.placement)] : []), ...copies];
   });
   if (!placed.length) return undefined;
   const collisions: CadAssemblyReport['collisions'] = [];

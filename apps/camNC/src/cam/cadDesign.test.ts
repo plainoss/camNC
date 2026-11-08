@@ -1,4 +1,14 @@
-import { addCircle, addRectangle, createCadDocument, createCadPart, createPlateDocument, updateDimension } from '@wbcnc/cad';
+import {
+  addCircle,
+  addPartCopy,
+  addRectangle,
+  createCadDocument,
+  createCadPart,
+  createPlateDocument,
+  mirroredPartId,
+  setPartPlacements,
+  updateDimension,
+} from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
 import { acceptDesign, boardGeometryKey, hasDesignDraft, saveDesignDraft } from './cadDesign';
 import { createDesignJob, getJob, getModelBytes, modelKey, saveJob } from './jobDb';
@@ -13,6 +23,22 @@ async function plateJob() {
 }
 
 describe('native design revisions', () => {
+  it('counts copies in a part’s quantity and lists a mirrored copy as a part, and placing them changes nothing to cut', async () => {
+    const first = await plateJob();
+    const partId = first.design!.accepted!.parts[0]!.id;
+    const copied = addPartCopy(addPartCopy(first.design!.draft, partId).document, partId, { mirrored: true });
+    const accepted = await acceptDesign(await saveDesignDraft(first, copied.document), copied.document);
+    expect(accepted.parts.map(p => [p.id, p.quantity])).toEqual([
+      [partId, 2],
+      [mirroredPartId(partId), 1],
+    ]);
+    const placed = setPartPlacements(accepted.design!.draft, [
+      { partId, copyId: copied.id, placement: { position: [0, 0, 300], rotation: [0, 0, 0, 1] } },
+    ]);
+    const moved = await acceptDesign(await saveDesignDraft(accepted, placed), placed);
+    expect(moved.design!.partGeometryKeys).toEqual(accepted.design!.partGeometryKeys);
+    expect(moved.design!.partRevisions).toEqual(accepted.design!.partRevisions);
+  });
   it('treats a restored accepted source as clean despite its newer undo-session revision', async () => {
     const first = await plateJob();
     const restored = { ...structuredClone(first.design!.accepted!), revision: first.design!.draft.revision + 100 };
