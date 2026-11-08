@@ -122,6 +122,52 @@ What still took hand work, or went wrong:
 - **Report.** Cut sizes include the dogbones (15.93 for a 15 mm dado), underside circles
   measure 34.99, and through cuts drawn in a sketch don't count under `holes`.
 
+## The fourth run, with joints cut by parts
+
+Two fresh agents built the nine pieces again from the README, now with copies as tools,
+combs and shouldered tenons cut by `cutParts`, and `floor`, `min`, `max` and `sqrt` in
+expressions. Then they changed each piece's board thickness.
+
+| Piece           |     Lines, runs 1 / 2 / 3 / 4 | Check runs, run 3 / 4 |
+| --------------- | ----------------------------: | --------------------: |
+| Bookshelf       |             73 / 61 / 56 / 47 |                 1 / 1 |
+| Kitchen cabinet |          112 / 119 / 106 / 92 |                 3 / 2 |
+| Nightstand      |         241 / 201 / 178 / 130 |                 1 / 2 |
+| Wardrobe door   |             62 / 63 / 62 / 59 |                 2 / 1 |
+| Plant stand     |           112 / 125 / 55 / 68 |                 6 / 1 |
+| Stool           |         238 / 195 / 169 / 170 |                 5 / 6 |
+| Wall shelf      |           237 / 160 / 90 / 86 |                 2 / 5 |
+| Desk organizer  |         244 / 217 / 123 / 124 |                 2 / 4 |
+| Coat rack       |            181 / 84 / 82 / 77 |                 3 / 3 |
+| **Total**       | **1,500 / 1,225 / 921 / 853** |           **25 / 25** |
+
+All nine passed with no collisions. After the thickness change every joint still fit,
+with no collisions. Two checks failed only on the agent's own `expect` depths, written
+as fixed numbers. The bookshelf's shelves are one part patterned up, and the nightstand's
+housings come from one side cutting both its copies.
+
+What still took hand work, or went wrong:
+
+- **Box joints.** A comb cuts slots into a plain board. When both boards have fingers,
+  each is refused as not "square-cornered and straight-sided", so the drawer's corners
+  were drawn as finger outlines from shared expressions.
+- **Relief on a tool.** With `relief`, a part's tenon shoulders get bones, and it can't
+  cut its mortise any more. The stool's seat mortises and wedge holes were drawn by hand.
+- **Relief and round holes.** The cabinet's 36 pin holes were counted as "640 corners …
+  too tight for a 3.175 mm bone". CAM still warned about material left in the bones'
+  corners, so it was unclear whether the bones helped.
+- **Half-laps and cross-laps** are still slots drawn into outlines.
+- **Units in counts.** `(width/3 - 3*board/2 - 10mm)/penPitch` was refused as having
+  units until `30mm` became `30` elsewhere in it.
+- **`expect` takes numbers only,** so depths that follow a variable fail the check when
+  it changes.
+- **Report.** A notch off a part's edge counts under `holes`. `corner-relief-skipped` and
+  `redundant-constraint` name no corners or entities. Pattern copies swallowed by an
+  overlapping shape vanish without a word, and `close()` adds a straight edge silently.
+  The face frames don't say which face of a part is its `top`.
+- **Docs.** The README still said finger joints aren't covered. Argument types for
+  `relief`, `clearance` and `copy`'s axes had to be guessed from the examples.
+
 ## What works now
 
 - **Parts and cuts.** Profiles with holes, pockets on the top, the underside or a
@@ -184,9 +230,9 @@ pockets out of the edge. The warning now counts only the part.
 
 ## Next, in order
 
-1. **A Part Studio**, being planned for the CAD roadmap: parts built up in one view,
-   with cuts sketched on the faces of the parts they receive. Placement and copies in
-   this API change to match it.
-2. **Joints and fits** as part of it, checked by the collision check.
+1. **Joints the model can't cut yet:** box joints between two fingered boards,
+   half-laps and cross-laps, and relief that leaves a tool's own shoulders square.
+2. **Report:** say where relief and constraint warnings are, warn when pattern copies
+   vanish, count edge notches apart from holes, and let `expect` follow variables.
 3. **Drilling operations** for holes up to the bit's size and for hinge cups.
-4. **A third furniture run** on the Part Studio, measured against these two.
+4. **A fifth furniture run** once the joints exist, measured against these four.
