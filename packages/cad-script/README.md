@@ -33,6 +33,25 @@ file in camNC's CAM page to get it as a new job. `--svg` draws
 the parts. A failed check removes any existing `--out` file and any existing `--svg`
 file unless it writes a new SVG for that run. See `examples/` for more.
 
+## From an MCP client
+
+Agents without a shell, such as Claude Desktop, use the same check through an MCP
+server over stdio. It keeps designs in one folder: `<name>.cad.ts` is the script,
+`<name>.json` the document to open in camNC's CAM page, written only when the check
+passes, and `<name>.svg` the drawing.
+
+```sh
+pnpm --silent --dir <camNC checkout> --filter @wbcnc/cad-script mcp --dir ~/designs
+```
+
+Use that as the server's command, for example in Claude Desktop's
+`claude_desktop_config.json` under `mcpServers`, or with
+`claude mcp add camnc-cad -- pnpm --silent --dir <camNC checkout> --filter @wbcnc/cad-script mcp --dir ~/designs`.
+An app that starts it without your shell's `PATH` needs the full path to `pnpm`.
+Its tools: `cad_script_guide` (this file and the list of examples),
+`cad_script_example`, `check_design` (save a script under a name, check it, and get the
+report) and `read_design`.
+
 ## Writing a script
 
 - All lengths are mm, Y up, in the part's own sketch coordinates. Arc angles are degrees.

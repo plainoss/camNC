@@ -8,15 +8,18 @@
   },
   "scripts": {
     "check": "vite-node --config vite.config.ts src/cli.ts",
+    "mcp": "vite-node --config vite.config.ts src/mcpMain.ts",
     "test": "vitest",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@wbcnc/cad": "workspace:*",
     "@wbcnc/cad-editor": "workspace:*",
     "@wbcnc/cam": "workspace:*",
     "typescript": "catalog:",
-    "vite-node": "3.2.4"
+    "vite-node": "3.2.4",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

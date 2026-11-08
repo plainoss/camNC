@@ -30,9 +30,12 @@ of this adds a second source of truth.
    the report summarises each part's toolpaths with it. A summary only, never a program
    file.
 5. In progress: variables, placements and patterns are in the API, with a collision
-   check between placed parts. Joints wait for roadmap PR 10. After the physical test
-   cut, decide on an MCP server and in-app chat. Both need the editor to accept
-   outside changes through its session.
+   check between placed parts. Joints wait for roadmap PR 10.
+6. Done: an MCP server (`pnpm --filter @wbcnc/cad-script mcp`) gives agents without a
+   shell, such as Claude Desktop, the guide, the examples and the check. Designs are
+   written to a folder as scripts and as documents ready to import into CAM. Next, an
+   in-app chat that uses the same tools, once the editor accepts outside changes through
+   its session.
 
 [Designing furniture with scripts](CAD_AI_FURNITURE.md) lists what a furniture test run
 found and what to improve next.
