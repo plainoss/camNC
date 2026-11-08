@@ -2,6 +2,8 @@ import {
   closestCurvePoint,
   evaluateCurvePoint,
   isNurbsCurve,
+  mirrorEvaluatedPart,
+  mirroredPartId,
   type CadEntity,
   type CadPart,
   type CadPoint,
@@ -104,11 +106,20 @@ export function carryDesignTabs(
     const designIssues = { ...board.designIssues };
     for (const [instanceId, tabs] of Object.entries(board.tabsAt)) {
       if (!tabs.length) continue;
-      const partId = instanceId.split('#')[0];
-      const oldPart = oldParts.get(partId),
-        nextPart = newParts.get(partId);
-      const oldShape = oldShapes.get(partId),
-        nextShape = newShapes.get(partId);
+      const partId = instanceId.split('#')[0]!;
+      // A mirrored copy is cut as a part of its own, the mirror image of its part across the sketch's y axis. Its tabs
+      // follow that part's curves, mirrored.
+      const sourceId = partId.split(':')[0]!,
+        mirrored = partId !== sourceId && partId === mirroredPartId(sourceId);
+      const flip = (p: CadPoint): CadPoint => (mirrored ? { x: -p.x, y: p.y } : p);
+      const shape = (shapes: Map<string, EvaluatedCadPart>) => {
+        const found = shapes.get(mirrored ? sourceId : partId);
+        return found && mirrored ? mirrorEvaluatedPart(found) : found;
+      };
+      const oldPart = oldParts.get(mirrored ? sourceId : partId),
+        nextPart = newParts.get(mirrored ? sourceId : partId);
+      const oldShape = shape(oldShapes),
+        nextShape = shape(newShapes);
       if (!oldPart || !nextPart || !oldShape || !nextShape) continue;
       if (isCut(board)) {
         if (board.cut?.sourceKey && board.cut.sourceKey === acceptedBoardSourceKeys[board.id]) {
@@ -137,7 +148,7 @@ export function carryDesignTabs(
       const curves = oldPart.sketch.entities.filter((e): e is Curve => e.type !== 'point' && outerIds.has(e.id));
       let failed = false;
       const mapped = tabs.map(at => {
-        const sourceAt = { x: at.x + oldOrigin.x, y: at.y + oldOrigin.y };
+        const sourceAt = flip({ x: at.x + oldOrigin.x, y: at.y + oldOrigin.y });
         const anchor = curves
           .flatMap(curve => {
             const hit = project(curve, oldPart, sourceAt);
@@ -150,7 +161,8 @@ export function carryDesignTabs(
           failed = true;
           return at;
         }
-        return { x: point.x - nextOrigin.x, y: point.y - nextOrigin.y };
+        const placed = flip(point);
+        return { x: placed.x - nextOrigin.x, y: placed.y - nextOrigin.y };
       });
       if (failed) designIssues[instanceId] = 'A tab boundary changed. Reset or place this part’s tabs again on Boards.';
       else tabsAt[instanceId] = mapped;

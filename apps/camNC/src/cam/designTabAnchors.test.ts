@@ -6,6 +6,8 @@ import {
   setConicRho,
   constraintEntityIds,
   createPlateDocument,
+  addPartCopy,
+  mirroredPartId,
   evaluateCadDocument,
   type CadSolveResult,
 } from '@wbcnc/cad';
@@ -40,6 +42,31 @@ describe('CAD tab boundary lineage', () => {
     expect(carried.tabsAt).toEqual(board.tabsAt);
     expect(carried.cut).toEqual(board.cut);
     expect(carried.designIssues).toEqual(retained ? board.designIssues : undefined);
+  });
+
+  it('moves a mirrored copy’s tab with the edge it sits on', () => {
+    let document = createPlateDocument({ width: 100, height: 60, thickness: 12 });
+    document = addPartCopy(document, document.parts[0]!.id, { mirrored: true }).document;
+    const widened = structuredClone(document);
+    widened.parts[0]!.sketch.entities = widened.parts[0]!.sketch.entities.map(entity =>
+      entity.type === 'point' && entity.x === 100 ? { ...entity, x: 120 } : entity
+    );
+    const result = (source: typeof document): CadSolveResult => ({
+      ...evaluateCadDocument(source),
+      document: source,
+      status: 'solved',
+      sketches: [],
+    });
+    // The mirror image's left edge is the plate's right edge, which moves out by 20 mm.
+    const instance = `${mirroredPartId(document.parts[0]!.id)}#0`;
+    const board = { ...newBoard([], 12, 'plywood', [instance]), tabsAt: { [instance]: [{ x: 0, y: 30 }] } };
+    const carried = carryDesignTabs([board], result(document), result(widened))![0]!;
+    expect(carried.designIssues).toBeUndefined();
+    expect(carried.tabsAt![instance]![0]!.x).toBeCloseTo(0, 6);
+    expect(carried.tabsAt![instance]![0]!.y).toBeCloseTo(30, 6);
+    // A tab on the far edge, the plate's left edge, ends 120 mm across instead of 100.
+    const far = { ...board, tabsAt: { [instance]: [{ x: 100, y: 30 }] } };
+    expect(carryDesignTabs([far], result(document), result(widened))![0]!.tabsAt![instance]![0]!.x).toBeCloseTo(120, 6);
   });
 
   it('retains changed-source tab repair state if an unrequested preparation rolls back', () => {

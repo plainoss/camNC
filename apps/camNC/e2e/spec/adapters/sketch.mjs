@@ -230,6 +230,15 @@ export async function createAdapter(page, url) {
       }, undefined, { timeout: 5000 });
     await page.waitForTimeout(60);
   };
+  // After a reload the design editor is back once its canvas is drawn and it has finished checking the design. A fixed
+  // pause was too short on a busy runner, so the first check could look before the labels were drawn.
+  const reopened = async () => {
+    if (/\/design$/.test(new URL(page.url()).pathname)) {
+      // It may come back showing the 3D view, with the sketch canvas there but hidden.
+      await page.getByTestId('cad-canvas').waitFor({ state: 'attached' });
+      await settle();
+    } else await page.waitForTimeout(1500);
+  };
   const leaveTool = async () => {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
@@ -361,7 +370,9 @@ export async function createAdapter(page, url) {
         return;
       }
       case 'button':
-        await page.getByRole('button', { name: new RegExp(rest, 'i') }).first().click();
+        // A button can wait on work in progress, as "Take the job to the machine" waits for every board's plan. On a busy
+        // runner that takes longer than the default 8 s a click waits for it to enable.
+        await page.getByRole('button', { name: new RegExp(rest, 'i') }).first().click({ timeout: 30_000 });
         return;
       case 'handle': {
         // handle <start|end> <point|segment>, optionally with Shift to add to the selection.
@@ -443,11 +454,11 @@ export async function createAdapter(page, url) {
       case 'reload':
         await settle();
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(1500);
+        await reopened();
         return;
       case 'reloadnow':
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(1500);
+        await reopened();
         return;
       case 'goto':
         await settle();
