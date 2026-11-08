@@ -157,9 +157,9 @@ export async function outlineArt(art: CarvingArt, height: number): Promise<{ reg
     const region = maskOutline(inkMask(ctx.getImageData(0, 0, w, h).data, w, h), w, h, ppm);
     return { region, width, height };
   }
-  const document = new DOMParser().parseFromString(art.svg, 'image/svg+xml');
-  if (document.querySelector('parsererror')) throw new Error(kUnreadableSvg);
-  const svg = document.documentElement;
+  const doc = new DOMParser().parseFromString(art.svg, 'image/svg+xml');
+  if (doc.querySelector('parsererror')) throw new Error(kUnreadableSvg);
+  const svg = doc.documentElement;
   if (svg.localName !== 'svg' || (svg.namespaceURI && svg.namespaceURI !== 'http://www.w3.org/2000/svg'))
     throw new Error('This file is not an SVG. Choose an SVG file.');
   const viewBox = svg

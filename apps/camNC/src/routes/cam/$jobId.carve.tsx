@@ -390,6 +390,8 @@ function ArtFields({ carving, onArt }: { carving: CarvingV1; onArt: (art: Carvin
           onChange={e => {
             const file = e.target.files?.[0];
             if (file) void file.text().then(svg => onArt({ kind: 'svg', svg, fileName: file.name }));
+            // Choosing the same file again still counts.
+            e.target.value = '';
           }}
         />
       </Field>
