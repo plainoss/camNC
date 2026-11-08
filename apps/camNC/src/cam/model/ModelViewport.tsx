@@ -77,6 +77,54 @@ export function FitCamera({ box }: { box: THREE.Box3 }) {
   return null;
 }
 
+/** A camera looking straight at a sketch's plane, showing exactly what the sketch's drawing shows, as in a sketch's normal view. */
+export interface SketchView {
+  /** The sketch's frame in the model: its origin, its x and y, and the way its plane faces (the camera's side). */
+  origin: [number, number, number];
+  x: [number, number, number];
+  y: [number, number, number];
+  normal: [number, number, number];
+  /** The middle of what's shown, and how wide and high, in the sketch's own mm. */
+  center: [number, number];
+  width: number;
+  height: number;
+  /** The view's right, up and toward-the-viewer directions in the sketch's frame, once it's turned off straight on. */
+  turned?: { right: [number, number, number]; up: [number, number, number]; back: [number, number, number] };
+}
+
+function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 }) {
+  const set = useThree(s => s.set);
+  const size = useThree(s => s.size);
+  const camera = useMemo(() => new THREE.OrthographicCamera(), []);
+  useEffect(() => {
+    set({ camera });
+  }, [camera, set]);
+  useEffect(() => {
+    const v = (a: [number, number, number]) => new THREE.Vector3(...a);
+    const at = v(view.origin).addScaledVector(v(view.x), view.center[0]).addScaledVector(v(view.y), view.center[1]).applyMatrix4(model);
+    // Far enough out along the plane's normal to see everything in front of it, looking back at it.
+    const reach = 20000;
+    // A direction given in the sketch's frame, in the model's.
+    const along = ([a, b, c]: [number, number, number]) =>
+      v(view.x).multiplyScalar(a).addScaledVector(v(view.y), b).addScaledVector(v(view.normal), c);
+    camera.position.copy(at).addScaledVector(view.turned ? along(view.turned.back) : v(view.normal), reach);
+    camera.up.copy(view.turned ? along(view.turned.up) : v(view.y));
+    camera.lookAt(at);
+    // A face's frame can be mirrored, its x × y facing away from its normal: the picture is mirrored with it, as its
+    // drawing is.
+    const right = view.turned ? along(view.turned.right) : v(view.x);
+    const mirrored = v([1, 0, 0]).applyQuaternion(camera.quaternion).dot(right) < 0;
+    camera.left = ((mirrored ? 1 : -1) * view.width) / 2;
+    camera.right = ((mirrored ? -1 : 1) * view.width) / 2;
+    camera.top = view.height / 2;
+    camera.bottom = -view.height / 2;
+    camera.near = 1;
+    camera.far = reach * 2;
+    camera.updateProjectionMatrix();
+  }, [camera, view, model, size]);
+  return null;
+}
+
 function boundsOf(meshes: BodyMesh[], matrices: THREE.Matrix4[]) {
   const box = new THREE.Box3();
   const v = new THREE.Vector3();
@@ -102,6 +150,7 @@ export function ModelViewport({
   onSelect,
   onPickFace,
   onMissed,
+  sketchView,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -117,6 +166,8 @@ export function ModelViewport({
   onSelect: (partId: string, index: number) => void;
   onPickFace?: (pick: ModelFacePick) => void;
   onMissed?: () => void;
+  /** Looks straight at a sketch's plane, following its drawing, in place of the orbiting camera. */
+  sketchView?: SketchView;
 }) {
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
   const assembled = useMemo(() => centerAssembled(meshes), [meshes]);
@@ -138,7 +189,7 @@ export function ModelViewport({
       <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
       <directionalLight position={[300, -500, 800]} intensity={1.8} />
       <directionalLight position={[-400, 300, 200]} intensity={0.4} />
-      <FitCamera box={box} />
+      {sketchView ? <SketchCamera view={sketchView} model={assembled} /> : <FitCamera box={box} />}
       <group>
         {meshes.map((m, i) => (
           <Body
@@ -159,7 +210,7 @@ export function ModelViewport({
           />
         ))}
       </group>
-      <OrbitControls makeDefault dampingFactor={kOrbitDamping} />
+      {!sketchView && <OrbitControls makeDefault dampingFactor={kOrbitDamping} />}
     </Canvas>
   );
 }
