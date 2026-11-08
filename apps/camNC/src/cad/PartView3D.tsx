@@ -4,6 +4,7 @@ import {
   evaluateCadFeatures,
   evaluateCadPart,
   pointInPolygon,
+  withPartCuts,
   type CadCutDepth,
   type CadDocument,
   type CadFaceRef,
@@ -38,15 +39,21 @@ const kTurnSeconds = 0.35;
 const faceLabel = (face: CadFaceRef) => (face === 'top' ? 'top' : face === 'underside' ? 'underside' : 'pocket floor');
 const alone = (part: CadPart): CadDocument => ({ version: 2, id: 'part-view', name: part.name, revision: 0, parts: [part] });
 
-/** The part as it'll be cut, or why it can't be shown. Uses the same mesh CAM reads back. */
-function partSolid(part: CadPart): { geometry?: THREE.BufferGeometry; origin?: [number, number]; problem?: string } {
+/**
+ * The part as it'll be cut, or why it can't be shown. Uses the same mesh CAM reads back. Other parts of `document` cut
+ * out of it are cut here too.
+ */
+function partSolid(
+  part: CadPart,
+  document?: CadDocument
+): { geometry?: THREE.BufferGeometry; origin?: [number, number]; problem?: string } {
   const { part: profile } = evaluateCadPart(part);
   if (!profile) return { problem: 'This part can’t be shown until its sketch is fixed.' };
   // A cut with an error is left out and explained, so the part stays on screen while it's put right.
   const { part: evaluated, diagnostics } = evaluateCadFeatures(part, profile),
     problem = diagnostics.find(diagnostic => diagnostic.severity === 'error')?.message;
   try {
-    const { mesh, info } = nativePart(evaluated);
+    const { mesh, info } = nativePart(document ? withPartCuts(document, evaluated) : evaluated);
     return { geometry: modelGeometry(mesh), origin: info.sourceOrigin, problem };
   } catch (cause) {
     return { problem: cause instanceof Error ? cause.message : String(cause) };
@@ -223,11 +230,14 @@ function regionCenter({ region }: CutRegion, clicked: { x: number; y: number }) 
 /** One part in 3D, as it'll be cut. Click a region to set its depth, or drag the arrow to push its floor up and down. */
 export default function PartView3D({
   part,
+  document,
   variables,
   onChoose,
   onSketchFace,
 }: {
   part: CadPart;
+  /** The design the part is in, whose other parts may cut it. */
+  document?: CadDocument;
   /** Design variables a typed depth may use. */
   variables?: CadValueScope;
   onChoose: (entry: CutRegion, depth: CadCutDepth, expression?: string) => void;
@@ -246,7 +256,7 @@ export default function PartView3D({
     if (dragging === null || !entry) return part;
     return withRegionDepth(alone(part), part.id, entry, dragging).parts[0]!;
   }, [part, entry, dragging]);
-  const solid = useMemo(() => partSolid(shown), [shown]);
+  const solid = useMemo(() => partSolid(shown, document), [shown, document]);
   const shownRegions = useMemo(() => cutRegions(shown), [shown]);
   useEffect(() => () => solid.geometry?.dispose(), [solid]);
   // The camera frames the part once, and stays put while its cuts change.

@@ -55,4 +55,21 @@ describe('the design workspace', () => {
     expect(newPart).toHaveBeenCalledWith({ plane: 'right' });
     expect(screen.queryByRole('button', { name: 'Right plane' })).toBeNull();
   });
+
+  it('starts a step cutting parts once there are two', () => {
+    const cut = vi.fn();
+    render(
+      <div style={{ height: 500, display: 'flex' }}>
+        <WorkspaceView
+          document={{ ...createCadDocument(), parts: [panel('Side'), panel('Back')] }}
+          selectedId={null}
+          onSelect={() => {}}
+          onOpen={() => {}}
+          onCutParts={cut}
+        />
+      </div>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cut parts' }));
+    expect(cut).toHaveBeenCalled();
+  });
 });

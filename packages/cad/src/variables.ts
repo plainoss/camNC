@@ -6,6 +6,7 @@ import type {
   CadDiagnostic,
   CadDocument,
   CadLinearPattern,
+  CadPartCut,
   CadPart,
   CadPlacement,
   CadSketch,
@@ -133,6 +134,13 @@ function dimensionOutcome(constraint: CadConstraint, scope: CadValueScope): Outc
   return { value: parsed.value };
 }
 
+function clearanceOutcome(step: CadPartCut, scope: CadValueScope): Outcome | null {
+  if (!usesVariables(step.clearanceExpression)) return null;
+  const parsed = parseCadValue(step.clearanceExpression, { unit: 'mm', variables: scope });
+  if ('error' in parsed) return parsed;
+  return parsed.value >= 0 ? parsed : { error: 'A clearance can’t be less than nothing.' };
+}
+
 function reliefOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
   const expression = part.cornerRelief?.diameterExpression;
   if (!usesVariables(expression)) return null;
@@ -256,7 +264,13 @@ export function applyCadVariables(document: CadDocument): CadDocument {
       })
     );
   });
-  return parts.every((part, index) => part === document.parts[index]) ? document : { ...document, parts };
+  const partCuts = document.partCuts?.map(step => {
+    const outcome = clearanceOutcome(step, scope);
+    return outcome && 'value' in outcome && outcome.value !== step.clearance ? { ...step, clearance: outcome.value } : step;
+  });
+  const cutsChanged = partCuts?.some((step, index) => step !== document.partCuts![index]);
+  if (parts.every((part, index) => part === document.parts[index]) && !cutsChanged) return document;
+  return { ...document, parts, ...(cutsChanged && { partCuts }) };
 }
 
 /** Variables that can't be worked out, and values on parts that can't follow their variables. */
@@ -332,6 +346,15 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
           });
       }
   }
+  for (const step of document.partCuts ?? []) {
+    const outcome = clearanceOutcome(step, scope);
+    if (outcome && 'error' in outcome)
+      problems.push({
+        code: 'variable-value',
+        severity: 'error',
+        message: `Cut parts clearance ${step.clearanceExpression}: ${outcome.error}`,
+      });
+  }
   return problems;
 }
 
@@ -355,6 +378,9 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
   return {
     ...document,
     variables: document.variables?.map(variable => ({ ...variable, expression: edit(variable.expression) })),
+    partCuts: document.partCuts?.map(step =>
+      step.clearanceExpression ? { ...step, clearanceExpression: edit(step.clearanceExpression) } : step
+    ),
     parts: document.parts.map(part =>
       mapSketches(
         mapCuts(

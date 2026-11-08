@@ -685,6 +685,17 @@ export function parseCadDocument(input: unknown): CadDocument {
     )
       throw new Error('Invalid CAD placement');
   };
+  if (d.partCuts !== undefined) {
+    if (!Array.isArray(d.partCuts)) throw new Error('Invalid CAD part cuts');
+    for (const step of d.partCuts) {
+      if (!step || typeof step !== 'object' || !Array.isArray(step.tools) || !Array.isArray(step.targets))
+        throw new Error('Invalid CAD part cut');
+      addId(step.id);
+      [...step.tools, ...step.targets].forEach(reference);
+      number(step.clearance);
+      if (step.clearanceExpression !== undefined && typeof step.clearanceExpression !== 'string') throw new Error('Invalid CAD part cut');
+    }
+  }
   for (const p of d.parts) {
     if (!p || typeof p !== 'object' || !p.sketch || typeof p.sketch !== 'object') throw new Error('Invalid CAD part');
     addId(p.id);

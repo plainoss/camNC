@@ -327,7 +327,20 @@ export interface CadDocument {
   revision: number;
   /** Design variables, such as `width` and `board`, that dimensions and thicknesses can use. */
   variables?: CadVariable[];
+  /** Steps that cut parts out of other parts, in order. */
+  partCuts?: CadPartCut[];
   parts: CadPart[];
+}
+/**
+ * Cuts the tool parts out of the target parts wherever they reach in, as placed, with `clearance` mm of room around
+ * them: grooves for backs, housings for shelves, mortises for tenons. It follows both parts' sizes and places.
+ */
+export interface CadPartCut {
+  id: string;
+  tools: string[];
+  targets: string[];
+  clearance: number;
+  clearanceExpression?: string;
 }
 /** A named value. Its kind follows from the expression: a length or angle unit, or a plain number. */
 export interface CadVariable {
