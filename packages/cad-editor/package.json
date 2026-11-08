@@ -22,7 +22,6 @@
     "./sketchContext": "./src/sketchContext.ts",
     "./sketchFeedback": "./src/sketchFeedback.ts",
     "./trimCurves": "./src/trimCurves.ts",
-    "./valueExpressions": "./src/valueExpressions.ts",
     "./viewState": "./src/viewState.ts"
   },
   "scripts": {

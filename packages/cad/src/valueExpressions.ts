@@ -1,7 +1,10 @@
-import { isBareBaseUnitLiteral } from '@wbcnc/cad';
+import { isBareBaseUnitLiteral } from './dimensionExpressions';
 
 export type CadValueUnit = 'mm' | 'deg' | 'scalar';
 export type CadValueResult = { value: number; expression?: string } | { error: string };
+export type CadVariableKind = 'length' | 'angle' | 'number';
+/** Named values an expression may use, by name. Lengths are mm and angles degrees. */
+export type CadValueScope = Readonly<Record<string, { value: number; kind: CadVariableKind }>>;
 
 interface Quantity {
   value: number;
@@ -9,7 +12,8 @@ interface Quantity {
   explicitUnits: boolean;
   fraction: boolean;
 }
-type Token = { kind: 'number'; value: number } | { kind: 'unit'; text: string } | { kind: 'operator'; text: string };
+/** A word is a unit or a variable name. */
+type Token = { kind: 'number'; value: number } | { kind: 'word'; text: string } | { kind: 'operator'; text: string };
 
 const plainNumber = /^[+-]?(?:\d+[.,]?\d*|[.,]\d+)(?:e[+-]?\d+)?$/i;
 /** Normalized millimetres/degrees, before any value is published to a sketch or sent to WASM. */
@@ -65,10 +69,10 @@ function tokenize(text: string, unitsOnly = false): Token[] {
       result.push({ kind: 'number', value });
       index += numeric[0].length;
     } else {
-      const unit = /^(?:[a-z]+|°|"|″)/i.exec(rest);
-      if (unit) {
-        result.push({ kind: 'unit', text: unit[0] });
-        index += unit[0].length;
+      const word = /^(?:#?[a-z_][a-z0-9_]*|°|"|″)/i.exec(rest);
+      if (word) {
+        result.push({ kind: 'word', text: word[0] });
+        index += word[0].length;
       } else if ('+-*/()'.includes(text[index]!)) {
         result.push({ kind: 'operator', text: text[index]! });
         index++;
@@ -87,11 +91,35 @@ function tokenize(text: string, unitsOnly = false): Token[] {
 
 /** Display only: use the same lexer and unit table even while an expression is incomplete or invalid. */
 export function cadValueHasUnit(text: string): boolean {
-  return tokenize(text.slice(0, 512), true).some(token => token.kind === 'unit' && unitFor(token.text) !== undefined);
+  return tokenize(text.slice(0, 512), true).some(token => token.kind === 'word' && unitFor(token.text) !== undefined);
 }
 
-/** A bounded arithmetic parser, with no eval, function calls, variables or application-state access. */
-export function parseCadValue(text: string, { unit = 'mm' }: { unit?: CadValueUnit } = {}): CadValueResult {
+const variableName = (word: string) => word.replace(/^#/, '');
+const kNamePattern = /^[a-z_][a-z0-9_]*$/i;
+
+/** Why a variable can't have this name, or null when it can. Names may not be units, so `2in` never means a variable. */
+export function cadVariableNameError(name: string): string | null {
+  if (!kNamePattern.test(name)) return 'Start the name with a letter, then use letters, digits or _.';
+  if (unitFor(name) !== undefined || name.toLowerCase() === 'm') return `${name} is a unit, so it can't be a variable name.`;
+  return null;
+}
+
+/** The variable names an expression uses, whether or not they exist. */
+export function cadExpressionNames(text: string): string[] {
+  const words = tokenize(text.slice(0, 512), true).filter(token => token.kind === 'word' && unitFor(token.text) === undefined);
+  return [...new Set(words.map(token => variableName((token as { text: string }).text)))].filter(name => kNamePattern.test(name));
+}
+
+/** The expression with one variable renamed, leaving everything else as typed. */
+export function renameCadExpressionVariable(text: string, from: string, to: string): string {
+  return text.replace(new RegExp(`(?<![A-Za-z0-9_#])(#?)${from}(?![A-Za-z0-9_])`, 'g'), `$1${to}`);
+}
+
+/** A bounded arithmetic parser, with no eval, function calls or application-state access. Variables come only from the scope given. */
+export function parseCadValue(
+  text: string,
+  { unit = 'mm', variables = {} }: { unit?: CadValueUnit; variables?: CadValueScope } = {}
+): CadValueResult {
   const original = text.trim();
   if (!original) return { error: 'Enter a value.' };
   if (original.length > 512) return { error: 'This expression is too long.' };
@@ -107,10 +135,12 @@ export function parseCadValue(text: string, { unit = 'mm' }: { unit?: CadValueUn
     };
     const applyUnit = (quantity: Quantity): Quantity => {
       const token = tokens[index];
-      if (token?.kind !== 'unit') return quantity;
-      if (unit === 'scalar') throw new Error('Use a unitless value; length and angle units are not accepted.');
+      if (token?.kind !== 'word') return quantity;
       // M is an ambiguous magnitude prefix; keep requiring explicit lowercase m for metres.
       const conversion = unitFor(token.text);
+      if (!conversion && Object.hasOwn(variables, variableName(token.text)))
+        throw new Error(`Put * between the number and ${variableName(token.text)}.`);
+      if (unit === 'scalar') throw new Error('Use a unitless value; length and angle units are not accepted.');
       if (!conversion) throw new Error(`Unknown unit: ${token.text}.`);
       if (conversion.dimension !== expectedDimension)
         throw new Error(unit === 'mm' ? 'Use length units: mm, cm, m, in, inch or ft.' : 'Use angle units: deg or rad.');
@@ -134,6 +164,14 @@ export function parseCadValue(text: string, { unit = 'mm' }: { unit?: CadValueUn
         return applyUnit(result);
       }
       const token = tokens[index];
+      if (token?.kind === 'word' && unitFor(token.text) === undefined) {
+        const name = variableName(token.text);
+        if (!Object.hasOwn(variables, name)) throw new Error(`There's no variable called ${name}.`);
+        const variable = variables[name]!;
+        index++;
+        const dimension = variable.kind === 'number' ? null : variable.kind;
+        return applyUnit({ value: checked(variable.value), dimension, explicitUnits: dimension !== null, fraction: false });
+      }
       if (token?.kind !== 'number') throw new Error('Enter a number or a parenthesized expression.');
       index++;
       let value = token.value;
@@ -142,7 +180,7 @@ export function parseCadValue(text: string, { unit = 'mm' }: { unit?: CadValueUn
       // while explicit 1/(2in) remains division by a length and is rejected below.
       const denominator = tokens[index + 1],
         suffix = tokens[index + 2];
-      if (operator('/') && denominator?.kind === 'number' && suffix?.kind === 'unit') {
+      if (operator('/') && denominator?.kind === 'number' && suffix?.kind === 'word' && unitFor(suffix.text)) {
         if (denominator.value === 0) throw new Error('Cannot divide by zero.');
         value = checked(value / denominator.value);
         fraction = true;

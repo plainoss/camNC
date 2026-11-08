@@ -1,2 +1,9 @@
-// Browser adapter imports the headless editor command implementation.
-export * from '@wbcnc/cad-editor/valueExpressions';
+// Browser adapter re-exports the headless value parser.
+export {
+  CAD_MAX_INPUT_MAGNITUDE,
+  cadValueHasUnit,
+  formatCadValue,
+  parseCadValue,
+  type CadValueResult,
+  type CadValueUnit,
+} from '@wbcnc/cad';

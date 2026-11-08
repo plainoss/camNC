@@ -2,6 +2,7 @@ import { slotIssue, removeUnusedSlotWidths } from './slot';
 import { materializePatternJoins, removeUnusedPatternCenters } from './patternTopology';
 import { linearPatternIssue, sketchPatternOwner, afterPatternEntityRemoval } from './pattern';
 import { refreshDimensionMeasurement } from './dimensions';
+import { cadVariableNameError } from './valueExpressions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
 import type {
   CadArcEntity,
@@ -657,6 +658,18 @@ export function parseCadDocument(input: unknown): CadDocument {
   const reference = (value: unknown) => {
     if (typeof value !== 'string' || !value) throw new Error('CAD references must be nonempty strings');
   };
+  if (d.variables !== undefined) {
+    if (!Array.isArray(d.variables)) throw new Error('Invalid CAD variables');
+    const names = new Set<string>();
+    for (const variable of d.variables) {
+      if (!variable || typeof variable !== 'object') throw new Error('Invalid CAD variable');
+      addId(variable.id);
+      if (typeof variable.name !== 'string' || cadVariableNameError(variable.name) || names.has(variable.name))
+        throw new Error('Invalid CAD variable name');
+      if (typeof variable.expression !== 'string') throw new Error('Invalid CAD variable');
+      names.add(variable.name);
+    }
+  }
   for (const p of d.parts) {
     if (!p || typeof p !== 'object' || !p.sketch || typeof p.sketch !== 'object') throw new Error('Invalid CAD part');
     addId(p.id);
@@ -668,6 +681,7 @@ export function parseCadDocument(input: unknown): CadDocument {
     )
       throw new Error('Invalid CAD part');
     number(p.thickness);
+    if (p.thicknessExpression !== undefined && typeof p.thicknessExpression !== 'string') throw new Error('Invalid CAD part');
     if (d.version === 1 && p.features !== undefined) throw new Error('Invalid CAD document');
     if (p.features !== undefined && !Array.isArray(p.features)) throw new Error('Invalid CAD features');
     const sketches = [p.sketch];
