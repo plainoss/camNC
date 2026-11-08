@@ -214,7 +214,12 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
   const holdHits = movedHold ? hitsPath(movedHold, deg, overlay.path, overlay.bit ?? 6, overlay.stockTop ?? 0) : false;
   const canMove = editable && (!!hold || !!part?.movable);
   const itemBar = !!selected && !!box && !!name && !item;
-  // The board's corner lowest on screen (leftmost of a tie), in the board frame: the board turns under its bar.
+  // The board's corner lowest on screen (leftmost of a tie), in the board frame: through the camera, as the view can be
+  // turned on screen too.
+  const onScreen = (c: P2) => {
+    const t = turn(c, deg);
+    return new Vector3(offset.x + t.x, offset.y + t.y, 0).project(camera);
+  };
   const low = (
     [
       { x: 0, y: 0 },
@@ -223,8 +228,8 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
       { x: 0, y: overlay.h },
     ] as P2[]
   ).reduce((a, b) => {
-    const [ta, tb] = [turn(a, deg), turn(b, deg)];
-    return tb.y < ta.y - 1e-6 || (Math.abs(tb.y - ta.y) <= 1e-6 && tb.x < ta.x) ? b : a;
+    const [sa, sb] = [onScreen(a), onScreen(b)];
+    return sb.y < sa.y - 1e-4 || (Math.abs(sb.y - sa.y) <= 1e-4 && sb.x < sa.x) ? b : a;
   });
   const handleAt = box && { x: box.x + box.w + (hold ? 10 : -box.w / 2), y: box.y + box.h + (hold ? 10 : -box.h / 2) };
 
@@ -366,7 +371,7 @@ export function CamBedLayer({ overlay, offset, running }: { overlay: BoardOverla
 
       {/* Nothing selected: the board's own bar, under its lower left corner as seen on screen. */}
       {!itemBar && !item && (
-        <CanvasLabel position={[low.x, low.y, 0.6]} offset={[0, 12]} maxWidth={420} interactive zIndexRange={[30, 0]}>
+        <CanvasLabel position={[low.x, low.y, 0.6]} offset={[0, 12]} maxWidth={320} interactive zIndexRange={[30, 0]}>
           <BedToolbar />
         </CanvasLabel>
       )}
