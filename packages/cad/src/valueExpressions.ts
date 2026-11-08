@@ -8,7 +8,7 @@ export type CadValueScope = Readonly<Record<string, { value: number; kind: CadVa
 
 interface Quantity {
   value: number;
-  dimension: 'length' | 'angle' | null;
+  dimension: 'length' | 'length²' | 'angle' | null;
   explicitUnits: boolean;
   /** A unit was typed, like `in`, rather than coming only from variables. */
   typedUnit: boolean;
@@ -35,10 +35,14 @@ const unitFactors: Record<string, { dimension: 'length' | 'angle'; factor: numbe
   '°': { dimension: 'angle', factor: 1 },
 };
 
-function checked(value: number): number {
+const functionNames = new Set(['floor', 'round', 'min', 'max', 'sqrt']);
+/** Only a word directly followed by `(` is a function call, so a variable may still be called `round`. */
+const isFunction = (name: string) => functionNames.has(name.toLowerCase());
+
+function checked(value: number, dimension: Quantity['dimension'] = null): number {
+  const limit = dimension === 'length²' ? CAD_MAX_INPUT_MAGNITUDE ** 2 : CAD_MAX_INPUT_MAGNITUDE;
   if (!Number.isFinite(value)) throw new Error('The result is outside the supported numeric range.');
-  if (Math.abs(value) > CAD_MAX_INPUT_MAGNITUDE)
-    throw new Error(`Keep values and intermediate results within ±${CAD_MAX_INPUT_MAGNITUDE}.`);
+  if (Math.abs(value) > limit) throw new Error(`Keep values and intermediate results within ±${limit}.`);
   return value === 0 ? 0 : value;
 }
 
@@ -49,6 +53,7 @@ const unitFor = (text: string) => {
 
 function tokenize(text: string, unitsOnly = false): Token[] {
   const result: Token[] = [];
+  const argumentLists: boolean[] = [];
   for (let index = 0; index < text.length; ) {
     const rest = text.slice(index);
     const whitespace = /^\s+/.exec(rest);
@@ -56,9 +61,17 @@ function tokenize(text: string, unitsOnly = false): Token[] {
       index += whitespace[0].length;
       continue;
     }
+    const separator =
+      text[index] === ',' && argumentLists.at(-1) && !(/\d/.test(text[index - 1] ?? '') && /\d/.test(text[index + 1] ?? ''));
     const mixed = /^(\d+)\s+(\d+)\s*\/\s*(\d+)(?![\d.e])/i.exec(rest);
-    const numeric = /^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i.exec(rest);
-    if (mixed) {
+    // Inside min/max, a decimal comma must have a digit on each side.
+    const numeric = (
+      argumentLists.at(-1) ? /^(?:\d+(?:\.\d*|,\d+)?|[.,]\d+)(?:e[+-]?\d+)?/i : /^(?:\d+[.,]?\d*|[.,]\d+)(?:e[+-]?\d+)?/i
+    ).exec(rest);
+    if (separator) {
+      result.push({ kind: 'operator', text: ',' });
+      index++;
+    } else if (mixed) {
       const whole = unitsOnly ? 0 : checked(Number(mixed[1])),
         numerator = unitsOnly ? 0 : checked(Number(mixed[2])),
         denominator = unitsOnly ? 1 : checked(Number(mixed[3]));
@@ -66,7 +79,9 @@ function tokenize(text: string, unitsOnly = false): Token[] {
       result.push({ kind: 'number', value: checked(whole + checked(numerator / denominator)) });
       index += mixed[0].length;
     } else if (numeric) {
-      const value = unitsOnly ? 0 : checked(Number(numeric[0]));
+      if (!unitsOnly && /,\d{3}(?!\d)/.test(numeric[0]))
+        throw new Error('Ambiguous comma group: use a decimal point or remove thousands separators.');
+      const value = unitsOnly ? 0 : checked(Number(numeric[0].replace(',', '.')));
       if (!unitsOnly && value === 0 && /[1-9]/.test(numeric[0].split(/e/i)[0]!)) throw new Error('The number is too small to represent.');
       result.push({ kind: 'number', value });
       index += numeric[0].length;
@@ -75,13 +90,17 @@ function tokenize(text: string, unitsOnly = false): Token[] {
       if (word) {
         result.push({ kind: 'word', text: word[0] });
         index += word[0].length;
-      } else if ('+-*/()'.includes(text[index]!)) {
+      } else if ('+-*/();'.includes(text[index]!)) {
+        if (text[index] === '(') {
+          const previous = result.at(-1);
+          argumentLists.push(previous?.kind === 'word' ? /^(min|max)$/i.test(previous.text) : (argumentLists.at(-1) ?? false));
+        } else if (text[index] === ')') argumentLists.pop();
         result.push({ kind: 'operator', text: text[index]! });
         index++;
       } else if (unitsOnly) {
         index++;
         continue;
-      } else throw new Error('Use numbers, units, +, -, *, / and parentheses.');
+      } else throw new Error('Use numbers, units, functions, +, -, *, /, parentheses and ;.');
     }
     if (result.length > 256) {
       if (unitsOnly) return result;
@@ -106,18 +125,23 @@ export function cadVariableNameError(name: string): string | null {
   return null;
 }
 
+const isCallOpening = (token: Token | undefined) => token?.kind === 'operator' && token.text === '(';
+
 /** The variable names an expression uses, whether or not they exist. */
 export function cadExpressionNames(text: string): string[] {
-  const words = tokenize(text.slice(0, 512), true).filter(token => token.kind === 'word' && unitFor(token.text) === undefined);
+  const tokens = tokenize(text.slice(0, 512), true);
+  const words = tokens.filter(
+    (token, index) => token.kind === 'word' && unitFor(token.text) === undefined && !isCallOpening(tokens[index + 1])
+  );
   return [...new Set(words.map(token => variableName((token as { text: string }).text)))].filter(name => kNamePattern.test(name));
 }
 
 /** The expression with one variable renamed, leaving everything else as typed. */
 export function renameCadExpressionVariable(text: string, from: string, to: string): string {
-  return text.replace(new RegExp(`(?<![A-Za-z0-9_#])(#?)${from}(?![A-Za-z0-9_])`, 'g'), `$1${to}`);
+  return text.replace(new RegExp(`(?<![A-Za-z0-9_#])(#?)${from}(?![A-Za-z0-9_])(?!\\s*\\()`, 'g'), `$1${to}`);
 }
 
-/** A bounded arithmetic parser, with no eval, function calls or application-state access. Variables come only from the scope given. */
+/** A bounded arithmetic parser, with fixed functions, no eval and no application-state access. Variables come only from the scope given. */
 export function parseCadValue(
   text: string,
   { unit = 'mm', variables = {} }: { unit?: CadValueUnit; variables?: CadValueScope } = {}
@@ -126,8 +150,7 @@ export function parseCadValue(
   if (!original) return { error: 'Enter a value.' };
   if (original.length > 512) return { error: 'This expression is too long.' };
   try {
-    if (/,\d{3}(?!\d)/.test(original)) throw new Error('Ambiguous comma group: use a decimal point or remove thousands separators.');
-    const source = original.replace(/^=/, '').replaceAll(',', '.').replaceAll('−', '-').replaceAll('×', '*').replaceAll('÷', '/');
+    const source = original.replace(/^=/, '').replaceAll('−', '-').replaceAll('×', '*').replaceAll('÷', '/');
     const tokens = tokenize(source);
     let index = 0;
     const expectedDimension = unit === 'scalar' ? null : unit === 'mm' ? 'length' : 'angle';
@@ -156,6 +179,21 @@ export function parseCadValue(
         typedUnit: true,
       };
     };
+    const compatible = (left: Quantity, right: Quantity): [Quantity, Quantity] => {
+      // A plain number added to a variable is in that variable's base unit: `depth + 10` is 10 mm more, wherever it's
+      // typed. With a typed unit, as in `2 + 1in`, the plain number stays ambiguous and still needs its own.
+      const plain = (q: Quantity) => !q.dimension && !q.explicitUnits && !q.fraction;
+      const named = (q: Quantity) => (q.dimension === 'length' || q.dimension === 'angle') && !q.typedUnit;
+      if (plain(left) && named(right)) left = { ...left, dimension: right.dimension };
+      if (plain(right) && named(left)) right = { ...right, dimension: left.dimension };
+      if (left.dimension !== right.dimension && (left.fraction || right.fraction))
+        throw new Error('Put units on each fraction, or put the whole sum in parentheses before its unit.');
+      if ((!left.dimension && left.explicitUnits && right.dimension) || (!right.dimension && right.explicitUnits && left.dimension))
+        throw new Error('A unitless ratio cannot be added to a length or angle.');
+      if (left.dimension !== right.dimension)
+        throw new Error('Put units on each added value, or put the whole sum in parentheses before its unit.');
+      return [left, right];
+    };
     const primary = (depth: number): Quantity => {
       if (depth > 32) throw new Error('Too many nested parentheses or signs.');
       if (operator('+') || operator('-')) {
@@ -172,9 +210,48 @@ export function parseCadValue(
         return applyUnit(result);
       }
       const token = tokens[index];
+      if (token?.kind === 'word' && operator('(', 1)) {
+        const name = token.text.toLowerCase();
+        if (!isFunction(name)) throw new Error(`Unknown function: ${token.text}.`);
+        index += 2;
+        const args = [sum(depth + 1)];
+        while (operator(';') || operator(',')) {
+          index++;
+          args.push(sum(depth + 1));
+        }
+        if (!operator(')')) throw new Error('Close the parentheses.');
+        index++;
+        const first = args[0]!;
+        let result: Quantity;
+        if (name === 'min' || name === 'max') {
+          if (args.length < 2) throw new Error(`${name} needs at least two arguments. Separate values with ", " or ";".`);
+          result = first;
+          for (const arg of args.slice(1)) {
+            const [left, right] = compatible(result, arg);
+            result = {
+              value: name === 'min' ? Math.min(left.value, right.value) : Math.max(left.value, right.value),
+              dimension: left.dimension,
+              explicitUnits: left.explicitUnits || right.explicitUnits,
+              typedUnit: left.typedUnit || right.typedUnit,
+              fraction: left.fraction || right.fraction,
+            };
+          }
+        } else {
+          if (args.length !== 1) throw new Error(`${name} needs exactly one argument.`);
+          if (name === 'sqrt') {
+            if (first.value < 0) throw new Error('Cannot take the square root of a negative value.');
+            if (first.dimension && first.dimension !== 'length²') throw new Error('sqrt needs a unitless value or a squared length.');
+            const dimension = first.dimension === 'length²' ? 'length' : null;
+            result = { ...first, dimension, value: checked(Math.sqrt(first.value), dimension) };
+          } else
+            result = { ...first, value: checked(name === 'floor' ? Math.floor(first.value) : Math.round(first.value), first.dimension) };
+        }
+        return applyUnit(result);
+      }
       if (token?.kind === 'word' && unitFor(token.text) === undefined) {
         const name = variableName(token.text);
-        if (!Object.hasOwn(variables, name)) throw new Error(`There's no variable called ${name}.`);
+        if (!Object.hasOwn(variables, name))
+          throw new Error(isFunction(name) ? `Use parentheses after ${name}: ${name}(...).` : `There's no variable called ${name}.`);
         const variable = variables[name]!;
         index++;
         const dimension = variable.kind === 'number' ? null : variable.kind;
@@ -209,13 +286,20 @@ export function parseCadValue(
         index++;
         const right = primary(depth);
         if (divide && right.value === 0) throw new Error('Cannot divide by zero.');
-        if ((!divide && left.dimension && right.dimension) || (divide && right.dimension && left.dimension !== right.dimension))
-          throw new Error('The expression must produce a length or angle, not compound units.');
-        const result = checked(divide ? left.value / right.value : left.value * right.value);
+        let dimension = left.dimension ?? right.dimension;
+        if (divide && right.dimension) {
+          if (left.dimension === right.dimension) dimension = null;
+          else if (left.dimension === 'length²' && right.dimension === 'length') dimension = 'length';
+          else throw new Error('The expression must produce a length or angle, not compound units.');
+        } else if (!divide && left.dimension && right.dimension) {
+          if (left.dimension === 'length' && right.dimension === 'length') dimension = 'length²';
+          else throw new Error('The expression must produce a length or angle, not compound units.');
+        }
+        const result = checked(divide ? left.value / right.value : left.value * right.value, dimension);
         if (result === 0 && left.value !== 0 && right.value !== 0) throw new Error('The result is too small to represent.');
         left = {
           value: result,
-          dimension: divide && right.dimension ? null : (left.dimension ?? right.dimension),
+          dimension,
           explicitUnits: left.explicitUnits || right.explicitUnits,
           typedUnit: left.typedUnit || right.typedUnit,
           fraction: left.fraction || right.fraction || divide,
@@ -229,20 +313,9 @@ export function parseCadValue(
         const subtract = operator('-');
         index++;
         let right = product(depth);
-        // A plain number added to a variable is in that variable's base unit: `depth + 10` is 10 mm more, wherever it's
-        // typed. With a typed unit, as in `2 + 1in`, the plain number stays ambiguous and still needs its own.
-        const plain = (q: Quantity) => !q.dimension && !q.explicitUnits && !q.fraction;
-        const named = (q: Quantity) => q.dimension !== null && !q.typedUnit;
-        if (plain(left) && named(right)) left = { ...left, dimension: right.dimension };
-        if (plain(right) && named(left)) right = { ...right, dimension: left.dimension };
-        if (left.dimension !== right.dimension && (left.fraction || right.fraction))
-          throw new Error('Put units on each fraction, or put the whole sum in parentheses before its unit.');
-        if ((!left.dimension && left.explicitUnits && right.dimension) || (!right.dimension && right.explicitUnits && left.dimension))
-          throw new Error('A unitless ratio cannot be added to a length or angle.');
-        if (left.dimension !== right.dimension)
-          throw new Error('Put units on each added value, or put the whole sum in parentheses before its unit.');
+        [left, right] = compatible(left, right);
         left = {
-          value: checked(left.value + (subtract ? -right.value : right.value)),
+          value: checked(left.value + (subtract ? -right.value : right.value), left.dimension),
           dimension: left.dimension ?? right.dimension,
           explicitUnits: left.explicitUnits || right.explicitUnits,
           typedUnit: left.typedUnit || right.typedUnit,
@@ -253,6 +326,7 @@ export function parseCadValue(
     };
     const result = sum(0);
     if (index !== tokens.length) throw new Error('Separate values with an operator and check the parentheses.');
+    if (result.dimension === 'length²') throw new Error('The expression must produce a length, not a squared length: take its sqrt(...).');
     if (result.explicitUnits && result.dimension !== expectedDimension)
       throw new Error(
         unit === 'mm'
