@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   addCircle,
+  evaluatedPartCopy,
   addRectangle,
   createCadDocument,
   createCadPart,
@@ -93,6 +94,57 @@ describe('positioned Extrude Remove', () => {
     const solved = await solveCadDocument(document);
     expect(solved.document.parts[1]!.thickness).toBe(18);
     expect(solved.parts[0]!.cuts![0]).toMatchObject({ through: true, to: 18 });
+  });
+
+  it.each(['remove', 'cutParts'])('preserves cuts on individual copies after an earlier %s', earlier => {
+    const document = design();
+    document.parts[0]!.copies = [{ id: 'copy', placement: { position: [200, 0, 0], rotation: [0, 0, 0, 1] } }];
+    const second: CadPart = {
+      ...createCadPart('Second removal', 10),
+      id: 'second-removal',
+      drawnOn: { on: { plane: 'top' }, offset: 18, inward: true },
+      remove: { depth: 4 },
+    };
+    second.sketch = addRectangle(second.sketch, { x: 240, y: 30, width: 20, height: 20 });
+    document.parts.push(second);
+    if (earlier === 'cutParts') {
+      delete document.parts[1]!.remove;
+      document.parts[1]!.thickness = 6;
+      document.partCuts = [{ id: 'earlier-cut', tools: ['tool'], targets: ['board'], clearance: 0 }];
+    }
+    const placed = resolveDrawnPlacements(document).document;
+    const result = evaluateCadDocument(placed);
+    expect(result.diagnostics.filter(problem => problem.severity === 'error')).toEqual([]);
+    const board = result.parts[0]!;
+    const copy = evaluatedPartCopy(board, placed.parts[0]!.copies![0]!);
+    expect(board.cuts).toHaveLength(1);
+    expect(copy.cuts).toHaveLength(1);
+    expect(board.cuts![0]!.to).toBe(6);
+    expect(copy.cuts![0]!.to).toBe(4);
+    expect(Math.min(...copy.cuts![0]!.outline.map(point => point.x))).toBe(40);
+    expect(cadPartsToCut(placed, result.parts).filter(entry => entry.names.some(name => name.includes('Plate')))).toHaveLength(2);
+  });
+
+  it('keeps disconnected face pockets when offset or symmetric extrusion controls are changed', () => {
+    const document = design(6);
+    const tool = document.parts[1]!;
+    tool.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1 };
+    tool.sketch = addRectangle(tool.sketch, { x: 70, y: 70, width: 10, height: 10 });
+    expect(errors(document)).toEqual([]);
+    expect(evaluateCadDocument(document).parts[0]!.cuts!.map(cut => cut.to)).toEqual([5, 5]);
+    tool.drawnOn.offset = 0;
+    tool.symmetric = true;
+    expect(errors(document)).toEqual([]);
+    expect(evaluateCadDocument(document).parts[0]!.cuts!.map(cut => cut.to)).toEqual([3, 3]);
+  });
+
+  it('cuts through an unplaced support at the origin', () => {
+    const document = design('through');
+    delete document.parts[0]!.drawnOn;
+    delete document.parts[0]!.placement;
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1 };
+    expect(errors(document)).toEqual([]);
+    expect(cut(document)).toMatchObject({ through: true, to: 18 });
   });
 
   it('rejects invalid saved removal scopes', () => {

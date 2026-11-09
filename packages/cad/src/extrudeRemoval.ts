@@ -1,8 +1,9 @@
 import { applyPartCuts } from './cutParts';
 import { cadSketchFrame } from './usedEdges';
-import { resolveDrawnPlacements } from './drawnOn';
-import { isCadBody } from './extrudeSteps';
-import { evaluateCadPart } from './geometry';
+import { cadDrawnOnSupports, effectivePlacement, resolveDrawnPlacements } from './drawnOn';
+import { evaluatedPartCopy } from './copies';
+import { isCadBody, removalRegions } from './extrudeSteps';
+import { regionGroups } from './regionProfile';
 import { placePoint } from './placement';
 import type { CadDiagnostic, CadDocument, CadPart, EvaluatedCadPart } from './types';
 
@@ -61,13 +62,19 @@ export function applyExtrudeRemovals(
         error('The sketch’s plane could not be placed.');
         continue;
       }
+      const supports = cadDrawnOnSupports(placed);
       const reaches = targets.flatMap(target => {
         const shape = parts.find(part => part.partId === target.id)!;
         const source = placed.parts.find(part => part.id === target.id)!;
-        return [source.placement, ...(source.copies ?? []).map(copy => copy.placement)].flatMap(placement =>
+        // A board used as a support lives at the origin even without a saved placement. Mirrored copies have their own extents.
+        const instances = [
+          { placement: effectivePlacement(source, supports), shape },
+          ...(source.copies ?? []).map(copy => ({ placement: copy.placement, shape: evaluatedPartCopy(shape, copy) })),
+        ];
+        return instances.flatMap(({ placement, shape: instance }) =>
           placement
-            ? shape.outline.flatMap(point =>
-                [0, shape.thickness].map(z => {
+            ? instance.outline.flatMap(point =>
+                [0, instance.thickness].map(z => {
                   const world = placePoint(placement, [point.x, point.y, z]);
                   return world.reduce((sum, value, axis) => sum + (value - frame.origin[axis]!) * frame.normal[axis]!, 0);
                 })
@@ -82,21 +89,59 @@ export function applyExtrudeRemovals(
           ...(step.symmetric ? reaches.map(Math.abs).map(value => value * 2) : reaches.map(value => (inward ? -value : value)))
         ) + 1;
     }
-    const tool: CadPart = { ...step, thickness, drawnOn: { ...step.drawnOn!, inward } };
-    delete tool.copies;
-    delete tool.pattern;
-    const profile = evaluateCadPart(tool);
-    if (!profile.part) {
-      error(profile.diagnostics[0]?.message ?? 'Draw a closed shape to cut.');
+    if (!(thickness > 0)) {
+      error('A cut needs some depth.');
       continue;
     }
+    const found = removalRegions(document, step);
+    if ('error' in found) {
+      error(found.error);
+      continue;
+    }
+    const wanted = step.regions ?? found.cut;
+    const regions = found.regions.filter(region => wanted.includes(region.id));
+    if (new Set(wanted).size !== regions.length) {
+      error('A region picked to remove is no longer in its sketch. Pick its regions again.');
+      continue;
+    }
+    const groups = regionGroups(regions);
+    if (!groups.length) {
+      error('Draw a closed shape to cut it out.');
+      continue;
+    }
+    // A Remove can cut several disconnected pockets. Group adjacent regions without requiring one solid profile.
+    const tools: CadPart[] = groups.map((_, index) => {
+      const tool: CadPart = {
+        ...step,
+        id: index ? `${step.id}-region-${index}` : step.id,
+        thickness,
+        drawnOn: { ...step.drawnOn!, inward },
+      };
+      delete tool.copies;
+      delete tool.pattern;
+      return tool;
+    });
+    const profiles: EvaluatedCadPart[] = groups.map((group, index) => ({
+      partId: tools[index]!.id,
+      name: step.name,
+      thickness,
+      outline: group.outline,
+      holes: group.holes,
+      loops: [
+        { id: `${tools[index]!.id}:outline`, kind: 'outer', points: group.outline, entityIds: group.curveIds },
+        ...group.holes.map((points, hole) => ({ id: `${tools[index]!.id}:hole-${hole}`, kind: 'hole' as const, points, entityIds: [] })),
+      ],
+    }));
     const prepared = resolveDrawnPlacements({
       ...document,
-      parts: document.parts.map(part => (part.id === step.id ? tool : part)),
+      parts: [...document.parts.map(part => (part.id === step.id ? tools[0]! : part)), ...tools.slice(1)],
     }).document;
     const cut = applyPartCuts(
-      { ...prepared, partCuts: [{ id: `remove-${step.id}`, tools: [step.id], targets: targets.map(target => target.id), clearance: 0 }] },
-      [...parts.filter(part => part.partId !== step.id), profile.part]
+      {
+        ...prepared,
+        partCuts: [{ id: `remove-${step.id}`, tools: tools.map(tool => tool.id), targets: targets.map(target => target.id), clearance: 0 }],
+      },
+      [...parts.filter(part => part.partId !== step.id), ...profiles]
     );
     for (const problem of cut.diagnostics)
       error(

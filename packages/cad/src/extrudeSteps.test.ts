@@ -199,7 +199,7 @@ describe('Extrude → Remove', () => {
       'Draw a closed shape on the face to cut it out.'
     );
     const onPlane = { ...pocket, drawnOn: { on: { plane: 'top' as const }, offset: 0 }, remove: { depth: 5 } };
-    expect(extrudeStepProblem(design(board, onPlane), onPlane)).toMatch(/Close every cut contour/);
+    expect(extrudeStepProblem(design(board, onPlane), onPlane)).toMatch(/Draw a closed shape/);
   });
 
   it('follows a depth typed with a variable', async () => {

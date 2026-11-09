@@ -2,7 +2,7 @@ import { applyExtrudeRemovals } from './extrudeRemoval';
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
 import { validPartCutSplit } from './partCutSplit';
-import { mirrorEvaluatedPart, sameCadCuts } from './copies';
+import { evaluatedPartCopy, mirrorEvaluatedPart, sameCadCuts } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
 import { evaluateCadFeatures } from './features';
@@ -262,7 +262,8 @@ export function applyPartCuts(
         ...(sources.get(part.partId)?.copies ?? []).map(copy => ({
           key: copy.id,
           at: copy.placement,
-          shape: copy.mirrored ? mirrorEvaluatedPart(part) : part,
+          // A preceding removal can give each instance different cuts; don't copy the original's cuts over them.
+          shape: evaluatedPartCopy(part, copy),
           mirrored: !!copy.mirrored,
         })),
       ],
@@ -388,7 +389,7 @@ export function applyPartCuts(
                     {
                       key: `:${copy.id}`,
                       at: copy.placement,
-                      shape: copy.mirrored ? mirrorEvaluatedPart(tool) : tool,
+                      shape: evaluatedPartCopy(tool, copy),
                       name: cadCopyName(toolSource, index),
                     },
                   ]
@@ -549,7 +550,8 @@ export function applyPartCuts(
       const cuts = (copy.mirrored ? mirrorEvaluatedPart(copy.shape) : copy.shape).cuts ?? [];
       if (!sameCadCuts(original.cuts, cuts)) copyCuts[copy.key] = cuts;
     }
-    byId.set(id, { ...original, ...(Object.keys(copyCuts).length && { copyCuts }) });
+    const { copyCuts: _previousCopyCuts, ...shape } = original;
+    byId.set(id, { ...shape, ...(Object.keys(copyCuts).length && { copyCuts }) });
   }
   return { parts: parts.map(part => byId.get(part.partId)!), diagnostics };
 }
