@@ -16,13 +16,17 @@ import { useCallback, useEffect, useRef } from 'react';
 import { nativeRunHistoryChanged } from './machine/nativeRunHistory';
 import { boardGeometryKey } from './cadDesign';
 import { followPlan } from './planProgress';
+import { trackCalls } from '@/lib/settled';
 
 export { modelKey } from './jobDb';
 
 let worker: Comlink.Remote<CamWorkerAPI> | undefined;
 /** One long-lived worker, started on the first model: occt's wasm is 2.3 MB brotli. */
 export function camWorker() {
-  worker ??= Comlink.wrap<CamWorkerAPI>(new Worker(new URL('../workers/cam.worker.ts', import.meta.url), { type: 'module' }));
+  worker ??= trackCalls(
+    'worker',
+    Comlink.wrap<CamWorkerAPI>(new Worker(new URL('../workers/cam.worker.ts', import.meta.url), { type: 'module' }))
+  );
   return worker;
 }
 
