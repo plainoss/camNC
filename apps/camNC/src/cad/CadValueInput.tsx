@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type Ref } from 'react';
 import { cadValueHasUnit } from './valueExpressions';
-import { settleField, useCadVariableFields, variableDefinition, variablePrefix } from './variableFields';
+import { settleField, useCadVariableFields, variableDefinition, variablePrefix, whenVariable } from './variableFields';
 
 type Props = ComponentPropsWithoutRef<'input'> & {
   inputRef?: Ref<HTMLInputElement>;
@@ -60,28 +60,23 @@ export function CadValueInput({
       mounted.current = false;
     };
   }, []);
-  // The design's variables as of the latest render, to know when a variable just made is there to use.
-  const latestFields = useRef(fields);
-  latestFields.current = fields;
   /**
-   * Runs once the variable the field now names is in scope, a frame after the design has it (a few seconds at most), and
+   * Runs once the variable the field now names is in scope, just after the editor offers it (a few seconds at most), and
    * only while the field is still there. A dialog the field is in waits for it before it's done.
    */
   const later = (run: () => void) => {
     const name = /^#([A-Za-z_][A-Za-z0-9_]*)$/.exec(own.current?.value ?? '')?.[1];
     settleField(
-      new Promise(resolve => {
-        const wait = (frames: number) =>
-          requestAnimationFrame(() => {
-            const ready = !name || !!latestFields.current?.variables.some(variable => variable.name === name);
-            if (!ready && frames > 0) return wait(frames - 1);
-            requestAnimationFrame(() => {
+      (name ? whenVariable(name) : Promise.resolve(true)).then(
+        () =>
+          // A turn after the editor offers it, so its own render has finished.
+          new Promise<void>(resolve =>
+            setTimeout(() => {
               if (mounted.current && own.current?.isConnected) run();
               resolve();
-            });
-          });
-        wait(180);
-      })
+            })
+          )
+      )
     );
   };
   const options = menu

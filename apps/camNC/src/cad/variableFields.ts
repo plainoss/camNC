@@ -40,6 +40,28 @@ export function useProvideCadVariableFields(fields: CadVariableFields) {
   }, [fields]);
 }
 
+/**
+ * Resolves once the open editor offers a variable of this name, which is after it has rendered with it, so every field's
+ * owner already has it in scope. Gives up after `timeout` ms. It waits on the editor itself, not on animation frames,
+ * which a busy or background page slows down.
+ */
+export function whenVariable(name: string, timeout = 5000): Promise<boolean> {
+  const has = () => !!current?.variables.some(variable => variable.name === name);
+  if (has()) return Promise.resolve(true);
+  return new Promise(resolve => {
+    const done = (found: boolean) => {
+      clearTimeout(timer);
+      listeners.delete(check);
+      resolve(found);
+    };
+    const check = () => {
+      if (has()) done(true);
+    };
+    const timer = setTimeout(() => done(false), timeout);
+    listeners.add(check);
+  });
+}
+
 /** The open editor's variables, for a value field. */
 export const useCadVariableFields = () => useSyncExternalStore(subscribe, () => current);
 
