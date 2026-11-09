@@ -72,6 +72,7 @@ import {
   removeCadFeature,
   removeCadVariable,
   removeDatumPlane,
+  removeEdgeFillet,
   consumedTools,
   splitApartRegions,
   cadCopyName,
@@ -236,6 +237,7 @@ import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureLis
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
 import { MirrorDialog } from './MirrorDialog';
+import { FilletDialog } from './FilletDialog';
 import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
 import { pickedPlane, pickedPlaneFrame } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
@@ -490,6 +492,7 @@ export function CadEditor({
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   const [planeDialog, setPlaneDialog] = useState<{ id?: string; preselected?: CadDrawnOn['on'] } | null>(null);
   const [mirrorDialog, setMirrorDialog] = useState<{ partId: string; copyId?: string } | null>(null);
+  const [filletDialog, setFilletDialog] = useState<{ partId?: string; filletId?: string } | null>(null);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // A part being copied by a transform, or the transformed copy being changed.
@@ -3550,6 +3553,7 @@ export function CadEditor({
     if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
     if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
     if (studioSession && step.kind === 'move') return openTransform(step.partId, undefined, true);
+    if (studioSession && step.kind === 'fillet') return setFilletDialog({ partId: step.partId, filletId: step.id });
     if (studioSession && step.kind === 'copy') {
       const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
       if (copy?.offset) return openTransform(step.partId, copy.id);
@@ -3633,6 +3637,7 @@ export function CadEditor({
     if (action === 'rollToEnd') return setRolledTo(null);
     if (action !== 'delete') return;
     setFeatureDialog(null);
+    if (step.kind === 'fillet') return commit(removeEdgeFillet(current, step.partId, step.id));
     if (step.kind === 'move')
       return commit(
         replacePart(current, step.partId, p => {
@@ -3770,7 +3775,8 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
-    } else if (command === 'mirror') {
+    } else if (command === 'fillet') setFilletDialog({});
+    else if (command === 'mirror') {
       if (part) setMirrorDialog({ partId: part.id });
     } else if (command === 'plane') {
       setFeatureDialog(null);
@@ -4446,6 +4452,14 @@ export function CadEditor({
                 setVariableDialog(null);
               }}
               onCancel={() => setVariableDialog(null)}
+            />
+          )}
+          {showWorkspace && filletDialog && (
+            <FilletDialog
+              key={filletDialog.filletId ?? 'new'}
+              {...{ document: doc, variables: variableScope, ...filletDialog, pickEdge: pointPicker.start }}
+              onSave={next => (commit(next), setFilletDialog(null))}
+              onCancel={() => setFilletDialog(null)}
             />
           )}
           {showWorkspace && mirrorDialog && (
