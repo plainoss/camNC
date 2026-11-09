@@ -945,6 +945,16 @@ it('extrudes up to a picked plane, its thickness following the distance, or symm
   await waitFor(() => expect(latest().parts[0]!.upTo).toEqual({ plane: 'front' }));
   expect(latest().parts[0]!.symmetric).toBeUndefined();
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(300));
+  // Thin has a depth of its own, so it leaves Up to face, and its thickness can be typed again.
+  await userEvent.click(within(dialog).getByRole('tab', { name: 'Thin' }));
+  await waitFor(() => expect(latest().parts[0]!.upTo).toBeUndefined());
+  await userEvent.click(within(dialog).getByRole('tab', { name: 'Solid' }));
+  // Choosing Blind while a face is still to be picked stops waiting for it: a plane clicked next is only selected.
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'upTo');
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'blind');
+  expect((within(dialog).getByRole('combobox', { name: 'End type' }) as HTMLSelectElement).value).toBe('blind');
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Right/ }));
+  expect(latest().parts[0]!.upTo).toBeUndefined();
 });
 
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {

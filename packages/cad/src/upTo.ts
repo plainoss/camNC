@@ -1,4 +1,4 @@
-import { cadFaceFrame } from './drawnOn';
+import { cadFaceFrame, resolveDrawnPlacements } from './drawnOn';
 import { cadSketchFrame } from './usedEdges';
 import type { CadDocument } from './types';
 
@@ -12,10 +12,12 @@ const kThinnest = 0.1;
 export function resolveUpTo(document: CadDocument): CadDocument {
   if (!document.parts.some(part => part.upTo)) return document;
   let changed = false;
+  // Faces are where their parts now are, as when one was moved by changing what it's drawn on.
+  const placed = resolveDrawnPlacements(document).document;
   const parts = document.parts.map(part => {
     if (!part.upTo || part.thin || !part.drawnOn) return part;
-    const from = cadSketchFrame(document, part);
-    const to = cadFaceFrame(document, part.upTo);
+    const from = cadSketchFrame(placed, placed.parts.find(candidate => candidate.id === part.id)!);
+    const to = cadFaceFrame(placed, part.upTo);
     if (!from || 'error' in to) return part;
     const reach = [0, 1, 2].reduce((sum, axis) => sum + (to.origin[axis]! - from.origin[axis]!) * from.normal[axis]!, 0);
     const thickness = Math.round((part.drawnOn.inward ? -reach : reach) * 1e6) / 1e6;

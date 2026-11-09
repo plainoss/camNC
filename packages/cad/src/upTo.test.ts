@@ -21,6 +21,19 @@ describe('extruding up to a face', () => {
     expect(placed({ ...createCadDocument(), parts: [raised, post] }).parts[1]!.thickness).toBe(250);
   });
 
+  it('reaches a face moved since its part was last placed', () => {
+    const lid = { ...plate('Lid'), drawnOn: { on: { plane: 'top' as const }, offset: 200 } };
+    const post = {
+      ...plate('Post'),
+      drawnOn: { on: { plane: 'top' as const }, offset: 0 },
+      upTo: { partId: lid.id, face: 'underside' as const },
+    };
+    const before = resolveDrawnPlacements({ ...createCadDocument(), parts: [lid, post] }).document;
+    // The lid's offset changed, but its stored placement is still at 200.
+    const raised = { ...before, parts: [{ ...before.parts[0]!, drawnOn: { ...lid.drawnOn, offset: 250 } }, before.parts[1]!] };
+    expect(resolveUpTo(raised).parts[1]!.thickness).toBe(250);
+  });
+
   it('places a symmetric extrude half to each side of its plane', () => {
     const part = { ...plate('Mid'), drawnOn: { on: { plane: 'top' as const }, offset: 0 }, symmetric: true as const };
     expect(resolveDrawnPlacements({ ...createCadDocument(), parts: [part] }).document.parts[0]!.placement!.position[2]).toBe(-9);

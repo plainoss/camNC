@@ -65,8 +65,8 @@ export function ExtrudeDialog({
   pickFace,
 }: PartDialogProps & {
   onEditSketch: () => void;
-  /** Starts picking a plane or a face, for Up to face; the pick comes back once. */
-  pickFace?: (picked: (on: CadDrawnOn['on']) => void) => void;
+  /** Starts picking a plane or a face, for Up to face; the pick comes back once. Null stops a pick under way. */
+  pickFace?: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
 }) {
   const [pickingFace, setPickingFace] = useState(false);
   /** Blind to a thickness, or up to a plane or face: its thickness then follows that face. */
@@ -81,6 +81,12 @@ export function ExtrudeDialog({
         return next;
       })
     );
+  /** Stops waiting for a face, as when Blind or Thin is chosen instead. */
+  const stopPickingFace = () => {
+    if (!pickingFace) return;
+    setPickingFace(false);
+    pickFace?.(null);
+  };
   const startPickingFace = () => {
     if (!pickFace) return;
     setPickingFace(true);
@@ -181,15 +187,20 @@ export function ExtrudeDialog({
   // A sketch that isn't one outline extrudes the region picked from it in the view; until then there's nothing to make.
   const profileError = part.thin ? undefined : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
   const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? formatCadValue(part.thin.depth)) : '100');
-  const setThin = (thin: CadPart['thin'] | null) =>
+  const setThin = (thin: CadPart['thin'] | null) => {
+    // A thin extrude has a depth of its own, so it no longer goes up to a face.
+    if (thin) stopPickingFace();
     onChange(document =>
       changePart(document, part.id, p => {
         const next = { ...p };
-        if (thin) next.thin = thin;
-        else delete next.thin;
+        if (thin) {
+          next.thin = thin;
+          delete next.upTo;
+        } else delete next.thin;
         return next;
       })
     );
+  };
   /** Takes the typed depth, or says why not. Whether it was taken. */
   const applyDepth = () => {
     const parsed = parseCadValue(depthText, { unit: 'mm', variables });
@@ -335,7 +346,11 @@ export function ExtrudeDialog({
               <select
                 aria-label="End type"
                 value={part.upTo || pickingFace ? 'upTo' : 'blind'}
-                onChange={event => (event.target.value === 'upTo' ? startPickingFace() : setUpTo(null))}>
+                onChange={event => {
+                  if (event.target.value === 'upTo') return startPickingFace();
+                  stopPickingFace();
+                  setUpTo(null);
+                }}>
                 <option value="blind">Blind</option>
                 <option value="upTo">Up to face</option>
               </select>
