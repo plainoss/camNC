@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { checkStudio, studioContent, studioState } from './adapters/studioModel.mjs';
@@ -21,4 +22,34 @@ describe('Part Studio workflow expectations', () => {
     const actual = { ...studioState(cupboard), listedParts: [{ name: 'Side', thickness: 18 }], partIssues: ['Missing face'] };
     expect(checkStudio({ listedParts: [{ name: 'Side', thickness: 24 }], partIssues: [] }, actual)).toHaveLength(2);
   });
+});
+
+it('source expectations reject wrong pattern, offset and consumed tools',()=>{
+  const state=studioState(cupboard);
+  assert.equal(checkStudio({patterns:{Shelf:{count:3}},offsets:{Shelf:{value:231.5}},cutSettings:[{keepTools:false}]},state).length,3);
+});
+it('retained-identity and exact growth checks reject churn despite unchanged count and dimensions',()=>{
+  const before=structuredClone(cupboard),shelf=before.parts.find(p=>p.name==='Shelf');
+  shelf.pattern={id:'stable-pattern',axis:'z',count:3,countExpression:'shelves',spacing:120};
+  shelf.copies=[{id:'copy-one'},{id:'copy-two'}];
+  const checkpoints=new Map([['repeat-shelves',studioState(before)]]);
+  const good=structuredClone(before),next=good.parts.find(p=>p.name==='Shelf');
+  next.pattern.count=4;next.copies.push({id:'copy-three'});
+  const expected={retainedIdsSince:'repeat-shelves',samePatternIdsSince:'repeat-shelves',addedCopyIdsSince:{checkpoint:'repeat-shelves',part:'Shelf',count:1}};
+  assert.deepEqual(checkStudio(expected,studioState(good),checkpoints),[]);
+  next.copies.reverse();
+  assert.equal(checkStudio(expected,studioState(good),checkpoints).length,2);
+  next.copies.reverse();
+  next.copies[0].id='churned-copy';
+  assert.equal(checkStudio(expected,studioState(good),checkpoints).length,3);
+  next.pattern.id='churned-pattern';
+  assert.equal(checkStudio(expected,studioState(good),checkpoints).length,4);
+});
+it('retained identities keep their named source owner when panels are swapped', () => {
+  const changed = structuredClone(cupboard), bottom = changed.parts.find(part => part.name === 'Bottom'), top = changed.parts.find(part => part.name === 'Top');
+  [bottom.id, top.id] = [top.id, bottom.id];
+  const failures = checkStudio({ retainedIdsSince: 'assembled' }, studioState(changed), new Map([['assembled', studioState(cupboard)]]));
+  expect(failures).toHaveLength(2);
+  expect(failures[0]).toContain('/Bottom/0');
+  expect(failures[1]).toContain('/Top/0');
 });
