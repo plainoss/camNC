@@ -83,14 +83,14 @@ describe('a part extruding another part’s sketch', () => {
     expect(document.parts[1]!.sketch).toBe(document.parts[0]!.sketch);
   });
 
-  it('is made from the regions its sketch’s extrudes don’t use yet, and not for a part that’s its whole sketch', () => {
+  it('starts with the regions its sketch’s extrudes don’t use yet, or none when they use it all', () => {
     const { owner, narrow } = splitDesign();
-    const made = newExtrudeOf(design(owner), owner, 'Part 2')!;
+    const made = newExtrudeOf(design(owner), owner, 'Part 2');
     expect(made).toMatchObject({ sketchOf: 'shelf', regions: [narrow], thickness: 18, drawnOn: { on: { plane: 'top' } } });
-    expect(newExtrudeOf(design(owner, made), made, 'Part 3')).toBeNull();
+    expect(newExtrudeOf(design(owner, made), made, 'Part 3')).toMatchObject({ sketchOf: 'shelf', regions: [] });
     const whole: CadPart = { ...owner };
     delete whole.regions;
-    expect(newExtrudeOf(design(whole), whole, 'Part 2')).toBeNull();
+    expect(newExtrudeOf(design(whole), whole, 'Part 2').regions).toEqual([]);
   });
 
   it('asks for regions while it has none picked', () => {
