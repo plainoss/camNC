@@ -1,0 +1,399 @@
+{
+  "statuses": {
+    "done": "Works, and the evidence checks it",
+    "partial": "Works with the limits in its note",
+    "gap": "Missing or refused; pick it up from the known gaps"
+  },
+  "areas": [
+    {
+      "name": "Part Studio features",
+      "rows": [
+        {
+          "item": "Separate parts, each with its own sketch and features",
+          "status": "done",
+          "evidence": ["sketch/part/parts-are-separate", "packages/cad/src/partIsolation.test.ts"]
+        },
+        {
+          "item": "Extrude a closed profile to a thickness, thin, or up to a face",
+          "status": "done",
+          "evidence": ["packages/cad/src/thinExtrude.test.ts", "packages/cad/src/upTo.test.ts", "apps/camNC/src/cad/CadThicknessField.test.tsx"]
+        },
+        {
+          "item": "Extrude Add: another sketch's extrude joins a part",
+          "status": "done",
+          "evidence": ["packages/cad/src/extrudeSteps.test.ts"]
+        },
+        {
+          "item": "Sketch on the top face, the underside and pocket floors",
+          "status": "done",
+          "evidence": ["sketch/finish/pocket-inside-a-pocket", "packages/cad/src/drawnOn.test.ts"],
+          "note": "The camera turns to face the surface, then the flat sketch editor opens. An underside sketch is drawn as seen from below, so its X runs the other way."
+        },
+        {
+          "item": "Datum planes",
+          "status": "done",
+          "evidence": ["packages/cad/src/datumPlanes.test.ts", "apps/camNC/src/cad/CadEditor.planes.test.tsx"]
+        },
+        {
+          "item": "Face edges show in a sketch drawn on that face, and parts stay tied to them",
+          "status": "done",
+          "evidence": ["packages/cad/src/faceEdges.test.ts", "apps/camNC/src/cad/CadEditor.faceEdges.test.tsx"]
+        },
+        {
+          "item": "Inner loops are through-holes unless given a depth",
+          "status": "done",
+          "evidence": ["sketch/finish/hole-is-through-cut", "packages/cad/src/cad.test.ts"]
+        },
+        {
+          "item": "Pocket depths set on the drawing or by clicking the part in 3D, switched off without losing the depth",
+          "status": "done",
+          "evidence": ["sketch/finish/pockets-reach-boards", "sketch/finish/cuts-set-in-3d", "apps/camNC/src/cad/CadEditor.cuts.test.tsx"]
+        },
+        {
+          "item": "Rabbets from a face sketch that crosses the part outline",
+          "status": "done",
+          "evidence": ["sketch/finish/pockets-reach-boards", "packages/cad/src/sketchRegions.test.ts"]
+        },
+        {
+          "item": "Transform a part: translate, translate by line, rotate, mate connectors",
+          "status": "done",
+          "evidence": ["packages/cad/src/mateMove.test.ts", "apps/camNC/src/cad/CadEditor.studio.test.tsx"]
+        },
+        {
+          "item": "Copies of a part",
+          "status": "done",
+          "evidence": ["packages/cad/src/copies.test.ts", "apps/camNC/src/cad/CadCopyNames.test.tsx"]
+        },
+        {
+          "item": "Linear pattern of parts along a picked edge",
+          "status": "done",
+          "evidence": ["packages/cad/src/partPatterns.test.ts", "apps/camNC/src/cad/CadPartPatternField.test.tsx"]
+        },
+        {
+          "item": "Mirror a part across a plane",
+          "status": "done",
+          "evidence": ["packages/cad/src/mirror.test.ts", "apps/camNC/src/cad/CadEditor.mirror.test.tsx"]
+        },
+        {
+          "item": "Part cut: house one part in another with clearance",
+          "status": "done",
+          "evidence": ["packages/cad/src/cutParts.test.ts", "apps/camNC/src/cad/PartCutDialog.test.tsx"]
+        },
+        {
+          "item": "Overlapping parts are reported",
+          "status": "done",
+          "evidence": ["packages/cad/src/assemblyCollisions.test.ts"]
+        },
+        {
+          "item": "Suppress a step",
+          "status": "done",
+          "evidence": ["packages/cad/src/suppression.test.ts"]
+        },
+        {
+          "item": "Variables in values",
+          "status": "done",
+          "evidence": ["packages/cad/src/variables.test.ts", "apps/camNC/src/cad/CadVariablesPanel.test.tsx"]
+        },
+        {
+          "item": "Accepted geometry and draft edits persist with the project",
+          "status": "done",
+          "evidence": ["sketch/persist/reload-keeps-design", "sketch/persist/reload-keeps-accepted", "sketch/persist/last-edit-saved-immediately"]
+        },
+        {
+          "item": "Returning to the sketch from Boards keeps its geometry, dimensions, CAM settings and Undo",
+          "status": "done",
+          "evidence": ["sketch/finish/return-keeps-geometry", "sketch/finish/undo-survives-boards"]
+        },
+        {
+          "item": "Save to file and open a saved design",
+          "status": "done",
+          "evidence": ["sketch/file/open-saved-design"]
+        },
+        {
+          "item": "Invalid profiles stay drafts with an explanation while CAM keeps the last accepted geometry",
+          "status": "done",
+          "evidence": ["sketch/finish/navigating-away-invalid-explains", "sketch/finish/blocks-open-profile", "sketch/finish/blocks-crossing-profile"]
+        },
+        {
+          "item": "Sketch on an edge face, end-grain holes and angled joints",
+          "status": "gap",
+          "evidence": [],
+          "note": "Deferred: only polygons from the top, the underside and pocket floors are modelled (docs/CAD_ROADMAP.md)."
+        }
+      ]
+    },
+    {
+      "name": "Sketch tools",
+      "rows": [
+        {
+          "item": "Lines, by drag or click chain",
+          "status": "done",
+          "evidence": ["sketch/draw/drag-line", "sketch/draw/click-chain", "sketch/draw/close-triangle"]
+        },
+        {
+          "item": "Corner, center and aligned rectangles",
+          "status": "done",
+          "evidence": [
+            "sketch/draw/drag-rectangle",
+            "sketch/draw/center-rectangle",
+            "apps/camNC/src/cad/CadEditor.alignedRectangle.test.tsx"
+          ]
+        },
+        {
+          "item": "Rectangle corner joins can be removed",
+          "status": "done",
+          "evidence": ["sketch/draw/rectangle-joins-corner", "apps/camNC/src/cad/CadEditor.rectangleCorners.test.tsx"]
+        },
+        {
+          "item": "Circles, by center or three points",
+          "status": "done",
+          "evidence": ["sketch/draw/drag-circle", "apps/camNC/src/cad/CadEditor.threePointCircle.test.tsx"]
+        },
+        {
+          "item": "Three-point, tangent and center-point arcs",
+          "status": "done",
+          "evidence": ["sketch/draw/three-point-arc", "sketch/draw/tangent-continuation", "apps/camNC/src/cad/CadEditor.centerPointArc.test.tsx"]
+        },
+        {
+          "item": "Points, conics, fit splines and Bezier curves",
+          "status": "partial",
+          "evidence": ["sketch/draw/spline-escape-keeps-points", "sketch/draw/bezier-escape-keeps-points", "apps/camNC/src/cad/CadEditor.curves.test.tsx"],
+          "note": "Adding a fit point to a periodic spline is unsupported. Bezier degree is limited to 15. Inserting a fit point may reshape unconstrained geometry while keeping fixed points and driving dimensions."
+        },
+        {
+          "item": "Ellipses",
+          "status": "done",
+          "evidence": ["packages/cad/src/ellipse.test.ts"]
+        },
+        {
+          "item": "Inscribed and circumscribed polygons",
+          "status": "done",
+          "evidence": ["apps/camNC/src/cad/CadEditor.inscribedPolygon.test.tsx", "apps/camNC/src/cad/CadEditor.circumscribedPolygon.test.tsx"]
+        },
+        {
+          "item": "Slots",
+          "status": "done",
+          "evidence": ["packages/cad/src/slot.test.ts", "apps/camNC/src/cad/CadEditor.slot.test.tsx"]
+        },
+        {
+          "item": "Construction geometry, kept out of cut profiles",
+          "status": "done",
+          "evidence": ["sketch/modify/construction-toggle"]
+        },
+        {
+          "item": "Fillets sharing one radius across selected corners",
+          "status": "done",
+          "evidence": ["sketch/modify/fillet-two-corners", "packages/cad/src/fillet.test.ts"]
+        },
+        {
+          "item": "Chamfers",
+          "status": "done",
+          "evidence": ["apps/camNC/src/cad/CadEditor.chamfer.test.tsx", "packages/cad/src/chamfer.test.ts"]
+        },
+        {
+          "item": "Trim line, circle and arc spans",
+          "status": "partial",
+          "evidence": ["sketch/modify/trim-crossing", "sketch/modify/trim-stops-at-point", "packages/cad-editor/src/trimCurves.test.ts"],
+          "note": "Rational curves can bound a trim but can't be interval-trimmed themselves."
+        },
+        {
+          "item": "Split an edge at points",
+          "status": "done",
+          "evidence": ["apps/camNC/src/cad/CadEditor.split.test.tsx", "packages/cad/src/split.test.ts"]
+        },
+        {
+          "item": "Extend line and arc ends",
+          "status": "partial",
+          "evidence": ["sketch/extend/line-to-edge", "sketch/extend/arc-keeps-center", "sketch/extend/skips-construction"],
+          "note": "An explicitly selected construction boundary can keep a persistent contact. Rational curves can bound an extend but can't be extended."
+        },
+        {
+          "item": "Offset lines, circles, arcs and closed line/arc loops by one signed distance",
+          "status": "partial",
+          "evidence": ["sketch/offset/loop-inward-default", "sketch/offset/negative-reverses", "packages/cad/src/offset.test.ts"],
+          "note": "Partial or open multi-edge chains and rational curves are refused."
+        },
+        {
+          "item": "Mirror points, lines, circles and arcs about a straight axis as linked copies",
+          "status": "partial",
+          "evidence": ["sketch/mirror/circle-linked", "sketch/mirror/half-profile"],
+          "note": "Mirror rejects conics, fit splines and Bezier curves."
+        },
+        {
+          "item": "Transform sketch geometry: translate, rotate, scale",
+          "status": "done",
+          "evidence": ["apps/camNC/src/cad/CadEditor.transform.test.tsx", "packages/cad/src/transform.test.ts"]
+        },
+        {
+          "item": "Linear and circular sketch patterns",
+          "status": "done",
+          "evidence": [
+            "apps/camNC/src/cad/CadEditor.linearPattern.test.tsx",
+            "apps/camNC/src/cad/CadEditor.circularPattern.test.tsx",
+            "packages/cad/src/pattern.test.ts"
+          ]
+        },
+        {
+          "item": "Use points from another part's corners",
+          "status": "partial",
+          "evidence": ["packages/cad/src/usedEdges.test.ts"],
+          "note": "Corner points only; projecting whole edges is not there yet."
+        },
+        {
+          "item": "Driving dimensions: length, distance, angle, diameter, radius, arc gaps",
+          "status": "done",
+          "evidence": [
+            "sketch/dimension/line-length",
+            "sketch/dimension/point-line-diagonal",
+            "sketch/dimension/angle-two-lines",
+            "sketch/dimension/circle-diameter",
+            "sketch/dimension/arc-radius",
+            "sketch/dimension/arc-arc-facing"
+          ]
+        },
+        {
+          "item": "Dimension labels follow geometry through drags, Undo/Redo and reload",
+          "status": "done",
+          "evidence": [
+            "sketch/dimension/label-follow-live",
+            "sketch/dimension/label-follow-undo-redo",
+            "sketch/dimension/label-follow-reload",
+            "sketch/dimension/label-follow-hand-placed"
+          ]
+        },
+        {
+          "item": "Value fields take units, fractions and arithmetic, and never show a doubled unit",
+          "status": "done",
+          "evidence": ["sketch/dimension/units", "sketch/dimension/expression", "sketch/dimension/no-double-unit-typing"]
+        },
+        {
+          "item": "Coincident, horizontal, vertical, parallel, perpendicular, equal, tangent and midpoint constraints",
+          "status": "done",
+          "evidence": [
+            "sketch/constraint/coincident-points",
+            "sketch/constraint/horizontal-preselected",
+            "sketch/constraint/vertical-tool-first",
+            "sketch/constraint/parallel-preselected",
+            "sketch/constraint/perpendicular-preselected",
+            "sketch/constraint/equal-preselected",
+            "sketch/constraint/tangent",
+            "sketch/constraint/midpoint"
+          ]
+        },
+        {
+          "item": "Symmetric and concentric constraints",
+          "status": "done",
+          "evidence": ["apps/camNC/src/cad/CadEditor.symmetric.test.tsx", "apps/camNC/src/cad/CadEditor.concentric.test.tsx"]
+        },
+        {
+          "item": "Spline endpoint handles can be selected and constrained on their own",
+          "status": "done",
+          "evidence": ["sketch/spline/handle-segment-horizontal", "sketch/spline/handle-segment-tangent-circle", "sketch/spline/handle-delete-protected"]
+        },
+        {
+          "item": "Normal, Pierce and Equal curvature constraints",
+          "status": "gap",
+          "evidence": ["apps/camNC/src/cad/CadEditor.shortcuts.test.tsx"],
+          "note": "Their shortcuts say the constraint isn't available yet."
+        }
+      ]
+    },
+    {
+      "name": "CAM operations",
+      "rows": [
+        {
+          "item": "Through-cut profiles from exact polygons",
+          "status": "done",
+          "evidence": ["packages/cam/src/profileTransitions.test.ts", "packages/cam/src/cutFeatures.test.ts"]
+        },
+        {
+          "item": "Pockets, recesses and rabbets",
+          "status": "done",
+          "evidence": ["packages/cam/src/pocketTransitions.test.ts", "packages/cam/src/openPocketTransitions.test.ts", "packages/cam/src/boardPocketSafety.test.ts"]
+        },
+        {
+          "item": "Through-hole middles cleared, left for the vacuum or fixed by hand",
+          "status": "done",
+          "evidence": ["packages/cam/src/holeMiddles.test.ts", "apps/camNC/src/cam/holeChoices.test.ts"]
+        },
+        {
+          "item": "V-bit carving",
+          "status": "done",
+          "evidence": ["packages/cam/src/vcarve.test.ts"]
+        },
+        {
+          "item": "Tabs",
+          "status": "done",
+          "evidence": ["packages/cam/src/tabPlan.test.ts"]
+        },
+        {
+          "item": "Board nesting and auto-fill from stock",
+          "status": "done",
+          "evidence": ["packages/cam/src/nest.test.ts", "apps/camNC/src/cam/boards.test.ts"]
+        },
+        {
+          "item": "Hold suggestions: clamps and screws",
+          "status": "done",
+          "evidence": ["packages/cam/src/hold.test.ts", "packages/cam/src/holdSafety.test.ts", "packages/cam/src/settle.test.ts"]
+        },
+        {
+          "item": "Side B program for underside cuts",
+          "status": "partial",
+          "evidence": ["packages/cam/src/flip.test.ts"],
+          "note": "Cuts from the two faces that would meet are refused. No side B program has been cut on the machine yet."
+        },
+        {
+          "item": "G-code checked for the controller",
+          "status": "done",
+          "evidence": ["packages/cam/src/postValidation.test.ts", "packages/cam/src/fluidncChecker.test.ts"]
+        },
+        {
+          "item": "Machining revision and physical-sheet checks after geometry changes",
+          "status": "done",
+          "evidence": ["sketch/machine/edit-after-cut-keeps-boards", "sketch/machine/edit-during-run-is-not-applied-to-sheet"]
+        },
+        {
+          "item": "3D material removal preview",
+          "status": "done",
+          "evidence": ["apps/camNC/src/visualize/stockSim/HeightmapStamper.test.ts", "apps/camNC/src/visualize/stockSim/toolShapes.test.ts"]
+        }
+      ]
+    },
+    {
+      "name": "Machine",
+      "rows": [
+        {
+          "item": "Controller connection, status reports and jogging",
+          "status": "done",
+          "evidence": ["packages/fluidnc/src/sim.integration.test.ts", "apps/camNC/src/lib/fluidnc/cnc-api.test.ts"]
+        },
+        {
+          "item": "Run, pause and resume a job",
+          "status": "done",
+          "evidence": ["apps/camNC/src/lib/machine/jobs.test.ts", "apps/camNC/src/lib/machine/resume.test.ts", "apps/camNC/src/lib/machine/jobRecovery.test.ts"]
+        },
+        {
+          "item": "Alarms explained",
+          "status": "done",
+          "evidence": ["apps/camNC/src/lib/machine/alarms.test.ts"]
+        },
+        {
+          "item": "Camera calibration",
+          "status": "done",
+          "evidence": ["packages/camera-calibration/src/lib/calibrationCore.test.ts"]
+        },
+        {
+          "item": "Machine plane and bounds for the camera overlay",
+          "status": "done",
+          "evidence": ["apps/camNC/src/calibration/machinePlane.test.ts", "apps/camNC/src/store/machineBounds.test.ts"]
+        },
+        {
+          "item": "A side B program cut on the machine",
+          "status": "gap",
+          "evidence": [],
+          "note": "Not tried on a real machine yet."
+        }
+      ]
+    }
+  ]
+}

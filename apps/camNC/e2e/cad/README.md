@@ -82,6 +82,6 @@ binary. Canonical files are in `packages/cad/licenses` and
 solver dependency changes. Third-party attribution and license contents are
 independent of these regression recipes.
 
-See [CAD status](../../../../docs/CAD_STATUS.md) for supported tools and current
-limits, and the [declarative behavior specs](../spec/README.md) for the separate
+See [Status](../../../../docs/STATUS.md) for supported tools, current limits and
+known gaps, and the [declarative behavior specs](../spec/README.md) for the separate
 scenario runner and reviewed SVG goldens.
