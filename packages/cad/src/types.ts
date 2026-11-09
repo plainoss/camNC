@@ -272,6 +272,13 @@ export interface CadPart {
   moved?:
     | { by: [number, number, number]; byExpressions?: [string | null, string | null, string | null] }
     | (CadDirection & { distance: number });
+  /**
+   * Extruded up to a plane or a part's face instead of a typed thickness: the thickness is the distance from the sketch's
+   * plane to it, and follows it when it moves.
+   */
+  upTo?: CadDrawnOn['on'];
+  /** Extruded half to each side of the sketch's plane. */
+  symmetric?: true;
   /** Its extrude switched off in the feature list: its sketch stays, as a sketch not yet extruded does. */
   suppressed?: true;
   /**

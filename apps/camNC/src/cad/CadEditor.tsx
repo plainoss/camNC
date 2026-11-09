@@ -4442,7 +4442,12 @@ export function CadEditor({
                 onCancel: () => closeFeature(false),
               };
               return featureDialog.kind === 'extrude' ? (
-                <ExtrudeDialog key={target.id} {...props} onEditSketch={() => openSketch(target.id)} />
+                <ExtrudeDialog
+                  key={target.id}
+                  {...props}
+                  onEditSketch={() => openSketch(target.id)}
+                  pickFace={picked => setDirectionPicker(() => picked)}
+                />
               ) : (
                 <PartPatternDialog key={target.id} {...props} pickDirection={picked => setDirectionPicker(() => picked)} />
               );

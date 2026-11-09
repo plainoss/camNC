@@ -15,6 +15,7 @@ export * from './featureModel';
 export * from './features';
 export * from './directions';
 export * from './usedEdges';
+export * from './upTo';
 export * from './suppression';
 export * from './extrudeSteps';
 

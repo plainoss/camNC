@@ -845,6 +845,32 @@ it('saves a picked-direction distance expression and removes it when replaced by
   expect(latest().parts[0]!.copies![0]!.along).not.toHaveProperty('distanceExpression');
 });
 
+it('extrudes up to a picked plane, its thickness following the distance, or symmetrically about its own plane', async () => {
+  const post = { ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name: 'Post' };
+  // Drawn 300 mm in front of the Front plane, facing away from it.
+  post.drawnOn = { on: { plane: 'front' }, offset: -300 };
+  const source: CadDocument = { ...createCadDocument(), parts: [post] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Post/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Post' });
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Symmetric' }));
+  await waitFor(() => expect(latest().parts[0]!.symmetric).toBe(true));
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'upTo');
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Front/ }));
+  await waitFor(() => expect(latest().parts[0]!.upTo).toEqual({ plane: 'front' }));
+  expect(latest().parts[0]!.symmetric).toBeUndefined();
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(300));
+});
+
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {
   const { latest } = await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
