@@ -380,6 +380,11 @@ export interface CadPartCopy {
    * it, so it moves with the part. The position can use variables; the rotation is unused.
    */
   offset?: CadPlacement;
+  /**
+   * A mirror image of the part across a plane, a part's face, or a plane made to sketch on (`datum`). Its placement
+   * follows from where the part and that plane are, so it stays mirrored as either moves. It's always `mirrored`.
+   */
+  mirror?: { across: CadDrawnOn['on']; datum?: string };
 }
 /** Copies of a part in a row along an axis, each `spacing` on from the last. */
 /** A direction taken from a plane or a part's face, as the reference picks one: out of it, or into it with `flip`. */
