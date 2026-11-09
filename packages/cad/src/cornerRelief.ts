@@ -61,7 +61,7 @@ function relieveLoop(
     loop = counterclockwise ? points : [...points].reverse(),
     facets = facetTurns(loop);
   const out: CadPoint[] = [];
-  let skipped = 0;
+  const skipped: CadPoint[] = [];
   loop.forEach((p, i) => {
     const a = loop[(i + loop.length - 1) % loop.length]!,
       b = loop[(i + 1) % loop.length]!;
@@ -80,7 +80,7 @@ function relieveLoop(
       ahead = 2 * radius * dot(bisector, d2);
     // Each edge is shared with the next corner, which may want a bone too.
     if (back > length(inward) / 2 || ahead > length(outward) / 2) {
-      skipped++;
+      skipped.push(p);
       return out.push(p);
     }
     const from = { x: p.x - back * d1.x, y: p.y - back * d1.y },
@@ -102,7 +102,7 @@ function relieveLoop(
     bone.push(to);
     // A bone that would break into another contour, such as a hole's bone through a nearby edge, isn't cut.
     if (!fits(bone)) {
-      skipped++;
+      skipped.push(p);
       return out.push(p);
     }
     out.push(...bone);
@@ -118,18 +118,18 @@ export function relieveLoopCorners(points: CadPoint[], cutInside: boolean, diame
 /**
  * The part with a bone in each inside corner of its outline, holes, cuts and the islands left in them, so a bit of
  * `diameter` cuts every corner fully and parts that fit into them go all the way in. Corners on the part's own edge,
- * where a cut runs off it, stay square: the bit runs out past them.
+ * where a cut runs off it, stay square: the bit runs out past them. `skipped`: the corners too tight for a bone.
  */
-export function relieveCorners(part: EvaluatedCadPart, diameter: number): { part: EvaluatedCadPart; skipped: number } {
+export function relieveCorners(part: EvaluatedCadPart, diameter: number): { part: EvaluatedCadPart; skipped: CadPoint[] } {
   const radius = diameter / 2;
-  let skipped = 0;
+  const skipped: CadPoint[] = [];
   // A bone stays inside the part and out of its holes, so contours never cross.
   const insidePart = (loop: CadPoint[]) => (bone: CadPoint[]) =>
     bone.every(p => pointInPolygon(p, part.outline) && !part.holes.some(hole => hole !== loop && pointInPolygon(p, hole)));
   const clearOfHoles = (bone: CadPoint[]) => bone.every(p => !part.holes.some(hole => pointInPolygon(p, hole)));
   const relieve = (points: CadPoint[], cutInside: boolean, keep: (p: CadPoint) => boolean = () => false, count = true) => {
     const result = relieveLoop(points, cutInside, radius, keep, cutInside ? insidePart(points) : clearOfHoles);
-    if (count) skipped += result.skipped;
+    if (count) skipped.push(...result.skipped);
     return result.points;
   };
   const onEdge = (p: CadPoint) => onLoop(p, part.outline);

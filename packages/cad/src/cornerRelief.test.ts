@@ -68,7 +68,7 @@ describe('inside corners relieved for a round bit', () => {
       holes: original.parts[0]!.holes.map(hole => [...hole].reverse()),
       loops: original.parts[0]!.loops.map(loop => ({ ...loop, points: [...loop.points].reverse() })),
     };
-    expect(relieveCorners(reversed, 3.175)).toEqual({ part: reversed, skipped: 0 });
+    expect(relieveCorners(reversed, 3.175)).toEqual({ part: reversed, skipped: [] });
   });
 
   it('still relieves both real corners where a line meets a semicircle at an angle', () => {
@@ -160,6 +160,7 @@ describe('inside corners relieved for a round bit', () => {
         message: '4 corners are too tight for a 6 mm bone and stay square.',
       }),
     ]);
+    expect(new Set(diagnostics[0]!.points!.map(p => `${p.x},${p.y}`))).toEqual(new Set(['30,20', '35,20', '35,25', '30,25']));
   });
 
   it('follows a bit variable', () => {
