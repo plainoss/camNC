@@ -1,5 +1,5 @@
 import { newCadId } from './document';
-import { cadSketchRegions, evaluateCadFeatures } from './features';
+import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
 import { regionGroups } from './regionProfile';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
@@ -10,6 +10,19 @@ export const sketchOwnerId = (part: CadPart): string => part.sketchOf ?? part.id
 
 /** Whether two parts extrude the same sketch. */
 export const sharesSketch = (a: CadPart, b: CadPart): boolean => sketchOwnerId(a) === sketchOwnerId(b);
+
+/**
+ * Whether a part is an Extrude → Add of another sketch: a body of its own, joined to the part it adds to. It's built and
+ * made like a part, but listed as part of that one. How it's machined, as one piece or several, is decided later.
+ */
+export function isJoinedBody(document: CadDocument, part: CadPart): boolean {
+  if (!part.addTo || part.extrude === false || part.suppressed || part.remove) return false;
+  const target = document.parts.find(candidate => candidate.id === part.addTo);
+  return !!target && isCadPart(target) && !sharesSketch(target, part);
+}
+
+/** The parts and the bodies joined to them: everything built as a solid. */
+export const isCadBody = (document: CadDocument, part: CadPart): boolean => isCadPart(part) || isJoinedBody(document, part);
 
 /** The parts and sketch features that extrude a part's sketch, the part itself among them. */
 export const sketchUsers = (document: CadDocument, part: CadPart): CadPart[] =>
@@ -192,6 +205,11 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
   if (part.addTo) {
     const target = document.parts.find(candidate => candidate.id === part.addTo);
     if (!target) return 'The part it adds to is gone. Pick another, or make a new part.';
+    // Another sketch's extrude is joined as a body of its own: it only needs a profile to extrude.
+    if (!sharesSketch(target, part)) {
+      const problem = evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
+      return problem ? (part.regions ? problem.message : 'Pick a region of the sketch in the view.') : null;
+    }
     if (!sharesSketch(target, part)) return `Add joins regions of the sketch ${target.name} is made from.`;
     if (!target.regions) return `${target.name} is its whole sketch already.`;
     if (!part.regions?.length) return 'Pick the regions to add in the view.';

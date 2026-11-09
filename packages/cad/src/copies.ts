@@ -1,5 +1,5 @@
 import { newCadId } from './document';
-import { isCadPart } from './features';
+import { isCadBody } from './extrudeSteps';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
 import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 import { activeDesign } from './suppression';
@@ -137,7 +137,7 @@ export function cadPartsToCut(given: CadDocument, parts: readonly EvaluatedCadPa
   return parts.flatMap(part => {
     const source = document.parts.find(candidate => candidate.id === part.partId);
     // A sketch not yet extruded, or a step adding to or cutting others, isn't a part to cut.
-    if (source && !isCadPart(source)) return [];
+    if (source && !isCadBody(document, source)) return [];
     const groups: (CadPartToCut & { mirrored?: boolean })[] = [{ part, names: [part.name] }];
     for (const [index, copy] of (source?.copies ?? []).entries()) {
       const shape = evaluatedPartCopy(part, copy);

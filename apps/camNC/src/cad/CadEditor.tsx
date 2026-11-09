@@ -3884,6 +3884,10 @@ export function CadEditor({
           const made = { ...p };
           delete made.extrude;
           if (made.drawnOn && !made.thin && isSingleLine(made)) return { ...made, thin: { depth: 100, midPlane: true } };
+          // A sketch on a part's face adds to that part by default, with it in the merge scope.
+          const face = made.drawnOn && !('plane' in made.drawnOn.on) ? made.drawnOn.on.partId : null;
+          const onto = face && before.parts.find(candidate => candidate.id === face);
+          if (onto && isCadPart(onto)) made.addTo = onto.id;
           // A sketch of several regions, such as overlapping shapes or outlines apart, starts with all of them picked.
           const regions = sketchRegions(made.sketch, CAD_CHORD_TOLERANCE);
           // Picked from its row in the feature list, a sketch of several regions starts with all of them; just finished,
