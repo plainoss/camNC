@@ -22,6 +22,7 @@ export * from './consumedTools';
 export * from './edgeFillets';
 export * from './suppression';
 export * from './extrudeSteps';
+export * from './faceExtrude';
 
 export * from './dimensions';
 export * from './firstDimensionScale';

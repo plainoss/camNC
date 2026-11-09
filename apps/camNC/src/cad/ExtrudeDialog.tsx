@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import {
   type CadDrawnOn,
+  cadFaceFrame,
+  cadSketchFrame,
+  cadDatumFrame,
   CAD_CHORD_TOLERANCE,
   evaluateCadPart,
   extrudeStepProblem,
@@ -73,6 +76,13 @@ export function ExtrudeDialog({
         const next = { ...p };
         if (upTo) {
           next.upTo = upTo;
+          const from = cadSketchFrame(document, p);
+          const to = (datum && cadDatumFrame(document, datum)) || cadFaceFrame(document, upTo);
+          if (from && !('error' in to) && p.drawnOn) {
+            // A picked end face chooses the way to reach it, including one behind the profile's outward normal.
+            const reach = from.normal.reduce((sum, value, axis) => sum + value * (to.origin[axis]! - from.origin[axis]!), 0);
+            next.drawnOn = { ...p.drawnOn, inward: reach < 0 };
+          }
           if (datum) next.upToDatum = datum;
           else delete next.upToDatum;
           delete next.symmetric;
@@ -97,7 +107,7 @@ export function ExtrudeDialog({
       setUpTo(on, datum);
     });
   };
-  const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo ? 'add' : 'new';
+  const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo !== undefined ? 'add' : 'new';
   const mergeTarget = document.parts.find(candidate => candidate.id === part.addTo);
   const ownExtrusion = operation !== 'add' || !mergeTarget || !sharesSketch(mergeTarget, part);
   const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
@@ -162,7 +172,8 @@ export function ExtrudeDialog({
           if (regions?.length) made.regions = regions;
         } else if (next === 'add') {
           const into = mergeable[0]!;
-          made.addTo = into.id;
+          // A solid face names the profile, not the body to join: that scope must be picked explicitly.
+          made.addTo = p.faceProfile ? '' : into.id;
           if (sharesSketch(into, p)) made.regions = (keptRegions(p, own) ?? []).filter(id => !into.regions!.includes(id));
           else {
             const regions = keptRegions(p, own);
@@ -193,14 +204,16 @@ export function ExtrudeDialog({
     );
     return true;
   };
-  const stepProblem = operation === 'new' ? null : extrudeStepProblem(document, part);
+  const stepProblem = extrudeStepProblem(document, part);
   const regionCount = operation === 'remove' && !part.regions ? null : (part.regions?.length ?? null);
   const selection =
-    regionCount === null
-      ? `${owner.name}’s sketch`
-      : regionCount === 1
-        ? `A region of ${owner.name}’s sketch`
-        : `${regionCount} regions of ${owner.name}’s sketch`;
+    part.faceProfile && part.drawnOn
+      ? drawnOnName(document, part.drawnOn.on)
+      : regionCount === null
+        ? `${owner.name}’s sketch`
+        : regionCount === 1
+          ? `A region of ${owner.name}’s sketch`
+          : `${regionCount} regions of ${owner.name}’s sketch`;
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';
@@ -264,11 +277,13 @@ export function ExtrudeDialog({
       )}
       {operation !== 'new' && (
         <div className="cad-feature-selection" data-active={stepProblem ? '' : undefined}>
-          <small>{operation === 'add' ? 'Regions to add' : 'Sketch to cut'}</small>
+          <small>{part.faceProfile ? 'Face to extrude' : operation === 'add' ? 'Regions to add' : 'Sketch to cut'}</small>
           <span>{selection}</span>
-          <button type="button" onClick={onEditSketch}>
-            Edit sketch
-          </button>
+          {!part.faceProfile && (
+            <button type="button" onClick={onEditSketch}>
+              Edit sketch
+            </button>
+          )}
         </div>
       )}
       {operation === 'add' ? (
@@ -278,11 +293,16 @@ export function ExtrudeDialog({
             <select
               value={part.addTo}
               onChange={event => {
+                if (!event.target.value) {
+                  setOperationError(null);
+                  return onChange(current => changePart(current, part.id, p => ({ ...p, addTo: '' })));
+                }
                 const into = document.parts.find(candidate => candidate.id === event.target.value)!;
                 const refused = partIsBuiltOn(document, part, into);
                 setOperationError(refused);
                 if (!refused) onChange(current => changePart(current, part.id, p => ({ ...p, addTo: into.id })));
               }}>
+              <option value="">Pick a part</option>
               {mergeable.map(candidate => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.name}
@@ -392,16 +412,22 @@ export function ExtrudeDialog({
           )}
           {operation === 'new' && (
             <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
-              <small>Sketch to extrude</small>
+              <small>{part.faceProfile ? 'Face to extrude' : 'Sketch to extrude'}</small>
               <span>{selection}</span>
-              <button type="button" onClick={onEditSketch}>
-                Edit sketch
-              </button>
+              {!part.faceProfile && (
+                <button type="button" onClick={onEditSketch}>
+                  Edit sketch
+                </button>
+              )}
             </div>
           )}
           {profileError && (
             <p role="alert" className="cad-thickness-error">
-              {part.regions ? profileError.message : 'Pick a region of the sketch in the view.'}
+              {part.faceProfile
+                ? (stepProblem ?? profileError.message)
+                : part.regions
+                  ? profileError.message
+                  : 'Pick a region of the sketch in the view.'}
             </p>
           )}
           {solidControls && !part.thin && part.drawnOn && (

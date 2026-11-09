@@ -24,7 +24,7 @@ import type {
 import { isCadBody, resolveExtrudeSteps } from './extrudeSteps';
 
 /** Whether a part is one, rather than a sketch not yet extruded, a suppressed extrude, or an extrude that adds to or cuts others. */
-export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !part.suppressed && !part.addTo && !part.remove;
+export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !part.suppressed && part.addTo === undefined && !part.remove;
 
 /** Features belong to the newer format, so an older build refuses the file instead of silently cutting without them. */
 export function withFeatureVersion(document: CadDocument): CadDocument {

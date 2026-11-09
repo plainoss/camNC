@@ -451,6 +451,7 @@ export async function fullCadReport(
           settings: {
             thickness: typed(part.thickness, part.thicknessExpression),
             ...(part.sketchOf && { sketchOf: partName(part.sketchOf) }),
+            ...(part.faceProfile && part.drawnOn && { faceProfile: faceOn(part.drawnOn.on) }),
             ...(part.regions && { regions: regionIds(part.regions) }),
             ...(part.addedRegions && { addedRegions: regionIds(part.addedRegions) }),
             ...(part.addTo && { addTo: partName(part.addTo) }),

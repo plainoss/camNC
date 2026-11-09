@@ -9,6 +9,7 @@ import {
   type CadEntity,
   type CadPart,
 } from '@wbcnc/cad';
+import { extrudeMergeTarget } from './extrudeMergeTarget';
 
 // Small helpers of the sketch editor, kept apart so the editor itself stays readable.
 
@@ -63,7 +64,7 @@ export function extrudedSketch(document: CadDocument, sketch: CadPart, pickAll: 
   if (made.drawnOn && !made.thin && isSingleLine(made)) return { ...made, thin: { depth: 100, midPlane: true } };
   const face = made.drawnOn && !('plane' in made.drawnOn.on) ? made.drawnOn.on.partId : null;
   const onto = face && document.parts.find(candidate => candidate.id === face);
-  if (onto && isCadPart(onto)) made.addTo = onto.id;
+  if (onto && isCadPart(onto)) made.addTo = extrudeMergeTarget(document, made, onto.id);
   const regions = sketchRegions(made.sketch, CAD_CHORD_TOLERANCE);
   if (pickAll && !made.regions && regions.length > 1 && evaluateCadPart(made).diagnostics.some(d => d.severity === 'error'))
     made.regions = regions.map(region => region.id);

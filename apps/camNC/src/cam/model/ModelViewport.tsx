@@ -1,5 +1,5 @@
 import { Edges, Html, Line, OrbitControls } from '@react-three/drei';
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
@@ -11,6 +11,7 @@ import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
 import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
+import type { StudioCameraRef } from '@/cad/studioCamera';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
 export interface ViewRequest {
@@ -149,7 +150,7 @@ function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number;
         polygonOffsetFactor={2}
         polygonOffsetUnits={2}
       />
-      <Edges color={hovered ? kPlaneHighlight : color} />
+      <Edges key={size} color={hovered ? kPlaneHighlight : color} />
       <Html
         // Under the dialogs and panels over the view, not on top of everything.
         zIndexRange={[5, 0]}
@@ -186,19 +187,55 @@ const kStudioPicked = '#f39c2c';
  * something to see and again when `fitKey` changes, such as on switching to the exploded view, but never because what's
  * shown changed: hiding a part or editing one leaves the camera where it is. Explicit view requests also refit it.
  */
-export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKey?: string; viewRequest?: ViewRequest }) {
-  const camera = useThree(s => s.camera) as THREE.PerspectiveCamera;
+export function FitCamera({
+  box,
+  fitKey,
+  viewRequest,
+  cameraState,
+}: {
+  box: THREE.Box3;
+  fitKey?: string;
+  viewRequest?: ViewRequest;
+  cameraState?: StudioCameraRef;
+}) {
+  const camera = useThree(s => s.camera) as THREE.PerspectiveCamera | THREE.OrthographicCamera;
   const controls = useThree(s => s.controls) as OrbitControlsImpl | null;
   const aspect = useThree(s => s.size.width / s.size.height);
   const invalidate = useThree(s => s.invalidate);
   const fitted = useRef<{ key?: string; seq?: number; controls: OrbitControlsImpl | null } | null>(null);
+  useFrame(() => {
+    if (!cameraState || !fitted.current || !controls || !('isOrthographicCamera' in camera)) return;
+    cameraState.current = {
+      center: controls.target.toArray(),
+      back: camera.getWorldDirection(new THREE.Vector3()).negate().toArray(),
+      up: new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).toArray(),
+      height: (camera.top - camera.bottom) / camera.zoom,
+      key: fitKey,
+      seq: viewRequest?.seq,
+    };
+  });
   useEffect(() => {
     // Nothing to see yet, or no size to see it at.
     if (box.isEmpty() || !(aspect > 0) || !Number.isFinite(aspect)) return;
     // Fitted already, for this key and with the controls that orbit it.
     if (fitted.current && fitted.current.key === fitKey && fitted.current.controls === controls && fitted.current.seq === viewRequest?.seq)
       return;
+    const saved = (!fitted.current || !fitted.current.controls) && cameraState?.current;
     fitted.current = { key: fitKey, controls, seq: viewRequest?.seq };
+    if (saved && saved.key === fitKey && saved.seq === viewRequest?.seq && 'isOrthographicCamera' in camera) {
+      const center = new THREE.Vector3(...saved.center);
+      camera.position.copy(center).addScaledVector(new THREE.Vector3(...saved.back), 20000);
+      camera.up.set(...saved.up);
+      camera.lookAt(center);
+      camera.zoom = (camera.top - camera.bottom) / saved.height;
+      camera.near = 1;
+      camera.far = 40000;
+      camera.updateProjectionMatrix();
+      controls?.target.copy(center);
+      controls?.update();
+      invalidate();
+      return;
+    }
     if (controls?.enableDamping) {
       // Finish any orbit or pan still easing out, so it doesn't carry on from the view placed here.
       controls.enableDamping = false;
@@ -208,15 +245,17 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const radius = Math.max(size.x / Math.min(aspect, 1.6), size.y, size.z) * 0.62;
-    const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const ortho = 'isOrthographicCamera' in camera;
+    const tan = ortho ? 1 : Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     let dist = radius / tan;
+    if (ortho && !viewRequest) dist = Math.max(dist, 105);
     const name = viewRequest?.name ?? 'iso';
     const direction =
       name === 'fit'
         ? camera.getWorldDirection(new THREE.Vector3()).negate()
         : name === 'normal' || viewRequest?.direction
           ? new THREE.Vector3(...(viewRequest?.direction ?? [0, 0, 1])).normalize()
-          : new THREE.Vector3(...kViewDirections[name]).normalize();
+          : new THREE.Vector3(...(ortho && !viewRequest ? [0.77, -1, 0.17] : kViewDirections[name])).normalize();
     if (name === 'normal') camera.up.set(...(viewRequest?.up ?? [0, 1, 0]));
     else if (name !== 'fit') {
       const vertical = Math.abs(direction.z) > 1 - 1e-10;
@@ -233,14 +272,16 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
             const corner = new THREE.Vector3(x, y, z).sub(center);
             dist = Math.max(
               dist,
-              corner.dot(direction) + Math.max(Math.abs(corner.dot(right)) / (tan * aspect), Math.abs(corner.dot(up)) / tan)
+              (ortho ? 0 : corner.dot(direction)) + Math.max(Math.abs(corner.dot(right)) / (tan * aspect), Math.abs(corner.dot(up)) / tan)
             );
           }
       dist = Math.max(dist * 1.1, 1);
     }
-    camera.position.copy(center).addScaledVector(direction, dist);
-    camera.near = dist / 100;
-    camera.far = dist * 20;
+    if (ortho) camera.zoom = (camera.top - camera.bottom) / (dist * 2);
+    const reach = ortho ? 20000 : dist;
+    camera.position.copy(center).addScaledVector(direction, reach);
+    camera.near = ortho ? 1 : dist / 100;
+    camera.far = ortho ? 40000 : dist * 20;
     camera.lookAt(center);
     camera.updateProjectionMatrix();
     if (controls) {
@@ -249,7 +290,7 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
     }
     // The view draws only when something changes, and moving the camera is a change.
     invalidate();
-  }, [box, camera, controls, aspect, fitKey, viewRequest, invalidate]);
+  }, [box, camera, controls, aspect, fitKey, viewRequest, invalidate, cameraState]);
   return null;
 }
 
@@ -264,6 +305,8 @@ export interface SketchView {
   center: [number, number];
   width: number;
   height: number;
+  /** Screen-plane offset in mm when the camera's centre ray doesn't intersect an edge-on sketch plane. */
+  shift?: [number, number];
   /** The view's right, up and toward-the-viewer directions in the sketch's frame, once it's turned off straight on. */
   turned?: { right: [number, number, number]; up: [number, number, number]; back: [number, number, number] };
 }
@@ -284,12 +327,14 @@ function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 
     // A direction given in the sketch's frame, in the model's.
     const along = ([a, b, c]: [number, number, number]) =>
       v(view.x).multiplyScalar(a).addScaledVector(v(view.y), b).addScaledVector(v(view.normal), c);
+    const right = view.turned ? along(view.turned.right) : v(view.x);
+    const up = view.turned ? along(view.turned.up) : v(view.y);
+    if (view.shift) at.addScaledVector(right, -view.shift[0]).addScaledVector(up, view.shift[1]);
     camera.position.copy(at).addScaledVector(view.turned ? along(view.turned.back) : v(view.normal), reach);
     camera.up.copy(view.turned ? along(view.turned.up) : v(view.y));
     camera.lookAt(at);
     // A face's frame can be mirrored, its x × y facing away from its normal: the picture is mirrored with it, as its
     // drawing is.
-    const right = view.turned ? along(view.turned.right) : v(view.x);
     const mirrored = v([1, 0, 0]).applyQuaternion(camera.quaternion).dot(right) < 0;
     camera.left = ((mirrored ? 1 : -1) * view.width) / 2;
     camera.right = ((mirrored ? -1 : 1) * view.width) / 2;
@@ -342,6 +387,7 @@ export function ModelViewport({
   palette,
   regions = [],
   onPickRegion,
+  cameraState,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -382,6 +428,7 @@ export function ModelViewport({
   /** A sketch's regions to pick for an extrude, and picking one. */
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
+  cameraState?: StudioCameraRef;
 }) {
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
   // The studio shows a design where it is, about its origin, so hiding a part doesn't shift the rest.
@@ -399,10 +446,10 @@ export function ModelViewport({
       meshes.map(() => new THREE.Matrix4())
     );
     for (const line of sketchLines) for (const point of line.points) reach.expandByPoint(new THREE.Vector3(...point));
-    if (reach.isEmpty()) return 100;
+    if (reach.isEmpty()) return palette === 'studio' ? 150 : 100;
     const half = Math.max(...reach.min.toArray().map(Math.abs), ...reach.max.toArray().map(Math.abs));
-    return Math.max(100, half * 2.2);
-  }, [meshes, sketchLines]);
+    return Math.max(palette === 'studio' ? 150 : 100, half * 2.2);
+  }, [meshes, sketchLines, palette]);
   const shownPlanes = view === 'assembled' ? planes : [];
   const box = useMemo(() => {
     const fit = boundsOf(meshes, matrices);
@@ -461,6 +508,7 @@ export function ModelViewport({
     <Canvas
       // Drawn when something changes, not every frame, so an idle view costs nothing.
       frameloop="demand"
+      orthographic={palette === 'studio'}
       camera={{ fov: 30 }}
       dpr={[1, 2]}
       onPointerLeave={() => onHover?.(null)}
@@ -471,7 +519,11 @@ export function ModelViewport({
       <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
       <directionalLight position={[300, -500, 800]} intensity={1.8} />
       <directionalLight position={[-400, 300, 200]} intensity={0.4} />
-      {sketchView ? <SketchCamera view={sketchView} model={assembled} /> : <FitCamera box={box} fitKey={view} viewRequest={viewRequest} />}
+      {sketchView ? (
+        <SketchCamera view={sketchView} model={assembled} />
+      ) : (
+        <FitCamera box={box} fitKey={view} viewRequest={viewRequest} cameraState={cameraState} />
+      )}
       <group>
         {meshes.map((m, i) => (
           <ModelBody

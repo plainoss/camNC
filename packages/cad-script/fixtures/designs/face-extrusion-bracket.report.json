@@ -1,0 +1,1275 @@
+{
+ "design": {
+  "name": "Face extrusion bracket",
+  "revision": 0,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [
+  {
+   "code": "underconstrained",
+   "message": "4 degrees of freedom remain. Add dimensions to keep this shape predictable.",
+   "part": "Shelf"
+  },
+  {
+   "code": "underconstrained",
+   "message": "4 degrees of freedom remain. Add dimensions to keep this shape predictable.",
+   "part": "Side"
+  }
+ ],
+ "features": [
+  {
+   "id": "face-bracket-2:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Panel",
+   "part": "Panel",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Panel / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "face-bracket-2:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Panel",
+   "part": "Panel",
+   "settings": {
+    "thickness": {
+     "value": 25
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 25,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      57.268,
+      63
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "face-bracket-27:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Shelf",
+   "part": "Shelf",
+   "settings": {
+    "on": "Panel's top (-y)"
+   },
+   "result": {
+    "sketch": "Shelf / profile",
+    "freedom": 4,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "face-bracket-27:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Shelf",
+   "part": "Shelf",
+   "settings": {
+    "thickness": {
+     "value": 65.7
+    },
+    "drawnOn": {
+     "on": "Panel's top (-y)",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 65.7,
+    "outline": {
+     "at": [
+      0,
+      48.34
+     ],
+     "size": [
+      57.268,
+      14.66
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "Panel's top (-y): sketch origin at 0, -25, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "face-bracket-49:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Side",
+   "part": "Side",
+   "settings": {
+    "on": "Panel's +x face"
+   },
+   "result": {
+    "sketch": "Side / profile",
+    "freedom": 4,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "face-bracket-49:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Side",
+   "part": "Side",
+   "settings": {
+    "thickness": {
+     "value": 3
+    },
+    "drawnOn": {
+     "on": "Panel's +x face",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 3,
+    "outline": {
+     "at": [
+      0,
+      25
+     ],
+     "size": [
+      63,
+      65.7
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "Panel's +x face: sketch origin at 57.268, 0, 0, its x along +z, its y along -y, looking +x."
+   }
+  },
+  {
+   "id": "face-bracket-71:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Face extension",
+   "part": "Face extension",
+   "settings": {
+    "thickness": {
+     "value": 25
+    },
+    "faceProfile": "Side's +y face",
+    "addTo": "Side",
+    "upTo": "Panel's underside (+y)",
+    "drawnOn": {
+     "on": "Side's +y face",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "addsTo": "Side"
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Panel",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 5,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1
+   },
+   "entities": [
+    {
+     "ref": "face-bracket-12",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      57.268,
+      0
+     ],
+     "ends": [
+      "face-bracket-4",
+      "face-bracket-5"
+     ]
+    },
+    {
+     "ref": "face-bracket-13",
+     "type": "line",
+     "a": [
+      57.268,
+      0
+     ],
+     "b": [
+      57.268,
+      63
+     ],
+     "ends": [
+      "face-bracket-6",
+      "face-bracket-7"
+     ]
+    },
+    {
+     "ref": "face-bracket-14",
+     "type": "line",
+     "a": [
+      57.268,
+      63
+     ],
+     "b": [
+      0,
+      63
+     ],
+     "ends": [
+      "face-bracket-8",
+      "face-bracket-9"
+     ]
+    },
+    {
+     "ref": "face-bracket-15",
+     "type": "line",
+     "a": [
+      0,
+      63
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "face-bracket-10",
+      "face-bracket-11"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      57.268,
+      63
+     ],
+     "area": 3607.884,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Shelf",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 4,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1
+   },
+   "entities": [
+    {
+     "ref": "face-bracket-37",
+     "type": "line",
+     "a": [
+      0,
+      48.34
+     ],
+     "b": [
+      57.268,
+      48.34
+     ],
+     "ends": [
+      "face-bracket-29",
+      "face-bracket-30"
+     ]
+    },
+    {
+     "ref": "face-bracket-38",
+     "type": "line",
+     "a": [
+      57.268,
+      48.34
+     ],
+     "b": [
+      57.268,
+      63
+     ],
+     "ends": [
+      "face-bracket-31",
+      "face-bracket-32"
+     ]
+    },
+    {
+     "ref": "face-bracket-39",
+     "type": "line",
+     "a": [
+      57.268,
+      63
+     ],
+     "b": [
+      0,
+      63
+     ],
+     "ends": [
+      "face-bracket-33",
+      "face-bracket-34"
+     ]
+    },
+    {
+     "ref": "face-bracket-4",
+     "type": "line",
+     "a": [
+      0,
+      63
+     ],
+     "b": [
+      0,
+      48.34
+     ],
+     "ends": [
+      "face-bracket-35",
+      "face-bracket-36"
+     ]
+    },
+    {
+     "ref": "face-bracket-28:face:face-bracket-12",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      57.268,
+      0
+     ],
+     "ends": [
+      "face-bracket-28:face:face-bracket-4",
+      "face-bracket-28:face:face-bracket-5"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-28:face:face-bracket-13",
+     "type": "line",
+     "a": [
+      57.268,
+      0
+     ],
+     "b": [
+      57.268,
+      63
+     ],
+     "ends": [
+      "face-bracket-28:face:face-bracket-5",
+      "face-bracket-28:face:face-bracket-7"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-28:face:face-bracket-14",
+     "type": "line",
+     "a": [
+      57.268,
+      63
+     ],
+     "b": [
+      0,
+      63
+     ],
+     "ends": [
+      "face-bracket-28:face:face-bracket-7",
+      "face-bracket-28:face:face-bracket-9"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-28:face:face-bracket-15",
+     "type": "line",
+     "a": [
+      0,
+      63
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "face-bracket-28:face:face-bracket-9",
+      "face-bracket-28:face:face-bracket-4"
+     ],
+     "construction": true
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      48.34
+     ],
+     "size": [
+      57.268,
+      14.66
+     ],
+     "area": 839.549,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Side",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 4,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1
+   },
+   "entities": [
+    {
+     "ref": "face-bracket-59",
+     "type": "line",
+     "a": [
+      0,
+      25
+     ],
+     "b": [
+      63,
+      25
+     ],
+     "ends": [
+      "face-bracket-51",
+      "face-bracket-52"
+     ]
+    },
+    {
+     "ref": "face-bracket-60",
+     "type": "line",
+     "a": [
+      63,
+      25
+     ],
+     "b": [
+      63,
+      90.7
+     ],
+     "ends": [
+      "face-bracket-53",
+      "face-bracket-54"
+     ]
+    },
+    {
+     "ref": "face-bracket-61",
+     "type": "line",
+     "a": [
+      63,
+      90.7
+     ],
+     "b": [
+      0,
+      90.7
+     ],
+     "ends": [
+      "face-bracket-55",
+      "face-bracket-56"
+     ]
+    },
+    {
+     "ref": "face-bracket-62",
+     "type": "line",
+     "a": [
+      0,
+      90.7
+     ],
+     "b": [
+      0,
+      25
+     ],
+     "ends": [
+      "face-bracket-57",
+      "face-bracket-58"
+     ]
+    },
+    {
+     "ref": "face-bracket-50:face:side0",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      63,
+      0
+     ],
+     "ends": [
+      "face-bracket-50:face:corner0",
+      "face-bracket-50:face:corner1"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-50:face:side1",
+     "type": "line",
+     "a": [
+      63,
+      0
+     ],
+     "b": [
+      63,
+      25
+     ],
+     "ends": [
+      "face-bracket-50:face:corner1",
+      "face-bracket-50:face:corner2"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-50:face:side2",
+     "type": "line",
+     "a": [
+      63,
+      25
+     ],
+     "b": [
+      0,
+      25
+     ],
+     "ends": [
+      "face-bracket-50:face:corner2",
+      "face-bracket-50:face:corner3"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-50:face:side3",
+     "type": "line",
+     "a": [
+      0,
+      25
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "face-bracket-50:face:corner3",
+      "face-bracket-50:face:corner0"
+     ],
+     "construction": true
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      25
+     ],
+     "size": [
+      63,
+      65.7
+     ],
+     "area": 4139.1,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Face extension",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {},
+   "entities": [
+    {
+     "ref": "face-bracket-72:face:side0",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      63,
+      0
+     ],
+     "ends": [
+      "face-bracket-72:face:corner0",
+      "face-bracket-72:face:corner1"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-72:face:side1",
+     "type": "line",
+     "a": [
+      63,
+      0
+     ],
+     "b": [
+      63,
+      3
+     ],
+     "ends": [
+      "face-bracket-72:face:corner1",
+      "face-bracket-72:face:corner2"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-72:face:side2",
+     "type": "line",
+     "a": [
+      63,
+      3
+     ],
+     "b": [
+      0,
+      3
+     ],
+     "ends": [
+      "face-bracket-72:face:corner2",
+      "face-bracket-72:face:corner3"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-72:face:side3",
+     "type": "line",
+     "a": [
+      0,
+      3
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "face-bracket-72:face:corner3",
+      "face-bracket-72:face:corner0"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "face-bracket-72:profile:0:0:",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      63,
+      0
+     ],
+     "ends": [
+      "face-bracket-72:profile:0:0",
+      "face-bracket-72:profile:0:1"
+     ]
+    },
+    {
+     "ref": "face-bracket-72:profile:0:1:",
+     "type": "line",
+     "a": [
+      63,
+      0
+     ],
+     "b": [
+      63,
+      3
+     ],
+     "ends": [
+      "face-bracket-72:profile:0:1",
+      "face-bracket-72:profile:0:2"
+     ]
+    },
+    {
+     "ref": "face-bracket-72:profile:0:2:",
+     "type": "line",
+     "a": [
+      63,
+      3
+     ],
+     "b": [
+      0,
+      3
+     ],
+     "ends": [
+      "face-bracket-72:profile:0:2",
+      "face-bracket-72:profile:0:3"
+     ]
+    },
+    {
+     "ref": "face-bracket-72:profile:0:3:",
+     "type": "line",
+     "a": [
+      0,
+      3
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "face-bracket-72:profile:0:3",
+      "face-bracket-72:profile:0:0"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      63,
+      3
+     ],
+     "area": 189,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Panel",
+   "thickness": 25,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     57.268,
+     63
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 3.8,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 25.3,
+      "steps": 17
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      -25,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge face-bracket-12",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge face-bracket-13",
+     "looks": "+x",
+     "origin": [
+      57.268,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge face-bracket-14",
+     "looks": "+z",
+     "origin": [
+      57.268,
+      0,
+      63
+     ]
+    },
+    {
+     "face": "edge face-bracket-15",
+     "looks": "-x",
+     "origin": [
+      0,
+      0,
+      63
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Shelf",
+   "thickness": 65.7,
+   "outline": {
+    "at": [
+     0,
+     48.34
+    ],
+    "size": [
+     57.268,
+     14.66
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 6.8,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 66,
+      "steps": 42
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      -90.7,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      -25,
+      0
+     ]
+    },
+    {
+     "face": "edge face-bracket-37",
+     "looks": "-z",
+     "origin": [
+      0,
+      -25,
+      48.34
+     ]
+    },
+    {
+     "face": "edge face-bracket-38",
+     "looks": "+x",
+     "origin": [
+      57.268,
+      -25,
+      48.34
+     ]
+    },
+    {
+     "face": "edge face-bracket-39",
+     "looks": "+z",
+     "origin": [
+      57.268,
+      -25,
+      63
+     ]
+    },
+    {
+     "face": "edge face-bracket-4",
+     "looks": "-x",
+     "origin": [
+      0,
+      -25,
+      63
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Side",
+   "thickness": 3,
+   "outline": {
+    "at": [
+     0,
+     25
+    ],
+    "size": [
+     63,
+     65.7
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 0.9,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 3.3,
+      "steps": 3
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      60.268,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      57.268,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge face-bracket-59",
+     "looks": "+y",
+     "origin": [
+      57.268,
+      -25,
+      0
+     ]
+    },
+    {
+     "face": "edge face-bracket-60",
+     "looks": "+z",
+     "origin": [
+      57.268,
+      -25,
+      63
+     ]
+    },
+    {
+     "face": "edge face-bracket-61",
+     "looks": "-y",
+     "origin": [
+      57.268,
+      -90.7,
+      63
+     ]
+    },
+    {
+     "face": "edge face-bracket-62",
+     "looks": "-z",
+     "origin": [
+      57.268,
+      -90.7,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "add",
+   "name": "Face extension",
+   "thickness": 25,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     63,
+     3
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": []
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Panel",
+    "at": [
+     0,
+     -25,
+     0
+    ],
+    "size": [
+     57.268,
+     25,
+     63
+    ]
+   },
+   {
+    "name": "Shelf",
+    "at": [
+     0,
+     -90.7,
+     48.34
+    ],
+    "size": [
+     57.268,
+     65.7,
+     14.66
+    ]
+   },
+   {
+    "name": "Side",
+    "at": [
+     57.268,
+     -90.7,
+     0
+    ],
+    "size": [
+     3,
+     65.7,
+     63
+    ]
+   },
+   {
+    "name": "Face extension",
+    "at": [
+     57.268,
+     -25,
+     0
+    ],
+    "size": [
+     3,
+     25,
+     63
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 3,
+   "sides": 1,
+   "size": [
+    76.4,
+    79.1
+   ],
+   "yield": 0.685,
+   "parts": [
+    {
+     "name": "Side",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      63,
+      65.7
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Side",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 0.9,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 3.3,
+     "steps": 3
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  },
+  {
+   "name": "Board B",
+   "thickness": 25,
+   "sides": 1,
+   "size": [
+    76.4,
+    89.4
+   ],
+   "yield": 0.556,
+   "parts": [
+    {
+     "name": "Panel",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      57.268,
+      63
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Face extension",
+     "at": [
+      6.7,
+      79.7
+     ],
+     "size": [
+      63,
+      3
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Panel",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Face extension",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 6.5,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 25.3,
+     "steps": 17
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 25.3,
+     "steps": 17
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  },
+  {
+   "name": "Board C",
+   "thickness": 65.7,
+   "sides": 1,
+   "size": [
+    70.668,
+    28.06
+   ],
+   "yield": 0.423,
+   "parts": [
+    {
+     "name": "Shelf",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      57.268,
+      14.66
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Shelf",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 6.8,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 66,
+     "steps": 42
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}
