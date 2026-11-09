@@ -760,7 +760,7 @@ it('copies a part with a transform, and edits the copy from its feature', async 
   expect(within(panel).getByRole('button', { name: 'Hide Plate 2' })).toBeDefined();
 });
 
-it('opens a new design in the studio, asking for its first sketch’s plane', async () => {
+it('opens a new design in the studio with no parts, and asks for the first sketch’s plane once Sketch is chosen', async () => {
   const source: CadDocument = { ...createCadDocument(), parts: [createCadPart('Part 1')] };
   sessions.push(source.id);
   const change = vi.fn<(document: CadDocument) => void>();
@@ -771,15 +771,14 @@ it('opens a new design in the studio, asking for its first sketch’s plane', as
   );
   await settled();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  expect(
-    within(toolbar)
-      .getByRole('button', { name: /Sketch/ })
-      .getAttribute('aria-pressed')
-  ).toBe('true');
-  // The blank part isn't a feature until it's sketched; the base planes are listed before the features.
+  // The blank part isn't a feature or a part until it's sketched; the base planes are listed before the features.
   const features = screen.getByRole('region', { name: 'Features' });
   expect(features.querySelectorAll('ol button')).toHaveLength(0);
-  // The sketch waits for its plane, picked in the view or the list.
+  expect(screen.getByRole('heading', { name: 'Parts (0)' })).toBeDefined();
+  expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull();
+  expect(screen.queryByText(/Not shown/)).toBeNull();
+  // Sketch waits for its plane, picked in the view or the list.
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Sketch/ }));
   const waiting = await screen.findByRole('dialog', { name: 'Sketch' });
   expect(waiting.textContent).toMatch(/Pick a plane or a face/);
   await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Right/ }));

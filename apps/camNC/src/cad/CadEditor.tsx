@@ -510,7 +510,8 @@ export function CadEditor({
     before: CadDocument;
   } | null>(null);
   // Picking the plane or face a new part is sketched on.
-  const [choosingFace, setChoosingFace] = useState(startsBlank);
+  // A new design opens with nothing picked or asked for: the first sketch starts from the toolbar, as in the reference.
+  const [choosingFace, setChoosingFace] = useState(false);
   // A base plane picked in the studio, in its view or feature list, for the next sketch to be drawn on.
   // A base plane, or one of the design's planes, by its id.
   const [selectedPlane, setSelectedPlane] = useState<string | null>(null);
@@ -680,7 +681,12 @@ export function CadEditor({
           ? `${featureDialog.partId}:extrude`
           : (doc.parts.find(candidate => candidate.id === featureDialog.partId)?.pattern?.id ?? null)
         : (partCutting?.id ?? (rolledTo && designSteps(doc).some(step => step.id === rolledTo) ? rolledTo : null));
-  const shownDocument = useMemo(() => (rollbackStep ? rolledBackTo(doc, rollbackStep) : doc), [doc, rollbackStep]);
+  // A new design's blank first part isn't a part until it's sketched, as the reference starts with no parts at all.
+  const blankDesign = studioSession && doc.parts.length === 1 && isBlank(doc.parts[0]!);
+  const shownDocument = useMemo(
+    () => (blankDesign ? { ...doc, parts: [] } : rollbackStep ? rolledBackTo(doc, rollbackStep) : doc),
+    [doc, rollbackStep, blankDesign]
+  );
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
   const finishing = useRef(false);
@@ -4207,7 +4213,7 @@ export function CadEditor({
   // The parts, each with an eye to show or hide it in the view. In the studio they sit at the bottom left, below the
   // features, as in the reference.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
-  const builtParts = doc.parts.filter(isCadPart);
+  const builtParts = blankDesign ? [] : doc.parts.filter(isCadPart);
   // An open sketch turned with its parts behind it, about the middle of the view.
   const turned = !!sketchBackdrop && sketchTurn !== straightOn;
   const [ta, tb, tc, td] = drawingMatrix(sketchTurn);
