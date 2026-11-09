@@ -3849,11 +3849,10 @@ export function CadEditor({
       );
       openFeature('extrude', part.id, before);
     } else if (command === 'extrude' && part) {
-      // Extruding a sketch again, as the reference does, makes another part of the regions its extrudes leave. When
-      // they use it all, Extrude opens the part's own.
+      // Extrude always starts a new extrude, of the part's sketch here, as in the reference: it starts with the regions
+      // the sketch's extrudes leave, or none. An extrude already made is edited from its step in the feature list.
       const before = documentRef.current;
       const made = newExtrudeOf(before, part, `Part ${before.parts.length + 1}`);
-      if (!made) return openFeature('extrude', part.id);
       commit({ ...before, revision: before.revision + 1, parts: [...before.parts, made] });
       openFeature('extrude', made.id, before);
     } else if (part) openFeature(command, part.id);
