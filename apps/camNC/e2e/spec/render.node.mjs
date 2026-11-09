@@ -23,6 +23,8 @@ test('render options name a design, its views and a picture size', () => {
   assert.deepEqual(options.viewport, { width: 800, height: 600 });
   assert.equal(options.outDir, '/tmp/x');
   assert.deepEqual(parseRenderArgs(['designs/plate.json']).views, ['iso']);
+  assert.equal(parseRenderArgs(['designs/plate.json']).planes, false);
+  assert.equal(parseRenderArgs(['designs/plate.json', '--planes']).planes, true);
   assert.throws(() => parseRenderArgs(['designs/plate.json', '--view', 'sideways']), /Unknown view/);
   assert.throws(() => parseRenderArgs(['designs/plate.json', '--size', 'big']), /WIDTHxHEIGHT/);
   assert.throws(() => parseRenderArgs(['designs/missing.json']), /No such design/);

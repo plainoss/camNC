@@ -483,6 +483,20 @@ export async function createAdapter(page, url) {
         await page.waitForTimeout(100);
         return;
       }
+      case 'hideplanes': {
+        // The origin and base planes off with their eyes in the feature list, so a fitted view frames the parts alone.
+        await settle();
+        if (!(await studioToolbar.isVisible())) await closeSketch();
+        const geometry = page.getByRole('list', { name: 'Default geometry' });
+        const shown = geometry.getByRole('button', { name: 'Hide', exact: true });
+        for (let left = await shown.count(); left > 0; left--) {
+          await shown.first().click();
+          await page.waitForFunction(([list, want]) => list.querySelectorAll('button[aria-label="Hide"]').length === want, [await geometry.elementHandle(), left - 1]);
+        }
+        // Off the list, so a hovered row's eye doesn't show in a picture.
+        await page.mouse.move(0, 0);
+        return;
+      }
       case 'view': {
         // A named view of the Part Studio's 3D view, by its keyboard shortcut (the studio toolbar's Views help).
         const digit = NAMED_VIEWS.indexOf(rest) + 1;

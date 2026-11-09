@@ -12,7 +12,15 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const fromCaller = file => path.resolve(process.env.INIT_CWD ?? process.cwd(), file);
 
 export function parseRenderArgs(args) {
-  const options = { design: null, views: [], outDir: null, viewport: { width: 1440, height: 1000 }, url: null, headed: false };
+  const options = {
+    design: null,
+    views: [],
+    outDir: null,
+    viewport: { width: 1440, height: 1000 },
+    url: null,
+    headed: false,
+    planes: false,
+  };
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
     if (flag === '--') continue;
@@ -20,6 +28,7 @@ export function parseRenderArgs(args) {
     else if (flag === '--out') options.outDir = fromCaller(args[++i]);
     else if (flag === '--url') options.url = args[++i];
     else if (flag === '--headed') options.headed = true;
+    else if (flag === '--planes') options.planes = true;
     else if (flag === '--size') {
       const match = /^(\d+)x(\d+)$/.exec(args[++i] ?? '');
       if (!match) throw new Error('--size takes WIDTHxHEIGHT, such as 1440x1000');
@@ -29,7 +38,9 @@ export function parseRenderArgs(args) {
     else options.design = flag;
   }
   if (!options.design)
-    throw new Error('Usage: render <design.json> [--view top|front|right|iso ...] [--out dir] [--size WxH] [--url <dev server>]');
+    throw new Error(
+      'Usage: render <design.json> [--view top|front|right|iso ...] [--out dir] [--size WxH] [--planes] [--url <dev server>]'
+    );
   // Relative to where it was typed, else to the package or the spec folder, as `open` reads it.
   const candidates = [fromCaller(options.design), path.resolve(options.design), path.resolve(root, options.design)];
   const design = candidates.find(file => existsSync(file));
@@ -48,11 +59,16 @@ export async function render(options) {
   const started = Date.now();
   const session = await browserSession(options);
   try {
-    const opened = await session.run(`open ${options.design}`);
-    const rendered = opened.ok ? await session.run(`render ${options.views.join(' ')}`) : opened;
-    const errors = [...(opened.errors ?? []), ...(rendered === opened ? [] : (rendered.errors ?? []))];
-    if (!rendered.ok) return { ok: false, error: rendered.error, errors, ms: Date.now() - started };
-    return { ok: true, files: rendered.files, parts: rendered.parts, errors, ms: Date.now() - started };
+    // Unless asked for, the origin and base planes are hidden, so each view frames the parts alone.
+    const lines = [`open ${options.design}`, ...(options.planes ? [] : ['hideplanes']), `render ${options.views.join(' ')}`];
+    const errors = [];
+    let result;
+    for (const line of lines) {
+      result = await session.run(line);
+      errors.push(...(result.errors ?? []));
+      if (!result.ok) return { ok: false, error: result.error, errors, ms: Date.now() - started };
+    }
+    return { ok: true, files: result.files, parts: result.parts, errors, ms: Date.now() - started };
   } finally {
     await session.close();
   }

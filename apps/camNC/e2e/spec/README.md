@@ -95,6 +95,7 @@ pnpm --silent --filter @wbcnc/camNC render designs/plate.json --view top --view 
 
 Options: `--view <front|back|left|right|top|bottom|iso>` (repeat, or separate with commas; `iso` by default),
 `--out <dir>` (default `apps/camNC/test-results/spec-render/<design>/`), `--size <W>x<H>` (default `1440x1000`),
+`--planes` (keep the origin and base planes, which are hidden by default so the view frames the parts),
 `--url <running dev server>`, `--headed`. The design path is read from where the command was typed, else from this
 folder. It prints one JSON line with the files, the design's part count, any page errors and `ms`, and exits non-zero
 if anything failed. A picture is written once two frames in a row of the 3D view look the same, so the camera has
@@ -141,6 +142,7 @@ The comparison reports themselves are kept outside this repository.
 | `uncheck <label>` / `hold <key>` / `release <key>` / `selectdim` / `editdim` / `addpart` | Hold a modifier, select or edit the first dimension label, add a part                           |
 | `handle <start\|end> <point\|segment> [add]`                                             | Click a spline's own tangent handle, optionally adding to the selection                         |
 | `open <file.json>`                                                                       | Open a saved design file (relative to this folder) as a new project, on its first sketch        |
+| `hideplanes`                                                                             | Hide the origin and base planes with their eyes in the feature list                             |
 | `view <name>`                                                                            | Show the Part Studio's 3D view from `front`, `back`, `left`, `right`, `top`, `bottom` or `iso`  |
 | `frame <name>`                                                                           | Compare this moment with a reviewed golden, if one exists                                       |
 | `{ "expect": { ... } }`                                                                  | Check the state at this moment                                                                  |
