@@ -1,6 +1,7 @@
 import { newCadId } from './document';
 import { cadSketchRegions, evaluateCadFeatures } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
+import { regionGroups } from './regionProfile';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart } from './types';
 
@@ -108,8 +109,12 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     }
     const owner = byId.get(ownerId)!;
     const next: CadPart = { ...part, sketchOf: ownerId, sketch: owner.sketch };
-    if (owner.drawnOn) next.drawnOn = { ...(part.drawnOn ?? { offset: 0 }), on: owner.drawnOn.on };
-    else {
+    // Extrudes of a shared sketch start on its plane, wherever that is.
+    if (owner.drawnOn) {
+      next.drawnOn = { ...(part.drawnOn ?? {}), on: owner.drawnOn.on, offset: owner.drawnOn.offset };
+      if (owner.drawnOn.datum) next.drawnOn.datum = owner.drawnOn.datum;
+      else delete next.drawnOn.datum;
+    } else {
       delete next.drawnOn;
       if (owner.placement) next.placement = owner.placement;
     }
@@ -263,8 +268,39 @@ export function newExtrudeOf(document: CadDocument, part: CadPart, name: string)
     sketch: owner.sketch,
     sketchOf: owner.id,
     regions: unused,
-    ...(owner.drawnOn && { drawnOn: { on: owner.drawnOn.on, offset: 0 } }),
+    ...(owner.drawnOn && {
+      drawnOn: { on: owner.drawnOn.on, offset: owner.drawnOn.offset, ...(owner.drawnOn.datum && { datum: owner.drawnOn.datum }) },
+    }),
     ...(!owner.drawnOn && owner.placement && { placement: owner.placement }),
   };
   return unused.length && evaluateCadPart(made).part ? made : { ...made, regions: [] };
+}
+
+/**
+ * A New extrude of regions that lie apart makes a part of each group of them that touch, as the first is: the first
+ * group stays with the extrude, and each other is a part of its own of the same sketch, as thick.
+ */
+export function splitApartRegions(document: CadDocument, partId: string): CadDocument {
+  const part = document.parts.find(candidate => candidate.id === partId);
+  if (!part?.regions || part.regions.length < 2 || part.addTo || part.remove) return document;
+  const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).filter(region => part.regions!.includes(region.id));
+  const groups = regionGroups(regions);
+  if (groups.length < 2) return document;
+  const owner = sketchOwnerId(part);
+  const made = groups.slice(1).map((group, index): CadPart => {
+    const next: CadPart = {
+      ...part,
+      id: newCadId(),
+      name: `Part ${document.parts.length + index + 1}`,
+      sketchOf: owner,
+      regions: group.regionIds,
+    };
+    // What was done to the extrude's own part afterwards isn't the new part's.
+    for (const key of ['features', 'copies', 'pattern', 'addedRegions', 'moved'] as const) delete next[key];
+    return next;
+  });
+  const parts = document.parts.flatMap(candidate =>
+    candidate.id === partId ? [{ ...candidate, regions: groups[0]!.regionIds }, ...made] : [candidate]
+  );
+  return { ...document, revision: document.revision + 1, parts };
 }

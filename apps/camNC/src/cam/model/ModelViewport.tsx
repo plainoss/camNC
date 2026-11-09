@@ -3,6 +3,7 @@ import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
+import { kPlaneMarker, planeGivesWay } from './planePicking';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { ViewCube } from './ViewCube';
 import { modelGeometry } from './modelGeometry';
@@ -113,12 +114,21 @@ function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number;
       matrixAutoUpdate={false}
       matrix={matrix}
       renderOrder={1}
+      userData={kPlaneMarker}
       onPointerOver={event => {
+        if (planeGivesWay(event.intersections)) return;
+        event.stopPropagation();
+        if (onPick) setHovered(true);
+      }}
+      onPointerMove={event => {
+        // A face or region under the pointer, even behind the plane, is what's hovered.
+        if (planeGivesWay(event.intersections)) return setHovered(false);
         event.stopPropagation();
         if (onPick) setHovered(true);
       }}
       onPointerOut={() => setHovered(false)}
       onClick={event => {
+        if (planeGivesWay(event.intersections)) return;
         event.stopPropagation();
         if (event.delta <= 4) onPick?.();
       }}>

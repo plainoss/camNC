@@ -69,45 +69,81 @@ export function regionProfile(part: CadPart & { regions: string[] }): { part?: E
 const regionArea = (region: Pick<CadSketchRegion, 'points' | 'holes'>) =>
   Math.abs(polygonArea(region.points)) - region.holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0);
 
-/** The curves with picked regions on both sides: a region's ID lists the side of each curve it lies on. */
-function curvesBetween(regions: CadSketchRegion[]): Set<string> {
-  const sides = new Map<string, Set<string>>();
-  for (const region of regions)
-    for (const side of region.id
-      .slice(region.id.indexOf(':region:') + ':region:'.length)
-      .replace(/#\d+$/, '')
-      .split('|')) {
-      const curve = side.slice(0, side.lastIndexOf(':'));
-      sides.set(curve, (sides.get(curve) ?? new Set()).add(side));
+type Point = { x: number; y: number };
+
+/**
+ * The picked regions put together: the boundary pieces two of them share are left out, and what's left is chained into
+ * outlines, each with the holes inside it. Regions side by side, or overlapping shapes' pieces, come out as one outline;
+ * regions apart as one each, in the order of their first region.
+ */
+export function regionGroups(picked: CadSketchRegion[]): { outline: Point[]; holes: Point[][]; regionIds: string[]; curveIds: string[] }[] {
+  const key = (point: Point) => `${Math.round(point.x * 1e4)},${Math.round(point.y * 1e4)}`;
+  const oriented = (points: Point[], ccw: boolean) => (polygonArea(points) > 0 === ccw ? points : [...points].reverse());
+  const segments = new Map<string, { from: Point; to: Point; region: number }>();
+  picked.forEach((region, index) => {
+    for (const loop of [oriented(region.points, true), ...region.holes.map(hole => oriented(hole, false))])
+      loop.forEach((from, at) => {
+        const to = loop[(at + 1) % loop.length]!;
+        if (key(from) === key(to)) return;
+        const back = `${key(to)}>${key(from)}`;
+        // A piece two picked regions share is inside what they make together.
+        if (segments.has(back)) segments.delete(back);
+        else segments.set(`${key(from)}>${key(to)}`, { from, to, region: index });
+      });
+  });
+  const leaving = new Map<string, { from: Point; to: Point; region: number }[]>();
+  for (const segment of segments.values()) leaving.set(key(segment.from), [...(leaving.get(key(segment.from)) ?? []), segment]);
+  const loops: { points: Point[]; regions: Set<number> }[] = [];
+  for (const first of segments.values()) {
+    if (!leaving.get(key(first.from))?.includes(first)) continue;
+    const points: Point[] = [],
+      regions = new Set<number>();
+    let segment: typeof first | undefined = first;
+    while (segment) {
+      const out = leaving.get(key(segment.from))!;
+      out.splice(out.indexOf(segment), 1);
+      points.push(segment.from);
+      regions.add(segment.region);
+      if (key(segment.to) === key(first.from)) break;
+      segment = leaving.get(key(segment.to))?.[0];
     }
-  return new Set([...sides].filter(([, on]) => on.size > 1).map(([id]) => id));
+    if (points.length > 2) loops.push({ points, regions });
+  }
+  const outlines = loops.filter(loop => polygonArea(loop.points) > 0);
+  const holes = loops.filter(loop => polygonArea(loop.points) < 0);
+  // Every picked region is in the outline around a point inside it; outlines go in the order of their first region.
+  const groups = outlines.map(loop => ({
+    outline: loop.points,
+    holes: [] as Point[][],
+    members: picked.flatMap((region, index) => {
+      const inside = regionInteriorPoint(oriented(region.points, true));
+      return inside && pointInPolygon(inside, loop.points) ? [index] : [];
+    }),
+  }));
+  for (const hole of holes) {
+    const around = groups
+      .filter(group => pointInPolygon(hole.points[0]!, group.outline))
+      .sort((a, b) => Math.abs(polygonArea(a.outline)) - Math.abs(polygonArea(b.outline)))[0];
+    around?.holes.push([...hole.points].reverse());
+  }
+  return groups
+    .filter(group => group.members.length)
+    .sort((a, b) => Math.min(...a.members) - Math.min(...b.members))
+    .map(group => ({
+      outline: group.outline,
+      holes: group.holes,
+      regionIds: group.members.map(index => picked[index]!.id),
+      curveIds: [...new Set(group.members.flatMap(index => picked[index]!.curveIds))],
+    }));
 }
 
 /**
- * Regions side by side as one: the region the sketch has where the curves between them are left out. Curves drawn over
- * each other are left out in turn. Regions that don't touch, or whose curves between them also bound others, have none.
+ * Regions side by side, or overlapping, as one: their outlines put together, with the holes left inside. Regions that
+ * don't touch have none.
  */
-export function joinedRegions(sketch: CadSketch, picked: CadSketchRegion[]): CadSketchRegion | null {
-  const area = picked.reduce((sum, region) => sum + regionArea(region), 0);
-  const inside = picked.map(region => regionInteriorPoint(region.points));
-  if (inside.some(point => !point)) return null;
-  let entities = sketch.entities,
-    current = picked;
-  for (let round = 0; round < 8; round++) {
-    const between = curvesBetween(current);
-    if (!between.size) return null;
-    entities = entities.filter(entity => !between.has(entity.id));
-    const regions = sketchRegions({ ...sketch, entities }, CAD_CHORD_TOLERANCE);
-    // Each picked region is now in the smallest region around a point inside it.
-    const holding = inside.map(point =>
-      regions
-        .filter(region => pointInPolygon(point!, region.points))
-        .reduce<CadSketchRegion | null>((best, region) => (!best || regionArea(region) < regionArea(best) ? region : best), null)
-    );
-    if (holding.some(region => !region)) return null;
-    current = [...new Set(holding as CadSketchRegion[])];
-    // One region, and nothing more than the picked ones, as the area says.
-    if (current.length === 1) return Math.abs(regionArea(current[0]!) - area) < 1e-3 * Math.max(1, area) ? current[0]! : null;
-  }
-  return null;
+export function joinedRegions(_sketch: CadSketch, picked: CadSketchRegion[]): CadSketchRegion | null {
+  const groups = regionGroups(picked);
+  if (groups.length !== 1 || groups[0]!.regionIds.length !== picked.length) return null;
+  const [group] = groups;
+  return { id: group!.regionIds.join('+'), curveIds: group!.curveIds, points: group!.outline, holes: group!.holes };
 }

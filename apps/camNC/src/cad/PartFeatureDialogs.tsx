@@ -14,6 +14,7 @@ import {
   sharesSketch,
   sketchOwnerId,
   sketchRegions,
+  splitApartRegions,
   setPartCopyOffset,
   setPartPattern,
   renamePartCopy,
@@ -185,7 +186,10 @@ export function ExtrudeDialog({
   const [thicknessValid, setThicknessValid] = useState(true);
   const [depthError, setDepthError] = useState<string | null>(null);
   // A sketch that isn't one outline extrudes the region picked from it in the view; until then there's nothing to make.
-  const profileError = part.thin ? undefined : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
+  // Regions picked apart are fine for New: each group becomes a part of its own on OK.
+  const apart = operation === 'new' && splitApartRegions(document, part.id) !== document;
+  const profileError =
+    part.thin || apart ? undefined : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
   const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? formatCadValue(part.thin.depth)) : '100');
   const setThin = (thin: CadPart['thin'] | null) => {
     // A thin extrude has a depth of its own, so it no longer goes up to a face.
@@ -387,6 +391,29 @@ export function ExtrudeDialog({
               />
               Symmetric
             </label>
+          )}
+          {!part.upTo && !part.symmetric && part.drawnOn && !part.thin && (
+            // The other way out of the sketch's plane, or into the face it's drawn on.
+            <button
+              type="button"
+              className="cad-flip-direction"
+              aria-label="Flip direction"
+              title="Extrude the other way"
+              aria-pressed={!!part.drawnOn.inward}
+              onClick={() =>
+                onChange(document =>
+                  changePart(document, part.id, p => {
+                    const drawnOn = { ...p.drawnOn! };
+                    if (drawnOn.inward) delete drawnOn.inward;
+                    else drawnOn.inward = true;
+                    return { ...p, drawnOn };
+                  })
+                )
+              }>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3" />
+              </svg>
+            </button>
           )}
           {!part.upTo && (
             <CadThicknessField

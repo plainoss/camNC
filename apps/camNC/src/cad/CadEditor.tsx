@@ -75,6 +75,7 @@ import {
   removeCadFeature,
   removeCadVariable,
   removeDatumPlane,
+  splitApartRegions,
   cadCopyName,
   setCadVariable,
   type CadFaceRef,
@@ -3562,6 +3563,11 @@ export function CadEditor({
   const closeFeature = (keep: boolean) => {
     setDirectionPicker(null);
     if (!keep && featureDialog) commit(featureDialog.before);
+    // Regions picked apart are a part each.
+    if (keep && featureDialog?.kind === 'extrude') {
+      const split = splitApartRegions(documentRef.current, featureDialog.partId);
+      if (split !== documentRef.current) commit(split);
+    }
     // A Remove is a cut in the board its sketch is drawn on, so that board is the one selected.
     const step = keep && featureDialog && documentRef.current.parts.find(p => p.id === featureDialog.partId);
     const on = step && step.remove && step.drawnOn?.on;
@@ -3852,7 +3858,12 @@ export function CadEditor({
         replacePart(before, part.id, p => {
           const made = { ...p };
           delete made.extrude;
-          return made.drawnOn && !made.thin && isSingleLine(made) ? { ...made, thin: { depth: 100, midPlane: true } } : made;
+          if (made.drawnOn && !made.thin && isSingleLine(made)) return { ...made, thin: { depth: 100, midPlane: true } };
+          // A sketch of several regions, such as overlapping shapes or outlines apart, starts with all of them picked.
+          const regions = sketchRegions(made.sketch, CAD_CHORD_TOLERANCE);
+          if (!made.regions && regions.length > 1 && evaluateCadPart(made).diagnostics.some(d => d.severity === 'error'))
+            made.regions = regions.map(region => region.id);
+          return made;
         })
       );
       openFeature('extrude', part.id, before);
