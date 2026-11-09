@@ -6,7 +6,7 @@ export default defineConfig({
   ...config,
   test: {
     ...config.test,
-    reporters: ['default', new TimingReporter({ suite: 'performance' })],
+    reporters: ['default', new TimingReporter({ suite: 'performance' }), '@mergifyio/vitest'],
     include: ['src/routes/cam/$jobId.plan.variedBoards.test.tsx'],
     testNamePattern: /\[performance\]/,
     fileParallelism: false,

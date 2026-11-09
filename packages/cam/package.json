@@ -26,6 +26,7 @@
     "occt-import-js": "0.0.23"
   },
   "devDependencies": {
+    "@mergifyio/vitest": "catalog:",
     "@types/node": "catalog:",
     "@wbcnc/typescript-config": "workspace:*",
     "playwright": "catalog:",

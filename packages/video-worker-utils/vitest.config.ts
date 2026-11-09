@@ -3,6 +3,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     globals: false,
+    // Vitest's default reporters, plus Mergify's.
+    reporters: ['default', ...(process.env.GITHUB_ACTIONS === 'true' ? ['github-actions'] : []), '@mergifyio/vitest'],
     browser: {
       screenshotFailures: false,
       enabled: true,

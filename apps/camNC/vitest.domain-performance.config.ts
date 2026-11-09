@@ -9,6 +9,6 @@ export default defineConfig({
     include: ['src/cam/boards.test.ts'],
     testNamePattern: /\[performance\]/,
     fileParallelism: false,
-    reporters: ['default', new TimingReporter({ suite: 'domain-performance' })],
+    reporters: ['default', new TimingReporter({ suite: 'domain-performance' }), '@mergifyio/vitest'],
   },
 });

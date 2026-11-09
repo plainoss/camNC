@@ -14,6 +14,7 @@
     "@wbcnc/cam": "workspace:*"
   },
   "devDependencies": {
+    "@mergifyio/vitest": "catalog:",
     "@types/node": "catalog:",
     "@wbcnc/typescript-config": "workspace:*",
     "vitest": "catalog:",

@@ -23,6 +23,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      HAS_MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
       # The only job that saves the pnpm store, and only on main: PR and merge-queue jobs read main's entry.
@@ -30,8 +32,23 @@ jobs:
         uses: ./.github/actions/install-dependencies
         with:
           save-cache: ${{ github.event_name == 'push' }}
+      # node --test does not create the directory of its report.
+      - name: Create the JUnit report directory
+        run: mkdir -p test-results/junit
+      # Also writes a JUnit report for Mergify, keeping the TAP output node --test prints when not on a terminal.
       - name: Check CI configuration
+        id: ci-tests
+        env:
+          NODE_OPTIONS: --test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/junit/node-test.xml
         run: pnpm run test:ci
+      - name: Upload CI configuration test results to Mergify
+        if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('test-results/junit/node-test.xml') != ''
+        uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29
+        with:
+          token: ${{ secrets.MERGIFY_TOKEN }}
+          report_path: test-results/junit/node-test.xml
+          job_name: Format, lint and types (CI configuration)
+          test_step_outcome: ${{ steps.ci-tests.outcome }}
       # Turborepo's local cache, so packages whose inputs did not change replay their result.
       # Fork PRs keep local snapshots; only trusted repository jobs may exchange an identity token.
       - name: Authenticate remote cache
@@ -89,6 +106,8 @@ jobs:
     defaults: &bash
       run:
         shell: bash
+    env: &mergify-env
+      HAS_MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN != '' }}
     steps: &test-steps
       - uses: actions/checkout@v7
       - name: Install dependencies
@@ -110,17 +129,47 @@ jobs:
           path: .turbo/cache
           key: turbo-test-${{ matrix.suite }}-${{ github.sha }}
           restore-keys: turbo-test-${{ matrix.suite }}-
+      # node --test does not create the directory of its report.
+      - name: Create the JUnit report directory
+        if: matrix.suite == 'headless'
+        run: mkdir -p apps/camNC/test-results/junit
       # A module that never finishes importing hits no test timeout, so bound the step. Turbo groups logs in CI, which
       # would leave a hung run with no output; stream them to show which files finished.
+      # The Vitest suites report to Mergify themselves; both browser shards report as one suite. In the headless suites,
+      # the Cloudflare Workers suites write JUnit reports instead, and so does node --test (camNC's license check),
+      # keeping its TAP output. Both are uploaded below.
       - name: Run tests
+        id: tests
         timeout-minutes: 20
         env:
           TURBO_CACHE_DIR: .turbo/cache
+          MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
+          MERGIFY_TEST_JOB_NAME: Tests (${{ startsWith(matrix.suite, 'app-browser-') && 'app-browser' || matrix.suite }})
+          NODE_OPTIONS: ${{ matrix.suite == 'headless' && '--test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/junit/node-test.xml' || '' }}
         run: node scripts/turbo-shared-cache.mjs run ${{ matrix.tasks }} --log-order=stream ${{ matrix.filter }} -- ${{ matrix.args }}
+      - name: Upload Cloudflare Workers test results to Mergify
+        if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/*/test-results/junit/worker.xml') != ''
+        uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29
+        with:
+          token: ${{ secrets.MERGIFY_TOKEN }}
+          report_path: apps/*/test-results/junit/worker.xml
+          job_name: Tests (${{ matrix.suite }}, Workers pool)
+          test_step_outcome: ${{ steps.tests.outcome }}
+      - name: Upload node --test results to Mergify
+        if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/camNC/test-results/junit/node-test.xml') != ''
+        uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29
+        with:
+          token: ${{ secrets.MERGIFY_TOKEN }}
+          report_path: apps/camNC/test-results/junit/node-test.xml
+          job_name: Tests (${{ matrix.suite }}, node --test)
+          test_step_outcome: ${{ steps.tests.outcome }}
       # Like the root test script: both gates run one after the other on a runner whose functional tests have finished,
       # directly rather than through turbo, so a cached result never stands in for a measurement.
       - name: Performance gates
         if: matrix.performance != ''
+        env:
+          MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
+          MERGIFY_TEST_JOB_NAME: Tests (${{ matrix.suite }}, performance gates)
         run: ${{ matrix.performance }}
       - name: Upload test timings
         if: always()
@@ -154,6 +203,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: *browser-container
     defaults: *bash
+    env: *mergify-env
     steps: *test-steps
 
   specs:
@@ -175,6 +225,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      HAS_MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
       - name: Install dependencies
@@ -193,19 +245,46 @@ jobs:
           path: .turbo/cache
           key: turbo-specs-${{ strategy.job-index }}-${{ github.sha }}
           restore-keys: turbo-specs-${{ strategy.job-index }}-
+      # Writes a JUnit report for Mergify unless turbo replays the shard.
       - name: Run sketch behaviour specs
+        id: specs
         timeout-minutes: 15
         env:
           TURBO_CACHE_DIR: .turbo/cache
         run: node scripts/turbo-shared-cache.mjs run spec:cad --filter=@wbcnc/camNC --log-order=stream -- --shard=${{ matrix.shard }}
+      - name: Upload behaviour spec results to Mergify
+        if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/camNC/test-results/junit/spec-*.xml') != ''
+        uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29
+        with:
+          token: ${{ secrets.MERGIFY_TOKEN }}
+          report_path: apps/camNC/test-results/junit/spec-*.xml
+          # One name for the four shards of the suite.
+          job_name: Behaviour specs
+          test_step_outcome: ${{ steps.specs.outcome }}
       - name: Check the interactive spec session
         if: matrix.shard == '1/4'
         timeout-minutes: 5
         run: printf 'rect 10,10 100,60\nexpect {"entityCount":4}\nframe smoke\n' | pnpm --silent --filter @wbcnc/camNC spec:session
+      # node --test does not create the directory of its report.
+      - name: Create the JUnit report directory
+        if: matrix.shard == '1/4'
+        run: mkdir -p apps/camNC/test-results/junit
+      # Also writes a JUnit report for Mergify, keeping the TAP output node --test prints when not on a terminal.
       - name: Check rendering a saved design
+        id: render
         if: matrix.shard == '1/4'
         timeout-minutes: 5
+        env:
+          NODE_OPTIONS: --test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/junit/node-test.xml
         run: pnpm --filter @wbcnc/camNC test:render
+      - name: Upload rendering test results to Mergify
+        if: (success() || failure()) && matrix.shard == '1/4' && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/camNC/test-results/junit/node-test.xml') != ''
+        uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29
+        with:
+          token: ${{ secrets.MERGIFY_TOKEN }}
+          report_path: apps/camNC/test-results/junit/node-test.xml
+          job_name: Behaviour specs (rendering)
+          test_step_outcome: ${{ steps.render.outcome }}
       - name: Upload spec results
         if: always()
         uses: actions/upload-artifact@v7
@@ -294,12 +373,16 @@ jobs:
         env:
           FLUIDNC_SIM_HOST: 127.0.0.1:8848
           FLUIDNC_SIM_VARIANT: v4
+          MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
+          MERGIFY_TEST_JOB_NAME: FluidNC simulator integration (FluidNC 4.1.1)
       - name: Integration tests (3.9.9 personality)
         working-directory: packages/fluidnc
         run: pnpm vitest run src/sim.integration.test.ts
         env:
           FLUIDNC_SIM_HOST: 127.0.0.1:8850
           FLUIDNC_SIM_VARIANT: v3-81
+          MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
+          MERGIFY_TEST_JOB_NAME: FluidNC simulator integration (3.9.9 personality)
       - name: Simulator log
         if: failure()
         run: cat packages/fluidnc/sim.log
