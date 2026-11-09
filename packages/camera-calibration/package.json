@@ -6,13 +6,13 @@
   "scripts": {
     "lint": "oxlint --max-warnings 0",
     "test": "vitest",
-    "check-types": "tsc --noEmit",
-    "check-types:fast": "tsgo --noEmit"
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@react-spring/web": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/uuid": "catalog:",
+    "@wbcnc/video-worker-utils": "workspace:*",
     "@zip.js/zip.js": "catalog:",
     "comlink": "catalog:",
     "immer": "catalog:",
@@ -23,8 +23,7 @@
     "react-dom": "catalog:",
     "tailwindcss": "catalog:",
     "uuid": "catalog:",
-    "zustand": "catalog:",
-    "@wbcnc/video-worker-utils": "workspace:*"
+    "zustand": "catalog:"
   },
   "exports": {
     ".": "./src/index.ts"
@@ -37,9 +36,9 @@
     "@wbcnc/load-opencv": "workspace:*",
     "@wbcnc/typescript-config": "workspace:*",
     "@wbcnc/ui": "workspace:*",
-    "typescript": "~5.8.3",
+    "@webgpu/types": "catalog:",
+    "typescript": "catalog:",
     "vite": "catalog:",
-    "vitest": "catalog:",
-    "@webgpu/types": "catalog:"
+    "vitest": "catalog:"
   }
 }
