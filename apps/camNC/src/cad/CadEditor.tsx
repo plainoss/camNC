@@ -4505,7 +4505,12 @@ export function CadEditor({
                   pickFace={picked => setDirectionPicker(() => picked)}
                 />
               ) : (
-                <PartPatternDialog key={target.id} {...props} pickDirection={picked => setDirectionPicker(() => picked)} />
+                <PartPatternDialog
+                  key={target.id}
+                  {...props}
+                  pickDirection={picked => setDirectionPicker(() => picked)}
+                  pickPoint={pointPicker.start}
+                />
               );
             })()}
           {studioSession && !showWorkspace && part && (
