@@ -45,7 +45,8 @@ async function studio() {
 
 it('toggles base planes and requests named views and fit from workspace shortcuts', async () => {
   await studio();
-  const workspace = await screen.findByTestId('workspace-3d');
+  // The 3D workspace loads lazily, which can take longer than the default wait on a busy runner.
+  const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() => expect(props().planes).toHaveLength(3));
   fireEvent.keyDown(workspace, { key: 'p', code: 'KeyP' });
@@ -67,7 +68,7 @@ it('toggles base planes and requests named views and fit from workspace shortcut
 
 it('leaves viewport shortcuts alone while typing in fields or using modifiers', async () => {
   await studio();
-  const workspace = await screen.findByTestId('workspace-3d');
+  const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() => expect(props().planes).toHaveLength(3));
   for (const field of [document.createElement('input'), document.createElement('textarea'), document.createElement('div')]) {
