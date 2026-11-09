@@ -2,7 +2,7 @@
  * Read the files of a zip archive (stored or deflated entries), e.g. Fusion's `.tools` tool library export, which is
  * a zip with the library JSON inside. Uses the browser's DecompressionStream, no library.
  */
-export async function unzip(bytes: Uint8Array): Promise<{ name: string; data: Uint8Array }[]> {
+export async function unzip(bytes: Uint8Array<ArrayBuffer>): Promise<{ name: string; data: Uint8Array }[]> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   // End of central directory: the last record starting with PK\5\6.
   let eocd = -1;

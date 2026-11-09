@@ -4,7 +4,7 @@ export type Array9 = [number, number, number, number, number, number, number, nu
 
 export function matrix3ToRowMajor(matrix: Matrix3): Array9 {
   const elements = matrix.elements;
-  // prettier-ignore
+  // biome-ignore format: keep the hand-aligned layout
   return [
     elements[0], elements[3], elements[6], // First row
     elements[1], elements[4], elements[7], // Second row

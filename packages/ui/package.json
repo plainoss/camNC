@@ -4,8 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "lint": "eslint . --max-warnings 0",
-    "check-types": "tsc --noEmit"
+    "lint": "oxlint --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "check-types:fast": "tsgo --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "catalog:",
@@ -46,17 +47,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@wbcnc/eslint-config": "workspace:*",
     "@wbcnc/typescript-config": "workspace:*",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-jsx-a11y": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "eslint-plugin-react": "catalog:",
-    "eslint-plugin-react-hooks": "catalog:",
-    "eslint-plugin-unused-imports": "catalog:",
     "framer-motion": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:"
