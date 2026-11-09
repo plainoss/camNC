@@ -33,6 +33,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - From within a package you can run `pnpm test`.
 - Focus on one test with `pnpm vitest run -t "<test name>"`.
 - Tests run in headless Chromium (Vitest browser mode); install it once with `pnpm exec playwright install chromium`.
+- Reproduce Part Studio and CAM issues headlessly before opening a browser: run a saved design (Save to file) through `pnpm --silent --filter @wbcnc/cad-script check --from design.json --report full`, and keep it as a golden report in `packages/cad-script/fixtures/designs/` (see `packages/cad-script/README.md`).
 - To try sketch editor behaviour in a real browser without replaying a whole scenario, use the interactive session in `apps/camNC/e2e/spec/README.md`.
 - Fix failing tests or type errors until the suite passes.
 - After moving files or changing imports, run `pnpm lint --filter <project_name>`.
@@ -41,6 +42,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 ## Iteration and CI failures
 
 - During development, run the changed tests and relevant package lint/type checks first. Run the local fast suite once the change is ready, plus affected files excluded from it. After rebasing or resolving conflicts, rerun affected checks and `pnpm run check-format` before pushing; a previous green run validates the previous tree.
+- PR CI runs only the quick suites. The browser files and behaviour specs run in the merge queue, so run the ones your change touches locally before queueing, or label the PR `full-ci` to run them on the PR (docs/TESTING.md).
 - Push coherent, validated milestones. Superseded PR commits cancel their CI, so avoid repeated pushes of incomplete fixes that discard useful validation.
 - Before repairing a shared test driver or CI failure, inspect open PRs and current main for an existing fix. Coordinate one shared repair rather than independently patching it into several feature branches.
 - Claim a shared failure before fixing it: comment on its open `flaky-test` issue (CI files one when a test fails and then passes on the same code), or open one if there is none, with the `flaky-test` label and a title CI would give it, so later flakes land on it: `Flaky test: ` and then the spec (`sketch/machine/edit-after-cut-keeps-boards`) or `file > describe > test`, and link your PR there. If someone already claimed it, wait for their fix or help on their PR.
@@ -56,7 +58,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 
 - Title format: `feat/fix/chore/docs(<project_name>) <Title>`
 - Open reviewable dependent PRs as soon as their work is ready; distinguish a dependency blocking merge from one blocking review or initial validation. State the dependency and base explicitly, and account for the workflow's target-branch triggers when deciding which checks can run before retargeting.
-- When asked to merge, enable auto-merge once ready and continue monitoring until it merges or a concrete blocker needs action. After a queue rejection, inspect the reason and current candidate, address it, and restore auto-merge when appropriate; a retry of an obsolete candidate does not validate a new one.
+- When asked to merge, use the active queue: once Mergify is enabled, comment `@mergifyio queue` (see `docs/TESTING.md`); until then, enable GitHub auto-merge. Continue monitoring until it merges or a concrete blocker needs action. After a queue rejection, inspect the reason and current candidate, address it, and requeue when appropriate; a retry of an obsolete candidate does not validate a new one.
 - Do not routinely rebase a healthy queued PR just because main advanced; the queue validates the combined candidate. Update the branch when resolving an actual conflict or incorporating a required fix, then validate the changed tree.
 
 ## Code Style

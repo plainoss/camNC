@@ -1,0 +1,389 @@
+{
+ "design": {
+  "name": "Untitled design",
+  "revision": 17,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [
+  {
+   "code": "redundant-constraint",
+   "message": "Some constraints repeat relationships that are already defined. Entities: corb, point-3.",
+   "part": "Corbel A · curved-03",
+   "entities": [
+    "corb",
+    "point-3"
+   ]
+  },
+  {
+   "code": "underconstrained",
+   "message": "6 degrees of freedom remain. Add dimensions to keep this shape predictable.",
+   "part": "Corbel A · curved-03"
+  }
+ ],
+ "features": [
+  {
+   "id": "corbel-part:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Corbel A · curved-03",
+   "part": "Corbel A · curved-03",
+   "settings": {
+    "on": "not placed"
+   },
+   "result": {
+    "sketch": "Corbel A · curved-03 / profile",
+    "freedom": 6,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "corbel-part:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Corbel A · curved-03",
+   "part": "Corbel A · curved-03",
+   "settings": {
+    "thickness": {
+     "value": 18
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      110,
+      100
+     ]
+    },
+    "holes": 0,
+    "notches": 0
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Corbel A · curved-03",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 6,
+   "status": "solved",
+   "constraints": {
+    "distance": 1,
+    "horizontal": 1,
+    "horizontalPoints": 3,
+    "radius": 1,
+    "tangent": 7,
+    "verticalPoints": 2
+   },
+   "entities": [
+    {
+     "ref": "line-1",
+     "type": "line",
+     "a": [
+      22,
+      0
+     ],
+     "b": [
+      88,
+      0
+     ],
+     "ends": [
+      "point-2",
+      "point-3"
+     ]
+    },
+    {
+     "ref": "arc-1",
+     "type": "arc",
+     "at": [
+      88,
+      22
+     ],
+     "r": 22,
+     "a": [
+      88,
+      0
+     ],
+     "b": [
+      110,
+      22
+     ],
+     "ends": [
+      "point-3",
+      "point-5"
+     ]
+    },
+    {
+     "ref": "line-2",
+     "type": "line",
+     "a": [
+      110,
+      22
+     ],
+     "b": [
+      110,
+      78
+     ],
+     "ends": [
+      "point-5",
+      "point-6"
+     ]
+    },
+    {
+     "ref": "arc-2",
+     "type": "arc",
+     "at": [
+      88,
+      78
+     ],
+     "r": 22,
+     "a": [
+      110,
+      78
+     ],
+     "b": [
+      88,
+      100
+     ],
+     "ends": [
+      "point-6",
+      "point-8"
+     ]
+    },
+    {
+     "ref": "line-3",
+     "type": "line",
+     "a": [
+      88,
+      100
+     ],
+     "b": [
+      22,
+      100
+     ],
+     "ends": [
+      "point-8",
+      "point-9"
+     ]
+    },
+    {
+     "ref": "arc-3",
+     "type": "arc",
+     "at": [
+      22,
+      78
+     ],
+     "r": 22,
+     "a": [
+      22,
+      100
+     ],
+     "b": [
+      0,
+      78
+     ],
+     "ends": [
+      "point-9",
+      "point-11"
+     ]
+    },
+    {
+     "ref": "line-4",
+     "type": "line",
+     "a": [
+      0,
+      78
+     ],
+     "b": [
+      0,
+      22
+     ],
+     "ends": [
+      "point-11",
+      "point-12"
+     ]
+    },
+    {
+     "ref": "arc-4",
+     "type": "arc",
+     "at": [
+      22,
+      22
+     ],
+     "r": 22,
+     "a": [
+      0,
+      22
+     ],
+     "b": [
+      22,
+      0
+     ],
+     "ends": [
+      "point-12",
+      "point-2"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      110,
+      100
+     ],
+     "area": 10583.673,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Corbel A · curved-03",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     110,
+     100
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 3.8,
+    "operations": [
+     {
+      "label": "curved-03 · Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      18
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge line-1",
+     "looks": "-y",
+     "origin": [
+      22,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge line-2",
+     "looks": "+x",
+     "origin": [
+      110,
+      22,
+      0
+     ]
+    },
+    {
+     "face": "edge line-3",
+     "looks": "+y",
+     "origin": [
+      88,
+      100,
+      0
+     ]
+    },
+    {
+     "face": "edge line-4",
+     "looks": "-x",
+     "origin": [
+      0,
+      78,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    123.4,
+    113.4
+   ],
+   "yield": 0.786,
+   "parts": [
+    {
+     "name": "Corbel A · curved-03",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      110,
+      100
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Corbel A · curved-03",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 3.8,
+   "operations": [
+    {
+     "label": "curved-03 · Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}

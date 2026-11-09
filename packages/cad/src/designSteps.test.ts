@@ -11,9 +11,10 @@ import {
   createPlateDocument,
   setCutDepth,
   type CadDocument,
-} from '@wbcnc/cad';
+  designSteps,
+  rolledBackTo,
+} from './index';
 import { describe, expect, it } from 'vitest';
-import { designSteps, rolledBackTo } from './designSteps';
 
 describe('the design’s steps', () => {
   it('lists each part’s sketch, thickness, cuts and copies in order', () => {

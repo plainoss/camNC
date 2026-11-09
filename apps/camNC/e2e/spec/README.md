@@ -7,6 +7,7 @@ true. Nothing in `scenarios/` names a React component, CSS class or internal ID.
 ```text
 scenarios/<domain>/*.json   what a person does and what must be true
 adapters/<domain>.mjs       the only app-specific code: drive input, read state
+adapters/sketch.headless.mjs  the same steps against the editor's code in Node, for the scenarios it models
 goldens/<domain>/*.svg      reviewed pictures of named moments, normalized
 run.mjs                     runner, matchers and golden comparison
 ```
@@ -34,6 +35,21 @@ Results are one of `PASS`, `FAIL`, `XFAIL` (a listed known gap still fails) and
 A scenario with a `flaky` field (the issue that tracks it) is quarantined: it still runs, but a failure is reported as
 `FLAKY` and doesn't fail the run. Use it only for a race that blocks other PRs while its issue is open, and remove
 the field with the fix.
+
+## Without a browser
+
+`headless.test.mjs` runs the sketch scenarios that need no page against the editor's own drawing code in Node, through
+`adapters/sketch.headless.mjs`. It is part of the app's domain tests, so it takes milliseconds and runs on every change:
+
+```sh
+pnpm --filter @wbcnc/camNC exec vitest run --config vitest.node.config.ts e2e/spec/headless.test.mjs
+```
+
+It picks a scenario only when it models every step and expectation in it. So far that is the corner and center
+rectangle tools (`key g`, `key r`, `rect`, clicks and drags) and the geometry, `regions` and `tool` expectations.
+Anything else, and every `frame`, stays browser-only. The browser run still runs every scenario, so both adapters must
+agree on the ones they share. A tool runs here once its logic lives in `@wbcnc/cad-editor`, and
+`@wbcnc/cad-editor/headlessSketch` drives it.
 
 ## Interactive session
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addCircle,
   addLine,
   addRectangle,
   CAD_CHORD_TOLERANCE,
@@ -17,6 +18,8 @@ import {
   removalRegions,
   resolveExtrudeSteps,
   sketchRegions,
+  splitApartRegions,
+  evaluateCadPart,
   solveCadDocument,
   validateCadDocument,
   type CadDocument,
@@ -204,5 +207,19 @@ describe('Extrude → Remove', () => {
     const solved = await solveCadDocument(document);
     expect(solved.status).toBe('solved');
     expect(cadCuts(solved.document.parts[0]!).map(cut => [cut.depth, cut.depthExpression])).toEqual([[7, 'pocket']]);
+  });
+});
+
+describe('a New extrude of regions apart', () => {
+  it('makes a part of each group of regions that touch, of the same sketch and as thick', () => {
+    const part = { ...createCadPart('Arm', 25), drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
+    part.sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 80, height: 40 });
+    part.sketch = addCircle(part.sketch, { x: 150, y: 20, radius: 20 });
+    const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+    const split = splitApartRegions({ ...createCadDocument(), parts: [{ ...part, regions }] }, part.id);
+    expect(split.parts).toHaveLength(2);
+    expect(split.parts[1]).toMatchObject({ sketchOf: part.id, thickness: 25, drawnOn: part.drawnOn });
+    expect(split.parts.map(made => made.regions!.length)).toEqual([1, 1]);
+    expect(split.parts.every(made => evaluateCadPart(made).part)).toBe(true);
   });
 });

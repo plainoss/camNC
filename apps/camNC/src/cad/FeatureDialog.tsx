@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
+import { finalPreviewNow, subscribeFinalPreview } from './finalPreview';
 import { fieldsSettled } from './variableFields';
 import './featureDialog.css';
 
@@ -30,6 +31,7 @@ export function FeatureDialog({
   children: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
+  const final = useSyncExternalStore(subscribeFinalPreview, finalPreviewNow);
   // The field Enter last applied, and what it held: Enter on it again, unchanged, accepts the dialog.
   const lastEnter = useRef<{ input: HTMLInputElement; value: string } | null>(null);
   // As of the latest render: a field's Enter may have just found its value wrong, which shows a frame later.
@@ -73,6 +75,16 @@ export function FeatureDialog({
       }}>
       <div className="cad-feature-dialog-head">
         <h3>{title}</h3>
+        {final && (
+          <button
+            type="button"
+            className="cad-feature-final"
+            aria-pressed={final.shown}
+            title="Show the whole design, with this change, rather than only as far as this step"
+            onClick={final.toggle}>
+            Final
+          </button>
+        )}
         <button
           type="button"
           className="cad-feature-ok"

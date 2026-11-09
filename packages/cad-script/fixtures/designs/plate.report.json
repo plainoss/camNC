@@ -1,0 +1,608 @@
+{
+ "design": {
+  "name": "plate",
+  "revision": 1,
+  "version": 2
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "17f51e7f-5d51-4202-be33-c56a1139fcba:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Plate",
+   "part": "Plate",
+   "settings": {
+    "on": "not placed"
+   },
+   "result": {
+    "sketch": "Plate / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 5
+   }
+  },
+  {
+   "id": "17f51e7f-5d51-4202-be33-c56a1139fcba:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Plate",
+   "part": "Plate",
+   "settings": {
+    "thickness": {
+     "value": 18
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      400,
+      300
+     ]
+    },
+    "holes": 4,
+    "notches": 0
+   }
+  },
+  {
+   "id": "8b958b48-667a-4d71-a27b-8a73bbf08ef5",
+   "kind": "faceSketch",
+   "label": "Sketch on the top · Plate",
+   "part": "Plate",
+   "settings": {
+    "on": "top"
+   },
+   "result": {
+    "sketch": "Plate / 9272",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 2
+   }
+  },
+  {
+   "id": "553b9d2b-5ab9-4c41-94ef-2dfe4143c7b0",
+   "kind": "cut",
+   "label": "Cut 1 · Plate",
+   "part": "Plate",
+   "settings": {
+    "sketch": "Plate / 9272",
+    "region": "r2",
+    "depth": {
+     "value": 6
+    }
+   },
+   "result": {
+    "cuts": [
+     {
+      "side": "top",
+      "from": 0,
+      "to": 6,
+      "through": false,
+      "at": [
+       100,
+       75
+      ],
+      "size": [
+       200,
+       150
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Plate",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "diameter": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 5,
+    "positionY": 5
+   },
+   "entities": [
+    {
+     "ref": "b674",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      400,
+      0
+     ],
+     "ends": [
+      "e153",
+      "d9f1"
+     ]
+    },
+    {
+     "ref": "bb33",
+     "type": "line",
+     "a": [
+      400,
+      0
+     ],
+     "b": [
+      400,
+      300
+     ],
+     "ends": [
+      "c0c0",
+      "96ad"
+     ]
+    },
+    {
+     "ref": "7fe2",
+     "type": "line",
+     "a": [
+      400,
+      300
+     ],
+     "b": [
+      0,
+      300
+     ],
+     "ends": [
+      "30a2",
+      "4817"
+     ]
+    },
+    {
+     "ref": "64ce",
+     "type": "line",
+     "a": [
+      0,
+      300
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "cbfc",
+      "3cb4"
+     ]
+    },
+    {
+     "ref": "3a32",
+     "type": "circle",
+     "at": [
+      30,
+      30
+     ],
+     "d": 8
+    },
+    {
+     "ref": "81f3",
+     "type": "circle",
+     "at": [
+      370,
+      30
+     ],
+     "d": 8
+    },
+    {
+     "ref": "faf8",
+     "type": "circle",
+     "at": [
+      30,
+      270
+     ],
+     "d": 8
+    },
+    {
+     "ref": "bbaa",
+     "type": "circle",
+     "at": [
+      370,
+      270
+     ],
+     "d": 8
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      400,
+      300
+     ],
+     "area": 119799.591,
+     "islands": 4
+    },
+    {
+     "ref": "r2",
+     "at": [
+      26.01,
+      26.002
+     ],
+     "size": [
+      7.99,
+      7.995
+     ],
+     "area": 50.102,
+     "islands": 0
+    },
+    {
+     "ref": "r3",
+     "at": [
+      366.01,
+      26.002
+     ],
+     "size": [
+      7.99,
+      7.995
+     ],
+     "area": 50.102,
+     "islands": 0
+    },
+    {
+     "ref": "r4",
+     "at": [
+      26.01,
+      266.002
+     ],
+     "size": [
+      7.99,
+      7.995
+     ],
+     "area": 50.102,
+     "islands": 0
+    },
+    {
+     "ref": "r5",
+     "at": [
+      366.01,
+      266.002
+     ],
+     "size": [
+      7.99,
+      7.995
+     ],
+     "area": 50.102,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Plate",
+   "ref": "9272",
+   "on": "top",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "5886",
+     "type": "line",
+     "a": [
+      100,
+      75
+     ],
+     "b": [
+      300,
+      75
+     ],
+     "ends": [
+      "e9ba",
+      "fa0d"
+     ]
+    },
+    {
+     "ref": "e69a",
+     "type": "line",
+     "a": [
+      300,
+      75
+     ],
+     "b": [
+      300,
+      225
+     ],
+     "ends": [
+      "738f",
+      "e135"
+     ]
+    },
+    {
+     "ref": "0659",
+     "type": "line",
+     "a": [
+      300,
+      225
+     ],
+     "b": [
+      100,
+      225
+     ],
+     "ends": [
+      "480e",
+      "797f"
+     ]
+    },
+    {
+     "ref": "a5ef",
+     "type": "line",
+     "a": [
+      100,
+      225
+     ],
+     "b": [
+      100,
+      75
+     ],
+     "ends": [
+      "6853",
+      "90c7"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      400,
+      300
+     ],
+     "area": 90000,
+     "islands": 1
+    },
+    {
+     "ref": "r2",
+     "at": [
+      100,
+      75
+     ],
+     "size": [
+      200,
+      150
+     ],
+     "area": 30000,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Plate",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     400,
+     300
+    ]
+   },
+   "holes": 4,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "553b",
+     "side": "top",
+     "from": 0,
+     "to": 6,
+     "through": false,
+     "at": [
+      100,
+      75
+     ],
+     "size": [
+      200,
+      150
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 4
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 72.9,
+    "operations": [
+     {
+      "label": "1 pocket 6 deep",
+      "depth": 6,
+      "steps": 4
+     },
+     {
+      "label": "Through hole",
+      "depth": 18.3,
+      "steps": 12
+     },
+     {
+      "label": "Through hole",
+      "depth": 18.3,
+      "steps": 12
+     },
+     {
+      "label": "Through hole",
+      "depth": 18.3,
+      "steps": 12
+     },
+     {
+      "label": "Through hole",
+      "depth": 18.3,
+      "steps": 12
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [
+     "Plate: pocket z=12: 2.2mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      18
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge b674",
+     "looks": "-y",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge bb33",
+     "looks": "+x",
+     "origin": [
+      400,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 7fe2",
+     "looks": "+y",
+     "origin": [
+      400,
+      300,
+      0
+     ]
+    },
+    {
+     "face": "edge 64ce",
+     "looks": "-x",
+     "origin": [
+      0,
+      300,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    413.4,
+    313.4
+   ],
+   "yield": 0.926,
+   "parts": [
+    {
+     "name": "Plate",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      400,
+      300
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Plate",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 72.9,
+   "operations": [
+    {
+     "label": "1 pocket 6 deep",
+     "depth": 6,
+     "steps": 4
+    },
+    {
+     "label": "Through hole",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Through hole",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Through hole",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Through hole",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [
+    "Plate: pocket z=12: 2.2mm² left in corners/narrow spots with D=3.175"
+   ],
+   "blocked": []
+  }
+ ]
+}

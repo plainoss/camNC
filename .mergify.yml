@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://docs.mergify.com/mergify-configuration-schema.json
+merge_queue:
+  mode: serial
+  # Check cumulative batches ahead, without filling the runners with speculative work.
+  max_parallel_checks: 2
+
+queue_rules:
+  - name: main
+    # Queue explicitly with @mergifyio queue; passing CI alone is not merge consent.
+    queue_conditions:
+      - base = main
+      - -draft
+      - check-success = Run tests
+    merge_conditions:
+      - check-success = Run tests
+      # Distinct merge conditions force batch validation after the lighter PR checks.
+      - check-success = Tests (app-browser-1)
+      - check-success = Tests (app-browser-2)
+      - check-success = Behaviour specs (1/4)
+      - check-success = Behaviour specs (2/4)
+      - check-success = Behaviour specs (3/4)
+      - check-success = Behaviour specs (4/4)
+    # Preserve required reviews/checks from GitHub in addition to the explicit CI gate.
+    branch_protection_injection_mode: queue
+    merge_method: squash
+    batch_size: 3
+    batch_max_wait_time: 30 seconds
+    # Failed batches are bisected; do not hide failures with automatic CI retries.
+    max_checks_retries: 0
