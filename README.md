@@ -191,8 +191,7 @@ Checks (also run in CI):
 ```bash
 pnpm run check-format  # Biome for TypeScript, Prettier for Markdown (a pre-commit hook formats staged files)
 pnpm run lint          # oxlint
-pnpm run check-types   # tsc --noEmit in every package
-pnpm run check-types:fast # the same with tsgo (TypeScript 7 preview), for local iteration
+pnpm run check-types   # tsc --noEmit (TypeScript 7) in every package
 pnpm run test          # functional tests, then isolated performance gates
 pnpm run test:performance # only the performance gates (Node, then headless Chromium)
 pnpm run build

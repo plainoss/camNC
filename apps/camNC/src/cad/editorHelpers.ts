@@ -69,3 +69,10 @@ export function extrudedSketch(document: CadDocument, sketch: CadPart, pickAll: 
     made.regions = regions.map(region => region.id);
   return made;
 }
+
+/** A sketch on a part's face made a Hole step: round holes at its points, 5 mm across, through the part. */
+export function asHole(part: CadPart): CadPart {
+  const made: CadPart = { ...part, remove: part.remove ?? { depth: 'through' }, hole: part.hole ?? { diameter: 5 } };
+  delete made.extrude;
+  return made;
+}

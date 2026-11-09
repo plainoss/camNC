@@ -8,8 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint --max-warnings 0",
     "preview": "vite preview",
-    "check-types": "tsc --noEmit",
-    "check-types:fast": "tsgo --noEmit"
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "catalog:",

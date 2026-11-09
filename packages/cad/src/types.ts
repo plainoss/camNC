@@ -318,6 +318,11 @@ export interface CadPart {
    * the sketch is drawn on, this deep. The step isn't a part itself.
    */
   remove?: { depth: CadCutDepth; depthExpression?: string };
+  /**
+   * A Hole step: a Remove whose sketch's points are the holes' centres, each cut as a round hole this wide, as deep as
+   * `remove` says. The sketch's lines and curves only place the points.
+   */
+  hole?: { diameter: number; diameterExpression?: string };
   /** Regions Extrude → Add steps join to this part. The design writes it from those steps; it's never edited. */
   addedRegions?: string[];
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
@@ -419,6 +424,8 @@ export interface CadPartPattern {
   id: string;
   /** Picked from a plane or face; it overrides `axis` while that face is there, and follows it when it moves. */
   direction?: CadDirection;
+  /** Along a picked edge, as a unit vector, when there's no `direction`. It stays as picked. */
+  vector?: [number, number, number];
   /** Switched off in the feature list: no copies, and the count and spacing are kept. */
   suppressed?: true;
   axis: 'x' | 'y' | 'z';

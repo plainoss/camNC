@@ -4,12 +4,29 @@ import {
   cadPartsToCut,
   createCadDocument,
   createPlateDocument,
+  parseCadDocument,
   setPartPattern,
   solveCadDocument,
   type CadPart,
 } from './index';
 
 describe('part patterns', () => {
+  it('lays copies along a picked edge, as it was picked', () => {
+    let document = createPlateDocument({ width: 100, height: 50 });
+    const part = document.parts[0]!;
+    part.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    document = setPartPattern(document, part.id, { axis: 'x', count: 3, spacing: 20, vector: [0, 0.6, 0.8] });
+    expect(document.parts[0]!.copies!.map(copy => copy.placement!.position.map(value => +value.toFixed(6)))).toEqual([
+      [0, 12, 16],
+      [0, 24, 32],
+    ]);
+    // Saved and opened again, it keeps the edge's direction; a broken one is refused.
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document))).parts[0]!.pattern!.vector).toEqual([0, 0.6, 0.8]);
+    const broken = JSON.parse(JSON.stringify(document));
+    broken.parts[0].pattern.vector = [0, 0, 0];
+    expect(() => parseCadDocument(broken)).toThrow(/pattern vector/);
+  });
+
   it('keeps a picked direction, flips it and clears back to the saved axis', () => {
     let document = createPlateDocument({ width: 100, height: 50 });
     const part = document.parts[0]!;

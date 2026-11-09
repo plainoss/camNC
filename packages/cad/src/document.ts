@@ -775,6 +775,12 @@ export function parseCadDocument(input: unknown): CadDocument {
     }
     if (p.pattern !== undefined) {
       if (p.pattern?.direction !== undefined) checkDirection(p.pattern.direction);
+      const vector = p.pattern?.vector;
+      if (
+        vector !== undefined &&
+        !(Array.isArray(vector) && vector.length === 3 && vector.every(Number.isFinite) && Math.hypot(...vector) > 0)
+      )
+        throw new Error('Invalid CAD pattern vector');
       const { id, axis, count, spacing, countExpression, spacingExpression } = p.pattern ?? ({} as NonNullable<CadPart['pattern']>);
       if (
         typeof id !== 'string' ||

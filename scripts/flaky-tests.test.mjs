@@ -20,12 +20,11 @@ test('reads failed specs and Vitest tests from a job log, each once', () => {
   ]);
 });
 
-test('only a failed queue run or a fixed rerun counts as a flake', () => {
-  assert.equal(attemptToRead({ event: 'merge_group', conclusion: 'failure', attempt: 1 }), 1);
+test('only a fixed rerun or a later passing batch counts as a flake', () => {
   assert.equal(attemptToRead({ event: 'pull_request', conclusion: 'success', attempt: 3 }), 2);
+  assert.equal(attemptToRead({ event: 'pull_request', conclusion: 'success', attempt: 1 }), null);
   assert.equal(attemptToRead({ event: 'pull_request', conclusion: 'failure', attempt: 1 }), null);
-  assert.equal(attemptToRead({ event: 'merge_group', conclusion: 'success', attempt: 1 }), null);
-  assert.equal(attemptToRead({ event: 'merge_group', conclusion: 'cancelled', attempt: 1 }), null);
+  assert.equal(attemptToRead({ event: 'pull_request', conclusion: 'cancelled', attempt: 2 }), null);
   // A failed Mergify batch is not reported when it fails, but when a batch with the same commits passes.
   const batch = 'mergify/merge-queue/d49b391ce9';
   assert.equal(attemptToRead({ event: 'pull_request', conclusion: 'failure', attempt: 1, branch: batch }), null);
