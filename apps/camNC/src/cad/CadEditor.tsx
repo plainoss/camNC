@@ -229,7 +229,7 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { editable, hasOutline, isBlank, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { editable, extrudedSketch, hasOutline, isBlank, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
 import { offerFinalPreview } from './finalPreview';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
@@ -3799,29 +3799,7 @@ export function CadEditor({
         !sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).length &&
         evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
       if (problem) return setStudioRefusal(`Can’t extrude this sketch yet: ${problem.message}`);
-      commit(
-        replacePart(before, part.id, p => {
-          const made = { ...p };
-          delete made.extrude;
-          if (made.drawnOn && !made.thin && isSingleLine(made)) return { ...made, thin: { depth: 100, midPlane: true } };
-          // A sketch on a part's face adds to that part by default, with it in the merge scope.
-          const face = made.drawnOn && !('plane' in made.drawnOn.on) ? made.drawnOn.on.partId : null;
-          const onto = face && before.parts.find(candidate => candidate.id === face);
-          if (onto && isCadPart(onto)) made.addTo = onto.id;
-          // A sketch of several regions, such as overlapping shapes or outlines apart, starts with all of them picked.
-          const regions = sketchRegions(made.sketch, CAD_CHORD_TOLERANCE);
-          // Picked from its row in the feature list, a sketch of several regions starts with all of them; just finished,
-          // with none, for them to be picked in the view.
-          if (
-            sketchRowPicked === made.id &&
-            !made.regions &&
-            regions.length > 1 &&
-            evaluateCadPart(made).diagnostics.some(d => d.severity === 'error')
-          )
-            made.regions = regions.map(region => region.id);
-          return made;
-        })
-      );
+      commit(replacePart(before, part.id, p => extrudedSketch(before, p, sketchRowPicked === p.id)));
       openFeature('extrude', part.id, before);
     } else if (command === 'extrude' && part) {
       // Extrude always starts a new extrude, of the part's sketch here, as in the reference: it starts with the regions
