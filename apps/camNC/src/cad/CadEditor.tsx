@@ -3748,6 +3748,7 @@ export function CadEditor({
     const current = documentRef.current;
     setStudioRefusal(null);
     if (entry.kind === 'plane') {
+      if (action === 'newSketch') return newSketchOn(entry.id);
       if (action === 'edit') {
         if (!showWorkspace) {
           closeSketch(true);
@@ -3888,6 +3889,14 @@ export function CadEditor({
    * A plane clicked in the view or the feature list: drawn on while choosing, otherwise picked for the next sketch. One
    * of the design's planes gives what it's offset from as a direction, as its normal is the same.
    */
+  /** New sketch from a plane's menu: a new sketch on that plane, straight away. */
+  const newSketchOn = (plane: string) => {
+    const picked = pickedPlane(documentRef.current, plane);
+    if (!picked || busy) return;
+    setChoosingFace(false);
+    setSelectedPlane(null);
+    newPartOn(picked.on, picked.datum);
+  };
   const pickPlane = (plane: string) => {
     const picked = pickedPlane(documentRef.current, plane);
     if (!picked) return;
@@ -4499,7 +4508,7 @@ export function CadEditor({
                   )
                 )
               }
-              {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
+              {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane, onNewSketch: newSketchOn })}
               shown={featureShown}
               onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}
             />

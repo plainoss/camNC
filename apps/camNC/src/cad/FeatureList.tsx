@@ -1,7 +1,8 @@
 import { cadVariableValues, type CadDocument } from '@wbcnc/cad';
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { kBasePlanes } from './basePlanes';
 import { designSteps, type DesignStep } from './designSteps';
+import { PartRowMenu } from './PartRowMenu';
 import { formatCadValue } from './valueExpressions';
 import './featureList.css';
 
@@ -42,12 +43,13 @@ function Eye({ name, shown, onToggle }: { name: string; shown: boolean; onToggle
 
 /** A row of the list: a design variable, a plane made to sketch on, or a step of how the design is built. */
 export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'plane'; id: string } | { kind: 'step'; step: DesignStep };
-export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete';
+export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete' | 'newSketch';
 
 /** What each row's menu offers, and why an item isn't there for it. */
 function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAction; label: string; disabled?: boolean }[] {
   if (entry.kind === 'variable' || entry.kind === 'plane')
     return [
+      ...(entry.kind === 'plane' ? [{ action: 'newSketch' as const, label: 'New sketch' }] : []),
       { action: 'edit', label: 'Edit…' },
       { action: 'delete', label: 'Delete' },
     ];
@@ -85,6 +87,7 @@ export function FeatureList({
   onPickPlane,
   shown,
   onToggleShown,
+  onNewSketch,
 }: {
   document: CadDocument;
   selectedPartId: string | null;
@@ -112,6 +115,8 @@ export function FeatureList({
    */
   shown?: (id: string) => boolean;
   onToggleShown?: (id: string) => void;
+  /** New sketch, from a base plane's right-click menu, as the reference's. */
+  onNewSketch?: (plane: string) => void;
 }) {
   const { scope } = cadVariableValues(document);
   const blank = new Set(
@@ -128,6 +133,8 @@ export function FeatureList({
       .map(step => ({ kind: 'step' as const, step })),
   ];
   const [menu, setMenu] = useState<{ entry: FeatureEntry; x: number; y: number } | null>(null);
+  const [planeMenu, setPlaneMenu] = useState<{ plane: string; name: string; x: number; y: number } | null>(null);
+  const closePlaneMenu = useCallback(() => setPlaneMenu(null), []);
   const [renaming, setRenaming] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -198,7 +205,16 @@ export function FeatureList({
           )}
           {kBasePlanes.map(({ plane, label: name }) => (
             <li key={plane} className={shown?.(plane) === false ? 'cad-feature-hidden' : undefined}>
-              <button type="button" aria-pressed={selectedPlane === plane} onClick={() => onPickPlane?.(plane)}>
+              <button
+                type="button"
+                aria-pressed={selectedPlane === plane}
+                aria-haspopup={onNewSketch ? 'menu' : undefined}
+                onClick={() => onPickPlane?.(plane)}
+                onContextMenu={event => {
+                  if (!onNewSketch && !onToggleShown) return;
+                  event.preventDefault();
+                  setPlaneMenu({ plane, name, x: event.clientX, y: event.clientY });
+                }}>
                 <span aria-hidden="true">▱</span>
                 <span>{name}</span>
               </button>
@@ -405,6 +421,20 @@ export function FeatureList({
             </button>
           ))}
         </div>
+      )}
+      {planeMenu && (
+        <PartRowMenu
+          name={planeMenu.name}
+          x={planeMenu.x}
+          y={planeMenu.y}
+          onClose={closePlaneMenu}
+          items={[
+            ...(onNewSketch ? [{ label: 'New sketch', onSelect: () => onNewSketch(planeMenu.plane) }] : []),
+            ...(onToggleShown
+              ? [{ label: shown?.(planeMenu.plane) === false ? 'Show' : 'Hide', onSelect: () => onToggleShown(planeMenu.plane) }]
+              : []),
+          ]}
+        />
       )}
     </section>
   );

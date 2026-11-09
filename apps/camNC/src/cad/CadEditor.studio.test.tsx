@@ -362,6 +362,17 @@ it('hides the hovered part or copy before the selection, and falls back after ho
   expect(props().meshes).toHaveLength(0);
 });
 
+it('starts a new sketch from a base plane’s right-click menu', async () => {
+  const { latest } = await studio();
+  const planes = within(await screen.findByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' });
+  fireEvent.contextMenu(within(planes).getByRole('button', { name: /Front/ }));
+  const menu = screen.getByRole('menu', { name: 'Front actions' });
+  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual(['New sketch', 'Hide']);
+  await userEvent.click(within(menu).getByRole('menuitem', { name: 'New sketch' }));
+  await screen.findByRole('dialog', { name: /^Sketch · / });
+  await waitFor(() => expect(latest().parts.at(-1)!.drawnOn?.on).toEqual({ plane: 'front' }));
+});
+
 it('keeps the default planes listed while a sketch is open', async () => {
   await newStudioSketch();
   const planes = within(screen.getByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' });

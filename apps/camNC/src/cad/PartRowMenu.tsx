@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import './featureList.css';
 
-/** A part row's right-click menu in the Parts list, styled and keyed as the feature list's. */
+/** A row's right-click menu, such as a part's in the Parts list or a base plane's, styled and keyed as the feature list's. */
 export function PartRowMenu({
   name,
   x,
