@@ -50,17 +50,30 @@ const onLine = (p: Vec3, a: Vec3, b: Vec3) => {
 
 /**
  * The part's edge nearest a click on it, when the click is within `tolerance` of one: the whole straight edge, joined
- * from the pieces the mesh splits it into, so a pick gives the edge from end to end.
+ * from the pieces the mesh splits it into, so a pick gives the edge from end to end. Distances are in the mesh's space.
  */
 export function nearestEdge(positions: Float32Array, indices: ArrayLike<number>, point: Vec3, tolerance: number): ModelEdge | null {
+  return nearestEdgeBy(positions, indices, (a, b) => distanceToSegment(point, a, b), tolerance);
+}
+
+/**
+ * The same, with each piece of edge measured by `distance`, such as how far it's drawn on screen from the pointer, so
+ * a tolerance in pixels holds however the face is turned.
+ */
+export function nearestEdgeBy(
+  positions: Float32Array,
+  indices: ArrayLike<number>,
+  distance: (a: Vec3, b: Vec3) => number,
+  tolerance: number
+): ModelEdge | null {
   const edges = edgesOf(positions, indices);
   const at = (i: number): Vec3 => [edges[i]!, edges[i + 1]!, edges[i + 2]!];
   let best: { a: Vec3; b: Vec3; distance: number } | null = null;
   for (let i = 0; i < edges.length; i += 6) {
     const a = at(i),
       b = at(i + 3);
-    const distance = distanceToSegment(point, a, b);
-    if (distance <= tolerance && (!best || distance < best.distance)) best = { a, b, distance };
+    const away = distance(a, b);
+    if (away <= tolerance && (!best || away < best.distance)) best = { a, b, distance: away };
   }
   if (!best) return null;
   // Grow it along the same line through the pieces that touch its ends.
@@ -87,4 +100,37 @@ export function nearestEdge(positions: Float32Array, indices: ArrayLike<number>,
     }
   }
   return { a, b };
+}
+
+/**
+ * How far a piece of edge is drawn from the pointer on screen, in pixels: the edge in the mesh's space, placed by
+ * `matrix` and seen by `camera` on a view `width` × `height` pixels, with the pointer in normalized device coordinates.
+ */
+export function screenDistance(
+  camera: THREE.Camera,
+  matrix: THREE.Matrix4,
+  width: number,
+  height: number,
+  pointer: { x: number; y: number }
+): { segment: (a: Vec3, b: Vec3) => number; point: (p: Vec3) => number } {
+  const toScreen = (p: Vec3): [number, number] => {
+    const v = new THREE.Vector3(...p).applyMatrix4(matrix).project(camera);
+    return [((v.x + 1) / 2) * width, ((1 - v.y) / 2) * height];
+  };
+  const at: [number, number] = [((pointer.x + 1) / 2) * width, ((1 - pointer.y) / 2) * height];
+  return {
+    segment: (a, b) => {
+      const [ax, ay] = toScreen(a),
+        [bx, by] = toScreen(b);
+      const dx = bx - ax,
+        dy = by - ay,
+        span = dx * dx + dy * dy;
+      const t = span ? Math.max(0, Math.min(1, ((at[0] - ax) * dx + (at[1] - ay) * dy) / span)) : 0;
+      return Math.hypot(at[0] - ax - dx * t, at[1] - ay - dy * t);
+    },
+    point: p => {
+      const [x, y] = toScreen(p);
+      return Math.hypot(at[0] - x, at[1] - y);
+    },
+  };
 }

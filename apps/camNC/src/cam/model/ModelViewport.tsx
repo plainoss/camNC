@@ -8,7 +8,7 @@ import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { ViewCube } from './ViewCube';
 import { modelGeometry } from './modelGeometry';
 import { snapToFace } from './faceSnap';
-import { nearestEdge, type ModelEdge } from './edgePick';
+import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
 import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
 
@@ -493,11 +493,11 @@ export function ModelViewport({
     // Back from where the view drew it to where the part sits in the model.
     const point = e.point.clone().applyMatrix4(matrix.clone().invert()),
       normal = e.face.normal.clone().normalize().toArray();
-    // Within a few pixels of an edge, the edge is picked too, back where the part sits.
-    const pixel =
-      (2 * e.distance * Math.tan(((e.camera as THREE.PerspectiveCamera).fov * Math.PI) / 360)) /
-      (e.nativeEvent.target as HTMLElement).clientHeight;
-    const near = nearestEdge(mesh.positions, mesh.indices, point.toArray(), Number.isFinite(pixel) ? kEdgePixels * pixel : 0);
+    // Within a few pixels of an edge on screen, the edge is picked too, unless the click is on one of its corners.
+    const canvas = e.nativeEvent.target as HTMLElement;
+    const screen = screenDistance(e.camera, matrix, canvas.clientWidth, canvas.clientHeight, e.pointer);
+    const edge = canvas.clientWidth ? nearestEdgeBy(mesh.positions, mesh.indices, screen.segment, kEdgePixels) : null;
+    const near = edge && Math.min(screen.point(edge.a), screen.point(edge.b)) > kEdgePixels ? edge : null;
     const face: ModelFacePick = {
       partId: mesh.partId,
       index,

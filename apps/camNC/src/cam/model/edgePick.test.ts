@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { nearestEdge } from './edgePick';
+import * as THREE from 'three';
+import { nearestEdge, nearestEdgeBy, screenDistance } from './edgePick';
 
 // A 100 × 60 × 40 box, its top split into four triangles meeting in the middle of its long edges.
 const positions = new Float32Array([
@@ -66,5 +67,31 @@ describe('picking an edge', () => {
     // The line splitting the top in two is no edge.
     const edge = nearestEdge(positions, indices, [50, 30.5, 40], 31);
     expect(edge && [edge.a, edge.b].every(p => p[0] === 50)).toBeFalsy();
+  });
+});
+
+describe('picking an edge on screen', () => {
+  // Looking at the box's top almost edge-on, from far off along -y, so the top is squashed into a few pixels.
+  const camera = new THREE.PerspectiveCamera(30, 1, 1, 10_000);
+  camera.position.set(50, -1000, 60);
+  camera.lookAt(50, 30, 40);
+  camera.updateMatrixWorld();
+  const pointerAt = (p: [number, number, number]) => {
+    const v = new THREE.Vector3(...p).project(camera);
+    return { x: v.x, y: v.y };
+  };
+
+  it('measures in pixels, so an edge a few pixels away is picked however the face is turned', () => {
+    // A point on the top 10 mm in from its far edge is only a pixel or so from it on screen.
+    const screen = screenDistance(camera, new THREE.Matrix4(), 800, 800, pointerAt([50, 50, 40]));
+    const edge = nearestEdgeBy(positions, indices, screen.segment, 8);
+    expect(edge).not.toBeNull();
+    expect(screen.segment([0, 60, 40], [100, 60, 40])).toBeLessThan(8);
+  });
+
+  it('gives the distance to a corner in pixels', () => {
+    const screen = screenDistance(camera, new THREE.Matrix4(), 800, 800, pointerAt([0, 0, 40]));
+    expect(screen.point([0, 0, 40])).toBeCloseTo(0, 6);
+    expect(screen.point([100, 0, 40])).toBeGreaterThan(8);
   });
 });

@@ -528,9 +528,14 @@ export function PartPatternDialog({
   onOk,
   onCancel,
   pickDirection,
+  pickPoint,
 }: PartDialogProps & {
   pickDirection?: (picked: (on: CadDrawnOn['on']) => void) => void;
+  /** Starts picking in the view, for an edge to pattern along. Null stops it. */
+  pickPoint?: (picked: ((pick: CadConnectorPick) => void) | null) => void;
 }) {
+  // Closed while picking, the view stops picking.
+  useEffect(() => () => pickPoint?.(null), [pickPoint]);
   return (
     <FeatureDialog title={`Linear pattern · ${part.name}`} onOk={onOk} onCancel={onCancel}>
       <div className="cad-feature-selection">
@@ -543,6 +548,7 @@ export function PartPatternDialog({
         pattern={part.pattern}
         document={document}
         pickDirection={pickDirection}
+        pickEdge={pickPoint && (picked => pickPoint(pick => picked(pick.edge ?? null)))}
         variables={variables}
         onChange={pattern => onChange(document => setPartPattern(document, part.id, pattern))}
       />
@@ -687,7 +693,8 @@ export function TransformDialog({
       if (end === 'from' && (picked.partId !== part.id || picked.copy)) return setError(`Pick the first connector on ${part.name} itself.`);
       if (end === 'to' && picked.partId === part.id) return setError('Pick the connector to move to on another part.');
       // An edge picked for the line is the whole line, from one end to the other.
-      if ((end === 'start' || end === 'end') && picked.edge)
+      // Picking where the line ends, after its start, an edge gives only its nearest point.
+      if ((end === 'start' || (end === 'end' && !picks.start)) && picked.edge)
         return setPicks(before => ({
           ...before,
           start: { ...picked, point: picked.edge!.a },
