@@ -4,8 +4,9 @@ import { linearPatternIssue, sketchPatternOwner, afterPatternEntityRemoval } fro
 import { refreshDimensionMeasurement } from './dimensions';
 import { cadVariableNameError } from './valueExpressions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
+import { nestedDeeperThan } from './nestingDepth';
+import { validPartCutSplit } from './partCutSplit';
 import type {
-  CadPartCut,
   CadDirection,
   CadArcEntity,
   CadCircleEntity,
@@ -632,7 +633,8 @@ export function addArc(
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
 export function parseCadDocument(input: unknown): CadDocument {
-  if (!input || typeof input !== 'object') throw new Error('Invalid CAD document');
+  // Saved designs nest about ten levels; far deeper input is not one, and would overflow the stack while loading.
+  if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
   if (
     (d.version !== 1 && d.version !== 2) ||
@@ -645,9 +647,9 @@ export function parseCadDocument(input: unknown): CadDocument {
   )
     throw new Error('Invalid CAD document');
   const ids = new Set<string>([d.id]);
-  const addId = (id: unknown) => {
-    if (typeof id !== 'string' || !id || ids.has(id)) throw new Error('CAD IDs must be unique nonempty strings');
-    ids.add(id);
+  const addId = (id: unknown, into = ids) => {
+    if (typeof id !== 'string' || !id || into.has(id)) throw new Error('CAD IDs must be unique nonempty strings');
+    into.add(id);
   };
   const number = (value: unknown) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('CAD numeric fields must be finite numbers');
@@ -695,7 +697,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   };
   const checkDirection = (direction: CadDirection) => {
     const { along, flip } = direction ?? ({} as CadDirection);
-    const face = along && 'face' in along ? along.face : undefined;
+    const face = along && typeof along === 'object' && 'face' in along ? along.face : undefined;
     if (
       !along ||
       typeof along !== 'object' ||
@@ -797,7 +799,7 @@ export function parseCadDocument(input: unknown): CadDocument {
     if (p.placement !== undefined) checkPlacement(p.placement);
     if (p.drawnOn !== undefined) {
       const { on, offset, offsetExpression, inward } = p.drawnOn ?? ({} as NonNullable<CadPart['drawnOn']>);
-      const face = on && 'face' in on ? on.face : undefined;
+      const face = on && typeof on === 'object' && 'face' in on ? on.face : undefined;
       if (
         !on ||
         typeof on !== 'object' ||
@@ -814,8 +816,9 @@ export function parseCadDocument(input: unknown): CadDocument {
     }
     if (d.version === 1 && p.features !== undefined) throw new Error('Invalid CAD document');
     if (p.features !== undefined && !Array.isArray(p.features)) throw new Error('Invalid CAD features');
-    // A shared sketch, and a Remove step's sketch on the board it cuts, are copies: their IDs are the original's.
-    const sketches = p.sketchOf ? [] : [p.sketch];
+    // A shared sketch, and a Remove step's sketch on the board it cuts, are copies: their IDs are the original's, so
+    // they're checked against IDs of their own. Loading migrates every sketch, so each is checked.
+    const sketches: [CadSketch, boolean][] = [[p.sketch, !p.sketchOf]];
     for (const f of p.features ?? []) {
       if (!f || typeof f !== 'object') throw new Error('Invalid CAD feature');
       addId(f.id);
@@ -825,7 +828,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (f.on !== 'top' && f.on !== 'underside' && (typeof f.on !== 'object' || !f.on)) throw new Error('Invalid CAD feature');
         if (typeof f.on === 'object') reference(f.on.floorOf);
         if (f.removedBy !== undefined) reference(f.removedBy);
-        else sketches.push(f.sketch);
+        sketches.push([f.sketch, f.removedBy === undefined]);
       } else if (f.type === 'cut') {
         reference(f.sketchId);
         reference(f.regionId);
@@ -835,11 +838,13 @@ export function parseCadDocument(input: unknown): CadDocument {
           throw new Error('Invalid CAD feature');
       } else throw new Error('Invalid CAD feature');
     }
-    for (const sketch of sketches) {
-      addId(sketch.id);
+    for (const [sketch, own] of sketches) {
+      const scope = own ? ids : new Set<string>();
+      const add = (id: unknown) => addId(id, scope);
+      add(sketch.id);
       for (const e of sketch.entities) {
         if (!e || typeof e !== 'object') throw new Error('Invalid CAD entity');
-        addId(e.id);
+        add(e.id);
         if (!['point', 'line', 'circle', 'ellipse', 'arc', 'conic', 'bezier', 'spline'].includes(e.type))
           throw new Error('Unknown CAD entity');
         if (e.construction !== undefined && typeof e.construction !== 'boolean') throw new Error('Invalid construction flag');
@@ -881,7 +886,7 @@ export function parseCadDocument(input: unknown): CadDocument {
       }
       for (const c of sketch.constraints) {
         if (!c || typeof c !== 'object') throw new Error('Invalid CAD constraint');
-        addId(c.id);
+        add(c.id);
         if (
           ![
             'horizontal',
@@ -1101,18 +1106,4 @@ export function parseCadDocument(input: unknown): CadDocument {
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);
   }
   return parsed;
-}
-
-/** Whether a split describes alternating segments that can form a joint. */
-export function validPartCutSplit(split: unknown): split is CadPartCut['split'] {
-  return (
-    split === undefined ||
-    split === 'half' ||
-    (!!split &&
-      typeof split === 'object' &&
-      'fingers' in split &&
-      Number.isInteger(split.fingers) &&
-      (split.fingers as number) >= 2 &&
-      (!('fingersExpression' in split) || split.fingersExpression === undefined || typeof split.fingersExpression === 'string'))
-  );
 }

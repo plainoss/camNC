@@ -1,5 +1,6 @@
 export * from './types';
 export * from './document';
+export * from './partCutSplit';
 export * from './geometry';
 export * from './solver';
 export * from './fillet';
