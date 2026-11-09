@@ -570,7 +570,13 @@ export async function createAdapter(page, url) {
           await closeSketch();
           await extrudeSketch();
         }
-        await page.getByRole('link', { name: new RegExp(rest) }).or(page.getByRole('button', { name: new RegExp(`^${rest}$`) })).first().click();
+        // A stage link is marked pending (aria-disabled) while the step before it still works, as Plan does while the
+        // boards are being laid out. On a busy runner that takes longer than the default 8 s a click waits for it.
+        await page
+          .getByRole('link', { name: new RegExp(rest) })
+          .or(page.getByRole('button', { name: new RegExp(`^${rest}$`) }))
+          .first()
+          .click({ timeout: 30_000 });
         await page.waitForTimeout(700);
         return;
       }

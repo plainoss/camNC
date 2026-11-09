@@ -114,6 +114,7 @@ import {
   useCallback,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
   type Ref,
@@ -219,6 +220,7 @@ import { useSvgPixelScale, SKETCH_APPEARANCE } from './sketchAppearance';
 import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
+import { kStudioCommands } from './studioCommands';
 import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
@@ -529,6 +531,9 @@ export function CadEditor({
   const [transparentParts, setTransparentParts] = useState<ReadonlySet<string>>(() => new Set());
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
+  // Sketches, planes and the origin shown or hidden with their eyes in the feature list, where that differs from how
+  // they start: a sketch shows until Extrude makes a part of it, and the rest show.
+  const [featureVisibility, setFeatureVisibility] = useState<Readonly<Record<string, boolean>>>({});
   const hoveredPart = useRef<string | null>(null);
   const onHoverPart = useCallback((id: string | null) => {
     hoveredPart.current = id;
@@ -547,6 +552,21 @@ export function CadEditor({
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
+  const [cancelledSketch, setCancelledSketch] = useState<{
+    document: CadDocument;
+    partId: string;
+    before: CadDocument;
+  } | null>(null);
+  useEffect(() => {
+    if (!cancelledSketch) return;
+    const timer = setTimeout(() => setCancelledSketch(null), 12_000);
+    return () => clearTimeout(timer);
+  }, [cancelledSketch]);
+  useEffect(() => {
+    // Accepting the design, or anything else that makes the editor busy, saves what's there: a restore can't race it.
+    if (busy || !showWorkspace || choosingFace || featureDialog || partCutting || variableDialog || transformDialog)
+      setCancelledSketch(null);
+  }, [busy, showWorkspace, choosingFace, featureDialog, partCutting, variableDialog, transformDialog]);
   useEffect(() => {
     const element = svg.current;
     if (!element) return;
@@ -590,6 +610,8 @@ export function CadEditor({
   const contextPress = useRef<SketchContextPress>({ phase: 'idle' });
   const [thicknessValid, setThicknessValid] = useState(true);
   const svg = useRef<SVGSVGElement>(null);
+  // The drawing inside the canvas, which a turned sketch turns: points on screen map through it.
+  const drawingGroup = useRef<SVGGElement>(null);
   const markerScale = useSvgPixelScale(svg, view);
   const root = useRef<HTMLDivElement>(null);
   const dimensionInput = useRef<HTMLInputElement>(null);
@@ -851,7 +873,7 @@ export function CadEditor({
     const zoom = (event: WheelEvent) => {
       if (!event.deltaY) return;
       event.preventDefault();
-      const matrix = canvas.getScreenCTM();
+      const matrix = (drawingGroup.current ?? canvas).getScreenCTM();
       if (!matrix) return;
       const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
       const factor = event.deltaY > 0 ? 1.12 : 1 / 1.12;
@@ -889,6 +911,7 @@ export function CadEditor({
   }, [sketch]);
 
   const publish = (next: CadDocument) => {
+    setCancelledSketch(null);
     setFinishError(null);
     documentRef.current = next;
     setDocument(next);
@@ -1103,7 +1126,7 @@ export function CadEditor({
   const startAnnotationDrag = (id: string, event: PointerEvent<SVGGElement>) => {
     if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || busy || solving || !sketch) return;
     const constraint = sketch.constraints.find(c => c.id === id);
-    const matrix = svg.current?.getScreenCTM();
+    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
     const position = constraint && numeric(constraint) ? dimensionAnchor(constraint, sketch, markerScale) : null;
     if (!matrix || !position) return;
     const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
@@ -1342,13 +1365,13 @@ export function CadEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const projectPoint = (point: Point) => {
-    const matrix = svg.current?.getScreenCTM();
+    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
     if (!matrix) return { x: point.x, y: -point.y };
     const p = new DOMPoint(point.x, -point.y).matrixTransform(matrix);
     return { x: p.x, y: p.y };
   };
   const pointAt = (event: { clientX: number; clientY: number; shiftKey?: boolean }): Point => {
-    const matrix = svg.current?.getScreenCTM();
+    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
     lastSnap.current = null;
     lastDrawingHint.current = null;
     inference.current = null;
@@ -2916,7 +2939,7 @@ export function CadEditor({
         setCursor(position);
         applyDimensionEvent({ type: 'pick', entityId: id, previewId: newCadId(), additive: event.shiftKey, position });
       } else {
-        const matrix = svg.current?.getScreenCTM();
+        const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
         if (!matrix) return;
         const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
         // Placement opens the input during pointerdown; suppress the following native mousedown focus.
@@ -2930,7 +2953,7 @@ export function CadEditor({
       event.preventDefault();
       if (!id) {
         if (tool === 'select') {
-          const matrix = svg.current?.getScreenCTM();
+          const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
           if (matrix) {
             const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
             const start = { x: raw.x, y: -raw.y };
@@ -3064,7 +3087,7 @@ export function CadEditor({
   };
   const pointerMove = (event: PointerEvent<SVGSVGElement>) => {
     if (slotDrag.current) {
-      const matrix = svg.current?.getScreenCTM();
+      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
       if (!matrix) return;
       const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
         center = slotDrag.current.center;
@@ -3072,7 +3095,7 @@ export function CadEditor({
       return;
     }
     if (circularDrag.current) {
-      const matrix = svg.current?.getScreenCTM();
+      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
       if (!matrix) return;
       const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
         point = { x: raw.x, y: -raw.y },
@@ -3099,7 +3122,7 @@ export function CadEditor({
       return;
     }
     if (patternDrag.current) {
-      const matrix = svg.current?.getScreenCTM();
+      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
       if (!matrix) return;
       const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
         { index, anchor, parameters } = patternDrag.current;
@@ -3115,7 +3138,7 @@ export function CadEditor({
     }
 
     if (transformDrag.current) {
-      const matrix = svg.current?.getScreenCTM();
+      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
       if (!matrix) return;
       const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
       let point = { x: raw.x, y: -raw.y };
@@ -3166,7 +3189,7 @@ export function CadEditor({
     }
 
     if (chamferDrag.current) {
-      const matrix = svg.current?.getScreenCTM();
+      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
       if (!matrix) return;
       const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
       const { side, origin, direction } = chamferDrag.current;
@@ -3189,7 +3212,7 @@ export function CadEditor({
     }).state;
     const annotation = annotationDrag.current;
     if (annotation) {
-      const matrix = svg.current?.getScreenCTM();
+      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
       if (
         !matrix ||
         (!annotation.moved && Math.hypot(event.clientX - annotation.screenStart.x, event.clientY - annotation.screenStart.y) < 3)
@@ -3219,7 +3242,7 @@ export function CadEditor({
     }
     const box = boxGesture.current;
     if (box) {
-      const matrix = svg.current?.getScreenCTM();
+      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
       if (!matrix) return;
       const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
       box.end = { x: raw.x, y: -raw.y };
@@ -3242,7 +3265,7 @@ export function CadEditor({
       if (modification.phase === 'extend' && modification.entityId) setModifyTarget(p);
     }
     if (placingDimension) {
-      const matrix = svg.current?.getScreenCTM();
+      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
       if (matrix) {
         const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
         p = { x: raw.x, y: -raw.y };
@@ -3254,7 +3277,7 @@ export function CadEditor({
     if (movingPoint?.snapPointId) {
       const source = movingPoint.document.parts.find(part => part.id === movingPoint.partId)!.sketch;
       const point = source.entities.find(entity => entity.id === movingPoint.snapPointId)!;
-      const matrix = svg.current?.getScreenCTM();
+      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
       if (point.type === 'point' && matrix) {
         const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
         drop = inferDragPoint(
@@ -3565,6 +3588,7 @@ export function CadEditor({
   };
   /** Opens a part's sketch from the studio, remembering the design to go back to if it's cancelled. */
   const openSketch = (stepPartId: string, before = documentRef.current) => {
+    setCancelledSketch(null);
     // A shared sketch is edited where it's drawn, and every extrude of it follows.
     const partId = documentRef.current.parts.find(candidate => candidate.id === stepPartId)?.sketchOf ?? stepPartId;
     sketchBefore.current = before;
@@ -3591,7 +3615,11 @@ export function CadEditor({
         (creationValues?.editing ? applyCreationValue({ advance: false }) : null);
       if (error) return setMessage(error);
     }
-    if (!keep && sketchBefore.current) commit(sketchBefore.current);
+    if (!keep && sketchBefore.current) {
+      const cancelled = { document: structuredClone(documentRef.current), partId: part!.id, before: sketchBefore.current };
+      commit(sketchBefore.current);
+      if (studioSession) setCancelledSketch(cancelled);
+    }
     sketchBefore.current = null;
     setMessage('');
     chooseTool('select');
@@ -3868,7 +3896,7 @@ export function CadEditor({
     onEditFaceSketch(documentRef.current, part.id, added.sketchId);
   };
   const valuePosition = (anchor: Point | null, desiredWidth = 216, topOffset = 12) => {
-    const matrix = svg.current?.getScreenCTM();
+    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
     const drawing = svg.current?.closest('.cad-drawing')?.getBoundingClientRect();
     if (!anchor || !matrix || !drawing) return undefined;
     const screen = new DOMPoint(anchor.x, -anchor.y).matrixTransform(matrix);
@@ -4068,24 +4096,55 @@ export function CadEditor({
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
   // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
-  const sketchCanFinish = edgeOnBoard
-    ? !solving
-    : faceSketch
-      ? !solving &&
-        !problems.length &&
-        !splitFirst &&
-        !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
-      : thicknessValid &&
-        !solving &&
-        !problems.length &&
-        numberOfShapes > 0 &&
-        !splitFirst &&
-        !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
-        !((tool === 'fillet' || tool === 'chamfer') && selected.length);
+  const sketchFinishReason = solving
+    ? 'Wait for the current sketch check to finish.'
+    : edgeOnBoard
+      ? null
+      : !faceSketch && !thicknessValid
+        ? 'Enter a valid part thickness before finishing the sketch.'
+        : problems.length
+          ? problems.join(' ')
+          : !faceSketch && numberOfShapes === 0
+            ? 'Draw an outline before finishing the sketch.'
+            : splitFirst
+              ? 'Choose the second split point or press Escape before finishing the sketch.'
+              : (tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length
+                ? 'Apply the preview or press Escape before finishing the sketch.'
+                : !faceSketch && (tool === 'fillet' || tool === 'chamfer') && selected.length
+                  ? 'Apply the corner preview or press Escape before finishing the sketch.'
+                  : null;
+  const sketchCanFinish = sketchFinishReason === null;
   // The parts, each with an eye to show or hide it in the view. In the studio they sit at the bottom left, below the
   // features, as in the reference.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   const builtParts = doc.parts.filter(isCadPart);
+  // An open sketch turned with its parts behind it, about the middle of the view.
+  const turned = !!sketchBackdrop && sketchTurn !== straightOn;
+  const [ta, tb, tc, td] = drawingMatrix(sketchTurn);
+  const middle = { x: view.x + view.w / 2, y: view.y + view.h / 2 };
+  const turnTransform = `translate(${middle.x} ${middle.y}) matrix(${ta} ${tb} ${tc} ${td} 0 0) translate(${-middle.x} ${-middle.y})`;
+  const turnDet = ta * td - tb * tc || 1;
+  // Labels and points are turned back where they stand, to read and look the same from any side.
+  const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
+  // Studio commands that need something first, with why.
+  const studioDisabled: Partial<Record<StudioCommand, string>> = {
+    // A sketch not yet extruded can be extruded; patterns and transforms need a part.
+    ...(part?.extrude === false
+      ? { pattern: 'Extrude the sketch first', transform: 'Extrude the sketch first' }
+      : part && !isCadPart(part)
+        ? { pattern: 'Select a part first', transform: 'Select a part first' }
+        : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
+    ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
+  };
+  const featureShown = useCallback(
+    (id: string) => {
+      if (id in featureVisibility) return featureVisibility[id]!;
+      // As the design is shown: rolled back to its sketch, a part isn't extruded yet, so its sketch shows.
+      const sketched = id.endsWith(':sketch') && shownDocument.parts.find(candidate => `${candidate.id}:sketch` === id);
+      return !sketched || !isCadPart(sketched);
+    },
+    [featureVisibility, shownDocument]
+  );
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>
@@ -4178,25 +4237,30 @@ export function CadEditor({
                 ? 'cutParts'
                 : variableDialog
                   ? 'variable'
-                  : transformDialog
-                    ? 'transform'
-                    : (featureDialog?.kind ?? null)
+                  : planeDialog
+                    ? 'plane'
+                    : transformDialog
+                      ? 'transform'
+                      : (featureDialog?.kind ?? null)
           }
-          disabled={{
-            // A sketch not yet extruded can be extruded; patterns and transforms need a part.
-            ...(part?.extrude === false
-              ? { pattern: 'Extrude the sketch first', transform: 'Extrude the sketch first' }
-              : part && !isCadPart(part)
-                ? { pattern: 'Select a part first', transform: 'Select a part first' }
-                : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
-            ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
-          }}
+          disabled={studioDisabled}
           canUndo={session.past.length > 0}
           canRedo={session.future.length > 0}
           canFinish={
-            thicknessValid && !solving && !problems.length && !featureDialog && !partCutting && !variableDialog && !transformDialog
+            thicknessValid &&
+            !solving &&
+            !problems.length &&
+            !featureDialog &&
+            !partCutting &&
+            !variableDialog &&
+            !planeDialog &&
+            !transformDialog
           }
           onCommand={studioCommand}
+          onSearch={() => {
+            setSearchMode(true);
+            setPalette(value => !value);
+          }}
           onUndo={() => navigateHistory()}
           onRedo={() => navigateHistory(true)}
           onCancel={() => void cancel()}
@@ -4272,6 +4336,8 @@ export function CadEditor({
               onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
               onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
+              shown={featureShown}
+              onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}
             />
           )}
           {!faceSketch && !studioSession && <CadVariablesPanel document={doc} onChange={commit} />}
@@ -4536,7 +4602,12 @@ export function CadEditor({
                 onCancel: () => closeFeature(false),
               };
               return featureDialog.kind === 'extrude' ? (
-                <ExtrudeDialog key={target.id} {...props} onEditSketch={() => openSketch(target.id)} />
+                <ExtrudeDialog
+                  key={target.id}
+                  {...props}
+                  onEditSketch={() => openSketch(target.id)}
+                  pickFace={picked => setDirectionPicker(() => picked)}
+                />
               ) : (
                 <PartPatternDialog key={target.id} {...props} pickDirection={picked => setDirectionPicker(() => picked)} />
               );
@@ -4547,6 +4618,7 @@ export function CadEditor({
               title={`Sketch · ${part.name}`}
               okLabel="✓ Finish sketch"
               okDisabled={!sketchCanFinish}
+              okReason={sketchFinishReason}
               onOk={() => closeSketch(true)}
               onCancel={() => closeSketch(false)}
               autoFocus={false}
@@ -4669,6 +4741,7 @@ export function CadEditor({
                 }}
                 highlightIds={partCutting ? cutPicked : undefined}
                 hiddenIds={hiddenParts}
+                featureShown={featureShown}
                 onHover={onHoverPart}
                 onOpen={id => {
                   if (partCutting) return pickForCut(id);
@@ -4779,13 +4852,7 @@ export function CadEditor({
           <svg
             ref={svg}
             className={`cad-canvas cad-tool-${tool}${sketchBackdrop ? ' cad-canvas-over-parts' : ''}${usingEdges ? ' cad-using-edges' : ''}`}
-            style={
-              showWorkspace || (show3D && partHasOutline)
-                ? { display: 'none' }
-                : sketchBackdrop && sketchTurn !== straightOn
-                  ? { transform: `matrix(${drawingMatrix(sketchTurn).join(', ')}, 0, 0)`, transformOrigin: 'center' }
-                  : undefined
-            }
+            style={showWorkspace || (show3D && partHasOutline) ? { display: 'none' } : undefined}
             data-sketch-turned={sketchBackdrop && sketchTurn !== straightOn ? '' : undefined}
             data-testid="cad-canvas"
             role="img"
@@ -4823,411 +4890,425 @@ export function CadEditor({
               event.preventDefault();
               if (event.button !== 2) keyboardContext();
             }}>
-            <defs>
-              <pattern id={`cad-grid-${doc.id}`} width={grid} height={grid} patternUnits="userSpaceOnUse">
-                <circle cx="0" cy="0" r={grid * 0.025} fill="#ccd5df" />
-              </pattern>
-            </defs>
-            <rect x={view.x - view.w} y={view.y - view.h} width={view.w * 3} height={view.h * 3} fill={`url(#cad-grid-${doc.id})`} />
-            {shownEdges.length > 0 && (
-              <g className="cad-part-edges" aria-label="Edges of the parts behind the sketch">
-                {shownEdges.map(edge => (
-                  <line
-                    key={edge.key}
-                    data-part-edge={edge.key}
-                    className={pickedEdges.includes(edge.key) ? 'cad-part-edge is-picked' : 'cad-part-edge'}
-                    x1={edge.x1}
-                    y1={-edge.y1}
-                    x2={edge.x2}
-                    y2={-edge.y2}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                ))}
-              </g>
-            )}
-            <SketchRegion
-              document={doc}
-              partId={part?.id}
-              verified={
-                !solving &&
-                !splitFirst &&
-                !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
-                !((tool === 'slot' || tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
-                activeSketchStatus?.status === 'solved' &&
-                lastCheckedRevision.current === `${doc.id}:${doc.revision}`
-              }
-            />
-            {faceSketch && (
-              <path
-                data-face-outline
-                className="cad-face-outline"
-                d={faceSketch.outline.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
-                pointerEvents="none"
-              />
-            )}
-            {!faceSketch && drawnOnFace && (
-              <path
-                data-drawn-on-face
-                className="cad-face-outline"
-                d={drawnOnFace.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
-                pointerEvents="none"
-              />
-            )}
-            {faceSketch?.floor && (
-              <path
-                data-face-floor
-                d={faceSketch.floor.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
-                fill="#c99a5b"
-                fillOpacity={0.25}
-                stroke="#7a5526"
-                strokeWidth={1 / markerScale}
-                pointerEvents="none"
-              />
-            )}
-            {!faceSketch && <CutOverlay part={part} millimetresPerPixel={1 / markerScale} />}
-            <line
-              x1={view.x - view.w}
-              x2={view.x + view.w * 2}
-              y1="0"
-              y2="0"
-              stroke="#db9d9d"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-            />
-            <line
-              x1="0"
-              x2="0"
-              y1={view.y - view.h}
-              y2={view.y + view.h * 2}
-              stroke="#92bfa2"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-            />
-            {shownSketch && (
-              <SketchGeometry
-                entities={shownSketch.entities}
-                selectedIds={[
-                  ...dimensionSelection,
-                  ...hoveredConstraintEntities,
-                  ...selectedConstraints.flatMap(id => associatedEntityIds(sketch, id)),
-                ]}
-                stroke={cornerPreview?.ok || transformPreview?.ok || linearPreview?.ok || slotPreview?.ok ? '#858d96' : stroke}
-                entityStatus={entityStatus}
-                pixelScale={markerScale}
-                hoveredPointId={hoveredPoint}
-                interactive={tool === 'select' && !constraintMode && !placingDimension}
-                onEditConic={id => {
-                  const curve = sketch?.entities.find(entity => entity.id === id);
-                  if (curve?.type === 'conic') {
-                    setRho(String(curve.rho));
-                    setConicEditing(id);
-                  }
-                }}
-              />
-            )}
-            {tool === 'slot' && slotWidthCircle?.type === 'circle' && slotWidthCenter?.type === 'point' && (
-              <SketchSlotWidthHandle
-                center={slotWidthCenter}
-                radius={slotWidthCircle.radius}
-                pixelScale={markerScale}
-                onStart={e => {
-                  slotDrag.current = { center: slotWidthCenter, width: slotWidth };
-                  svg.current?.setPointerCapture(e.pointerId);
-                  svg.current?.focus();
-                }}
-              />
-            )}
-            {tool === 'circularPattern' && selected.length > 0 && parsedCircular.ok && linearPreview?.ok && (
-              <SketchCircularPatternManipulator
-                center={parsedCircular.center}
-                anchor={patternAnchor}
-                count={parsedCircular.count}
-                angle={parsedCircular.angle}
-                closed={parsedCircular.closed}
-                pixelScale={markerScale}
-                onEdit={field => {
-                  circularFields.current[field]?.focus();
-                  circularFields.current[field]?.select();
-                }}
-                onStart={(kind, event) => {
-                  const matrix = svg.current?.getScreenCTM();
-                  if (!matrix) return;
-                  const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-                  circularDrag.current = {
-                    kind,
-                    start: { x: raw.x, y: -raw.y },
-                    parameters: circularParameters,
-                    last: Math.atan2(-raw.y - parsedCircular.center.y, raw.x - parsedCircular.center.x),
-                    sweep:
-                      ((parsedCircular.angle * Math.PI) / 180) *
-                      (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
-                  };
-                  svg.current?.setPointerCapture(event.pointerId);
-                  svg.current?.focus();
-                }}
-              />
-            )}
-            {tool === 'linearPattern' && selected.length > 0 && parsedLinear.ok && (
-              <SketchLinearPatternManipulator
-                anchor={patternAnchor}
-                steps={linearParameters.secondDirection ? [parsedLinear.stepX, parsedLinear.stepY] : [parsedLinear.stepX]}
-                counts={[parsedLinear.countX, parsedLinear.countY]}
-                pixelScale={markerScale}
-                onStart={(index, event) => {
-                  patternDrag.current = { index, anchor: patternAnchor, parameters: linearParameters };
-                  svg.current?.setPointerCapture(event.pointerId);
-                }}
-                onEdit={field => {
-                  patternFields.current[field]?.focus();
-                  patternFields.current[field]?.select();
-                }}
-              />
-            )}
-            {tool === 'transform' && selected.length > 0 && parsedTransform.ok && (
-              <SketchTransformManipulator
-                pivot={{
-                  x: parsedTransform.pivot.x + parsedTransform.translation.x,
-                  y: parsedTransform.pivot.y + parsedTransform.translation.y,
-                }}
-                pixelScale={markerScale}
-                onStart={(kind, event) => {
-                  const matrix = svg.current?.getScreenCTM();
-                  if (!matrix) return;
-                  const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-                  transformDrag.current = { kind, start: { x: raw.x, y: -raw.y }, parameters: transformParameters };
-                  svg.current?.setPointerCapture(event.pointerId);
-                }}
-              />
-            )}
-            {tool === 'split' && splitFirst && (
-              <circle
-                cx={splitFirst.point.x}
-                cy={-splitFirst.point.y}
-                r={5 / markerScale}
-                fill="#fff"
-                stroke="#2467d1"
-                vectorEffect="non-scaling-stroke"
-                pointerEvents="none"
-                data-split-first="true"
-              />
-            )}
-            {tool === 'chamfer' &&
-              chamferPreview?.ok &&
-              chamferPreview.dimensionIds.map((id, side) => {
-                const dimension = chamferPreview.sketch.constraints.find(c => c.id === id);
-                if (dimension?.type !== 'distance') return null;
-                const origin = chamferPreview.sketch.entities.find(e => e.id === dimension.pointAId);
-                const point = chamferPreview.sketch.entities.find(e => e.id === dimension.pointBId);
-                if (origin?.type !== 'point' || point?.type !== 'point') return null;
-                const length = Math.hypot(point.x - origin.x, point.y - origin.y);
-                return (
-                  <circle
-                    key={side}
-                    data-chamfer-handle={side}
-                    cx={point.x}
-                    cy={-point.y}
-                    r={6 / markerScale}
-                    fill="#fff"
-                    stroke="#2467d1"
-                    vectorEffect="non-scaling-stroke"
-                    style={{ cursor: 'move' }}
-                    onPointerDown={event => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      chamferDrag.current = {
-                        side,
-                        origin,
-                        direction: { x: (point.x - origin.x) / length, y: (point.y - origin.y) / length },
-                        previous: chamferDistances,
-                      };
-                      svg.current?.setPointerCapture(event.pointerId);
-                    }}
-                  />
-                );
-              })}
-            {(tool === 'fillet' || tool === 'chamfer') &&
-              cornerPreview &&
-              !cornerPreview.ok &&
-              cornerPreview.cornerPointIds.map(id => {
-                const point = sketch?.entities.find(entity => entity.type === 'point' && entity.id === id);
-                return point?.type === 'point' ? (
-                  <circle
-                    key={id}
-                    data-fillet-error={id}
-                    cx={point.x}
-                    cy={-point.y}
-                    r={8 / markerScale}
-                    fill="#c43b3522"
-                    stroke="#c43b35"
-                    vectorEffect="non-scaling-stroke"
-                    pointerEvents="none"
-                  />
-                ) : null;
-              })}
-            {annotationSketch && showConstraints && (
-              <InlineConstraints
-                sketch={annotationSketch}
-                scale={markerScale}
-                selectedConstraintIds={selectedConstraints}
-                conflictedConstraintIds={shownConflicts}
-                interactive={tool === 'select' && !constraintMode && !placingDimension}
-                onSelect={(id, additive) => {
-                  setSelectedConstraints(previous =>
-                    additive ? (previous.includes(id) ? previous.filter(existing => existing !== id) : [...previous, id]) : [id]
-                  );
-                  if (!additive) setSelected([]);
-                  setDimension(null);
-                  setMessage('Constraint selected. Press Delete to remove it; Undo restores it.');
-                  svg.current?.focus();
-                }}
-                onHover={(_id, ids) => setHoveredConstraintEntities(ids)}
-                onEdit={editPattern}
-              />
-            )}
-            {annotationSketch &&
-              annotationSketch.constraints
-                .filter(numeric)
-                .map(c => (
-                  <DimensionGraphics
-                    key={c.id}
-                    constraint={c}
-                    sketch={annotationSketch}
-                    pixelScale={markerScale}
-                    selected={
-                      selectedConstraints.includes(c.id) ||
-                      (dimensionFlow.phase === 'placing' && dimensionFlow.existingConstraintId === c.id)
-                    }
-                    conflicted={shownConflicts.includes(c.id)}
-                    interactive={canEditCanvasDimensions}
-                    onSelect={additive => selectDimension(c.id, additive)}
-                    onEdit={() => editDimension(c.id)}
-                    onLabelPointerDown={event => startAnnotationDrag(c.id, event)}
-                  />
-                ))}
-            {sketch && dimensionDraft && (
-              <DimensionGraphics
-                constraint={dimensionDraft}
-                sketch={sketch}
-                pixelScale={markerScale}
-                position={dimensionDraft.labelPosition ?? cursor}
-                selected
-                interactive={false}
-              />
-            )}
-            {snapCue && (
-              <g pointerEvents="none">
-                <circle
-                  cx={snapCue.point.x}
-                  cy={-snapCue.point.y}
-                  r={5 / markerScale}
-                  fill="none"
-                  stroke="#bd7b18"
-                  strokeWidth="1.5"
-                  vectorEffect="non-scaling-stroke"
-                />
-                <text
-                  x={snapCue.point.x + 9 / markerScale}
-                  y={-snapCue.point.y - 8 / markerScale}
-                  fontSize={11 / markerScale}
-                  fill="#9b6516">
-                  {snapCue.label}
-                </text>
-              </g>
-            )}
-            {modificationPreview && (
-              <ModificationPreview
-                sketch={modificationPreview.sketch}
-                curveIds={
-                  offsetPreview?.ok
-                    ? offsetPreview.entityIds
-                    : extendPreview?.ok
-                      ? [extendPreview.entityId]
-                      : mirrorPreview?.ok
-                        ? mirrorPreview.createdEntityIds
-                        : []
+            {/*
+             * A turned sketch is turned inside the drawing, not as a whole, so its lines keep their width and its labels
+             * and points their shape, however far it's turned.
+             */}
+            <g
+              ref={drawingGroup}
+              data-testid="cad-drawing"
+              className={turned ? 'cad-drawing-turned' : undefined}
+              transform={turned ? turnTransform : undefined}
+              style={turned ? ({ '--unturn': unturn } as CSSProperties) : undefined}>
+              <defs>
+                <pattern id={`cad-grid-${doc.id}`} width={grid} height={grid} patternUnits="userSpaceOnUse">
+                  <circle cx="0" cy="0" r={grid * 0.025} fill="#ccd5df" />
+                </pattern>
+              </defs>
+              <rect x={view.x - view.w} y={view.y - view.h} width={view.w * 3} height={view.h * 3} fill={`url(#cad-grid-${doc.id})`} />
+              {shownEdges.length > 0 && (
+                <g className="cad-part-edges" aria-label="Edges of the parts behind the sketch">
+                  {shownEdges.map(edge => (
+                    <line
+                      key={edge.key}
+                      data-part-edge={edge.key}
+                      className={pickedEdges.includes(edge.key) ? 'cad-part-edge is-picked' : 'cad-part-edge'}
+                      x1={edge.x1}
+                      y1={-edge.y1}
+                      x2={edge.x2}
+                      y2={-edge.y2}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ))}
+                </g>
+              )}
+              <SketchRegion
+                document={doc}
+                partId={part?.id}
+                verified={
+                  !solving &&
+                  !splitFirst &&
+                  !(
+                    (tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') &&
+                    selected.length
+                  ) &&
+                  !((tool === 'slot' || tool === 'fillet' || tool === 'chamfer' || tool === 'transform') && selected.length) &&
+                  activeSketchStatus?.status === 'solved' &&
+                  lastCheckedRevision.current === `${doc.id}:${doc.revision}`
                 }
-                pixelScale={markerScale}
               />
-            )}
-            {offsetDimension && offsetPreview?.ok && (
-              <DimensionGraphics
-                constraint={offsetDimension}
-                sketch={offsetPreview.sketch}
-                pixelScale={markerScale}
-                interactive={false}
-                showLabel={false}
+              {faceSketch && (
+                <path
+                  data-face-outline
+                  className="cad-face-outline"
+                  d={faceSketch.outline.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                  pointerEvents="none"
+                />
+              )}
+              {!faceSketch && drawnOnFace && (
+                <path
+                  data-drawn-on-face
+                  className="cad-face-outline"
+                  d={drawnOnFace.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                  pointerEvents="none"
+                />
+              )}
+              {faceSketch?.floor && (
+                <path
+                  data-face-floor
+                  d={faceSketch.floor.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${-p.y}`).join(' ') + ' Z'}
+                  fill="#c99a5b"
+                  fillOpacity={0.25}
+                  stroke="#7a5526"
+                  strokeWidth={1 / markerScale}
+                  pointerEvents="none"
+                />
+              )}
+              {!faceSketch && <CutOverlay part={part} millimetresPerPixel={1 / markerScale} />}
+              <line
+                x1={view.x - view.w}
+                x2={view.x + view.w * 2}
+                y1="0"
+                y2="0"
+                stroke="#db9d9d"
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
               />
-            )}
-            {modification.phase === 'extend' &&
-              modification.entityId &&
-              sketch &&
-              (() => {
-                const curve = sketch.entities.find(e => e.id === modification.entityId);
-                const point =
-                  curve &&
-                  (curve.type === 'line' || curve.type === 'arc') &&
-                  pointsOf(sketch).get(modification.end === 'start' ? curve.startId : curve.endId);
-                return point ? (
+              <line
+                x1="0"
+                x2="0"
+                y1={view.y - view.h}
+                y2={view.y + view.h * 2}
+                stroke="#92bfa2"
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
+              />
+              {shownSketch && (
+                <SketchGeometry
+                  entities={shownSketch.entities}
+                  selectedIds={[
+                    ...dimensionSelection,
+                    ...hoveredConstraintEntities,
+                    ...selectedConstraints.flatMap(id => associatedEntityIds(sketch, id)),
+                  ]}
+                  stroke={cornerPreview?.ok || transformPreview?.ok || linearPreview?.ok || slotPreview?.ok ? '#858d96' : stroke}
+                  entityStatus={entityStatus}
+                  pixelScale={markerScale}
+                  hoveredPointId={hoveredPoint}
+                  interactive={tool === 'select' && !constraintMode && !placingDimension}
+                  onEditConic={id => {
+                    const curve = sketch?.entities.find(entity => entity.id === id);
+                    if (curve?.type === 'conic') {
+                      setRho(String(curve.rho));
+                      setConicEditing(id);
+                    }
+                  }}
+                />
+              )}
+              {tool === 'slot' && slotWidthCircle?.type === 'circle' && slotWidthCenter?.type === 'point' && (
+                <SketchSlotWidthHandle
+                  center={slotWidthCenter}
+                  radius={slotWidthCircle.radius}
+                  pixelScale={markerScale}
+                  onStart={e => {
+                    slotDrag.current = { center: slotWidthCenter, width: slotWidth };
+                    svg.current?.setPointerCapture(e.pointerId);
+                    svg.current?.focus();
+                  }}
+                />
+              )}
+              {tool === 'circularPattern' && selected.length > 0 && parsedCircular.ok && linearPreview?.ok && (
+                <SketchCircularPatternManipulator
+                  center={parsedCircular.center}
+                  anchor={patternAnchor}
+                  count={parsedCircular.count}
+                  angle={parsedCircular.angle}
+                  closed={parsedCircular.closed}
+                  pixelScale={markerScale}
+                  onEdit={field => {
+                    circularFields.current[field]?.focus();
+                    circularFields.current[field]?.select();
+                  }}
+                  onStart={(kind, event) => {
+                    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
+                    if (!matrix) return;
+                    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+                    circularDrag.current = {
+                      kind,
+                      start: { x: raw.x, y: -raw.y },
+                      parameters: circularParameters,
+                      last: Math.atan2(-raw.y - parsedCircular.center.y, raw.x - parsedCircular.center.x),
+                      sweep:
+                        ((parsedCircular.angle * Math.PI) / 180) *
+                        (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
+                    };
+                    svg.current?.setPointerCapture(event.pointerId);
+                    svg.current?.focus();
+                  }}
+                />
+              )}
+              {tool === 'linearPattern' && selected.length > 0 && parsedLinear.ok && (
+                <SketchLinearPatternManipulator
+                  anchor={patternAnchor}
+                  steps={linearParameters.secondDirection ? [parsedLinear.stepX, parsedLinear.stepY] : [parsedLinear.stepX]}
+                  counts={[parsedLinear.countX, parsedLinear.countY]}
+                  pixelScale={markerScale}
+                  onStart={(index, event) => {
+                    patternDrag.current = { index, anchor: patternAnchor, parameters: linearParameters };
+                    svg.current?.setPointerCapture(event.pointerId);
+                  }}
+                  onEdit={field => {
+                    patternFields.current[field]?.focus();
+                    patternFields.current[field]?.select();
+                  }}
+                />
+              )}
+              {tool === 'transform' && selected.length > 0 && parsedTransform.ok && (
+                <SketchTransformManipulator
+                  pivot={{
+                    x: parsedTransform.pivot.x + parsedTransform.translation.x,
+                    y: parsedTransform.pivot.y + parsedTransform.translation.y,
+                  }}
+                  pixelScale={markerScale}
+                  onStart={(kind, event) => {
+                    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
+                    if (!matrix) return;
+                    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+                    transformDrag.current = { kind, start: { x: raw.x, y: -raw.y }, parameters: transformParameters };
+                    svg.current?.setPointerCapture(event.pointerId);
+                  }}
+                />
+              )}
+              {tool === 'split' && splitFirst && (
+                <circle
+                  cx={splitFirst.point.x}
+                  cy={-splitFirst.point.y}
+                  r={5 / markerScale}
+                  fill="#fff"
+                  stroke="#2467d1"
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                  data-split-first="true"
+                />
+              )}
+              {tool === 'chamfer' &&
+                chamferPreview?.ok &&
+                chamferPreview.dimensionIds.map((id, side) => {
+                  const dimension = chamferPreview.sketch.constraints.find(c => c.id === id);
+                  if (dimension?.type !== 'distance') return null;
+                  const origin = chamferPreview.sketch.entities.find(e => e.id === dimension.pointAId);
+                  const point = chamferPreview.sketch.entities.find(e => e.id === dimension.pointBId);
+                  if (origin?.type !== 'point' || point?.type !== 'point') return null;
+                  const length = Math.hypot(point.x - origin.x, point.y - origin.y);
+                  return (
+                    <circle
+                      key={side}
+                      data-chamfer-handle={side}
+                      cx={point.x}
+                      cy={-point.y}
+                      r={6 / markerScale}
+                      fill="#fff"
+                      stroke="#2467d1"
+                      vectorEffect="non-scaling-stroke"
+                      style={{ cursor: 'move' }}
+                      onPointerDown={event => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        chamferDrag.current = {
+                          side,
+                          origin,
+                          direction: { x: (point.x - origin.x) / length, y: (point.y - origin.y) / length },
+                          previous: chamferDistances,
+                        };
+                        svg.current?.setPointerCapture(event.pointerId);
+                      }}
+                    />
+                  );
+                })}
+              {(tool === 'fillet' || tool === 'chamfer') &&
+                cornerPreview &&
+                !cornerPreview.ok &&
+                cornerPreview.cornerPointIds.map(id => {
+                  const point = sketch?.entities.find(entity => entity.type === 'point' && entity.id === id);
+                  return point?.type === 'point' ? (
+                    <circle
+                      key={id}
+                      data-fillet-error={id}
+                      cx={point.x}
+                      cy={-point.y}
+                      r={8 / markerScale}
+                      fill="#c43b3522"
+                      stroke="#c43b35"
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  ) : null;
+                })}
+              {annotationSketch && showConstraints && (
+                <InlineConstraints
+                  sketch={annotationSketch}
+                  scale={markerScale}
+                  selectedConstraintIds={selectedConstraints}
+                  conflictedConstraintIds={shownConflicts}
+                  interactive={tool === 'select' && !constraintMode && !placingDimension}
+                  onSelect={(id, additive) => {
+                    setSelectedConstraints(previous =>
+                      additive ? (previous.includes(id) ? previous.filter(existing => existing !== id) : [...previous, id]) : [id]
+                    );
+                    if (!additive) setSelected([]);
+                    setDimension(null);
+                    setMessage('Constraint selected. Press Delete to remove it; Undo restores it.');
+                    svg.current?.focus();
+                  }}
+                  onHover={(_id, ids) => setHoveredConstraintEntities(ids)}
+                  onEdit={editPattern}
+                />
+              )}
+              {annotationSketch &&
+                annotationSketch.constraints
+                  .filter(numeric)
+                  .map(c => (
+                    <DimensionGraphics
+                      key={c.id}
+                      constraint={c}
+                      sketch={annotationSketch}
+                      pixelScale={markerScale}
+                      selected={
+                        selectedConstraints.includes(c.id) ||
+                        (dimensionFlow.phase === 'placing' && dimensionFlow.existingConstraintId === c.id)
+                      }
+                      conflicted={shownConflicts.includes(c.id)}
+                      interactive={canEditCanvasDimensions}
+                      onSelect={additive => selectDimension(c.id, additive)}
+                      onEdit={() => editDimension(c.id)}
+                      onLabelPointerDown={event => startAnnotationDrag(c.id, event)}
+                    />
+                  ))}
+              {sketch && dimensionDraft && (
+                <DimensionGraphics
+                  constraint={dimensionDraft}
+                  sketch={sketch}
+                  pixelScale={markerScale}
+                  position={dimensionDraft.labelPosition ?? cursor}
+                  selected
+                  interactive={false}
+                />
+              )}
+              {snapCue && (
+                <g pointerEvents="none">
                   <circle
-                    data-extend-endpoint={modification.end}
-                    cx={point.x}
-                    cy={-point.y}
+                    cx={snapCue.point.x}
+                    cy={-snapCue.point.y}
                     r={5 / markerScale}
                     fill="none"
-                    stroke={SKETCH_APPEARANCE.selectedColor}
-                    strokeWidth={1.5}
+                    stroke="#bd7b18"
+                    strokeWidth="1.5"
                     vectorEffect="non-scaling-stroke"
-                    pointerEvents="none"
                   />
-                ) : null;
-              })()}
-            {extendPreview?.ok && extendPreview.kind === 'delete' && (
-              <text
-                data-extend-removes-curve="true"
-                x={cursor.x + 10 / markerScale}
-                y={-cursor.y - 10 / markerScale}
-                fontSize={13 / markerScale}
-                fill="#c73535"
-                pointerEvents="none">
-                Remove curve
-              </text>
-            )}
-            <SketchToolPreview
-              tool={tool}
-              pending={pending}
-              cursor={cursor}
-              curvePreview={curvePreview}
-              tangent={chainPreview?.tangent}
-              polygonSides={Number(polygonSides)}
-              sweepIntent={centerArcSweep.current?.sweep}
-              pixelScale={markerScale}
-              construction={construction}
-            />
-            {sketch && drawingCue && (
-              <DrawingInferencePreview
-                inference={drawingCue}
-                orientation={inference.current}
-                axis={tangentAxis.current}
-                start={chainPreview?.point ?? pending[0]}
-                sketch={sketch}
+                  <text
+                    x={snapCue.point.x + 9 / markerScale}
+                    y={-snapCue.point.y - 8 / markerScale}
+                    fontSize={11 / markerScale}
+                    fill="#9b6516">
+                    {snapCue.label}
+                  </text>
+                </g>
+              )}
+              {modificationPreview && (
+                <ModificationPreview
+                  sketch={modificationPreview.sketch}
+                  curveIds={
+                    offsetPreview?.ok
+                      ? offsetPreview.entityIds
+                      : extendPreview?.ok
+                        ? [extendPreview.entityId]
+                        : mirrorPreview?.ok
+                          ? mirrorPreview.createdEntityIds
+                          : []
+                  }
+                  pixelScale={markerScale}
+                />
+              )}
+              {offsetDimension && offsetPreview?.ok && (
+                <DimensionGraphics
+                  constraint={offsetDimension}
+                  sketch={offsetPreview.sketch}
+                  pixelScale={markerScale}
+                  interactive={false}
+                  showLabel={false}
+                />
+              )}
+              {modification.phase === 'extend' &&
+                modification.entityId &&
+                sketch &&
+                (() => {
+                  const curve = sketch.entities.find(e => e.id === modification.entityId);
+                  const point =
+                    curve &&
+                    (curve.type === 'line' || curve.type === 'arc') &&
+                    pointsOf(sketch).get(modification.end === 'start' ? curve.startId : curve.endId);
+                  return point ? (
+                    <circle
+                      data-extend-endpoint={modification.end}
+                      cx={point.x}
+                      cy={-point.y}
+                      r={5 / markerScale}
+                      fill="none"
+                      stroke={SKETCH_APPEARANCE.selectedColor}
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  ) : null;
+                })()}
+              {extendPreview?.ok && extendPreview.kind === 'delete' && (
+                <text
+                  data-extend-removes-curve="true"
+                  x={cursor.x + 10 / markerScale}
+                  y={-cursor.y - 10 / markerScale}
+                  fontSize={13 / markerScale}
+                  fill="#c73535"
+                  pointerEvents="none">
+                  Remove curve
+                </text>
+              )}
+              <SketchToolPreview
+                tool={tool}
+                pending={pending}
+                cursor={cursor}
+                curvePreview={curvePreview}
+                tangent={chainPreview?.tangent}
+                polygonSides={Number(polygonSides)}
+                sweepIntent={centerArcSweep.current?.sweep}
                 pixelScale={markerScale}
+                construction={construction}
               />
-            )}
-            {selectionBox && (
-              <rect
-                data-sketch-selection-box={selectionBox.end.x >= selectionBox.start.x ? 'window' : 'crossing'}
-                x={Math.min(selectionBox.start.x, selectionBox.end.x)}
-                y={-Math.max(selectionBox.start.y, selectionBox.end.y)}
-                width={Math.abs(selectionBox.end.x - selectionBox.start.x)}
-                height={Math.abs(selectionBox.end.y - selectionBox.start.y)}
-                fill={selectionBox.end.x >= selectionBox.start.x ? '#438bd522' : '#32a76a22'}
-                stroke={selectionBox.end.x >= selectionBox.start.x ? '#438bd5' : '#32a76a'}
-                strokeWidth="1"
-                strokeDasharray={selectionBox.end.x >= selectionBox.start.x ? undefined : '4 3'}
-                vectorEffect="non-scaling-stroke"
-                pointerEvents="none"
-              />
-            )}
+              {sketch && drawingCue && (
+                <DrawingInferencePreview
+                  inference={drawingCue}
+                  orientation={inference.current}
+                  axis={tangentAxis.current}
+                  start={chainPreview?.point ?? pending[0]}
+                  sketch={sketch}
+                  pixelScale={markerScale}
+                />
+              )}
+              {selectionBox && (
+                <rect
+                  data-sketch-selection-box={selectionBox.end.x >= selectionBox.start.x ? 'window' : 'crossing'}
+                  x={Math.min(selectionBox.start.x, selectionBox.end.x)}
+                  y={-Math.max(selectionBox.start.y, selectionBox.end.y)}
+                  width={Math.abs(selectionBox.end.x - selectionBox.start.x)}
+                  height={Math.abs(selectionBox.end.y - selectionBox.start.y)}
+                  fill={selectionBox.end.x >= selectionBox.start.x ? '#438bd522' : '#32a76a22'}
+                  stroke={selectionBox.end.x >= selectionBox.start.x ? '#438bd5' : '#32a76a'}
+                  strokeWidth="1"
+                  strokeDasharray={selectionBox.end.x >= selectionBox.start.x ? undefined : '4 3'}
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                />
+              )}
+            </g>
           </svg>
           <ModificationControls
             state={modification}
@@ -5298,7 +5379,24 @@ export function CadEditor({
               ))}
             </div>
           )}
-          {palette && searchMode && (
+          {palette && searchMode && studioSession && showWorkspace && (
+            // In the studio the search is of its commands; in a sketch, of the sketch's tools.
+            <CommandSearch
+              commands={kStudioCommands
+                .filter(command => !studioDisabled[command.id])
+                .map(({ id, label, hint, glyph }) => ({ id, label, description: hint, glyph }))}
+              onHighlight={() => {}}
+              onClose={(restoreFocus = true) => {
+                setPalette(false);
+                if (restoreFocus) root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]')?.focus();
+              }}
+              onChoose={id => {
+                setPalette(false);
+                studioCommand(id as StudioCommand);
+              }}
+            />
+          )}
+          {palette && searchMode && !(studioSession && showWorkspace) && (
             <CommandSearch
               commands={[
                 ...tools.map(t => ({
@@ -5704,6 +5802,7 @@ export function CadEditor({
           onClose={() => setContextMenu(null)}
           onAction={contextAction}
           onReturnToCanvas={() => svg.current?.focus()}
+          {...(studioSession && !showWorkspace && { confirm: { reason: sketchFinishReason, onConfirm: () => closeSketch(true) } })}
         />
       )}
       <footer className="cad-status">
@@ -5722,8 +5821,24 @@ export function CadEditor({
             </>
           )}
         </span>
+        {cancelledSketch && (
+          // Its own status, outside the instruction line that narrow windows hide, so Restore is always there.
+          <span className="cad-restore-sketch" role="status">
+            Sketch cancelled.{' '}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (busy) return;
+                commit(cancelledSketch.document);
+                openSketch(cancelledSketch.partId, cancelledSketch.before);
+              }}>
+              Restore
+            </button>
+          </span>
+        )}
         <span className="cad-instruction" role="status">
-          {acceptanceNotice || (studioSession && showWorkspace) ? '' : message}
+          {cancelledSketch || acceptanceNotice || (studioSession && showWorkspace) ? '' : message}
         </span>
         <span>{saveStatus ?? 'Draft'}</span>
       </footer>

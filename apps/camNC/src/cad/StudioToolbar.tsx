@@ -1,52 +1,7 @@
-import type { ReactNode } from 'react';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
+import { kStudioCommands, type StudioCommand } from './studioCommands';
 
-export type StudioCommand = 'sketch' | 'extrude' | 'cutParts' | 'transform' | 'pattern' | 'plane' | 'variable';
-
-const kCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactNode }[] = [
-  {
-    id: 'sketch',
-    label: 'Sketch',
-    hint: 'Sketch a new part on a plane or on a part’s face (Shift S): on the one picked, or pick one next',
-    glyph: <path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />,
-  },
-  {
-    id: 'extrude',
-    label: 'Extrude',
-    hint: 'Extrude the selected sketch into a part, or change how thick a part is (Shift E)',
-    glyph: <path d="M5 15h9v5H5zM5 15l4-4h9l-4 4M18 11v5l-4 4M9 11V4M7 6l2-2 2 2" />,
-  },
-  {
-    id: 'cutParts',
-    label: 'Cut parts',
-    hint: 'Cut parts out of the parts they reach into, with a clearance',
-    glyph: <path d="M3 9h18v9H3zM9 9V4h6v5M8 9v4h8V9" />,
-  },
-  {
-    id: 'transform',
-    label: 'Transform',
-    hint: 'A copy of the selected part, moved along X, Y and Z',
-    glyph: <path d="M4 14h8v6H4zM12 4h8v6h-8zM8 14V9h4M16 10v5h-4M10 7l2 2-2 2" />,
-  },
-  {
-    id: 'pattern',
-    label: 'Pattern',
-    hint: 'Copies of the selected part in a row',
-    glyph: <path d="M3 8h4v8H3zM10 8h4v8h-4zM17 8h4v8h-4z" />,
-  },
-  {
-    id: 'plane',
-    label: 'Plane',
-    hint: 'A plane to sketch on, offset from a plane or a part’s face',
-    glyph: <path d="M3 17l5-6h13l-5 6zM3 11l5-6h13l-5 6" />,
-  },
-  {
-    id: 'variable',
-    label: 'Variable',
-    hint: 'A named size, such as the board thickness, that any value can use',
-    glyph: <path d="M8 5C5 8 5 16 8 19M16 5c3 3 3 11 0 14M10 9l4 6M14 9l-4 6" />,
-  },
-];
+export type { StudioCommand };
 
 /**
  * The studio's commands, which each open a step's dialog over the view, then undo, redo, and leaving the design. While
@@ -64,6 +19,7 @@ export function StudioToolbar({
   onCancel,
   onFinish,
   canFinish,
+  onSearch,
 }: {
   busy: boolean;
   /** Commands that need something first, such as a selected part, with why. */
@@ -77,6 +33,8 @@ export function StudioToolbar({
   onRedo: () => void;
   onCancel: () => void;
   onFinish: () => void;
+  /** Opens the search of these commands, as Alt+C does. */
+  onSearch?: () => void;
 }) {
   return (
     <header
@@ -85,7 +43,7 @@ export function StudioToolbar({
       aria-label="Part Studio toolbar"
       title="Views: Shift+1 Front, Shift+2 Back, Shift+3 Left, Shift+4 Right, Shift+5 Top, Shift+6 Bottom, Shift+7 Isometric. F fits the model. P toggles base planes. Y hides the part under the pointer, Shift+T toggles transparency, Shift+Y shows all, Shift+I isolates the selected part.">
       <div className="cad-tool-group" role="group" aria-label="Part Studio features" inert={busy}>
-        {kCommands.map(command => (
+        {kStudioCommands.map(command => (
           <ToolHint key={command.id} label={disabled[command.id] ?? command.hint}>
             <button
               type="button"
@@ -101,6 +59,11 @@ export function StudioToolbar({
           </ToolHint>
         ))}
       </div>
+      {onSearch && (
+        <button type="button" className="cad-search-trigger" disabled={busy} onClick={onSearch} aria-keyshortcuts="Alt+C">
+          Search tools… <kbd>alt/⌥ C</kbd>
+        </button>
+      )}
       <div className="cad-tool-group cad-session-actions" aria-label="Design actions" role="group">
         <ToolHint label="Undo (Ctrl or Command Z)">
           <button

@@ -152,7 +152,7 @@ export function resolveDrawnPlacements(
       if (part.thin.midPlane) origin = add(origin, z, -part.thickness / 2);
       placement = { position: origin.map(tidy) as Vec3, rotation: rotationOf({ origin, x, y, z }) };
     } else {
-      const along = offset - (inward ? part.thickness : 0);
+      const along = offset - (part.symmetric ? part.thickness / 2 : inward ? part.thickness : 0);
       placement = {
         position: add(frame.origin, frame.z, along).map(tidy) as Vec3,
         rotation: rotationOf(frame),

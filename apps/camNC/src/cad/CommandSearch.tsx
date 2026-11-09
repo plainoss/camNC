@@ -1,11 +1,14 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { SketchToolGlyph } from './SketchToolbar';
 import type { SketchToolDefinition } from './sketchTools';
 import type { ConstraintCommandTool } from './constraintCommands';
+import type { StudioCommand } from './studioCommands';
 
 export type SearchCommand = Omit<SketchToolDefinition, 'id'> & {
-  id: SketchToolDefinition['id'] | ConstraintCommandTool | 'construction' | 'fix' | 'fit';
+  id: SketchToolDefinition['id'] | ConstraintCommandTool | StudioCommand | 'construction' | 'fix' | 'fit';
   description?: string;
+  /** The command's own icon, for one that isn't a sketch tool. */
+  glyph?: ReactNode;
 };
 
 /** Nonmodal tool search keeps the drawing available and closes on outside click or Escape. */
@@ -111,7 +114,13 @@ export function CommandSearch({
                   if (event.currentTarget.parentElement?.contains(document.activeElement)) event.currentTarget.focus();
                 }}
                 onClick={() => onChoose(command.id)}>
-                {command.id !== 'fit' && <SketchToolGlyph kind={command.id} />}
+                {command.glyph ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    {command.glyph}
+                  </svg>
+                ) : (
+                  command.id !== 'fit' && <SketchToolGlyph kind={command.id as SketchToolDefinition['id']} />
+                )}
                 <span>{command.label}</span>
                 <kbd>{command.key}</kbd>
               </button>

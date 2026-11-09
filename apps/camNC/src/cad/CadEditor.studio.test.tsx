@@ -5,6 +5,10 @@ import {
   addPartCopy,
   addCircle,
   addLine,
+  addConstraint,
+  cadCornerSources,
+  cadSketchFrame,
+  cornerKey,
   cadSketchRegions,
   createCadDocument,
   createCadPart,
@@ -12,10 +16,11 @@ import {
   setCutDepth,
   type CadDocument,
 } from '@wbcnc/cad';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
+import { solveCadDocument } from './solveCad';
 import { endCadSession } from './session';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 
@@ -47,6 +52,137 @@ async function studio(source = createPlateDocument({ width: 200, height: 100 }))
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
   return { latest, finish };
 }
+
+async function newStudioSketch() {
+  const result = await studio();
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Sketch/ }));
+  await userEvent.click(within(screen.getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Top/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Sketch · / });
+  await settled();
+  const canvas = screen.getByTestId('cad-canvas') as unknown as SVGSVGElement;
+  vi.spyOn(canvas, 'setPointerCapture').mockImplementation(() => {});
+  return { ...result, dialog, canvas };
+}
+
+async function drawStudioLine(canvas: SVGSVGElement) {
+  fireEvent.keyDown(canvas, { key: 'l' });
+  for (const [x, y] of [
+    [20, 20],
+    [80, 40],
+  ]) {
+    const at = new DOMPoint(x, -y).matrixTransform(canvas.getScreenCTM()!);
+    fireEvent.pointerDown(canvas, { button: 0, pointerId: 1, clientX: at.x, clientY: at.y });
+    fireEvent.pointerUp(canvas, { button: 0, pointerId: 1, clientX: at.x, clientY: at.y });
+  }
+  fireEvent.keyDown(canvas, { key: 'Escape' });
+  await settled();
+}
+
+async function blankSketchMenu(canvas: SVGSVGElement) {
+  const box = canvas.getBoundingClientRect();
+  const position = { clientX: box.right - 30, clientY: box.bottom - 30, button: 2, pointerId: 1 };
+  fireEvent.pointerDown(canvas, position);
+  fireEvent.pointerUp(canvas, position);
+  return screen.findByRole('menu', { name: 'Sketch menu' });
+}
+
+it.each(['Cancel', 'Escape'])('restores a cancelled studio sketch and its drawn line after %s', async cancel => {
+  const { latest, dialog, canvas } = await newStudioSketch();
+  await drawStudioLine(canvas);
+  const kept = structuredClone(latest().parts.at(-1)!);
+  const line = kept.sketch.entities.find(entity => entity.type === 'line')!;
+  expect(line).toBeDefined();
+  if (cancel === 'Escape') fireEvent.keyDown(dialog, { key: 'Escape' });
+  else await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  const restore = await screen.findByRole('button', { name: 'Restore' });
+  expect(restore.closest('[role="status"]')?.textContent).toContain('Sketch cancelled.');
+  expect(latest().parts.some(part => part.id === kept.id)).toBe(false);
+  await userEvent.click(restore);
+  await screen.findByRole('dialog', { name: `Sketch · ${kept.name}` });
+  await settled();
+  expect(latest().parts.find(part => part.id === kept.id)?.sketch).toEqual(kept.sketch);
+  expect(screen.getByTestId('cad-canvas').querySelector(`[data-entity-id="${line.id}"]`)).not.toBeNull();
+  expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
+  // Restoring is a normal edit in the document's undo history.
+  fireEvent.keyDown(screen.getByTestId('cad-canvas'), { key: 'z', ctrlKey: true });
+  await waitFor(() => expect(latest().parts.some(part => part.id === kept.id)).toBe(false));
+});
+
+it('confirms a studio sketch from the empty-canvas context menu and keeps its line', async () => {
+  const { latest, canvas } = await newStudioSketch();
+  await drawStudioLine(canvas);
+  const kept = structuredClone(latest().parts.at(-1)!);
+  const menu = await blankSketchMenu(canvas);
+  expect(within(menu).getByRole('menuitem', { name: 'Zoom to fit' })).toBeDefined();
+  const confirm = within(menu).getByRole('menuitem', { name: 'Confirm sketch' });
+  expect(confirm.getAttribute('aria-disabled')).not.toBe('true');
+  await userEvent.click(confirm);
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull();
+  expect(latest().parts.find(part => part.id === kept.id)?.sketch).toEqual(kept.sketch);
+});
+
+it('disables Confirm sketch with the same reason as the empty sketch dialog', async () => {
+  const { dialog, canvas } = await newStudioSketch();
+  const finish = within(dialog).getByRole('button', { name: '✓ Finish sketch' });
+  expect(finish).toHaveProperty('disabled', true);
+  const menu = await blankSketchMenu(canvas);
+  const confirm = within(menu).getByRole('menuitem', { name: 'Confirm sketch' });
+  expect(confirm.getAttribute('aria-disabled')).toBe('true');
+  const reason = confirm.getAttribute('title');
+  expect(reason).toBeTruthy();
+  expect(confirm.getAttribute('aria-description')).toBe(reason);
+  expect(finish.getAttribute('title')).toBe(reason);
+  fireEvent.click(confirm);
+  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+});
+
+it.each(['sketch', 'extrude', 'undo'])('dismisses Restore when another step starts: %s', async step => {
+  await studio();
+  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Plate/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await screen.findByRole('button', { name: 'Restore' });
+  const toolbar = screen.getByRole('toolbar', { name: 'Part Studio toolbar' });
+  if (step === 'undo') fireEvent.keyDown(toolbar, { key: 'z', ctrlKey: true });
+  else if (step === 'sketch') {
+    await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Plate/ }));
+    await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  } else {
+    await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+    await screen.findByRole('dialog', { name: /^Extrude · / });
+  }
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull());
+});
+
+it('dismisses Restore while the design is being accepted', async () => {
+  const { finish } = await studio();
+  let accept = () => {};
+  finish.mockImplementation(() => new Promise<void>(resolve => (accept = resolve)));
+  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Plate/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await screen.findByRole('button', { name: 'Restore' });
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Done/ }));
+  await waitFor(() => expect(finish).toHaveBeenCalled());
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull());
+  accept();
+});
+
+it('expires Restore after twelve seconds', async () => {
+  const { dialog } = await newStudioSketch();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeDefined();
+    act(() => vi.advanceTimersByTime(11_999));
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeDefined();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 it('toggles base planes and requests named views and fit from workspace shortcuts', async () => {
   await studio();
@@ -921,6 +1057,42 @@ it('reorders parts by dragging a step onto another in the feature list', async (
   await waitFor(() => expect(latest().parts.map(part => part.name)).toEqual(['B', 'A']));
 });
 
+it('extrudes up to a picked plane, its thickness following the distance, or symmetrically about its own plane', async () => {
+  const post = { ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name: 'Post' };
+  // Drawn 300 mm in front of the Front plane, facing away from it.
+  post.drawnOn = { on: { plane: 'front' }, offset: -300 };
+  const source: CadDocument = { ...createCadDocument(), parts: [post] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Post/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Post' });
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Symmetric' }));
+  await waitFor(() => expect(latest().parts[0]!.symmetric).toBe(true));
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'upTo');
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Front/ }));
+  await waitFor(() => expect(latest().parts[0]!.upTo).toEqual({ plane: 'front' }));
+  expect(latest().parts[0]!.symmetric).toBeUndefined();
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(300));
+  // Thin has a depth of its own, so it leaves Up to face, and its thickness can be typed again.
+  await userEvent.click(within(dialog).getByRole('tab', { name: 'Thin' }));
+  await waitFor(() => expect(latest().parts[0]!.upTo).toBeUndefined());
+  await userEvent.click(within(dialog).getByRole('tab', { name: 'Solid' }));
+  // Choosing Blind while a face is still to be picked stops waiting for it: a plane clicked next is only selected.
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'upTo');
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'blind');
+  expect((within(dialog).getByRole('combobox', { name: 'End type' }) as HTMLSelectElement).value).toBe('blind');
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Right/ }));
+  expect(latest().parts[0]!.upTo).toBeUndefined();
+});
+
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {
   const { latest } = await studio();
   await editExtrude('Plate');
@@ -1157,6 +1329,68 @@ it('uses an edge of a part behind a sketch in it, fixed where it is, picked then
   await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(false));
 });
 
+it('resizes a part drawn against an edge used from another, when that other’s sketch changes', async () => {
+  // An L: the side board stands on the Front plane, and the back board on the Right plane runs along its 500 mm edge.
+  const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
+  side.drawnOn = { on: { plane: 'front' as const }, offset: 0 };
+  const back = { ...createCadPart('Back', 20), drawnOn: { on: { plane: 'right' as const }, offset: 0 } };
+  const placed = (await solveCadDocument({ ...createCadDocument(), parts: [side] })).document;
+  const corners = cadCornerSources(placed, cadSketchFrame(placed, back)!);
+  const tall = [...corners.keys()].map(key => key.split(',').map(Number) as [number, number]).filter(([x]) => x !== 0);
+  expect(tall.map(([, y]) => y).sort((a, b) => a - b)).toEqual([0, 500]);
+  const x = tall[0]![0];
+  let sketch = addLine(back.sketch, { x1: x, y1: 0, x2: x, y2: 500 });
+  sketch = {
+    ...sketch,
+    entities: sketch.entities.map(entity =>
+      entity.type === 'point' && !entity.fixed ? { ...entity, fixed: true, used: corners.get(cornerKey(entity.x, entity.y)) } : entity
+    ),
+  };
+  const [bottom, top] = sketch.entities
+    .filter(entity => entity.type === 'point' && entity.used)
+    .sort((a, b) => (a.type === 'point' && b.type === 'point' ? a.y - b.y : 0));
+  const usedIds = new Set(sketch.entities.map(entity => entity.id));
+  sketch = addRectangle(sketch, { x: x < 0 ? x - 300 : x, y: 0, width: 300, height: 500 });
+  const own = sketch.entities.filter(entity => entity.type === 'point' && !usedIds.has(entity.id));
+  for (const used of [bottom!, top!]) {
+    const corner = own.find(entity => entity.type === 'point' && used.type === 'point' && entity.x === used.x && entity.y === used.y)!;
+    sketch = addConstraint(sketch, { type: 'coincident', pointAId: corner.id, pointBId: used.id });
+  }
+  back.sketch = sketch;
+  // Extruded as the studio does, by the region the rectangle closes.
+  back.regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+  expect(back.regions).toHaveLength(1);
+  // As saved: the side board where the Front plane puts it.
+  const source: CadDocument = { ...createCadDocument(), parts: [placed.parts[0]!, back] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const backHeight = () => {
+    const ys = latest().parts[1]!.sketch.entities.flatMap(entity =>
+      entity.type === 'point' && own.some(p => p.id === entity.id) ? [entity.y] : []
+    );
+    return Math.max(...ys) - Math.min(...ys);
+  };
+  // The side board made 100 mm taller in its sketch: the back board, tied to its edge, grows with it.
+  await userEvent.dblClick(within(await screen.findByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Side/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Sketch · Side' });
+  // The tall sketch is partly under its dialog, so the label is opened directly.
+  fireEvent.doubleClick(await screen.findByRole('button', { name: /^Edit Height: 500 mm/ }));
+  const height = await screen.findByRole('textbox', { name: /Height/ });
+  await userEvent.clear(height);
+  await userEvent.type(height, '600{Enter}');
+  await settled();
+  await userEvent.click(within(dialog).getByRole('button', { name: /Finish sketch/ }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch · Side' })).toBeNull());
+  await waitFor(() => expect(backHeight()).toBeCloseTo(600, 6));
+});
+
 it('shows the parts built before a sketch behind it, seen straight at its plane and turned by a right drag, and none of its own', async () => {
   const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
   side.drawnOn = { on: { plane: 'right' as const }, offset: 0 };
@@ -1190,14 +1424,16 @@ it('shows the parts built before a sketch behind it, seen straight at its plane 
   for (const dx of [20, 40, 60]) pointer('pointermove', dx, 2);
   pointer('pointerup', 60, 0);
   await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(true));
-  expect(canvas.style.transform).toMatch(/^matrix\(/);
+  // The drawing turns inside the canvas, so its lines keep their width.
+  expect(screen.getByTestId('cad-drawing').getAttribute('transform')).toMatch(/matrix\(/);
+  expect(canvas.style.transform).toBe('');
   expect(screen.queryByRole('menu')).toBeNull();
   // n looks straight at the plane again, and once more, at its other side.
   canvas.focus();
   await userEvent.keyboard('n');
   await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(false));
   await userEvent.keyboard('n');
-  await waitFor(() => expect(canvas.style.transform).toBe('matrix(-1, 0, 0, 1, 0, 0)'));
+  await waitFor(() => expect(screen.getByTestId('cad-drawing').getAttribute('transform')).toMatch(/matrix\(-1 0 0 1 0 0\)/));
   // Seen from behind, a middle drag to the right still carries the drawing to the right.
   const viewX = () => Number(canvas.getAttribute('viewBox')!.split(' ')[0]);
   const x0 = viewX();
