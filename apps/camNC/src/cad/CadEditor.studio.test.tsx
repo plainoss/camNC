@@ -1063,9 +1063,9 @@ it('moves a part so a corner of it lands on a corner of another, by mate connect
   });
   const { latest } = await studio(source);
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
-  const click = (partId: string, point: [number, number, number]) => {
+  const click = (partId: string, point: [number, number, number], normal: [number, number, number] = [0, 0, 1]) => {
     const index = props().instanceIds!.indexOf(partId);
-    act(() => props().onSelect!(partId, index, { partId, index, point, normal: [0, 0, 1] }));
+    act(() => props().onSelect!(partId, index, { partId, index, point, normal }));
   };
   await waitFor(() => expect(props().instanceIds).toContain('boss'));
   click('boss', [0, 0, 0]);
@@ -1078,12 +1078,50 @@ it('moves a part so a corner of it lands on a corner of another, by mate connect
   click(base.id, [5, 5, 18]);
   await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toMatch(/on Boss itself/));
   await userEvent.click(within(dialog).getByRole('button', { name: 'Mate connector' }));
-  click('boss', [40, 40, 36]);
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mate connector' }).textContent).toMatch(/Boss at 40, 40, 36/));
+  // The boss's underside corner onto the base's top corner: the faces already meet, so it only moves.
+  click('boss', [40, 40, 18], [0, 0, -1]);
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mate connector' }).textContent).toMatch(/Boss at 40, 40, 18/));
   await userEvent.click(within(dialog).getByRole('button', { name: 'Mate connector to move to' }));
   click(base.id, [200, 100, 18]);
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(latest().parts[1]!.moved).toEqual({ by: [160, 60, -18] }));
+  await waitFor(() => expect(latest().parts[1]!.moved).toEqual({ by: [160, 60, 0] }));
+  // Its top onto the base's top turns it over first, about the point picked.
+  const features = screen.getByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Boss/ }));
+  const again = await screen.findByRole('dialog', { name: 'Transform · Boss' });
+  await userEvent.selectOptions(within(again).getByRole('combobox', { name: 'Transform type' }), 'mate');
+  await userEvent.click(within(again).getByRole('button', { name: 'Mate connector' }));
+  // Picked where the move put it, at the base's corner.
+  click('boss', [200, 100, 36]);
+  await userEvent.click(within(again).getByRole('button', { name: 'Mate connector to move to' }));
+  click(base.id, [0, 0, 18]);
+  await userEvent.click(within(again).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[1]!.moved).toMatchObject({ by: [-40, -40, -18], turn: { about: [40, 40, 36], degrees: 180 } }));
+});
+
+it('rotates a part about the line out of a face picked for the axis', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  source.parts[0]!.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  const { latest } = await studio(source);
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  const part = latest().parts[0]!;
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'rotate');
+  // Without an axis it says what to pick.
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/Pick a face for the axis/);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Axis' }));
+  const index = props().instanceIds!.indexOf(part.id);
+  act(() => props().onSelect!(part.id, index, { partId: part.id, index, point: [0, 0, 18], normal: [0, 0, 1] }));
+  const angle = within(dialog).getByRole('textbox', { name: 'Angle' });
+  await userEvent.clear(angle);
+  await userEvent.type(angle, '90');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() =>
+    expect(latest().parts[0]!.moved).toEqual({ by: [0, 0, 0], turn: { about: [0, 0, 18], axis: [0, 0, 1], degrees: 90 } })
+  );
 });
 
 it('suppresses an extrude from the feature list, and rolls the design back with the bar', async () => {

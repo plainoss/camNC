@@ -144,7 +144,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
               label: `Transform · ${part.name}`,
               detail:
                 'by' in part.moved
-                  ? `moved ${part.moved.by.map(value => +value.toFixed(3)).join(', ')} mm`
+                  ? `${part.moved.turn ? `turned ${+part.moved.turn.degrees.toFixed(3)}°, ` : ''}moved ${part.moved.by.map(value => +value.toFixed(3)).join(', ')} mm`
                   : `moved ${+part.moved.distance.toFixed(3)} mm`,
               partId: part.id,
             },

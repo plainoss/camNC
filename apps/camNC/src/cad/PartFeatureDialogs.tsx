@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   addPartCopy,
+  mateMove,
+  unmovedPick,
   cadDirectionVector,
   resolvePartPatterns,
   type CadDrawnOn,
@@ -543,11 +545,15 @@ export function PartPatternDialog({
 }
 
 const kAxisLabels = ['X', 'Y', 'Z'] as const;
+type TransformKind = 'xyz' | 'distance' | 'mate' | 'rotate';
+const kKindLabels = { from: 'Mate connector', to: 'Mate connector to move to', axis: 'Axis' } as const;
 
 /** An implicit mate connector picked in the view: where on a part, in the design's space. */
 export interface CadConnectorPick {
   partId: string;
   point: [number, number, number];
+  /** The way the face picked looks: a connector's axis. */
+  normal: [number, number, number];
   /** Picked on a copy of the part rather than the part itself. */
   copy?: boolean;
 }
@@ -587,7 +593,7 @@ export function TransformDialog({
   // Copy part, as in the reference: off by default, so a transform moves the part itself.
   const [copyPart, setCopyPart] = useState(!!copy);
   // By X, Y and Z, or by a distance along a picked plane's or face's normal, as the reference's Translate types.
-  const [kind, setKind] = useState<'xyz' | 'distance' | 'mate'>(alongNow ? 'distance' : 'xyz');
+  const [kind, setKind] = useState<TransformKind>(alongNow ? 'distance' : 'xyz');
   const [direction, setDirection] = useState<CadDrawnOn['on'] | null>(alongNow?.along ?? null);
   const [flip, setFlip] = useState(!!alongNow?.flip);
   const [distanceText, setDistanceText] = useState(
@@ -613,7 +619,7 @@ export function TransformDialog({
     if (!part.drawnOn) return setError('Only a part drawn on a plane or a face can be moved.');
     // A part moved already is moved again from there, by X, Y and Z; its own Transform step changes one along a face.
     if (!move && part.moved) {
-      if (!('by' in part.moved) || !('by' in next))
+      if (!('by' in part.moved) || !('by' in next) || part.moved.turn || next.turn)
         return setError('This part is already moved. Change its Transform step in the feature list to move it differently.');
       const before = part.moved,
         added = next;
@@ -640,10 +646,13 @@ export function TransformDialog({
   // Transform by mate connectors: a corner or face middle on the part, and the one it goes to.
   const [mateFrom, setMateFrom] = useState<CadConnectorPick | null>(null);
   const [mateTo, setMateTo] = useState<CadConnectorPick | null>(null);
-  const [pickingMate, setPickingMate] = useState<'from' | 'to' | null>(null);
+  const [pickingMate, setPickingMate] = useState<'from' | 'to' | 'axis' | null>(null);
+  // Rotate: about the line out of a picked face, through the point picked on it.
+  const [axisPick, setAxisPick] = useState<CadConnectorPick | null>(null);
+  const [angleText, setAngleText] = useState('30');
   // Closed while picking, the view stops picking.
   useEffect(() => () => pickPoint?.(null), [pickPoint]);
-  const pickMate = (end: 'from' | 'to') => {
+  const pickMate = (end: 'from' | 'to' | 'axis') => {
     if (!pickPoint) return;
     setPickingMate(end);
     setError(null);
@@ -651,7 +660,7 @@ export function TransformDialog({
       setPickingMate(null);
       if (end === 'from' && (picked.partId !== part.id || picked.copy)) return setError(`Pick the first connector on ${part.name} itself.`);
       if (end === 'to' && picked.partId === part.id) return setError('Pick the connector to move to on another part.');
-      (end === 'from' ? setMateFrom : setMateTo)(picked);
+      (end === 'from' ? setMateFrom : end === 'to' ? setMateTo : setAxisPick)(picked);
     });
   };
   const save = () => {
@@ -688,12 +697,29 @@ export function TransformDialog({
       );
     }
     let values: { value: number; expression?: string }[];
+    // By X, Y and Z, a turned part or copy stays turned.
+    let turn = kind === 'xyz' ? (copy ? copy.turn : move && part.moved && 'by' in part.moved ? part.moved.turn : undefined) : undefined;
+    // Changing the part's own move, what's picked on it sits where that move put it.
+    const unmoved = (pick: CadConnectorPick) =>
+      !copyPart && move && pick.partId === part.id && part.moved && 'by' in part.moved ? unmovedPick(pick, part.moved) : pick;
     if (kind === 'mate') {
-      // The part moves so its connector lands on the other: by the step from one to the other.
+      // The part turns so its connector's face meets the other's, then moves so the two points touch.
       if (!mateFrom || !mateTo) return setError(`Pick a corner or face middle on ${part.name}, then one to move it to.`);
-      // Changing the part's own move, the connector already sits where that move put it.
-      const already = !copyPart && move && part.moved && 'by' in part.moved ? part.moved.by : [0, 0, 0];
-      values = mateTo.point.map((value, axis) => ({ value: +(value - mateFrom.point[axis]! + already[axis]!).toFixed(6) }));
+      const mate = mateMove(unmoved(mateFrom), mateTo);
+      values = mate.by.map(value => ({ value }));
+      turn = mate.turn;
+    } else if (kind === 'rotate') {
+      if (!axisPick) return setError('Pick a face for the axis: the part turns about the line straight out of it.');
+      const angle = parseCadValue(angleText, { unit: 'deg', variables });
+      if ('error' in angle) return setError(angle.error);
+      const axis = unmoved(axisPick);
+      values = [{ value: 0 }, { value: 0 }, { value: 0 }];
+      turn = {
+        about: axis.point,
+        axis: axis.normal,
+        degrees: angle.value,
+        ...(angle.expression && { degreesExpression: angle.expression }),
+      };
     } else {
       const parsed = text.map(value => parseCadValue(value, { unit: 'mm', variables }));
       const failed = parsed.find(result => 'error' in result);
@@ -707,6 +733,7 @@ export function TransformDialog({
         ...(values.some(result => result.expression) && {
           byExpressions: values.map(result => result.expression ?? null) as [string | null, string | null, string | null],
         }),
+        ...(turn && { turn }),
       });
     const offset = {
       position: values.map(result => result.value) as [number, number, number],
@@ -715,9 +742,9 @@ export function TransformDialog({
         positionExpressions: values.map(result => result.expression ?? null) as [string | null, string | null, string | null],
       }),
     };
-    if (!copy) return onSave(addPartCopy(document, part.id, { offset, mirrored }).document);
+    if (!copy) return onSave(addPartCopy(document, part.id, { offset, mirrored, turn }).document);
     // By X, Y and Z, a copy no longer follows the direction it was picked along.
-    const moved = setPartCopyOffset(document, part.id, copy.id, { offset, mirrored });
+    const moved = setPartCopyOffset(document, part.id, copy.id, { offset, mirrored, turn });
     onSave({
       ...moved,
       parts: moved.parts.map(candidate =>
@@ -743,10 +770,11 @@ export function TransformDialog({
       </div>
       <label className="cad-number-field">
         Type
-        <select aria-label="Transform type" value={kind} onChange={event => setKind(event.target.value as 'xyz' | 'distance' | 'mate')}>
+        <select aria-label="Transform type" value={kind} onChange={event => setKind(event.target.value as TransformKind)}>
           <option value="xyz">Translate by XYZ</option>
           <option value="distance">Translate by distance</option>
           {pickPoint && <option value="mate">Transform by mate connectors</option>}
+          {pickPoint && <option value="rotate">Rotate</option>}
         </select>
       </label>
       {kind === 'distance' && (
@@ -779,18 +807,18 @@ export function TransformDialog({
           </label>
         </>
       )}
-      {kind === 'mate' &&
-        (['from', 'to'] as const).map(end => {
-          const picked = end === 'from' ? mateFrom : mateTo;
+      {(kind === 'mate' || kind === 'rotate') &&
+        (kind === 'mate' ? (['from', 'to'] as const) : (['axis'] as const)).map(end => {
+          const picked = end === 'from' ? mateFrom : end === 'to' ? mateTo : axisPick;
           return (
             <button
               key={end}
               type="button"
               className="cad-feature-selection"
               data-active={pickingMate === end || !picked ? '' : undefined}
-              aria-label={end === 'from' ? 'Mate connector' : 'Mate connector to move to'}
+              aria-label={kKindLabels[end]}
               onClick={() => pickMate(end)}>
-              <small>{end === 'from' ? `Connector on ${part.name}` : 'Connector to move to'}</small>
+              <small>{end === 'from' ? `Connector on ${part.name}` : end === 'to' ? 'Connector to move to' : 'Axis'}</small>
               <span>
                 {picked
                   ? `${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part'} at ${picked.point.map(value => +value.toFixed(2)).join(', ')}`
@@ -799,6 +827,21 @@ export function TransformDialog({
             </button>
           );
         })}
+      {kind === 'rotate' && (
+        <label className="cad-number-field">
+          Angle
+          <span>
+            <CadValueInput
+              bare
+              aria-label="Angle"
+              value={angleText}
+              spellCheck={false}
+              onChange={event => setAngleText(event.target.value)}
+            />
+          </span>
+          deg
+        </label>
+      )}
       {kind === 'xyz' &&
         kAxisLabels.map((label, axis) => (
           <label key={label} className="cad-number-field">

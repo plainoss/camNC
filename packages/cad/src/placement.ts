@@ -1,4 +1,4 @@
-import type { CadDocument, CadPlacement } from './types';
+import type { CadDocument, CadPlacement, CadTurn } from './types';
 
 export type Vec3 = [number, number, number];
 type Quat = [number, number, number, number];
@@ -109,6 +109,34 @@ export function placeAgainst(current: CadPlacement | undefined, moving: CadFaceP
     position: offset.map((value, i) => tidy(value + target.point[i]!)) as Vec3,
     rotation: next.map(value => snap(value / length)) as Quat,
   };
+}
+
+/** A turn as an axis and an angle, or none for no turn at all. */
+function asTurn(about: Vec3, turn: Quat): CadTurn | undefined {
+  const sine = Math.hypot(turn[0], turn[1], turn[2]);
+  if (sine < 1e-9) return undefined;
+  const degrees = tidy((2 * Math.atan2(sine, turn[3]) * 180) / Math.PI);
+  return { about, axis: [turn[0] / sine, turn[1] / sine, turn[2] / sine].map(tidy) as Vec3, degrees };
+}
+
+/** A point and direction on a moved part, back where they were before `turn` and `by` moved it. */
+export function unmovedPick(pick: CadFacePick, moved: { by: Vec3; turn?: CadTurn } | undefined): CadFacePick {
+  if (!moved) return pick;
+  const point: Vec3 = [pick.point[0] - moved.by[0], pick.point[1] - moved.by[1], pick.point[2] - moved.by[2]];
+  if (!moved.turn) return { point, normal: pick.normal };
+  const back = turnAbout(CAD_IDENTITY_PLACEMENT, [0, 0, 0], moved.turn.axis, -moved.turn.degrees).rotation;
+  const { about } = moved.turn;
+  const offset = rotateVector(back, [point[0] - about[0], point[1] - about[1], point[2] - about[2]]);
+  return { point: offset.map((value, i) => value + about[i]!) as Vec3, normal: rotateVector(back, pick.normal) };
+}
+
+/**
+ * The move that mates a part's connector `from` to another's `to`, as the reference's mate connectors do: the part turns
+ * about `from` so the two faces meet, facing each other, then moves so the two points touch.
+ */
+export function mateMove(from: CadFacePick, to: CadFacePick): { by: Vec3; turn?: CadTurn } {
+  const turn = asTurn(from.point, turnBetween(from.normal, [-to.normal[0], -to.normal[1], -to.normal[2]]));
+  return { by: to.point.map((value, i) => tidy(value - from.point[i]!)) as Vec3, ...(turn && { turn }) };
 }
 
 export interface CadPlacementChange {
