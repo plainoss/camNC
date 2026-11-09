@@ -157,21 +157,25 @@ test('CI covers every runtime task and both browser shards, without duplicating 
 });
 
 
-test('merge queue runs all validation and isolates concurrent candidate builds', () => {
+test('the Mergify queue runs all validation, PRs run the quick suites and main only warms caches', () => {
   const workflow = parse(read('.github/workflows/ci.yml'));
-  assert.deepEqual(workflow.on.merge_group.types, ['checks_requested']);
+  assert.equal(workflow.on.merge_group, undefined, 'Mergify batches are pull requests; GitHub merge groups are gone');
   assert(workflow.on.pull_request, 'ordinary PR checks must still run');
   assert(workflow.on.push, 'main checks must still run');
   assert.equal(workflow.concurrency.group, 'ci-${{ github.event.pull_request.number || github.run_id }}');
   assert.equal(workflow.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
-  const pr = labels => ({ event_name: 'pull_request', event: { pull_request: { labels: labels.map(name => ({ name })) } } });
+  const pr = (labels, head_ref = 'feature/example') => ({
+    event_name: 'pull_request',
+    head_ref,
+    event: { pull_request: { labels: labels.map(name => ({ name })) } },
+  });
   const runs = (job, github) => job.if === undefined || actionsIf(job.if, github);
   for (const [id, job] of Object.entries(workflow.jobs)) {
-    for (const github of [{ event_name: 'merge_group' }, pr(['full-ci'])]) {
+    for (const github of [pr([], 'mergify/merge-queue/main/batch-example'), pr(['full-ci'])]) {
       assert(runs(job, github), `${id} must not skip validation on ${github.event_name} events`);
     }
   }
-  // A PR runs the quick suites; the merge queue validates the whole batch with everything once.
+  // A PR runs the quick suites; a Mergify batch validates the whole batch with everything once.
   const onPr = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], pr(['enhancement'])));
   assert.deepEqual(onPr.sort(), ['checks', 'fluidnc-sim', 'results', 'test']);
   // A PR runs only the headless matrix entry; the browser shards are their own job, so no include adds them back.
@@ -280,7 +284,7 @@ test('remote caching uses short-lived tokens and skips untrusted fork PRs', () =
     const event = (event_name, head = 'plainoss/camNC') => ({
       event_name, repository: 'plainoss/camNC', event: { pull_request: { head: { repo: { full_name: head } } } },
     });
-    for (const name of ['push', 'merge_group', 'pull_request']) {
+    for (const name of ['push', 'pull_request']) {
       assert.equal(enabled(event(name), { TURBO_TEAM: 'cache-team' }), true);
       assert.equal(enabled(event(name), { TURBO_TEAM: '' }), false);
     }
