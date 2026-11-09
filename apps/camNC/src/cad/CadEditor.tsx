@@ -558,8 +558,10 @@ export function CadEditor({
     return () => clearTimeout(timer);
   }, [cancelledSketch]);
   useEffect(() => {
-    if (!showWorkspace || choosingFace || featureDialog || partCutting || variableDialog || transformDialog) setCancelledSketch(null);
-  }, [showWorkspace, choosingFace, featureDialog, partCutting, variableDialog, transformDialog]);
+    // Accepting the design, or anything else that makes the editor busy, saves what's there: a restore can't race it.
+    if (busy || !showWorkspace || choosingFace || featureDialog || partCutting || variableDialog || transformDialog)
+      setCancelledSketch(null);
+  }, [busy, showWorkspace, choosingFace, featureDialog, partCutting, variableDialog, transformDialog]);
   useEffect(() => {
     const element = svg.current;
     if (!element) return;
@@ -5758,7 +5760,9 @@ export function CadEditor({
             Sketch cancelled.{' '}
             <button
               type="button"
+              disabled={busy}
               onClick={() => {
+                if (busy) return;
                 commit(cancelledSketch.document);
                 openSketch(cancelledSketch.partId, cancelledSketch.before);
               }}>
