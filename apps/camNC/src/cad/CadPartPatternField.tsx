@@ -64,6 +64,9 @@ export function CadPartPatternField({
       (['axis', 'direction', 'count', 'spacing', 'countExpression', 'spacingExpression'] as const).every(key => pattern[key] === next[key]);
     if (!same) onChange(next);
   };
+  // A pick lands after later renders, so it applies with the count and spacing as they are then, not as they were.
+  const latestApply = useRef(apply);
+  latestApply.current = apply;
   const keys = (event: React.KeyboardEvent) => {
     event.stopPropagation();
     if (event.key === 'Enter') {
@@ -98,7 +101,7 @@ export function CadPartPatternField({
               onClick={() => {
                 setPicking(true);
                 pickDirection(along => {
-                  apply(current.axis, { along });
+                  latestApply.current(undefined, { along });
                   setPicking(false);
                 });
               }}>

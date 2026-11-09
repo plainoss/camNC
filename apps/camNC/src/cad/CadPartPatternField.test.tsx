@@ -58,6 +58,28 @@ describe('the part pattern field', () => {
     expect(screen.queryByLabelText('Flip direction')).toBeNull();
   });
 
+  it('keeps a count changed while a direction is being picked', () => {
+    const document = createPlateDocument({ width: 100, height: 50 });
+    let pattern: CadPartPattern = { id: 'p', axis: 'x', count: 3, spacing: 20 };
+    const onChange = vi.fn();
+    let picked: (on: CadDrawnOn['on']) => void = () => {};
+    const field = () => (
+      <CadPartPatternField document={document} pattern={pattern} pickDirection={callback => (picked = callback)} onChange={onChange} />
+    );
+    const { rerender } = render(field());
+    const update = () => {
+      pattern = { id: 'p', ...onChange.mock.calls.at(-1)![0] };
+      rerender(field());
+    };
+    fireEvent.click(screen.getByRole('button', { name: 'Direction' }));
+    fireEvent.change(screen.getByLabelText('How many'), { target: { value: '5' } });
+    fireEvent.blur(screen.getByLabelText('How many'));
+    update();
+    picked({ plane: 'front' });
+    update();
+    expect(pattern).toMatchObject({ count: 5, direction: { along: { plane: 'front' } } });
+  });
+
   it('says why a count can’t be used, and takes the pattern away when unticked', () => {
     const onChange = vi.fn();
     render(<CadPartPatternField pattern={{ id: 'p', axis: 'z', count: 3, spacing: 50 }} onChange={onChange} />);
