@@ -217,7 +217,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import type { BasePlane } from './basePlanes';
-import type { ViewRegion } from '@/cam/model/ModelViewport';
+import type { ViewRegion, ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
@@ -472,6 +472,8 @@ export function CadEditor({
   // Opened as a Part Studio: the studio is home, a sketch is opened from it and closed back to it, and steps are set
   // in dialogs over the view.
   const studioSession = startIn3D !== undefined && !faceSketch;
+  const [viewRequest, setViewRequest] = useState<ViewRequest>();
+  const [showPlanes, setShowPlanes] = useState(true);
   // A "cut parts" step being added, or the one being changed.
   const [partCutting, setPartCutting] = useState<{ id?: string } | null>(null);
   // A part clicked while a cut-parts step is open, which goes into the box being filled, and what both boxes hold.
@@ -2223,6 +2225,26 @@ export function CadEditor({
       return;
     }
     if (editable(event.target)) return;
+    if (studioSession && showWorkspace && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const namedViews = ['front', 'back', 'left', 'right', 'top', 'bottom', 'iso'] as const;
+      const name = event.shiftKey
+        ? /^Digit[1-7]$/.test(event.code)
+          ? namedViews[Number(event.code.slice(-1)) - 1]
+          : undefined
+        : event.key.toLowerCase() === 'f'
+          ? 'fit'
+          : undefined;
+      if (name) {
+        event.preventDefault();
+        if (!event.repeat) setViewRequest(previous => ({ name, seq: (previous?.seq ?? 0) + 1 }));
+        return;
+      }
+      if (!event.shiftKey && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        if (!event.repeat) setShowPlanes(previous => !previous);
+        return;
+      }
+    }
     // Shift+E extrudes the selected sketch or part, as in the reference.
     if (
       studioSession &&
@@ -4418,6 +4440,8 @@ export function CadEditor({
             <Suspense fallback={<div className="cad-part-view" />}>
               <WorkspaceView
                 document={shownDocument}
+                viewRequest={viewRequest}
+                showPlanes={showPlanes}
                 selectedId={part?.id ?? null}
                 onSelect={id => {
                   if (partCutting) return pickForCut(id);

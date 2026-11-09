@@ -73,7 +73,11 @@ export function StudioToolbar({
   onFinish: () => void;
 }) {
   return (
-    <header className="cad-toolbar cad-studio-toolbar" role="toolbar" aria-label="Part Studio toolbar">
+    <header
+      className="cad-toolbar cad-studio-toolbar"
+      role="toolbar"
+      aria-label="Part Studio toolbar"
+      title="Views: Shift+1 Front, Shift+2 Back, Shift+3 Left, Shift+4 Right, Shift+5 Top, Shift+6 Bottom, Shift+7 Isometric. F fits the model. P toggles base planes.">
       <div className="cad-tool-group" role="group" aria-label="Part Studio features" inert={busy}>
         {kCommands.map(command => (
           <ToolHint key={command.id} label={disabled[command.id] ?? command.hint}>

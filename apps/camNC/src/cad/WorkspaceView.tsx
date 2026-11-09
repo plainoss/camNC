@@ -1,6 +1,6 @@
 import { assemblyReport, evaluateCadDocument, isCadPart, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ModelViewport, type ModelFacePick, type ModelView, type ViewRegion } from '@/cam/model/ModelViewport';
+import { ModelViewport, type ModelFacePick, type ModelView, type ViewRegion, type ViewRequest } from '@/cam/model/ModelViewport';
 import { assemblyModel, instanceKey } from './assemblyModel';
 import { basePlaneViews, type BasePlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
@@ -32,6 +32,8 @@ export default function WorkspaceView({
   picked,
   regions,
   onPickRegion,
+  viewRequest,
+  showPlanes = true,
   children,
 }: {
   document: CadDocument;
@@ -62,6 +64,8 @@ export default function WorkspaceView({
   /** A sketch's regions to pick for its extrude, while its Extrude dialog is open. */
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
+  viewRequest?: ViewRequest;
+  showPlanes?: boolean;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
 }) {
@@ -174,12 +178,13 @@ export default function WorkspaceView({
         meshes={model.meshes}
         parts={model.parts}
         view={view}
+        viewRequest={viewRequest}
         selectedId={selectedId}
         selectedIndexes={selectedIndexes}
         warnIds={clashes.flatMap(clash => clash.partIds)}
         milled={always}
         onPickFace={choosing ? pickFace : undefined}
-        planes={onNewPart ? planes : undefined}
+        planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
         regions={regions}
         onPickRegion={onPickRegion}

@@ -16,6 +16,9 @@ import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { endCadSession } from './session';
+import { ModelViewport } from '@/cam/model/ModelViewport';
+
+vi.mock('@/cam/model/ModelViewport', { spy: true });
 
 const sessions: string[] = [];
 afterEach(() => {
@@ -39,6 +42,48 @@ async function studio() {
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
   return { latest, finish };
 }
+
+it('toggles base planes and requests named views and fit from workspace shortcuts', async () => {
+  await studio();
+  // The 3D workspace loads lazily, which can take longer than the default wait on a busy runner.
+  const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().planes).toHaveLength(3));
+  fireEvent.keyDown(workspace, { key: 'p', code: 'KeyP' });
+  await waitFor(() => expect(props().planes).toBeUndefined());
+  fireEvent.keyDown(workspace, { key: 'p', code: 'KeyP' });
+  await waitFor(() => expect(props().planes).toHaveLength(3));
+  // The physical digit works even on a layout whose shifted key isn't "5".
+  fireEvent.keyDown(workspace, { key: '%', code: 'Digit5', shiftKey: true });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'top', seq: 1 }));
+  fireEvent.keyDown(workspace, { key: 'f', code: 'KeyF' });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'fit', seq: 2 }));
+  fireEvent.keyDown(workspace, { key: 'f', code: 'KeyF' });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'fit', seq: 3 }));
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Sketch/ }));
+  await screen.findByRole('dialog', { name: 'Sketch' });
+  fireEvent.keyDown(workspace, { key: 'Escape', code: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
+});
+
+it('leaves viewport shortcuts alone while typing in fields or using modifiers', async () => {
+  await studio();
+  const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().planes).toHaveLength(3));
+  for (const field of [document.createElement('input'), document.createElement('textarea'), document.createElement('div')]) {
+    if (field instanceof HTMLDivElement) field.contentEditable = 'true';
+    workspace.append(field);
+    fireEvent.keyDown(field, { key: 'p', code: 'KeyP' });
+    fireEvent.keyDown(field, { key: 'f', code: 'KeyF' });
+    fireEvent.keyDown(field, { key: '%', code: 'Digit5', shiftKey: true });
+    field.remove();
+  }
+  fireEvent.keyDown(workspace, { key: 'p', code: 'KeyP', ctrlKey: true });
+  fireEvent.keyDown(workspace, { key: '%', code: 'Digit5', shiftKey: true, altKey: true });
+  expect(props().planes).toHaveLength(3);
+  expect(props().viewRequest).toBeUndefined();
+});
 
 it('opens as a studio, with its own toolbar and steps set in dialogs that keep or drop their changes', async () => {
   const { latest } = await studio();
