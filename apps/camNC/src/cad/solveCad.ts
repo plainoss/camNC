@@ -1,6 +1,7 @@
 import type { CadDimension, CadDimensionCreationResult, CadDocument, CadPart, CadSolveOptions, CadSolveResult } from '@wbcnc/cad';
 import * as Comlink from 'comlink';
 import type { CadWorkerAPI } from '../workers/cad.worker';
+import { trackPending } from '@/lib/settled';
 
 interface SolverClient {
   worker: Worker;
@@ -31,13 +32,16 @@ function solverClient(): SolverClient {
 
 function request<T>(run: (remote: Comlink.Remote<CadWorkerAPI>) => Promise<T>): Promise<T> {
   const target = solverClient();
-  return new Promise((resolve, reject) => {
-    const cancel = (error: Error) => reject(error);
-    target.pending.add(cancel);
-    void run(target.remote)
-      .then(resolve, reject)
-      .finally(() => target.pending.delete(cancel));
-  });
+  return trackPending(
+    'solve',
+    new Promise((resolve, reject) => {
+      const cancel = (error: Error) => reject(error);
+      target.pending.add(cancel);
+      void run(target.remote)
+        .then(resolve, reject)
+        .finally(() => target.pending.delete(cancel));
+    })
+  );
 }
 
 /** One lazy worker per app session. Callers compare source revisions before applying a result. */

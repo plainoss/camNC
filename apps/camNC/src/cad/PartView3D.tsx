@@ -17,6 +17,7 @@ import { FitCamera } from '@/cam/model/ModelViewport';
 import { modelGeometry } from '@/cam/model/modelGeometry';
 import { nativePart } from '@/cam/nativeCadModel';
 import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
+import { holdPending } from '@/lib/settled';
 import {
   cutRegions,
   depthLabel,
@@ -126,6 +127,13 @@ function RegionSurface({
 function FaceCamera({ box, below, onDone }: { box: THREE.Box3; below: boolean; onDone: () => void }) {
   const start = useRef<{ from: THREE.Vector3; up: THREE.Vector3; at: number } | null>(null);
   const done = useRef(false);
+  // The turn ends by opening the face's sketch: until then the app hasn't settled (src/lib/settled.ts).
+  const turning = useRef<() => void>(null);
+  useEffect(() => {
+    const release = holdPending('animation');
+    turning.current = release;
+    return release;
+  }, []);
   useFrame(({ camera, clock }) => {
     if (done.current) return;
     start.current ??= { from: camera.position.clone(), up: camera.up.clone(), at: clock.elapsedTime };
@@ -144,6 +152,7 @@ function FaceCamera({ box, below, onDone }: { box: THREE.Box3; below: boolean; o
     if (t === 1) {
       done.current = true;
       onDone();
+      turning.current?.();
     }
   });
   return null;

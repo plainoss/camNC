@@ -2,6 +2,7 @@ import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
 import { carvingBoard, carvingRegion, kCarvingBoard, kDefaultVBit, normalizeCarving, type CarvingV1 } from './carving';
 import { outlineArt } from './carvingOutline';
 import { rebaseJob } from './rebaseJob';
+import { trackPending } from '@/lib/settled';
 import type { BoardV1, StockBoardV1 } from './boards';
 import type { NestObjective } from './autoNest';
 import type { PartPrint } from './partMatch';
@@ -125,20 +126,24 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
-async function tx(
+function tx(
   context: Exclude<StorageContext, 'rehearsal'>,
   stores: string[],
   mode: IDBTransactionMode,
   fn: (t: IDBTransaction) => void
 ): Promise<void> {
-  const db = await openDb(context);
-  return new Promise((resolve, reject) => {
-    const t = db.transaction(stores, mode);
-    fn(t);
-    t.oncomplete = () => resolve();
-    t.onerror = () => reject(t.error);
-    t.onabort = () => reject(t.error);
-  });
+  const done = openDb(context).then(
+    db =>
+      new Promise<void>((resolve, reject) => {
+        const t = db.transaction(stores, mode);
+        fn(t);
+        t.oncomplete = () => resolve();
+        t.onerror = () => reject(t.error);
+        t.onabort = () => reject(t.error);
+      })
+  );
+  // A write is pending for the specs' settled signal from the moment it is asked for, including opening the database.
+  return mode === 'readwrite' ? trackPending('save', done) : done;
 }
 
 export const kModelFile = /\.(step|stp|stl)$/i;
