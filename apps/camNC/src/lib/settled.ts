@@ -6,6 +6,7 @@
  * - `solve`: sketch solver calls in flight (checks, drags, dimension preparation, acceptance).
  * - `worker`: CAM worker calls in flight (imports, the Part Studio's model, part and board plans).
  * - `save`: IndexedDB writes and queued design draft saves not yet finished.
+ * - `animation`: a camera move that does something when it ends (turning to a face before sketching on it).
  * - `route`: a navigation still loading its route.
  * - `query`: data queries fetching and mutations running (reading a job, saving boards).
  * - `frame`: 1 until two animation frames have passed since the last input event or change to any of the above, so
@@ -15,7 +16,7 @@
  * page loads apart, so a caller can tell a change made after it looked from one made before.
  */
 
-export type SettledWork = 'solve' | 'worker' | 'save';
+export type SettledWork = 'solve' | 'worker' | 'save' | 'animation';
 export type SettledProbe = 'route' | 'query';
 export interface SettledSnapshot {
   load: number;
@@ -32,7 +33,7 @@ declare global {
 // MODE is supplied by Vite from the command mode, not a process environment input.
 // eslint-disable-next-line turbo/no-undeclared-env-vars
 const enabled = typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.MODE === 'test');
-const pending: Record<SettledWork, number> = { solve: 0, worker: 0, save: 0 };
+const pending: Record<SettledWork, number> = { solve: 0, worker: 0, save: 0, animation: 0 };
 const probes: Record<SettledProbe, () => number> = { route: () => 0, query: () => 0 };
 let revision = 0;
 let frame = 0;
@@ -59,6 +60,13 @@ export function trackPending<T>(kind: SettledWork, work: Promise<T>): Promise<T>
   };
   work.then(done, done);
   return work;
+}
+
+/** Counts one pending `kind` until the returned function is first called, as an effect's cleanup can. */
+export function holdPending(kind: SettledWork): () => void {
+  let release!: () => void;
+  void trackPending(kind, new Promise<void>(resolve => (release = resolve)));
+  return () => release();
 }
 
 /** The same remote, with each method call it makes counted as pending `kind` until its result arrives. */

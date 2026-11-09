@@ -511,6 +511,9 @@ export async function createAdapter(page, url) {
         const done = studioToolbar.getByRole('button', { name: /Done/ });
         await page.waitForFunction(element => !element.disabled, await done.elementHandle(), { timeout: 8000 });
         await done.click();
+        // Accepting checks and saves the design before it leaves, which can take longer than a click's timeout on a
+        // loaded runner: once that has settled, the stage has changed.
+        await settle();
         await page.waitForURL(u => !u.pathname.endsWith('/design'), { timeout: 8000 });
         return;
       }
