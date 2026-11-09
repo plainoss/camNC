@@ -738,7 +738,8 @@ export function parseCadDocument(input: unknown): CadDocument {
     )
       throw new Error('Invalid CAD part');
     number(p.thickness);
-    if (p.thicknessExpression !== undefined && typeof p.thicknessExpression !== 'string') throw new Error('Invalid CAD part');
+    for (const key of ['thicknessExpression', 'sketchName', 'extrudeName'] as const)
+      if (p[key] !== undefined && typeof p[key] !== 'string') throw new Error('Invalid CAD part');
     if (p.thin !== undefined) {
       if (!p.thin || typeof p.thin !== 'object') throw new Error('Invalid thin extrude');
       number(p.thin.depth);
@@ -749,8 +750,7 @@ export function parseCadDocument(input: unknown): CadDocument {
     for (const regions of [p.regions, p.addedRegions])
       if (regions !== undefined && (!Array.isArray(regions) || !regions.every(id => typeof id === 'string')))
         throw new Error('Invalid CAD part regions');
-    if (p.sketchOf !== undefined) reference(p.sketchOf);
-    if (p.addTo !== undefined) reference(p.addTo);
+    for (const id of [p.sketchOf, p.addTo]) if (id !== undefined) reference(id);
     if (p.remove !== undefined) {
       if (!p.remove || typeof p.remove !== 'object') throw new Error('Invalid extrude remove');
       if (p.remove.depth !== 'through') number(p.remove.depth);

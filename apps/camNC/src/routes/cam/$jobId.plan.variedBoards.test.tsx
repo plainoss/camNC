@@ -1,8 +1,7 @@
-import { instancesOf, nestBoard, reconcileBoards, settleInputOf, suggestFixtures, withLayout } from '@/cam/boards';
-import { camWorker, modelKey } from '@/cam/camQueries';
+import { instancesOf, nestBoard, reconcileBoards, suggestFixtures, withLayout } from '@/cam/boards';
+import { wrapCamWorker, camWorker, modelKey } from '@/cam/camQueries';
 import { createJob, getModelBytes, saveJob } from '@/cam/jobDb';
 import { usePlanLayout } from '@/cam/plan/planLayoutStore';
-import { fixtureFree } from '@wbcnc/cam/settle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import * as Comlink from 'comlink';
@@ -13,6 +12,7 @@ import gearUrl from '../../../../../packages/cam/test/fixtures/varied-boards/gea
 import ringsUrl from '../../../../../packages/cam/test/fixtures/varied-boards/round-02.step?url';
 import trayUrl from '../../../../../packages/cam/test/fixtures/varied-boards/tray-02.step?url';
 import { Route } from './$jobId.plan';
+import { camWorkerCache } from '@/test/camWorkerCache';
 
 const params = vi.hoisted(() => ({ jobId: '' }));
 
@@ -35,6 +35,9 @@ vi.mock('@/visualize/depthViewStore', () => ({
 }));
 
 const PlanStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
+
+// The performance runs and the Plan step open the same models as new jobs: read each once for the file.
+wrapCamWorker(camWorkerCache);
 
 afterEach(() => {
   cleanup();
@@ -78,24 +81,12 @@ describe('varied STEP boards, end to end', () => {
     120_000
   );
 
-  it.each(HOLD_BOARDS)(
-    '%s gets holds clear of every cut at the app’s real clearances',
-    async (id, url) => {
-      const { laid, instances } = await laidOutBoard(id, url);
-      const next = suggestFixtures(laid, instances, 3.175);
-      const nest = nestBoard(next, instances, 3.175);
-      const { input, spots } = settleInputOf(next, nest, instances, 3.175);
-      for (const f of next.fixtures ?? []) expect(fixtureFree(input, spots, f)).toBe(true);
-    },
-    120_000
-  );
-
+  // The Plan step's view of a held board and a blocked one. Holds and plans for every model, including the 60-part tray,
+  // are checked in Node (src/cam/variedBoards.test.ts).
   it.each([
     // Knobs take tabs on their gentle curves. A gear's teeth are all corners: the job is blocked until the board changes.
     ['frame-01', frameUrl, 11, true],
     ['gear-02', gearUrl, 4, false],
-    ['round-02', ringsUrl, 12, true],
-    ['tray-02', trayUrl, 60, true],
   ])(
     '%s goes from a new job to a laid out board and a plan',
     async (id, url, parts, held) => {

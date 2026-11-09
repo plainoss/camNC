@@ -161,6 +161,9 @@ describe('Extrude → Remove', () => {
     const deeper = resolveExtrudeSteps({ ...document, parts: [document.parts[0]!, { ...document.parts[1]!, remove: { depth: 9 } }] });
     expect(cadCuts(deeper.parts[0]!).map(feature => feature.depth)).toEqual([9]);
     expect(resolveExtrudeSteps({ ...document, parts: [document.parts[0]!] }).parts[0]!.features).toBeUndefined();
+    // Nor does a sketch whose extrude is gone cut anything, even with its Remove settings left on it.
+    const unextruded = resolveExtrudeSteps({ ...document, parts: [document.parts[0]!, { ...document.parts[1]!, extrude: false }] });
+    expect(unextruded.parts[0]!.features).toBeUndefined();
   });
 
   it('cuts only the regions picked, when they are', () => {

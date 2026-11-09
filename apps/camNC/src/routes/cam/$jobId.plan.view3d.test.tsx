@@ -6,7 +6,9 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import type { ComponentType } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import stepUrl from '../../../../../packages/cam/test/fixtures/besteckkasten.step?url';
+import { wrapCamWorker } from '@/cam/camQueries';
 import { Route } from './$jobId.plan';
+import { camWorkerCache } from '@/test/camWorkerCache';
 
 const params = vi.hoisted(() => ({ jobId: '' }));
 
@@ -20,6 +22,9 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('@/components/page-header', () => ({ PageHeader: () => null }));
 
 const PlanStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
+
+// Tests open the same models as new jobs: read them and plan each board once for the file.
+wrapCamWorker(camWorkerCache);
 
 afterEach(() => {
   cleanup();

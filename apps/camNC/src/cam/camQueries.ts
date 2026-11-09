@@ -26,6 +26,11 @@ export function camWorker() {
   return worker;
 }
 
+/** Puts something in front of the worker: browser route tests reuse results between tests (`src/test/camWorkerCache.ts`). */
+export function wrapCamWorker(wrap: (real: Comlink.Remote<CamWorkerAPI>) => Comlink.Remote<CamWorkerAPI>) {
+  worker = wrap(camWorker());
+}
+
 export const camKeys = {
   jobs: ['cam', 'jobs'] as const,
   job: (id: string) => ['cam', 'job', id] as const,

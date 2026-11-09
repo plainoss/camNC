@@ -1,5 +1,5 @@
 import { instancesOf, reconcileBoards } from '@/cam/boards';
-import { camWorker, modelKey } from '@/cam/camQueries';
+import { wrapCamWorker, camWorker, modelKey } from '@/cam/camQueries';
 import { createDesignJob, createJob, getJob, saveJob } from '@/cam/jobDb';
 import { acceptDesign, saveDesignDraft } from '@/cam/cadDesign';
 import { addCircle, createPlateDocument } from '@wbcnc/cad';
@@ -10,6 +10,7 @@ import { ExtrudeGeometry, Path, Shape } from 'three';
 import type { ComponentType } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Route } from './$jobId.plan';
+import { camWorkerCache } from '@/test/camWorkerCache';
 
 const params = vi.hoisted(() => ({ jobId: '' }));
 
@@ -24,6 +25,9 @@ vi.mock('@/components/page-header', () => ({ PageHeader: () => null }));
 vi.mock('@/cam/plan3d/PlanView3D', () => ({ PlanView3D: () => null }));
 
 const PlanStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
+
+// Tests open the same models as new jobs: read them and plan each board once for the file.
+wrapCamWorker(camWorkerCache);
 
 /** A plate with a ⌀40 through hole, as a binary STL. */
 function plateStl() {
