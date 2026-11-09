@@ -1709,7 +1709,26 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
     if (contained) warnings.push(`Pocket ${i + 1}: Open-pocket path would reach a neighboring part; using a path inside the pocket`);
     ops.push(...pocketOps);
     // Only material on the part counts: what's left in the waste past an open edge comes away with the outline.
-    const uncut = polyArea(difference(p.strictRegion, reached));
+    const left = difference(p.strictRegion, reached);
+    // Kept inside the pocket, the bit can't run past its open edge: name what that leaves apart from the corners.
+    const atEdge = contained
+      ? polyArea(left) -
+        polyArea(
+          difference(
+            left,
+            reachOf(
+              openPocketRegion(features.outlines, p, tool.diameter / 2 + 1, geometryTolerances(s.geometryTolerance, s.sourceTolerance)),
+              tool.diameter / 2,
+              offsetToleranceFor(s)
+            )
+          )
+        )
+      : 0;
+    if (atEdge > 1)
+      warnings.push(
+        `Pocket ${i + 1}: ${atEdge.toFixed(1)}mm² left along the open edge with D=${tool.diameter}: the path stays inside the pocket to keep clear of a neighboring part`
+      );
+    const uncut = polyArea(left) - atEdge;
     if (uncut > 1) warnings.push(`pocket z=${p.floorZ}: ${uncut.toFixed(1)}mm² left in corners/narrow spots with D=${tool.diameter}`);
     pocketTop = p.floorZ;
     previousContained = !!contained;
