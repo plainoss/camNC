@@ -231,15 +231,25 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { editable, extrudedSketch, hasOutline, isBlank, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
+import {
+  asHole,
+  editable,
+  extrudedSketch,
+  hasOutline,
+  isBlank,
+  isSingleLine,
+  replacePart,
+  snapLabels,
+  withoutExtrude,
+} from './editorHelpers';
 import { offerFinalPreview } from './finalPreview';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
-import { MirrorDialog } from './MirrorDialog';
-import { FilletDialog } from './FilletDialog';
+import { ShapeStepDialogs } from './ShapeStepDialogs';
+import { HoleDialog } from './HoleDialog';
 import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
-import { pickedPlane, pickedPlaneFrame } from './basePlanes';
+import { pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import { toggleSuppressed } from './toggleSuppressed';
@@ -436,7 +446,7 @@ export function CadEditor({
   const pickForCut = (partId: string) => setCutPick(previous => ({ partId, seq: (previous?.seq ?? 0) + 1 }));
   // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
   const [featureDialog, setFeatureDialog] = useState<{
-    kind: 'extrude' | 'pattern';
+    kind: 'extrude' | 'pattern' | 'hole';
     partId: string;
     before: CadDocument;
   } | null>(null);
@@ -3464,7 +3474,7 @@ export function CadEditor({
       setBusy(false);
     }
   };
-  const openFeature = (kind: 'extrude' | 'pattern', partId: string, before = documentRef.current) => {
+  const openFeature = (kind: 'extrude' | 'pattern' | 'hole', partId: string, before = documentRef.current) => {
     setPartCutting(null);
     setVariableDialog(null);
     setPlaneDialog(null);
@@ -3551,7 +3561,8 @@ export function CadEditor({
   const openStep = (step: DesignStep) => {
     // In the studio a step opens its dialog, and a sketch opens to be drawn on, as the reference does.
     if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
-    if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
+    if (studioSession && step.kind === 'extrude')
+      return openFeature(documentRef.current.parts.find(p => p.id === step.partId)?.hole ? 'hole' : 'extrude', step.partId);
     if (studioSession && step.kind === 'move') return openTransform(step.partId, undefined, true);
     if (studioSession && step.kind === 'fillet') return setFilletDialog({ partId: step.partId, filletId: step.id });
     if (studioSession && step.kind === 'copy') {
@@ -3775,6 +3786,10 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
+    } else if (command === 'hole' && part?.extrude === false) {
+      const before = documentRef.current;
+      commit(replacePart(before, part.id, asHole));
+      openFeature('hole', part.id, before);
     } else if (command === 'fillet') setFilletDialog({});
     else if (command === 'mirror') {
       if (part) setMirrorDialog({ partId: part.id });
@@ -3782,10 +3797,7 @@ export function CadEditor({
       setFeatureDialog(null);
       setPartCutting(null);
       setChoosingFace(false);
-      // A plane or face picked first is what the new plane is offset from.
-      const plane = selectedPlane && pickedPlane(documentRef.current, selectedPlane);
-      const face = selectedFace && cadFaceFrame(documentRef.current, selectedFace);
-      const preselected = plane && !plane.datum ? plane.on : face && !('error' in face) ? selectedFace : null;
+      const preselected = planeOffsetFrom(documentRef.current, selectedPlane, selectedFace);
       setPlaneDialog(preselected ? { preselected } : {});
     } else if (command === 'cutParts') {
       setFeatureDialog(null);
@@ -4454,22 +4466,11 @@ export function CadEditor({
               onCancel={() => setVariableDialog(null)}
             />
           )}
-          {showWorkspace && filletDialog && (
-            <FilletDialog
-              key={filletDialog.filletId ?? 'new'}
-              {...{ document: doc, variables: variableScope, ...filletDialog, pickEdge: pointPicker.start }}
-              onSave={next => (commit(next), setFilletDialog(null))}
-              onCancel={() => setFilletDialog(null)}
-            />
-          )}
-          {showWorkspace && mirrorDialog && (
-            <MirrorDialog
-              key={mirrorDialog.copyId ?? mirrorDialog.partId}
-              document={doc}
-              {...mirrorDialog}
-              pickPlane={picked => setDirectionPicker(() => picked)}
-              onSave={next => (commit(next), setDirectionPicker(null), setMirrorDialog(null))}
-              onCancel={() => (setDirectionPicker(null), setMirrorDialog(null))}
+          {showWorkspace && (
+            <ShapeStepDialogs
+              {...{ document: doc, variables: variableScope, mirror: mirrorDialog, fillet: filletDialog, commit }}
+              {...{ setMirror: setMirrorDialog, setFillet: setFilletDialog, pickEdge: pointPicker.start }}
+              setDirectionPicker={picker => setDirectionPicker(() => picker)}
             />
           )}
           {showWorkspace && planeDialog && (
@@ -4504,6 +4505,7 @@ export function CadEditor({
                 onOk: () => closeFeature(true),
                 onCancel: () => closeFeature(false),
               };
+              if (featureDialog.kind === 'hole') return <HoleDialog key={target.id} {...props} />;
               return featureDialog.kind === 'extrude' ? (
                 <ExtrudeDialog
                   key={target.id}

@@ -129,7 +129,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
             {
               id: `${part.id}:extrude`,
               kind: 'extrude' as const,
-              label: part.extrudeName ?? `Extrude · ${part.name}`,
+              label: part.extrudeName ?? `${part.hole ? 'Hole' : 'Extrude'} · ${part.name}`,
               detail: extrudeDetail(document, part),
               partId: part.id,
               suppressed: !!part.suppressed,

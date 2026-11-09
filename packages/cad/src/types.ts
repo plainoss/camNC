@@ -319,6 +319,11 @@ export interface CadPart {
    */
   remove?: { depth: CadCutDepth; depthExpression?: string };
   /**
+   * A Hole step: a Remove whose sketch's points are the holes' centres, each cut as a round hole this wide, as deep as
+   * `remove` says. The sketch's lines and curves only place the points.
+   */
+  hole?: { diameter: number; diameterExpression?: string };
+  /**
    * Fillet steps: the part's edges through its thickness, at these corners of its sketch, rounded to a radius. The sketch
    * itself keeps its sharp corners; the part is rounded where it's made.
    */
