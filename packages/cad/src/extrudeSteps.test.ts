@@ -88,7 +88,7 @@ describe('a part extruding another part’s sketch', () => {
     const made = newExtrudeOf(design(owner), owner, 'Part 2')!;
     expect(made).toMatchObject({ sketchOf: 'shelf', regions: [narrow], thickness: 18, drawnOn: { on: { plane: 'top' } } });
     expect(newExtrudeOf(design(owner, made), made, 'Part 3')).toBeNull();
-    const whole = { ...owner };
+    const whole: CadPart = { ...owner };
     delete whole.regions;
     expect(newExtrudeOf(design(whole), whole, 'Part 2')).toBeNull();
   });
