@@ -233,6 +233,9 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
       const copies = (part.copies ?? []).filter(copy => (copy.pattern ? pattern : kept.has(copy.id)));
       if (copies.length) next.copies = copies;
       else delete next.copies;
+      const fillets = part.fillets?.filter(fillet => kept.has(fillet.id));
+      if (fillets?.length) next.fillets = fillets;
+      else delete next.fillets;
       return next;
     });
   const next: CadDocument = { ...document, parts };

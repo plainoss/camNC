@@ -75,7 +75,7 @@ type Point = { x: number; y: number };
  * A point in a region's area: inside its outline and outside its holes. Just inside the middle of one of its outline's
  * edges is in its area however narrow it is, as a thin ring's is.
  */
-function areaPoint(region: CadSketchRegion): Point | null {
+export function areaPoint(region: CadSketchRegion): Point | null {
   const outline = polygonArea(region.points) > 0 ? region.points : [...region.points].reverse();
   const inArea = (point: Point) => pointInPolygon(point, outline) && !region.holes.some(hole => pointInPolygon(point, hole));
   for (let i = 0; i < outline.length; i++) {
