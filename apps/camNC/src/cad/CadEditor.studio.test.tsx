@@ -155,6 +155,20 @@ it.each(['sketch', 'extrude', 'undo'])('dismisses Restore when another step star
   await waitFor(() => expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull());
 });
 
+it('dismisses Restore while the design is being accepted', async () => {
+  const { finish } = await studio();
+  let accept = () => {};
+  finish.mockImplementation(() => new Promise<void>(resolve => (accept = resolve)));
+  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Plate/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await screen.findByRole('button', { name: 'Restore' });
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Done/ }));
+  await waitFor(() => expect(finish).toHaveBeenCalled());
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull());
+  accept();
+});
+
 it('expires Restore after twelve seconds', async () => {
   const { dialog } = await newStudioSketch();
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
