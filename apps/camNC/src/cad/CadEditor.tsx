@@ -4470,15 +4470,8 @@ export function CadEditor({
               document={doc}
               {...mirrorDialog}
               pickPlane={picked => setDirectionPicker(() => picked)}
-              onSave={next => {
-                commit(next);
-                setDirectionPicker(null);
-                setMirrorDialog(null);
-              }}
-              onCancel={() => {
-                setDirectionPicker(null);
-                setMirrorDialog(null);
-              }}
+              onSave={next => (commit(next), setDirectionPicker(null), setMirrorDialog(null))}
+              onCancel={() => (setDirectionPicker(null), setMirrorDialog(null))}
             />
           )}
           {showWorkspace && planeDialog && (
