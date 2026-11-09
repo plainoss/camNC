@@ -13,6 +13,11 @@ interface EntityBase {
 export interface CadPointEntity extends EntityBase, CadPoint {
   type: 'point';
   fixed?: boolean;
+  /**
+   * Used from another part's corner, as the reference's Use: the point stays where that corner is seen on this sketch's
+   * plane, on the part's top or its bottom, and follows it when that part changes.
+   */
+  used?: { partId: string; pointId: string; side: 'top' | 'bottom' };
   /** Explicit Point-tool geometry survives removal of curves that reuse it. */
   standalone?: boolean;
 }

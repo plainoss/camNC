@@ -925,6 +925,8 @@ it('uses an edge of a part behind a sketch in it, fixed where it is, picked then
       [500, true],
     ])
   );
+  // Each end is tied to the side board's corner it was used from, so it follows that board.
+  expect(ends.every(end => end.type === 'point' && end.used?.partId === side.id)).toBe(true);
   // Tool first, as the reference teaches: U with nothing picked, then each edge clicked goes in, until Escape.
   await userEvent.keyboard('u');
   await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(true));
