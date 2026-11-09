@@ -29,6 +29,8 @@ import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { CadEditor, type CadEditorController } from '@/cad/CadEditor';
 import { acknowledgeCadSession, cadSession, endCadSession, replaceCadSession, syncCadSession } from '@/cad/session';
 import { openAtMachine } from '@/cam/machine/openAtMachine';
+import { downloadDesignFile } from '@/cam/designFile';
+import { Download } from 'lucide-react';
 
 const designContextSchema = z.object({
   returnTo: z.enum(['boards', 'plan', 'machine']).optional(),
@@ -198,6 +200,13 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       setRecovering(false);
     }
   };
+  /** The design as it is on screen, open values included, so a file shows exactly what was being edited. */
+  const saveToFile = () => {
+    const prepared = editor.current?.prepareDocument();
+    // A face editor holds one sketch, so the file needs the rest of the design around it.
+    if (!prepared) downloadDesignFile(session.document);
+    else downloadDesignFile(faceEdit ? withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, prepared) : prepared);
+  };
   const restoreSaved = async () => {
     if (recoveryInProgress.current) return;
     recoveryInProgress.current = true;
@@ -282,7 +291,21 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
         : undefined;
   return (
     <CamPage className="h-dvh">
-      <CamJobBar job={initialJob} onStageNavigate={destination => void navigateStage(destination)} navigationPending={navigationPending} />
+      <CamJobBar
+        job={initialJob}
+        onStageNavigate={destination => void navigateStage(destination)}
+        navigationPending={navigationPending}
+        tools={
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground"
+            title="Save the whole design, with its sketches and features, as a .json file. Open it again from Projects."
+            onClick={saveToFile}>
+            <Download /> Save to file
+          </Button>
+        }
+      />
       <div className="relative min-h-0 flex-1">
         {conflicted && (
           <div

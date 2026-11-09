@@ -1215,3 +1215,10 @@
 .cad-using-edges {
   cursor: copy;
 }
+/** In a turned sketch, labels and points are turned back where they stand, to stay readable and round. */
+.cad-drawing-turned text:not([transform]),
+.cad-drawing-turned .cad-point {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: var(--unturn);
+}

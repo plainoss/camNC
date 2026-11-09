@@ -1,4 +1,5 @@
 import {
+  cadPartsToCut,
   closestCurvePoint,
   evaluateCurvePoint,
   isNurbsCurve,
@@ -94,13 +95,19 @@ export function carryDesignTabs(
   boards: BoardV1[] | undefined,
   before: CadSolveResult | null,
   after: CadSolveResult,
-  acceptedBoardSourceKeys: Readonly<Record<string, string | undefined>> = {}
+  acceptedBoardSourceKeys: Readonly<Record<string, string | undefined>> = {},
+  /** Whether each design's parts cut only from below were milled turned over (see `millsUndersideUp`). */
+  { turnedBefore = true, turnedAfter = true }: { turnedBefore?: boolean; turnedAfter?: boolean } = {}
 ): BoardV1[] | undefined {
   if (!before || !boards) return boards;
   const oldParts = new Map(before.document.parts.map(p => [p.id, p]));
   const newParts = new Map(after.document.parts.map(p => [p.id, p]));
   const oldShapes = new Map(before.parts.map(p => [p.partId, p]));
   const newShapes = new Map(after.parts.map(p => [p.partId, p]));
+  // Each piece CAM cuts, with its own cuts: a copy whose cuts differ is a piece of its own and can lie another way up.
+  const pieces = (result: CadSolveResult) => new Map(cadPartsToCut(result.document, result.parts).map(({ part }) => [part.partId, part]));
+  const oldPieces = pieces(before),
+    newPieces = pieces(after);
   return boards.map(board => {
     if (!board.tabsAt) return board;
     const tabsAt = { ...board.tabsAt };
@@ -112,19 +119,24 @@ export function carryDesignTabs(
       // follow that part's curves, mirrored.
       const sourceId = partId.split(':')[0]!,
         mirrored = partId.startsWith(mirroredPartId(sourceId));
-      // A part with cuts only from its underside lies turned over about the same axis, and can turn back when that changes.
-      const flipFor = (shapes: Map<string, EvaluatedCadPart>) => {
-        const turned = mirrored !== millsUndersideUp(shapes.get(sourceId) ?? {});
-        return (p: CadPoint): CadPoint => (turned ? { x: -p.x, y: p.y } : p);
+      const piece = (found: Map<string, EvaluatedCadPart>, shapes: Map<string, EvaluatedCadPart>) => {
+        const source = shapes.get(sourceId);
+        return found.get(partId) ?? (source && mirrored ? mirrorEvaluatedPart(source) : source);
       };
-      const shape = (shapes: Map<string, EvaluatedCadPart>) => {
-        const found = shapes.get(sourceId);
-        return found && asMilled(mirrored ? mirrorEvaluatedPart(found) : found);
+      const oldPiece = piece(oldPieces, oldShapes),
+        nextPiece = piece(newPieces, newShapes);
+      // A piece with cuts only from its underside lies turned over about the same axis, and can turn back when that changes.
+      const turns = (shape: EvaluatedCadPart | undefined, turning: boolean) => turning && !!shape && millsUndersideUp(shape);
+      const flipFor = (turned: boolean) => {
+        const flipped = mirrored !== turned;
+        return (p: CadPoint): CadPoint => (flipped ? { x: -p.x, y: p.y } : p);
       };
+      const oldTurned = turns(oldPiece, turnedBefore),
+        nextTurned = turns(nextPiece, turnedAfter);
+      const oldShape = oldPiece && (oldTurned ? asMilled(oldPiece) : oldPiece),
+        nextShape = nextPiece && (nextTurned ? asMilled(nextPiece) : nextPiece);
       const oldPart = oldParts.get(sourceId),
         nextPart = newParts.get(sourceId);
-      const oldShape = shape(oldShapes),
-        nextShape = shape(newShapes);
       if (!oldPart || !nextPart || !oldShape || !nextShape) continue;
       if (isCut(board)) {
         if (board.cut?.sourceKey && board.cut.sourceKey === acceptedBoardSourceKeys[board.id]) {
@@ -151,8 +163,8 @@ export function carryDesignTabs(
       const outerIds = new Set(oldShape.loops.filter(l => l.kind === 'outer').flatMap(l => l.entityIds));
       const nextOuterIds = new Set(nextShape.loops.filter(l => l.kind === 'outer').flatMap(l => l.entityIds));
       const curves = oldPart.sketch.entities.filter((e): e is Curve => e.type !== 'point' && outerIds.has(e.id));
-      const flipOld = flipFor(oldShapes),
-        flipNext = flipFor(newShapes);
+      const flipOld = flipFor(oldTurned),
+        flipNext = flipFor(nextTurned);
       let failed = false;
       const mapped = tabs.map(at => {
         const sourceAt = flipOld({ x: at.x + oldOrigin.x, y: at.y + oldOrigin.y });

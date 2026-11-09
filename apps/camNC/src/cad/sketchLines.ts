@@ -3,12 +3,15 @@ import { cadFaceFrame, isCadPart, tessellateCurve, type CadDocument, type CadPoi
 type Vec3 = [number, number, number];
 
 /**
- * The curves of the sketches not yet extruded, where they sit in the model, for the studio to show them as the
- * reference shows a finished sketch: as lines on its plane, until Extrude makes a part of it.
+ * The curves of the sketches shown, where they sit in the model, as lines on their planes. By default those not yet
+ * extruded: a sketch hides once Extrude makes a part of it, and can be shown again from the feature list.
  */
-export function sketchLinesInModel(document: CadDocument): { partId: string; points: Vec3[] }[] {
+export function sketchLinesInModel(
+  document: CadDocument,
+  shown: (partId: string) => boolean = partId => !isCadPart(document.parts.find(part => part.id === partId)!)
+): { partId: string; points: Vec3[] }[] {
   return document.parts
-    .filter(part => !isCadPart(part))
+    .filter(part => !part.sketchOf && shown(part.id))
     .flatMap(part => {
       const frame = cadFaceFrame(document, part.drawnOn?.on ?? { plane: 'top' });
       if ('error' in frame) return [];

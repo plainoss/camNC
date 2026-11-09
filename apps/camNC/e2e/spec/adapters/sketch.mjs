@@ -3,6 +3,12 @@
  * the saved design. Scenarios never see these hooks, so replacing the app means replacing this file.
  */
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/** Design files named by `open` are relative to the spec folder, so `designs/x.json` is `e2e/spec/designs/x.json`. */
+const SPEC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
 const POSITION_TOLERANCE_MM = 1.5;
 const VALUE_TOLERANCE = 0.05;
 
@@ -236,7 +242,8 @@ export async function createAdapter(page, url) {
     }
     if (await extrude.isVisible()) await extrude.getByRole('button', { name: 'OK', exact: true }).click();
   };
-  const jobId = new URL(page.url()).pathname.split('/')[2];
+  // `open` moves the session to the project it makes.
+  let jobId = new URL(page.url()).pathname.split('/')[2];
   let cursor = null;
 
   // The canvas can be re-rendered between steps, and a loaded runner can take longer than the 8 s default to bring it back.
@@ -599,6 +606,21 @@ export async function createAdapter(page, url) {
         }
         await studioToolbar.getByRole('button', { name: 'Cancel', exact: true }).click();
         return;
+      case 'open': {
+        // A saved design file (Save to file in the design's top bar), opened as a new project the way a person opens it.
+        await page.goto(new URL('/cam', page.url()).href, { waitUntil: 'domcontentloaded' });
+        const openButton = page.getByRole('button', { name: /Open model/ });
+        await openButton.waitFor({ timeout: 30000 });
+        const chooser = page.waitForEvent('filechooser', { timeout: 15000 });
+        await openButton.click();
+        await (await chooser).setFiles(path.resolve(SPEC_DIR, rest));
+        await page.waitForURL(u => u.pathname.endsWith('/design'), { timeout: 15000 });
+        jobId = new URL(page.url()).pathname.split('/')[2];
+        await reopened();
+        await flatView();
+        await settle();
+        return;
+      }
       case 'design':
         await page.getByRole('link', { name: /Design/ }).first().click();
         await flatView();
