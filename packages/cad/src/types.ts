@@ -332,6 +332,8 @@ export interface CadThinExtrude {
 }
 /** A part drawn on a base plane, or on a face of another part: its top, underside, or the edge face along an outline line. */
 export interface CadDrawnOn {
+  /** The datum plane it's drawn on, if any: `on` and `offset` then follow that plane. */
+  datum?: string;
   on: { plane: 'top' | 'front' | 'right' } | { partId: string; face: 'top' | 'underside' | { edge: string } };
   /** How far from the plane or face the part starts, in mm along its normal. */
   offset: number;
@@ -428,7 +430,18 @@ export interface CadDocument {
   variables?: CadVariable[];
   /** Steps that cut parts out of other parts, in order. */
   partCuts?: CadPartCut[];
+  /** Planes made to sketch on: a base plane or a part's face, moved out along its normal. */
+  planes?: CadDatumPlane[];
   parts: CadPart[];
+}
+/** A plane offset from a base plane or a part's face, as a step of its own, to draw parts on. */
+export interface CadDatumPlane {
+  id: string;
+  name: string;
+  on: CadDrawnOn['on'];
+  /** mm out along the normal of what it's on; negative goes the other way. */
+  offset: number;
+  offsetExpression?: string;
 }
 /**
  * Cuts the tool parts out of the target parts wherever they reach in, as placed, with `clearance` mm of room around

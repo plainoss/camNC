@@ -1,3 +1,4 @@
+import { resolveDatumPlanes } from './datumPlanes';
 import { dimensionValueError } from './dimensionValues';
 import { newCadId } from './document';
 import type {
@@ -353,8 +354,16 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     return next;
   });
   const cutsChanged = partCuts?.some((step, index) => step !== document.partCuts![index]);
-  if (parts.every((part, index) => part === document.parts[index]) && !cutsChanged) return document;
-  return { ...document, parts, ...(cutsChanged && { partCuts }) };
+  const planes = document.planes?.map(plane => {
+    if (!usesVariables(plane.offsetExpression)) return plane;
+    const parsed = parseCadValue(plane.offsetExpression, { unit: 'mm', variables: scope });
+    return 'error' in parsed || parsed.value === plane.offset ? plane : { ...plane, offset: parsed.value };
+  });
+  const planesChanged = planes?.some((plane, index) => plane !== document.planes![index]);
+  if (parts.every((part, index) => part === document.parts[index]) && !cutsChanged && !planesChanged) return document;
+  const next = { ...document, parts, ...(cutsChanged && { partCuts }), ...(planesChanged && { planes }) };
+  // What's drawn on a plane that moved goes with it.
+  return planesChanged ? resolveDatumPlanes(next) : next;
 }
 
 /** Variables that can't be worked out, and values on parts that can't follow their variables. */
@@ -495,6 +504,7 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
   return {
     ...document,
     variables: document.variables?.map(variable => ({ ...variable, expression: edit(variable.expression) })),
+    planes: document.planes?.map(plane => (plane.offsetExpression ? { ...plane, offsetExpression: edit(plane.offsetExpression) } : plane)),
     partCuts: document.partCuts?.map(step => ({
       ...step,
       ...(step.clearanceExpression && { clearanceExpression: edit(step.clearanceExpression) }),

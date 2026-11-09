@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
 
-export type StudioCommand = 'sketch' | 'extrude' | 'cutParts' | 'transform' | 'pattern' | 'variable';
+export type StudioCommand = 'sketch' | 'extrude' | 'cutParts' | 'transform' | 'pattern' | 'plane' | 'variable';
 
 const kCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactNode }[] = [
   {
@@ -33,6 +33,12 @@ const kCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactN
     label: 'Pattern',
     hint: 'Copies of the selected part in a row',
     glyph: <path d="M3 8h4v8H3zM10 8h4v8h-4zM17 8h4v8h-4z" />,
+  },
+  {
+    id: 'plane',
+    label: 'Plane',
+    hint: 'A plane to sketch on, offset from a plane or a part’s face',
+    glyph: <path d="M3 17l5-6h13l-5 6zM3 11l5-6h13l-5 6" />,
   },
   {
     id: 'variable',
