@@ -231,11 +231,14 @@ export async function createAdapter(page, url) {
   const jobId = new URL(page.url()).pathname.split('/')[2];
   let cursor = null;
 
-  const screen = ([x, y]) =>
-    canvas.evaluate((svg, p) => {
+  // The canvas can be re-rendered between steps, and a loaded runner can take longer than the 8 s default to bring it back.
+  const screen = async ([x, y]) => {
+    await canvas.waitFor({ state: 'attached', timeout: 30_000 });
+    return canvas.evaluate((svg, p) => {
       const q = new DOMPoint(p[0], -p[1]).matrixTransform(svg.getScreenCTM());
       return [q.x, q.y];
     }, [x, y]);
+  };
   const moveTo = async at => {
     const [x, y] = await screen(at);
     await page.mouse.move(x, y, { steps: 4 });
