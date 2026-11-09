@@ -23,6 +23,7 @@ import { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 import { dimensionValueError } from './dimensionValues';
 import { isOwnedSplineHandle, splineHandleIssue } from './splineHandles';
 import { regionProfile } from './regionProfile';
+import { withEdgeFillets } from './edgeFillets';
 export { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 /** Absolute chord error, mm; analytic sketch geometry is retained in the source. */
 export const CAD_CHORD_TOLERANCE = 0.01;
@@ -409,6 +410,12 @@ export function cadThinLine(part: CadPart): { a: CadPoint; b: CadPoint; id: stri
 }
 
 export function evaluateCadPart(part: CadPart): { part?: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
+  // Fillet steps round the part's corners where it's made, leaving its sketch as drawn.
+  if (part.fillets?.length) {
+    const filleted = withEdgeFillets(part);
+    const made = evaluateCadPart(filleted.part);
+    return { ...made, diagnostics: [...filleted.diagnostics, ...made.diagnostics] };
+  }
   if (part.thin) {
     // A thin board, flat as it's cut: as long as its line and as wide as its depth.
     const line = cadThinLine(part);
