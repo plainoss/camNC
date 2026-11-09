@@ -4,7 +4,7 @@ import { mirrorEvaluatedPart, sameCadCuts } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
 import { evaluateCadFeatures } from './features';
-import { evaluateCadPart, pointInPolygon, polygonArea } from './geometry';
+import { evaluateCadPart, polygonArea } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
@@ -420,12 +420,7 @@ export function applyPartCuts(
               continue;
             }
             const normal = rotateVector(conjugate(intoAt.rotation), rotateVector(at.rotation, [0, 0, 1]));
-            const axis = ([0, 1] as const).find(a => Math.abs(normal[a]) < kSquare);
-            if (axis === undefined || Math.abs(normal[2]) > kSquare) {
-              refused = true;
-              warn(`${name} and ${intoSource.name} have no shared in-plane axis for a split cut.`);
-              continue;
-            }
+            const parallel = Math.abs(normal[2]) > 1 - kSquare;
             const reverse = toolBoxes(into, intoAt, shape, at);
             if ('refused' in reverse) {
               refused = true;
@@ -442,6 +437,19 @@ export function applyPartCuts(
               })
             );
             if (!overlap.length) continue;
+            const overlapDepth = Math.max(...overlap.map(bounds => bounds[1][2])) - Math.min(...overlap.map(bounds => bounds[0][2]));
+            // Coincident boards with no depth beyond their overlap have no backbone to connect the fingers.
+            // Keep refusing that case rather than splitting both boards into disconnected strips.
+            if (parallel && overlapDepth >= into.thickness - kSquare && overlapDepth >= shape.thickness - kSquare) {
+              refused = true;
+              warn(`${name} and ${intoSource.name} need material beyond the overlap depth to connect the fingers of a split joint.`);
+              continue;
+            }
+            const span = (axis: 0 | 1) =>
+              Math.max(...overlap.map(bounds => bounds[1][axis])) - Math.min(...overlap.map(bounds => bounds[0][axis]));
+            // A strip sketched on a board's face can extrude across its thickness into a perpendicular board.
+            // Its extrusion axis is still parallel to the first board's: the longer shared span runs along the joint.
+            const axis = parallel ? (span(0) >= span(1) ? 0 : 1) : ([0, 1] as const).find(a => Math.abs(normal[a]) < kSquare)!;
             const unit: Vec3 = [0, 0, 0];
             unit[axis] = 1;
             const world = rotateVector(intoAt.rotation, unit);
@@ -467,9 +475,12 @@ export function applyPartCuts(
                     high: Vec3 = [...top];
                   low[a] = Math.max(low[a], Math.min(first, last));
                   high[a] = Math.min(high[a], Math.max(first, last));
-                  // Split joints always cut through the receiving board's thickness.
-                  low[2] = 0;
-                  high[2] = placement === intoAt ? into.thickness : shape.thickness;
+                  // Perpendicular extrusions need through slots. A face-sketched board instead keeps the depth
+                  // outside the overlap as its backbone; extending these cuts through would sever its fingers.
+                  if (!parallel) {
+                    low[2] = 0;
+                    high[2] = placement === intoAt ? into.thickness : shape.thickness;
+                  }
                   return high[a] - low[a] > kSquare ? [[low, high] as [Vec3, Vec3]] : [];
                 });
               });

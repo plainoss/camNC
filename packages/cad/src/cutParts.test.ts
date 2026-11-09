@@ -50,7 +50,7 @@ const variables = async (document: CadDocument, values: Record<string, string>) 
 };
 /** Two sides `height` high and `depth` deep, and a shelf 20 mm shallower reaching `housing` into each, housed with `fit` to spare. */
 function carcass(): CadDocument {
-  let document: CadDocument = {
+  const document: CadDocument = {
     ...createCadDocument(),
     parts: [
       panel('Left', 'height', 'depth', 'board', '0', true),
@@ -770,7 +770,7 @@ describe('half-lap and finger joints', () => {
     );
   });
 
-  it('refuses parallel boards and names both', async () => {
+  it('refuses coincident boards without a backbone and names both', async () => {
     const document = joint('half');
     document.parts[1]!.placement = document.parts[0]!.placement;
     const solved = await solveCadDocument(document);
@@ -813,6 +813,15 @@ describe('a round tool cut from a board', () => {
 });
 
 describe('tools used up by their cut', () => {
+  it.each(['half', { fingers: 5 }] as const)('keeps both boards of a %j joint even with a saved consumeTools flag', async split => {
+    const document = joint(split, true);
+    document.partCuts![0]!.consumeTools = true;
+    const solved = await solveCadDocument(document);
+    expect(cadPartsToCut(solved.document, solved.parts).map(entry => entry.part.name)).toEqual(['Across', 'Along']);
+    expect(solved.parts.map(part => part.cuts?.length)).toEqual(split === 'half' ? [1, 1] : [3, 2]);
+    expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+  });
+
   it('leave only the cut: they are no longer parts to cut', async () => {
     const block = { ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!, name: 'Block' };
     block.drawnOn = { on: { plane: 'top' }, offset: 0 };

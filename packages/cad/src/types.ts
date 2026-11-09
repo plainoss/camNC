@@ -499,9 +499,9 @@ export interface CadPartCut {
    */
   clearance: number;
   clearanceExpression?: string;
-  /** Alternate cuts along the shared in-plane overlap, counting from its positive world end; half means two segments. */
+  /** Alternate cuts along the shared in-plane overlap (its longer axis for parallel extrusions), from its positive world end. */
   split?: 'half' | { fingers: number; fingersExpression?: string };
-  /** The tools are used up by the cut: they're no longer parts of their own, only the cut they made is left. */
+  /** The tools are used up by a cut-out. Split joints always keep both parts, even when this is saved as true. */
   consumeTools?: true;
 }
 /** A named value. Its kind follows from the expression: a length or angle unit, or a plain number. */

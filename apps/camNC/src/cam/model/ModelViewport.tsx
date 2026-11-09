@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { kPlaneMarker, planeGivesWay } from './planePicking';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { ViewCube } from './ViewCube';
-import { modelGeometry } from './modelGeometry';
+import { ModelBody } from './ModelBody';
 import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
@@ -180,57 +180,6 @@ const kClash = '#dc2626';
 // The studio's parts, as the reference shows them: a neutral grey, picked in orange, with no colour for overlaps.
 const kStudioPart = '#b8c0c9';
 const kStudioPicked = '#f39c2c';
-function Body({
-  mesh,
-  matrix,
-  color,
-  opacity,
-  edges,
-  onSelect,
-  onHover,
-}: {
-  /** Draws the part's edges over it in a dark line, as a model is shown with its edges. */
-  edges?: boolean;
-  mesh: BodyMesh;
-  matrix: THREE.Matrix4 | null;
-  color: string;
-  opacity: number;
-  onSelect: (e: ThreeEvent<MouseEvent>) => void;
-  onHover: (hovered: boolean) => void;
-}) {
-  const geometry = useMemo(() => modelGeometry(mesh), [mesh]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
-  return (
-    <mesh
-      geometry={geometry}
-      matrixAutoUpdate={false}
-      matrix={matrix ?? new THREE.Matrix4()}
-      onPointerOver={event => {
-        event.stopPropagation();
-        onHover(true);
-      }}
-      onPointerMove={event => {
-        event.stopPropagation();
-        onHover(true);
-      }}
-      onPointerOut={() => onHover(false)}
-      onClick={(e: ThreeEvent<MouseEvent>) => {
-        e.stopPropagation();
-        // A drag that ended here was an orbit, not a click.
-        if (e.delta <= 4) onSelect(e);
-      }}>
-      <meshStandardMaterial
-        vertexColors
-        color={color}
-        roughness={0.8}
-        transparent={opacity < 1}
-        opacity={opacity}
-        depthWrite={opacity >= 1}
-      />
-      {edges && <Edges threshold={20} color="#2b3646" />}
-    </mesh>
-  );
-}
 
 /**
  * Point the camera at the box from the front-right, above (Z up), and orbit around its center. It does so once there's
@@ -525,7 +474,7 @@ export function ModelViewport({
       {sketchView ? <SketchCamera view={sketchView} model={assembled} /> : <FitCamera box={box} fitKey={view} viewRequest={viewRequest} />}
       <group>
         {meshes.map((m, i) => (
-          <Body
+          <ModelBody
             key={i}
             mesh={m}
             matrix={matrices[i]!}

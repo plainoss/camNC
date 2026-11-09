@@ -319,7 +319,7 @@ export default function PartView3D({
               setFacePicked(event.point.z > part.thickness - kLift ? 'top' : event.point.z < kLift ? 'underside' : null);
             }}>
             <meshStandardMaterial vertexColors color={kWood} roughness={0.8} />
-            <Edges threshold={30} color="#5b4a36" />
+            <Edges geometry={solid.geometry} threshold={30} color="#5b4a36" />
           </mesh>
         )}
         {facePicked && (
