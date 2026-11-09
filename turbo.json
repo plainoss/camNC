@@ -111,6 +111,7 @@
     },
     "lint": { "dependsOn": ["^transit"] },
     "check-types": { "dependsOn": ["^transit"] },
+    "check-types:fast": { "dependsOn": ["^transit"] },
     "dev": {
       "cache": false,
       "persistent": true,

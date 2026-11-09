@@ -171,7 +171,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together
 - **load-opencv** – loads OpenCV.js in the browser.
 - **ui** – shared React UI components.
 - **public-config** – shared public configuration (signalling URL).
-- **eslint-config**, **typescript-config** – shared lint rules and tsconfig presets.
+- **typescript-config** – shared tsconfig presets. Lint rules are in [`.oxlintrc.json`](.oxlintrc.json).
 
 ## Development
 
@@ -190,8 +190,9 @@ Checks (also run in CI):
 
 ```bash
 pnpm run check-format  # prettier (a pre-commit hook formats staged files)
-pnpm run lint          # eslint
+pnpm run lint          # oxlint
 pnpm run check-types   # tsc --noEmit in every package
+pnpm run check-types:fast # the same with tsgo (TypeScript 7 preview), for local iteration
 pnpm run test          # functional tests, then isolated performance gates
 pnpm run test:performance # only the performance gates (Node, then headless Chromium)
 pnpm run build

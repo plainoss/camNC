@@ -13,11 +13,14 @@
     "check-format": "prettier --check \"**/*.{ts,tsx,md}\"",
     "check-file-size": "node scripts/file-size-ratchet.mjs",
     "check-types": "turbo run check-types",
+    "check-types:fast": "turbo run check-types:fast",
     "prepare": "simple-git-hooks",
     "sim": "pnpm --filter @wbcnc/fluidnc sim --"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "nano-staged": "^1.0.2",
+    "oxlint": "1.93.0",
     "playwright": "catalog:",
     "prettier": "catalog:",
     "prettier-plugin-astro": "^0.14.1",

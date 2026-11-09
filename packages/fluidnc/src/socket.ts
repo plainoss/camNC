@@ -166,7 +166,8 @@ export class FluidncSocket {
   send(data: string | Uint8Array) {
     if (!this.isOpen()) throw new Error('FluidNC socket is not connected');
     const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
-    this.ws!.send(bytes);
+    // Newer DOM typings reject a view that could be over a SharedArrayBuffer; ours never are.
+    this.ws!.send(bytes as Uint8Array<ArrayBuffer>);
   }
 
   /** Drop raw-transfer bytes and resume line parsing with any unconsumed response bytes. */

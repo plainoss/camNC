@@ -33,24 +33,24 @@ into machine coordinates.
 
 ## Workspace layout
 
-| Path                                                   | Purpose                                                                                                         |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `apps/camNC`                                           | Main app (TanStack Router, React 19, react-three-fiber), served by a Cloudflare Worker.                         |
-| `apps/camnc-desktop`                                   | Desktop app: `apps/camNC` in Tauri 3 + CEF, with camera discovery, a go2rtc sidecar and native sockets.         |
-| `apps/webrtc-cam`                                      | Runs on a phone: streams its camera to camNC over WebRTC.                                                       |
-| `apps/website`                                         | Astro landing page (www.camnc.app).                                                                             |
-| `apps/chessboard`                                      | Static page that displays/prints the calibration chessboard.                                                    |
-| `apps/demos`                                           | Sandbox pages for individual packages.                                                                          |
-| `apps/signal`                                          | Cloudflare Worker + Durable Object relaying WebRTC signalling between peers in a room.                          |
-| `packages/camera-calibration`                          | Chessboard calibration UI, zustand store and workers (corner finding, pose uniqueness, `calibrateCamera`).      |
-| `packages/go2webrtc`                                   | Video source abstraction: go2rtc (WebSocket/WebRTC), phone (`webrtc:`), WebTorrent tracker, webcam and URLs.    |
-| `packages/webrtc-channel`                              | `Peer` (perfect negotiation), `WsSignaller`, `RolePeering`, chunked data channel, Comlink middleware.           |
-| `packages/fluidnc`                                     | Direct FluidNC WebSocket: `FluidncSocket`, `FluidncProtocol`, parsers, uploads, `FakeFluidnc`, `pnpm sim`.      |
-| `packages/video-worker-utils`                          | Helpers to move video into workers (`MediaStreamTrackProcessor` + polyfill), three.js Comlink transfer handler. |
-| `packages/load-opencv`                                 | Loads the OpenCV.js WASM build from `/opencv_js.js` and exposes a typed `cv2` proxy.                            |
-| `packages/ui`                                          | Shared shadcn/radix components, hooks and theme provider.                                                       |
-| `packages/public-config`                               | Public configuration, e.g. the WebRTC signalling URL.                                                           |
-| `packages/eslint-config`, `packages/typescript-config` | Shared lint and TypeScript presets.                                                                             |
+| Path                          | Purpose                                                                                                         |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `apps/camNC`                  | Main app (TanStack Router, React 19, react-three-fiber), served by a Cloudflare Worker.                         |
+| `apps/camnc-desktop`          | Desktop app: `apps/camNC` in Tauri 3 + CEF, with camera discovery, a go2rtc sidecar and native sockets.         |
+| `apps/webrtc-cam`             | Runs on a phone: streams its camera to camNC over WebRTC.                                                       |
+| `apps/website`                | Astro landing page (www.camnc.app).                                                                             |
+| `apps/chessboard`             | Static page that displays/prints the calibration chessboard.                                                    |
+| `apps/demos`                  | Sandbox pages for individual packages.                                                                          |
+| `apps/signal`                 | Cloudflare Worker + Durable Object relaying WebRTC signalling between peers in a room.                          |
+| `packages/camera-calibration` | Chessboard calibration UI, zustand store and workers (corner finding, pose uniqueness, `calibrateCamera`).      |
+| `packages/go2webrtc`          | Video source abstraction: go2rtc (WebSocket/WebRTC), phone (`webrtc:`), WebTorrent tracker, webcam and URLs.    |
+| `packages/webrtc-channel`     | `Peer` (perfect negotiation), `WsSignaller`, `RolePeering`, chunked data channel, Comlink middleware.           |
+| `packages/fluidnc`            | Direct FluidNC WebSocket: `FluidncSocket`, `FluidncProtocol`, parsers, uploads, `FakeFluidnc`, `pnpm sim`.      |
+| `packages/video-worker-utils` | Helpers to move video into workers (`MediaStreamTrackProcessor` + polyfill), three.js Comlink transfer handler. |
+| `packages/load-opencv`        | Loads the OpenCV.js WASM build from `/opencv_js.js` and exposes a typed `cv2` proxy.                            |
+| `packages/ui`                 | Shared shadcn/radix components, hooks and theme provider.                                                       |
+| `packages/public-config`      | Public configuration, e.g. the WebRTC signalling URL.                                                           |
+| `packages/typescript-config`  | Shared TypeScript presets.                                                                                      |
 
 Packages are consumed as TypeScript source (no build step); each app's Vite
 build compiles them.
