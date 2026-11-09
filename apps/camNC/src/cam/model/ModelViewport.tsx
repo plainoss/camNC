@@ -93,6 +93,9 @@ function Region({ region, model, onPick }: { region: ViewRegion; model: THREE.Ma
 // Planes are a pale blue, and turn orange when hovered or picked.
 const kPlane = '#7aa6d8';
 /** A finished sketch's curve in the model, by the sketch's part. */
+/** How parts are drawn in the view. */
+export type ModelDisplay = 'edges' | 'shaded' | 'translucent';
+
 export interface SketchLine {
   partId: string;
   points: [number, number, number][];
@@ -165,9 +168,12 @@ function Body({
   matrix,
   color,
   opacity,
+  edges,
   onSelect,
   onHover,
 }: {
+  /** Draws the part's edges over it in a dark line, as a model is shown with its edges. */
+  edges?: boolean;
   mesh: BodyMesh;
   matrix: THREE.Matrix4 | null;
   color: string;
@@ -204,6 +210,7 @@ function Body({
         opacity={opacity}
         depthWrite={opacity >= 1}
       />
+      {edges && <Edges threshold={20} color="#2b3646" />}
     </mesh>
   );
 }
@@ -365,6 +372,7 @@ export function ModelViewport({
   onPickPlane,
   sketchLines = kNoLines,
   showOrigin = false,
+  display = 'shaded',
   palette,
   regions = [],
   onPickRegion,
@@ -401,6 +409,8 @@ export function ModelViewport({
   sketchLines?: SketchLine[];
   /** The design's origin, as a point where the base planes meet. */
   showOrigin?: boolean;
+  /** How parts are drawn: shaded with their edges, shaded only, or see-through. */
+  display?: ModelDisplay;
   /** `studio` shows parts as the reference does: grey, picked in orange. */
   palette?: 'studio';
   /** A sketch's regions to pick for an extrude, and picking one. */
@@ -504,7 +514,8 @@ export function ModelViewport({
                       ? kStudioPart
                       : kWood
             }
-            opacity={transparentIds?.has(instanceIds?.[i] ?? m.partId) ? 0.3 : milled(m.partId) ? 1 : 0.35}
+            opacity={display === 'translucent' || transparentIds?.has(instanceIds?.[i] ?? m.partId) ? 0.3 : milled(m.partId) ? 1 : 0.35}
+            edges={display === 'edges'}
             onSelect={e => pick(m, i, matrices[i]!, e)}
             onHover={hovered => onHover?.(hovered ? m.partId : null, hovered ? i : undefined)}
           />
