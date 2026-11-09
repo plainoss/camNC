@@ -203,6 +203,10 @@ jobs:
         if: matrix.shard == '1/4'
         timeout-minutes: 5
         run: printf 'rect 10,10 100,60\nexpect {"entityCount":4}\nframe smoke\n' | pnpm --silent --filter @wbcnc/camNC spec:session
+      - name: Check rendering a saved design
+        if: matrix.shard == '1/4'
+        timeout-minutes: 5
+        run: pnpm --filter @wbcnc/camNC test:render
       - name: Upload spec results
         if: always()
         uses: actions/upload-artifact@v7
