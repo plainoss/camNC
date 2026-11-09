@@ -90,14 +90,15 @@ function Region({ region, model, onPick }: { region: ViewRegion; model: THREE.Ma
   );
 }
 
-const kPlane = '#d08a3c';
+// Planes are a pale blue, and turn orange when hovered or picked.
+const kPlane = '#7aa6d8';
 /** A finished sketch's curve in the model, by the sketch's part. */
 export interface SketchLine {
   partId: string;
   points: [number, number, number][];
 }
 const kNoLines: SketchLine[] = [];
-const kPlaneHighlight = '#2f80ed';
+const kPlaneHighlight = '#f0a020';
 
 function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number; model: THREE.Matrix4; onPick?: () => void }) {
   const [hovered, setHovered] = useState(false);
@@ -127,7 +128,7 @@ function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number;
       <meshBasicMaterial
         color={color}
         transparent
-        opacity={plane.highlighted ? 0.22 : 0.1}
+        opacity={plane.highlighted ? 0.2 : 0.07}
         side={THREE.DoubleSide}
         depthWrite={false}
         polygonOffset
