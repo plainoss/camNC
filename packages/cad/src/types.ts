@@ -410,6 +410,8 @@ export interface CadDiagnostic {
   partId?: string;
   entityIds?: string[];
   constraintIds?: string[];
+  /** Where on the part, in its sketch's coordinates, e.g. the corners a bone didn't fit in. */
+  points?: CadPoint[];
 }
 export interface EvaluatedCadLoop {
   /** Stable lineage: curve IDs, never coordinates or list indices. */

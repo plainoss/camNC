@@ -221,12 +221,13 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
   if (!part.cornerRelief) return cut;
   const { part: next, skipped } = relieveCorners(cut.part, part.cornerRelief.diameter);
   const diagnostics = [...cut.diagnostics];
-  if (skipped)
+  if (skipped.length)
     diagnostics.push({
       code: 'corner-relief-skipped',
       severity: 'warning',
       partId: part.id,
-      message: `${skipped === 1 ? 'One corner is' : `${skipped} corners are`} too tight for a ${part.cornerRelief.diameter} mm bone and stay square.`,
+      message: `${skipped.length === 1 ? 'One corner is' : `${skipped.length} corners are`} too tight for a ${part.cornerRelief.diameter} mm bone and stay square.`,
+      points: skipped,
     });
   return { part: next, diagnostics };
 }
