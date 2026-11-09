@@ -12,7 +12,10 @@ export function CadDrawnOnField({
   variables,
   onChange,
   onDone,
+  inwardToggle = true,
 }: {
+  /** Whether it offers growing into the face, which the Extrude dialog's flip does instead. */
+  inwardToggle?: boolean;
   document: CadDocument;
   part: CadPart & { drawnOn: CadDrawnOn };
   variables?: CadValueScope;
@@ -62,7 +65,9 @@ export function CadDrawnOnField({
               if (dirty.current) apply();
             }}
             onKeyDown={event => {
-              event.stopPropagation();
+              // In a step's dialog, Enter and Escape go on to the dialog: Enter again accepts it, Escape cancels it.
+              const inDialog = !!event.currentTarget.closest('.cad-feature-dialog');
+              if (!(inDialog && (event.key === 'Enter' || event.key === 'Escape'))) event.stopPropagation();
               if (event.key === 'Enter') {
                 apply();
                 onDone?.();
@@ -77,18 +82,20 @@ export function CadDrawnOnField({
         </span>
         mm
       </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={!!part.drawnOn.inward}
-          onChange={event => {
-            const next: CadDrawnOn = { ...part.drawnOn, inward: true };
-            if (!event.target.checked) delete next.inward;
-            onChange(next);
-          }}
-        />
-        Grows into the face
-      </label>
+      {inwardToggle && (
+        <label>
+          <input
+            type="checkbox"
+            checked={!!part.drawnOn.inward}
+            onChange={event => {
+              const next: CadDrawnOn = { ...part.drawnOn, inward: true };
+              if (!event.target.checked) delete next.inward;
+              onChange(next);
+            }}
+          />
+          Grows into the face
+        </label>
+      )}
       {error && (
         <p id={`${id}-error`} role="alert" className="cad-thickness-error">
           {error}

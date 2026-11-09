@@ -77,3 +77,12 @@ it('searches the studio’s own commands with Alt+C outside a sketch', async () 
   await userEvent.keyboard('{Enter}');
   expect(await screen.findByRole('dialog', { name: 'Plane' })).toBeDefined();
 });
+
+it('shows parts shaded with their edges, and offers shaded only or translucent', async () => {
+  await studio();
+  await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().display).toBe('edges'));
+  await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Display' }), 'translucent');
+  await waitFor(() => expect(props().display).toBe('translucent'));
+});

@@ -20,6 +20,24 @@ const toLocal = (placement: CadPlacement, point: Vec3): Vec3 =>
     point[2] - placement.position[2],
   ]);
 const kSquare = 1e-6;
+/** Why a tool can't be cut in boxes: it's round or slanted, which its own outline can still cut. */
+const kNotSquare = "isn't square-cornered and straight-sided";
+
+/** A counterclockwise loop moved out by `by` mm on every side, its corners mitred; a negative `by` moves it in. */
+function grown(loop: CadPoint[], by: number): CadPoint[] {
+  if (!by) return loop;
+  const normal = (a: CadPoint, b: CadPoint) => {
+    const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    return { x: (b.y - a.y) / length, y: -(b.x - a.x) / length };
+  };
+  return loop.map((point, i) => {
+    const before = normal(loop[(i + loop.length - 1) % loop.length]!, point),
+      after = normal(point, loop[(i + 1) % loop.length]!);
+    // Where the two edges moved out meet; a sharp spike is capped at four times the distance.
+    const scale = Math.min(4, 1 / Math.max(0.25, (1 + before.x * after.x + before.y * after.y) / 2));
+    return { x: point.x + ((before.x + after.x) / 2) * by * scale, y: point.y + ((before.y + after.y) / 2) * by * scale };
+  });
+}
 
 /** The part's box in its own frame: its outline's extent, and its thickness. */
 function box(part: EvaluatedCadPart): [Vec3, Vec3] {
@@ -111,7 +129,7 @@ function toolBoxes(
       hi[1]
     );
   // A curved tool would split into slivers that aren't what it fills.
-  const curved = "isn't square-cornered and straight-sided";
+  const curved = kNotSquare;
   if ((xs.length - 1) * (ys.length - 1) > 400) return { refused: curved };
   const slack = Math.max((hi[0] - lo[0]) * (hi[1] - lo[1]) * 1e-6, kSquare);
   // Each cell is all tool or none of it; one only partly filled means a slanted or curved side, which no box fits.
@@ -158,6 +176,35 @@ function toolBoxes(
       ])
     ),
   };
+}
+
+/**
+ * A tool standing on a target's face, its sketch's plane parallel to the target's, cuts its own outline in, whatever its
+ * shape: a round dowel makes a round hole. Its outline and holes are carried into the target's frame, and its reach is
+ * how far it goes in from that face. None when it isn't parallel or doesn't reach in.
+ */
+function toolOutlineCut(
+  tool: EvaluatedCadPart,
+  toolAt: CadPlacement,
+  into: EvaluatedCadPart,
+  intoAt: CadPlacement
+): { outline: CadPoint[]; islands: CadPoint[][]; lo: number; hi: number } | null {
+  const normal = rotateVector(conjugate(intoAt.rotation), rotateVector(toolAt.rotation, [0, 0, 1]));
+  if (Math.abs(Math.abs(normal[2]) - 1) > kSquare) return null;
+  const carried = (loop: CadPoint[], z: number) => loop.map(p => toLocal(intoAt, toWorld(toolAt, [p.x, p.y, z])));
+  const bottom = carried(tool.outline, 0),
+    top = carried(tool.outline, tool.thickness);
+  const lo = Math.max(0, Math.min(bottom[0]![2], top[0]![2])),
+    hi = Math.min(into.thickness, Math.max(bottom[0]![2], top[0]![2]));
+  if (hi - lo < kSquare) return null;
+  const flat = (points: Vec3[]) => {
+    const loop = points.map(([x, y]) => ({ x, y }));
+    return polygonArea(loop) < 0 ? loop.reverse() : loop;
+  };
+  const outline = flat(bottom);
+  const [ilo, ihi] = box(into);
+  if (areaWithin(outline, ilo, ihi) < kSquare) return null;
+  return { outline, islands: tool.holes.map(hole => flat(carried(hole, 0)).reverse()), lo, hi };
 }
 
 /**
@@ -331,6 +378,38 @@ export function applyPartCuts(
               continue;
             }
             const found = toolBoxes(shape, at, into, intoAt);
+            // A round or slanted tool entering a face cuts its own outline in.
+            // Only a shape boxes can't follow: a tool with a cut of its own there stays refused.
+            const outlined =
+              'refused' in found && found.refused === kNotSquare && !step.split ? toolOutlineCut(shape, at, into, intoAt) : null;
+            if (outlined) {
+              const t = into.thickness,
+                fromTop = outlined.hi >= t - kSquare,
+                fromBelow = outlined.lo <= kSquare;
+              if (!fromTop && !fromBelow) {
+                refused = true;
+                warn(`${name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
+                continue;
+              }
+              // The clearance deepens it, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
+              const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - outlined.lo : outlined.hi) + step.clearance),
+                through = reach >= t - kSquare;
+              const id = `cut-parts:${step.id}:${partId}${key}`;
+              const cut: EvaluatedCadCut = {
+                id,
+                regionId: id,
+                side: fromTop ? 'top' : 'underside',
+                from: 0,
+                to: through ? t : reach,
+                through,
+                // The clearance widens it all round, and narrows what the tool's holes leave standing.
+                outline: grown(outlined.outline, step.clearance),
+                islands: outlined.islands.map(island => grown([...island].reverse(), -step.clearance).reverse()),
+              };
+              target.shape = { ...target.shape, cuts: [...(target.shape.cuts ?? []), cut] };
+              made++;
+              continue;
+            }
             if ('refused' in found) {
               refused = true;
               warn(`${name} ${found.refused} where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
@@ -478,6 +557,8 @@ export function updatePartCut(document: CadDocument, id: string, change: Partial
       const next = { ...step, ...change };
       if (change.clearance !== undefined && !change.clearanceExpression) delete next.clearanceExpression;
       if (Object.hasOwn(change, 'split') && change.split === undefined) delete next.split;
+      // Kept is the default, so it's only stored when the tools are used up.
+      if (Object.hasOwn(change, 'consumeTools') && !change.consumeTools) delete next.consumeTools;
       return next;
     }),
   };

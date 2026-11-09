@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 /** The studio's commands, as its toolbar and the tool search list them. */
-export type StudioCommand = 'sketch' | 'extrude' | 'cutParts' | 'transform' | 'pattern' | 'plane' | 'variable';
+export type StudioCommand = 'sketch' | 'extrude' | 'cutParts' | 'transform' | 'pattern' | 'mirror' | 'plane' | 'variable';
 
 export const kStudioCommands: { id: StudioCommand; label: string; hint: string; glyph: ReactNode }[] = [
   {
@@ -33,6 +33,12 @@ export const kStudioCommands: { id: StudioCommand; label: string; hint: string; 
     label: 'Pattern',
     hint: 'Copies of the selected part in a row',
     glyph: <path d="M3 8h4v8H3zM10 8h4v8h-4zM17 8h4v8h-4z" />,
+  },
+  {
+    id: 'mirror',
+    label: 'Mirror',
+    hint: 'A mirror image of the selected part across a plane or a face',
+    glyph: <path d="M12 3v18M9 6 4 18h5zM15 6l5 12h-5z" />,
   },
   {
     id: 'plane',

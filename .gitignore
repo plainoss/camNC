@@ -20,6 +20,9 @@ coverage
 # Turbo
 .turbo
 
+# CI's pnpm store (.github/actions/install-dependencies)
+.pnpm-store
+
 # Generated framework build state (TanStack Start/Nitro, Astro)
 .tanstack
 .nitro

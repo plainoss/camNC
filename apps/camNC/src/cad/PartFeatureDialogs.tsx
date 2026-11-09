@@ -14,6 +14,7 @@ import {
   sharesSketch,
   sketchOwnerId,
   sketchRegions,
+  splitApartRegions,
   setPartCopyOffset,
   setPartPattern,
   renamePartCopy,
@@ -66,18 +67,23 @@ export function ExtrudeDialog({
 }: PartDialogProps & {
   onEditSketch: () => void;
   /** Starts picking a plane or a face, for Up to face; the pick comes back once. Null stops a pick under way. */
-  pickFace?: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
+  pickFace?: (picked: ((on: CadDrawnOn['on'], datum?: string) => void) | null) => void;
 }) {
   const [pickingFace, setPickingFace] = useState(false);
   /** Blind to a thickness, or up to a plane or face: its thickness then follows that face. */
-  const setUpTo = (upTo: CadDrawnOn['on'] | null) =>
+  const setUpTo = (upTo: CadDrawnOn['on'] | null, datum?: string) =>
     onChange(document =>
       changePart(document, part.id, p => {
         const next = { ...p };
         if (upTo) {
           next.upTo = upTo;
+          if (datum) next.upToDatum = datum;
+          else delete next.upToDatum;
           delete next.symmetric;
-        } else delete next.upTo;
+        } else {
+          delete next.upTo;
+          delete next.upToDatum;
+        }
         return next;
       })
     );
@@ -90,9 +96,9 @@ export function ExtrudeDialog({
   const startPickingFace = () => {
     if (!pickFace) return;
     setPickingFace(true);
-    pickFace(on => {
+    pickFace((on, datum) => {
       setPickingFace(false);
-      setUpTo(on);
+      setUpTo(on, datum);
     });
   };
   const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo ? 'add' : 'new';
@@ -185,7 +191,10 @@ export function ExtrudeDialog({
   const [thicknessValid, setThicknessValid] = useState(true);
   const [depthError, setDepthError] = useState<string | null>(null);
   // A sketch that isn't one outline extrudes the region picked from it in the view; until then there's nothing to make.
-  const profileError = part.thin ? undefined : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
+  // Regions picked apart are fine for New: each group becomes a part of its own on OK.
+  const apart = operation === 'new' && splitApartRegions(document, part.id) !== document;
+  const profileError =
+    part.thin || apart ? undefined : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
   const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? formatCadValue(part.thin.depth)) : '100');
   const setThin = (thin: CadPart['thin'] | null) => {
     // A thin extrude has a depth of its own, so it no longer goes up to a face.
@@ -196,6 +205,7 @@ export function ExtrudeDialog({
         if (thin) {
           next.thin = thin;
           delete next.upTo;
+          delete next.upToDatum;
         } else delete next.thin;
         return next;
       })
@@ -365,7 +375,9 @@ export function ExtrudeDialog({
               onClick={startPickingFace}>
               <small>Up to</small>
               <span>
-                {part.upTo ? `${drawnOnName(document, part.upTo)}, ${formatCadValue(part.thickness)} mm away` : 'Pick a plane or a face'}
+                {part.upTo
+                  ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${formatCadValue(part.thickness)} mm away`
+                  : 'Pick a plane or a face'}
               </span>
             </button>
           )}
@@ -387,6 +399,29 @@ export function ExtrudeDialog({
               />
               Symmetric
             </label>
+          )}
+          {!part.upTo && !part.symmetric && part.drawnOn && !part.thin?.midPlane && (
+            // The other way out of the sketch's plane, or into the face it's drawn on, for a thin board as for a solid one.
+            <button
+              type="button"
+              className="cad-flip-direction"
+              aria-label="Flip direction"
+              title="Extrude the other way"
+              aria-pressed={!!part.drawnOn.inward}
+              onClick={() =>
+                onChange(document =>
+                  changePart(document, part.id, p => {
+                    const drawnOn = { ...p.drawnOn! };
+                    if (drawnOn.inward) delete drawnOn.inward;
+                    else drawnOn.inward = true;
+                    return { ...p, drawnOn };
+                  })
+                )
+              }>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3" />
+              </svg>
+            </button>
           )}
           {!part.upTo && (
             <CadThicknessField
@@ -448,6 +483,7 @@ export function ExtrudeDialog({
           {part.drawnOn && (
             <CadDrawnOnField
               key={`${part.id}:drawn-on`}
+              inwardToggle={false}
               document={document}
               part={part as CadPart & { drawnOn: NonNullable<CadPart['drawnOn']> }}
               variables={variables}

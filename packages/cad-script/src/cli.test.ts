@@ -88,3 +88,48 @@ export default design(d => {
   expect(currentSvg).toContain('Small');
   expect(currentSvg).not.toBe(previousSvg);
 }, 60000);
+
+it('prints the full report of a saved design, as its golden report has it', async () => {
+  const design = path.join(packageDir, 'fixtures/designs/tray.json');
+  const stdout = await new Promise<string>((resolve, reject) =>
+    execFile(
+      process.execPath,
+      ['node_modules/vite-node/vite-node.mjs', '--config', 'vite.config.ts', 'src/cli.ts', '--from', design, '--report', 'full'],
+      { cwd: packageDir },
+      (error, out) => (error ? reject(error) : resolve(out))
+    )
+  );
+  expect(stdout).toBe(await readFile(design.replace(/\.json$/, '.report.json'), 'utf8'));
+}, 60000);
+
+it('says in the full report why a script editing a saved design stopped', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cad-script-cli-'));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'bad.cad.ts');
+  await writeFile(
+    file,
+    `import { design } from '@wbcnc/cad-script';
+export default design(d => {
+  d.part('Bad', { thickness: -1 });
+});
+`
+  );
+  const design = path.join(packageDir, 'fixtures/designs/tray.json');
+  const { code, stdout } = await new Promise<{ code: number; stdout: string }>((resolve, reject) =>
+    execFile(
+      process.execPath,
+      ['node_modules/vite-node/vite-node.mjs', '--config', 'vite.config.ts', 'src/cli.ts', file, '--from', design, '--report', 'full'],
+      { cwd: packageDir },
+      (error, out) => {
+        const code = error?.code ?? 0;
+        if (typeof code !== 'number') return reject(error);
+        resolve({ code, stdout: out });
+      }
+    )
+  );
+  expect(code).toBe(1);
+  const report = JSON.parse(stdout);
+  expect(report).toMatchObject({ ok: false, status: 'solved', scriptError: expect.stringMatching(/thickness/i) });
+  // The design is reported as it was before the script.
+  expect(report.design.name).toBe('tray');
+}, 60000);
