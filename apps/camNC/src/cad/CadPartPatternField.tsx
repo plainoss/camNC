@@ -16,6 +16,7 @@ export function CadPartPatternField({
   variables,
   onChange,
   onDone,
+  ready,
 }: {
   pattern: CadPartPattern | undefined;
   document?: CadDocument;
@@ -24,8 +25,16 @@ export function CadPartPatternField({
   /** The new pattern, or `null` to take it away. */
   onChange: (pattern: Pattern | null) => void;
   onDone?: () => void;
+  /** Patterning from the start, as the reference's Linear pattern dialog opens: no checkbox to switch it on first. */
+  ready?: boolean;
 }) {
   const id = useId();
+  // Opened ready, a part without a pattern gets one straight away; the dialog's cancel takes it back off.
+  useEffect(() => {
+    if (ready && !pattern) onChange(kStart);
+    // Only on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [picking, setPicking] = useState(false);
   const current = pattern ?? kStart;
   const typedCount = current.countExpression ?? String(current.count),
@@ -88,10 +97,12 @@ export function CadPartPatternField({
   };
   return (
     <div className="cad-part-pattern-field">
-      <label>
-        <input type="checkbox" checked={!!pattern} onChange={event => (event.target.checked ? onChange(kStart) : onChange(null))} />
-        Pattern copies in a row
-      </label>
+      {!ready && (
+        <label>
+          <input type="checkbox" checked={!!pattern} onChange={event => (event.target.checked ? onChange(kStart) : onChange(null))} />
+          Pattern copies in a row
+        </label>
+      )}
       {pattern && (
         <>
           {pickDirection && (

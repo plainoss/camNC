@@ -498,10 +498,15 @@ it('opens as a studio, with its own toolbar and steps set in dialogs that keep o
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(24));
   expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull();
 
-  // A pattern is set in its own dialog.
+  // A pattern is set in its own dialog, which patterns as soon as it opens; cancelling takes it back off.
   await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
   dialog = screen.getByRole('dialog', { name: 'Linear pattern · Plate' });
-  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Pattern copies in a row' }));
+  expect(within(dialog).queryByRole('checkbox', { name: 'Pattern copies in a row' })).toBeNull();
+  await waitFor(() => expect(latest().parts[0]!.copies).toHaveLength(1));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(latest().parts[0]!.pattern).toBeUndefined());
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
+  dialog = screen.getByRole('dialog', { name: 'Linear pattern · Plate' });
   await waitFor(() => expect(latest().parts[0]!.copies).toHaveLength(1));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   expect(latest().parts[0]!.pattern).toBeDefined();
@@ -1001,7 +1006,6 @@ it('patterns a part along a picked Front plane', async () => {
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
   const dialog = await screen.findByRole('dialog', { name: /^Linear pattern/ });
-  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Pattern copies in a row' }));
   await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
   const features = screen.getByRole('region', { name: 'Features' });
   await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Front/ }));

@@ -530,6 +530,7 @@ export function PartPatternDialog({
       </div>
       <CadPartPatternField
         key={`${part.id}:pattern`}
+        ready
         pattern={part.pattern}
         document={document}
         pickDirection={pickDirection}
