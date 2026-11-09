@@ -308,7 +308,7 @@ export function rotateAboutOrigin(deg: number): (q: Vec3) => Vec3 {
 }
 
 /** Placement moves cutting-transition evidence into the same frame as its actual toolpath. */
-function transformOperation(operation: Operation, transform: (point: Vec3) => Vec3): Operation {
+export function transformOperation(operation: Operation, transform: (point: Vec3) => Vec3): Operation {
   return {
     ...operation,
     ...(operation.pocketTransition && {
