@@ -1,4 +1,3 @@
-import { cadDirectionVector } from './directions';
 import { cadThinLine, evaluateCadPart, pointInPolygon } from './geometry';
 import { CAD_IDENTITY_PLACEMENT, placePoint, rotateVector, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadDrawnOn, CadPart, CadPlacement, CadPoint, EvaluatedCadPart } from './types';
@@ -161,7 +160,21 @@ export function resolveDrawnPlacements(
     }
     // A transform without copying moves the part from where it's drawn.
     const move = part.moved;
-    const moved = move && ('by' in move ? move.by : cadDirectionVector(document, move)?.map(value => value * move.distance));
+    /** A picked direction, from where its plane or face is being placed now rather than where it was. */
+    const along = (direction: { along: CadDrawnOn['on']; flip?: boolean }): Vec3 | null => {
+      let normal: Vec3;
+      if ('plane' in direction.along) normal = kPlanes[direction.along.plane].z;
+      else {
+        const source = byId.get(direction.along.partId);
+        const shape = source && (shapes.get(source.id) ?? evaluateCadPart(source).part);
+        if (!source || !shape) return null;
+        const face = partFace(source, shape, direction.along.face);
+        if (typeof face === 'string') return null;
+        normal = carried(place(source) ?? CAD_IDENTITY_PLACEMENT, face).z;
+      }
+      return scale(normal, direction.flip ? -1 : 1);
+    };
+    const moved = move && ('by' in move ? move.by : along(move)?.map(value => value * move.distance));
     if (moved) placement = { ...placement, position: placement.position.map((value, axis) => tidy(value + moved[axis]!)) as Vec3 };
     placed.set(part.id, placement);
     return placement;

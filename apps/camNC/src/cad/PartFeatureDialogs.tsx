@@ -457,11 +457,28 @@ export function TransformDialog({
     copy?.offset
       ? (copy.offset.positionExpressions?.[axis] ?? formatCadValue(copy.offset.position[axis]!))
       : moved && 'by' in moved
-        ? formatCadValue(moved.by[axis]!)
+        ? (moved.byExpressions?.[axis] ?? formatCadValue(moved.by[axis]!))
         : '0';
   /** Moves the part itself, from where it's drawn. */
   const saveMove = (next: NonNullable<CadPart['moved']>) => {
     if (!part.drawnOn) return setError('Only a part drawn on a plane or a face can be moved.');
+    // A part moved already is moved again from there, by X, Y and Z; its own Transform step changes one along a face.
+    if (!move && part.moved) {
+      if (!('by' in part.moved) || !('by' in next))
+        return setError('This part is already moved. Change its Transform step in the feature list to move it differently.');
+      const before = part.moved,
+        added = next;
+      next = {
+        by: before.by.map((value, axis) => value + added.by[axis]!) as [number, number, number],
+        ...((before.byExpressions || added.byExpressions) && {
+          byExpressions: [0, 1, 2].map(axis => {
+            const a = before.byExpressions?.[axis] ?? null,
+              b = added.byExpressions?.[axis] ?? null;
+            return a || b ? `(${a ?? formatCadValue(before.by[axis]!)}) + (${b ?? formatCadValue(added.by[axis]!)})` : null;
+          }) as [string | null, string | null, string | null],
+        }),
+      };
+    }
     onSave({
       ...document,
       revision: document.revision + 1,
@@ -503,7 +520,14 @@ export function TransformDialog({
     const failed = parsed.find(result => 'error' in result);
     if (failed && 'error' in failed) return setError(failed.error);
     const values = parsed as { value: number; expression?: string }[];
-    if (!copyPart) return saveMove({ by: values.map(result => result.value) as [number, number, number] });
+    if (!copyPart)
+      return saveMove({
+        by: values.map(result => result.value) as [number, number, number],
+        // Typed with variables, the move follows them.
+        ...(values.some(result => result.expression) && {
+          byExpressions: values.map(result => result.expression ?? null) as [string | null, string | null, string | null],
+        }),
+      });
     const offset = {
       position: values.map(result => result.value) as [number, number, number],
       rotation: [0, 0, 0, 1] as [number, number, number, number],

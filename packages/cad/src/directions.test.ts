@@ -53,3 +53,19 @@ describe('a part moved without copying', () => {
     expect(resolved.parts[0]!.placement!.position).toEqual([0, -25, 0]);
   });
 });
+
+describe('a move typed with variables', () => {
+  it('follows them', async () => {
+    const { applyCadVariables } = await import('./variables');
+    const base = {
+      ...plate('Base'),
+      drawnOn: { on: { plane: 'top' as const }, offset: 0 },
+      moved: {
+        by: [0, 0, 30] as [number, number, number],
+        byExpressions: [null, null, 'lift'] as [string | null, string | null, string | null],
+      },
+    };
+    const document: CadDocument = { ...createCadDocument(), variables: [{ id: 'v', name: 'lift', expression: '45 mm' }], parts: [base] };
+    expect(applyCadVariables(document).parts[0]!.moved).toMatchObject({ by: [0, 0, 45] });
+  });
+});

@@ -432,6 +432,15 @@ it('moves a part with a transform when Copy part is off, as the reference does b
   const again = await screen.findByRole('dialog', { name: 'Transform · Plate' });
   expect(within(again).queryByRole('checkbox', { name: 'Copy part' })).toBeNull();
   expect(within(again).getAllByRole('textbox')[2]).toHaveProperty('value', '40');
+  await userEvent.click(within(again).getByRole('button', { name: 'Cancel' }));
+  // Another transform from the toolbar moves it on from there, keeping the first move.
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  const more = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  const z2 = within(more).getAllByRole('textbox')[2]!;
+  await userEvent.clear(z2);
+  await userEvent.type(z2, '10');
+  await userEvent.click(within(more).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.moved).toEqual({ by: [0, 0, 50] }));
 });
 
 it('copies a part with a transform, and edits the copy from its feature', async () => {

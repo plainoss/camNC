@@ -264,7 +264,9 @@ export interface CadPart {
    * Moved by a transform without copying, as the reference's Transform does with Copy part off: by X, Y and Z, or a
    * distance along a picked direction. Applied after the part is placed on its plane or face, so it moves with that face.
    */
-  moved?: { by: [number, number, number] } | (CadDirection & { distance: number });
+  moved?:
+    | { by: [number, number, number]; byExpressions?: [string | null, string | null, string | null] }
+    | (CadDirection & { distance: number });
   /** Its extrude switched off in the feature list: its sketch stays, as a sketch not yet extruded does. */
   suppressed?: true;
   /**
