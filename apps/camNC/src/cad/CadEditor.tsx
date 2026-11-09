@@ -514,6 +514,14 @@ export function CadEditor({
   useEffect(() => setUsingEdges(false), [part?.id, showWorkspace]);
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
+  const hoveredPart = useRef<string | null>(null);
+  const onHoverPart = useCallback((id: string | null) => {
+    hoveredPart.current = id;
+  }, []);
+  const isolation = useRef<{ before: ReadonlySet<string>; hidden: ReadonlySet<string> } | null>(null);
+  useEffect(() => {
+    hoveredPart.current = null;
+  }, [hiddenParts, showWorkspace]);
   // A variable being added, or the one being changed.
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
@@ -2226,6 +2234,32 @@ export function CadEditor({
     }
     if (editable(event.target)) return;
     if (studioSession && showWorkspace && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (event.code === 'KeyY') {
+        event.preventDefault();
+        if (event.repeat) return;
+        if (event.shiftKey) setHiddenParts(new Set());
+        else {
+          const key = hoveredPart.current ?? part?.id;
+          if (key) setHiddenParts(previous => (previous.has(key) ? previous : new Set([...previous, key])));
+        }
+        return;
+      }
+      if (event.shiftKey && event.code === 'KeyI') {
+        event.preventDefault();
+        if (event.repeat || !part || !isCadPart(part)) return;
+        if (isolation.current?.hidden === hiddenParts) {
+          setHiddenParts(isolation.current.before);
+          isolation.current = null;
+        } else {
+          // Keys as assemblyModel's instanceKey makes them, without importing the 3D model code here.
+          const hidden = new Set(
+            builtParts.flatMap(p => [p.id, ...(p.copies ?? []).map(copy => `${p.id}/${copy.id}`)]).filter(key => key !== part.id)
+          );
+          isolation.current = { before: hiddenParts, hidden };
+          setHiddenParts(hidden);
+        }
+        return;
+      }
       const namedViews = ['front', 'back', 'left', 'right', 'top', 'bottom', 'iso'] as const;
       const name = event.shiftKey
         ? /^Digit[1-7]$/.test(event.code)
@@ -4450,6 +4484,7 @@ export function CadEditor({
                 }}
                 highlightIds={partCutting ? cutPicked : undefined}
                 hiddenIds={hiddenParts}
+                onHover={onHoverPart}
                 onOpen={id => {
                   if (partCutting) return pickForCut(id);
                   if (studioSession) return openSketch(id);

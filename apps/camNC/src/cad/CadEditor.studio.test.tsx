@@ -2,6 +2,7 @@ import {
   sketchRegions,
   CAD_CHORD_TOLERANCE,
   addRectangle,
+  addPartCopy,
   addCircle,
   addLine,
   cadSketchRegions,
@@ -28,8 +29,7 @@ afterEach(() => {
 const settled = () =>
   waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
 
-async function studio() {
-  const source = createPlateDocument({ width: 200, height: 100 });
+async function studio(source = createPlateDocument({ width: 200, height: 100 })) {
   sessions.push(source.id);
   const change = vi.fn<(document: CadDocument) => void>();
   const finish = vi.fn<(document: CadDocument) => Promise<void>>(async () => {});
@@ -83,6 +83,101 @@ it('leaves viewport shortcuts alone while typing in fields or using modifiers', 
   fireEvent.keyDown(workspace, { key: '%', code: 'Digit5', shiftKey: true, altKey: true });
   expect(props().planes).toHaveLength(3);
   expect(props().viewRequest).toBeUndefined();
+});
+
+async function visibilityStudio() {
+  let source = createPlateDocument({ width: 200, height: 100 });
+  source.parts.push({ ...createPlateDocument({ width: 50, height: 50 }).parts[0]!, id: 'shelf', name: 'Shelf' });
+  source = addPartCopy(source, source.parts[0]!.id).document;
+  await studio(source);
+  const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const panel = screen.getByRole('region', { name: 'Parts panel' });
+  fireEvent.click(within(within(panel).getByRole('button', { name: 'Hide Plate' }).closest('li')!).getAllByRole('button')[0]!);
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate', 'Plate 2', 'Shelf']));
+  return { workspace, panel, props };
+}
+
+it('hides the selected part with Y and shows all parts with Shift+Y', async () => {
+  const { workspace, panel, props } = await visibilityStudio();
+  // Use the physical key even when the keyboard layout gives it another character.
+  fireEvent.keyDown(workspace, { key: 'z', code: 'KeyY' });
+  await waitFor(() => expect(within(panel).getByRole('button', { name: 'Show Plate' }).getAttribute('aria-pressed')).toBe('false'));
+  expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate 2', 'Shelf']);
+  fireEvent.click(within(panel).getByRole('button', { name: 'Hide Shelf' }));
+  fireEvent.keyDown(workspace, { key: 'Z', code: 'KeyY', shiftKey: true });
+  await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate', 'Plate 2', 'Shelf']));
+  expect(within(panel).getByRole('button', { name: 'Hide Plate' })).toBeDefined();
+  expect(within(panel).getByRole('button', { name: 'Hide Shelf' })).toBeDefined();
+});
+
+it('hides the hovered part or copy before the selection, and falls back after hover leaves', async () => {
+  const { workspace, panel, props } = await visibilityStudio();
+  props().onHover?.('shelf');
+  fireEvent.keyDown(workspace, { key: 'y', code: 'KeyY' });
+  await waitFor(() => expect(within(panel).getByRole('button', { name: 'Show Shelf' })).toBeDefined());
+  expect(within(panel).getByRole('button', { name: 'Hide Plate' })).toBeDefined();
+  expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate', 'Plate 2']);
+  props().onHover?.(props().meshes[1]!.partId, 1);
+  fireEvent.keyDown(workspace, { key: 'y', code: 'KeyY' });
+  await waitFor(() => expect(within(panel).getByRole('button', { name: 'Show Plate 2' })).toBeDefined());
+  expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate']);
+  props().onHover?.(props().meshes[0]!.partId, 0);
+  props().onHover?.(null);
+  fireEvent.keyDown(workspace, { key: 'y', code: 'KeyY' });
+  await waitFor(() => expect(within(panel).getByRole('button', { name: 'Show Plate' })).toBeDefined());
+  expect(props().meshes).toHaveLength(0);
+});
+
+it('isolates the selected part including hiding copies, then restores the previous hidden set', async () => {
+  const { workspace, panel, props } = await visibilityStudio();
+  fireEvent.click(within(panel).getByRole('button', { name: 'Hide Shelf' }));
+  fireEvent.click(within(panel).getByRole('button', { name: 'Hide Plate' }));
+  fireEvent.keyDown(workspace, { key: 'I', code: 'KeyI', shiftKey: true });
+  await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate']));
+  expect(within(panel).getByRole('button', { name: 'Hide Plate' })).toBeDefined();
+  expect(within(panel).getByRole('button', { name: 'Show Plate 2' })).toBeDefined();
+  expect(within(panel).getByRole('button', { name: 'Show Shelf' })).toBeDefined();
+  fireEvent.keyDown(workspace, { key: 'I', code: 'KeyI', shiftKey: true, repeat: true });
+  expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate']);
+  fireEvent.keyDown(workspace, { key: 'I', code: 'KeyI', shiftKey: true });
+  await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate 2']));
+  expect(within(panel).getByRole('button', { name: 'Show Plate' })).toBeDefined();
+  expect(within(panel).getByRole('button', { name: 'Show Shelf' })).toBeDefined();
+});
+
+it('starts a new isolation after the eyes change visibility', async () => {
+  const { workspace, panel, props } = await visibilityStudio();
+  fireEvent.keyDown(workspace, { key: 'I', code: 'KeyI', shiftKey: true });
+  await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate']));
+  fireEvent.click(within(panel).getByRole('button', { name: 'Show Shelf' }));
+  fireEvent.keyDown(workspace, { key: 'I', code: 'KeyI', shiftKey: true });
+  await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate']));
+  fireEvent.keyDown(workspace, { key: 'I', code: 'KeyI', shiftKey: true });
+  await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate', 'Shelf']));
+});
+
+it('ignores visibility shortcuts while typing, using modifiers, or repeating Y', async () => {
+  const { workspace, props } = await visibilityStudio();
+  for (const field of [document.createElement('input'), document.createElement('textarea'), document.createElement('div')]) {
+    if (field instanceof HTMLDivElement) field.contentEditable = 'true';
+    workspace.append(field);
+    fireEvent.keyDown(field, { key: 'y', code: 'KeyY' });
+    fireEvent.keyDown(field, { key: 'Y', code: 'KeyY', shiftKey: true });
+    fireEvent.keyDown(field, { key: 'I', code: 'KeyI', shiftKey: true });
+    field.remove();
+  }
+  for (const modifier of ['ctrlKey', 'metaKey', 'altKey']) {
+    fireEvent.keyDown(workspace, { key: 'y', code: 'KeyY', [modifier]: true });
+    fireEvent.keyDown(workspace, { key: 'Y', code: 'KeyY', shiftKey: true, [modifier]: true });
+    fireEvent.keyDown(workspace, { key: 'I', code: 'KeyI', shiftKey: true, [modifier]: true });
+  }
+  fireEvent.keyDown(workspace, { key: 'y', code: 'KeyY', repeat: true });
+  expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate', 'Plate 2', 'Shelf']);
+  fireEvent.keyDown(workspace, { key: 'y', code: 'KeyY' });
+  await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate 2', 'Shelf']));
+  fireEvent.keyDown(workspace, { key: 'Y', code: 'KeyY', shiftKey: true, repeat: true });
+  expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate 2', 'Shelf']);
 });
 
 it('opens as a studio, with its own toolbar and steps set in dialogs that keep or drop their changes', async () => {

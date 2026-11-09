@@ -77,7 +77,7 @@ export function StudioToolbar({
       className="cad-toolbar cad-studio-toolbar"
       role="toolbar"
       aria-label="Part Studio toolbar"
-      title="Views: Shift+1 Front, Shift+2 Back, Shift+3 Left, Shift+4 Right, Shift+5 Top, Shift+6 Bottom, Shift+7 Isometric. F fits the model. P toggles base planes.">
+      title="Views: Shift+1 Front, Shift+2 Back, Shift+3 Left, Shift+4 Right, Shift+5 Top, Shift+6 Bottom, Shift+7 Isometric. F fits the model. P toggles base planes. Y hides the part under the pointer, Shift+Y shows all, Shift+I isolates the selected part.">
       <div className="cad-tool-group" role="group" aria-label="Part Studio features" inert={busy}>
         {kCommands.map(command => (
           <ToolHint key={command.id} label={disabled[command.id] ?? command.hint}>
