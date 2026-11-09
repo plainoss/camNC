@@ -19,6 +19,7 @@ export default function WorkspaceView({
   document,
   selectedId,
   onSelect,
+  onHover,
   onOpen,
   onNewPart,
   onCutParts,
@@ -40,6 +41,7 @@ export default function WorkspaceView({
   document: CadDocument;
   selectedId: string | null;
   onSelect: (partId: string) => void;
+  onHover?: (id: string | null) => void;
   onOpen: (partId: string) => void;
   /** Starts a new part drawn on a base plane or a part's face. */
   onNewPart?: (on: CadDrawnOn['on']) => void;
@@ -192,6 +194,7 @@ export default function WorkspaceView({
         highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
         onPickFace={choosing ? pickFace : undefined}
+        onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
         regions={regions}

@@ -26,11 +26,29 @@ describe('a part extruded from picked regions', () => {
     expect(evaluateCadDocument(document).diagnostics.filter(d => d.severity === 'error')).toEqual([]);
   });
 
-  it('says when a picked region is gone, or more than one is picked', () => {
+  it('says when a picked region is gone, or none is picked', () => {
+    const part = splitSketch();
+    expect(evaluateCadPart({ ...part, regions: ['gone'] }).diagnostics[0]!.code).toBe('region-missing');
+    expect(evaluateCadPart({ ...part, regions: [] }).diagnostics[0]!.code).toBe('region-count');
+  });
+
+  it('is both regions as one, when they’re picked side by side', () => {
     const part = splitSketch();
     const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE);
-    expect(evaluateCadPart({ ...part, regions: ['gone'] }).diagnostics[0]!.code).toBe('region-missing');
-    expect(evaluateCadPart({ ...part, regions: regions.map(region => region.id) }).diagnostics[0]!.code).toBe('region-count');
+    const evaluated = evaluateCadPart({ ...part, regions: regions.map(region => region.id) });
+    expect(evaluated.diagnostics).toEqual([]);
+    expect(Math.abs(polygonArea(evaluated.part!.outline))).toBeCloseTo(5000, 3);
+  });
+
+  it('joins two rectangles drawn side by side, over the edge they share', () => {
+    const part = createCadPart('Board', 18);
+    let sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 30, height: 50 });
+    sketch = addRectangle(sketch, { x: 30, y: 0, width: 70, height: 50 });
+    const regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE);
+    expect(regions).toHaveLength(2);
+    const evaluated = evaluateCadPart({ ...part, sketch, regions: regions.map(region => region.id) });
+    expect(evaluated.diagnostics).toEqual([]);
+    expect(Math.abs(polygonArea(evaluated.part!.outline))).toBeCloseTo(5000, 3);
   });
 });
 

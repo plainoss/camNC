@@ -258,10 +258,10 @@ export function applyPartCuts(
           through = reach >= t - kSquare;
         const relief = intoSource.cornerRelief
           ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
-          : { points: outline, skipped: 0 };
-        if (relief.skipped)
+          : { points: outline, skipped: [] };
+        if (relief.skipped.length)
           warn(
-            `${relief.skipped} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
+            `${relief.skipped.length} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
           );
         const current = target.shape;
         // The first piece keeps the ID a tool's one cut always had.

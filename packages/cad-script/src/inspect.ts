@@ -49,6 +49,8 @@ export interface CadReportIssue {
   part?: string;
   /** Handles of what's involved. */
   entities?: string[];
+  /** Where on the part, in its sketch's millimetres, e.g. each corner left square. */
+  at?: number[][];
 }
 export type CadReportEntity =
   | { ref: string; type: 'line'; a: number[]; b: number[]; ends: string[]; construction?: true }
@@ -322,8 +324,14 @@ export async function inspectCadDocument(
           ]
         : d.entityIds;
     const entities = entityHandles(d.partId, ids);
-    const message = d.code === 'redundant-constraint' && entities?.length ? `${d.message} Entities: ${entities.join(', ')}.` : d.message;
-    const issue = { code: d.code, message, part: nameOf(d.partId), entities };
+    const at = d.points?.length ? d.points.map(xy) : undefined;
+    const message =
+      d.code === 'redundant-constraint' && entities?.length
+        ? `${d.message} Entities: ${entities.join(', ')}.`
+        : at
+          ? `${d.message} At ${at.map(p => `[${p.join(', ')}]`).join(', ')}.`
+          : d.message;
+    const issue = { code: d.code, message, part: nameOf(d.partId), entities, ...(at && { at }) };
     (d.severity === 'error' ? errors : warnings).push(issue);
   }
   const statuses = solved.sketches;

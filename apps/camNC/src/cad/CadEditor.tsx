@@ -87,7 +87,9 @@ import {
   sketchRegions,
   CAD_CHORD_TOLERANCE,
   isCadPart,
-  extrudeRemove,
+  newExtrudeOf,
+  removalRegions,
+  resolveExtrudeSteps,
   cadDrawnOnSupports,
   CAD_IDENTITY_PLACEMENT,
   withFaceEdges,
@@ -222,7 +224,7 @@ import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
-import { ExtrudeDialog, type ExtrudeRemoval, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
+import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 import './cad.css';
 
@@ -490,8 +492,6 @@ export function CadEditor({
     kind: 'extrude' | 'pattern';
     partId: string;
     before: CadDocument;
-    /** Set while the extrude is a Remove, with the design as it was as a part, to go back to on New. */
-    remove?: ExtrudeRemoval & { solid: CadDocument };
   } | null>(null);
   // Picking the plane or face a new part is sketched on.
   const [choosingFace, setChoosingFace] = useState(startsBlank);
@@ -519,6 +519,14 @@ export function CadEditor({
   useEffect(() => setUsingEdges(false), [part?.id, showWorkspace]);
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
+  const hoveredPart = useRef<string | null>(null);
+  const onHoverPart = useCallback((id: string | null) => {
+    hoveredPart.current = id;
+  }, []);
+  const isolation = useRef<{ before: ReadonlySet<string>; hidden: ReadonlySet<string> } | null>(null);
+  useEffect(() => {
+    hoveredPart.current = null;
+  }, [hiddenParts, showWorkspace]);
   // A variable being added, or the one being changed.
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
@@ -875,7 +883,8 @@ export function CadEditor({
     setDocument(next);
     callbacks.current.onDraftChange(next);
   };
-  const commit = (next: CadDocument) => publish(commitCadSession(session, next));
+  // What extrudes make of each other's sketches and parts follows each change straight away, as the solver keeps it.
+  const commit = (next: CadDocument) => publish(commitCadSession(session, resolveExtrudeSteps(next)));
   const changeSketch = (next: CadSketch) => part && commit(replacePart(documentRef.current, part.id, p => ({ ...p, sketch: next })));
 
   const solveDrag = async (moving: DragGesture) => {
@@ -2232,6 +2241,32 @@ export function CadEditor({
     }
     if (editable(event.target)) return;
     if (studioSession && showWorkspace && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (event.code === 'KeyY') {
+        event.preventDefault();
+        if (event.repeat) return;
+        if (event.shiftKey) setHiddenParts(new Set());
+        else {
+          const key = hoveredPart.current ?? part?.id;
+          if (key) setHiddenParts(previous => (previous.has(key) ? previous : new Set([...previous, key])));
+        }
+        return;
+      }
+      if (event.shiftKey && event.code === 'KeyI') {
+        event.preventDefault();
+        if (event.repeat || !part || !isCadPart(part)) return;
+        if (isolation.current?.hidden === hiddenParts) {
+          setHiddenParts(isolation.current.before);
+          isolation.current = null;
+        } else {
+          // Keys as assemblyModel's instanceKey makes them, without importing the 3D model code here.
+          const hidden = new Set(
+            builtParts.flatMap(p => [p.id, ...(p.copies ?? []).map(copy => `${p.id}/${copy.id}`)]).filter(key => key !== part.id)
+          );
+          isolation.current = { before: hiddenParts, hidden };
+          setHiddenParts(hidden);
+        }
+        return;
+      }
       const namedViews = ['front', 'back', 'left', 'right', 'top', 'bottom', 'iso'] as const;
       const name = event.shiftKey
         ? /^Digit[1-7]$/.test(event.code)
@@ -3494,13 +3529,18 @@ export function CadEditor({
   };
   const closeFeature = (keep: boolean) => {
     if (!keep && featureDialog) commit(featureDialog.before);
-    // A removed sketch is a cut in the board it was drawn on now, so that board is the one selected.
-    const on = featureDialog?.remove && featureDialog.remove.solid.parts.find(p => p.id === featureDialog.partId)?.drawnOn?.on;
-    if (keep && on && !('plane' in on)) setPartId(on.partId);
+    // A Remove is a cut in the board its sketch is drawn on, so that board is the one selected.
+    const step = keep && featureDialog && documentRef.current.parts.find(p => p.id === featureDialog.partId);
+    const on = step && step.remove && step.drawnOn?.on;
+    if (on && !('plane' in on)) setPartId(on.partId);
+    // An Add is part of the part it adds to.
+    else if (step && step.addTo) setPartId(step.addTo);
     setFeatureDialog(null);
   };
   /** Opens a part's sketch from the studio, remembering the design to go back to if it's cancelled. */
-  const openSketch = (partId: string, before = documentRef.current) => {
+  const openSketch = (stepPartId: string, before = documentRef.current) => {
+    // A shared sketch is edited where it's drawn, and every extrude of it follows.
+    const partId = documentRef.current.parts.find(candidate => candidate.id === stepPartId)?.sketchOf ?? stepPartId;
     sketchBefore.current = before;
     setFeatureDialog(null);
     setVariableDialog(null);
@@ -3728,6 +3768,14 @@ export function CadEditor({
         })
       );
       openFeature('extrude', part.id, before);
+    } else if (command === 'extrude' && part) {
+      // Extruding a sketch again, as the reference does, makes another part of the regions its extrudes leave. When
+      // they use it all, Extrude opens the part's own.
+      const before = documentRef.current;
+      const made = newExtrudeOf(before, part, `Part ${before.parts.length + 1}`);
+      if (!made) return openFeature('extrude', part.id);
+      commit({ ...before, revision: before.revision + 1, parts: [...before.parts, made] });
+      openFeature('extrude', made.id, before);
     } else if (part) openFeature(command, part.id);
   };
   const sketchOnFace = (face: CadFaceRef) => {
@@ -3814,14 +3862,31 @@ export function CadEditor({
   const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
   const acceptanceNotice = notice ?? finishError;
   // The parts already built, behind an open sketch in the studio, seen straight at its plane as the drawing is.
-  // The regions of the sketch being extruded, to pick in the view as the reference's Extrude does, when it has more than one.
+  // The regions of the sketch being extruded, to pick in the view as the reference's Extrude does, when there's a choice.
   const extrudeRegions = useMemo((): ViewRegion[] => {
     const target = featureDialog?.kind === 'extrude' ? doc.parts.find(candidate => candidate.id === featureDialog.partId) : undefined;
     if (!studioSession || !target || target.thin) return [];
+    if (target.remove) {
+      // A Remove picks among the regions the board's outline closes off too, shown on the face it cuts.
+      const found = removalRegions(doc, target);
+      if ('error' in found) return [];
+      const frame = cadFaceFrame(doc, target.drawnOn!.on);
+      if ('error' in frame) return [];
+      const origin = frame.origin.map((value, axis) => value + frame.normal[axis]! * 0.1) as [number, number, number];
+      const picked = target.regions ?? found.cut;
+      return found.regions.map(region => ({
+        id: region.id,
+        frame: { origin, x: frame.x, y: frame.y, normal: frame.normal },
+        outline: region.points,
+        holes: region.holes,
+        picked: picked.includes(region.id),
+      }));
+    }
     const regions = sketchRegions(target.sketch, CAD_CHORD_TOLERANCE);
-    // One region is worth showing too when the sketch as a whole can't be the part, as with a stray line beside it.
-    const wholeFails = !target.regions?.length && evaluateCadPart(target).diagnostics.some(diagnostic => diagnostic.severity === 'error');
-    if (!regions.length || (regions.length < 2 && !target.regions?.length && !wholeFails)) return [];
+    // One region is worth showing too when the sketch as a whole can't be the part, as with a stray line beside it, or
+    // when the regions are another extrude's to share.
+    const wholeFails = !target.regions && evaluateCadPart(target).diagnostics.some(diagnostic => diagnostic.severity === 'error');
+    if (!regions.length || (regions.length < 2 && !target.regions && !wholeFails)) return [];
     const frame = cadFaceFrame(doc, target.drawnOn?.on ?? { plane: 'top' });
     if ('error' in frame) return [];
     // Shown on the face the extrude ends at, so the part's own body doesn't hide them.
@@ -3835,12 +3900,18 @@ export function CadEditor({
       picked: !!target.regions?.includes(region.id),
     }));
   }, [studioSession, featureDialog, doc]);
-  /** A region clicked while extruding: the part is that region, or the whole sketch again when it's clicked twice. */
+  /**
+   * A region clicked while extruding is added to the extrude, or taken off it when it's clicked again, as the
+   * reference's selection box takes them. A part left with none is its whole sketch again.
+   */
   const pickRegion = (regionId: string) => {
     if (!featureDialog) return;
     commit(
       replacePart(documentRef.current, featureDialog.partId, p => {
-        if (!p.regions?.includes(regionId)) return { ...p, regions: [regionId] };
+        const removing = p.remove && removalRegions(documentRef.current, p);
+        const current = p.regions ?? (removing && !('error' in removing) ? removing.cut : []);
+        const regions = current.includes(regionId) ? current.filter(id => id !== regionId) : [...current, regionId];
+        if (regions.length || p.sketchOf || p.addTo || p.remove) return { ...p, regions };
         const whole = { ...p };
         delete whole.regions;
         return whole;
@@ -4027,7 +4098,9 @@ export function CadEditor({
             // A sketch not yet extruded can be extruded; patterns and transforms need a part.
             ...(part?.extrude === false
               ? { pattern: 'Extrude the sketch first', transform: 'Extrude the sketch first' }
-              : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
+              : part && !isCadPart(part)
+                ? { pattern: 'Select a part first', transform: 'Select a part first' }
+                : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
             ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
           }}
           canUndo={session.past.length > 0}
@@ -4323,12 +4396,8 @@ export function CadEditor({
           {showWorkspace &&
             featureDialog &&
             (() => {
-              // While it's a Remove, the part is gone from the design: the dialog shows it as it was.
-              const source = featureDialog.remove?.solid ?? doc;
-              const target = source.parts.find(candidate => candidate.id === featureDialog.partId);
+              const target = doc.parts.find(candidate => candidate.id === featureDialog.partId);
               if (!target) return null;
-              const on = target.drawnOn?.on;
-              const canRemove = !!on && !('plane' in on) && (on.face === 'top' || on.face === 'underside') && !target.thin;
               const props = {
                 document: doc,
                 part: target,
@@ -4338,34 +4407,7 @@ export function CadEditor({
                 onCancel: () => closeFeature(false),
               };
               return featureDialog.kind === 'extrude' ? (
-                <ExtrudeDialog
-                  key={target.id}
-                  {...props}
-                  document={source}
-                  onEditSketch={() => {
-                    // The sketch is edited as the part's, so a Remove goes back to New first.
-                    if (featureDialog.remove) commit(featureDialog.remove.solid);
-                    openSketch(target.id);
-                  }}
-                  removal={featureDialog.remove}
-                  onRemoval={
-                    canRemove
-                      ? removal => {
-                          const solid = featureDialog.remove?.solid ?? documentRef.current;
-                          if (!removal) {
-                            commit(solid);
-                            setFeatureDialog({ ...featureDialog, remove: undefined });
-                            return null;
-                          }
-                          const result = extrudeRemove(solid, target.id, removal.depth, removal.depthExpression);
-                          if ('error' in result) return result.error;
-                          commit(result.document);
-                          setFeatureDialog({ ...featureDialog, remove: { ...removal, solid } });
-                          return null;
-                        }
-                      : undefined
-                  }
-                />
+                <ExtrudeDialog key={target.id} {...props} onEditSketch={() => openSketch(target.id)} />
               ) : (
                 <PartPatternDialog key={target.id} {...props} />
               );
@@ -4400,7 +4442,7 @@ export function CadEditor({
           <div className="cad-canvas-bar">
             {showWorkspace ? (
               <span>
-                <strong>PART STUDIO</strong> · {doc.parts.length === 1 ? 'one part' : `${doc.parts.length} parts`}
+                <strong>PART STUDIO</strong> · {builtParts.length === 1 ? 'one part' : `${builtParts.length} parts`}
               </span>
             ) : studioSession && part ? (
               <span>
@@ -4494,6 +4536,7 @@ export function CadEditor({
                 }}
                 highlightIds={partCutting ? cutPicked : undefined}
                 hiddenIds={hiddenParts}
+                onHover={onHoverPart}
                 onOpen={id => {
                   if (partCutting) return pickForCut(id);
                   if (studioSession) return openSketch(id);

@@ -6,6 +6,7 @@ import {
   holdsOnParts,
   jobHoldClashes,
   rotateAboutOrigin,
+  transformOperation,
   splitByBit,
   usesTabs,
   type BoardSpec,
@@ -508,7 +509,8 @@ const turn2 = (turn: ReturnType<typeof rotateAboutOrigin>, p: { x: number; y: nu
   const [x, y] = turn([p.x, p.y, 0]);
   return { x, y };
 };
-const turnCam = (cam: PartCam, turn: ReturnType<typeof rotateAboutOrigin>): PartCam => ({
+/** A program turned like the board lies on the bed, with its cutting-transition evidence turned along with its passes. */
+export const turnCam = (cam: PartCam, turn: ReturnType<typeof rotateAboutOrigin>): PartCam => ({
   ...cam,
   stockSummary: undefined,
   stockFootprint: cam.stockFootprint?.map(path =>
@@ -517,7 +519,7 @@ const turnCam = (cam: PartCam, turn: ReturnType<typeof rotateAboutOrigin>): Part
       return { x, y };
     })
   ),
-  operations: cam.operations.map(op => ({ ...op, passes: op.passes.map(p => ({ ...p, pts: p.pts.map(turn) })) })),
+  operations: cam.operations.map(op => transformOperation(op, turn)),
 });
 
 function boardSpec(board: BoardRequest, source: BoardPartSource): BoardSpec {

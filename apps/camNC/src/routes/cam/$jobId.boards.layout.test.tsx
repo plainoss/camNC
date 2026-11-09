@@ -46,6 +46,8 @@ async function open(file = boardLayoutFile()) {
 const suggestHolds = async () => {
   fireEvent.pointerDown(screen.getByRole('button', { name: 'Suggest holds' }), { button: 0, ctrlKey: false });
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Suggest holds' }));
+  // The menu takes a few frames to close and hand focus back to its button. A menu opened before then loses its focus to it.
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull(), { timeout: 10_000 });
 };
 
 const saved = async (id: string, name = 'A') => (await getJob(id))!.boards!.find(b => b.name === name)!;
@@ -474,9 +476,10 @@ describe('CAM boards layout', () => {
       return c!;
     });
     fireEvent.contextMenu(clamp);
-    // The menu exists before its focus scope is ready. Wait for it to take focus before selecting its dialog action.
-    await waitFor(() => expect(screen.getByRole('menu').contains(document.activeElement)).toBe(true), { timeout: 10_000 });
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Clamp and screw sizes…' }));
+    // The menu exists before its focus scope is ready. Wait for the clamp's own menu to take focus before selecting its dialog action.
+    const sizes = await screen.findByRole('menuitem', { name: 'Clamp and screw sizes…' });
+    await waitFor(() => expect(sizes.closest('[role="menu"]')!.contains(document.activeElement)).toBe(true), { timeout: 10_000 });
+    await userEvent.click(sizes);
     expect(await screen.findByRole('figure', { name: 'What the clamp sizes mean' }, { timeout: 10_000 })).toBeTruthy();
     expect(screen.getByRole('figure', { name: 'What the screw sizes mean' })).toBeTruthy();
   }, 90_000);

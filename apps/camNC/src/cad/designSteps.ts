@@ -1,4 +1,4 @@
-import { cadCopyName, cadFaceSketches, faceIsUnderside, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { cadCopyName, cadFaceSketches, faceIsUnderside, resolveExtrudeSteps, type CadDocument, type CadPart } from '@wbcnc/cad';
 
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
@@ -30,6 +30,14 @@ function faceName(part: CadPart, on: ReturnType<typeof cadFaceSketches>[number][
 const names = (document: CadDocument, ids: string[]) =>
   ids.map(id => document.parts.find(part => part.id === id)?.name ?? 'a removed part').join(', ');
 
+/** What an extrude does: the thickness of a new part, the part it adds to, or how deep it removes. */
+function extrudeDetail(document: CadDocument, part: CadPart) {
+  if (part.addTo) return `add to ${names(document, [part.addTo])}`;
+  if (part.remove)
+    return `remove ${part.remove.depth === 'through' ? 'through all' : typed(part.remove.depthExpression, part.remove.depth)}`;
+  return typed(part.thicknessExpression, part.thickness);
+}
+
 /**
  * The design's steps: for each part in turn, its sketch and the thickness it's made to, the sketches and cuts on its
  * faces, and its copies. A step cutting parts out of others comes after the last of the parts it uses.
@@ -54,7 +62,8 @@ export function designSteps(document: CadDocument): DesignStep[] {
   }
   return document.parts.flatMap((part, partIndex) => {
     const steps: DesignStep[] = [
-      { id: `${part.id}:sketch`, kind: 'sketch', label: `Sketch · ${part.name}`, partId: part.id },
+      // A part extruding another's sketch has none of its own.
+      ...(part.sketchOf ? [] : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: `Sketch · ${part.name}`, partId: part.id }]),
       // A sketch not yet extruded is only its sketch.
       ...(part.extrude === false
         ? []
@@ -63,7 +72,7 @@ export function designSteps(document: CadDocument): DesignStep[] {
               id: `${part.id}:extrude`,
               kind: 'extrude' as const,
               label: `Extrude · ${part.name}`,
-              detail: typed(part.thicknessExpression, part.thickness),
+              detail: extrudeDetail(document, part),
               partId: part.id,
               suppressed: !!part.suppressed,
             },
@@ -71,6 +80,8 @@ export function designSteps(document: CadDocument): DesignStep[] {
     ];
     let cut = 0;
     for (const feature of part.features ?? []) {
+      // What an Extrude → Remove cuts is that step's, listed where it is.
+      if (feature.removedBy) continue;
       if (feature.type === 'sketch')
         steps.push({
           id: feature.id,
@@ -127,11 +138,12 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
   if (at < 0 || at === steps.length - 1) return document;
   const kept = new Set(steps.slice(0, at + 1).map(step => step.id));
   const parts = document.parts
-    .filter(part => kept.has(`${part.id}:sketch`))
+    .filter(part => kept.has(`${part.id}:${part.sketchOf ? 'extrude' : 'sketch'}`))
     .map(part => {
       // Rolled back past its extrude, a part is only its sketch.
       const next: CadPart = kept.has(`${part.id}:extrude`) || part.extrude === false ? { ...part } : { ...part, extrude: false };
-      if (part.features) next.features = part.features.filter(feature => kept.has(feature.id));
+      // What Remove steps cut follows from those steps, below.
+      if (part.features) next.features = part.features.filter(feature => !feature.removedBy && kept.has(feature.id));
       const pattern = part.pattern && kept.has(part.pattern.id);
       if (!pattern) delete next.pattern;
       const copies = (part.copies ?? []).filter(copy => (copy.pattern ? pattern : kept.has(copy.id)));
@@ -143,5 +155,6 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
   const partCuts = (document.partCuts ?? []).filter(step => kept.has(step.id));
   if (partCuts.length) next.partCuts = partCuts;
   else delete next.partCuts;
-  return next;
+  // Add and Remove steps kept still add and cut; shared sketches go to the first part left that uses them.
+  return resolveExtrudeSteps(next);
 }

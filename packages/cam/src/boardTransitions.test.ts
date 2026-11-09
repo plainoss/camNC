@@ -3,6 +3,7 @@ import { machiningCases, machiningPart, rectangle } from '../test/machining-fixt
 import { readGcode } from './analyze';
 import { camBoard, partToBoard, rotateAboutOrigin, type BoardPart, type BoardSpec } from './board';
 import { toGcode } from './gcode';
+import { turnCam } from './plan';
 import { camPart } from './toolpaths';
 
 describe('placed pocket cutting transitions', () => {
@@ -68,5 +69,23 @@ describe('placed pocket cutting transitions', () => {
     const retracts = (code: string) => readGcode(code).filter(move => move.rapid && move.to[2] > move.from[2] + 1e-6).length;
     const baseline = camBoard({ ...board, rotationDeg: 0, parts: [{ ...part, rotated: false }] }, settings);
     expect(retracts(toGcode(placed))).toBe(retracts(toGcode(baseline)));
+  });
+});
+
+describe('turned release programs', () => {
+  it('turns a pocket’s cutting-transition evidence with its passes, so the program still posts', () => {
+    const cam = camPart(machiningCases.rectangle(), { cutThrough: false });
+    expect(cam.operations[0].passes.some(pass => pass.cuttingTransition)).toBe(true);
+    const turn = rotateAboutOrigin(17);
+    const turned = turnCam(cam, turn);
+    const [before, after] = [cam.operations[0], turned.operations[0]];
+    after.passes.forEach((pass, i) => {
+      const was = before.passes[i].cuttingTransition;
+      expect(pass.cuttingTransition).toEqual(was && { from: turn(was.from), to: turn(was.to) });
+    });
+    expect(after.pocketTransition!.region[0][0]).toEqual(
+      (([x, y]) => ({ x, y }))(turn([before.pocketTransition!.region[0][0].x, before.pocketTransition!.region[0][0].y, 0]))
+    );
+    expect(() => toGcode(turned)).not.toThrow();
   });
 });

@@ -154,12 +154,14 @@ function Body({
   color,
   opacity,
   onSelect,
+  onHover,
 }: {
   mesh: BodyMesh;
   matrix: THREE.Matrix4 | null;
   color: string;
   opacity: number;
   onSelect: (e: ThreeEvent<MouseEvent>) => void;
+  onHover: (hovered: boolean) => void;
 }) {
   const geometry = useMemo(() => modelGeometry(mesh), [mesh]);
   useEffect(() => () => geometry.dispose(), [geometry]);
@@ -168,6 +170,15 @@ function Body({
       geometry={geometry}
       matrixAutoUpdate={false}
       matrix={matrix ?? new THREE.Matrix4()}
+      onPointerOver={event => {
+        event.stopPropagation();
+        onHover(true);
+      }}
+      onPointerMove={event => {
+        event.stopPropagation();
+        onHover(true);
+      }}
+      onPointerOut={() => onHover(false)}
       onClick={(e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
         // A drag that ended here was an orbit, not a click.
@@ -317,6 +328,7 @@ export function ModelViewport({
   onSelect,
   onPickFace,
   onMissed,
+  onHover,
   sketchView,
   viewRequest,
   planes = [],
@@ -341,6 +353,8 @@ export function ModelViewport({
   onSelect: (partId: string, index: number, face?: ModelFacePick) => void;
   onPickFace?: (pick: ModelFacePick) => void;
   onMissed?: () => void;
+  /** The part under the pointer, with its mesh index to distinguish copies. */
+  onHover?: (id: string | null, index?: number) => void;
   /** Looks straight at a sketch's plane, following its drawing, in place of the orbiting camera. */
   sketchView?: SketchView;
   viewRequest?: ViewRequest;
@@ -380,6 +394,15 @@ export function ModelViewport({
     // Finished sketches are in view too, as a first one is before it has any part.
     for (const line of view === 'assembled' ? sketchLines : [])
       for (const point of line.points) fit.expandByPoint(new THREE.Vector3(...point).applyMatrix4(assembled));
+    // So are the regions to pick for an extrude, as when the sketch can't be a part as a whole.
+    for (const region of view === 'assembled' ? regions : [])
+      for (const point of region.outline)
+        fit.expandByPoint(
+          new THREE.Vector3(...region.frame.origin)
+            .addScaledVector(new THREE.Vector3(...region.frame.x), point.x)
+            .addScaledVector(new THREE.Vector3(...region.frame.y), point.y)
+            .applyMatrix4(assembled)
+        );
     if (!shownPlanes.length) return fit;
     // The planes are in view too, so a design with no parts yet still shows them.
     const corner = new THREE.Vector3();
@@ -398,7 +421,7 @@ export function ModelViewport({
     return fit;
     // The planes' identity changes with their highlight, which shouldn't move the camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meshes, matrices, shownPlanes.length, planeSize, assembled, sketchLines, view]);
+  }, [meshes, matrices, shownPlanes.length, planeSize, assembled, sketchLines, regions, view]);
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
     if (!e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.
@@ -409,7 +432,14 @@ export function ModelViewport({
     else onSelect(mesh.partId, index, face);
   };
   return (
-    <Canvas camera={{ fov: 30 }} dpr={[1, 2]} onPointerMissed={() => onMissed?.()}>
+    <Canvas
+      camera={{ fov: 30 }}
+      dpr={[1, 2]}
+      onPointerLeave={() => onHover?.(null)}
+      onPointerMissed={() => {
+        onHover?.(null);
+        onMissed?.();
+      }}>
       <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
       <directionalLight position={[300, -500, 800]} intensity={1.8} />
       <directionalLight position={[-400, 300, 200]} intensity={0.4} />
@@ -435,6 +465,7 @@ export function ModelViewport({
             }
             opacity={milled(m.partId) ? 1 : 0.35}
             onSelect={e => pick(m, i, matrices[i]!, e)}
+            onHover={hovered => onHover?.(hovered ? m.partId : null, hovered ? i : undefined)}
           />
         ))}
       </group>
