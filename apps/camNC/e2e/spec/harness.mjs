@@ -40,8 +40,8 @@ export async function startDevServer() {
 }
 
 /** A fresh browser context, so nothing saved carries over, with its runtime errors collected. */
-export async function openPage(browser) {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' });
+export async function openPage(browser, viewport = { width: 1440, height: 1000 }) {
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1, locale: 'en-US' });
   const page = await context.newPage();
   // A cold Vite server can still compile lazy editor modules after DOMContentLoaded.
   page.setDefaultTimeout(45000);
