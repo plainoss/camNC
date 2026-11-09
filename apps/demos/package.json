@@ -5,11 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsgo -b && vite build",
     "lint": "oxlint --max-warnings 0",
     "preview": "vite preview",
-    "check-types": "tsc --noEmit",
-    "check-types:fast": "tsgo --noEmit"
+    "check-types": "tsgo --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "catalog:",

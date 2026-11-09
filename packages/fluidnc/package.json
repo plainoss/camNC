@@ -11,8 +11,7 @@
   },
   "scripts": {
     "test": "vitest",
-    "check-types": "tsc --noEmit",
-    "check-types:fast": "tsgo --noEmit",
+    "check-types": "tsgo --noEmit",
     "sim": "node scripts/sim.mjs"
   },
   "license": "Apache-2.0",

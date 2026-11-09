@@ -13,7 +13,6 @@
     "check-format": "biome format && prettier --check \"**/*.md\"",
     "check-file-size": "node scripts/file-size-ratchet.mjs",
     "check-types": "turbo run check-types",
-    "check-types:fast": "turbo run check-types:fast",
     "prepare": "simple-git-hooks",
     "sim": "pnpm --filter @wbcnc/fluidnc sim --"
   },

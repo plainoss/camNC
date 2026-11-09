@@ -42,7 +42,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 
 ## Iteration and CI failures
 
-- During development, run the changed tests and relevant package lint/type checks first. `pnpm run check-types:fast` type-checks every package with tsgo in about 12 s; CI still runs `tsc`, so run `pnpm run check-types` once before pushing if you changed types across packages. Run the local fast suite once the change is ready, plus affected files excluded from it. After rebasing or resolving conflicts, rerun affected checks and `pnpm run check-format` before pushing; a previous green run validates the previous tree.
+- During development, run the changed tests and relevant package lint/type checks first. `pnpm run check-types` type-checks every package with tsgo (TypeScript 7 preview) in about 12 s, the same check CI runs. Run the local fast suite once the change is ready, plus affected files excluded from it. After rebasing or resolving conflicts, rerun affected checks and `pnpm run check-format` before pushing; a previous green run validates the previous tree.
 - PR CI runs only the quick suites. The browser files and behaviour specs run in the merge queue, so run the ones your change touches locally before queueing, or label the PR `full-ci` to run them on the PR (docs/TESTING.md).
 - Push coherent, validated milestones. Superseded PR commits cancel their CI, so avoid repeated pushes of incomplete fixes that discard useful validation.
 - Before repairing a shared test driver or CI failure, inspect open PRs and current main for an existing fix. Coordinate one shared repair rather than independently patching it into several feature branches.
