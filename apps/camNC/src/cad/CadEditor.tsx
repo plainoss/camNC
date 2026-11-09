@@ -92,7 +92,6 @@ import {
   CAD_CHORD_TOLERANCE,
   isCadPart,
   newExtrudeOf,
-  removalRegions,
   resolveExtrudeSteps,
   cadDrawnOnSupports,
   CAD_IDENTITY_PLACEMENT,
@@ -196,6 +195,7 @@ import { loadShownState, saveShownState } from './shownState';
 import { dragTargets, hasDragMovement } from './drag';
 import { dragSnapConstraints, inferDragPoint } from './dragSnap';
 import { boxSelectSketch, type CadSelectionBox } from './boxSelection';
+import { chainGeometry, type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture } from './editorGestures';
 import { constraintColorNotice, sketchDofStatus, sketchFeedback } from './sketchFeedback';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
@@ -228,12 +228,13 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { chainGeometry, editable, hasOutline, isBlank, isSingleLine, replacePart, withoutExtrude, type ChainAnchor } from './editorHelpers';
+import { editable, hasOutline, isBlank, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
+import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
 import { pickedPlane, pickedPlaneFrame } from './basePlanes';
-import type { ViewRegion, ViewRequest } from '@/cam/model/ModelViewport';
+import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import { toggleSuppressed } from './toggleSuppressed';
 import { reorderedSteps } from './reorderSteps';
@@ -256,39 +257,6 @@ const snapLabels: Record<CadSnapResult['kind'], string> = {
   midpoint: 'Midpoint',
   pointOnCurve: 'On curve',
 };
-interface DragGesture {
-  origin: Point;
-  target: Point;
-  document: CadDocument;
-  preview: CadDocument;
-  partId: string;
-  selectedIds: string[];
-  points: string[];
-  radiusEntityId?: string;
-  moved: boolean;
-  request: number;
-  solvedRequest: number;
-  working: boolean;
-  ended: boolean;
-  failure?: string;
-  snapPointId?: string;
-  dropInference?: CadDrawingInference | null;
-}
-interface BoxGesture extends CadSelectionBox {
-  screenStart: Point;
-  selected: string[];
-  additive: boolean;
-  moved: boolean;
-}
-interface AnnotationGesture {
-  id: string;
-  document: CadDocument;
-  screenStart: Point;
-  worldStart: Point;
-  position: Point;
-  moved: boolean;
-}
-
 type View = { x: number; y: number; w: number; h: number };
 const initialView: View = { x: -35, y: -175, w: 300, h: 210 };
 const rounded = (n: number) => Math.round(n * 100) / 100;
@@ -527,6 +495,23 @@ export function CadEditor({
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // A part being copied by a transform, or the transformed copy being changed.
   const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string; move?: boolean } | null>(null);
+  // When a step's dialog closes, the view has the keyboard again, so its shortcuts work straight away.
+  const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || transformDialog || partCutting);
+  const dialogWasOpen = useRef(false);
+  useEffect(() => {
+    const closed = dialogWasOpen.current && !stepDialogOpen;
+    dialogWasOpen.current = stepDialogOpen;
+    if (!closed || !studioSession || !showWorkspace) return;
+    const focusView = (frames: number) =>
+      requestAnimationFrame(() => {
+        const active = root.current?.ownerDocument.activeElement;
+        if (active && active !== root.current?.ownerDocument.body && active.isConnected) return;
+        const view = root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]');
+        if (view && !view.closest('[inert]')) view.focus();
+        else if (frames > 0) focusView(frames - 1);
+      });
+    focusView(30);
+  }, [stepDialogOpen, studioSession, showWorkspace]);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
@@ -654,11 +639,16 @@ export function CadEditor({
   const mounted = useRef(true);
   callbacks.current = { onDraftChange, onFinish, onCancel, onFinishBlocked };
   const deferredCanvasFocus = useRef<(() => void) | null>(null);
+  // The field of a step's dialog last typed in: solving makes the view inert, which drops the keyboard, and it goes back.
+  const dialogFocus = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     if (!busy) {
       const restore = deferredCanvasFocus.current;
       deferredCanvasFocus.current = null;
       restore?.();
+      const field = dialogFocus.current;
+      const active = field?.ownerDocument.activeElement;
+      if (field?.isConnected && (!active || active === field.ownerDocument.body)) field.focus();
     }
   }, [busy]);
   const restoreCanvasKeyboard = () => {
@@ -4015,60 +4005,13 @@ export function CadEditor({
   const acceptanceNotice = notice ?? finishError;
   // The parts already built, behind an open sketch in the studio, seen straight at its plane as the drawing is.
   // The regions of the sketch being extruded, to pick in the view as the reference's Extrude does, when there's a choice.
-  const extrudeRegions = useMemo((): ViewRegion[] => {
+  const extrudeRegions = useMemo(() => {
     const target = featureDialog?.kind === 'extrude' ? doc.parts.find(candidate => candidate.id === featureDialog.partId) : undefined;
-    if (!studioSession || !target || target.thin) return [];
-    if (target.remove) {
-      // A Remove picks among the regions the board's outline closes off too, shown on the face it cuts.
-      const found = removalRegions(doc, target);
-      if ('error' in found) return [];
-      const frame = cadFaceFrame(doc, target.drawnOn!.on);
-      if ('error' in frame) return [];
-      const origin = frame.origin.map((value, axis) => value + frame.normal[axis]! * 0.1) as [number, number, number];
-      const picked = target.regions ?? found.cut;
-      return found.regions.map(region => ({
-        id: region.id,
-        frame: { origin, x: frame.x, y: frame.y, normal: frame.normal },
-        outline: region.points,
-        holes: region.holes,
-        picked: picked.includes(region.id),
-      }));
-    }
-    const regions = sketchRegions(target.sketch, CAD_CHORD_TOLERANCE);
-    // One region is worth showing too when the sketch as a whole can't be the part, as with a stray line beside it, or
-    // when the regions are another extrude's to share.
-    const wholeFails = !target.regions && evaluateCadPart(target).diagnostics.some(diagnostic => diagnostic.severity === 'error');
-    if (!regions.length || (regions.length < 2 && !target.regions && !wholeFails)) return [];
-    const frame = cadFaceFrame(doc, target.drawnOn?.on ?? { plane: 'top' });
-    if ('error' in frame) return [];
-    // Shown on the face the extrude ends at, so the part's own body doesn't hide them.
-    const along = (target.drawnOn?.offset ?? 0) + (target.drawnOn?.inward ? 0.1 : target.thickness + 0.1);
-    const origin = frame.origin.map((value, axis) => value + frame.normal[axis]! * along) as [number, number, number];
-    return regions.map(region => ({
-      id: region.id,
-      frame: { origin, x: frame.x, y: frame.y, normal: frame.normal },
-      outline: region.points,
-      holes: region.holes,
-      picked: !!target.regions?.includes(region.id),
-    }));
+    return studioSession && target ? extrudeRegionViews(doc, target) : [];
   }, [studioSession, featureDialog, doc]);
-  /**
-   * A region clicked while extruding is added to the extrude, or taken off it when it's clicked again, as the
-   * reference's selection box takes them. A part left with none is its whole sketch again.
-   */
+  /** A region clicked while extruding is added to the extrude, or taken off it when it's clicked again. */
   const pickRegion = (regionId: string) => {
-    if (!featureDialog) return;
-    commit(
-      replacePart(documentRef.current, featureDialog.partId, p => {
-        const removing = p.remove && removalRegions(documentRef.current, p);
-        const current = p.regions ?? (removing && !('error' in removing) ? removing.cut : []);
-        const regions = current.includes(regionId) ? current.filter(id => id !== regionId) : [...current, regionId];
-        if (regions.length || p.sketchOf || p.addTo || p.remove) return { ...p, regions };
-        const whole = { ...p };
-        delete whole.regions;
-        return whole;
-      })
-    );
+    if (featureDialog) commit(withRegionToggled(documentRef.current, featureDialog.partId, regionId));
   };
   const sketchBackdrop = useMemo(() => {
     if (!studioSession || showWorkspace || show3D || !part || !canvasBox?.width || !canvasBox.height) return null;
@@ -4258,6 +4201,10 @@ export function CadEditor({
       aria-busy={busy}
       data-demo-mode={isDemoMode() || undefined}
       onKeyDown={keyDown}
+      onFocus={event => {
+        const target = event.target as HTMLElement;
+        dialogFocus.current = target.closest('.cad-feature-dialog') ? target : null;
+      }}
       onKeyUp={event => event.stopPropagation()}>
       {studioSession && showWorkspace ? (
         <StudioToolbar
