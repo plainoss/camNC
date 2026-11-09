@@ -8,6 +8,20 @@ export function studioState(document) {
     copies: Object.fromEntries(document.parts.map(part => [part.name, part.copies?.length ?? 0])),
     identities: document.parts.map(part => [part.id, ...(part.copies ?? []).map(copy => copy.id)]),
     partCuts: document.partCuts?.length ?? 0,
+    patterns: Object.fromEntries(document.parts.map(part => [part.name, part.pattern ? {
+      id: part.pattern.id, axis: part.pattern.axis, count: part.pattern.count,
+      countExpression: part.pattern.countExpression ?? null, spacing: part.pattern.spacing,
+      spacingExpression: part.pattern.spacingExpression ?? null,
+    } : null])),
+    offsets: Object.fromEntries(document.parts.map(part => [part.name, part.drawnOn ? {
+      value: part.drawnOn.offset, expression: part.drawnOn.offsetExpression ?? null,
+    } : null])),
+    copyIds: Object.fromEntries(document.parts.map(part => [part.name, (part.copies ?? []).map(copy => copy.id)])),
+    cutSettings: (document.partCuts ?? []).map(cut => ({
+      clearance: cut.clearance, suppressed: !!cut.suppressed, keepTools: !cut.consumeTools,
+      tools: cut.tools.map(id => document.parts.find(part => part.id === id)?.name).sort(),
+      targets: cut.targets.map(id => document.parts.find(part => part.id === id)?.name).sort(),
+    })),
   };
 }
 
@@ -25,12 +39,44 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
   for (const [key, wanted] of Object.entries(expected)) {
     if (['variables', 'copies'].includes(key)) {
       for (const [name, value] of Object.entries(wanted)) equal(`${key}/${name}`, value, actual[key]?.[name]);
+    } else if (['patterns', 'offsets'].includes(key)) {
+      for (const [name, fields] of Object.entries(wanted)) {
+        if (fields === null) equal(`${key}/${name}`, null, actual[key]?.[name]);
+        else for (const [field, value] of Object.entries(fields)) equal(`${key}/${name}/${field}`, value, actual[key]?.[name]?.[field]);
+      }
+    } else if (key === 'cutSettings') equal(key, wanted, actual.cutSettings);
+    else if (key === 'retainedIdsSince') {
+      const before = checkpoints.get(wanted);
+      if (!before) failures.push(`studio/${key}: unknown checkpoint ${wanted}`);
+      else {
+        for (const [index, previous] of before.identities.entries()) {
+          const name = before.sourceParts[index], current = actual.identities[actual.sourceParts.indexOf(name)];
+          // IDs belong to named source parts and copy slots. A flat set would
+          // miss identities swapped between panels or between shelf instances.
+          for (const [slot, id] of previous.entries()) equal(`${key}/${name}/${slot}`, id, current?.[slot]);
+        }
+      }
+    } else if (key === 'addedCopyIdsSince') {
+      const before = checkpoints.get(wanted.checkpoint), current = actual.copyIds?.[wanted.part] ?? [];
+      if (!before) failures.push(`studio/${key}: unknown checkpoint ${wanted.checkpoint}`);
+      else {
+        const previous = before.copyIds?.[wanted.part] ?? [];
+        // Copy index names the visible shelf instance, so retaining a set while
+        // swapping existing IDs between slots would still break edit identity.
+        equal(`${key}/retained`, true, previous.every((id, index) => current[index] === id));
+        equal(`${key}/added`, wanted.count, current.filter(id => !previous.includes(id)).length);
+        equal(`${key}/unique`, current.length, new Set(current).size);
+      }
+    } else if (key === 'samePatternIdsSince') {
+      const before = checkpoints.get(wanted);
+      if (!before) failures.push(`studio/${key}: unknown checkpoint ${wanted}`);
+      else for (const [name, pattern] of Object.entries(before.patterns)) if (pattern) equal(`${key}/${name}`, pattern.id, actual.patterns?.[name]?.id);
     } else if (key === 'thicknesses') {
       for (const [name, value] of Object.entries(wanted)) {
         if (!Number.isFinite(actual.thicknesses[name]) || Math.abs(actual.thicknesses[name] - value) > 0.001)
           failures.push(`studio/thicknesses/${name}: wanted ${value}, got ${actual.thicknesses[name]}`);
       }
-    } else if (['sourceParts', 'partCuts', 'dialog', 'listedParts', 'partIssues'].includes(key)) equal(key, wanted, actual[key]);
+    } else if (['sourceParts', 'partCuts', 'dialog', 'listedParts', 'partIssues', 'workspacePartCount'].includes(key)) equal(key, wanted, actual[key]);
     else if (key === 'sameIdsSince' || key === 'unchangedSince') {
       const checkpoint = checkpoints.get(wanted);
       if (!checkpoint) failures.push(`studio/${key}: unknown checkpoint ${wanted}`);

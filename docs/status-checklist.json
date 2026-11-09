@@ -109,8 +109,14 @@
         {
           "item": "Complete multi-part cabinet edit sequence",
           "status": "partial",
-          "evidence": ["packages/cad-script/src/iteration/workflow.test.ts", "studio/cupboard/shared-variable-cancel-edit-reload"],
-          "note": "Covers shared dimensions, shelf patterns, placement, housings, suppression, identities and reload. Divided-tray workflows, complete interface details and toolpath equivalence remain outside this sequence."
+          "evidence": [
+            "packages/cad-script/src/iteration/workflow.test.ts",
+            "studio/cupboard/eight-checkpoint-regeneration",
+            "studio/cupboard/shared-variable-cancel-edit-reload",
+            "studio/cupboard/physical-part-counter",
+            "studio/cupboard/suppressed-copies-restore-membership"
+          ],
+          "note": "Core checks cover dimensions, placement, housings and cutting-piece membership. Browser controls exercise all eight edits, cancel, visible physical-part counts, ordered copy identities and reload. Complete interface details, divided-tray workflows and toolpath equivalence remain outside this sequence."
         },
         {
           "item": "Split a part by a plane",

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "studio/cupboard/physical-part-counter",
+    "title": "The workspace header counts the mirrored side as a physical part",
+    "evidence": "design physical part counter must agree with rendered Parts list",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/cupboard.json",
+      "closesketch",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 6
+          }
+        }
+      }
+    ]
+  }
+]

@@ -73,7 +73,6 @@ import {
   removeCadVariable,
   removeDatumPlane,
   removeEdgeFillet,
-  consumedTools,
   splitApartRegions,
   cadCopyName,
   setCadVariable,
@@ -223,6 +222,7 @@ import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
+import { builtStudioParts } from './studioParts';
 import { FeatureDialog } from './FeatureDialog';
 import { PartsList } from './PartsList';
 import { usePointPicker } from './pointPicker';
@@ -3992,12 +3992,11 @@ export function CadEditor({
                   ? 'Apply the corner preview or press Escape before finishing the sketch.'
                   : null;
   const sketchCanFinish = sketchFinishReason === null;
-  // The parts, each with an eye to show or hide it in the view. In the studio they sit at the bottom left, below the
-  // features, as in the reference.
+  // The studio's Parts list shows each physical instance, with an eye to show or hide it in the view.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
-  const usedUp = consumedTools(doc);
-  const builtParts = blankDesign ? [] : doc.parts.filter(part => isCadPart(part) && !usedUp.has(part.id));
+  const builtParts = blankDesign ? [] : builtStudioParts(doc);
+  const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
   // An open sketch turned with its parts behind it, about the middle of the view.
   const turned = !!sketchBackdrop && sketchTurn !== straightOn;
   const [ta, tb, tc, td] = drawingMatrix(sketchTurn);
@@ -4006,7 +4005,6 @@ export function CadEditor({
   const turnDet = ta * td - tb * tc || 1;
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
-  // Studio commands that need something first, with why.
   const studioDisabled: Partial<Record<StudioCommand, string>> = {
     // A sketch not yet extruded can be extruded; patterns and transforms need a part.
     ...(part?.extrude === false
@@ -4030,7 +4028,7 @@ export function CadEditor({
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>
-        <h2>Parts ({studioSession ? builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0) : doc.parts.length})</h2>
+        <h2>Parts ({studioSession ? physicalPartCount : doc.parts.length})</h2>
         {!studioSession && (
           <button
             type="button"
@@ -4542,7 +4540,7 @@ export function CadEditor({
           <div className="cad-canvas-bar">
             {showWorkspace ? (
               <span>
-                <strong>PART STUDIO</strong> · {builtParts.length === 1 ? 'one part' : `${builtParts.length} parts`}
+                <strong>PART STUDIO</strong> · {physicalPartCount === 1 ? 'one part' : `${physicalPartCount} parts`}
               </span>
             ) : studioSession && part ? (
               <span>
