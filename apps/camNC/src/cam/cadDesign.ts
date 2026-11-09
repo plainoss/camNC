@@ -3,6 +3,7 @@ import { solveCadDocument } from '../cad/solveCad';
 import { updateJobForModel, type CamJobV1 } from './jobDb';
 import { carryDesignTabs } from './designTabAnchors';
 import { designGeometryFingerprint, designGeometryKey } from './designGeometry';
+import { asMilled } from './millSide';
 import { missingNativeHoleChoices } from './holeChoices';
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -42,7 +43,10 @@ export async function acceptDesign(base: CamJobV1, document: CadDocument): Promi
   const toCut = cadPartsToCut(solved.document, solved.parts),
     cut = toCut.map(entry => entry.part),
     cutBefore = before ? cadPartsToCut(before.document, before.parts).map(entry => entry.part) : [];
-  const partGeometryKeys = Object.fromEntries(await Promise.all(cut.map(async part => [part.partId, await designGeometryKey(part)])));
+  // Keyed as milled: a part that now lies turned over is another program, so a sheet cut the other way up no longer matches.
+  const partGeometryKeys = Object.fromEntries(
+    await Promise.all(cut.map(async part => [part.partId, await designGeometryKey(asMilled(part))]))
+  );
   const saved = await updateJobForModel(base, current => {
     if (!current.design || !same(current.design.draft, base.design!.draft)) return null;
     const previous = new Map(cutBefore.map(p => [p.partId, p]));
@@ -81,13 +85,14 @@ export async function acceptDesign(base: CamJobV1, document: CadDocument): Promi
       readError: undefined,
       parts: [...nativeParts, ...current.parts.filter(p => !ids.has(p.id))],
       // CAD origin changes are not layout commands: the saved CAM positions remain authoritative.
-      boards: carryDesignTabs(current.boards, before, solved, boardSourceKeys),
+      boards: carryDesignTabs(current.boards, before, solved, boardSourceKeys, { turnedBefore: !!current.design.turnsUndersideUp }),
       design: {
         draft: solved.document,
         accepted: solved.document,
         acceptedRevision: current.design.acceptedRevision + (sameDesignContent(current.design.accepted, solved.document) ? 0 : 1),
         partRevisions,
         partGeometryKeys,
+        turnsUndersideUp: true,
         ...(holeChoiceIssues.length && { holeChoiceIssues }),
       },
     };
