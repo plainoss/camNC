@@ -3795,7 +3795,16 @@ export function CadEditor({
           return next;
         })
       );
-    if (step.kind === 'sketch' || step.kind === 'extrude') {
+    if (step.kind === 'extrude' && studioSession) {
+      // In the studio a sketch stands on its own, as in the reference: deleting its Extrude leaves the sketch.
+      commit(
+        replacePart(current, step.partId, p => {
+          const next: CadPart = { ...p, extrude: false };
+          delete next.extrudeName;
+          return next;
+        })
+      );
+    } else if (step.kind === 'sketch' || step.kind === 'extrude') {
       // A part is its sketch pushed out, so deleting either deletes the part.
       const parts = current.parts.filter(candidate => candidate.id !== step.partId);
       commit(withFeatureVersion({ ...current, parts }));

@@ -226,15 +226,24 @@ it('looks straight at the selected part’s sketch plane with N, and from behind
   await waitFor(() => expect(props().highlightIds).toBeUndefined());
 });
 
-it('deletes a feature with the Delete key, as the reference does, and undo brings it back', async () => {
+it('deletes only the focused feature with the Delete key, and undo brings it back', async () => {
   const { latest } = await studio();
   const features = await screen.findByRole('region', { name: 'Features' });
   const row = within(features).getByRole('button', { name: /Extrude · Plate/ });
   row.focus();
   await userEvent.keyboard('{Delete}');
-  await waitFor(() => expect(latest().parts).toHaveLength(0));
+  // Only the extrude goes: its sketch stays.
+  await waitFor(() => expect(latest().parts[0]?.extrude).toBe(false));
+  expect(within(features).queryByRole('button', { name: /Extrude · Plate/ })).toBeNull();
+  expect(within(features).getByRole('button', { name: /Sketch · Plate/ })).toBeDefined();
   await userEvent.keyboard('{Control>}z{/Control}');
-  await waitFor(() => expect(latest().parts).toHaveLength(1));
+  await waitFor(() => expect(latest().parts[0]?.extrude).toBeUndefined());
+  // Deleting the sketch takes the part with it.
+  within(features)
+    .getByRole('button', { name: /Sketch · Plate/ })
+    .focus();
+  await userEvent.keyboard('{Delete}');
+  await waitFor(() => expect(latest().parts).toHaveLength(0));
 });
 
 it('routes cube requests through the studio sequence', async () => {
@@ -521,13 +530,17 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Edit…' }));
   expect(await screen.findByRole('dialog', { name: 'Shelf' })).toBeDefined();
 
-  // Deleting the extrude deletes the part, and undo brings it back.
+  // Deleting the extrude leaves its sketch, and undo brings the extrude back.
   await userEvent.click(screen.getByRole('dialog', { name: 'Shelf' }).querySelector('.cad-feature-cancel')!);
   fireEvent.contextMenu(within(features).getByRole('button', { name: /Shelf/ }));
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Delete' }));
-  await waitFor(() => expect(latest().parts).toHaveLength(0));
+  await waitFor(() => expect(latest().parts[0]?.extrude).toBe(false));
+  expect(latest().parts).toHaveLength(1);
+  expect(within(features).queryByRole('button', { name: /Shelf/ })).toBeNull();
+  expect(within(features).getByRole('button', { name: new RegExp(`Sketch · ${partName}`) })).toBeDefined();
   await userEvent.click(within(toolbar).getByRole('button', { name: /^Undo/ }));
-  await waitFor(() => expect(latest().parts).toHaveLength(1));
+  await waitFor(() => expect(latest().parts[0]?.extrudeName).toBe('Shelf'));
+  expect(within(features).getByRole('button', { name: /Shelf/ })).toBeDefined();
 });
 
 it('cancels a new design’s first sketch back to how the design opened', async () => {
