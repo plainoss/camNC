@@ -226,6 +226,25 @@ it('looks straight at the selected part’s sketch plane with N, and from behind
   await waitFor(() => expect(props().highlightIds).toBeUndefined());
 });
 
+it('flags the features drawn on a part once that part is suppressed', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  const base = source.parts[0]!;
+  source.parts.push({
+    ...createPlateDocument({ width: 40, height: 40 }).parts[0]!,
+    id: 'boss',
+    name: 'Boss',
+    drawnOn: { on: { partId: base.id, face: 'top' }, offset: 0 },
+  });
+  await studio(source);
+  const features = await screen.findByRole('region', { name: 'Features' });
+  expect(within(features).queryByRole('status', { name: /with errors/ })).toBeNull();
+  fireEvent.contextMenu(within(features).getByRole('button', { name: new RegExp(`Extrude · ${base.name}`) }));
+  await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Suppress' }));
+  const boss = within(features).getByRole('button', { name: /Extrude · Boss/ });
+  await waitFor(() => expect(within(boss).getByRole('img', { name: 'Error' }).getAttribute('title')).toMatch(/which is suppressed/));
+  expect(within(features).getByRole('status', { name: '2 with errors' })).toBeDefined();
+});
+
 it('deletes only the focused feature with the Delete key, and undo brings it back', async () => {
   const { latest } = await studio();
   const features = await screen.findByRole('region', { name: 'Features' });

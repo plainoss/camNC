@@ -167,10 +167,22 @@ export function FeatureList({
     onSelect(entry);
     setMenu({ entry, x: event.clientX, y: event.clientY });
   };
+  const brokenCount = entries.filter(entry => entry.kind === 'step' && entry.step.broken).length;
   return (
     <section className="cad-studio-features" aria-label="Features" tabIndex={-1}>
       <div className="cad-panel-heading">
-        <h2>Features ({entries.length})</h2>
+        <h2>
+          Features ({entries.length})
+          {brokenCount > 0 && (
+            <span
+              className="cad-feature-error-badge"
+              role="status"
+              aria-label={`${brokenCount} with errors`}
+              title={`${brokenCount} with errors`}>
+              {brokenCount}
+            </span>
+          )}
+        </h2>
       </div>
       {onPickPlane && (
         <ul className="cad-default-geometry" aria-label="Default geometry">
@@ -248,6 +260,7 @@ export function FeatureList({
                 [
                   rollbackAt >= 0 && index > rollbackAt && 'cad-feature-rolled-back',
                   step?.suppressed && 'cad-feature-suppressed',
+                  step?.broken && 'cad-feature-broken',
                   visibilityId(entry) && shown?.(visibilityId(entry)!) === false && 'cad-feature-hidden',
                 ]
                   .filter(Boolean)
@@ -258,6 +271,7 @@ export function FeatureList({
                 aria-current={step && step.partId === selectedPartId ? 'true' : undefined}
                 aria-pressed={entry.kind === 'plane' ? selectedPlane === entry.id : undefined}
                 aria-haspopup="menu"
+                aria-description={step?.broken}
                 onClick={() => {
                   // A plane is picked to sketch on, as a base plane is.
                   if (entry.kind === 'plane') onPickPlane?.(entry.id);
@@ -295,6 +309,11 @@ export function FeatureList({
                 <span aria-hidden="true">{kIcons[step ? step.kind : (entry.kind as 'variable' | 'plane')]}</span>
                 <span>{label(entry)}</span>
                 {step?.detail && <small>{step.detail}</small>}
+                {step?.broken && (
+                  <span className="cad-feature-warning" role="img" aria-label="Error" title={step.broken}>
+                    ⚠
+                  </span>
+                )}
               </button>
               {onToggleShown && visibilityId(entry) && (
                 <Eye

@@ -36,6 +36,29 @@ describe('the design’s steps', () => {
     ]);
   });
 
+  it('flags the steps that need a part that is suppressed, deleted or only a sketch, and those built on them', () => {
+    const base = createPlateDocument({ width: 300, height: 600, thickness: 18 }).parts[0]!;
+    const boss = { ...createCadPart('Boss', 10), drawnOn: { on: { partId: base.id, face: 'top' as const }, offset: 0 } };
+    const knob = { ...createCadPart('Knob', 5), drawnOn: { on: { partId: boss.id, face: 'top' as const }, offset: 0 } };
+    const flagged = (document: CadDocument) =>
+      designSteps(document)
+        .filter(step => step.broken)
+        .map(step => [step.label, step.broken]);
+    const document: CadDocument = { ...createCadDocument(), parts: [base, boss, knob] };
+    expect(flagged(document)).toEqual([]);
+    expect(flagged({ ...document, parts: [{ ...base, suppressed: true }, boss, knob] })).toEqual([
+      ['Sketch · Boss', `It’s drawn on a face of ${base.name}, which is suppressed.`],
+      ['Extrude · Boss', `It’s drawn on a face of ${base.name}, which is suppressed.`],
+      ['Sketch · Knob', 'It’s drawn on a face of Boss, which can’t be built.'],
+      ['Extrude · Knob', 'It’s drawn on a face of Boss, which can’t be built.'],
+    ]);
+    expect(flagged({ ...document, parts: [{ ...base, extrude: false }, boss] })[0]).toEqual([
+      'Sketch · Boss',
+      `It’s drawn on a face of ${base.name}, which isn’t extruded.`,
+    ]);
+    expect(flagged({ ...document, parts: [boss] })[0]).toEqual(['Sketch · Boss', 'It’s drawn on a face of a deleted part.']);
+  });
+
   it('puts a step cutting parts after the last part it uses', () => {
     let document = createPlateDocument({ width: 300, height: 600, thickness: 18 });
     document.parts[0]!.name = 'Side';

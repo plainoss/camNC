@@ -17,6 +17,8 @@ export interface DesignStep {
   copyId?: string;
   /** Switched off in the feature list. */
   suppressed?: boolean;
+  /** Why the step can't be built as it stands: what it was drawn on or adds to is suppressed, deleted or not extruded. */
+  broken?: string;
 }
 
 const typed = (expression: string | undefined, value: number) =>
@@ -43,6 +45,57 @@ function extrudeDetail(document: CadDocument, part: CadPart) {
  * faces, and its copies. A step cutting parts out of others comes after the last of the parts it uses.
  */
 export function designSteps(document: CadDocument): DesignStep[] {
+  const broken = brokenParts(document);
+  const byId = new Map(document.parts.map(part => [part.id, part]));
+  return listedSteps(document).map(step => {
+    const own = broken.get(step.partId);
+    const part = byId.get(step.partId);
+    // A sketch or cut on a part's own face needs that part to be there.
+    const onFace =
+      (step.kind === 'faceSketch' || step.kind === 'cut') && part
+        ? part.suppressed
+          ? `It’s on ${part.name}, which is suppressed.`
+          : own && `It’s on ${part.name}, which can’t be built.`
+        : null;
+    const reason = (step.kind === 'sketch' || step.kind === 'extrude') && own ? own : onFace;
+    return reason ? { ...step, broken: reason } : step;
+  });
+}
+
+/**
+ * The parts that can't be built because a part they need is gone: the part whose face they're drawn on, or the part
+ * they add to, is suppressed, deleted or only a sketch, or is itself broken. Each says why.
+ */
+export function brokenParts(document: CadDocument): Map<string, string> {
+  const byId = new Map(document.parts.map(part => [part.id, part]));
+  const broken = new Map<string, string>();
+  const missing = (id: string): string | null => {
+    const host = byId.get(id);
+    if (!host) return 'a deleted part';
+    if (host.suppressed) return `${host.name}, which is suppressed`;
+    if (host.extrude === false) return `${host.name}, which isn’t extruded`;
+    if (broken.has(id)) return `${host.name}, which can’t be built`;
+    return null;
+  };
+  // In order, so a part built on a broken one is broken too.
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const part of document.parts) {
+      if (broken.has(part.id)) continue;
+      const on = part.drawnOn?.on;
+      const face = on && 'partId' in on ? missing(on.partId) : null;
+      const adds = part.addTo ? missing(part.addTo) : null;
+      const reason = face ? `It’s drawn on a face of ${face}.` : adds ? `It adds to ${adds}.` : null;
+      if (reason) {
+        broken.set(part.id, reason);
+        changed = true;
+      }
+    }
+  }
+  return broken;
+}
+
+function listedSteps(document: CadDocument): DesignStep[] {
   const order = new Map(document.parts.map((part, index) => [part.id, index]));
   const after = new Map<number, DesignStep[]>();
   for (const step of document.partCuts ?? []) {
