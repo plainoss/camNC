@@ -74,6 +74,7 @@ import {
   moveFaceSketch,
   removeCadFeature,
   removeCadVariable,
+  removeDatumPlane,
   cadCopyName,
   setCadVariable,
   type CadFaceRef,
@@ -221,7 +222,8 @@ import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
-import type { BasePlane } from './basePlanes';
+import { PlaneDialog } from './PlaneDialog';
+import { pickedPlane, pickedPlaneFrame } from './basePlanes';
 import type { ViewRegion, ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import { toggleSuppressed } from './toggleSuppressed';
@@ -499,7 +501,8 @@ export function CadEditor({
   // Picking the plane or face a new part is sketched on.
   const [choosingFace, setChoosingFace] = useState(startsBlank);
   // A base plane picked in the studio, in its view or feature list, for the next sketch to be drawn on.
-  const [selectedPlane, setSelectedPlane] = useState<BasePlane | null>(null);
+  // A base plane, or one of the design's planes, by its id.
+  const [selectedPlane, setSelectedPlane] = useState<string | null>(null);
   // A dialog waiting for a plane or face to be picked for a direction, as the Transform dialog's Direction box.
   const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on']) => void) | null>(null);
   // Where the rollback bar was moved to in the feature list: the step it sits after. Null is the end.
@@ -535,6 +538,7 @@ export function CadEditor({
   }, [hiddenParts, showWorkspace]);
   // A variable being added, or the one being changed.
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
+  const [planeDialog, setPlaneDialog] = useState<{ id?: string; preselected?: CadDrawnOn['on'] } | null>(null);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // A part being copied by a transform, or the transformed copy being changed.
@@ -2308,10 +2312,8 @@ export function CadEditor({
       }
       // N looks straight at the picked plane or face, or the selected part's sketch plane; again, from its other side.
       if (!event.shiftKey && event.key.toLowerCase() === 'n') {
-        const on = selectedPlane
-          ? { plane: selectedPlane }
-          : (selectedFace ?? (part ? (part.drawnOn?.on ?? { plane: 'top' as const }) : null));
-        const frame = on && cadFaceFrame(documentRef.current, on);
+        const on = selectedFace ?? (part ? (part.drawnOn?.on ?? { plane: 'top' as const }) : null);
+        const frame = selectedPlane ? pickedPlaneFrame(documentRef.current, selectedPlane) : on && cadFaceFrame(documentRef.current, on);
         if (!frame || 'error' in frame) return;
         event.preventDefault();
         if (event.repeat) return;
@@ -3540,6 +3542,7 @@ export function CadEditor({
   const openFeature = (kind: 'extrude' | 'pattern', partId: string, before = documentRef.current) => {
     setPartCutting(null);
     setVariableDialog(null);
+    setPlaneDialog(null);
     setTransformDialog(null);
     setChoosingFace(false);
     setPartId(partId);
@@ -3566,6 +3569,7 @@ export function CadEditor({
     sketchBefore.current = before;
     setFeatureDialog(null);
     setVariableDialog(null);
+    setPlaneDialog(null);
     setTransformDialog(null);
     setPartCutting(null);
     setChoosingFace(false);
@@ -3640,6 +3644,24 @@ export function CadEditor({
   const featureAction = (entry: FeatureEntry, action: FeatureAction) => {
     const current = documentRef.current;
     setStudioRefusal(null);
+    if (entry.kind === 'plane') {
+      if (action === 'edit') {
+        if (!showWorkspace) {
+          closeSketch(true);
+          if (sketchBefore.current) return;
+        }
+        setFeatureDialog(null);
+        setPartCutting(null);
+        setTransformDialog(null);
+        setVariableDialog(null);
+        return setPlaneDialog({ id: entry.id });
+      }
+      if (action === 'delete') {
+        if (selectedPlane === entry.id) setSelectedPlane(null);
+        return commit(removeDatumPlane(current, entry.id));
+      }
+      return;
+    }
     if (entry.kind === 'variable') {
       if (action === 'edit') {
         // A variable is set in the studio, as any other step: an open sketch is finished first.
@@ -3650,6 +3672,7 @@ export function CadEditor({
         setFeatureDialog(null);
         setPartCutting(null);
         setTransformDialog(null);
+        setPlaneDialog(null);
         return setVariableDialog({ id: entry.id });
       }
       if (action === 'delete') {
@@ -3692,13 +3715,14 @@ export function CadEditor({
     setFeatureDialog(null);
     setPartCutting(null);
     setVariableDialog(null);
+    setPlaneDialog(null);
     setChoosingFace(false);
     setPartId(partId);
     setShowWorkspace(true);
     setTransformDialog({ partId, ...(copyId && { copyId }), ...(move && { move }) });
   };
-  /** Starts a new part drawn on a base plane or a part's face, and opens its sketch. */
-  const newPartOn = (on: CadDrawnOn['on']) => {
+  /** Starts a new part drawn on a base plane or a part's face, or on one of the design's planes, and opens its sketch. */
+  const newPartOn = (on: CadDrawnOn['on'], datum?: string) => {
     const before = documentRef.current;
     // A design's board thickness, when it names one, is what a new part is made from.
     const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variableScope, name));
@@ -3713,7 +3737,11 @@ export function CadEditor({
     const placed = {
       ...base,
       ...(board && { thicknessExpression: board }),
-      drawnOn: { on, offset: 0 },
+      drawnOn: {
+        on,
+        offset: (datum && documentRef.current.planes?.find(plane => plane.id === datum)?.offset) || 0,
+        ...(datum && { datum }),
+      },
       ...(studioSession && { extrude: false as const }),
     };
     // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
@@ -3735,7 +3763,8 @@ export function CadEditor({
       parts: blank ? [drawn] : atBar >= 0 ? [...parts.slice(0, atBar + 1), drawn, ...parts.slice(atBar + 1)] : [...parts, drawn],
     });
     if (atBar >= 0) setRolledTo(`${drawn.id}:sketch`);
-    setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
+    const onName = (datum && pickedPlane(documentRef.current, datum)?.name) || drawnOnName(documentRef.current, on);
+    setMessage(`Draw the new part's outline on ${onName}, then finish to see it in place.`);
     if (studioSession) return openSketch(drawn.id, before);
     setPartId(drawn.id);
     setSelected([]);
@@ -3743,16 +3772,21 @@ export function CadEditor({
     setShow3D(false);
     requestAnimationFrame(() => svg.current?.focus());
   };
-  /** A base plane clicked in the view or the feature list: drawn on while choosing, otherwise picked for the next sketch. */
-  const pickPlane = (plane: BasePlane) => {
+  /**
+   * A plane clicked in the view or the feature list: drawn on while choosing, otherwise picked for the next sketch. One
+   * of the design's planes gives what it's offset from as a direction, as its normal is the same.
+   */
+  const pickPlane = (plane: string) => {
+    const picked = pickedPlane(documentRef.current, plane);
+    if (!picked) return;
     if (directionPicker) {
-      directionPicker({ plane });
+      directionPicker(picked.on);
       return setDirectionPicker(null);
     }
     if (choosingFace) {
       setChoosingFace(false);
       setSelectedPlane(null);
-      return newPartOn({ plane });
+      return newPartOn(picked.on, picked.datum);
     }
     setSelectedFace(null);
     setSelectedPlane(picked => (picked === plane ? null : plane));
@@ -3761,6 +3795,7 @@ export function CadEditor({
     setStudioRefusal(null);
     // Starting one step closes any other step's dialog.
     setVariableDialog(null);
+    setPlaneDialog(null);
     setTransformDialog(null);
     if (command === 'sketch') {
       setFeatureDialog(null);
@@ -3768,11 +3803,12 @@ export function CadEditor({
       // A plane or face picked first is drawn on straight away, as the reference sketches on what's selected.
       // A face picked on a part that has since gone, as when it was deleted, is no longer there to draw on.
       const face = selectedFace && cadFaceFrame(documentRef.current, selectedFace);
-      const picked = !choosingFace && (selectedPlane ? { plane: selectedPlane } : face && !('error' in face) ? selectedFace : null);
+      const plane = selectedPlane && pickedPlane(documentRef.current, selectedPlane);
+      const picked = !choosingFace && (plane ? plane.on : face && !('error' in face) ? selectedFace : null);
       if (picked) {
         setSelectedPlane(null);
         setSelectedFace(null);
-        return newPartOn(picked);
+        return newPartOn(picked, plane ? plane.datum : undefined);
       }
       setChoosingFace(!choosingFace);
     } else if (command === 'transform') {
@@ -3782,6 +3818,15 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
+    } else if (command === 'plane') {
+      setFeatureDialog(null);
+      setPartCutting(null);
+      setChoosingFace(false);
+      // A plane or face picked first is what the new plane is offset from.
+      const plane = selectedPlane && pickedPlane(documentRef.current, selectedPlane);
+      const face = selectedFace && cadFaceFrame(documentRef.current, selectedFace);
+      const preselected = plane && !plane.datum ? plane.on : face && !('error' in face) ? selectedFace : null;
+      setPlaneDialog(preselected ? { preselected } : {});
     } else if (command === 'cutParts') {
       setFeatureDialog(null);
       setChoosingFace(false);
@@ -4444,6 +4489,25 @@ export function CadEditor({
               onCancel={() => setVariableDialog(null)}
             />
           )}
+          {showWorkspace && planeDialog && (
+            <PlaneDialog
+              key={planeDialog.id ?? 'new'}
+              document={doc}
+              planeId={planeDialog.id}
+              preselected={planeDialog.preselected}
+              variables={variableScope}
+              pickPlane={picked => setDirectionPicker(() => picked)}
+              onSave={next => {
+                commit(next);
+                setDirectionPicker(null);
+                setPlaneDialog(null);
+              }}
+              onCancel={() => {
+                setDirectionPicker(null);
+                setPlaneDialog(null);
+              }}
+            />
+          )}
           {showWorkspace &&
             featureDialog &&
             (() => {
@@ -4607,7 +4671,9 @@ export function CadEditor({
                 selectedPlane={selectedPlane}
                 onSelectPlane={pickPlane}
                 hoverIds={hoveredStepPart ? [hoveredStepPart] : undefined}
-                picked={selectedPlane ? drawnOnName(doc, { plane: selectedPlane }) : selectedFace ? drawnOnName(doc, selectedFace) : null}
+                picked={
+                  selectedPlane ? (pickedPlane(doc, selectedPlane)?.name ?? null) : selectedFace ? drawnOnName(doc, selectedFace) : null
+                }
                 regions={extrudeRegions}
                 onPickRegion={extrudeRegions.length ? pickRegion : undefined}
                 onSelectFace={on => {

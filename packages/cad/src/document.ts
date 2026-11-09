@@ -674,6 +674,18 @@ export function parseCadDocument(input: unknown): CadDocument {
       names.add(variable.name);
     }
   }
+  if (d.planes !== undefined) {
+    if (!Array.isArray(d.planes)) throw new Error('Invalid CAD planes');
+    for (const plane of d.planes) {
+      if (!plane || typeof plane !== 'object' || typeof plane.name !== 'string') throw new Error('Invalid CAD plane');
+      addId(plane.id);
+      const on = plane.on;
+      if (!on || typeof on !== 'object' || ('plane' in on ? !['top', 'front', 'right'].includes(on.plane) : typeof on.partId !== 'string'))
+        throw new Error('Invalid CAD plane');
+      if (plane.offsetExpression !== undefined && typeof plane.offsetExpression !== 'string') throw new Error('Invalid CAD plane');
+      number(plane.offset);
+    }
+  }
   const checkPlacement = (placement: CadPlacement) => {
     const { position, rotation, positionExpressions } = placement ?? ({} as CadPlacement);
     if (!Array.isArray(position) || position.length !== 3 || !Array.isArray(rotation) || rotation.length !== 4)
@@ -794,7 +806,8 @@ export function parseCadDocument(input: unknown): CadDocument {
           : typeof on.partId !== 'string' ||
             !(face === 'top' || face === 'underside' || (typeof face === 'object' && face && typeof face.edge === 'string'))) ||
         (offsetExpression !== undefined && typeof offsetExpression !== 'string') ||
-        (inward !== undefined && typeof inward !== 'boolean')
+        (inward !== undefined && typeof inward !== 'boolean') ||
+        (p.drawnOn.datum !== undefined && !d.planes?.some(plane => plane.id === p.drawnOn!.datum))
       )
         throw new Error('Invalid CAD part support');
       number(offset);
