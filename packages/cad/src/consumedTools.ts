@@ -4,7 +4,8 @@ import type { CadDocument } from './types';
 export function consumedTools(document: CadDocument): Set<string> {
   return new Set(
     (document.partCuts ?? [])
-      .filter(step => step.consumeTools && !step.suppressed)
+      // Split joints cut both boards; consuming either one would discard half of the joint.
+      .filter(step => step.consumeTools && !step.split && !step.suppressed)
       .flatMap(step => step.tools.filter(tool => !tool.includes(':')))
   );
 }

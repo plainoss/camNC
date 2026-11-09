@@ -98,7 +98,7 @@ export function PartCutDialog({
       clearance: parsed.value,
       clearanceExpression: parsed.expression,
       split,
-      ...(!keepTools && { consumeTools: true as const }),
+      consumeTools: !split && !keepTools ? true : undefined,
     });
   };
   const name = (id: string) => document.parts.find(part => part.id === id)?.name ?? 'a removed part';
@@ -154,10 +154,12 @@ export function PartCutDialog({
         />
         mm
       </label>
-      <label>
-        <input type="checkbox" checked={keepTools} onChange={event => setKeepTools(event.target.checked)} />
-        Keep tools
-      </label>
+      {joint === 'none' && (
+        <label>
+          <input type="checkbox" checked={keepTools} onChange={event => setKeepTools(event.target.checked)} />
+          Keep tools
+        </label>
+      )}
       <label>
         Joint
         <select value={joint} onChange={event => setJoint(event.target.value as Joint)}>
@@ -166,6 +168,7 @@ export function PartCutDialog({
           <option value="fingers">Finger joint</option>
         </select>
       </label>
+      {joint !== 'none' && <p className="cad-feature-hint">Both parts are kept.</p>}
       {joint === 'fingers' && (
         <label className="cad-part-cut-clearance">
           Fingers

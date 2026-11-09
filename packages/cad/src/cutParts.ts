@@ -5,7 +5,7 @@ import { mirrorEvaluatedPart, sameCadCuts } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
 import { evaluateCadFeatures } from './features';
-import { evaluateCadPart, pointInPolygon, polygonArea } from './geometry';
+import { evaluateCadPart, polygonArea } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
@@ -83,6 +83,28 @@ function areaWithin(polygon: CadPoint[], lo: Vec3, hi: Vec3): number {
     points = kept;
   }
   return points.length < 3 ? 0 : Math.abs(polygonArea(points));
+}
+
+/** A continuous layer or side strip that connects the fingers of a face-sketched board. */
+function splitBackbone(part: EvaluatedCadPart, boxes: [Vec3, Vec3][], axis: 0 | 1, clearance: number): boolean {
+  const lo = [0, 1, 2].map(a => Math.min(...boxes.map(bounds => bounds[0][a]!))) as Vec3;
+  const hi = [0, 1, 2].map(a => Math.max(...boxes.map(bounds => bounds[1][a]!))) as Vec3;
+  if (lo[2] > clearance + kSquare || hi[2] + clearance < part.thickness - kSquare) return true;
+  const across = axis === 0 ? 1 : 0;
+  const [bottom, top] = box(part);
+  return [
+    [bottom[across], lo[across] - clearance],
+    [hi[across] + clearance, top[across]],
+  ].some(([from, to]) => {
+    if (to! - from! <= kSquare) return false;
+    const low: Vec3 = [...lo],
+      high: Vec3 = [...hi];
+    low[across] = from!;
+    high[across] = to!;
+    const area = (high[0] - low[0]) * (high[1] - low[1]);
+    const material = areaWithin(part.outline, low, high) - part.holes.reduce((sum, hole) => sum + areaWithin(hole, low, high), 0);
+    return material >= area - Math.max(area * 1e-6, kSquare);
+  });
 }
 
 /** A box in one part's frame, seen in another's: both square to each other, so it's still a box. */
@@ -421,12 +443,7 @@ export function applyPartCuts(
               continue;
             }
             const normal = rotateVector(conjugate(intoAt.rotation), rotateVector(at.rotation, [0, 0, 1]));
-            const axis = ([0, 1] as const).find(a => Math.abs(normal[a]) < kSquare);
-            if (axis === undefined || Math.abs(normal[2]) > kSquare) {
-              refused = true;
-              warn(`${name} and ${intoSource.name} have no shared in-plane axis for a split cut.`);
-              continue;
-            }
+            const parallel = Math.abs(normal[2]) > 1 - kSquare;
             const reverse = toolBoxes(into, intoAt, shape, at);
             if ('refused' in reverse) {
               refused = true;
@@ -443,8 +460,35 @@ export function applyPartCuts(
               })
             );
             if (!overlap.length) continue;
+            const span = (axis: 0 | 1) =>
+              Math.max(...overlap.map(bounds => bounds[1][axis])) - Math.min(...overlap.map(bounds => bounds[0][axis]));
+            // A strip sketched on a board's face can extrude across its thickness into a perpendicular board.
+            // Its extrusion axis is still parallel to the first board's: the longer shared span runs along the joint.
+            const axis = parallel ? (span(0) >= span(1) ? 0 : 1) : ([0, 1] as const).find(a => Math.abs(normal[a]) < kSquare)!;
             const unit: Vec3 = [0, 0, 0];
             unit[axis] = 1;
+            const localAxis = (placement: CadPlacement) => {
+              const direction = rotateVector(conjugate(placement.rotation), rotateVector(intoAt.rotation, unit));
+              return ([0, 1] as const).find(a => Math.abs(direction[a]) > 1 - kSquare)!;
+            };
+            // Each board needs its own connection. A thicker tool's depth backbone cannot keep a thinner
+            // target from being severed into strips; clearance must also leave the connection intact.
+            if (
+              parallel &&
+              (!splitBackbone(into, overlap, axis, step.clearance) ||
+                !splitBackbone(
+                  shape,
+                  overlap.map(bounds => carry(intoAt, at, bounds)),
+                  localAxis(at),
+                  step.clearance
+                ))
+            ) {
+              refused = true;
+              warn(
+                `${name} and ${intoSource.name} each need material beyond or alongside the overlap to connect the fingers of a split joint.`
+              );
+              continue;
+            }
             const world = rotateVector(intoAt.rotation, unit);
             // Orient the shared line towards its positive world end, independent of either sketch's direction.
             const sign = world.find(value => Math.abs(value) > kSquare)! < 0 ? -1 : 1;
@@ -452,8 +496,7 @@ export function applyPartCuts(
               hi = Math.max(...overlap.map(bounds => bounds[1][axis]));
             const count = step.split === 'half' ? 2 : step.split.fingers;
             const segments = (boxes: [Vec3, Vec3][], placement: CadPlacement, parity: number): [Vec3, Vec3][] => {
-              const localAxis = rotateVector(conjugate(placement.rotation), rotateVector(intoAt.rotation, unit));
-              const a = ([0, 1] as const).find(a => Math.abs(localAxis[a]) > 1 - kSquare)!;
+              const a = localAxis(placement);
               return Array.from({ length: count }, (_, i) => i).flatMap(i => {
                 if (i % 2 !== parity) return [];
                 const from = sign > 0 ? hi - ((i + 1) * (hi - lo)) / count : lo + (i * (hi - lo)) / count,
@@ -468,9 +511,12 @@ export function applyPartCuts(
                     high: Vec3 = [...top];
                   low[a] = Math.max(low[a], Math.min(first, last));
                   high[a] = Math.min(high[a], Math.max(first, last));
-                  // Split joints always cut through the receiving board's thickness.
-                  low[2] = 0;
-                  high[2] = placement === intoAt ? into.thickness : shape.thickness;
+                  // Perpendicular extrusions need through slots. A face-sketched board instead keeps the depth
+                  // outside the overlap as its backbone; extending these cuts through would sever its fingers.
+                  if (!parallel) {
+                    low[2] = 0;
+                    high[2] = placement === intoAt ? into.thickness : shape.thickness;
+                  }
                   return high[a] - low[a] > kSquare ? [[low, high] as [Vec3, Vec3]] : [];
                 });
               });

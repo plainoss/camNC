@@ -124,6 +124,17 @@ describe('the cut parts dialog', () => {
     return onSave;
   }
 
+  it.each(['half', 'fingers'])('keeps both parts when switching from consuming a tool to %s', async joint => {
+    const document = design();
+    const step: CadPartCut = { id: 'cut', tools: ['back'], targets: [document.parts[0]!.id], clearance: 0.2, consumeTools: true };
+    const onSave = vi.fn();
+    render(<PartCutDialog document={document} step={step} onSave={onSave} onClose={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Joint'), { target: { value: joint } });
+    expect(screen.queryByRole('checkbox', { name: 'Keep tools' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ consumeTools: undefined })));
+  });
+
   it('saves a number variable as the finger count expression', async () => {
     const onSave = edit({ fingers: 5 }, true);
     fireEvent.change(screen.getByLabelText('Fingers'), { target: { value: '#count' } });
