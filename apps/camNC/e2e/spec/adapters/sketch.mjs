@@ -5,6 +5,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { settledSnapshot, waitSettled } from '../settle.mjs';
 import { SKETCH_KEYS, canonical, checkSketch, point, samePoint } from './sketchModel.mjs';
 
 /** Design files named by `open` are relative to the spec folder, so `designs/x.json` is `e2e/spec/designs/x.json`. */
@@ -198,24 +199,7 @@ export async function createAdapter(page, url) {
     cursor = [x, y];
     return [x, y];
   };
-  const inputReady = (keyboard = false) => page.waitForFunction(keyboard => {
-    const editor = document.querySelector('.cad-editor');
-    const canvas = editor?.querySelector('[data-testid="cad-canvas"]');
-    const field = editor?.querySelector('#cad-edit-dimension');
-    return canvas && !canvas.closest('[inert]') && editor.getAttribute('aria-busy') !== 'true' &&
-      (!keyboard || !field || document.activeElement === field) &&
-      !/Checking/.test(editor.querySelector('.cad-status')?.textContent ?? '');
-  }, keyboard, { timeout: 30_000 });
-  const settle = async () => {
-    // Checking and saving can take more than 5 s on a loaded runner, including when reopening an accepted design.
-    // Keep waiting on the editor's actual readiness rather than giving each scenario a pause or retry.
-    await page
-      .waitForFunction(() => {
-        const status = document.querySelector('.cad-status')?.textContent ?? '';
-        return !/Checking|Saving/.test(status) && document.querySelector('.cad-editor')?.getAttribute('aria-busy') !== 'true';
-      }, undefined, { timeout: 30_000 });
-    await page.waitForTimeout(60);
-  };
+  const settle = (since = null) => waitSettled(page, since);
   // After a reload the design editor is back once its canvas is drawn and it has finished checking the design. A fixed
   // pause was too short on a busy runner, so the first check could look before the labels were drawn.
   const reopened = async () => {
@@ -231,13 +215,13 @@ export async function createAdapter(page, url) {
   const leaveTool = async () => {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
-    await settle();
   };
+  // Each click of a drawing tool can start a solve and change what the next click snaps to, so it settles first.
   const click = async (at, options) => {
     await moveTo(at);
     await page.mouse.down(options);
     await page.mouse.up(options);
-    await page.waitForTimeout(40);
+    await settle();
   };
   const drag = async (from, to) => {
     await moveTo(from);
@@ -246,7 +230,6 @@ export async function createAdapter(page, url) {
     await page.mouse.move(x, y, { steps: 12 });
     cursor = [x, y];
     await page.mouse.up();
-    await page.waitForTimeout(60);
   };
   const chooseTool = async name => {
     const family = /arc|conic/i.test(name) ? 'Arc tools' : /rectangle/i.test(name) ? 'Rectangle tools' : 'Spline tools';
@@ -280,37 +263,19 @@ export async function createAdapter(page, url) {
     await page.waitForTimeout(900);
   };
 
-  const step = async text => {
+  const act = async text => {
     const space = text.indexOf(' ');
     const verb = space < 0 ? text : text.slice(0, space);
     const rest = space < 0 ? '' : text.slice(space + 1);
     const args = rest.split(' ');
     switch (verb) {
+      // The step before has settled, so a value field it opened (after the solver checked a dimension) has focus.
       case 'key':
-        // Enter/Escape must reach the value field after dimension preparation, rather than be dropped by busy.
-        if (rest === 'Enter' || rest === 'Escape') await inputReady(true);
         await page.keyboard.press(rest);
-        await page.waitForTimeout(40);
         return;
-      case 'type': {
-        if ((await canvas.getAttribute('class'))?.includes('cad-tool-dimension')) {
-          // Placing a dimension checks its rank in the worker before mounting/focusing the value field.
-          // Do not send its value (or the following Enter/Escapes) while that operation still owns input.
-          await page.waitForFunction(() => {
-            const field = document.querySelector('#cad-edit-dimension');
-            return field && document.activeElement === field && !field.closest('[inert]');
-          }, undefined, { timeout: 30_000 });
-          await page.keyboard.type(rest);
-          return;
-        }
-        // A value field opens just after the click that asks for it, so typing straight away can lose the keys. Not every
-        // step types into a field, so this only waits so long.
-        await page
-          .waitForFunction(() => /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? ''), undefined, { timeout: 1000 })
-          .catch(() => {});
+      case 'type':
         await page.keyboard.type(rest);
         return;
-      }
       case 'click':
         return click(point(rest));
       case 'rclick':
@@ -318,7 +283,6 @@ export async function createAdapter(page, url) {
       case 'dblclick': {
         const [x, y] = await moveTo(point(rest));
         await page.mouse.dblclick(x, y);
-        await page.waitForTimeout(80);
         return;
       }
       case 'shiftclick':
@@ -328,12 +292,8 @@ export async function createAdapter(page, url) {
         return;
       case 'hover':
         await moveTo(point(rest));
-        await page.waitForTimeout(80);
         return;
       case 'down':
-        // Dimension creation/checking runs in the solver worker. A coordinate lookup only waits for DOM attachment,
-        // so starting the drag straight after Enter/Escape can race that work on a loaded runner.
-        await inputReady();
         await moveTo(point(rest));
         await page.mouse.down();
         return;
@@ -341,7 +301,6 @@ export async function createAdapter(page, url) {
         const [x, y] = await screen(point(rest));
         await page.mouse.move(x, y, { steps: 8 });
         cursor = [x, y];
-        await page.waitForTimeout(60);
         return;
       }
       case 'up':
@@ -352,7 +311,6 @@ export async function createAdapter(page, url) {
       case 'wheel':
         await moveTo(point(args[0]));
         await page.mouse.wheel(0, Number(args[1]));
-        await page.waitForTimeout(120);
         return;
       case 'tool':
         return chooseTool(rest);
@@ -371,7 +329,6 @@ export async function createAdapter(page, url) {
           await page.mouse.up();
           if (await field.waitFor({ timeout: 1000 }).then(() => true, () => false)) break;
         }
-        await page.waitForTimeout(80);
         return;
       }
       case 'button':
@@ -389,16 +346,13 @@ export async function createAdapter(page, url) {
         await page.mouse.down();
         await page.mouse.up();
         if (add) await page.keyboard.up('Shift');
-        await page.waitForTimeout(80);
         return;
       }
       case 'check':
         await page.getByLabel(rest, { exact: true }).check();
-        await page.waitForTimeout(80);
         return;
       case 'uncheck':
         await page.getByLabel(rest, { exact: true }).uncheck();
-        await page.waitForTimeout(80);
         return;
       case 'hold':
         await page.keyboard.down(rest);
@@ -415,12 +369,10 @@ export async function createAdapter(page, url) {
         await page.mouse.move(x, y, { steps: 3 });
         if (verb === 'editdim') await page.mouse.dblclick(x, y);
         else await page.mouse.click(x, y);
-        await page.waitForTimeout(100);
         return;
       }
       case 'hideplanes': {
         // The origin and base planes off with their eyes in the feature list, so a fitted view frames the parts alone.
-        await settle();
         if (!(await studioToolbar.isVisible())) await closeSketch();
         const geometry = page.getByRole('list', { name: 'Default geometry' });
         const shown = geometry.getByRole('button', { name: 'Hide', exact: true });
@@ -436,7 +388,6 @@ export async function createAdapter(page, url) {
         // A named view of the Part Studio's 3D view, by its keyboard shortcut (the studio toolbar's Views help).
         const digit = NAMED_VIEWS.indexOf(rest) + 1;
         if (!digit) throw new Error(`Unknown view: ${rest}. Use one of ${NAMED_VIEWS.join(', ')}`);
-        await settle();
         if (!(await studioToolbar.isVisible())) await closeSketch();
         const workspace = page.getByTestId('workspace-3d');
         const scene = workspace.locator('canvas').first();
@@ -456,7 +407,6 @@ export async function createAdapter(page, url) {
       }
       case 'addpart': {
         // In the Part Studio a new part is sketched from the studio: close the open sketch, then Sketch on the top plane.
-        await settle();
         if (!(await studioToolbar.isVisible())) {
           await closeSketch();
           await extrudeSketch();
@@ -464,7 +414,6 @@ export async function createAdapter(page, url) {
         await studioToolbar.getByRole('button', { name: /Sketch/ }).click();
         await page.getByRole('list', { name: 'Default geometry' }).getByRole('button', { name: 'Top', exact: true }).click();
         await canvas.waitFor();
-        await settle();
         return;
       }
       case 'line':
@@ -502,7 +451,6 @@ export async function createAdapter(page, url) {
         return;
       }
       case 'reload':
-        await settle();
         await page.reload({ waitUntil: 'domcontentloaded' });
         await reopened();
         return;
@@ -511,7 +459,6 @@ export async function createAdapter(page, url) {
         await reopened();
         return;
       case 'goto': {
-        await settle();
         // Leaving the design takes the sketch along as a part, as Extrude makes one of it.
         // A sketch that can't be finished stays open, for leaving to say why.
         const finishSketch = page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: /Finish sketch/ });
@@ -526,7 +473,6 @@ export async function createAdapter(page, url) {
           .or(page.getByRole('button', { name: new RegExp(`^${rest}$`) }))
           .first()
           .click({ timeout: 30_000 });
-        await page.waitForTimeout(700);
         return;
       }
       case 'start': {
@@ -554,22 +500,21 @@ export async function createAdapter(page, url) {
       case 'edit':
         await page.getByText('Edit design', { exact: true }).first().click();
         await flatView();
-        await page.waitForTimeout(400);
         return;
       case 'closesketch':
-        await settle();
         await closeSketch();
         return;
       case 'finish': {
-        await settle();
         // A sketch closes back to the studio, and Done there accepts the design.
         if (!(await studioToolbar.isVisible())) await closeSketch();
         await extrudeSketch();
         const done = studioToolbar.getByRole('button', { name: /Done/ });
         await page.waitForFunction(element => !element.disabled, await done.elementHandle(), { timeout: 8000 });
         await done.click();
+        // Accepting checks and saves the design before it leaves, which can take longer than a click's timeout on a
+        // loaded runner: once that has settled, the stage has changed.
+        await settle();
         await page.waitForURL(u => !u.pathname.endsWith('/design'), { timeout: 8000 });
-        await page.waitForTimeout(800);
         return;
       }
       case 'cancel':
@@ -592,18 +537,25 @@ export async function createAdapter(page, url) {
         jobId = new URL(page.url()).pathname.split('/')[2];
         await reopened();
         await flatView();
-        await settle();
         return;
       }
       case 'design':
         await page.getByRole('link', { name: /Design/ }).first().click();
         await flatView();
-        await page.waitForTimeout(250);
         return;
       default:
         throw new Error(`Unknown step: ${text}`);
     }
   };
+
+  /** Every step settles before it returns, so whatever reads or checks next sees what the step finally did. */
+  const step = async text => {
+    const since = await settledSnapshot(page);
+    await act(text);
+    await settle(since);
+  };
+
+  await settle();
 
   const check = async expect => {
     const failures = [];
@@ -663,13 +615,6 @@ export async function createAdapter(page, url) {
     }
     if (expect.noFalseGrid && /\bgrid\b/i.test(scene.footer) && !scene.gridLines) fail('grid label', 'no label without a drawn grid', scene.footer);
     if ('pageText' in expect) {
-      // Route banners can update after the sketch solve and its persisted snapshot.
-      // Wait for the observable result instead of sampling one frame after Finish.
-      await page.waitForFunction(
-        pattern => new RegExp(pattern, 'i').test(document.body.innerText),
-        expect.pageText,
-        { timeout: 5000 }
-      ).catch(() => {});
       const text = await page.locator('body').innerText();
       if (!new RegExp(expect.pageText, 'i').test(text)) fail('pageText', expect.pageText, text.slice(0, 800));
     }
