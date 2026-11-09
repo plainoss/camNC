@@ -62,7 +62,39 @@ export function ExtrudeDialog({
   onOk,
   onCancel,
   onEditSketch,
-}: PartDialogProps & { onEditSketch: () => void }) {
+  pickFace,
+}: PartDialogProps & {
+  onEditSketch: () => void;
+  /** Starts picking a plane or a face, for Up to face; the pick comes back once. Null stops a pick under way. */
+  pickFace?: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
+}) {
+  const [pickingFace, setPickingFace] = useState(false);
+  /** Blind to a thickness, or up to a plane or face: its thickness then follows that face. */
+  const setUpTo = (upTo: CadDrawnOn['on'] | null) =>
+    onChange(document =>
+      changePart(document, part.id, p => {
+        const next = { ...p };
+        if (upTo) {
+          next.upTo = upTo;
+          delete next.symmetric;
+        } else delete next.upTo;
+        return next;
+      })
+    );
+  /** Stops waiting for a face, as when Blind or Thin is chosen instead. */
+  const stopPickingFace = () => {
+    if (!pickingFace) return;
+    setPickingFace(false);
+    pickFace?.(null);
+  };
+  const startPickingFace = () => {
+    if (!pickFace) return;
+    setPickingFace(true);
+    pickFace(on => {
+      setPickingFace(false);
+      setUpTo(on);
+    });
+  };
   const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo ? 'add' : 'new';
   const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
   // The parts an Add can join: made from the same sketch, of regions picked from it.
@@ -155,15 +187,20 @@ export function ExtrudeDialog({
   // A sketch that isn't one outline extrudes the region picked from it in the view; until then there's nothing to make.
   const profileError = part.thin ? undefined : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
   const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? formatCadValue(part.thin.depth)) : '100');
-  const setThin = (thin: CadPart['thin'] | null) =>
+  const setThin = (thin: CadPart['thin'] | null) => {
+    // A thin extrude has a depth of its own, so it no longer goes up to a face.
+    if (thin) stopPickingFace();
     onChange(document =>
       changePart(document, part.id, p => {
         const next = { ...p };
-        if (thin) next.thin = thin;
-        else delete next.thin;
+        if (thin) {
+          next.thin = thin;
+          delete next.upTo;
+        } else delete next.thin;
         return next;
       })
     );
+  };
   /** Takes the typed depth, or says why not. Whether it was taken. */
   const applyDepth = () => {
     const parsed = parseCadValue(depthText, { unit: 'mm', variables });
@@ -303,22 +340,72 @@ export function ExtrudeDialog({
               {part.regions ? profileError.message : 'Pick a region of the sketch in the view.'}
             </p>
           )}
-          <CadThicknessField
-            key={`${part.id}:thickness`}
-            value={part.thickness}
-            expression={part.thicknessExpression}
-            variables={variables}
-            onValidityChange={setThicknessValid}
-            onCommit={(thickness, thicknessExpression) =>
-              onChange(document =>
-                changePart(document, part.id, p => {
-                  const next = { ...p, thickness, thicknessExpression };
-                  if (thicknessExpression === undefined) delete next.thicknessExpression;
-                  return next;
-                })
-              )
-            }
-          />
+          {!part.thin && part.drawnOn && (
+            <label className="cad-number-field">
+              End type
+              <select
+                aria-label="End type"
+                value={part.upTo || pickingFace ? 'upTo' : 'blind'}
+                onChange={event => {
+                  if (event.target.value === 'upTo') return startPickingFace();
+                  stopPickingFace();
+                  setUpTo(null);
+                }}>
+                <option value="blind">Blind</option>
+                <option value="upTo">Up to face</option>
+              </select>
+            </label>
+          )}
+          {(part.upTo || pickingFace) && (
+            <button
+              type="button"
+              className="cad-feature-selection"
+              aria-label="Up to"
+              data-active={pickingFace ? '' : undefined}
+              onClick={startPickingFace}>
+              <small>Up to</small>
+              <span>
+                {part.upTo ? `${drawnOnName(document, part.upTo)}, ${formatCadValue(part.thickness)} mm away` : 'Pick a plane or a face'}
+              </span>
+            </button>
+          )}
+          {!part.upTo && !pickingFace && !part.thin && part.drawnOn && (
+            <label>
+              <input
+                type="checkbox"
+                checked={!!part.symmetric}
+                onChange={event =>
+                  onChange(document =>
+                    changePart(document, part.id, p => {
+                      const next = { ...p };
+                      if (event.target.checked) next.symmetric = true;
+                      else delete next.symmetric;
+                      return next;
+                    })
+                  )
+                }
+              />
+              Symmetric
+            </label>
+          )}
+          {!part.upTo && (
+            <CadThicknessField
+              key={`${part.id}:thickness`}
+              value={part.thickness}
+              expression={part.thicknessExpression}
+              variables={variables}
+              onValidityChange={setThicknessValid}
+              onCommit={(thickness, thicknessExpression) =>
+                onChange(document =>
+                  changePart(document, part.id, p => {
+                    const next = { ...p, thickness, thicknessExpression };
+                    if (thicknessExpression === undefined) delete next.thicknessExpression;
+                    return next;
+                  })
+                )
+              }
+            />
+          )}
           {part.thin && (
             <>
               <label className="cad-number-field">
