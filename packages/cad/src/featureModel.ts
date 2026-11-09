@@ -17,9 +17,18 @@ export function faceIsUnderside(part: CadPart, on: CadFaceSketch['on']): boolean
  */
 export const flipUnderside = <P extends { x: number; y: number }>(points: P[]): P[] => points.map(p => ({ ...p, x: -p.x })).reverse();
 
-/** The profile sketch first, then the face sketches, each as a part the sketch checks and the solver can walk. */
+/**
+ * The profile sketch first, then the face sketches, each as a part the sketch checks and the solver can walk. Sketches
+ * that are copies of another kept in step by the design, a shared sketch or a Remove step's, are checked and solved
+ * where they're drawn.
+ */
 export function sketchTargets(part: CadPart): CadPart[] {
-  return [part, ...cadFaceSketches(part).map(face => ({ id: part.id, name: part.name, thickness: part.thickness, sketch: face.sketch }))];
+  return [
+    ...(part.sketchOf ? [] : [part]),
+    ...cadFaceSketches(part)
+      .filter(face => !face.removedBy)
+      .map(face => ({ id: part.id, name: part.name, thickness: part.thickness, sketch: face.sketch })),
+  ];
 }
 
 export function validateCadFeatures(part: CadPart): CadDiagnostic[] {

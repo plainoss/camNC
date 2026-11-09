@@ -15,13 +15,14 @@
       "inputSha256": "911787ef319a04cf466afdb3e5537e4f69557199e8fc36e0ed078b743cad3b44",
       "warnings": [
         "Main: Pocket 1: Open-pocket path would reach a neighboring part; using a path inside the pocket",
-        "Main: pocket z=6: 7.7mm² left in corners/narrow spots with D=6"
+        "Main: Pocket 1: 3.9mm² left along the open edge with D=6: the path stays inside the pocket to keep clear of a neighboring part",
+        "Main: pocket z=6: 3.9mm² left in corners/narrow spots with D=6"
       ],
       "programs": [
         {
           "file": "board-neighbor-open-pocket.nc",
-          "sha256": "1534f267290752863097bdf9251a311e916ab663f3a66770ce6aa80897d78899",
-          "bytes": 1166,
+          "sha256": "f87d7a96596d145cf67353f134c44cfb691dcafd6b7d0de173fc90e431e91881",
+          "bytes": 1294,
           "operations": 1,
           "passes": 2,
           "toolNumbers": [
@@ -29,7 +30,7 @@
           ],
           "setup": {
             "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-5baab53238e5620e",
+            "planFingerprint": "cam-plan-v1-844fa02e6559c31a",
             "programName": "board-neighbor-open-pocket",
             "units": "mm",
             "origin": {
@@ -141,10 +142,11 @@
             },
             "warnings": [
               "Main: Pocket 1: Open-pocket path would reach a neighboring part; using a path inside the pocket",
-              "Main: pocket z=6: 7.7mm² left in corners/narrow spots with D=6"
+              "Main: Pocket 1: 3.9mm² left along the open edge with D=6: the path stays inside the pocket to keep clear of a neighboring part",
+              "Main: pocket z=6: 3.9mm² left in corners/narrow spots with D=6"
             ],
             "statistics": {
-              "bytes": 1166,
+              "bytes": 1294,
               "executableBlocks": 47,
               "motionBlocks": 39,
               "arcBlocks": 0,
@@ -155,7 +157,7 @@
               "unresolvedCuttingLines": 0,
               "minimumCuttingLineMm": 1,
               "averageCuttingLineMm": 12.488878603493331,
-              "maximumLineBytes": 105
+              "maximumLineBytes": 127
             }
           }
         }

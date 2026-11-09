@@ -20,8 +20,8 @@ import type {
   EvaluatedCadPart,
 } from './types';
 
-/** Whether a part is one, rather than a sketch not yet extruded. */
-export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !part.suppressed;
+/** Whether a part is one, rather than a sketch not yet extruded, a suppressed extrude, or an extrude that adds to or cuts others. */
+export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !part.suppressed && !part.addTo && !part.remove;
 
 /** Features belong to the newer format, so an older build refuses the file instead of silently cutting without them. */
 export function withFeatureVersion(document: CadDocument): CadDocument {
@@ -222,12 +222,13 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
   if (!part.cornerRelief) return cut;
   const { part: next, skipped } = relieveCorners(cut.part, part.cornerRelief.diameter);
   const diagnostics = [...cut.diagnostics];
-  if (skipped)
+  if (skipped.length)
     diagnostics.push({
       code: 'corner-relief-skipped',
       severity: 'warning',
       partId: part.id,
-      message: `${skipped === 1 ? 'One corner is' : `${skipped} corners are`} too tight for a ${part.cornerRelief.diameter} mm bone and stay square.`,
+      message: `${skipped.length === 1 ? 'One corner is' : `${skipped.length} corners are`} too tight for a ${part.cornerRelief.diameter} mm bone and stay square.`,
+      points: skipped,
     });
   return { part: next, diagnostics };
 }

@@ -201,6 +201,18 @@ describe('corner relief', () => {
     seat.profile.rect({ at: [80, 91], w: 40, h: 18 });
   };
 
+  it('says where each corner too tight for a bone is, so it can be found', async () => {
+    const { report } = await editCad(null, d => {
+      const seat = d.part('Seat', { thickness: 18, relief: 6 });
+      seat.profile.rect({ at: [0, 0], w: 200, h: 200 });
+      seat.profile.rect({ at: [80, 90], w: 5, h: 5 });
+    });
+    const warning = report.warnings.find(w => w.code === 'corner-relief-skipped');
+    expect(warning?.at).toHaveLength(4);
+    expect(new Set(warning!.at!.map(p => p.join()))).toEqual(new Set(['80,90', '85,90', '85,95', '80,95']));
+    expect(warning!.message).toMatch(/^4 corners are too tight for a 6 mm bone and stay square\. At \[.+\]\.$/);
+  });
+
   it('puts dogbones in square inside corners and keeps the diameter as an expression', async () => {
     const { report, document, parts } = await editCad(null, mortised('bit'));
     expect(report.errors).toEqual([]);

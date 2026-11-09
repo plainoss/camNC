@@ -23,8 +23,13 @@ This plan moves there in stages. Every document saved today keeps loading, and e
 
 ## Stage 3: one sketch, several features
 
-- `CadPart.sketchOf?: string` points a part at another part's or sketch feature's sketch instead of its own. The evaluation resolves it, and editing the shared sketch updates every feature that uses it.
-- Extrude → Add merges into an existing part. Remove cuts the picked regions into the parts they reach. Today's `extrudeRemove` turns into this, with no separate face sketch.
+- `CadPart.sketchOf?: string` points a part at another part's or sketch feature's sketch instead of its own. `resolveExtrudeSteps` keeps a copy of that sketch on the part, on the same plane or face, after every change and every solve, so editing the shared sketch updates every feature that uses it. The copy's IDs are the sketch's own: checks and the solver skip it. When the sketch's owner is deleted, the first part still using it owns it.
+- Extrude on a part whose sketch has regions none of its extrudes use makes a new part of those regions, sharing the sketch. When the extrudes use all of it, Extrude opens the part's own, as before. Picked regions that touch make one part; regions apart are refused.
+- The Extrude dialog's operation tabs are New / Add / Remove:
+  - `CadPart.addTo` makes the step an Add: its regions join a part made from the same sketch, written to that part's `addedRegions`. Merge with picks the part.
+  - `CadPart.remove` makes it a Remove: its picked regions, or every closed region but what's left of the face, are cut into the board the sketch is drawn on. The board gets a face sketch and cuts marked `removedBy`, kept in step with the step. The step keeps its own sketch, and the feature list shows it as an extrude, not as the board's cuts. This replaces the `extrudeRemove` converter.
+  - Add and Remove steps aren't parts: they're left out of the parts list, the 3D view's parts, CAM and reports.
+- Not yet: one Extrude of regions apart making several parts, a Remove reaching parts other than the board it's drawn on, Add across sketches, and Intersect.
 
 ## Stage 4: references to other parts
 

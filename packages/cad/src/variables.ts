@@ -243,7 +243,7 @@ function mapPlacements(part: CadPart, edit: (placement: CadPlacement | undefined
   return { ...part, ...(placement !== part.placement && { placement }), ...(copiesChanged && { copies }) };
 }
 
-function depthOutcome(cut: CadCut, scope: CadValueScope): Outcome | null {
+function depthOutcome(cut: Pick<CadCut, 'depthExpression'>, scope: CadValueScope): Outcome | null {
   if (!usesVariables(cut.depthExpression)) return null;
   const parsed = parseCadValue(cut.depthExpression, { unit: 'mm', variables: scope });
   if ('error' in parsed) return parsed;
@@ -297,6 +297,9 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     const pattern = partPatternOutcome(sized, scope);
     if (pattern && 'count' in pattern && (pattern.count !== sized.pattern!.count || pattern.spacing !== sized.pattern!.spacing))
       sized = { ...sized, pattern: { ...sized.pattern!, ...pattern } };
+    const removal = sized.remove && depthOutcome(sized.remove, scope);
+    if (removal && 'value' in removal && removal.value !== sized.remove!.depth)
+      sized = { ...sized, remove: { ...sized.remove!, depth: removal.value } };
     sized = mapCuts(sized, cut => {
       const outcome = depthOutcome(cut, scope);
       return outcome && 'value' in outcome && outcome.value !== cut.depth ? { ...cut, depth: outcome.value } : cut;
