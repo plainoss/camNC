@@ -164,6 +164,13 @@ export async function createAdapter(page, url) {
     await page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: /Finish sketch/ }).click();
     await studioToolbar.waitFor();
   };
+  /** Back to the Part Studio from an open sketch; anywhere else, such as the Plan stage, says what needed it. */
+  const toStudio = async what => {
+    if (await studioToolbar.isVisible()) return;
+    if (!(await page.getByRole('dialog', { name: /^Sketch ·/ }).isVisible()))
+      throw new Error(`${what} needs the Part Studio, and this page is not in it. A render can use --view page here.`);
+    await closeSketch();
+  };
   /**
    * A finished sketch is a sketch until it's extruded: Shift+E extrudes it as it is, as the reference's Extrude. A part
    * already extruded is left as it is, since Extrude would start another extrude of it.
@@ -373,7 +380,7 @@ export async function createAdapter(page, url) {
       }
       case 'hideplanes': {
         // The origin and base planes off with their eyes in the feature list, so a fitted view frames the parts alone.
-        if (!(await studioToolbar.isVisible())) await closeSketch();
+        await toStudio('Hiding the planes');
         const geometry = page.getByRole('list', { name: 'Default geometry' });
         const shown = geometry.getByRole('button', { name: 'Hide', exact: true });
         for (let left = await shown.count(); left > 0; left--) {
@@ -388,7 +395,7 @@ export async function createAdapter(page, url) {
         // A named view of the Part Studio's 3D view, by its keyboard shortcut (the studio toolbar's Views help).
         const digit = NAMED_VIEWS.indexOf(rest) + 1;
         if (!digit) throw new Error(`Unknown view: ${rest}. Use one of ${NAMED_VIEWS.join(', ')}`);
-        if (!(await studioToolbar.isVisible())) await closeSketch();
+        await toStudio(`The ${rest} view`);
         const workspace = page.getByTestId('workspace-3d');
         const scene = workspace.locator('canvas').first();
         await scene.waitFor({ timeout: 30_000 });

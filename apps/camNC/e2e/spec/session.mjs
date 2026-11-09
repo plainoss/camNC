@@ -54,7 +54,8 @@ export function createSession({ open, outDir }) {
     render: async ({ adapter, page }, rest) => {
       const files = [];
       for (const view of rest ? rest.split(/\s+/) : ['iso']) {
-        await adapter.step(`view ${view}`);
+        // `page` is the page as it is, for a state outside the Part Studio such as the Plan stage.
+        if (view !== 'page') await adapter.step(`view ${view}`);
         files.push(await artifact(view, 'png', file => page.screenshot({ path: file })));
       }
       const { parts } = await adapter.state();
@@ -93,7 +94,9 @@ export function createSession({ open, outDir }) {
     const errors = current?.runtime.splice(0) ?? [];
     return { line: text, ...result, ...(errors.length && { errors }), ms: Date.now() - started };
   };
-  return { run, close: closePage };
+  /** The page as it is now, unsettled, as a render writes it after a failed step. Null when there is no page. */
+  const screenshot = async name => (current ? artifact(name, 'png', file => current.page.screenshot({ path: file })) : null);
+  return { run, screenshot, close: closePage };
 }
 
 function parseArgs(args) {
@@ -135,6 +138,7 @@ export async function browserSession(options) {
   const session = createSession({ open, outDir });
   return {
     run: session.run,
+    screenshot: session.screenshot,
     close: async () => {
       await session.close();
       await browser?.close();

@@ -86,6 +86,17 @@ test('render sets each named view and writes a picture of it', async () => {
   assert.deepEqual((await session.run('render')).files, [path.join(outDir, 'iso.png')]);
 });
 
+test('render page writes the page as it is, and a screenshot needs no settling', async () => {
+  const { log, session, outDir } = await fixture({ settle: async () => assert.fail('a screenshot does not settle') });
+  assert.equal(await session.screenshot('none-yet'), null);
+  await session.run('reset');
+  assert.equal(await session.screenshot('failed-step-1'), path.join(outDir, 'failed-step-1.png'));
+  const { log: shown, session: rendered, outDir: dir } = await fixture();
+  assert.deepEqual((await rendered.run('render page top')).files, [path.join(dir, 'page.png'), path.join(dir, 'top.png')]);
+  assert.deepEqual(shown.steps, ['view top']);
+  assert.deepEqual(log.steps, []);
+});
+
 test('reset starts over on a fresh page', async () => {
   const { log, session } = await fixture();
   await session.run('rect 0,0 1,1');
