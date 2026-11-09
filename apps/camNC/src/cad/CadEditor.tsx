@@ -553,6 +553,23 @@ export function CadEditor({
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // A part being copied by a transform, or the transformed copy being changed.
   const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string; move?: boolean } | null>(null);
+  // When a step's dialog closes, the view has the keyboard again, so its shortcuts work straight away.
+  const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || transformDialog || partCutting);
+  const dialogWasOpen = useRef(false);
+  useEffect(() => {
+    const closed = dialogWasOpen.current && !stepDialogOpen;
+    dialogWasOpen.current = stepDialogOpen;
+    if (!closed || !studioSession || !showWorkspace) return;
+    const focusView = (frames: number) =>
+      requestAnimationFrame(() => {
+        const active = root.current?.ownerDocument.activeElement;
+        if (active && active !== root.current?.ownerDocument.body && active.isConnected) return;
+        const view = root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]');
+        if (view && !view.closest('[inert]')) view.focus();
+        else if (frames > 0) focusView(frames - 1);
+      });
+    focusView(30);
+  }, [stepDialogOpen, studioSession, showWorkspace]);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
@@ -675,11 +692,16 @@ export function CadEditor({
   const mounted = useRef(true);
   callbacks.current = { onDraftChange, onFinish, onCancel, onFinishBlocked };
   const deferredCanvasFocus = useRef<(() => void) | null>(null);
+  // The field of a step's dialog last typed in: solving makes the view inert, which drops the keyboard, and it goes back.
+  const dialogFocus = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     if (!busy) {
       const restore = deferredCanvasFocus.current;
       deferredCanvasFocus.current = null;
       restore?.();
+      const field = dialogFocus.current;
+      const active = field?.ownerDocument.activeElement;
+      if (field?.isConnected && (!active || active === field.ownerDocument.body)) field.focus();
     }
   }, [busy]);
   const restoreCanvasKeyboard = () => {
@@ -4255,6 +4277,10 @@ export function CadEditor({
       aria-busy={busy}
       data-demo-mode={isDemoMode() || undefined}
       onKeyDown={keyDown}
+      onFocus={event => {
+        const target = event.target as HTMLElement;
+        dialogFocus.current = target.closest('.cad-feature-dialog') ? target : null;
+      }}
       onKeyUp={event => event.stopPropagation()}>
       {studioSession && showWorkspace ? (
         <StudioToolbar
