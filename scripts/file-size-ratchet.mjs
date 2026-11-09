@@ -8,8 +8,10 @@
 //   node scripts/file-size-ratchet.mjs --staged [files...]  check the content staged in the git index (pre-commit hook)
 //   node scripts/file-size-ratchet.mjs --update             lower ceilings of files that shrank, drop entries that fit
 //
-// The pre-commit hook passes `--staged`, so the check reads each file's staged content with `git show :<path>`. That is
-// what the commit will contain, even when the working file has unstaged edits or Prettier is rewriting it in parallel.
+// The pre-commit hook passes `--staged`, so the check reads each file's staged content with `git show :<path>`, which
+// ignores unstaged edits. nano-staged runs the hook's Prettier entry concurrently and stages its output only after every
+// entry finishes, so for the files that entry formats, the check formats the staged content the same way first (same
+// config, same .prettierignore) and counts what the commit will actually contain.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
@@ -17,6 +19,8 @@ import { fileURLToPath } from 'node:url';
 
 export const CONFIG_FILE = 'scripts/file-size-ceilings.json';
 export const DEFAULT_LIMIT = 1000;
+// Files the hook's `prettier --write` entry rewrites before they are committed. Keep in sync with package.json.
+export const FORMATTED_AT_COMMIT = /\.(ts|tsx)$/;
 
 const SOURCE = /\.(ts|tsx|mjs|js)$/;
 const ROOTS = ['apps/', 'packages/'];
@@ -129,8 +133,23 @@ export function saveConfig(root, config) {
   writeFileSync(resolve(root, CONFIG_FILE), `${JSON.stringify({ ...config, ceilings }, null, 2)}\n`);
 }
 
-/** Runs the CLI. Returns the exit code. */
-export function main(args, { root = resolve(fileURLToPath(import.meta.url), '../..'), cwd = process.cwd() } = {}) {
+/** Formats text as the hook's Prettier entry would format the file at `path`, unless Prettier ignores or can't parse it. */
+export async function formatLikeHook(root, path, text) {
+  if (!FORMATTED_AT_COMMIT.test(path)) return text;
+  const prettier = await import('prettier');
+  const file = resolve(root, path);
+  const info = await prettier.getFileInfo(file, { ignorePath: resolve(root, '.prettierignore') });
+  if (info.ignored || !info.inferredParser) return text;
+  const options = (await prettier.resolveConfig(file)) ?? {};
+  try {
+    return await prettier.format(text, { ...options, filepath: file });
+  } catch {
+    return text; // Prettier fails the commit on its own for a syntax error.
+  }
+}
+
+/** Runs the CLI. Resolves to the exit code. */
+export async function main(args, { root = resolve(fileURLToPath(import.meta.url), '../..'), cwd = process.cwd() } = {}) {
   const staged = args.includes('--staged');
   const updating = args.includes('--update');
   const unknown = args.find(arg => arg.startsWith('--') && arg !== '--staged' && arg !== '--update');
@@ -149,7 +168,7 @@ export function main(args, { root = resolve(fileURLToPath(import.meta.url), '../
     let text;
     if (staged) {
       try {
-        text = git(root, ['show', `:${path}`]);
+        text = await formatLikeHook(root, path, git(root, ['show', `:${path}`]));
       } catch {
         continue; // Not in the index, e.g. deleted.
       }
@@ -174,5 +193,5 @@ export function main(args, { root = resolve(fileURLToPath(import.meta.url), '../
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  process.exitCode = main(process.argv.slice(2));
+  process.exitCode = await main(process.argv.slice(2));
 }
