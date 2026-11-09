@@ -7,7 +7,7 @@
     "lint": "turbo run lint",
     "test": "node scripts/test-lock.mjs \"node scripts/turbo-shared-cache.mjs run test --filter=!@wbcnc/camNC -- run && node scripts/turbo-shared-cache.mjs run test:licenses test:domain test:worker test:browser && pnpm run test:performance\"",
     "test:fast": "node scripts/test-lock.mjs \"node scripts/turbo-shared-cache.mjs run test --filter=!@wbcnc/camNC -- run && node scripts/turbo-shared-cache.mjs run test:licenses test:domain test:worker test:fast\"",
-    "test:ci": "node --test scripts/ci-config.test.mjs scripts/test-lock.test.mjs scripts/test-timings.test.mjs scripts/spec-sharding.test.mjs scripts/balanced-shards.test.mjs scripts/flaky-tests.test.mjs scripts/spec-results.test.mjs scripts/file-size-ratchet.test.mjs scripts/status.test.mjs",
+    "test:ci": "node --test scripts/ci-config.test.mjs scripts/test-lock.test.mjs scripts/test-timings.test.mjs scripts/spec-sharding.test.mjs scripts/balanced-shards.test.mjs scripts/flaky-tests.test.mjs scripts/spec-results.test.mjs scripts/node-test-junit.test.mjs scripts/file-size-ratchet.test.mjs scripts/status.test.mjs",
     "test:performance": "pnpm --filter @wbcnc/cam test:performance && pnpm --filter @wbcnc/camNC test:performance",
     "format": "biome format --write && prettier --write \"**/*.md\"",
     "check-format": "biome format && prettier --check \"**/*.md\"",

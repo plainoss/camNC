@@ -41,6 +41,10 @@ jobs:
         env:
           NODE_OPTIONS: --test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/junit/node-test.xml
         run: pnpm run test:ci
+      # Node's junit reporter leaves top-level tests outside any <testsuite>, which Mergify's parser rejects.
+      - name: Group node --test results into a suite
+        if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('test-results/junit/node-test.xml') != ''
+        run: node scripts/node-test-junit.mjs test-results/junit/node-test.xml
       - name: Upload CI configuration test results to Mergify
         if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('test-results/junit/node-test.xml') != ''
         uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29
@@ -155,6 +159,10 @@ jobs:
           report_path: apps/*/test-results/junit/worker.xml
           job_name: Tests (${{ matrix.suite }}, Workers pool)
           test_step_outcome: ${{ steps.tests.outcome }}
+      # Node's junit reporter leaves top-level tests outside any <testsuite>, which Mergify's parser rejects.
+      - name: Group node --test results into a suite
+        if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/camNC/test-results/junit/node-test.xml') != ''
+        run: node scripts/node-test-junit.mjs apps/camNC/test-results/junit/node-test.xml
       - name: Upload node --test results to Mergify
         if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/camNC/test-results/junit/node-test.xml') != ''
         uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29
@@ -277,6 +285,10 @@ jobs:
         env:
           NODE_OPTIONS: --test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/junit/node-test.xml
         run: pnpm --filter @wbcnc/camNC test:render
+      # Node's junit reporter leaves top-level tests outside any <testsuite>, which Mergify's parser rejects.
+      - name: Group node --test results into a suite
+        if: (success() || failure()) && matrix.shard == '1/4' && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/camNC/test-results/junit/node-test.xml') != ''
+        run: node scripts/node-test-junit.mjs apps/camNC/test-results/junit/node-test.xml
       - name: Upload rendering test results to Mergify
         if: (success() || failure()) && matrix.shard == '1/4' && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/camNC/test-results/junit/node-test.xml') != ''
         uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29
