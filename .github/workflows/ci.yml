@@ -52,6 +52,8 @@ jobs:
           restore-keys: turbo-checks-
       - name: Check formatting
         run: pnpm run check-format
+      - name: Check file sizes
+        run: pnpm run check-file-size
       - name: Run linting
         run: pnpm run lint
       - name: Check types
