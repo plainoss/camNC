@@ -1,3 +1,4 @@
+import { cadCopyName } from './partPatterns';
 import type { CadDocument, CadPart } from './types';
 
 /**
@@ -6,19 +7,29 @@ import type { CadDocument, CadPart } from './types';
  * keeps its settings for when it's switched back on.
  */
 export function activeDesign(document: CadDocument): CadDocument {
+  const sketches = new Set(document.parts.filter(part => part.extrude === false).map(part => part.id));
   const suppressedSomething =
-    document.partCuts?.some(step => step.suppressed) ||
+    document.partCuts?.some(step => step.suppressed || [...step.tools, ...step.targets].some(id => sketches.has(id.split(':')[0]!))) ||
     document.parts.some(part => part.suppressed || part.pattern?.suppressed || part.copies?.some(copy => copy.suppressed));
   if (!suppressedSomething) return document;
   const parts = document.parts.map((part): CadPart => {
     const next: CadPart = part.suppressed ? { ...part, extrude: false } : { ...part };
     if (part.pattern?.suppressed) delete next.pattern;
-    const copies = (part.copies ?? []).filter(copy => !copy.suppressed && !(copy.pattern && part.pattern?.suppressed));
+    // The copies left keep the names they had, rather than moving up into a suppressed one's.
+    const copies = (part.copies ?? [])
+      .map((copy, index) => ({ ...copy, name: cadCopyName(part, index) }))
+      .filter(copy => !copy.suppressed && !(copy.pattern && part.pattern?.suppressed));
     if (copies.length) next.copies = copies;
     else delete next.copies;
     return next;
   });
-  const partCuts = (document.partCuts ?? []).filter(step => !step.suppressed);
+  // A part that isn't built cuts nothing and is cut by nothing, as a sketch not yet extruded.
+  const built = new Set(parts.filter(part => part.extrude !== false).map(part => part.id));
+  const kept = (ids: string[]) => ids.filter(id => built.has(id.split(':')[0]!));
+  const partCuts = (document.partCuts ?? [])
+    .filter(step => !step.suppressed)
+    .map(step => ({ ...step, tools: kept(step.tools), targets: kept(step.targets) }))
+    .filter(step => step.tools.length && step.targets.length);
   const next: CadDocument = { ...document, parts };
   if (partCuts.length) next.partCuts = partCuts;
   else delete next.partCuts;

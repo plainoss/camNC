@@ -129,7 +129,8 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
   const parts = document.parts
     .filter(part => kept.has(`${part.id}:sketch`))
     .map(part => {
-      const next: CadPart = { ...part };
+      // Rolled back past its extrude, a part is only its sketch.
+      const next: CadPart = kept.has(`${part.id}:extrude`) || part.extrude === false ? { ...part } : { ...part, extrude: false };
       if (part.features) next.features = part.features.filter(feature => kept.has(feature.id));
       const pattern = part.pattern && kept.has(part.pattern.id);
       if (!pattern) delete next.pattern;

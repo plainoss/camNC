@@ -4,9 +4,11 @@ import {
   addPartCut,
   setPartPattern,
   cadSketchRegions,
+  createCadDocument,
   createCadPart,
   createPlateDocument,
   setCutDepth,
+  type CadDocument,
 } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
 import { designSteps, rolledBackTo } from './designSteps';
@@ -90,4 +92,11 @@ describe('the design’s steps', () => {
     // The last step shows everything.
     expect(rolledBackTo(document, document.partCuts![0]!.id)).toBe(document);
   });
+});
+
+it('leaves a part only its sketch when the design is rolled back to before its extrude', () => {
+  const part = { ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name: 'Plate' };
+  const document: CadDocument = { ...createCadDocument(), parts: [part] };
+  expect(rolledBackTo(document, `${part.id}:sketch`).parts[0]!.extrude).toBe(false);
+  expect(rolledBackTo(document, `${part.id}:extrude`).parts[0]!.extrude).toBeUndefined();
 });

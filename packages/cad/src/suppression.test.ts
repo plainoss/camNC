@@ -18,11 +18,26 @@ describe('suppressed steps', () => {
     // The design itself still has them.
     expect(document.parts[1]!.copies).toHaveLength(2);
     const evaluated = evaluateCadDocument(document);
-    expect(cadPartsToCut(document, evaluated.parts).map(entry => entry.names)).toEqual([['B', 'B 2']].map(names => names.slice(0, 2)));
+    expect(cadPartsToCut(document, evaluated.parts).map(entry => entry.names)).toEqual([['B', 'B 3']]);
   });
 
   it('leaves a design with nothing suppressed as it is', () => {
     const document: CadDocument = { ...createCadDocument(), parts: [plate('A')] };
     expect(activeDesign(document)).toBe(document);
+  });
+});
+
+describe('suppressed steps, more', () => {
+  it('cut nothing with a suppressed part, and keep the copies after a suppressed one named as they were', () => {
+    const tool = { ...plate('Tool'), suppressed: true as const };
+    const target = { ...plate('Target'), copies: [{ id: 'c1', suppressed: true as const }, { id: 'c2' }] };
+    const document: CadDocument = {
+      ...createCadDocument(),
+      parts: [tool, target],
+      partCuts: [{ id: 'cut', tools: [tool.id], targets: [target.id], clearance: 0 }],
+    };
+    const built = activeDesign(document);
+    expect(built.partCuts).toBeUndefined();
+    expect(built.parts[1]!.copies?.map(copy => copy.name)).toEqual(['Target 3']);
   });
 });
