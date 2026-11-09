@@ -5,14 +5,22 @@ import type { CadDocument, CadPart, CadPointEntity, CadSketch } from './types';
 type Vec3 = [number, number, number];
 type Frame = { origin: Vec3; x: Vec3; y: Vec3; normal: Vec3 };
 
-/** Where a corner of a part is in the studio: a point of its sketch, on its top or its bottom. */
+/**
+ * Where a corner of a part is in the studio: a point of its sketch, on its top or its bottom. Its sketch's axes come
+ * from the plane or face it's drawn on rather than its saved turn, which is kept to nine places: turned through that, a
+ * corner 600 mm out lands a micrometre off, enough that an upright edge used from it isn't upright, and a sketch tied
+ * to both its ends can't be solved.
+ */
 function cornerAt(document: CadDocument, part: CadPart, pointId: string, side: 'top' | 'bottom'): Vec3 | null {
   if (part.thin || !part.drawnOn) return null;
   const point = part.sketch.entities.find((entity): entity is CadPointEntity => entity.type === 'point' && entity.id === pointId);
-  const top = cadFaceFrame(document, { partId: part.id, face: 'top' });
-  if (!point || 'error' in top) return null;
-  const down = side === 'bottom' ? part.thickness : 0;
-  return [0, 1, 2].map(axis => top.origin[axis]! + top.x[axis]! * point.x + top.y[axis]! * point.y - top.normal[axis]! * down) as Vec3;
+  const frame = cadSketchFrame(document, part);
+  if (!point || !frame) return null;
+  // Where the sketch's origin is, as the part is placed, which takes in a move by a transform. Its underside sits there.
+  const inward = part.drawnOn.inward ? -part.thickness : 0;
+  const origin = part.placement?.position ?? frame.origin.map((value, axis) => value + frame.normal[axis]! * inward);
+  const up = side === 'top' ? part.thickness : 0;
+  return [0, 1, 2].map(axis => origin[axis]! + frame.x[axis]! * point.x + frame.y[axis]! * point.y + frame.normal[axis]! * up) as Vec3;
 }
 
 /** A point of the studio seen on a sketch's plane, in that sketch's own mm. */

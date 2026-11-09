@@ -3,6 +3,7 @@ import { profileFeatures, summarizePart, type FlatPart, type PartFeatures } from
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three';
 import type { BodyMesh, CamPartInfo, ModelImport, Outline2D } from './camTypes';
 import { cutPartMesh } from './cutPartMesh';
+import { asMilled } from './millSide';
 
 export interface NativeCadEntry {
   part: FlatPart;
@@ -81,7 +82,7 @@ export async function nativeCadModel(document: CadDocument): Promise<{ model: Mo
   const solved = await solveCadDocument(document);
   if (solved.status !== 'solved') throw new Error(solved.diagnostics.map(d => d.message).join(' ') || 'The design could not be solved.');
   const parts = cadPartsToCut(solved.document, solved.parts).map(({ part, names }) => {
-    const native = nativePart(part);
+    const native = nativePart(asMilled(part));
     native.info.names = names;
     // A mirrored copy is cut as a part of its own, relieved like the part it mirrors.
     const relief = solved.document.parts.find(source => part.partId.split(':')[0] === source.id)?.cornerRelief;

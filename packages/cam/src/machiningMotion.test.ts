@@ -107,34 +107,10 @@ describe('machining motion invariants', () => {
     expect(outline.passes.some(p => p.roles?.includes('corner'))).toBe(false);
   });
 
-  it('leaves floor stock during roughing and finishes floor/walls in bounded depth increments', () => {
-    const cam = camPart(machiningCases.rectangle(), {
-      cutThrough: false,
-      maxStepdown: 1.5,
-      pocketWallAllowance: 0.2,
-      pocketFloorAllowance: 0.4,
-      pocketFinishStepdown: 0.5,
-    });
-    const op = cam.operations[0];
-    expect(op.passes.filter(p => p.phase === 'rough').every(p => minimum(p) >= 6.4 - 1e-8)).toBe(true);
-    expect(Math.min(...op.passes.map(minimum))).toBe(6);
-    const finishLevels = [12, ...new Set(op.passes.filter(p => p.phase === 'finish').map(minimum))];
-    for (let i = 1; i < finishLevels.length; i++) expect(finishLevels[i - 1] - finishLevels[i]).toBeLessThanOrEqual(0.5 + 1e-8);
-    const gcode = toGcode(cam);
-    expect(
-      Math.min(
-        ...readGcode(gcode)
-          .filter(m => m.spindle)
-          .map(m => m.to[2])
-      )
-    ).toBeGreaterThanOrEqual(6 - 1e-6);
-    expect(checkGcodeSafety(gcode, { stockTop: 12, size: [100, 70], minZ: 6, toolRadius: 3.175 / 2 })).toEqual([]);
-  });
-
-  it('keeps the requested tab plateau through repeated ramp laps and optional shoulders', () => {
+  it('keeps the requested tab plateau through repeated ramp laps', () => {
     const tool = DEFAULT_SETTINGS.tools[0],
       r = tool.diameter / 2;
-    const tabs = { height: 2, width: 5, minCount: 1, spacing: 200, centers: [{ x: 45, y: 20 }], rampLength: 2 };
+    const tabs = { height: 2, width: 5, minCount: 1, spacing: 200, centers: [{ x: 45, y: 20 }] };
     const op = profileOperation('tabbed', rectangle(20, 20, 70, 50), 12, tool, {
       ...DEFAULT_SETTINGS,
       tabs,
@@ -159,20 +135,6 @@ describe('machining motion invariants', () => {
     expect(final.pts.every(p => Math.abs(p[2] + 0.3) < 1e-8 || p[2] > -0.3)).toBe(true);
     const removal = tabRemovalProgram(program(op), { feed: 600, plungeFeed: 300 });
     expect(removal.tabs).toHaveLength(1);
-    expect(removal.tabs[0].length).toBeLessThan(tabs.width + tool.diameter + 2 * tabs.rampLength + 0.1);
-  });
-
-  it('generates contained tangent entry/exit and diagnoses conservative fallbacks', () => {
-    const tool = DEFAULT_SETTINGS.tools[0];
-    const hole = profileOperation('hole', circle(50, 35, 10), 12, tool, { ...DEFAULT_SETTINGS, profileEntry: 'tangent' }, true);
-    expect(hole.passes.every(p => p.entry === 'tangent')).toBe(true);
-    expect(hole.passes.some(p => p.roles?.includes('lead-in'))).toBe(true);
-    const tabbed = profileOperation('tabbed', rectangle(20, 20, 70, 50), 12, tool, {
-      ...DEFAULT_SETTINGS,
-      profileEntry: 'tangent',
-      tabs: { height: 2, width: 5, minCount: 3, spacing: 100 },
-    });
-    expect(tabbed.passes.every(p => p.entry === 'ramp' || p.entry === undefined)).toBe(true);
-    expect(tabbed.warnings).toContain('Tangent entry with tabs uses a contour ramp to preserve the holding material');
+    expect(removal.tabs[0].length).toBeLessThan(tabs.width + tool.diameter + 0.1);
   });
 });

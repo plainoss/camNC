@@ -508,7 +508,7 @@ export function CadEditor({
   // A base plane, or one of the design's planes, by its id.
   const [selectedPlane, setSelectedPlane] = useState<string | null>(null);
   // A dialog waiting for a plane or face to be picked for a direction, as the Transform dialog's Direction box.
-  const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on']) => void) | null>(null);
+  const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on'], datum?: string) => void) | null>(null);
   // Where the rollback bar was moved to in the feature list: the step it sits after. Null is the end.
   const [rolledTo, setRolledTo] = useState<string | null>(null);
   // The part whose row is hovered in the feature list, highlighted in the view as the reference does.
@@ -555,6 +555,21 @@ export function CadEditor({
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
+  const [cancelledSketch, setCancelledSketch] = useState<{
+    document: CadDocument;
+    partId: string;
+    before: CadDocument;
+  } | null>(null);
+  useEffect(() => {
+    if (!cancelledSketch) return;
+    const timer = setTimeout(() => setCancelledSketch(null), 12_000);
+    return () => clearTimeout(timer);
+  }, [cancelledSketch]);
+  useEffect(() => {
+    // Accepting the design, or anything else that makes the editor busy, saves what's there: a restore can't race it.
+    if (busy || !showWorkspace || choosingFace || featureDialog || partCutting || variableDialog || transformDialog)
+      setCancelledSketch(null);
+  }, [busy, showWorkspace, choosingFace, featureDialog, partCutting, variableDialog, transformDialog]);
   useEffect(() => {
     const element = svg.current;
     if (!element) return;
@@ -899,6 +914,7 @@ export function CadEditor({
   }, [sketch]);
 
   const publish = (next: CadDocument) => {
+    setCancelledSketch(null);
     setFinishError(null);
     documentRef.current = next;
     setDocument(next);
@@ -3580,6 +3596,7 @@ export function CadEditor({
   };
   /** Opens a part's sketch from the studio, remembering the design to go back to if it's cancelled. */
   const openSketch = (stepPartId: string, before = documentRef.current) => {
+    setCancelledSketch(null);
     // A shared sketch is edited where it's drawn, and every extrude of it follows.
     const partId = documentRef.current.parts.find(candidate => candidate.id === stepPartId)?.sketchOf ?? stepPartId;
     sketchBefore.current = before;
@@ -3606,7 +3623,11 @@ export function CadEditor({
         (creationValues?.editing ? applyCreationValue({ advance: false }) : null);
       if (error) return setMessage(error);
     }
-    if (!keep && sketchBefore.current) commit(sketchBefore.current);
+    if (!keep && sketchBefore.current) {
+      const cancelled = { document: structuredClone(documentRef.current), partId: part!.id, before: sketchBefore.current };
+      commit(sketchBefore.current);
+      if (studioSession) setCancelledSketch(cancelled);
+    }
     sketchBefore.current = null;
     // A sketch just finished is extruded with nothing picked yet.
     setSketchRowPicked(null);
@@ -3798,7 +3819,7 @@ export function CadEditor({
     const picked = pickedPlane(documentRef.current, plane);
     if (!picked) return;
     if (directionPicker) {
-      directionPicker(picked.on);
+      directionPicker(picked.on, picked.datum);
       return setDirectionPicker(null);
     }
     if (choosingFace) {
@@ -4097,20 +4118,24 @@ export function CadEditor({
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
   // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
-  const sketchCanFinish = edgeOnBoard
-    ? !solving
-    : faceSketch
-      ? !solving &&
-        !problems.length &&
-        !splitFirst &&
-        !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length)
-      : thicknessValid &&
-        !solving &&
-        !problems.length &&
-        numberOfShapes > 0 &&
-        !splitFirst &&
-        !((tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length) &&
-        !((tool === 'fillet' || tool === 'chamfer') && selected.length);
+  const sketchFinishReason = solving
+    ? 'Wait for the current sketch check to finish.'
+    : edgeOnBoard
+      ? null
+      : !faceSketch && !thicknessValid
+        ? 'Enter a valid part thickness before finishing the sketch.'
+        : problems.length
+          ? problems.join(' ')
+          : !faceSketch && numberOfShapes === 0
+            ? 'Draw an outline before finishing the sketch.'
+            : splitFirst
+              ? 'Choose the second split point or press Escape before finishing the sketch.'
+              : (tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length
+                ? 'Apply the preview or press Escape before finishing the sketch.'
+                : !faceSketch && (tool === 'fillet' || tool === 'chamfer') && selected.length
+                  ? 'Apply the corner preview or press Escape before finishing the sketch.'
+                  : null;
+  const sketchCanFinish = sketchFinishReason === null;
   // The parts, each with an eye to show or hide it in the view. In the studio they sit at the bottom left, below the
   // features, as in the reference.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
@@ -4615,6 +4640,7 @@ export function CadEditor({
               title={`Sketch · ${part.name}`}
               okLabel="✓ Finish sketch"
               okDisabled={!sketchCanFinish}
+              okReason={sketchFinishReason}
               onOk={() => closeSketch(true)}
               onCancel={() => closeSketch(false)}
               autoFocus={false}
@@ -5799,6 +5825,7 @@ export function CadEditor({
           onClose={() => setContextMenu(null)}
           onAction={contextAction}
           onReturnToCanvas={() => svg.current?.focus()}
+          {...(studioSession && !showWorkspace && { confirm: { reason: sketchFinishReason, onConfirm: () => closeSketch(true) } })}
         />
       )}
       <footer className="cad-status">
@@ -5817,8 +5844,24 @@ export function CadEditor({
             </>
           )}
         </span>
+        {cancelledSketch && (
+          // Its own status, outside the instruction line that narrow windows hide, so Restore is always there.
+          <span className="cad-restore-sketch" role="status">
+            Sketch cancelled.{' '}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (busy) return;
+                commit(cancelledSketch.document);
+                openSketch(cancelledSketch.partId, cancelledSketch.before);
+              }}>
+              Restore
+            </button>
+          </span>
+        )}
         <span className="cad-instruction" role="status">
-          {acceptanceNotice || (studioSession && showWorkspace) ? '' : message}
+          {cancelledSketch || acceptanceNotice || (studioSession && showWorkspace) ? '' : message}
         </span>
         <span>{saveStatus ?? 'Draft'}</span>
       </footer>

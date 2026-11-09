@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { filletLoop, limitRemovalRate, planControlledPocket } from './engagement';
-import { difference, polyArea, type PathD } from './geom';
+import { limitRemovalRate } from './engagement';
+import type { PathD } from './geom';
 import { StockModel } from './stock';
 import type { Pass } from './toolpaths';
 
@@ -10,42 +10,6 @@ const rect = (x0: number, y0: number, x1: number, y1: number): PathD => [
   { x: x1, y: y1 },
   { x: x0, y: y1 },
 ];
-
-describe('controlled offset roughing', () => {
-  it('constructs tangent quarter arcs at the requested radius and refuses insufficient edge length', () => {
-    const loop = filletLoop(rect(0, 0, 20, 10), 2)!;
-    expect(loop.length).toBeGreaterThan(16);
-    expect(loop[0]).toEqual({ x: 0, y: 2 });
-    expect(loop.every(point => point.x >= -1e-9 && point.x <= 20 + 1e-9 && point.y >= -1e-9 && point.y <= 10 + 1e-9)).toBe(true);
-    expect(filletLoop(rect(0, 0, 2, 2), 2)).toBeUndefined();
-  });
-
-  it('retains residual material and provides separate corner cleanup without pretending its radius is bounded', () => {
-    const region = [rect(0, 0, 30, 20)];
-    const result = planControlledPocket(region, { toolRadius: 2, stepover: 1.5, minimumTurnRadius: 1, radialAllowance: 0.2 });
-    expect(result.roughing.length).toBeGreaterThan(0);
-    expect(result.cleanup.length).toBeGreaterThan(0);
-    expect(result.entryExceptions.some(entry => entry.reason === 'full-slot-candidate')).toBe(true);
-    expect(polyArea(result.unreachable)).toBeGreaterThan(0);
-    expect(polyArea(result.remaining)).toBeLessThan(10);
-    expect(result.reachableResidualArea).toBeLessThan(2);
-    expect(difference(result.unreachable, result.remaining).length).toBe(0);
-  });
-
-  it('preserves an island while leaving impossible blends to explicit cleanup', () => {
-    const region = [rect(0, 0, 30, 20), [...rect(12, 7, 18, 13)].reverse()];
-    const result = planControlledPocket(region, { toolRadius: 2, stepover: 1.5, minimumTurnRadius: 3, radialAllowance: 0.2 });
-    expect(result.cleanup.length).toBeGreaterThan(0);
-    expect(result.diagnostics.length).toBeGreaterThan(0);
-    expect(polyArea(result.remaining)).toBeLessThan(20);
-  });
-
-  it('rejects a nonoverlapping stepover instead of silently leaving unreachable stripes', () => {
-    expect(() =>
-      planControlledPocket([rect(0, 0, 30, 20)], { toolRadius: 2, stepover: 5, minimumTurnRadius: 1, radialAllowance: 0.2 })
-    ).toThrow(/stepover/);
-  });
-});
 
 describe('stock-aware material rate', () => {
   const path: Pass = {

@@ -52,7 +52,6 @@ export interface MachiningCaseInput extends FeatureInput {
     floorCoveragePoints?: [number, number][];
     warningIncludes?: string[];
     tabPlateau?: { x0: number; x1: number; centerY: number; minimumHeight: number };
-    polish?: { insideOperation: string; outsideOperation: string; desiredWallFeed: number; springPasses: number };
   };
 }
 

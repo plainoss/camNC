@@ -67,18 +67,23 @@ export function ExtrudeDialog({
 }: PartDialogProps & {
   onEditSketch: () => void;
   /** Starts picking a plane or a face, for Up to face; the pick comes back once. Null stops a pick under way. */
-  pickFace?: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
+  pickFace?: (picked: ((on: CadDrawnOn['on'], datum?: string) => void) | null) => void;
 }) {
   const [pickingFace, setPickingFace] = useState(false);
   /** Blind to a thickness, or up to a plane or face: its thickness then follows that face. */
-  const setUpTo = (upTo: CadDrawnOn['on'] | null) =>
+  const setUpTo = (upTo: CadDrawnOn['on'] | null, datum?: string) =>
     onChange(document =>
       changePart(document, part.id, p => {
         const next = { ...p };
         if (upTo) {
           next.upTo = upTo;
+          if (datum) next.upToDatum = datum;
+          else delete next.upToDatum;
           delete next.symmetric;
-        } else delete next.upTo;
+        } else {
+          delete next.upTo;
+          delete next.upToDatum;
+        }
         return next;
       })
     );
@@ -91,9 +96,9 @@ export function ExtrudeDialog({
   const startPickingFace = () => {
     if (!pickFace) return;
     setPickingFace(true);
-    pickFace(on => {
+    pickFace((on, datum) => {
       setPickingFace(false);
-      setUpTo(on);
+      setUpTo(on, datum);
     });
   };
   const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo ? 'add' : 'new';
@@ -200,6 +205,7 @@ export function ExtrudeDialog({
         if (thin) {
           next.thin = thin;
           delete next.upTo;
+          delete next.upToDatum;
         } else delete next.thin;
         return next;
       })
@@ -369,7 +375,9 @@ export function ExtrudeDialog({
               onClick={startPickingFace}>
               <small>Up to</small>
               <span>
-                {part.upTo ? `${drawnOnName(document, part.upTo)}, ${formatCadValue(part.thickness)} mm away` : 'Pick a plane or a face'}
+                {part.upTo
+                  ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${formatCadValue(part.thickness)} mm away`
+                  : 'Pick a plane or a face'}
               </span>
             </button>
           )}
@@ -392,8 +400,8 @@ export function ExtrudeDialog({
               Symmetric
             </label>
           )}
-          {!part.upTo && !part.symmetric && part.drawnOn && !part.thin && (
-            // The other way out of the sketch's plane, or into the face it's drawn on.
+          {!part.upTo && !part.symmetric && part.drawnOn && !part.thin?.midPlane && (
+            // The other way out of the sketch's plane, or into the face it's drawn on, for a thin board as for a solid one.
             <button
               type="button"
               className="cad-flip-direction"

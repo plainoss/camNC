@@ -56,20 +56,16 @@ describe('profile finishing and depth transitions', () => {
     expect(() => toGcode(program(operation))).not.toThrow();
   });
 
-  it('retains tabs and explicitly requested spring laps with zero wall stock', () => {
+  it('retains tabs with zero wall stock', () => {
     const operation = profileOperation('zero finish with tabs', rectangle(20, 20, 70, 50), 12, tool, {
       ...settings,
       leaveStock: 0,
       tabs: { height: 3, width: 6, minCount: 3, spacing: 200 },
-      profileSpringPasses: 1,
     });
     const rough = operation.passes.filter(pass => pass.phase === 'rough');
     expect(minimum(rough.at(-1)!)).toBe(settings.finalZ);
     expect(rough.at(-1)!.pts.some(point => point[2] === 3)).toBe(true);
-    const finish = operation.passes.filter(pass => pass.phase === 'finish');
-    expect(finish).toHaveLength(1);
-    expect(finish[0].spring).toBe(true);
-    expect(finish[0].pts.some(point => point[2] === 3)).toBe(true);
+    expect(operation.passes.some(pass => pass.phase === 'finish')).toBe(false);
     expect(() => toGcode(program(operation))).not.toThrow();
   });
 
@@ -168,7 +164,7 @@ describe('profile finishing and depth transitions', () => {
     const operation = profileOperation('outline', rectangle(20, 20, 70, 50), 12, tool, {
       ...settings,
       rampAngleDeg: 0.5,
-      tabs: { height: 3, width: 6, minCount: 1, spacing: 200, centers: [{ x: seam[0], y: seam[1] }], rampLength: 2 },
+      tabs: { height: 3, width: 6, minCount: 1, spacing: 200, centers: [{ x: seam[0], y: seam[1] }] },
     });
     const resolved = certifyStockLinks(program(operation), { plungeFeed: 480, pathTolerance: 0.02 });
     const passes = resolved.cam.operations[0].passes;
