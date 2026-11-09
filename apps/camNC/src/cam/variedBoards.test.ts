@@ -1,17 +1,26 @@
 import { loadStep, planBoard } from '@wbcnc/cam';
 import { fixtureFree } from '@wbcnc/cam/settle';
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { planBlock } from './boardBlock';
 import { boardRequest, instancesOf, nestBoard, reconcileBoards, settleInputOf, suggestFixtures, withLayout } from './boards';
 import { modelOfBodies, partSource } from './importedModel';
 import { kDefaultPlan, toCamSettings } from './planSettings';
 
+/**
+ * Back to the event loop. Once OCCT is loaded, importing and planning run synchronously for seconds at a time (the
+ * tray's plan for ~30 s): without a break, Vitest's worker can't answer its runner and times out reporting results.
+ */
+const yieldToVitest = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+
 /** A varied-boards STEP fixture as the CAM worker imports it. */
 async function imported(id: string) {
   const bytes = readFileSync(new URL(`../../../../packages/cam/test/fixtures/varied-boards/${id}.step`, import.meta.url));
   const { bodies, readMs } = await loadStep(new Uint8Array(bytes));
-  return modelOfBodies(bodies, readMs);
+  await yieldToVitest();
+  const model = modelOfBodies(bodies, readMs);
+  await yieldToVitest();
+  return model;
 }
 
 /** Its parts, all milled, on the one board a new job gives them, nested. */
@@ -25,6 +34,8 @@ async function laidOutBoard(id: string) {
 
 // The pipeline behind the Plan step for these models: the route test shows one held and one blocked board.
 describe('varied STEP boards, from import to a plan', () => {
+  afterEach(yieldToVitest);
+
   it.each(['frame-01', 'gear-02', 'round-02', 'tray-02'])(
     '%s gets holds clear of every cut at the app’s real clearances',
     async id => {
@@ -58,6 +69,7 @@ describe('varied STEP boards, from import to a plan', () => {
         holes: plan.holes,
         leaveOut: plan.leaveOut,
       });
+      await yieldToVitest();
       const result = planBoard(request, toCamSettings(plan, 'oak'), partSource(entries));
       expect(result.ops.length).toBeGreaterThan(0);
       const loose = (result.timeline ?? []).filter(e => /would come loose when its outline is cut through/.test(e.message));
