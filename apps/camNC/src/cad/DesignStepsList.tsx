@@ -5,6 +5,7 @@ import './designStepsList.css';
 const kIcons: Record<DesignStep['kind'], string> = {
   sketch: '✎',
   extrude: '▮',
+  move: '⇥',
   faceSketch: '✎',
   cut: '⌴',
   copy: '⧉',

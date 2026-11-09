@@ -505,6 +505,8 @@ export function CadEditor({
   const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on']) => void) | null>(null);
   // Where the rollback bar was moved to in the feature list: the step it sits after. Null is the end.
   const [rolledTo, setRolledTo] = useState<string | null>(null);
+  // The part whose row is hovered in the feature list, highlighted in the view as the reference does.
+  const [hoveredStepPart, setHoveredStepPart] = useState<string | null>(null);
   // The face of the part last clicked in the studio, which the next sketch is drawn on, as with a picked plane.
   const [selectedFace, setSelectedFace] = useState<Extract<CadDrawnOn['on'], { partId: string }> | null>(null);
   // A picked face goes with its part.
@@ -521,6 +523,7 @@ export function CadEditor({
   // Use, started with `u` and nothing picked: each part edge clicked goes into the sketch, until Escape or another tool.
   const [usingEdges, setUsingEdges] = useState(false);
   useEffect(() => setUsingEdges(false), [part?.id, showWorkspace]);
+  const [transparentParts, setTransparentParts] = useState<ReadonlySet<string>>(() => new Set());
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   const hoveredPart = useRef<string | null>(null);
@@ -536,7 +539,7 @@ export function CadEditor({
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // A part being copied by a transform, or the transformed copy being changed.
-  const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string } | null>(null);
+  const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string; move?: boolean } | null>(null);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
@@ -2248,11 +2251,26 @@ export function CadEditor({
       if (event.code === 'KeyY') {
         event.preventDefault();
         if (event.repeat) return;
-        if (event.shiftKey) setHiddenParts(new Set());
-        else {
+        if (event.shiftKey) {
+          setHiddenParts(new Set());
+          setTransparentParts(new Set());
+        } else {
           const key = hoveredPart.current ?? part?.id;
           if (key) setHiddenParts(previous => (previous.has(key) ? previous : new Set([...previous, key])));
         }
+        return;
+      }
+      if (event.shiftKey && event.code === 'KeyT') {
+        event.preventDefault();
+        if (event.repeat) return;
+        const key = hoveredPart.current ?? part?.id;
+        if (key)
+          setTransparentParts(previous => {
+            const next = new Set(previous);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+          });
         return;
       }
       if (event.shiftKey && event.code === 'KeyI') {
@@ -2287,6 +2305,27 @@ export function CadEditor({
       if (!event.shiftKey && event.key.toLowerCase() === 'p') {
         event.preventDefault();
         if (!event.repeat) setShowPlanes(previous => !previous);
+        return;
+      }
+      // N looks straight at the picked plane or face, or the selected part's sketch plane; again, from its other side.
+      if (!event.shiftKey && event.key.toLowerCase() === 'n') {
+        const on = selectedPlane
+          ? { plane: selectedPlane }
+          : (selectedFace ?? (part ? (part.drawnOn?.on ?? { plane: 'top' as const }) : null));
+        const frame = on && cadFaceFrame(documentRef.current, on);
+        if (!frame || 'error' in frame) return;
+        event.preventDefault();
+        if (event.repeat) return;
+        setViewRequest(previous => {
+          const same =
+            previous?.name === 'normal' && previous.direction?.every((value, axis) => Math.abs(value - frame.normal[axis]!) < 1e-9);
+          return {
+            name: 'normal',
+            seq: (previous?.seq ?? 0) + 1,
+            direction: same ? (frame.normal.map(value => -value) as [number, number, number]) : frame.normal,
+            up: frame.y,
+          };
+        });
         return;
       }
     }
@@ -3571,6 +3610,7 @@ export function CadEditor({
     // In the studio a step opens its dialog, and a sketch opens to be drawn on, as the reference does.
     if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
     if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
+    if (studioSession && step.kind === 'move') return openTransform(step.partId, undefined, true);
     if (studioSession && step.kind === 'copy') {
       const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
       if (copy?.offset) return openTransform(step.partId, copy.id);
@@ -3629,8 +3669,17 @@ export function CadEditor({
     }
     if (action === 'suppress') return commit(toggleSuppressed(current, step));
     if (action === 'rollTo') return setRolledTo(designSteps(current).at(-1)?.id === step.id ? null : step.id);
+    if (action === 'rollToEnd') return setRolledTo(null);
     if (action !== 'delete') return;
     setFeatureDialog(null);
+    if (step.kind === 'move')
+      return commit(
+        replacePart(current, step.partId, p => {
+          const next = { ...p };
+          delete next.moved;
+          return next;
+        })
+      );
     if (step.kind === 'sketch' || step.kind === 'extrude') {
       // A part is its sketch pushed out, so deleting either deletes the part.
       const parts = current.parts.filter(candidate => candidate.id !== step.partId);
@@ -3640,14 +3689,14 @@ export function CadEditor({
     else if (step.kind === 'partCut' && step.partCutId) commit(removePartCut(current, step.partCutId));
     else if (step.kind === 'cut' && step.cutId) commit(removeCadFeature(current, step.partId, step.cutId));
   };
-  const openTransform = (partId: string, copyId?: string) => {
+  const openTransform = (partId: string, copyId?: string, move?: boolean) => {
     setFeatureDialog(null);
     setPartCutting(null);
     setVariableDialog(null);
     setChoosingFace(false);
     setPartId(partId);
     setShowWorkspace(true);
-    setTransformDialog({ partId, ...(copyId && { copyId }) });
+    setTransformDialog({ partId, ...(copyId && { copyId }), ...(move && { move }) });
   };
   /** Starts a new part drawn on a base plane or a part's face, and opens its sketch. */
   const newPartOn = (on: CadDrawnOn['on']) => {
@@ -4176,6 +4225,7 @@ export function CadEditor({
                     }
                   : undefined
               }
+              onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
               onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
             />
@@ -4382,6 +4432,7 @@ export function CadEditor({
                   document={doc}
                   part={target}
                   copyId={transformDialog.copyId}
+                  move={transformDialog.move}
                   variables={variableScope}
                   onSave={next => {
                     commit(next);
@@ -4542,6 +4593,10 @@ export function CadEditor({
               <WorkspaceView
                 document={shownDocument}
                 viewRequest={viewRequest}
+                onViewRequest={
+                  studioSession ? request => setViewRequest(previous => ({ ...request, seq: (previous?.seq ?? 0) + 1 })) : undefined
+                }
+                transparentIds={transparentParts}
                 showPlanes={showPlanes}
                 selectedId={part?.id ?? null}
                 onSelect={id => {
@@ -4566,6 +4621,7 @@ export function CadEditor({
                 onNewPart={newPartOn}
                 selectedPlane={selectedPlane}
                 onSelectPlane={pickPlane}
+                hoverIds={hoveredStepPart ? [hoveredStepPart] : undefined}
                 picked={selectedPlane ? drawnOnName(doc, { plane: selectedPlane }) : selectedFace ? drawnOnName(doc, selectedFace) : null}
                 regions={extrudeRegions}
                 onPickRegion={extrudeRegions.length ? pickRegion : undefined}

@@ -27,13 +27,16 @@ export default function WorkspaceView({
   onChoosingChange,
   highlightIds,
   hiddenIds,
+  transparentIds,
   selectedPlane,
   onSelectPlane,
   onSelectFace,
   picked,
+  hoverIds,
   regions,
   onPickRegion,
   viewRequest,
+  onViewRequest,
   showPlanes = true,
   children,
 }: {
@@ -56,6 +59,7 @@ export default function WorkspaceView({
   highlightIds?: readonly string[];
   /** Parts hidden from the view, as the parts list's eye toggles them. */
   hiddenIds?: ReadonlySet<string>;
+  transparentIds?: ReadonlySet<string>;
   /** A base plane picked to draw the next sketch on, and picking one outside of choosing. */
   selectedPlane?: BasePlane | null;
   onSelectPlane?: (plane: BasePlane) => void;
@@ -63,10 +67,13 @@ export default function WorkspaceView({
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
   /** The name of the plane or face picked for the next sketch, said in the status line so the pick isn't hidden. */
   picked?: string | null;
+  /** Parts shown highlighted, as when their row in the feature list is hovered. */
+  hoverIds?: readonly string[];
   /** A sketch's regions to pick for its extrude, while its Extrude dialog is open. */
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
   viewRequest?: ViewRequest;
+  onViewRequest?: (request: Omit<ViewRequest, 'seq'>) => void;
   showPlanes?: boolean;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
@@ -183,9 +190,15 @@ export default function WorkspaceView({
         parts={model.parts}
         view={view}
         viewRequest={viewRequest}
+        onViewRequest={onViewRequest}
+        transparentIds={transparentIds}
+        instanceIds={model.instances.map(instanceKey)}
         selectedId={selectedId}
         selectedIndexes={selectedIndexes}
-        warnIds={clashes.flatMap(clash => clash.partIds)}
+        // The studio shows parts as the reference does, and says in its status line when two overlap rather than colouring them.
+        warnIds={controlled ? undefined : clashes.flatMap(clash => clash.partIds)}
+        palette={controlled ? 'studio' : undefined}
+        highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
         onPickFace={choosing ? pickFace : undefined}
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}

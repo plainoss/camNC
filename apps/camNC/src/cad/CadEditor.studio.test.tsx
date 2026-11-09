@@ -66,6 +66,49 @@ it('toggles base planes and requests named views and fit from workspace shortcut
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
 });
 
+it('looks straight at the selected part’s sketch plane with N, and from behind with N again, and colours parts as the reference does', async () => {
+  await studio();
+  const workspace = await screen.findByTestId('workspace-3d');
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().palette).toBe('studio'));
+  // Overlaps aren't coloured in the studio.
+  expect(props().warnIds).toBeUndefined();
+  fireEvent.keyDown(workspace, { key: 'n', code: 'KeyN' });
+  await waitFor(() => expect(props().viewRequest).toMatchObject({ name: 'normal', direction: [0, 0, 1], up: [0, 1, 0] }));
+  fireEvent.keyDown(workspace, { key: 'n', code: 'KeyN' });
+  await waitFor(() => expect(props().viewRequest).toMatchObject({ name: 'normal', direction: [-0, -0, -1] }));
+  // Hovering a feature row highlights its part.
+  const features = screen.getByRole('region', { name: 'Features' });
+  fireEvent.pointerEnter(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  await waitFor(() => expect(props().highlightIds).toHaveLength(1));
+  fireEvent.pointerLeave(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  await waitFor(() => expect(props().highlightIds).toBeUndefined());
+});
+
+it('deletes a feature with the Delete key, as the reference does, and undo brings it back', async () => {
+  const { latest } = await studio();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  const row = within(features).getByRole('button', { name: /Extrude · Plate/ });
+  row.focus();
+  await userEvent.keyboard('{Delete}');
+  await waitFor(() => expect(latest().parts).toHaveLength(0));
+  await userEvent.keyboard('{Control>}z{/Control}');
+  await waitFor(() => expect(latest().parts).toHaveLength(1));
+});
+
+it('routes cube requests through the studio sequence', async () => {
+  await studio();
+  const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().onViewRequest).toBeDefined());
+  props().onViewRequest!({ name: 'top' });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'top', seq: 1 }));
+  props().onViewRequest!({ name: 'iso', direction: [1, -1, 0] });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'iso', direction: [1, -1, 0], seq: 2 }));
+  fireEvent.keyDown(workspace, { key: 'f', code: 'KeyF' });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'fit', seq: 3 }));
+});
+
 it('leaves viewport shortcuts alone while typing in fields or using modifiers', async () => {
   await studio();
   const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
@@ -97,6 +140,27 @@ async function visibilityStudio() {
   await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate', 'Plate 2', 'Shelf']));
   return { workspace, panel, props };
 }
+
+it('toggles transparency for the selection or hovered instance and clears it with show all', async () => {
+  const { workspace, props } = await visibilityStudio();
+  const selected = props().instanceIds![0]!;
+  const copy = props().instanceIds![1]!;
+  const toggle = (repeat = false) => fireEvent.keyDown(workspace, { key: 'T', code: 'KeyT', shiftKey: true, repeat });
+  toggle();
+  await waitFor(() => expect(props().transparentIds).toEqual(new Set([selected])));
+  toggle(true);
+  expect(props().transparentIds).toEqual(new Set([selected]));
+  toggle();
+  await waitFor(() => expect(props().transparentIds?.size).toBe(0));
+  props().onHover?.(props().meshes[1]!.partId, 1);
+  toggle();
+  await waitFor(() => expect(props().transparentIds).toEqual(new Set([copy])));
+  props().onHover?.(null);
+  toggle();
+  await waitFor(() => expect(props().transparentIds).toEqual(new Set([copy, selected])));
+  fireEvent.keyDown(workspace, { key: 'Y', code: 'KeyY', shiftKey: true });
+  await waitFor(() => expect(props().transparentIds?.size).toBe(0));
+});
 
 it('hides the selected part with Y and shows all parts with Shift+Y', async () => {
   const { workspace, panel, props } = await visibilityStudio();
@@ -404,11 +468,52 @@ it('keeps steps already set when a cut’s sketch view is cancelled', async () =
   expect(latest().parts[0]!.thickness).toBe(24);
 });
 
+it('moves a part with a transform when Copy part is off, as the reference does by default, and edits the move from its step', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  source.parts[0]!.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  expect(within(dialog).getByRole('checkbox', { name: 'Copy part' })).toHaveProperty('checked', false);
+  const z = within(dialog).getAllByRole('textbox')[2]!;
+  await userEvent.clear(z);
+  await userEvent.type(z, '40');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.moved).toEqual({ by: [0, 0, 40] }));
+  expect(latest().parts[0]!.copies).toBeUndefined();
+  // It's a step of its own, opened again to change.
+  const features = screen.getByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate/ }));
+  const again = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  expect(within(again).queryByRole('checkbox', { name: 'Copy part' })).toBeNull();
+  expect(within(again).getAllByRole('textbox')[2]).toHaveProperty('value', '40');
+  await userEvent.click(within(again).getByRole('button', { name: 'Cancel' }));
+  // Another transform from the toolbar moves it on from there, keeping the first move.
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  const more = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  const z2 = within(more).getAllByRole('textbox')[2]!;
+  await userEvent.clear(z2);
+  await userEvent.type(z2, '10');
+  await userEvent.click(within(more).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.moved).toEqual({ by: [0, 0, 50] }));
+});
+
 it('copies a part with a transform, and edits the copy from its feature', async () => {
   const { latest } = await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
   let dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  // A transform moves the part unless Copy part is on, as in the reference.
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   const x = within(dialog).getAllByRole('textbox')[0]!;
   await userEvent.clear(x);
   await userEvent.type(x, '250');
@@ -679,6 +784,7 @@ it('copies a part by a distance along a plane picked for the direction, as the r
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'distance');
   // The Direction box waits for a plane or face; one from the feature list fills it.
   await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
@@ -729,6 +835,10 @@ it('suppresses an extrude from the feature list, and rolls the design back with 
         .closest('li')!.className
     ).toMatch(/cad-feature-rolled-back/)
   );
+  // A greyed step's menu offers Roll to end, found by the step itself even after the list re-renders.
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  expect(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Roll to end' })).toBeDefined();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
   // The bar steps down with the arrow keys, back to the end.
   const bar = within(features).getByRole('separator', { name: 'Shown up to here' });
   bar.focus();
@@ -749,6 +859,7 @@ it('saves a picked-direction distance expression and removes it when replaced by
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
   let dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'distance');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
   const features = screen.getByRole('region', { name: 'Features' });
@@ -895,7 +1006,9 @@ it('finishes a sketch as a sketch, and extrudes a one-line sketch as a thin boar
   await userEvent.clear(depth);
   await userEvent.type(depth, '380{Enter}');
   await waitFor(() => expect(latest().parts[1]!.thin).toEqual({ depth: 380, midPlane: true }));
-  // Enter in a field keeps the step, as the tick does.
+  // Enter applies the field and keeps the dialog open, as in the reference; Enter again keeps the step, as the tick does.
+  expect(screen.getByRole('dialog', { name: 'Extrude · Back' })).toBeDefined();
+  await userEvent.keyboard('{Enter}');
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Back' })).toBeNull());
   // Solid takes it back to a face pushed out by its thickness.
   await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Back/ }));

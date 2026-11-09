@@ -6,7 +6,7 @@ type Vec3 = [number, number, number];
  * The curves of the sketches not yet extruded, where they sit in the model, for the studio to show them as the
  * reference shows a finished sketch: as lines on its plane, until Extrude makes a part of it.
  */
-export function sketchLinesInModel(document: CadDocument): Vec3[][] {
+export function sketchLinesInModel(document: CadDocument): { partId: string; points: Vec3[] }[] {
   return document.parts
     .filter(part => !isCadPart(part))
     .flatMap(part => {
@@ -19,7 +19,7 @@ export function sketchLinesInModel(document: CadDocument): Vec3[][] {
       return part.sketch.entities.flatMap(entity => {
         if (entity.type === 'point' || entity.construction || entity.faceEdge) return [];
         try {
-          return [tessellateCurve(entity, points).map(at)];
+          return [{ partId: part.id, points: tessellateCurve(entity, points).map(at) }];
         } catch {
           return [];
         }
