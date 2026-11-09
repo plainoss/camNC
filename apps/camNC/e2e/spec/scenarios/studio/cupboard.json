@@ -1,0 +1,80 @@
+[
+  {
+    "id": "studio/cupboard/shared-variable-cancel-edit-reload",
+    "title": "A shared board thickness edits all cabinet panels, cancels cleanly and survives reload",
+    "evidence": "design multi-part cabinetry regeneration; reference-live 2026-11-09 feature edit confirm and cancel",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/cupboard.json",
+      "closesketch",
+      "checkpoint initial",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": ["Side", "Bottom", "Top", "Back", "Shelf"],
+            "variables": { "board": "18mm" },
+            "thicknesses": { "Side": 18, "Bottom": 18, "Top": 18, "Back": 6, "Shelf": 18 },
+            "copies": { "Side": 1 },
+            "listedParts": [
+              { "name": "Side", "thickness": 18 },
+              { "name": "Right side", "thickness": 18 },
+              { "name": "Bottom", "thickness": 18 },
+              { "name": "Top", "thickness": 18 },
+              { "name": "Back", "thickness": 6 },
+              { "name": "Shelf", "thickness": 18 }
+            ],
+            "partIssues": [],
+            "partCuts": 1,
+            "dialog": null
+          }
+        }
+      },
+      "feature #board",
+      { "expect": { "studio": { "dialog": "#board" } } },
+      "dialogfill Value = 24mm",
+      "dialogcancel",
+      { "expect": { "studio": { "unchangedSince": "initial", "dialog": null } } },
+      "feature #board",
+      "dialogfill Value = 24mm",
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "variables": { "board": "24mm" },
+            "thicknesses": { "Side": 24, "Bottom": 24, "Top": 24, "Back": 6, "Shelf": 24 },
+            "listedParts": [
+              { "name": "Side", "thickness": 24 },
+              { "name": "Right side", "thickness": 24 },
+              { "name": "Bottom", "thickness": 24 },
+              { "name": "Top", "thickness": 24 },
+              { "name": "Back", "thickness": 6 },
+              { "name": "Shelf", "thickness": 24 }
+            ],
+            "partIssues": [],
+            "sameIdsSince": "initial",
+            "dialog": null
+          }
+        }
+      },
+      "reload",
+      {
+        "expect": {
+          "studio": {
+            "variables": { "board": "24mm" },
+            "thicknesses": { "Side": 24, "Bottom": 24, "Top": 24, "Back": 6, "Shelf": 24 },
+            "listedParts": [
+              { "name": "Side", "thickness": 24 },
+              { "name": "Right side", "thickness": 24 },
+              { "name": "Bottom", "thickness": 24 },
+              { "name": "Top", "thickness": 24 },
+              { "name": "Back", "thickness": 6 },
+              { "name": "Shelf", "thickness": 24 }
+            ],
+            "partIssues": [],
+            "sameIdsSince": "initial",
+            "partCuts": 1
+          }
+        }
+      }
+    ]
+  }
+]
