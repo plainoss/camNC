@@ -63,7 +63,7 @@ jobs:
     # The merge queue already validated this exact commit, and Turborepo's remote cache holds its results. On main the
     # checks job alone keeps the dependency and build caches warm.
     if: github.event_name != 'push'
-    permissions:
+    permissions: &turbo-permissions
       contents: read
       id-token: write
     # CAD/WASM, the app browser suite, and OpenCV must not compete for one runner's CPUs. Each browser shard gets its
@@ -72,34 +72,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # A pull request runs only the headless suites, and the merge queue runs everything once for a whole batch of
-        # PRs. The `full-ci` label runs the browser suites and specs on a PR too, from its next push.
-        exclude: ${{ fromJSON(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && '[{"suite":"app-browser-1"},{"suite":"app-browser-2"}]' || '[]') }}
         include:
           - suite: headless
             tasks: test @wbcnc/camNC#test:domain @wbcnc/camNC#test:worker @wbcnc/camNC#test:licenses
             args: ''
             filter: --filter=!@wbcnc/camNC --concurrency=1
             performance: pnpm run test:performance
-          - suite: app-browser-1
-            tasks: test:browser
-            args: --shard=1/2
-            filter: --filter=@wbcnc/camNC
-            performance: ''
-          - suite: app-browser-2
-            tasks: test:browser
-            args: --shard=2/2
-            filter: --filter=@wbcnc/camNC
-            performance: ''
     runs-on: ubuntu-24.04
-    container:
+    container: &browser-container
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.
       image: mcr.microsoft.com/playwright:v1.54.1-noble
       options: --ipc=host
-    defaults:
+    defaults: &bash
       run:
         shell: bash
-    steps:
+    steps: &test-steps
       - uses: actions/checkout@v7
       - name: Install dependencies
         uses: ./.github/actions/install-dependencies
@@ -141,9 +128,34 @@ jobs:
             apps/camNC/test-results
             packages/*/test-results
 
+  browser:
+    name: Tests (${{ matrix.suite }})
+    # The browser shards run in the merge queue, once for a whole batch of PRs, or on a PR labelled `full-ci` from its
+    # next push. A PR runs the headless suites alone. Same container and steps as test.
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
+    permissions: *turbo-permissions
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: app-browser-1
+            tasks: test:browser
+            args: --shard=1/2
+            filter: --filter=@wbcnc/camNC
+            performance: ''
+          - suite: app-browser-2
+            tasks: test:browser
+            args: --shard=2/2
+            filter: --filter=@wbcnc/camNC
+            performance: ''
+    runs-on: ubuntu-24.04
+    container: *browser-container
+    defaults: *bash
+    steps: *test-steps
+
   specs:
     name: Behaviour specs (${{ matrix.shard }})
-    # Only in the merge queue, or on a PR labelled `full-ci` (see the test matrix).
+    # Like browser, only in the merge queue or on a PR labelled `full-ci`.
     if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     permissions:
       contents: read
@@ -198,21 +210,24 @@ jobs:
     # Keep the check required by main's ruleset, including builds now running in checks.
     name: Run tests
     if: always() && github.event_name != 'push'
-    needs: [checks, test, specs, fluidnc-sim]
+    needs: [checks, test, browser, specs, fluidnc-sim]
     runs-on: ubuntu-24.04
     steps:
       - name: Require all validation jobs to pass
         env:
           CHECKS_RESULT: ${{ needs.checks.result }}
           TEST_RESULT: ${{ needs.test.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
           SPECS_RESULT: ${{ needs.specs.result }}
           SIM_RESULT: ${{ needs.fluidnc-sim.result }}
-          # The specs are skipped on purpose on a PR without `full-ci`; the merge queue requires them.
-          SPECS_OPTIONAL: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          # The browser shards and specs are skipped on purpose on a PR without `full-ci`; the merge queue requires them.
+          QUEUE_ONLY_OPTIONAL: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') }}
         run: |
           test "$CHECKS_RESULT" = success
           test "$TEST_RESULT" = success
-          if [ "$SPECS_OPTIONAL" != true ] || [ "$SPECS_RESULT" != skipped ]; then test "$SPECS_RESULT" = success; fi
+          for result in "$BROWSER_RESULT" "$SPECS_RESULT"; do
+            if [ "$QUEUE_ONLY_OPTIONAL" != true ] || [ "$result" != skipped ]; then test "$result" = success; fi
+          done
           test "$SIM_RESULT" = success
 
   fluidnc-sim:

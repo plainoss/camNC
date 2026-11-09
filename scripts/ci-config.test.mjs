@@ -58,7 +58,7 @@ test('desktop cache restores rediscover CMake tools while preserving compiled ar
   for (const file of retained) assert.equal(readFileSync(join(target, file), 'utf8'), 'cached');
 });
 
-for (const [workflow, job] of [['ci.yml', 'test'], ['ci.yml', 'specs'], ['setup-smoke.yml', 'setup-smoke']]) {
+for (const [workflow, job] of [['ci.yml', 'test'], ['ci.yml', 'browser'], ['ci.yml', 'specs'], ['setup-smoke.yml', 'setup-smoke']]) {
   test(`${workflow} ${job}: preinstalled browsers match the locked and installed Playwright versions`, () => {
     const { container } = parse(read(`.github/workflows/${workflow}`)).jobs[job];
     const version = lock.importers['.'].devDependencies.playwright.version;
@@ -104,7 +104,7 @@ test('the required Run tests check waits for every validation job and cannot hid
 test('the required check rejects a failed, cancelled or skipped dependency', () => {
   const gate = parse(read('.github/workflows/ci.yml')).jobs.results.steps[0];
   const results = Object.keys(gate.env).filter(key => key.endsWith('_RESULT'));
-  const allPassed = { ...Object.fromEntries(results.map(key => [key, 'success'])), SPECS_OPTIONAL: 'false' };
+  const allPassed = { ...Object.fromEntries(results.map(key => [key, 'success'])), QUEUE_ONLY_OPTIONAL: 'false' };
   const run = statuses => spawnSync('bash', ['-e', '-c', gate.run], { env: { PATH: process.env.PATH, ...statuses } });
   assert.equal(run(allPassed).status, 0);
   for (const key of results) {
@@ -112,15 +112,17 @@ test('the required check rejects a failed, cancelled or skipped dependency', () 
       assert.notEqual(run({ ...allPassed, [key]: status }).status, 0, `${key}=${status} must fail the required check`);
     }
   }
-  // Only a PR without `full-ci` may skip the specs, and even there they must not fail.
-  const light = { ...allPassed, SPECS_OPTIONAL: 'true' };
-  assert.equal(run({ ...light, SPECS_RESULT: 'skipped' }).status, 0);
+  // Only a PR without `full-ci` may skip the browser shards and specs, and even there they must not fail.
+  const light = { ...allPassed, QUEUE_ONLY_OPTIONAL: 'true' };
+  assert.equal(run({ ...light, BROWSER_RESULT: 'skipped', SPECS_RESULT: 'skipped' }).status, 0);
   assert.notEqual(run({ ...light, SPECS_RESULT: 'failure' }).status, 0);
+  assert.notEqual(run({ ...light, BROWSER_RESULT: 'cancelled' }).status, 0);
   assert.notEqual(run({ ...light, SIM_RESULT: 'skipped' }).status, 0);
 });
 
 test('CI covers every runtime task and both browser shards, without duplicating other tests', () => {
-  const suites = parse(read('.github/workflows/ci.yml')).jobs.test.strategy.matrix.include;
+  const { jobs } = parse(read('.github/workflows/ci.yml'));
+  const suites = [...jobs.test.strategy.matrix.include, ...jobs.browser.strategy.matrix.include];
   const selected = (tasks, filters) => {
     const plan = execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', ...tasks, ...filters, '--dry=json'], {
       cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024,
@@ -171,13 +173,11 @@ test('merge queue runs all validation and isolates concurrent candidate builds',
   // A PR runs the quick suites; the merge queue validates the whole batch with everything once.
   const onPr = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], pr(['enhancement'])));
   assert.deepEqual(onPr.sort(), ['checks', 'fluidnc-sim', 'results', 'test']);
-  const suites = github =>
-    workflow.jobs.test.strategy.matrix.include
-      .map(entry => entry.suite)
-      .filter(suite => !actionsIf(workflow.jobs.test.strategy.matrix.exclude.replace(/^\$\{\{|\}\}$/g, ''), github).some(e => e.suite === suite));
-  assert.deepEqual(suites(pr([])), ['headless']);
-  assert.deepEqual(suites(pr(['full-ci'])), ['headless', 'app-browser-1', 'app-browser-2']);
-  assert.deepEqual(suites({ event_name: 'merge_group' }), ['headless', 'app-browser-1', 'app-browser-2']);
+  // A PR runs only the headless matrix entry; the browser shards are their own job, so no include adds them back.
+  assert.deepEqual(workflow.jobs.test.strategy.matrix.include.map(entry => entry.suite), ['headless']);
+  assert(onPr.every(id => workflow.jobs[id].strategy?.matrix?.exclude === undefined));
+  assert.deepEqual(workflow.jobs.browser.steps, workflow.jobs.test.steps, 'browser shards run the same steps as test');
+  assert.deepEqual(workflow.jobs.browser.container, workflow.jobs.test.container);
   // The queue validated the commit that lands on main, so main only warms caches through the checks job.
   const onMain = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], { event_name: 'push' }));
   assert.deepEqual(onMain, ['checks']);
@@ -216,7 +216,7 @@ test('only the checks job on main saves the pnpm store, and every job restores t
 
 test('remote caching uses short-lived tokens and skips untrusted fork PRs', () => {
   const { jobs } = parse(read('.github/workflows/ci.yml'));
-  for (const id of ['checks', 'test', 'specs']) {
+  for (const id of ['checks', 'test', 'browser', 'specs']) {
     assert.deepEqual(jobs[id].permissions, { contents: 'read', 'id-token': 'write' });
     const auth = jobs[id].steps.find(step => step.name === 'Authenticate remote cache');
     assert.equal(auth.uses, 'vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10');
