@@ -13,6 +13,8 @@ import {
   partIsBuiltOn,
   resolveDrawnPlacements,
   solveCadDocument,
+  setPartPattern,
+  extrudeStepProblem,
   type CadDocument,
   type CadPart,
 } from './index';
@@ -145,6 +147,29 @@ describe('positioned Extrude Remove', () => {
     document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1 };
     expect(errors(document)).toEqual([]);
     expect(cut(document)).toMatchObject({ through: true, to: 18 });
+  });
+
+  it.each([6, 'through'] as const)('updates patterned copy intersections after moving the source (%s)', async depth => {
+    let document = setPartPattern(design(depth), 'board', { axis: 'x', count: 2, spacing: 200 });
+    document.parts[0]!.moved = { by: [-200, 0, 0] };
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.diagnostics.filter(problem => problem.severity === 'error')).toEqual([]);
+    expect(solved.parts[0]!.cuts ?? []).toHaveLength(0);
+    expect(evaluatedPartCopy(solved.parts[0]!, solved.document.parts[0]!.copies![0]!).cuts).toHaveLength(1);
+  });
+
+  it('keeps an otherwise valid pocket when its corner relief cannot fit', async () => {
+    const document = design(6);
+    document.parts[0]!.cornerRelief = { diameter: 6 };
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1 };
+    document.parts[1]!.sketch = addRectangle(createCadPart().sketch, { x: 20, y: 20, width: 2, height: 2 });
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.diagnostics.filter(problem => problem.severity === 'error')).toEqual([]);
+    expect(solved.diagnostics.some(problem => problem.code === 'corner-relief-skipped' && problem.severity === 'warning')).toBe(true);
+    expect(solved.parts[0]!.cuts![0]!.to).toBe(5);
+    expect(extrudeStepProblem(solved.document, solved.document.parts[1]!)).toBeNull();
   });
 
   it('rejects invalid saved removal scopes', () => {

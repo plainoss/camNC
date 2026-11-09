@@ -143,13 +143,19 @@ export function applyExtrudeRemovals(
       },
       [...parts.filter(part => part.partId !== step.id), ...profiles]
     );
-    for (const problem of cut.diagnostics)
+    for (const problem of cut.diagnostics) {
+      // Skipped bones leave a valid square corner; only an unsupported intersection blocks the feature.
+      if (problem.code === 'corner-relief-skipped') {
+        diagnostics.push({ ...problem, partId: step.id });
+        continue;
+      }
       error(
         problem.message.replace(
           'A "cut parts" step cuts nothing: none of its tools reach into its targets.',
           'This extrusion cuts nothing: its profile does not reach the selected parts.'
         )
       );
+    }
     const byId = new Map(cut.parts.map(part => [part.partId, part]));
     parts = parts.map(part => (part.partId === step.id ? part : (byId.get(part.partId) ?? part)));
   }

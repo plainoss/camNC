@@ -274,8 +274,8 @@ export function applyPartCuts(
       refused = false;
     // Each copy of a target is cut on its own, so the same problem is said once per step, not once per copy.
     const said = new Set<string>();
-    const warn = (message: string) => {
-      if (!said.has(message)) diagnostics.push({ code: 'part-cut-unresolved', severity: 'warning', message });
+    const warn = (message: string, code = 'part-cut-unresolved') => {
+      if (!said.has(message)) diagnostics.push({ code, severity: 'warning', message });
       said.add(message);
     };
     const cutBoxes = (
@@ -333,7 +333,8 @@ export function applyPartCuts(
           : { points: outline, skipped: [] };
         if (relief.skipped.length)
           warn(
-            `${relief.skipped.length} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
+            `${relief.skipped.length} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`,
+            'corner-relief-skipped'
           );
         const current = target.shape;
         // The first piece keeps the ID a tool's one cut always had.

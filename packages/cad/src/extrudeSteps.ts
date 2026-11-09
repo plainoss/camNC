@@ -255,7 +255,10 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
         const profile = evaluateCadPart(candidate).part;
         return profile ? [evaluateCadFeatures(candidate, profile).part] : [];
       });
-      return applyExtrudeRemovals(document, shapes).diagnostics.find(problem => problem.partId === part.id)?.message ?? null;
+      return (
+        applyExtrudeRemovals(document, shapes).diagnostics.find(problem => problem.partId === part.id && problem.severity === 'error')
+          ?.message ?? null
+      );
     }
     const support = removeSupport(document, part);
     if ('error' in support) return support.error;
