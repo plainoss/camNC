@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      // The fuzz tests (src/fuzzFixtures.ts) open the CAD script's saved designs, and FUZZ_SEED/FUZZ_SEEDS/FUZZ_STEPS
+      // choose how many seeds they run.
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/test-timings.mjs",
+        "$TURBO_ROOT$/scripts/balanced-shards.mjs",
+        "$TURBO_ROOT$/packages/cad-script/fixtures/designs/*.json"
+      ],
+      "env": ["CI", "FLUIDNC_SIM_HOST", "FLUIDNC_SIM_VARIANT", "FUZZ_SEED", "FUZZ_SEEDS", "FUZZ_STEPS"]
+    }
+  }
+}

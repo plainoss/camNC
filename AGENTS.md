@@ -39,6 +39,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - Fix failing tests or type errors until the suite passes.
 - After moving files or changing imports, run `pnpm lint --filter <project_name>`.
 - Always add or update tests for the code you change.
+- A crash fix comes with the failing seed or input as a regression test. The seeded fuzz tests of `@wbcnc/cad` (`parseFuzz`) and `@wbcnc/cad-editor` (`commandFuzz`) print both on failure; `FUZZ_SEED=<n>` replays one seed and `FUZZ_SEEDS=<n>` runs seeds 1..n.
 
 ## Iteration and CI failures
 
