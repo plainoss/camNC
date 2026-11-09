@@ -1,5 +1,5 @@
 import { cadThinLine, evaluateCadPart, pointInPolygon } from './geometry';
-import { CAD_IDENTITY_PLACEMENT, placePoint, rotateVector, type Vec3 } from './placement';
+import { CAD_IDENTITY_PLACEMENT, placePoint, rotateVector, turnAbout, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadDrawnOn, CadPart, CadPlacement, CadPoint, EvaluatedCadPart } from './types';
 
 /** A face as a frame: where its sketch's origin is, and which ways its x, y and outward normal point. */
@@ -174,6 +174,7 @@ export function resolveDrawnPlacements(
       }
       return scale(normal, direction.flip ? -1 : 1);
     };
+    if (move && 'by' in move && move.turn) placement = turnAbout(placement, move.turn.about, move.turn.axis, move.turn.degrees);
     const moved = move && ('by' in move ? move.by : along(move)?.map(value => value * move.distance));
     if (moved) placement = { ...placement, position: placement.position.map((value, axis) => tidy(value + moved[axis]!)) as Vec3 };
     placed.set(part.id, placement);

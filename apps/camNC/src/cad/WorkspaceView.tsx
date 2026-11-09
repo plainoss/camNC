@@ -45,6 +45,7 @@ export default function WorkspaceView({
   selectedPlane,
   onSelectPlane,
   onSelectFace,
+  onPickPoint,
   picked,
   hoverIds,
   regions,
@@ -87,6 +88,8 @@ export default function WorkspaceView({
   onSelectPlane?: (plane: string) => void;
   /** The face of the part last clicked, for a sketch started next to be drawn on, as the reference sketches on a selection. */
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
+  /** While set, a click picks the corner or face middle it snaps to, as a mate connector, instead of selecting. */
+  onPickPoint?: (pick: { partId: string; point: [number, number, number]; normal: [number, number, number]; copy: boolean }) => void;
   /** The name of the plane or face picked for the next sketch, said in the status line so the pick isn't hidden. */
   picked?: string | null;
   /** Parts shown highlighted, as when their row in the feature list is hovered. */
@@ -161,19 +164,21 @@ export default function WorkspaceView({
   );
   const status = notice
     ? notice
-    : choosing
-      ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
-      : picked
-        ? `Picked ${picked}: Sketch or Shift+S draws on it.`
-        : clashes.length
-          ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
-          : model.problems.length
-            ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
-            : view === 'flat'
-              ? 'Each part turned so its machined side faces up, the way it lies on the board.'
-              : model.meshes.length
-                ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
-                : 'Draw a part to start.';
+    : onPickPoint
+      ? 'Click a corner or the middle of a face for the mate connector.'
+      : choosing
+        ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
+        : picked
+          ? `Picked ${picked}: Sketch or Shift+S draws on it.`
+          : clashes.length
+            ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
+            : model.problems.length
+              ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
+              : view === 'flat'
+                ? 'Each part turned so its machined side faces up, the way it lies on the board.'
+                : model.meshes.length
+                  ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
+                  : 'Draw a part to start.';
   return (
     <div
       ref={frame}
@@ -261,6 +266,16 @@ export default function WorkspaceView({
         }}
         onSelect={(_, index, pick) => {
           const partId = model.instances[index]!.partId;
+          if (onPickPoint) {
+            if (!pick) return setNotice('Click a face of a part: its corners and middle snap.');
+            setNotice(null);
+            return onPickPoint({
+              partId,
+              point: pick.point as [number, number, number],
+              normal: pick.normal as [number, number, number],
+              copy: !!model.instances[index]!.copyId,
+            });
+          }
           // The face clicked is picked too, for a sketch started next to be drawn on it.
           const found = pick && faceAt(pick);
           onSelectFace?.(found ? { partId: found.part.id, face: found.face } : null);
