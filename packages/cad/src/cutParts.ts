@@ -20,6 +20,24 @@ const toLocal = (placement: CadPlacement, point: Vec3): Vec3 =>
     point[2] - placement.position[2],
   ]);
 const kSquare = 1e-6;
+/** Why a tool can't be cut in boxes: it's round or slanted, which its own outline can still cut. */
+const kNotSquare = "isn't square-cornered and straight-sided";
+
+/** A counterclockwise loop moved out by `by` mm on every side, its corners mitred; a negative `by` moves it in. */
+function grown(loop: CadPoint[], by: number): CadPoint[] {
+  if (!by) return loop;
+  const normal = (a: CadPoint, b: CadPoint) => {
+    const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    return { x: (b.y - a.y) / length, y: -(b.x - a.x) / length };
+  };
+  return loop.map((point, i) => {
+    const before = normal(loop[(i + loop.length - 1) % loop.length]!, point),
+      after = normal(point, loop[(i + 1) % loop.length]!);
+    // Where the two edges moved out meet; a sharp spike is capped at four times the distance.
+    const scale = Math.min(4, 1 / Math.max(0.25, (1 + before.x * after.x + before.y * after.y) / 2));
+    return { x: point.x + ((before.x + after.x) / 2) * by * scale, y: point.y + ((before.y + after.y) / 2) * by * scale };
+  });
+}
 
 /** The part's box in its own frame: its outline's extent, and its thickness. */
 function box(part: EvaluatedCadPart): [Vec3, Vec3] {
@@ -111,7 +129,7 @@ function toolBoxes(
       hi[1]
     );
   // A curved tool would split into slivers that aren't what it fills.
-  const curved = "isn't square-cornered and straight-sided";
+  const curved = kNotSquare;
   if ((xs.length - 1) * (ys.length - 1) > 400) return { refused: curved };
   const slack = Math.max((hi[0] - lo[0]) * (hi[1] - lo[1]) * 1e-6, kSquare);
   // Each cell is all tool or none of it; one only partly filled means a slanted or curved side, which no box fits.
@@ -361,7 +379,9 @@ export function applyPartCuts(
             }
             const found = toolBoxes(shape, at, into, intoAt);
             // A round or slanted tool entering a face cuts its own outline in.
-            const outlined = 'refused' in found && !step.split ? toolOutlineCut(shape, at, into, intoAt) : null;
+            // Only a shape boxes can't follow: a tool with a cut of its own there stays refused.
+            const outlined =
+              'refused' in found && found.refused === kNotSquare && !step.split ? toolOutlineCut(shape, at, into, intoAt) : null;
             if (outlined) {
               const t = into.thickness,
                 fromTop = outlined.hi >= t - kSquare,
@@ -382,8 +402,9 @@ export function applyPartCuts(
                 from: 0,
                 to: through ? t : reach,
                 through,
-                outline: outlined.outline,
-                islands: outlined.islands,
+                // The clearance widens it all round, and narrows what the tool's holes leave standing.
+                outline: grown(outlined.outline, step.clearance),
+                islands: outlined.islands.map(island => grown([...island].reverse(), -step.clearance).reverse()),
               };
               target.shape = { ...target.shape, cuts: [...(target.shape.cuts ?? []), cut] };
               made++;

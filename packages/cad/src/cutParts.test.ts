@@ -827,4 +827,18 @@ describe('tools used up by their cut', () => {
     expect(parseCadDocument(JSON.parse(JSON.stringify(document))).partCuts![0]!.consumeTools).toBe(true);
     expect(updatePartCut(document, added.id, { consumeTools: undefined }).partCuts![0]).not.toHaveProperty('consumeTools');
   });
+
+  it('widens the round cut by the clearance all round', async () => {
+    const block = { ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!, name: 'Block' };
+    block.drawnOn = { on: { plane: 'top' }, offset: 0 };
+    const peg = createCadPart('Peg', 10);
+    peg.sketch = addCircle(peg.sketch, { x: 50, y: 50, radius: 8 });
+    peg.drawnOn = { on: { partId: block.id, face: 'top' }, offset: 2, inward: true };
+    const document = addPartCut({ ...createCadDocument(), parts: [block, peg] }, [peg.id], [block.id], { value: 0.5 }).document;
+    const solved = await solveCadDocument(document);
+    const cut = solved.parts.find(part => part.partId === block.id)!.cuts!.find(c => c.id.startsWith('cut-parts:'))!;
+    const xs = cut.outline.map(p => p.x);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(17, 1);
+    expect(cut.to).toBeCloseTo(8.5, 6);
+  });
 });
