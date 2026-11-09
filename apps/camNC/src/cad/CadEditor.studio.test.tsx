@@ -1064,11 +1064,14 @@ it('moves a part so a corner of it lands on a corner of another, by mate connect
   const { latest } = await studio(source);
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   const click = (partId: string, point: [number, number, number], normal: [number, number, number] = [0, 0, 1]) => {
-    const index = props().instanceIds!.indexOf(partId);
-    act(() => props().onSelect!(partId, index, { partId, index, point, normal }));
+    const { instanceIds, onSelect } = props();
+    const index = instanceIds!.indexOf(partId);
+    act(() => onSelect!(partId, index, { partId, index, point, normal }));
   };
-  await waitFor(() => expect(props().instanceIds).toContain('boss'));
-  click('boss', [0, 0, 0]);
+  // The 3D view loads lazily, which can take a while.
+  await waitFor(() => expect(props().instanceIds).toContain('boss'), { timeout: 10_000 });
+  const panel = screen.getByRole('region', { name: 'Parts panel' });
+  await userEvent.click(within(panel).getByRole('button', { name: /^▱?\s*Boss/ }));
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Transform · Boss' });
@@ -1111,9 +1114,11 @@ it('mates a part moved by a distance from where it’s drawn, not from where the
   });
   const { latest } = await studio(source);
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().instanceIds?.length).toBeGreaterThan(0), { timeout: 10_000 });
   const click = (partId: string, point: [number, number, number], normal: [number, number, number]) => {
-    const index = props().instanceIds!.indexOf(partId);
-    act(() => props().onSelect!(partId, index, { partId, index, point, normal }));
+    const { instanceIds, onSelect } = props();
+    const index = instanceIds!.indexOf(partId);
+    act(() => onSelect!(partId, index, { partId, index, point, normal }));
   };
   const features = await screen.findByRole('region', { name: 'Features' });
   await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Boss/ }));
@@ -1128,11 +1133,40 @@ it('mates a part moved by a distance from where it’s drawn, not from where the
   await waitFor(() => expect(latest().parts[1]!.moved).toEqual({ by: [160, 60, 0] }));
 });
 
+it('copies a part along a line from one picked point to another, as Translate by line', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  source.parts[0]!.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  const { latest } = await studio(source);
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().instanceIds?.length).toBeGreaterThan(0), { timeout: 10_000 });
+  const part = latest().parts[0]!;
+  const click = (point: [number, number, number]) => {
+    const { instanceIds, onSelect } = props();
+    const index = instanceIds!.indexOf(part.id);
+    act(() => onSelect!(part.id, index, { partId: part.id, index, point, normal: [0, 0, 1] }));
+  };
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'line');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/Pick two points for the line/);
+  // Along the plate's long edge, by its length.
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Line start' }));
+  click([0, 0, 18]);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Line end' }));
+  click([200, 0, 18]);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.copies?.[0]?.offset?.position).toEqual([200, 0, 0]));
+});
+
 it('rotates a part about the line out of a face picked for the axis', async () => {
   const source = createPlateDocument({ width: 200, height: 100 });
   source.parts[0]!.drawnOn = { on: { plane: 'top' }, offset: 0 };
   const { latest } = await studio(source);
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().instanceIds?.length).toBeGreaterThan(0), { timeout: 10_000 });
   const part = latest().parts[0]!;
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
@@ -1142,8 +1176,9 @@ it('rotates a part about the line out of a face picked for the axis', async () =
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   expect(within(dialog).getByRole('alert').textContent).toMatch(/Pick a face for the axis/);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Axis' }));
-  const index = props().instanceIds!.indexOf(part.id);
-  act(() => props().onSelect!(part.id, index, { partId: part.id, index, point: [0, 0, 18], normal: [0, 0, 1] }));
+  const { instanceIds, onSelect } = props();
+  const index = instanceIds!.indexOf(part.id);
+  act(() => onSelect!(part.id, index, { partId: part.id, index, point: [0, 0, 18], normal: [0, 0, 1] }));
   const angle = within(dialog).getByRole('textbox', { name: 'Angle' });
   await userEvent.clear(angle);
   await userEvent.type(angle, '90');
