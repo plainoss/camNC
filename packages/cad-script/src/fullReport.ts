@@ -106,7 +106,10 @@ export interface CadFullBoard {
 }
 export interface CadFullReport {
   design: { name: string; revision: number; version: number };
+  /** False when anything is wrong, the check's expectations and a script that stopped included. */
   ok: boolean;
+  /** Why the script stopped, when one did: the design reported on is then the one it started from. */
+  scriptError?: string;
   status: string;
   errors: CadReport['errors'];
   warnings: CadReport['warnings'];
@@ -293,8 +296,8 @@ function sketchKey(part: CadPart, ref: string) {
  */
 export async function fullCadReport(
   input: CadDocument,
-  /** The check of `input`, when it's been made already, so it isn't solved and planned twice. */
-  inspected?: { document: CadDocument; report: CadReport; parts: EvaluatedCadPart[] }
+  /** The check of `input`, when it's been made already, so it isn't solved and planned twice, with why its script stopped, if it did. */
+  inspected?: { document: CadDocument; report: CadReport; parts: EvaluatedCadPart[]; scriptError?: string }
 ): Promise<CadFullReport> {
   const { document, report, parts } = inspected ?? (await inspectCadDocument(input));
   const byId = new Map(document.parts.map(part => [part.id, part]));
@@ -566,7 +569,8 @@ export async function fullCadReport(
   const { boards, unplanned } = planBoards(document, parts, partId => byId.get(partId)?.cornerRelief?.diameter);
   return {
     design: { name: document.name, revision: document.revision, version: document.version },
-    ok: report.ok,
+    ok: report.ok && !inspected?.scriptError,
+    ...(inspected?.scriptError && { scriptError: inspected.scriptError }),
     status: report.status,
     errors: report.errors,
     warnings: report.warnings,

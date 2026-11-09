@@ -36,7 +36,7 @@ console.log = console.error.bind(console);
 
 const options = parseArgs(process.argv.slice(2));
 const start = options.from ? parseCadDocument(JSON.parse(await readFile(options.from, 'utf8'))) : null;
-type Inspected = Awaited<ReturnType<typeof inspectCadDocument>>;
+type Inspected = Awaited<ReturnType<typeof inspectCadDocument>> & { scriptError?: string };
 const finish = async (ok: boolean, output: object, document?: unknown, svg?: string, inspected?: Inspected) => {
   // A design that doesn't check out is never written where it could be imported by mistake.
   if (ok && options.out) await writeFile(options.out, `${JSON.stringify(document, null, 1)}\n`);
