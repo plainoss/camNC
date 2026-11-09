@@ -109,7 +109,10 @@ test('CI covers every runtime task and both browser shards, without duplicating 
     const plan = execFileSync(process.execPath, [require.resolve('turbo/bin/turbo'), 'run', ...tasks, ...filters, '--dry=json'], {
       cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024,
     });
-    return JSON.parse(plan).tasks.filter(task => tasks.includes(task.task) && task.command !== '<NONEXISTENT>').map(task => task.taskId);
+    // A task is either a name for every filtered package or a package#task id that runs regardless of the filter.
+    return JSON.parse(plan).tasks
+      .filter(task => (tasks.includes(task.task) || tasks.includes(task.taskId)) && task.command !== '<NONEXISTENT>')
+      .map(task => task.taskId);
   };
   const assigned = suites.flatMap(suite => selected(suite.tasks.split(/\s+/), suite.filter.split(/\s+/)));
   const expected = [
@@ -119,8 +122,16 @@ test('CI covers every runtime task and both browser shards, without duplicating 
   ];
   assert.deepEqual(assigned.sort(), expected.sort());
   assert.deepEqual(suites.filter(suite => suite.tasks === 'test:browser').map(suite => suite.args).sort(), ['--shard=1/2', '--shard=2/2']);
+  // Both gates run serially in one job, after its functional tests, and never through turbo's cache.
+  assert.deepEqual(suites.map(suite => suite.performance).filter(Boolean), ['pnpm run test:performance']);
   const scripts = JSON.parse(read('package.json')).scripts;
-  assert.deepEqual(suites.map(suite => suite.performance).filter(Boolean).sort(), scripts['test:performance'].split(' && ').sort());
+  assert.match(scripts['test:performance'], /^pnpm --filter @wbcnc\/cam test:performance && pnpm --filter @wbcnc\/camNC test:performance$/);
+  const steps = parse(read('.github/workflows/ci.yml')).jobs.test.steps.map(step => step.name);
+  assert(steps.indexOf('Performance gates') > steps.indexOf('Run tests'));
+  // The headless suites share a runner one task at a time; each browser shard has a runner to itself.
+  const headless = suites.filter(suite => suite.tasks !== 'test:browser');
+  assert.deepEqual(headless.map(suite => suite.suite), ['headless']);
+  assert.match(headless[0].filter, /--concurrency=1/);
   const specs = parse(read('.github/workflows/ci.yml')).jobs.specs;
   assert.deepEqual(specs.strategy.matrix.shard, ['1/4', '2/4', '3/4', '4/4']);
   assert.match(specs.steps.find(step => step.name === 'Run sketch behaviour specs').run, /--shard=\$\{\{ matrix.shard \}\}/);
@@ -145,6 +156,37 @@ test('merge queue runs all validation and isolates concurrent candidate builds',
   // The queue validated the commit that lands on main, so main only warms caches through the checks job.
   const onMain = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], 'push'));
   assert.deepEqual(onMain, ['checks']);
+});
+
+test('only the checks job on main saves the pnpm store, and every job restores the same entry', () => {
+  const workflow = parse(read('.github/workflows/ci.yml'));
+  const action = parse(read('.github/actions/install-dependencies/action.yml'));
+  assert.doesNotMatch(read('.github/workflows/ci.yml'), /actions\/setup-node|pnpm install|cache: ["']?pnpm/,
+    'jobs install through the shared action');
+  assert.doesNotMatch(JSON.stringify(action), /"cache":/, 'setup-node must not save the store after every job');
+  for (const [id, job] of Object.entries(workflow.jobs)) {
+    if (id === 'results') continue;
+    const install = job.steps.find(step => step.uses === './.github/actions/install-dependencies');
+    assert(install, `${id} must install through the shared action`);
+    assert.equal(install.with?.['save-cache'], id === 'checks' ? "${{ github.event_name == 'push' }}" : undefined, id);
+  }
+  const steps = action.runs.steps;
+  const restore = steps.find(step => step.uses === 'actions/cache/restore@v6');
+  const save = steps.find(step => step.uses === 'actions/cache/save@v6');
+  assert(!steps.some(step => step.uses?.startsWith('actions/cache@')), 'a combined cache step would save in every job');
+  assert.equal(restore.with.path, save.with.path);
+  assert.equal(save.with.key, '${{ steps.restore.outputs.cache-primary-key }}');
+  assert.match(restore.with.key, /hashFiles\('pnpm-lock.yaml'\)/);
+  assert.equal(save.if, "inputs.save-cache == 'true' && steps.restore.outputs.cache-hit != 'true'");
+  // A cached path outside the workspace resolves differently in the Playwright container.
+  assert(!/^[/~]|\.\./.test(restore.with.path), 'cache a workspace-relative path');
+  assert.match(steps.find(step => step.name === 'Keep the pnpm store in the workspace').run,
+    new RegExp(`npm_config_store_dir=\\$GITHUB_WORKSPACE/${restore.with.path}"`));
+  assert(read('.gitignore').split('\n').includes(restore.with.path));
+  // Both cache steps must see the gzip-only environment of the container, and later steps get zstd back.
+  const index = name => steps.findIndex(step => step.name === name);
+  assert(index('Use the container\'s cache compression') < steps.indexOf(restore));
+  assert(index('Restore zstd for later cache steps') === steps.length - 1);
 });
 
 test('remote caching uses short-lived tokens and skips untrusted fork PRs', () => {
@@ -279,8 +321,13 @@ test('all workflows use maintained Node.js 24 action releases', () => {
     'actions/upload-artifact': 7,
     'actions/download-artifact': 8,
   };
-  for (const file of readdirSync(new URL('.github/workflows/', root)).filter(file => /\.ya?ml$/.test(file))) {
-    const workflow = parse(read(`.github/workflows/${file}`));
+  const files = [
+    ...readdirSync(new URL('.github/workflows/', root)).filter(file => /\.ya?ml$/.test(file)).map(file => `workflows/${file}`),
+    'actions/install-dependencies/action.yml',
+  ];
+  for (const file of files) {
+    const parsed = parse(read(`.github/${file}`));
+    const workflow = parsed.jobs ? parsed : { jobs: { [parsed.name]: parsed.runs } };
     assert.doesNotMatch(JSON.stringify(workflow), /ubuntu-latest/,
       `${file}: pin Linux runners to avoid unplanned OS migrations`);
     for (const [id, job] of Object.entries(workflow.jobs)) {
