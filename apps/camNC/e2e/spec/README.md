@@ -68,6 +68,19 @@ Besides the steps below, a line can be:
 
 Once a behaviour works, write the steps that showed it as a scenario.
 
+## Reproducing from a saved design
+
+**Save to file** in a design's top bar writes the whole design (every part's features, sketches, dimensions,
+variables and planes) as `.json`. To reproduce a report from one, put the file in `designs/` and start from it:
+
+```sh
+printf 'open designs/plate.json\nstate\n' | pnpm --silent --filter @wbcnc/camNC spec:session
+```
+
+A scenario does the same with `"open designs/<name>.json"` as its first step. Outside the editor,
+`pnpm --filter @wbcnc/cad-script check --from <file.json>` loads it headless, and a unit test can read it with
+`parseCadDocument(JSON.parse(text))` and render `<CadEditor document={…} />`.
+
 ## Scenario format
 
 ```json
@@ -105,6 +118,7 @@ The comparison reports themselves are kept outside this repository.
 | `closesketch`                                                                            | Close the open sketch back to the Part Studio with its dialog's tick                            |
 | `uncheck <label>` / `hold <key>` / `release <key>` / `selectdim` / `editdim` / `addpart` | Hold a modifier, select or edit the first dimension label, add a part                           |
 | `handle <start\|end> <point\|segment> [add]`                                             | Click a spline's own tangent handle, optionally adding to the selection                         |
+| `open <file.json>`                                                                       | Open a saved design file (relative to this folder) as a new project, on its first sketch        |
 | `frame <name>`                                                                           | Compare this moment with a reviewed golden, if one exists                                       |
 | `{ "expect": { ... } }`                                                                  | Check the state at this moment                                                                  |
 
