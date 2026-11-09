@@ -419,6 +419,8 @@ export interface CadPartPattern {
   id: string;
   /** Picked from a plane or face; it overrides `axis` while that face is there, and follows it when it moves. */
   direction?: CadDirection;
+  /** Along a picked edge, as a unit vector, when there's no `direction`. It stays as picked. */
+  vector?: [number, number, number];
   /** Switched off in the feature list: no copies, and the count and spacing are kept. */
   suppressed?: true;
   axis: 'x' | 'y' | 'z';
