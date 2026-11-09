@@ -241,7 +241,7 @@ import {
   snapLabels,
   withoutExtrude,
 } from './editorHelpers';
-import { offerFinalPreview } from './finalPreview';
+import { useFeaturePreview } from './useFeaturePreview';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
@@ -633,35 +633,17 @@ export function CadEditor({
     [doc.variables, variableScope]
   );
   useProvideCadVariableFields(variableFields);
-  // The step being edited in its dialog, or where the rollback bar was moved to. Like the reference, the studio shows the
-  // design only as far as that step.
-  const rollbackStep =
-    !studioSession || !showWorkspace
-      ? null
-      : featureDialog
-        ? featureDialog.kind === 'extrude'
-          ? `${featureDialog.partId}:extrude`
-          : (doc.parts.find(candidate => candidate.id === featureDialog.partId)?.pattern?.id ?? null)
-        : (partCutting?.id ?? (rolledTo && designSteps(doc).some(step => step.id === rolledTo) ? rolledTo : null));
   const blankDesign = studioSession && doc.parts.length === 1 && isBlank(doc.parts[0]!);
-  // Final shows the whole design while a step before the last is edited; it's off again for the next one.
-  const [showFinal, setShowFinal] = useState(false);
-  const editingStep = studioSession && showWorkspace && (featureDialog || partCutting) ? rollbackStep : null;
-  const offersFinal = !!editingStep && designSteps(doc).at(-1)?.id !== editingStep;
-  useEffect(() => setShowFinal(false), [editingStep]);
-  useEffect(() => {
-    offerFinalPreview(offersFinal ? { shown: showFinal, toggle: () => setShowFinal(shown => !shown) } : null);
-    return () => offerFinalPreview(null);
-  }, [offersFinal, showFinal]);
-  const shownDocument = useMemo(
-    () =>
-      blankDesign
-        ? { ...doc, parts: [] }
-        : rollbackStep && !(offersFinal && showFinal && rollbackStep === editingStep)
-          ? rolledBackTo(doc, rollbackStep)
-          : doc,
-    [doc, rollbackStep, offersFinal, showFinal, editingStep, blankDesign]
-  );
+  const { rollbackStep, shownDocument } = useFeaturePreview({
+    document: doc,
+    enabled: studioSession && showWorkspace,
+    blank: blankDesign,
+    rolledTo,
+    featureDialog,
+    partCutting,
+    transformDialog,
+    mirrorDialog,
+  });
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
   const finishing = useRef(false);
@@ -3565,7 +3547,16 @@ export function CadEditor({
     if (studioSession && step.kind === 'copy') {
       const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
       if (copy?.offset) return openTransform(step.partId, copy.id);
-      if (copy?.mirror) return setMirrorDialog({ partId: step.partId, copyId: copy.id });
+      if (copy?.mirror) {
+        setFeatureDialog(null);
+        setPartCutting(null);
+        setTransformDialog(null);
+        setVariableDialog(null);
+        setPlaneDialog(null);
+        setChoosingFace(false);
+        setDirectionPicker(null);
+        return setMirrorDialog({ partId: step.partId, copyId: copy.id });
+      }
     }
     if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
     // A cut opens its part's sketch view from the studio: cancelling there goes back to the design as it is now.
@@ -3604,6 +3595,7 @@ export function CadEditor({
         setPartCutting(null);
         setTransformDialog(null);
         setVariableDialog(null);
+        setMirrorDialog(null);
         return setPlaneDialog({ id: entry.id });
       }
       if (action === 'delete') {
