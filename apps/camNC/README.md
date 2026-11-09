@@ -33,9 +33,9 @@ repository (`plainoss/camNC`) in the Cloudflare dashboard (plainoss account):
 | Preview command (other branches)            | builds off                                               | `pnpm run deploy:preview` |
 | Build variable `VITE_CLERK_PUBLISHABLE_KEY` | Clerk production key                                     | Clerk development key     |
 
-The preview Worker's build, deploy and version commands skip GitHub's temporary
-`gh-readonly-queue/*` branches using `WORKERS_CI_BRANCH`. Wrap each command in
-`case "$WORKERS_CI_BRANCH" in gh-readonly-queue/*) echo "Skipping merge queue preview" ;; *) COMMAND ;; esac`,
+The preview Worker's build, deploy and version commands skip Mergify's temporary
+`mergify/merge-queue/*` batch branches using `WORKERS_CI_BRANCH`. Wrap each command in
+`case "$WORKERS_CI_BRANCH" in mergify/merge-queue/*) echo "Skipping merge queue preview" ;; *) COMMAND ;; esac`,
 substituting the command from the table for `COMMAND`. Queue validation runs in
 GitHub Actions; ordinary branches still get previews.
 

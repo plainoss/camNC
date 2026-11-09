@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Files a `flaky-test` issue for each test that failed in a CI run but passed on the same code: a merge-queue failure
-// whose PR passed, or a failed attempt that a rerun fixed. Each later flake comments on the open issue for that test,
+// Files a `flaky-test` issue for each test that failed in a CI run but passed on the same code: a failed Mergify batch
+// whose PRs later passed in another batch at the same commits, or a failed attempt that a rerun fixed. Each later flake comments on the open issue for that test,
 // so every session sees who already owns it before patching the same failure into its own branch.
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -29,8 +29,7 @@ export const MERGIFY_BATCH = 'mergify/merge-queue/';
  * Which attempt to read, or null when the run says nothing about flakiness. A failed Mergify batch is judged later,
  * when a batch with the same PR commits passes (see `coveredBy`), since PR runs skip the browser suites and specs.
  */
-export function attemptToRead({ event, conclusion, attempt, branch = '' }) {
-  if (event === 'merge_group' && conclusion === 'failure') return attempt;
+export function attemptToRead({ conclusion, attempt }) {
   if (conclusion === 'success' && attempt > 1) return attempt - 1;
   return null;
 }
@@ -121,25 +120,14 @@ async function main() {
   const attempt = attemptToRead(run);
   if (attempt === null) return;
   const runUrl = `https://github.com/${repo}/actions/runs/${run.id}/attempts/${attempt}`;
-  if (run.event !== 'merge_group') return report(repo, run.id, attempt, `A rerun of the same commit passed: ${runUrl}`);
-  const pr = /^gh-readonly-queue\/[^/]+\/pr-(\d+)-/.exec(run.branch)?.[1];
-  if (!pr) return;
-  // Only jobs that passed on the PR's own run count: PR runs skip the browser suites and specs unless labelled `full-ci`.
-  const head = api(`repos/${repo}/pulls/${pr}`, '.head.sha');
-  const own = JSON.parse(api(`repos/${repo}/actions/runs?head_sha=${head}&event=pull_request`,
-    '[.workflow_runs[] | select(.name == "CI" and .conclusion == "success") | .id]'));
-  const passedJobs = new Set(own.flatMap(id =>
-    JSON.parse(api(`repos/${repo}/actions/runs/${id}/jobs?per_page=100`, '[.jobs[] | select(.conclusion == "success") | .name]'))));
-  await report(repo, run.id, attempt,
-    `The merge queue failed ${runUrl} for #${pr}, whose own PR run passed the same job. It can also be an interaction with a PR ahead in the queue.`,
-    job => passedJobs.has(job));
+  await report(repo, run.id, attempt, `A rerun of the same commit passed: ${runUrl}`);
 }
 
-async function report(repo, runId, attempt, context, includeJob = () => true) {
+async function report(repo, runId, attempt, context) {
   const jobs = JSON.parse(api(`repos/${repo}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`,
     '[.jobs[] | select(.conclusion == "failure" and .name != "Run tests") | {id, name}]'));
   const flakes = new Map();
-  for (const job of jobs.filter(job => includeJob(job.name))) {
+  for (const job of jobs) {
     const tests = parseFailures(await jobLog(repo, job.id));
     // A job that hung or failed outside a test still gets one issue, under its own name.
     for (const test of tests.length ? tests : [`${job.name} (no failing test in its log)`]) flakes.set(test, job.name);

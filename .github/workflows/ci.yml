@@ -6,10 +6,7 @@ on:
   push:
     branches:
       - main
-  # Retain GitHub's queue during the Mergify pilot and for rollback.
-  merge_group:
-    types: [checks_requested]
-  # Mergify tests cumulative batches through temporary draft PRs targeting main.
+  # Mergify's merge queue tests cumulative batches through temporary draft PRs targeting main.
   pull_request:
     branches:
       - main
@@ -134,9 +131,9 @@ jobs:
 
   browser:
     name: Tests (${{ matrix.suite }})
-    # Both queues run the browser shards once per batch, including Mergify draft PRs.
-    # Ordinary PRs run headless suites unless labelled `full-ci`. Same container and steps as test.
-    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci')))
+    # Mergify's batch draft PRs run the browser shards once per batch. Ordinary PRs run the headless suites unless
+    # labelled `full-ci`. Same container and steps as test.
+    if: github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci'))
     permissions: *turbo-permissions
     strategy:
       fail-fast: false
@@ -159,8 +156,8 @@ jobs:
 
   specs:
     name: Behaviour specs (${{ matrix.shard }})
-    # Like browser, on GitHub merge groups, Mergify batch PRs, or PRs labelled `full-ci`.
-    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci')))
+    # Like browser, on Mergify batch PRs or PRs labelled `full-ci`.
+    if: github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci'))
     permissions:
       contents: read
       id-token: write
@@ -228,7 +225,7 @@ jobs:
           BROWSER_RESULT: ${{ needs.browser.result }}
           SPECS_RESULT: ${{ needs.specs.result }}
           SIM_RESULT: ${{ needs.fluidnc-sim.result }}
-          # Only ordinary PRs without `full-ci` may skip browser suites; both queues require them.
+          # Only ordinary PRs without `full-ci` may skip browser suites; Mergify batches require them.
           QUEUE_ONLY_OPTIONAL: ${{ github.event_name == 'pull_request' && !startsWith(github.head_ref, 'mergify/merge-queue/') && !contains(github.event.pull_request.labels.*.name, 'full-ci') }}
         run: |
           test "$CHECKS_RESULT" = success
