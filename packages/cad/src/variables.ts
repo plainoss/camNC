@@ -356,6 +356,13 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     const removal = sized.remove && depthOutcome(sized.remove, scope);
     if (removal && 'value' in removal && removal.value !== sized.remove!.depth)
       sized = { ...sized, remove: { ...sized.remove!, depth: removal.value } };
+    // A Hole step's diameter follows its variables too; one that can't be worked out keeps its last good size.
+    const hole =
+      sized.hole &&
+      usesVariables(sized.hole.diameterExpression) &&
+      parseCadValue(sized.hole.diameterExpression, { unit: 'mm', variables: scope });
+    if (hole && 'value' in hole && hole.value > 0 && hole.value !== sized.hole!.diameter)
+      sized = { ...sized, hole: { ...sized.hole!, diameter: hole.value } };
     sized = mapCuts(sized, cut => {
       const outcome = depthOutcome(cut, scope);
       return outcome && 'value' in outcome && outcome.value !== cut.depth ? { ...cut, depth: outcome.value } : cut;
@@ -553,6 +560,8 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
                   cornerRelief: { ...part.cornerRelief, diameterExpression: edit(part.cornerRelief.diameterExpression) },
                 }),
                 ...(part.thin?.depthExpression && { thin: { ...part.thin, depthExpression: edit(part.thin.depthExpression) } }),
+                ...(part.hole?.diameterExpression && { hole: { ...part.hole, diameterExpression: edit(part.hole.diameterExpression) } }),
+                ...(part.remove?.depthExpression && { remove: { ...part.remove, depthExpression: edit(part.remove.depthExpression) } }),
                 ...(part.drawnOn?.offsetExpression && {
                   drawnOn: { ...part.drawnOn, offsetExpression: edit(part.drawnOn.offsetExpression) },
                 }),

@@ -41,6 +41,12 @@ it('makes round holes at the points of a sketch on a part’s face', async () =>
   await userEvent.clear(diameter);
   await userEvent.type(diameter, '8{Enter}');
   await waitFor(() => expect(latest().parts[1]!.hole).toEqual({ diameter: 8 }));
+  // A blind depth left unusable doesn't stop going back to Through.
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Termination' }), 'blind');
+  await waitFor(() => expect(latest().parts[1]!.remove).toEqual({ depth: 10 }));
+  await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Depth' }));
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Termination' }), 'through');
+  await waitFor(() => expect(latest().parts[1]!.remove).toEqual({ depth: 'through' }));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Hole · Points' })).toBeNull());
   // Two through holes in the board, and the step listed as a hole.

@@ -32,14 +32,18 @@ export function HoleDialog({
   const apply = (diameter = diameterText, through = depth === 'through', blind = depthText) => {
     const across = parseCadValue(diameter, { unit: 'mm', variables });
     const deep = parseCadValue(blind, { unit: 'mm', variables });
+    // A blind depth that can't be used is no reason to refuse a hole through the part.
     const refused =
       'error' in across ? across.error : !(across.value > 0) ? 'A hole needs a diameter.' : !through && 'error' in deep ? deep.error : null;
     setError(refused);
-    if (refused || 'error' in across || 'error' in deep) return;
+    if (refused || 'error' in across || (!through && 'error' in deep)) return;
     change(p => ({
       ...p,
       hole: { diameter: across.value, ...(across.expression && { diameterExpression: across.expression }) },
-      remove: through ? { depth: 'through' } : { depth: deep.value, ...(deep.expression && { depthExpression: deep.expression }) },
+      remove:
+        through || 'error' in deep
+          ? { depth: 'through' }
+          : { depth: deep.value, ...(deep.expression && { depthExpression: deep.expression }) },
     }));
   };
   const problem = extrudeStepProblem(document, part);
