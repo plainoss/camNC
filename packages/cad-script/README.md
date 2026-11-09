@@ -207,6 +207,9 @@ by the parts that fit them.
   cut.
 - `d.cutParts(a, { with: b, split: 'half' })` makes a half-lap where two parts cross,
   each losing half its height, and `split: { fingers: 5 }` a finger joint at a corner.
+  Both parts are kept. A strip sketched on a board's face and extruded across it can
+  make the other board: fingers follow the longer in-plane overlap, and cuts stop
+  at the overlap depth so the extruded board keeps its backbone.
   The finger count also accepts an expression, such as `split: { fingers: 'n' }`, and follows its variables.
   Draw both parts as plain boards: the step makes the slots, so a person changes the
   joint by its finger count, and the slots follow the boards' sizes.

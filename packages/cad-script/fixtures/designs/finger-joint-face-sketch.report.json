@@ -1,0 +1,896 @@
+{
+ "design": {
+  "name": "Untitled design (12)",
+  "revision": 49,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [
+  {
+   "code": "underconstrained",
+   "message": "1 degrees of freedom remain. Add dimensions to keep this shape predictable.",
+   "part": "Part 3"
+  }
+ ],
+ "features": [
+  {
+   "id": "c4622bb7-37d6-49fb-80d4-824a4f3585ff:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 2",
+   "part": "Part 2",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Part 2 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "c4622bb7-37d6-49fb-80d4-824a4f3585ff:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 2",
+   "part": "Part 2",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "symmetric": true,
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": 0
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      -114,
+      -202
+     ],
+     "size": [
+      228,
+      404
+     ]
+    },
+    "holes": 0,
+    "notches": 3,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "7b6e98b0-f47d-45fa-a40e-346b3618a83f:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 3",
+   "part": "Part 3",
+   "settings": {
+    "on": "Part 2's underside (+y)"
+   },
+   "result": {
+    "sketch": "Part 3 / profile",
+    "freedom": 1,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "7b6e98b0-f47d-45fa-a40e-346b3618a83f:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 3",
+   "part": "Part 3",
+   "settings": {
+    "thickness": {
+     "value": 70
+    },
+    "drawnOn": {
+     "on": "Part 2's underside (+y)",
+     "offset": {
+      "value": -18
+     }
+    }
+   },
+   "result": {
+    "thickness": 70,
+    "outline": {
+     "at": [
+      -114,
+      -202
+     ],
+     "size": [
+      228,
+      27.638
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "Part 2's underside (+y): sketch origin at 0, 9, 0, its x along -x, its y along +z, looking +y."
+   }
+  },
+  {
+   "id": "bca60fbb-62a7-4c38-bd2f-85d040794c02",
+   "kind": "partCut",
+   "label": "Cut Part 2 with Part 3",
+   "part": "Part 2",
+   "settings": {
+    "tools": [
+     "Part 3"
+    ],
+    "targets": [
+     "Part 2"
+    ],
+    "clearance": {
+     "value": 0.2
+    },
+    "split": {
+     "fingers": {
+      "value": 5
+     }
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Part 2",
+      "tool": "Part 3",
+      "side": "top",
+      "width": 45.8,
+      "length": 27.838,
+      "depth": 18,
+      "through": true,
+      "at": {
+       "x": 68.2,
+       "y": -202
+      }
+     },
+     {
+      "target": "Part 2",
+      "tool": "Part 3",
+      "side": "top",
+      "width": 46,
+      "length": 27.838,
+      "depth": 18,
+      "through": true,
+      "at": {
+       "x": -23,
+       "y": -202
+      }
+     },
+     {
+      "target": "Part 2",
+      "tool": "Part 3",
+      "side": "top",
+      "width": 45.8,
+      "length": 27.838,
+      "depth": 18,
+      "through": true,
+      "at": {
+       "x": -114,
+       "y": -202
+      }
+     },
+     {
+      "target": "Part 3",
+      "tool": "Part 2",
+      "side": "underside",
+      "width": 46,
+      "length": 27.638,
+      "depth": 18.2,
+      "through": false,
+      "at": {
+       "x": -68.6,
+       "y": -202
+      }
+     },
+     {
+      "target": "Part 3",
+      "tool": "Part 2",
+      "side": "underside",
+      "width": 46,
+      "length": 27.638,
+      "depth": 18.2,
+      "through": false,
+      "at": {
+       "x": 22.6,
+       "y": -202
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Part 2",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 5,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "midpoint": 1,
+    "parallel": 2,
+    "perpendicular": 1
+   },
+   "entities": [
+    {
+     "ref": "0a76",
+     "type": "line",
+     "a": [
+      -114,
+      -202
+     ],
+     "b": [
+      114,
+      -202
+     ],
+     "ends": [
+      "4672",
+      "5983"
+     ]
+    },
+    {
+     "ref": "8df6",
+     "type": "line",
+     "a": [
+      114,
+      -202
+     ],
+     "b": [
+      114,
+      202
+     ],
+     "ends": [
+      "26c3",
+      "3f10"
+     ]
+    },
+    {
+     "ref": "3eae",
+     "type": "line",
+     "a": [
+      114,
+      202
+     ],
+     "b": [
+      -114,
+      202
+     ],
+     "ends": [
+      "b2f3",
+      "c7d9"
+     ]
+    },
+    {
+     "ref": "5740",
+     "type": "line",
+     "a": [
+      -114,
+      202
+     ],
+     "b": [
+      -114,
+      -202
+     ],
+     "ends": [
+      "bb67",
+      "20b6"
+     ]
+    },
+    {
+     "ref": "1504",
+     "type": "line",
+     "a": [
+      -114,
+      -202
+     ],
+     "b": [
+      114,
+      202
+     ],
+     "ends": [
+      "4672",
+      "b2f3"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "f27b",
+     "type": "line",
+     "a": [
+      114,
+      -202
+     ],
+     "b": [
+      -114,
+      202
+     ],
+     "ends": [
+      "5983",
+      "c7d9"
+     ],
+     "construction": true
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -114,
+      -202
+     ],
+     "size": [
+      228,
+      404
+     ],
+     "area": 92112,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Part 3",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 1,
+   "status": "solved",
+   "constraints": {
+    "coincident": 5,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "pointOnLine": 1
+   },
+   "entities": [
+    {
+     "ref": "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:0",
+     "type": "line",
+     "a": [
+      114,
+      -202
+     ],
+     "b": [
+      -114,
+      -202
+     ],
+     "ends": [
+      "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:4",
+      "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:59"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:8",
+     "type": "line",
+     "a": [
+      -114,
+      -202
+     ],
+     "b": [
+      -114,
+      202
+     ],
+     "ends": [
+      "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:59",
+      "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:3f"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:3e",
+     "type": "line",
+     "a": [
+      -114,
+      202
+     ],
+     "b": [
+      114,
+      202
+     ],
+     "ends": [
+      "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:3f",
+      "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:c"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:57",
+     "type": "line",
+     "a": [
+      114,
+      202
+     ],
+     "b": [
+      114,
+      -202
+     ],
+     "ends": [
+      "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:c",
+      "2466f67d-02f7-4d42-99b7-09d12477c0f2:face:4"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "2347",
+     "type": "line",
+     "a": [
+      -114,
+      -202
+     ],
+     "b": [
+      114,
+      -202
+     ],
+     "ends": [
+      "1ee4",
+      "bbf8"
+     ]
+    },
+    {
+     "ref": "baca",
+     "type": "line",
+     "a": [
+      114,
+      -202
+     ],
+     "b": [
+      114,
+      -174.362
+     ],
+     "ends": [
+      "3326",
+      "c299"
+     ]
+    },
+    {
+     "ref": "0270",
+     "type": "line",
+     "a": [
+      114,
+      -174.362
+     ],
+     "b": [
+      -114,
+      -174.362
+     ],
+     "ends": [
+      "b9b9",
+      "3692"
+     ]
+    },
+    {
+     "ref": "3feb",
+     "type": "line",
+     "a": [
+      -114,
+      -174.362
+     ],
+     "b": [
+      -114,
+      -202
+     ],
+     "ends": [
+      "6ca6",
+      "40cc"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -114,
+      -202
+     ],
+     "size": [
+      228,
+      27.638
+     ],
+     "area": 6301.415,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Part 2",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     -114,
+     -202
+    ],
+    "size": [
+     228,
+     404
+    ]
+   },
+   "holes": 0,
+   "notches": 3,
+   "cuts": [
+    {
+     "ref": "Part 3",
+     "side": "top",
+     "from": 0,
+     "to": 18,
+     "through": true,
+     "at": [
+      68.2,
+      -202
+     ],
+     "size": [
+      45.8,
+      27.838
+     ]
+    },
+    {
+     "ref": "Part 3#1",
+     "side": "top",
+     "from": 0,
+     "to": 18,
+     "through": true,
+     "at": [
+      -23,
+      -202
+     ],
+     "size": [
+      46,
+      27.838
+     ]
+    },
+    {
+     "ref": "Part 3#2",
+     "side": "top",
+     "from": 0,
+     "to": 18,
+     "through": true,
+     "at": [
+      -114,
+      -202
+     ],
+     "size": [
+      45.8,
+      27.838
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 10.7,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      -9,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      9,
+      0
+     ]
+    },
+    {
+     "face": "edge 0a76",
+     "looks": "-z",
+     "origin": [
+      -114,
+      9,
+      -202
+     ]
+    },
+    {
+     "face": "edge 8df6",
+     "looks": "+x",
+     "origin": [
+      114,
+      9,
+      -202
+     ]
+    },
+    {
+     "face": "edge 3eae",
+     "looks": "+z",
+     "origin": [
+      114,
+      9,
+      202
+     ]
+    },
+    {
+     "face": "edge 5740",
+     "looks": "-x",
+     "origin": [
+      -114,
+      9,
+      202
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Part 3",
+   "thickness": 70,
+   "outline": {
+    "at": [
+     -114,
+     -202
+    ],
+    "size": [
+     228,
+     27.638
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Part 2",
+     "side": "underside",
+     "from": 0,
+     "to": 18.2,
+     "through": false,
+     "at": [
+      -68.6,
+      -202
+     ],
+     "size": [
+      46,
+      27.638
+     ]
+    },
+    {
+     "ref": "Part 2#1",
+     "side": "underside",
+     "from": 0,
+     "to": 18.2,
+     "through": false,
+     "at": [
+      22.6,
+      -202
+     ],
+     "size": [
+      46,
+      27.638
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0,
+    "undersidePockets": 1
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 85.2,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 70.3,
+      "steps": 45
+     },
+     {
+      "label": "Side B: 2 edge grooves 18.2 deep",
+      "depth": 18.2,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+y",
+     "origin": [
+      0,
+      61,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-y",
+     "origin": [
+      0,
+      -9,
+      0
+     ]
+    },
+    {
+     "face": "edge 2347",
+     "looks": "-z",
+     "origin": [
+      114,
+      -9,
+      -202
+     ]
+    },
+    {
+     "face": "edge baca",
+     "looks": "-x",
+     "origin": [
+      -114,
+      -9,
+      -202
+     ]
+    },
+    {
+     "face": "edge 0270",
+     "looks": "+z",
+     "origin": [
+      -114,
+      -9,
+      -174.362
+     ]
+    },
+    {
+     "face": "edge 3feb",
+     "looks": "+x",
+     "origin": [
+      114,
+      -9,
+      -174.362
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Part 2",
+    "at": [
+     -114,
+     -9,
+     -202
+    ],
+    "size": [
+     228,
+     18,
+     404
+    ]
+   },
+   {
+    "name": "Part 3",
+    "at": [
+     -114,
+     -9,
+     -202
+    ],
+    "size": [
+     228,
+     70,
+     27.638
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    241.4,
+    417.4
+   ],
+   "yield": 0.914,
+   "parts": [
+    {
+     "name": "Part 2",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      228,
+      404
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Part 2",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 10.7,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  },
+  {
+   "name": "Board B",
+   "thickness": 70,
+   "sides": 2,
+   "size": [
+    241.4,
+    41.038
+   ],
+   "yield": 0.636,
+   "parts": [
+    {
+     "name": "Part 3",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      228,
+      27.638
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Part 3",
+     "how": "placed",
+     "tabs": 2,
+     "wanted": 3,
+     "anchored": 2,
+     "ok": true
+    }
+   ],
+   "minutes": 85.2,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 70.3,
+     "steps": 45
+    },
+    {
+     "label": "Side B: 2 edge grooves 18.2 deep",
+     "depth": 18.2,
+     "steps": 12
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}
