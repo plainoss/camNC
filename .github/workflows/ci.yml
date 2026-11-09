@@ -6,8 +6,10 @@ on:
   push:
     branches:
       - main
+  # Retain GitHub's queue during the Mergify pilot and for rollback.
   merge_group:
     types: [checks_requested]
+  # Mergify tests cumulative batches through temporary draft PRs targeting main.
   pull_request:
     branches:
       - main
@@ -60,8 +62,8 @@ jobs:
 
   test:
     name: Tests (${{ matrix.suite }})
-    # The merge queue already validated this exact commit, and Turborepo's remote cache holds its results. On main the
-    # checks job alone keeps the dependency and build caches warm.
+    # The queue validated the combined changes. Squash merges have new SHAs; Turbo caches by task inputs.
+    # On main, checks keeps build caches warm.
     if: github.event_name != 'push'
     permissions: &turbo-permissions
       contents: read
@@ -130,9 +132,9 @@ jobs:
 
   browser:
     name: Tests (${{ matrix.suite }})
-    # The browser shards run in the merge queue, once for a whole batch of PRs, or on a PR labelled `full-ci` from its
-    # next push. A PR runs the headless suites alone. Same container and steps as test.
-    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
+    # Both queues run the browser shards once per batch, including Mergify draft PRs.
+    # Ordinary PRs run headless suites unless labelled `full-ci`. Same container and steps as test.
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci')))
     permissions: *turbo-permissions
     strategy:
       fail-fast: false
@@ -155,8 +157,8 @@ jobs:
 
   specs:
     name: Behaviour specs (${{ matrix.shard }})
-    # Like browser, only in the merge queue or on a PR labelled `full-ci`.
-    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
+    # Like browser, on GitHub merge groups, Mergify batch PRs, or PRs labelled `full-ci`.
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci')))
     permissions:
       contents: read
       id-token: write
@@ -220,8 +222,8 @@ jobs:
           BROWSER_RESULT: ${{ needs.browser.result }}
           SPECS_RESULT: ${{ needs.specs.result }}
           SIM_RESULT: ${{ needs.fluidnc-sim.result }}
-          # The browser shards and specs are skipped on purpose on a PR without `full-ci`; the merge queue requires them.
-          QUEUE_ONLY_OPTIONAL: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          # Only ordinary PRs without `full-ci` may skip browser suites; both queues require them.
+          QUEUE_ONLY_OPTIONAL: ${{ github.event_name == 'pull_request' && !startsWith(github.head_ref, 'mergify/merge-queue/') && !contains(github.event.pull_request.labels.*.name, 'full-ci') }}
         run: |
           test "$CHECKS_RESULT" = success
           test "$TEST_RESULT" = success

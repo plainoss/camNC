@@ -58,7 +58,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 
 - Title format: `feat/fix/chore/docs(<project_name>) <Title>`
 - Open reviewable dependent PRs as soon as their work is ready; distinguish a dependency blocking merge from one blocking review or initial validation. State the dependency and base explicitly, and account for the workflow's target-branch triggers when deciding which checks can run before retargeting.
-- When asked to merge, enable auto-merge once ready and continue monitoring until it merges or a concrete blocker needs action. After a queue rejection, inspect the reason and current candidate, address it, and restore auto-merge when appropriate; a retry of an obsolete candidate does not validate a new one.
+- When asked to merge, use the active queue: once Mergify is enabled, comment `@mergifyio queue` (see `docs/TESTING.md`); until then, enable GitHub auto-merge. Continue monitoring until it merges or a concrete blocker needs action. After a queue rejection, inspect the reason and current candidate, address it, and requeue when appropriate; a retry of an obsolete candidate does not validate a new one.
 - Do not routinely rebase a healthy queued PR just because main advanced; the queue validates the combined candidate. Update the branch when resolving an actual conflict or incorporating a required fix, then validate the changed tree.
 
 ## Code Style

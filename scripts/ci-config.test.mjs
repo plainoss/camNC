@@ -15,11 +15,12 @@ const require = createRequire(import.meta.url);
 // Evaluates a workflow `if:` the way Actions would for these tests: `always()` is true, as for a gate after a failed
 // dependency, and `a.*.b` maps over a list.
 const actionsIf = (expression, github) =>
-  new Function('github', 'always', 'contains', 'fromJSON', `return (${expression.replace(/\.\*\.(\w+)/g, '.map(item => item.$1)')});`)(
+  new Function('github', 'always', 'contains', 'fromJSON', 'startsWith', `return (${expression.replace(/\.\*\.(\w+)/g, '.map(item => item.$1)')});`)(
     { event: {}, ...github },
     () => true,
     (list, item) => list.includes(item),
-    JSON.parse
+    JSON.parse,
+    (value, prefix) => (value ?? '').startsWith(prefix)
   );
 
 test('desktop cache restores rediscover CMake tools while preserving compiled artifacts', t => {
@@ -181,6 +182,58 @@ test('merge queue runs all validation and isolates concurrent candidate builds',
   // The queue validated the commit that lands on main, so main only warms caches through the checks job.
   const onMain = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], { event_name: 'push' }));
   assert.deepEqual(onMain, ['checks']);
+});
+
+test('Mergify batches retain the required gate, branch protections and explicit merge consent', () => {
+  const config = parse(read('.mergify.yml'));
+  assert.equal(config.pull_request_rules, undefined, 'CI success must not automatically request a merge');
+  assert.equal(config.merge_protections_settings?.auto_merge_conditions, undefined);
+  assert.equal(config.merge_queue.mode, 'serial', 'speculative batches must include preceding changes');
+  assert(config.merge_queue.max_parallel_checks > 1 && config.merge_queue.max_parallel_checks <= 2);
+  assert.equal(config.merge_queue.skip_intermediate_results ?? false, false);
+  assert.equal(config.queue_rules.length, 1);
+  const [queue] = config.queue_rules;
+  assert(queue.queue_conditions.includes('base = main'));
+  assert(queue.queue_conditions.includes('-draft'));
+  assert.equal(queue.branch_protection_injection_mode, 'queue');
+  assert.equal(queue.merge_method, 'squash');
+  assert(queue.batch_size > 1 && queue.batch_size <= 3);
+  assert.equal(queue.max_checks_retries, 0);
+  const required = Object.values(parse(read('.github/workflows/ci.yml')).jobs).find(job => job.name === 'Run tests');
+  assert(required);
+  for (const conditions of [queue.queue_conditions, queue.merge_conditions]) {
+    assert(conditions.includes(`check-success = ${required.name}`), 'both original PRs and batches must pass their validation gate');
+  }
+  const { jobs } = parse(read('.github/workflows/ci.yml'));
+  const browserChecks = jobs.browser.strategy.matrix.include.map(({ suite }) => `Tests (${suite})`);
+  const specChecks = jobs.specs.strategy.matrix.shard.map(shard => `Behaviour specs (${shard})`);
+  assert.deepEqual(queue.merge_conditions.filter(condition => !queue.queue_conditions.includes(condition)).sort(),
+    [...browserChecks, ...specChecks].map(name => `check-success = ${name}`).sort(),
+    'distinct merge conditions must require all browser/spec checks, preventing direct merge after only light PR CI');
+});
+
+test('Mergify draft batch PRs trigger all validation without needing merge_group events', () => {
+  const workflow = parse(read('.github/workflows/ci.yml'));
+  const trigger = workflow.on.pull_request;
+  assert(trigger.branches.includes('main'));
+  assert.equal(trigger.paths, undefined);
+  assert.equal(trigger['paths-ignore'], undefined);
+  for (const action of ['opened', 'synchronize', 'reopened']) {
+    assert(trigger.types === undefined || trigger.types.includes(action));
+  }
+  const github = {
+    event_name: 'pull_request',
+    head_ref: 'mergify/merge-queue/main/batch-example',
+    event: { pull_request: { labels: [], draft: true, user: { login: 'mergify[bot]' }, head: { ref: 'mergify/merge-queue/main/batch-example' } } },
+  };
+  for (const [id, job] of Object.entries(workflow.jobs)) {
+    const runs = job.if === undefined || actionsIf(job.if, github);
+    assert(runs, `${id} must validate Mergify draft PRs`);
+  }
+  const optionalExpression = workflow.jobs.results.steps[0].env.QUEUE_ONLY_OPTIONAL.slice(3, -3);
+  assert.equal(actionsIf(optionalExpression, github), false, 'batch gates must reject skipped browser/spec jobs');
+  assert.equal(actionsIf(optionalExpression, { ...github, head_ref: 'feature/example' }), true,
+    'ordinary PRs retain the lighter CI path');
 });
 
 test('only the checks job on main saves the pnpm store, and every job restores the same entry', () => {
