@@ -1,8 +1,9 @@
-import { CAD_MAX_PART_PATTERN, type CadPartPattern, type CadValueScope } from '@wbcnc/cad';
+import { CAD_MAX_PART_PATTERN, type CadDocument, type CadDrawnOn, type CadPartPattern, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 import './cadThicknessField.css';
 import { CadValueInput } from './CadValueInput';
+import { drawnOnName } from './drawnOnName';
 
 type Pattern = Omit<CadPartPattern, 'id'>;
 const kStart: Pattern = { axis: 'x', count: 2, spacing: 100 };
@@ -10,17 +11,22 @@ const kStart: Pattern = { axis: 'x', count: 2, spacing: 100 };
 /** Copies of a part in a row along an axis. The count and the spacing can use variables, such as a number of shelves. */
 export function CadPartPatternField({
   pattern,
+  document,
+  pickDirection,
   variables,
   onChange,
   onDone,
 }: {
   pattern: CadPartPattern | undefined;
+  document?: CadDocument;
+  pickDirection?: (picked: (on: CadDrawnOn['on']) => void) => void;
   variables?: CadValueScope;
   /** The new pattern, or `null` to take it away. */
   onChange: (pattern: Pattern | null) => void;
   onDone?: () => void;
 }) {
   const id = useId();
+  const [picking, setPicking] = useState(false);
   const current = pattern ?? kStart;
   const typedCount = current.countExpression ?? String(current.count),
     typedSpacing = current.spacingExpression ?? formatCadValue(current.spacing);
@@ -36,7 +42,7 @@ export function CadPartPatternField({
       setError(null);
     }
   }, [typedCount, typedSpacing]);
-  const apply = (axis = current.axis) => {
+  const apply = (axis = current.axis, direction: Pattern['direction'] | null = current.direction) => {
     const parsedCount = parseCadValue(count, { unit: 'scalar', variables });
     if ('error' in parsedCount) return setError(parsedCount.error);
     const n = Math.floor(parsedCount.value + 1e-9);
@@ -47,15 +53,20 @@ export function CadPartPatternField({
     setError(null);
     const next: Pattern = {
       axis,
+      ...(direction && { direction }),
       count: n,
       spacing: parsedSpacing.value,
       ...(parsedCount.expression && { countExpression: parsedCount.expression }),
       ...(parsedSpacing.expression && { spacingExpression: parsedSpacing.expression }),
     };
     const same =
-      pattern && (['axis', 'count', 'spacing', 'countExpression', 'spacingExpression'] as const).every(key => pattern[key] === next[key]);
+      pattern &&
+      (['axis', 'direction', 'count', 'spacing', 'countExpression', 'spacingExpression'] as const).every(key => pattern[key] === next[key]);
     if (!same) onChange(next);
   };
+  // A pick lands after later renders, so it applies with the count and spacing as they are then, not as they were.
+  const latestApply = useRef(apply);
+  latestApply.current = apply;
   const keys = (event: React.KeyboardEvent) => {
     event.stopPropagation();
     if (event.key === 'Enter') {
@@ -81,16 +92,51 @@ export function CadPartPatternField({
       </label>
       {pattern && (
         <>
-          <label htmlFor={`${id}-axis`} className="cad-number-field">
-            Along
-            <span>
-              <select id={`${id}-axis`} value={pattern.axis} onChange={event => apply(event.target.value as Pattern['axis'])}>
-                <option value="x">x</option>
-                <option value="y">y</option>
-                <option value="z">z</option>
-              </select>
-            </span>
-          </label>
+          {pickDirection && (
+            <button
+              type="button"
+              className="cad-feature-selection"
+              data-active={picking || !pattern.direction ? '' : undefined}
+              aria-label="Direction"
+              onClick={() => {
+                setPicking(true);
+                pickDirection(along => {
+                  latestApply.current(undefined, { along });
+                  setPicking(false);
+                });
+              }}>
+              <small>Direction</small>
+              <span>{pattern.direction && document ? drawnOnName(document, pattern.direction.along) : 'Pick a plane or a face'}</span>
+            </button>
+          )}
+          {pattern.direction ? (
+            <>
+              <div className="cad-feature-selection">
+                <button type="button" onClick={() => apply(current.axis, null)}>
+                  Clear
+                </button>
+              </div>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!!pattern.direction.flip}
+                  onChange={event => apply(current.axis, { ...pattern.direction!, flip: event.target.checked })}
+                />
+                Flip direction
+              </label>
+            </>
+          ) : (
+            <label htmlFor={`${id}-axis`} className="cad-number-field">
+              Along
+              <span>
+                <select id={`${id}-axis`} value={pattern.axis} onChange={event => apply(event.target.value as Pattern['axis'])}>
+                  <option value="x">x</option>
+                  <option value="y">y</option>
+                  <option value="z">z</option>
+                </select>
+              </span>
+            </label>
+          )}
           <label htmlFor={`${id}-count`} className="cad-number-field">
             How many
             <span>

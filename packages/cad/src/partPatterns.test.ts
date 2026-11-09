@@ -10,6 +10,34 @@ import {
 } from './index';
 
 describe('part patterns', () => {
+  it('keeps a picked direction, flips it and clears back to the saved axis', () => {
+    let document = createPlateDocument({ width: 100, height: 50 });
+    const part = document.parts[0]!;
+    part.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    document = setPartPattern(document, part.id, { axis: 'x', count: 3, spacing: 20, direction: { along: { plane: 'front' } } });
+    expect(document.parts[0]!.pattern!.direction).toEqual({ along: { plane: 'front' } });
+    expect(document.parts[0]!.copies!.map(copy => copy.placement!.position)).toEqual([
+      [0, -20, 0],
+      [0, -40, 0],
+    ]);
+    document = setPartPattern(document, part.id, {
+      axis: 'x',
+      count: 3,
+      spacing: 20,
+      direction: { along: { plane: 'front' }, flip: true },
+    });
+    expect(document.parts[0]!.copies!.map(copy => copy.placement!.position)).toEqual([
+      [0, 20, 0],
+      [0, 40, 0],
+    ]);
+    document = setPartPattern(document, part.id, { axis: 'x', count: 3, spacing: 20 });
+    expect(document.parts[0]!.pattern).not.toHaveProperty('direction');
+    expect(document.parts[0]!.copies!.map(copy => copy.placement!.position)).toEqual([
+      [20, 0, 0],
+      [40, 0, 0],
+    ]);
+  });
+
   it('lays out the copies of an unplaced part once another part is drawn on it', async () => {
     const base: CadPart = { ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name: 'Base' };
     let document = setPartPattern({ ...createCadDocument(), parts: [base] }, base.id, { axis: 'x', count: 3, spacing: 200 });

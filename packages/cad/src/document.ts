@@ -6,6 +6,7 @@ import { cadVariableNameError } from './valueExpressions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
 import type {
   CadPartCut,
+  CadDirection,
   CadArcEntity,
   CadCircleEntity,
   CadConstraint,
@@ -687,6 +688,20 @@ export function parseCadDocument(input: unknown): CadDocument {
     )
       throw new Error('Invalid CAD placement');
   };
+  const checkDirection = (direction: CadDirection) => {
+    const { along, flip } = direction ?? ({} as CadDirection);
+    const face = along && 'face' in along ? along.face : undefined;
+    if (
+      !along ||
+      typeof along !== 'object' ||
+      ('plane' in along
+        ? !['top', 'front', 'right'].includes(along.plane)
+        : typeof along.partId !== 'string' ||
+          !(face === 'top' || face === 'underside' || (face && typeof face === 'object' && typeof face.edge === 'string'))) ||
+      (flip !== undefined && typeof flip !== 'boolean')
+    )
+      throw new Error('Invalid CAD direction');
+  };
   if (d.partCuts !== undefined) {
     if (!Array.isArray(d.partCuts)) throw new Error('Invalid CAD part cuts');
     for (const step of d.partCuts) {
@@ -744,9 +759,16 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (copy.name !== undefined && typeof copy.name !== 'string') throw new Error('Invalid CAD part copy');
         if (copy.pattern !== undefined && typeof copy.pattern !== 'string') throw new Error('Invalid CAD part copy');
         if (copy.placement !== undefined) checkPlacement(copy.placement);
+        if (copy.along !== undefined) {
+          checkDirection(copy.along);
+          number(copy.along.distance);
+          if (copy.along.distanceExpression !== undefined && typeof copy.along.distanceExpression !== 'string')
+            throw new Error('Invalid CAD copy distance expression');
+        }
       }
     }
     if (p.pattern !== undefined) {
+      if (p.pattern?.direction !== undefined) checkDirection(p.pattern.direction);
       const { id, axis, count, spacing, countExpression, spacingExpression } = p.pattern ?? ({} as NonNullable<CadPart['pattern']>);
       if (
         typeof id !== 'string' ||
