@@ -1,0 +1,535 @@
+{
+ "design": {
+  "name": "bracket",
+  "revision": 1,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "dc9deb1d-5261-4c3e-a2ab-b5179da8ca20:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Bracket",
+   "part": "Bracket",
+   "settings": {
+    "on": "not placed"
+   },
+   "result": {
+    "sketch": "Bracket / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 4
+   }
+  },
+  {
+   "id": "dc9deb1d-5261-4c3e-a2ab-b5179da8ca20:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Bracket",
+   "part": "Bracket",
+   "settings": {
+    "thickness": {
+     "value": 12
+    }
+   },
+   "result": {
+    "thickness": 12,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      120,
+      100
+     ]
+    },
+    "holes": 3,
+    "notches": 0
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Bracket",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "diameter": 2,
+    "distance": 1,
+    "equal": 1,
+    "horizontal": 1,
+    "pointOnLine": 2,
+    "positionX": 8,
+    "positionY": 8,
+    "radius": 2,
+    "tangent": 6
+   },
+   "entities": [
+    {
+     "ref": "991b",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      120,
+      0
+     ],
+     "ends": [
+      "c47b",
+      "e879"
+     ]
+    },
+    {
+     "ref": "eb0b",
+     "type": "line",
+     "a": [
+      120,
+      0
+     ],
+     "b": [
+      120,
+      30
+     ],
+     "ends": [
+      "e879",
+      "3429"
+     ]
+    },
+    {
+     "ref": "ed50",
+     "type": "line",
+     "a": [
+      120,
+      30
+     ],
+     "b": [
+      40,
+      30
+     ],
+     "ends": [
+      "3429",
+      "7127"
+     ]
+    },
+    {
+     "ref": "aaf4",
+     "type": "line",
+     "a": [
+      30,
+      40
+     ],
+     "b": [
+      30,
+      100
+     ],
+     "ends": [
+      "9ec0",
+      "ca54"
+     ]
+    },
+    {
+     "ref": "e67e",
+     "type": "line",
+     "a": [
+      30,
+      100
+     ],
+     "b": [
+      0,
+      100
+     ],
+     "ends": [
+      "ca54",
+      "92f4"
+     ]
+    },
+    {
+     "ref": "64ca",
+     "type": "line",
+     "a": [
+      0,
+      100
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "92f4",
+      "c47b"
+     ]
+    },
+    {
+     "ref": "16fb",
+     "type": "arc",
+     "at": [
+      40,
+      40
+     ],
+     "r": 10,
+     "a": [
+      30,
+      40
+     ],
+     "b": [
+      40,
+      30
+     ],
+     "ends": [
+      "9ec0",
+      "7127"
+     ]
+    },
+    {
+     "ref": "8444",
+     "type": "circle",
+     "at": [
+      15,
+      80
+     ],
+     "d": 6
+    },
+    {
+     "ref": "d850",
+     "type": "circle",
+     "at": [
+      105,
+      15
+     ],
+     "d": 6
+    },
+    {
+     "ref": "c933",
+     "type": "line",
+     "a": [
+      50,
+      10
+     ],
+     "b": [
+      80,
+      10
+     ],
+     "ends": [
+      "4541",
+      "e2d2"
+     ]
+    },
+    {
+     "ref": "a6ab",
+     "type": "line",
+     "a": [
+      80,
+      20
+     ],
+     "b": [
+      50,
+      20
+     ],
+     "ends": [
+      "9614",
+      "98a2"
+     ]
+    },
+    {
+     "ref": "ddf2",
+     "type": "arc",
+     "at": [
+      80,
+      15
+     ],
+     "r": 5,
+     "a": [
+      80,
+      10
+     ],
+     "b": [
+      80,
+      20
+     ],
+     "ends": [
+      "e2d2",
+      "9614"
+     ]
+    },
+    {
+     "ref": "6920",
+     "type": "arc",
+     "at": [
+      50,
+      15
+     ],
+     "r": 5,
+     "a": [
+      50,
+      20
+     ],
+     "b": [
+      50,
+      10
+     ],
+     "ends": [
+      "98a2",
+      "4541"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      120,
+      100
+     ],
+     "area": 5286.922,
+     "islands": 3
+    },
+    {
+     "ref": "r2",
+     "at": [
+      45.01,
+      10
+     ],
+     "size": [
+      39.98,
+      10
+     ],
+     "area": 378.333,
+     "islands": 0
+    },
+    {
+     "ref": "r3",
+     "at": [
+      102.01,
+      12.002
+     ],
+     "size": [
+      5.99,
+      5.995
+     ],
+     "area": 28.152,
+     "islands": 0
+    },
+    {
+     "ref": "r4",
+     "at": [
+      12.01,
+      77.002
+     ],
+     "size": [
+      5.99,
+      5.995
+     ],
+     "area": 28.152,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Bracket",
+   "thickness": 12,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     120,
+     100
+    ]
+   },
+   "holes": 3,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 3
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 6.7,
+    "operations": [
+     {
+      "label": "Middle of a through hole",
+      "depth": 12.3,
+      "steps": 8
+     },
+     {
+      "label": "Through hole",
+      "depth": 12.3,
+      "steps": 8
+     },
+     {
+      "label": "Through hole",
+      "depth": 12.3,
+      "steps": 8
+     },
+     {
+      "label": "Through hole",
+      "depth": 12.3,
+      "steps": 8
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 12.3,
+      "steps": 8
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      12
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 991b",
+     "looks": "-y",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge eb0b",
+     "looks": "+x",
+     "origin": [
+      120,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge ed50",
+     "looks": "+y",
+     "origin": [
+      120,
+      30,
+      0
+     ]
+    },
+    {
+     "face": "edge aaf4",
+     "looks": "+x",
+     "origin": [
+      30,
+      40,
+      0
+     ]
+    },
+    {
+     "face": "edge e67e",
+     "looks": "+y",
+     "origin": [
+      30,
+      100,
+      0
+     ]
+    },
+    {
+     "face": "edge 64ca",
+     "looks": "-x",
+     "origin": [
+      0,
+      100,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 12,
+   "sides": 1,
+   "size": [
+    133.4,
+    113.4
+   ],
+   "yield": 0.793,
+   "parts": [
+    {
+     "name": "Bracket",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      120,
+      100
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Bracket",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 6.7,
+   "operations": [
+    {
+     "label": "Middle of a through hole",
+     "depth": 12.3,
+     "steps": 8
+    },
+    {
+     "label": "Through hole",
+     "depth": 12.3,
+     "steps": 8
+    },
+    {
+     "label": "Through hole",
+     "depth": 12.3,
+     "steps": 8
+    },
+    {
+     "label": "Through hole",
+     "depth": 12.3,
+     "steps": 8
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 12.3,
+     "steps": 8
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}

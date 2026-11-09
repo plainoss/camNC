@@ -33,6 +33,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - From within a package you can run `pnpm test`.
 - Focus on one test with `pnpm vitest run -t "<test name>"`.
 - Tests run in headless Chromium (Vitest browser mode); install it once with `pnpm exec playwright install chromium`.
+- Reproduce Part Studio and CAM issues headlessly before opening a browser: run a saved design (Save to file) through `pnpm --silent --filter @wbcnc/cad-script check --from design.json --report full`, and keep it as a golden report in `packages/cad-script/fixtures/designs/` (see `packages/cad-script/README.md`).
 - To try sketch editor behaviour in a real browser without replaying a whole scenario, use the interactive session in `apps/camNC/e2e/spec/README.md`.
 - Fix failing tests or type errors until the suite passes.
 - After moving files or changing imports, run `pnpm lint --filter <project_name>`.

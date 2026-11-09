@@ -88,3 +88,16 @@ export default design(d => {
   expect(currentSvg).toContain('Small');
   expect(currentSvg).not.toBe(previousSvg);
 }, 60000);
+
+it('prints the full report of a saved design, as its golden report has it', async () => {
+  const design = path.join(packageDir, 'fixtures/designs/tray.json');
+  const stdout = await new Promise<string>((resolve, reject) =>
+    execFile(
+      process.execPath,
+      ['node_modules/vite-node/vite-node.mjs', '--config', 'vite.config.ts', 'src/cli.ts', '--from', design, '--report', 'full'],
+      { cwd: packageDir },
+      (error, out) => (error ? reject(error) : resolve(out))
+    )
+  );
+  expect(stdout).toBe(await readFile(design.replace(/\.json$/, '.report.json'), 'utf8'));
+}, 60000);
