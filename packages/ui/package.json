@@ -5,8 +5,7 @@
   "private": true,
   "scripts": {
     "lint": "oxlint --max-warnings 0",
-    "check-types": "tsc --noEmit",
-    "check-types:fast": "tsgo --noEmit"
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "catalog:",

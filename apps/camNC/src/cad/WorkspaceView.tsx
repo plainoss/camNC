@@ -89,7 +89,13 @@ export default function WorkspaceView({
   /** The face of the part last clicked, for a sketch started next to be drawn on, as the reference sketches on a selection. */
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
   /** While set, a click picks the corner or face middle it snaps to, as a mate connector, instead of selecting. */
-  onPickPoint?: (pick: { partId: string; point: [number, number, number]; normal: [number, number, number]; copy: boolean }) => void;
+  onPickPoint?: (pick: {
+    partId: string;
+    point: [number, number, number];
+    normal: [number, number, number];
+    copy: boolean;
+    edge?: { a: [number, number, number]; b: [number, number, number] };
+  }) => void;
   /** The name of the plane or face picked for the next sketch, said in the status line so the pick isn't hidden. */
   picked?: string | null;
   /** Parts shown highlighted, as when their row in the feature list is hovered. */
@@ -165,7 +171,7 @@ export default function WorkspaceView({
   const status = notice
     ? notice
     : onPickPoint
-      ? 'Click a corner or the middle of a face for the mate connector.'
+      ? 'Click an edge, a corner or the middle of a face.'
       : choosing
         ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
         : picked
@@ -274,6 +280,7 @@ export default function WorkspaceView({
               point: pick.point as [number, number, number],
               normal: pick.normal as [number, number, number],
               copy: !!model.instances[index]!.copyId,
+              ...(pick.edge && { edge: pick.edge }),
             });
           }
           // The face clicked is picked too, for a sketch started next to be drawn on it.

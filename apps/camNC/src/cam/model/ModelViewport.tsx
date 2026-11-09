@@ -8,6 +8,7 @@ import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { ViewCube } from './ViewCube';
 import { modelGeometry } from './modelGeometry';
 import { snapToFace } from './faceSnap';
+import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
 import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
 
@@ -166,8 +167,12 @@ export interface ModelFacePick {
   index: number;
   point: [number, number, number];
   normal: [number, number, number];
+  /** The part's straight edge, when the click was this close to one, end to end. */
+  edge?: ModelEdge;
 }
 
+/** How close to an edge, in screen pixels, a click picks it. */
+const kEdgePixels = 8;
 const kWood = '#c9a477';
 const kSelected = '#8b5cf6';
 const kOff = '#71717a';
@@ -488,7 +493,18 @@ export function ModelViewport({
     // Back from where the view drew it to where the part sits in the model.
     const point = e.point.clone().applyMatrix4(matrix.clone().invert()),
       normal = e.face.normal.clone().normalize().toArray();
-    const face = { partId: mesh.partId, index, point: snapToFace(mesh.positions, point.toArray(), normal), normal };
+    // Within a few pixels of an edge on screen, the edge is picked too, unless the click is on one of its corners.
+    const canvas = e.nativeEvent.target as HTMLElement;
+    const screen = screenDistance(e.camera, matrix, canvas.clientWidth, canvas.clientHeight, e.pointer);
+    const edge = canvas.clientWidth ? nearestEdgeBy(mesh.positions, mesh.indices, screen.segment, kEdgePixels) : null;
+    const near = edge && Math.min(screen.point(edge.a), screen.point(edge.b)) > kEdgePixels ? edge : null;
+    const face: ModelFacePick = {
+      partId: mesh.partId,
+      index,
+      point: snapToFace(mesh.positions, point.toArray(), normal),
+      normal,
+      ...(near && { edge: near }),
+    };
     if (onPickFace) onPickFace(face);
     else onSelect(mesh.partId, index, face);
   };
