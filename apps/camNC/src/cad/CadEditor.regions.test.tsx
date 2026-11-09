@@ -73,3 +73,26 @@ it('flips an extrude to the other side of its sketch’s plane', async () => {
   await userEvent.click(flip);
   await waitFor(() => expect(latest().parts[1]!.drawnOn!.inward).toBeUndefined());
 });
+
+it('adds a sketch on a part’s face to that part by default, joined as one part', async () => {
+  const block = { ...createPlateDocument({ width: 100, height: 100 }).parts[0]!, name: 'Block' };
+  block.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  const boss = {
+    ...createCadPart('Boss', 10),
+    drawnOn: { on: { partId: block.id, face: 'top' as const }, offset: 0 },
+    extrude: false as const,
+  };
+  boss.sketch = addCircle(boss.sketch, { x: 50, y: 50, radius: 10 });
+  const { latest } = await studio({ ...createCadDocument(), parts: [block, boss] });
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.click(within(features).getByRole('button', { name: /Sketch · Boss/ }));
+  await userEvent.keyboard('{Shift>}E{/Shift}');
+  const dialog = await screen.findByRole('dialog', { name: /^Extrude/ });
+  expect(within(dialog).getByRole('tab', { name: 'Add' }).getAttribute('aria-selected')).toBe('true');
+  expect((within(dialog).getByRole('combobox', { name: 'Merge scope' }) as HTMLSelectElement).value).toBe(block.id);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Extrude/ })).toBeNull());
+  expect(latest().parts.find(part => part.id === boss.id)!.addTo).toBe(block.id);
+  // One part, the block, with the boss joined to it.
+  expect(within(screen.getByRole('list', { name: 'Parts' })).getAllByRole('listitem')).toHaveLength(1);
+});
