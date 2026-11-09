@@ -19,11 +19,9 @@ import {
   addThreePointCircle,
   addEllipse,
   addConic,
-  addCenterRectangle,
   addConstraint,
   addLine,
   addPoint,
-  addRectangle,
   addAlignedRectangle,
   addSpline,
   createCadPart,
@@ -188,7 +186,9 @@ import { dimensionAnchor } from './dimensionGeometry';
 import { tangentArcFrom, threePointArc } from './geometry';
 import { trimSketchCurveAt } from './trimCurves';
 import { pickBezierControlPolygon, pickSketchPoint, pickSketchSnap, type CadSnapResult } from './picking';
-import { inferDrawingPoint, inferredPointConstraints, type CadDrawingInference } from './drawingInference';
+import { drawingClickPoint, type CadDrawingInference } from './drawingInference';
+import { addDrawingRelations, drawnSelection, withSizeExpressions } from './drawingCommit';
+import { createRectangle, isRectangleTool, rectanglePrompt } from './rectangleTool';
 import { DrawingInferencePreview } from './DrawingInferencePreview';
 import { tangentLineAxis, type InferredLineAxis } from './lineInference';
 import { buildConstraintForSelection, constraintPrompt, type ConstraintCommandTool } from './constraintCommands';
@@ -1253,8 +1253,8 @@ export function CadEditor({
             ? 'Select near the end to extend, then click its new end or a boundary.'
             : next === 'select'
               ? 'Click geometry to select. Drag to move. Shift-click adds to selection.'
-              : next === 'rectangle' || next === 'centerRectangle'
-                ? `Click or drag from the ${next === 'centerRectangle' ? 'center' : 'first corner'} to the opposite corner. Or enter sizes below.`
+              : isRectangleTool(next)
+                ? rectanglePrompt(next)
                 : next === 'inscribedPolygon' || next === 'circumscribedPolygon'
                   ? 'Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.'
                   : next === 'alignedRectangle'
@@ -1426,107 +1426,19 @@ export function CadEditor({
         lineContinuation && chain
           ? chain.pointId
           : pending[0] && sketch.entities.find(e => e.type === 'point' && Math.hypot(e.x - pending[0]!.x, e.y - pending[0]!.y) < 1e-7)?.id;
-      const result = inferDrawingPoint(sketch, raw, {
+      lastDrawingHint.current = drawingClickPoint(sketch, raw, {
         project: projectPoint,
         directSnap: hit,
         lockedAxes,
         preferredPointIds: hoveredReferences.current,
         excludePointIds: [...(drag.current?.points ?? []), ...(tool === 'line' && startId && inference.current ? [startId] : [])],
       });
-      point = { ...result.point };
-      // Grid rounding is only a fallback; it must never manufacture a constraint inside a pixel tolerance.
-      if (!hit) {
-        if (lockedAxes.x === undefined && !result.alignments.some(a => a.type === 'verticalPoints')) point.x = Math.round(point.x);
-        if (lockedAxes.y === undefined && !result.alignments.some(a => a.type === 'horizontalPoints')) point.y = Math.round(point.y);
-      }
-      lastDrawingHint.current = { ...result, point, guides: result.guides.map(g => ({ ...g, to: point })) };
+      point = { ...lastDrawingHint.current.point };
     } else if (!hit) point = { x: Math.round(raw.x), y: Math.round(raw.y) };
     return point;
   };
-  const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex: number | readonly number[] = -1) => {
-    let next = source;
-    const createdCurve = source.entities.find(
-      e => (e.type === 'circle' || e.type === 'arc') && !sketch?.entities.some(before => before.id === e.id)
-    );
-    const polygonEdge =
-      tool === 'inscribedPolygon'
-        ? source.entities.find(e => e.type === 'line' && !sketch?.entities.some(before => before.id === e.id))
-        : undefined;
-    const rectangleTop =
-      tool === 'alignedRectangle'
-        ? source.entities.filter(e => e.type === 'line' && !sketch?.entities.some(before => before.id === e.id))[2]
-        : undefined;
-    for (const [index, inference] of hints.entries()) {
-      if (!inference || (!inference.snap && !inference.alignments.length)) continue;
-      const hint = inference.snap;
-      const candidates = next.entities.filter(
-        (e): e is SketchPoint => e.type === 'point' && Math.hypot(e.x - inference.point.x, e.y - inference.point.y) < 1e-7
-      );
-      let point: SketchPoint | undefined = candidates.find(e => !sketch?.entities.some(before => before.id === e.id)) ?? candidates[0];
-      if ((Array.isArray(curvePointIndex) ? curvePointIndex.includes(index) : index === curvePointIndex) && createdCurve) {
-        // A circle's rim / arc's through click needs a concrete construction point to retain its inferred intent.
-        if (!point) {
-          next = addPoint(next, { ...inference.point, construction: true, standalone: false });
-          point = next.entities.find(
-            (e): e is SketchPoint => e.type === 'point' && Math.hypot(e.x - inference.point.x, e.y - inference.point.y) < 1e-7
-          );
-        }
-        const pointId = point?.id;
-        if (pointId && !next.constraints.some(c => c.type === 'pointOnCircle' && c.pointId === pointId && c.entityId === createdCurve.id))
-          next = addConstraint(next, { type: 'pointOnCircle', pointId, entityId: createdCurve.id });
-      }
-      if (index === 1 && polygonEdge?.type === 'line') {
-        if (!point) {
-          next = addPoint(next, { ...inference.point, construction: true, standalone: false });
-          point = next.entities.at(-1) as SketchPoint;
-        }
-        next = addConstraint(next, { type: 'midpoint', pointId: point.id, entityId: polygonEdge.id });
-      }
-      if (index === 2 && rectangleTop?.type === 'line') {
-        if (!point) {
-          next = addPoint(next, { ...inference.point, construction: true, standalone: false });
-          point = next.entities.at(-1) as SketchPoint;
-        }
-        const equivalent = pointEquivalence(next.constraints);
-        if (![rectangleTop.startId, rectangleTop.endId].some(id => equivalent.equivalent(id, point!.id)))
-          next = addConstraint(next, { type: 'pointOnLine', pointId: point.id, entityId: rectangleTop.id });
-      }
-      if (point) for (const relation of inferredPointConstraints(inference, point.id, next)) next = addConstraint(next, relation);
-      if (point && hint?.targetPointId && point.id !== hint.targetPointId) {
-        if (
-          !next.constraints.some(
-            c =>
-              c.type === 'coincident' &&
-              [c.pointAId, c.pointBId].includes(point.id) &&
-              [c.pointAId, c.pointBId].includes(hint.targetPointId!)
-          )
-        )
-          next = addConstraint(next, { type: 'coincident', pointAId: point.id, pointBId: hint.targetPointId });
-        continue;
-      }
-      if (!hint?.intent) continue;
-      const curve = sketch?.entities.find(e => e.id === hint.intent!.entityId);
-      if (!point || !curve) continue;
-      const type =
-        hint.intent.type === 'midpoint'
-          ? 'midpoint'
-          : curve.type === 'line'
-            ? 'pointOnLine'
-            : curve.type === 'circle' || curve.type === 'arc'
-              ? 'pointOnCircle'
-              : 'pointOnCurve';
-      if (
-        !next.constraints.some(
-          c => c.type === type && 'pointId' in c && c.pointId === point.id && 'entityId' in c && c.entityId === curve.id
-        )
-      )
-        next =
-          type === 'pointOnCurve'
-            ? addConstraint(next, { type, pointId: point.id, entityId: curve.id, parameter: hint.parameter ?? 0.5 })
-            : addConstraint(next, { type, pointId: point.id, entityId: curve.id });
-    }
-    return next;
-  };
+  const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex: number | readonly number[] = -1) =>
+    sketch ? addDrawingRelations(sketch, source, hints, { tool, curvePointIndex }) : source;
   const addShape = (end?: Point) => {
     if (!sketch || !pending[0]) return;
     const anchor = lineContinuation ? chainGeometry(sketch, chain) : null;
@@ -1546,29 +1458,11 @@ export function CadEditor({
       } catch (error) {
         return setMessage(error instanceof Error ? error.message : String(error));
       }
-    } else if (tool === 'rectangle' || tool === 'centerRectangle') {
-      const centered = tool === 'centerRectangle';
-      const widthValue = end ? null : parseCadValue(width, { unit: 'mm', variables: variableScope });
-      const heightValue = end ? null : parseCadValue(height, { unit: 'mm', variables: variableScope });
-      if (widthValue && 'error' in widthValue) return setMessage(`Rectangle width: ${widthValue.error}`);
-      if (heightValue && 'error' in heightValue) return setMessage(`Rectangle height: ${heightValue.error}`);
-      const w = end ? (end.x - start.x) * (centered ? 2 : 1) : widthValue!.value;
-      const h = end ? (end.y - start.y) * (centered ? 2 : 1) : heightValue!.value;
-      if (!end && (w <= 0 || h <= 0)) return setMessage('Rectangle width and height must be greater than zero.');
-      if (!Number.isFinite(w) || !Number.isFinite(h) || Math.abs(w) < 0.1 || Math.abs(h) < 0.1)
-        return setMessage('Width and height must be greater than zero.');
-      next = (centered ? addCenterRectangle : addRectangle)(sketch, {
-        x: centered ? start.x : Math.min(start.x, start.x + w),
-        y: centered ? start.y : Math.min(start.y, start.y + h),
-        width: Math.abs(w),
-        height: Math.abs(h),
-        construction,
-        dimensioned: end === undefined,
-      });
-      if (!end) {
-        sizeExpressions.Width = widthValue?.expression;
-        sizeExpressions.Height = heightValue?.expression;
-      }
+    } else if (isRectangleTool(tool)) {
+      const rectangle = createRectangle(sketch, { tool, start, end, width, height, variables: variableScope, construction });
+      if (rectangle.error !== undefined) return setMessage(rectangle.error);
+      next = rectangle.sketch;
+      Object.assign(sizeExpressions, rectangle.sizeExpressions);
     } else if (tool === 'alignedRectangle' && pending[1] && end) {
       try {
         next = addAlignedRectangle(sketch, { start, end: pending[1], through: end, construction });
@@ -1658,15 +1552,7 @@ export function CadEditor({
         }
       }
     } else return;
-    if (Object.values(sizeExpressions).some(Boolean))
-      next = {
-        ...next,
-        constraints: next.constraints.map(c =>
-          !sketch.constraints.some(before => before.id === c.id) && c.label && sizeExpressions[c.label]
-            ? { ...c, expression: sizeExpressions[c.label] }
-            : c
-        ),
-      };
+    next = withSizeExpressions(sketch, next, sizeExpressions);
     const hints = polygonTool
       ? pendingSnaps.current.slice(0, 2)
       : end
@@ -1721,17 +1607,7 @@ export function CadEditor({
           )
         : null
     );
-    setSelected(
-      added
-        .filter(
-          e =>
-            tool !== 'centerRectangle' ||
-            next.constraints.some(
-              c => ['horizontal', 'vertical', 'parallel', 'perpendicular'].includes(c.type) && constraintEntityIds(c).includes(e.id)
-            )
-        )
-        .map(e => e.id)
-    );
+    setSelected(drawnSelection(sketch, next, tool));
     // Passive measured values leave shortcuts live; numeric typing turns them into drivers.
     setDimension(null);
     svg.current?.focus();

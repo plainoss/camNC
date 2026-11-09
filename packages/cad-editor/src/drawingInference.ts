@@ -131,3 +131,18 @@ export function inferredPointConstraints(inference: CadDrawingInference, pointBI
   }
   return proposals;
 }
+
+/**
+ * Where a drawing click lands: the inferred point, rounded to whole millimetres on each axis that no snap, alignment or
+ * locked direction fixed. The guides end at that point.
+ */
+export function drawingClickPoint(sketch: CadSketch, rawWorld: CadPoint, options: CadDrawingInferenceOptions): CadDrawingInference {
+  const result = inferDrawingPoint(sketch, rawWorld, options);
+  const point = { ...result.point };
+  // Grid rounding is only a fallback; it must never manufacture a constraint inside a pixel tolerance.
+  if (!(options.directSnap === undefined ? result.snap : options.directSnap)) {
+    if (options.lockedAxes?.x === undefined && !result.alignments.some(a => a.type === 'verticalPoints')) point.x = Math.round(point.x);
+    if (options.lockedAxes?.y === undefined && !result.alignments.some(a => a.type === 'horizontalPoints')) point.y = Math.round(point.y);
+  }
+  return { ...result, point, guides: result.guides.map(g => ({ ...g, to: point })) };
+}
