@@ -110,3 +110,18 @@
 .cad-editor .cad-default-geometry button[aria-pressed='true'] {
   background: #dbe8f8;
 }
+/** A suppressed step is struck through, as the reference shows it, and kept in the list to switch back on. */
+.cad-feature-suppressed button > span:nth-child(2) {
+  text-decoration: line-through;
+  color: #8796a8;
+}
+/** Movable, the bar is a thick handle, as the reference's: dragged, or stepped with the arrow keys once focused. */
+.cad-rollback-bar[draggable='true'] {
+  height: 6px;
+  background: #5f7186;
+  cursor: grab;
+}
+.cad-rollback-bar[draggable='true']:focus-visible {
+  outline: 2px solid #2f80ed;
+  outline-offset: 1px;
+}

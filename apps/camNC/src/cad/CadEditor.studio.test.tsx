@@ -180,7 +180,7 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
     within(menu)
       .getAllByRole('menuitem')
       .map(item => item.textContent)
-  ).toEqual(['Rename', 'Edit…', 'Edit sketch…', 'Suppress', 'Delete']);
+  ).toEqual(['Rename', 'Edit…', 'Edit sketch…', 'Suppress', 'Roll to here', 'Delete']);
   expect(within(menu).getByRole('menuitem', { name: 'Suppress' }).getAttribute('aria-disabled')).toBe('true');
   await userEvent.click(within(menu).getByRole('menuitem', { name: 'Rename' }));
   const name = within(features).getByRole('textbox', { name: 'New name' });
@@ -466,6 +466,47 @@ it('sketches on a base plane picked before Sketch or Shift+S, as on one picked a
   expect(await screen.findByRole('dialog', { name: 'Sketch' })).toBeDefined();
   await userEvent.click(within(screen.getByRole('dialog', { name: 'Sketch' })).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
+});
+
+it('suppresses an extrude from the feature list, and rolls the design back with the bar', async () => {
+  const { latest } = await studio();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  const parts = screen.getByRole('region', { name: 'Parts panel' });
+  // Suppressed, the extrude is struck through and its part is gone from the parts, as in the reference.
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Suppress' }));
+  await waitFor(() => expect(latest().parts[0]!.suppressed).toBe(true));
+  expect(
+    within(features)
+      .getByRole('button', { name: /Extrude · Plate/ })
+      .closest('li')!.className
+  ).toMatch(/cad-feature-suppressed/);
+  expect(within(parts).queryByText('Plate')).toBeNull();
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Unsuppress' }));
+  await waitFor(() => expect(latest().parts[0]!.suppressed).toBeUndefined());
+  expect(within(parts).getByText('Plate')).toBeDefined();
+  // Roll to here puts the bar after the sketch: the extrude after it is greyed out.
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Sketch · Plate/ }));
+  await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Roll to here' }));
+  await waitFor(() =>
+    expect(
+      within(features)
+        .getByRole('button', { name: /Extrude · Plate/ })
+        .closest('li')!.className
+    ).toMatch(/cad-feature-rolled-back/)
+  );
+  // The bar steps down with the arrow keys, back to the end.
+  const bar = within(features).getByRole('separator', { name: 'Shown up to here' });
+  bar.focus();
+  await userEvent.keyboard('{ArrowDown}');
+  await waitFor(() =>
+    expect(
+      within(features)
+        .getByRole('button', { name: /Extrude · Plate/ })
+        .closest('li')!.className
+    ).not.toMatch(/cad-feature-rolled-back/)
+  );
 });
 
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {

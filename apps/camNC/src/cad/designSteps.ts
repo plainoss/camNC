@@ -15,6 +15,8 @@ export interface DesignStep {
   partCutId?: string;
   /** The copy it made. */
   copyId?: string;
+  /** Switched off in the feature list. */
+  suppressed?: boolean;
 }
 
 const typed = (expression: string | undefined, value: number) =>
@@ -46,6 +48,7 @@ export function designSteps(document: CadDocument): DesignStep[] {
         detail: `clearance ${typed(step.clearanceExpression, step.clearance)}`,
         partId: step.targets[0] ?? step.tools[0]!,
         partCutId: step.id,
+        suppressed: !!step.suppressed,
       },
     ]);
   }
@@ -62,6 +65,7 @@ export function designSteps(document: CadDocument): DesignStep[] {
               label: `Extrude · ${part.name}`,
               detail: typed(part.thicknessExpression, part.thickness),
               partId: part.id,
+              suppressed: !!part.suppressed,
             },
           ]),
     ];
@@ -83,6 +87,7 @@ export function designSteps(document: CadDocument): DesignStep[] {
           label: `Cut ${cut} · ${part.name}`,
           detail: feature.suppressed ? 'off' : feature.depth === 'through' ? 'through' : typed(feature.depthExpression, feature.depth),
           partId: part.id,
+          suppressed: !!feature.suppressed,
           cutId: feature.id,
           sketchId: feature.sketchId,
         });
@@ -96,6 +101,7 @@ export function designSteps(document: CadDocument): DesignStep[] {
           label: `${copy.offset ? 'Transform' : copy.mirrored ? 'Mirrored copy' : 'Copy'} · ${cadCopyName(part, index)}`,
           partId: part.id,
           copyId: copy.id,
+          suppressed: !!copy.suppressed,
         });
     });
     if (part.pattern)
@@ -105,6 +111,7 @@ export function designSteps(document: CadDocument): DesignStep[] {
         label: `Pattern · ${part.name} × ${part.pattern.count} along ${part.pattern.axis}`,
         detail: `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing)}`,
         partId: part.id,
+        suppressed: !!part.pattern.suppressed,
       });
     return [...steps, ...(after.get(partIndex) ?? [])];
   });

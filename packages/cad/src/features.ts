@@ -5,6 +5,7 @@ import { relieveCorners } from './cornerRelief';
 import { applyPartCuts } from './cutParts';
 import { patternInstanceOffset, patternMaster } from './pattern';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
+import { activeDesign } from './suppression';
 import type {
   CadCut,
   CadCutDepth,
@@ -20,7 +21,7 @@ import type {
 } from './types';
 
 /** Whether a part is one, rather than a sketch not yet extruded. */
-export const isCadPart = (part: CadPart): boolean => part.extrude !== false;
+export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !part.suppressed;
 
 /** Features belong to the newer format, so an older build refuses the file instead of silently cutting without them. */
 export function withFeatureVersion(document: CadDocument): CadDocument {
@@ -355,7 +356,9 @@ function cutFeatures(part: CadPart, profile: EvaluatedCadPart): { part: Evaluate
   };
 }
 
-export function evaluateCadDocument(document: CadDocument): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
+export function evaluateCadDocument(given: CadDocument): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
+  // What's suppressed in the feature list isn't built.
+  const document = activeDesign(given);
   const diagnostics = validateCadDocument(document);
   if (diagnostics.some(d => d.severity === 'error')) return { parts: [], diagnostics };
   const parts: EvaluatedCadPart[] = [];

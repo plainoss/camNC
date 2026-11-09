@@ -1,4 +1,4 @@
-import { assemblyReport, evaluateCadDocument, isCadPart, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { activeDesign, assemblyReport, evaluateCadDocument, isCadPart, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ModelViewport, type ModelFacePick, type ModelView, type ViewRegion, type ViewRequest } from '@/cam/model/ModelViewport';
 import { assemblyModel, instanceKey } from './assemblyModel';
@@ -75,10 +75,12 @@ export default function WorkspaceView({
   const clashes = useMemo(() => {
     // Sketches not yet extruded take up no space.
     const sketches = new Set(document.parts.filter(part => !isCadPart(part)).map(part => part.id));
+    // Nor does anything suppressed in the feature list.
+    const built = activeDesign(document);
     return (
       assemblyReport(
-        document,
-        evaluateCadDocument(document).parts.filter(part => !sketches.has(part.partId))
+        built,
+        evaluateCadDocument(built).parts.filter(part => !sketches.has(part.partId))
       )?.collisions ?? []
     );
   }, [document]);
