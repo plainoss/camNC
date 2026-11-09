@@ -144,7 +144,9 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
   for (const step of parts) {
     const target = step.addTo && parts.find(part => part.id === step.addTo);
     // A suppressed Add adds nothing, as in the reference.
-    if (step.suppressed || !target || !target.regions || !sharesSketch(target, step) || step.addTo === step.id) continue;
+    // Nor does one not extruded, such as a sketch whose extrude was deleted.
+    if (step.suppressed || step.extrude === false || !target || !target.regions || !sharesSketch(target, step) || step.addTo === step.id)
+      continue;
     added.set(target.id, [...(added.get(target.id) ?? []), ...(step.regions ?? [])]);
   }
   parts = parts.map(part => {
@@ -159,8 +161,8 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
   const removed = new Map<string, CadFeature[]>();
   const resolved = { ...document, parts };
   for (const step of parts) {
-    // A suppressed Remove cuts nothing.
-    if (!step.remove || step.suppressed) continue;
+    // A suppressed Remove cuts nothing, and nor does a sketch not extruded.
+    if (!step.remove || step.suppressed || step.extrude === false) continue;
     const support = removeSupport(resolved, step);
     if ('error' in support) continue;
     const face = removedSketch(step, support.face);

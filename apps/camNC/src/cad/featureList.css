@@ -181,3 +181,24 @@
   padding: 3px 6px;
   font-size: 12px;
 }
+
+/** A step that can't be built, as what it needs is suppressed or gone: red, with a warning and a count in the heading. */
+.cad-feature-broken button > span:nth-child(2) {
+  color: #c62828;
+}
+.cad-feature-warning {
+  margin-left: 4px;
+  color: #c62828;
+}
+.cad-feature-error-badge {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #c62828;
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
