@@ -226,7 +226,7 @@ export function ExtrudeDialog({
   };
   return (
     <FeatureDialog
-      title={`Extrude · ${part.name}`}
+      title={part.extrudeName ?? `Extrude · ${part.name}`}
       okDisabled={operation === 'new' ? !thicknessValid || !!depthError || !!profileError : !!stepProblem || !!removeError}
       onOk={onOk}
       onCancel={onCancel}>

@@ -1,7 +1,8 @@
 import { cadVariableValues, type CadDocument } from '@wbcnc/cad';
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { kBasePlanes } from './basePlanes';
 import { designSteps, type DesignStep } from './designSteps';
+import { PartRowMenu } from './PartRowMenu';
 import { formatCadValue } from './valueExpressions';
 import './featureList.css';
 
@@ -42,12 +43,13 @@ function Eye({ name, shown, onToggle }: { name: string; shown: boolean; onToggle
 
 /** A row of the list: a design variable, a plane made to sketch on, or a step of how the design is built. */
 export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'plane'; id: string } | { kind: 'step'; step: DesignStep };
-export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete';
+export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete' | 'newSketch';
 
 /** What each row's menu offers, and why an item isn't there for it. */
 function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAction; label: string; disabled?: boolean }[] {
   if (entry.kind === 'variable' || entry.kind === 'plane')
     return [
+      ...(entry.kind === 'plane' ? [{ action: 'newSketch' as const, label: 'New sketch' }] : []),
       { action: 'edit', label: 'Edit…' },
       { action: 'delete', label: 'Delete' },
     ];
@@ -85,13 +87,14 @@ export function FeatureList({
   onPickPlane,
   shown,
   onToggleShown,
+  onNewSketch,
 }: {
   document: CadDocument;
   selectedPartId: string | null;
   onSelect: (entry: FeatureEntry) => void;
   onAction: (entry: FeatureEntry, action: FeatureAction) => void;
-  /** A part's new name, typed in place of its step's. */
-  onRename: (partId: string, name: string) => void;
+  /** A step's new name, typed in place of its row. It names that feature only, never the part it makes. */
+  onRename: (step: DesignStep, name: string) => void;
   /** The step being edited: the ones after it are greyed out, as the design is shown only that far. */
   rollback?: string | null;
   /**
@@ -112,6 +115,8 @@ export function FeatureList({
    */
   shown?: (id: string) => boolean;
   onToggleShown?: (id: string) => void;
+  /** New sketch, from a base plane's right-click menu, as the reference's. */
+  onNewSketch?: (plane: string) => void;
 }) {
   const { scope } = cadVariableValues(document);
   const blank = new Set(
@@ -128,6 +133,8 @@ export function FeatureList({
       .map(step => ({ kind: 'step' as const, step })),
   ];
   const [menu, setMenu] = useState<{ entry: FeatureEntry; x: number; y: number } | null>(null);
+  const [planeMenu, setPlaneMenu] = useState<{ plane: string; name: string; x: number; y: number } | null>(null);
+  const closePlaneMenu = useCallback(() => setPlaneMenu(null), []);
   const [renaming, setRenaming] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -167,12 +174,25 @@ export function FeatureList({
     onSelect(entry);
     setMenu({ entry, x: event.clientX, y: event.clientY });
   };
+  const brokenCount = entries.filter(entry => entry.kind === 'step' && entry.step.broken).length;
   return (
     <section className="cad-studio-features" aria-label="Features" tabIndex={-1}>
       <div className="cad-panel-heading">
-        <h2>Features ({entries.length})</h2>
+        <h2>
+          Features ({entries.length})
+          {brokenCount > 0 && (
+            <span
+              className="cad-feature-error-badge"
+              role="status"
+              aria-label={`${brokenCount} with errors`}
+              title={`${brokenCount} with errors`}>
+              {brokenCount}
+            </span>
+          )}
+        </h2>
       </div>
-      {onPickPlane && (
+      {/* Listed in a sketch too, as in the reference, to show or hide; a plane is picked to sketch on from the studio. */}
+      {(onPickPlane || onToggleShown) && (
         <ul className="cad-default-geometry" aria-label="Default geometry">
           {onToggleShown && (
             <li className={shown?.('origin') === false ? 'cad-feature-hidden' : undefined}>
@@ -185,7 +205,16 @@ export function FeatureList({
           )}
           {kBasePlanes.map(({ plane, label: name }) => (
             <li key={plane} className={shown?.(plane) === false ? 'cad-feature-hidden' : undefined}>
-              <button type="button" aria-pressed={selectedPlane === plane} onClick={() => onPickPlane(plane)}>
+              <button
+                type="button"
+                aria-pressed={selectedPlane === plane}
+                aria-haspopup={onNewSketch ? 'menu' : undefined}
+                onClick={() => onPickPlane?.(plane)}
+                onContextMenu={event => {
+                  if (!onNewSketch && !onToggleShown) return;
+                  event.preventDefault();
+                  setPlaneMenu({ plane, name, x: event.clientX, y: event.clientY });
+                }}>
                 <span aria-hidden="true">▱</span>
                 <span>{name}</span>
               </button>
@@ -198,25 +227,24 @@ export function FeatureList({
         {entries.map((entry, index) => {
           const step = entry.kind === 'step' ? entry.step : null;
           if (step && renaming === step.id) {
-            const part = document.parts.find(candidate => candidate.id === step.partId);
             return (
               <li key={key(entry)}>
                 <input
                   className="cad-feature-rename"
                   aria-label="New name"
-                  defaultValue={part?.name ?? ''}
+                  defaultValue={step.label}
                   autoFocus
                   onFocus={event => event.currentTarget.select()}
                   onBlur={event => {
                     const name = event.currentTarget.value.trim();
-                    if (name && part && name !== part.name) onRename(part.id, name);
+                    if (name && name !== step.label) onRename(step, name);
                     setRenaming(null);
                   }}
                   onKeyDown={event => {
                     event.stopPropagation();
                     if (event.key === 'Enter') event.currentTarget.blur();
                     else if (event.key === 'Escape') {
-                      event.currentTarget.value = part?.name ?? '';
+                      event.currentTarget.value = step.label;
                       event.currentTarget.blur();
                     }
                   }}
@@ -249,6 +277,7 @@ export function FeatureList({
                 [
                   rollbackAt >= 0 && index > rollbackAt && 'cad-feature-rolled-back',
                   step?.suppressed && 'cad-feature-suppressed',
+                  step?.broken && 'cad-feature-broken',
                   visibilityId(entry) && shown?.(visibilityId(entry)!) === false && 'cad-feature-hidden',
                 ]
                   .filter(Boolean)
@@ -259,6 +288,7 @@ export function FeatureList({
                 aria-current={step && step.partId === selectedPartId ? 'true' : undefined}
                 aria-pressed={entry.kind === 'plane' ? selectedPlane === entry.id : undefined}
                 aria-haspopup="menu"
+                aria-description={step?.broken}
                 onClick={() => {
                   // A plane is picked to sketch on, as a base plane is.
                   if (entry.kind === 'plane') onPickPlane?.(entry.id);
@@ -296,6 +326,11 @@ export function FeatureList({
                 <span aria-hidden="true">{kIcons[step ? step.kind : (entry.kind as 'variable' | 'plane')]}</span>
                 <span>{label(entry)}</span>
                 {step?.detail && <small>{step.detail}</small>}
+                {step?.broken && (
+                  <span className="cad-feature-warning" role="img" aria-label="Error" title={step.broken}>
+                    ⚠
+                  </span>
+                )}
               </button>
               {onToggleShown && visibilityId(entry) && (
                 <Eye
@@ -386,6 +421,20 @@ export function FeatureList({
             </button>
           ))}
         </div>
+      )}
+      {planeMenu && (
+        <PartRowMenu
+          name={planeMenu.name}
+          x={planeMenu.x}
+          y={planeMenu.y}
+          onClose={closePlaneMenu}
+          items={[
+            ...(onNewSketch ? [{ label: 'New sketch', onSelect: () => onNewSketch(planeMenu.plane) }] : []),
+            ...(onToggleShown
+              ? [{ label: shown?.(planeMenu.plane) === false ? 'Show' : 'Hide', onSelect: () => onToggleShown(planeMenu.plane) }]
+              : []),
+          ]}
+        />
       )}
     </section>
   );

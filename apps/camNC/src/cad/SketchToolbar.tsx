@@ -17,6 +17,7 @@ import {
   type SketchTool,
   type SketchToolDefinition,
 } from './sketchTools';
+import { sketchConstraints } from './sketchConstraints';
 
 type Glyph = SketchTool | ConstraintCommandTool | 'construction' | 'constraints' | 'fix' | 'undo' | 'redo' | 'cancel' | 'finish';
 type ToolGroupId = (typeof sketchToolGroups)[number]['id'] | (typeof sketchToolFamilies)[number]['id'];
@@ -362,19 +363,6 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
   );
 }
 
-const constraints: { id: ConstraintCommandTool; label: string; key?: string }[] = [
-  { id: 'horizontal', label: 'Horizontal', key: 'H' },
-  { id: 'vertical', label: 'Vertical', key: 'V' },
-  { id: 'coincident', label: 'Coincident', key: 'I' },
-  { id: 'concentric', label: 'Concentric', key: 'Shift+O' },
-  { id: 'symmetric', label: 'Symmetric', key: 'Shift+Q' },
-  { id: 'midpoint', label: 'Midpoint', key: 'Shift+M' },
-  { id: 'parallel', label: 'Parallel', key: 'B' },
-  { id: 'perpendicular', label: 'Perpendicular', key: 'Shift+L' },
-  { id: 'equal', label: 'Equal', key: 'E' },
-  { id: 'tangent', label: 'Tangent', key: 'T' },
-];
-
 export function ToolHint({ label, children }: { label: string; children: ReactNode }) {
   return (
     <Tooltip delayDuration={400}>
@@ -413,7 +401,8 @@ export function SketchToolbar({
   onSearch?: () => void;
   tool: SketchTool;
   construction: boolean;
-  constraintMode: ConstraintCommandTool | null;
+  /** The constraint tool that is active; `fix` while Fix waits for geometry to click. */
+  constraintMode: ConstraintCommandTool | 'fix' | null;
   busy: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -559,13 +548,20 @@ export function SketchToolbar({
         </ToolHint>
         <span className="cad-toolbar-divider" aria-hidden="true" />
         <DropdownMenu modal={false}>
-          <ToolHint label={constraintMode ? `${constraints.find(c => c.id === constraintMode)?.label} constraint` : 'Constraints'}>
+          <ToolHint
+            label={
+              constraintMode === 'fix'
+                ? 'Fix constraint'
+                : constraintMode
+                  ? `${sketchConstraints.find(c => c.id === constraintMode)?.label} constraint`
+                  : 'Constraints'
+            }>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 className="cad-icon-button"
                 aria-label="Constraints"
-                data-command-highlight={constraints.some(c => c.id === searchHighlight) || searchHighlight === 'fix' || undefined}
+                data-command-highlight={sketchConstraints.some(c => c.id === searchHighlight) || searchHighlight === 'fix' || undefined}
                 aria-pressed={!!constraintMode}>
                 <SketchToolGlyph kind={constraintMode ?? 'constraints'} />
               </button>
@@ -580,7 +576,7 @@ export function SketchToolbar({
               onReturnToCanvas();
             }}
             onEscapeKeyDown={event => event.stopPropagation()}>
-            {constraints.map(c => (
+            {sketchConstraints.map(c => (
               <DropdownMenuItem key={c.id} onSelect={() => onConstraint(c.id)} aria-label={c.id}>
                 <SketchToolGlyph kind={c.id} />
                 <span>{c.label}</span>

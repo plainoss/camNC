@@ -143,10 +143,11 @@ export async function createAdapter(page, url) {
   await page.goto(new URL('/cam', url).href, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /^New design/ }).click();
   const canvas = page.getByTestId('cad-canvas');
-  // A new design opens in the Part Studio asking for the first sketch's plane: scenarios draw on the top plane.
+  const studioToolbar = page.getByRole('toolbar', { name: 'Part Studio toolbar' });
+  // A new design opens in the Part Studio with no parts: scenarios start a sketch on the top plane.
+  await studioToolbar.getByRole('button', { name: /Sketch/ }).click();
   await page.getByRole('list', { name: 'Default geometry' }).getByRole('button', { name: 'Top', exact: true }).click();
   await canvas.waitFor();
-  const studioToolbar = page.getByRole('toolbar', { name: 'Part Studio toolbar' });
   // Existing designs open in the Part Studio, and most steps work on the first part's sketch.
   const flatView = async () => {
     await page.getByRole('toolbar', { name: /^(Part Studio|Sketch) toolbar$/ }).first().waitFor();

@@ -256,6 +256,9 @@ export interface CadSketch {
 export interface CadPart {
   id: string;
   name: string;
+  /** The feature list's names for this part's sketch and its extrude, when renamed there. Renaming either leaves the part's name alone. */
+  sketchName?: string;
+  extrudeName?: string;
   thickness: number;
   /** The thickness as typed, kept when it uses design variables. */
   thicknessExpression?: string;

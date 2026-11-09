@@ -226,15 +226,43 @@ it('looks straight at the selected part’s sketch plane with N, and from behind
   await waitFor(() => expect(props().highlightIds).toBeUndefined());
 });
 
-it('deletes a feature with the Delete key, as the reference does, and undo brings it back', async () => {
+it('flags the features drawn on a part once that part is suppressed', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  const base = source.parts[0]!;
+  source.parts.push({
+    ...createPlateDocument({ width: 40, height: 40 }).parts[0]!,
+    id: 'boss',
+    name: 'Boss',
+    drawnOn: { on: { partId: base.id, face: 'top' }, offset: 0 },
+  });
+  await studio(source);
+  const features = await screen.findByRole('region', { name: 'Features' });
+  expect(within(features).queryByRole('status', { name: /with errors/ })).toBeNull();
+  fireEvent.contextMenu(within(features).getByRole('button', { name: new RegExp(`Extrude · ${base.name}`) }));
+  await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Suppress' }));
+  const boss = within(features).getByRole('button', { name: /Extrude · Boss/ });
+  await waitFor(() => expect(within(boss).getByRole('img', { name: 'Error' }).getAttribute('title')).toMatch(/which is suppressed/));
+  expect(within(features).getByRole('status', { name: '2 with errors' })).toBeDefined();
+});
+
+it('deletes only the focused feature with the Delete key, and undo brings it back', async () => {
   const { latest } = await studio();
   const features = await screen.findByRole('region', { name: 'Features' });
   const row = within(features).getByRole('button', { name: /Extrude · Plate/ });
   row.focus();
   await userEvent.keyboard('{Delete}');
-  await waitFor(() => expect(latest().parts).toHaveLength(0));
+  // Only the extrude goes: its sketch stays.
+  await waitFor(() => expect(latest().parts[0]?.extrude).toBe(false));
+  expect(within(features).queryByRole('button', { name: /Extrude · Plate/ })).toBeNull();
+  expect(within(features).getByRole('button', { name: /Sketch · Plate/ })).toBeDefined();
   await userEvent.keyboard('{Control>}z{/Control}');
-  await waitFor(() => expect(latest().parts).toHaveLength(1));
+  await waitFor(() => expect(latest().parts[0]?.extrude).toBeUndefined());
+  // Deleting the sketch takes the part with it.
+  within(features)
+    .getByRole('button', { name: /Sketch · Plate/ })
+    .focus();
+  await userEvent.keyboard('{Delete}');
+  await waitFor(() => expect(latest().parts).toHaveLength(0));
 });
 
 it('routes cube requests through the studio sequence', async () => {
@@ -332,6 +360,45 @@ it('hides the hovered part or copy before the selection, and falls back after ho
   fireEvent.keyDown(workspace, { key: 'y', code: 'KeyY' });
   await waitFor(() => expect(within(panel).getByRole('button', { name: 'Show Plate' })).toBeDefined());
   expect(props().meshes).toHaveLength(0);
+});
+
+it('starts a new sketch from a base plane’s right-click menu', async () => {
+  const { latest } = await studio();
+  const planes = within(await screen.findByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' });
+  fireEvent.contextMenu(within(planes).getByRole('button', { name: /Front/ }));
+  const menu = screen.getByRole('menu', { name: 'Front actions' });
+  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual(['New sketch', 'Hide']);
+  await userEvent.click(within(menu).getByRole('menuitem', { name: 'New sketch' }));
+  await screen.findByRole('dialog', { name: /^Sketch · / });
+  await waitFor(() => expect(latest().parts.at(-1)!.drawnOn?.on).toEqual({ plane: 'front' }));
+});
+
+it('keeps the default planes listed while a sketch is open', async () => {
+  await newStudioSketch();
+  const planes = within(screen.getByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' });
+  expect(
+    within(planes)
+      .getAllByRole('listitem')
+      .map(item => item.textContent?.replace(/\s+/g, ' ').trim())
+  ).toEqual([
+    expect.stringContaining('Origin'),
+    expect.stringContaining('Top'),
+    expect.stringContaining('Front'),
+    expect.stringContaining('Right'),
+  ]);
+});
+
+it('keeps a part hidden with its eye when the design is opened again', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  const name = source.parts[0]!.name;
+  await studio(source);
+  fireEvent.click(within(screen.getByRole('region', { name: 'Parts panel' })).getByRole('button', { name: `Hide ${name}` }));
+  await waitFor(() => expect(screen.getByRole('button', { name: `Show ${name}` })).toBeDefined());
+  cleanup();
+  await studio(source);
+  expect(within(screen.getByRole('region', { name: 'Parts panel' })).getByRole('button', { name: `Show ${name}` })).toBeDefined();
+  fireEvent.click(screen.getByRole('button', { name: `Show ${name}` }));
+  await waitFor(() => expect(localStorage.getItem(`camnc:cad-shown:${source.id}`)).toBeNull());
 });
 
 it('isolates the selected part including hiding copies, then restores the previous hidden set', async () => {
@@ -461,6 +528,24 @@ it('opens a sketch from its step and closes it back to the studio, cancelling wh
   await waitFor(() => expect(finish).toHaveBeenCalled());
 });
 
+it('renames a part from its row in the Parts list, leaving its features named as they were', async () => {
+  const { latest } = await studio();
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  const before = latest().parts[0]!.name;
+  const parts = screen.getByRole('region', { name: 'Parts panel' });
+  fireEvent.contextMenu(within(parts).getByRole('button', { name: new RegExp(`^${before}$`) }));
+  const menu = screen.getByRole('menu', { name: `${before} actions` });
+  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual(['Rename', 'Hide']);
+  await userEvent.click(within(menu).getByRole('menuitem', { name: 'Rename' }));
+  const name = within(parts).getByRole('textbox', { name: `New name for ${before}` });
+  await userEvent.clear(name);
+  await userEvent.type(name, 'Side{Enter}');
+  await waitFor(() => expect(latest().parts[0]!.name).toBe('Side'));
+  const features = screen.getByRole('region', { name: 'Features' });
+  expect(within(features).getByRole('button', { name: new RegExp(`Sketch · ${before}`) })).toBeDefined();
+  expect(within(parts).getByRole('button', { name: /^Side$/ })).toBeDefined();
+});
+
 it('lists variables with the steps, edits them in a dialog, and offers a menu on each feature', async () => {
   const { latest } = await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
@@ -495,18 +580,25 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
   const name = within(features).getByRole('textbox', { name: 'New name' });
   await userEvent.clear(name);
   await userEvent.type(name, 'Shelf{Enter}');
-  await waitFor(() => expect(latest().parts[0]!.name).toBe('Shelf'));
-  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Shelf/ }));
+  // The feature is renamed on its own: its sketch and the part it makes keep their names.
+  await waitFor(() => expect(latest().parts[0]!.extrudeName).toBe('Shelf'));
+  const partName = latest().parts[0]!.name;
+  expect(within(features).getByRole('button', { name: new RegExp(`Sketch · ${partName}`) })).toBeDefined();
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Shelf/ }));
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Edit…' }));
-  expect(await screen.findByRole('dialog', { name: 'Extrude · Shelf' })).toBeDefined();
+  expect(await screen.findByRole('dialog', { name: 'Shelf' })).toBeDefined();
 
-  // Deleting the extrude deletes the part, and undo brings it back.
-  await userEvent.click(screen.getByRole('dialog', { name: 'Extrude · Shelf' }).querySelector('.cad-feature-cancel')!);
-  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Shelf/ }));
+  // Deleting the extrude leaves its sketch, and undo brings the extrude back.
+  await userEvent.click(screen.getByRole('dialog', { name: 'Shelf' }).querySelector('.cad-feature-cancel')!);
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Shelf/ }));
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Delete' }));
-  await waitFor(() => expect(latest().parts).toHaveLength(0));
+  await waitFor(() => expect(latest().parts[0]?.extrude).toBe(false));
+  expect(latest().parts).toHaveLength(1);
+  expect(within(features).queryByRole('button', { name: /Shelf/ })).toBeNull();
+  expect(within(features).getByRole('button', { name: new RegExp(`Sketch · ${partName}`) })).toBeDefined();
   await userEvent.click(within(toolbar).getByRole('button', { name: /^Undo/ }));
-  await waitFor(() => expect(latest().parts).toHaveLength(1));
+  await waitFor(() => expect(latest().parts[0]?.extrudeName).toBe('Shelf'));
+  expect(within(features).getByRole('button', { name: /Shelf/ })).toBeDefined();
 });
 
 it('cancels a new design’s first sketch back to how the design opened', async () => {
@@ -679,7 +771,7 @@ it('copies a part with a transform, and edits the copy from its feature', async 
   expect(within(panel).getByRole('button', { name: 'Hide Plate 2' })).toBeDefined();
 });
 
-it('opens a new design in the studio, asking for its first sketch’s plane', async () => {
+it('opens a new design in the studio with no parts, and asks for the first sketch’s plane once Sketch is chosen', async () => {
   const source: CadDocument = { ...createCadDocument(), parts: [createCadPart('Part 1')] };
   sessions.push(source.id);
   const change = vi.fn<(document: CadDocument) => void>();
@@ -690,15 +782,14 @@ it('opens a new design in the studio, asking for its first sketch’s plane', as
   );
   await settled();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  expect(
-    within(toolbar)
-      .getByRole('button', { name: /Sketch/ })
-      .getAttribute('aria-pressed')
-  ).toBe('true');
-  // The blank part isn't a feature until it's sketched; the base planes are listed before the features.
+  // The blank part isn't a feature or a part until it's sketched; the base planes are listed before the features.
   const features = screen.getByRole('region', { name: 'Features' });
   expect(features.querySelectorAll('ol button')).toHaveLength(0);
-  // The sketch waits for its plane, picked in the view or the list.
+  expect(screen.getByRole('heading', { name: 'Parts (0)' })).toBeDefined();
+  expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull();
+  expect(screen.queryByText(/Not shown/)).toBeNull();
+  // Sketch waits for its plane, picked in the view or the list.
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Sketch/ }));
   const waiting = await screen.findByRole('dialog', { name: 'Sketch' });
   expect(waiting.textContent).toMatch(/Pick a plane or a face/);
   await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Right/ }));
