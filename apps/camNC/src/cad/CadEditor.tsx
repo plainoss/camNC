@@ -504,12 +504,13 @@ export function CadEditor({
   // When a step's dialog closes, the view has the keyboard again, so its shortcuts work straight away.
   const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || transformDialog || partCutting);
   const dialogWasOpen = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const closed = dialogWasOpen.current && !stepDialogOpen;
     dialogWasOpen.current = stepDialogOpen;
     if (!closed || !studioSession || !showWorkspace) return;
     viewWantsKeyboard.current = true;
-    requestAnimationFrame(focusViewIfIdle);
+    // The dialog has left the DOM. A background page may not receive another animation frame.
+    focusViewIfIdle();
   }, [stepDialogOpen, studioSession, showWorkspace]);
   // A view still solving is inert: it takes the keyboard once it's done, unless something else has it by then.
   const viewWantsKeyboard = useRef(false);

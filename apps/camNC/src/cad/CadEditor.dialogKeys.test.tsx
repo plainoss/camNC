@@ -61,3 +61,26 @@ it('cancels the dialog with Escape, putting back the value applied in it', async
   await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Extrude/ })).toBeNull());
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(before));
 });
+
+it('returns the keyboard to the view after accepting a dialog while animation frames are paused', async () => {
+  const { latest } = await studio();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Extrude/ });
+  const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
+  await userEvent.clear(thickness);
+  // CI runs several browser pages; a background page need not render another frame.
+  const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+  try {
+    await userEvent.type(thickness, '40{Enter}');
+    await waitFor(() => expect(latest().parts[0]!.thickness).toBe(40));
+    await waitFor(() => expect(document.activeElement).toBe(thickness));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Extrude/ })).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('workspace-3d')));
+    await userEvent.keyboard('p');
+    await waitFor(() => expect(vi.mocked(ModelViewport).mock.calls.at(-1)![0].planes).toBeUndefined());
+  } finally {
+    frame.mockRestore();
+  }
+});
