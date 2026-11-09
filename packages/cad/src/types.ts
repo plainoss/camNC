@@ -383,6 +383,11 @@ export interface CadPartCopy {
    * it, so it moves with the part. The position can use variables; the rotation is unused.
    */
   offset?: CadPlacement;
+  /**
+   * A mirror image of the part across a plane, a part's face, or a plane made to sketch on (`datum`). Its placement
+   * follows from where the part and that plane are, so it stays mirrored as either moves. It's always `mirrored`.
+   */
+  mirror?: { across: CadDrawnOn['on']; datum?: string };
 }
 /** Copies of a part in a row along an axis, each `spacing` on from the last. */
 /** A direction taken from a plane or a part's face, as the reference picks one: out of it, or into it with `flip`. */
@@ -474,6 +479,8 @@ export interface CadPartCut {
   clearanceExpression?: string;
   /** Alternate cuts along the shared in-plane overlap, counting from its positive world end; half means two segments. */
   split?: 'half' | { fingers: number; fingersExpression?: string };
+  /** The tools are used up by the cut: they're no longer parts of their own, only the cut they made is left. */
+  consumeTools?: true;
 }
 /** A named value. Its kind follows from the expression: a length or angle unit, or a plain number. */
 export interface CadVariable {

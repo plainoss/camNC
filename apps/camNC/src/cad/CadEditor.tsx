@@ -19,11 +19,9 @@ import {
   addThreePointCircle,
   addEllipse,
   addConic,
-  addCenterRectangle,
   addConstraint,
   addLine,
   addPoint,
-  addRectangle,
   addAlignedRectangle,
   addSpline,
   createCadPart,
@@ -74,6 +72,7 @@ import {
   removeCadFeature,
   removeCadVariable,
   removeDatumPlane,
+  consumedTools,
   splitApartRegions,
   cadCopyName,
   setCadVariable,
@@ -186,7 +185,9 @@ import { dimensionAnchor } from './dimensionGeometry';
 import { tangentArcFrom, threePointArc } from './geometry';
 import { trimSketchCurveAt } from './trimCurves';
 import { pickBezierControlPolygon, pickSketchPoint, pickSketchSnap, type CadSnapResult } from './picking';
-import { inferDrawingPoint, inferredPointConstraints, type CadDrawingInference } from './drawingInference';
+import { drawingClickPoint, type CadDrawingInference } from './drawingInference';
+import { addDrawingRelations, drawnSelection, withSizeExpressions } from './drawingCommit';
+import { createRectangle, isRectangleTool, rectanglePrompt } from './rectangleTool';
 import { DrawingInferencePreview } from './DrawingInferencePreview';
 import { tangentLineAxis, type InferredLineAxis } from './lineInference';
 import { buildConstraintForSelection, constraintPrompt, type ConstraintCommandTool } from './constraintCommands';
@@ -229,9 +230,11 @@ import { sketchShortcuts, studioShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
 import { editable, hasOutline, isBlank, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { offerFinalPreview } from './finalPreview';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
+import { MirrorDialog } from './MirrorDialog';
 import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
 import { pickedPlane, pickedPlaneFrame } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
@@ -491,27 +494,35 @@ export function CadEditor({
   // A variable being added, or the one being changed.
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   const [planeDialog, setPlaneDialog] = useState<{ id?: string; preselected?: CadDrawnOn['on'] } | null>(null);
+  const [mirrorDialog, setMirrorDialog] = useState<{ partId: string; copyId?: string } | null>(null);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // A part being copied by a transform, or the transformed copy being changed.
   const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string; move?: boolean } | null>(null);
   // When a step's dialog closes, the view has the keyboard again, so its shortcuts work straight away.
-  const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || transformDialog || partCutting);
+  const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || mirrorDialog || transformDialog || partCutting);
   const dialogWasOpen = useRef(false);
-  useEffect(() => {
+  // A view still solving is inert: it takes the keyboard once it's done, unless something else has it by then.
+  const viewWantsKeyboard = useRef(false);
+  const focusViewIfIdle = useCallback(() => {
+    const active = root.current?.ownerDocument.activeElement;
+    if (!viewWantsKeyboard.current || (active && active !== root.current?.ownerDocument.body && active.isConnected)) {
+      viewWantsKeyboard.current = false;
+      return;
+    }
+    const view = root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]');
+    if (!view || view.closest('[inert]')) return;
+    view.focus();
+    viewWantsKeyboard.current = view.ownerDocument.activeElement !== view;
+  }, []);
+  useLayoutEffect(() => {
     const closed = dialogWasOpen.current && !stepDialogOpen;
     dialogWasOpen.current = stepDialogOpen;
     if (!closed || !studioSession || !showWorkspace) return;
-    const focusView = (frames: number) =>
-      requestAnimationFrame(() => {
-        const active = root.current?.ownerDocument.activeElement;
-        if (active && active !== root.current?.ownerDocument.body && active.isConnected) return;
-        const view = root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]');
-        if (view && !view.closest('[inert]')) view.focus();
-        else if (frames > 0) focusView(frames - 1);
-      });
-    focusView(30);
-  }, [stepDialogOpen, studioSession, showWorkspace]);
+    viewWantsKeyboard.current = true;
+    // The dialog has left the DOM. A background page may not receive another animation frame.
+    focusViewIfIdle();
+  }, [stepDialogOpen, studioSession, showWorkspace, focusViewIfIdle]);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
@@ -626,11 +637,24 @@ export function CadEditor({
           ? `${featureDialog.partId}:extrude`
           : (doc.parts.find(candidate => candidate.id === featureDialog.partId)?.pattern?.id ?? null)
         : (partCutting?.id ?? (rolledTo && designSteps(doc).some(step => step.id === rolledTo) ? rolledTo : null));
-  // A new design's blank first part isn't a part until it's sketched, as the reference starts with no parts at all.
   const blankDesign = studioSession && doc.parts.length === 1 && isBlank(doc.parts[0]!);
+  // Final shows the whole design while a step before the last is edited; it's off again for the next one.
+  const [showFinal, setShowFinal] = useState(false);
+  const editingStep = studioSession && showWorkspace && (featureDialog || partCutting) ? rollbackStep : null;
+  const offersFinal = !!editingStep && designSteps(doc).at(-1)?.id !== editingStep;
+  useEffect(() => setShowFinal(false), [editingStep]);
+  useEffect(() => {
+    offerFinalPreview(offersFinal ? { shown: showFinal, toggle: () => setShowFinal(shown => !shown) } : null);
+    return () => offerFinalPreview(null);
+  }, [offersFinal, showFinal]);
   const shownDocument = useMemo(
-    () => (blankDesign ? { ...doc, parts: [] } : rollbackStep ? rolledBackTo(doc, rollbackStep) : doc),
-    [doc, rollbackStep, blankDesign]
+    () =>
+      blankDesign
+        ? { ...doc, parts: [] }
+        : rollbackStep && !(offersFinal && showFinal && rollbackStep === editingStep)
+          ? rolledBackTo(doc, rollbackStep)
+          : doc,
+    [doc, rollbackStep, offersFinal, showFinal, editingStep, blankDesign]
   );
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
@@ -649,8 +673,9 @@ export function CadEditor({
       const field = dialogFocus.current;
       const active = field?.ownerDocument.activeElement;
       if (field?.isConnected && (!active || active === field.ownerDocument.body)) field.focus();
+      else focusViewIfIdle();
     }
-  }, [busy]);
+  }, [busy, focusViewIfIdle]);
   const restoreCanvasKeyboard = () => {
     const restore = () => {
       const canvas = svg.current,
@@ -1253,8 +1278,8 @@ export function CadEditor({
             ? 'Select near the end to extend, then click its new end or a boundary.'
             : next === 'select'
               ? 'Click geometry to select. Drag to move. Shift-click adds to selection.'
-              : next === 'rectangle' || next === 'centerRectangle'
-                ? `Click or drag from the ${next === 'centerRectangle' ? 'center' : 'first corner'} to the opposite corner. Or enter sizes below.`
+              : isRectangleTool(next)
+                ? rectanglePrompt(next)
                 : next === 'inscribedPolygon' || next === 'circumscribedPolygon'
                   ? 'Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.'
                   : next === 'alignedRectangle'
@@ -1426,107 +1451,19 @@ export function CadEditor({
         lineContinuation && chain
           ? chain.pointId
           : pending[0] && sketch.entities.find(e => e.type === 'point' && Math.hypot(e.x - pending[0]!.x, e.y - pending[0]!.y) < 1e-7)?.id;
-      const result = inferDrawingPoint(sketch, raw, {
+      lastDrawingHint.current = drawingClickPoint(sketch, raw, {
         project: projectPoint,
         directSnap: hit,
         lockedAxes,
         preferredPointIds: hoveredReferences.current,
         excludePointIds: [...(drag.current?.points ?? []), ...(tool === 'line' && startId && inference.current ? [startId] : [])],
       });
-      point = { ...result.point };
-      // Grid rounding is only a fallback; it must never manufacture a constraint inside a pixel tolerance.
-      if (!hit) {
-        if (lockedAxes.x === undefined && !result.alignments.some(a => a.type === 'verticalPoints')) point.x = Math.round(point.x);
-        if (lockedAxes.y === undefined && !result.alignments.some(a => a.type === 'horizontalPoints')) point.y = Math.round(point.y);
-      }
-      lastDrawingHint.current = { ...result, point, guides: result.guides.map(g => ({ ...g, to: point })) };
+      point = { ...lastDrawingHint.current.point };
     } else if (!hit) point = { x: Math.round(raw.x), y: Math.round(raw.y) };
     return point;
   };
-  const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex: number | readonly number[] = -1) => {
-    let next = source;
-    const createdCurve = source.entities.find(
-      e => (e.type === 'circle' || e.type === 'arc') && !sketch?.entities.some(before => before.id === e.id)
-    );
-    const polygonEdge =
-      tool === 'inscribedPolygon'
-        ? source.entities.find(e => e.type === 'line' && !sketch?.entities.some(before => before.id === e.id))
-        : undefined;
-    const rectangleTop =
-      tool === 'alignedRectangle'
-        ? source.entities.filter(e => e.type === 'line' && !sketch?.entities.some(before => before.id === e.id))[2]
-        : undefined;
-    for (const [index, inference] of hints.entries()) {
-      if (!inference || (!inference.snap && !inference.alignments.length)) continue;
-      const hint = inference.snap;
-      const candidates = next.entities.filter(
-        (e): e is SketchPoint => e.type === 'point' && Math.hypot(e.x - inference.point.x, e.y - inference.point.y) < 1e-7
-      );
-      let point: SketchPoint | undefined = candidates.find(e => !sketch?.entities.some(before => before.id === e.id)) ?? candidates[0];
-      if ((Array.isArray(curvePointIndex) ? curvePointIndex.includes(index) : index === curvePointIndex) && createdCurve) {
-        // A circle's rim / arc's through click needs a concrete construction point to retain its inferred intent.
-        if (!point) {
-          next = addPoint(next, { ...inference.point, construction: true, standalone: false });
-          point = next.entities.find(
-            (e): e is SketchPoint => e.type === 'point' && Math.hypot(e.x - inference.point.x, e.y - inference.point.y) < 1e-7
-          );
-        }
-        const pointId = point?.id;
-        if (pointId && !next.constraints.some(c => c.type === 'pointOnCircle' && c.pointId === pointId && c.entityId === createdCurve.id))
-          next = addConstraint(next, { type: 'pointOnCircle', pointId, entityId: createdCurve.id });
-      }
-      if (index === 1 && polygonEdge?.type === 'line') {
-        if (!point) {
-          next = addPoint(next, { ...inference.point, construction: true, standalone: false });
-          point = next.entities.at(-1) as SketchPoint;
-        }
-        next = addConstraint(next, { type: 'midpoint', pointId: point.id, entityId: polygonEdge.id });
-      }
-      if (index === 2 && rectangleTop?.type === 'line') {
-        if (!point) {
-          next = addPoint(next, { ...inference.point, construction: true, standalone: false });
-          point = next.entities.at(-1) as SketchPoint;
-        }
-        const equivalent = pointEquivalence(next.constraints);
-        if (![rectangleTop.startId, rectangleTop.endId].some(id => equivalent.equivalent(id, point!.id)))
-          next = addConstraint(next, { type: 'pointOnLine', pointId: point.id, entityId: rectangleTop.id });
-      }
-      if (point) for (const relation of inferredPointConstraints(inference, point.id, next)) next = addConstraint(next, relation);
-      if (point && hint?.targetPointId && point.id !== hint.targetPointId) {
-        if (
-          !next.constraints.some(
-            c =>
-              c.type === 'coincident' &&
-              [c.pointAId, c.pointBId].includes(point.id) &&
-              [c.pointAId, c.pointBId].includes(hint.targetPointId!)
-          )
-        )
-          next = addConstraint(next, { type: 'coincident', pointAId: point.id, pointBId: hint.targetPointId });
-        continue;
-      }
-      if (!hint?.intent) continue;
-      const curve = sketch?.entities.find(e => e.id === hint.intent!.entityId);
-      if (!point || !curve) continue;
-      const type =
-        hint.intent.type === 'midpoint'
-          ? 'midpoint'
-          : curve.type === 'line'
-            ? 'pointOnLine'
-            : curve.type === 'circle' || curve.type === 'arc'
-              ? 'pointOnCircle'
-              : 'pointOnCurve';
-      if (
-        !next.constraints.some(
-          c => c.type === type && 'pointId' in c && c.pointId === point.id && 'entityId' in c && c.entityId === curve.id
-        )
-      )
-        next =
-          type === 'pointOnCurve'
-            ? addConstraint(next, { type, pointId: point.id, entityId: curve.id, parameter: hint.parameter ?? 0.5 })
-            : addConstraint(next, { type, pointId: point.id, entityId: curve.id });
-    }
-    return next;
-  };
+  const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex: number | readonly number[] = -1) =>
+    sketch ? addDrawingRelations(sketch, source, hints, { tool, curvePointIndex }) : source;
   const addShape = (end?: Point) => {
     if (!sketch || !pending[0]) return;
     const anchor = lineContinuation ? chainGeometry(sketch, chain) : null;
@@ -1546,29 +1483,11 @@ export function CadEditor({
       } catch (error) {
         return setMessage(error instanceof Error ? error.message : String(error));
       }
-    } else if (tool === 'rectangle' || tool === 'centerRectangle') {
-      const centered = tool === 'centerRectangle';
-      const widthValue = end ? null : parseCadValue(width, { unit: 'mm', variables: variableScope });
-      const heightValue = end ? null : parseCadValue(height, { unit: 'mm', variables: variableScope });
-      if (widthValue && 'error' in widthValue) return setMessage(`Rectangle width: ${widthValue.error}`);
-      if (heightValue && 'error' in heightValue) return setMessage(`Rectangle height: ${heightValue.error}`);
-      const w = end ? (end.x - start.x) * (centered ? 2 : 1) : widthValue!.value;
-      const h = end ? (end.y - start.y) * (centered ? 2 : 1) : heightValue!.value;
-      if (!end && (w <= 0 || h <= 0)) return setMessage('Rectangle width and height must be greater than zero.');
-      if (!Number.isFinite(w) || !Number.isFinite(h) || Math.abs(w) < 0.1 || Math.abs(h) < 0.1)
-        return setMessage('Width and height must be greater than zero.');
-      next = (centered ? addCenterRectangle : addRectangle)(sketch, {
-        x: centered ? start.x : Math.min(start.x, start.x + w),
-        y: centered ? start.y : Math.min(start.y, start.y + h),
-        width: Math.abs(w),
-        height: Math.abs(h),
-        construction,
-        dimensioned: end === undefined,
-      });
-      if (!end) {
-        sizeExpressions.Width = widthValue?.expression;
-        sizeExpressions.Height = heightValue?.expression;
-      }
+    } else if (isRectangleTool(tool)) {
+      const rectangle = createRectangle(sketch, { tool, start, end, width, height, variables: variableScope, construction });
+      if (rectangle.error !== undefined) return setMessage(rectangle.error);
+      next = rectangle.sketch;
+      Object.assign(sizeExpressions, rectangle.sizeExpressions);
     } else if (tool === 'alignedRectangle' && pending[1] && end) {
       try {
         next = addAlignedRectangle(sketch, { start, end: pending[1], through: end, construction });
@@ -1658,15 +1577,7 @@ export function CadEditor({
         }
       }
     } else return;
-    if (Object.values(sizeExpressions).some(Boolean))
-      next = {
-        ...next,
-        constraints: next.constraints.map(c =>
-          !sketch.constraints.some(before => before.id === c.id) && c.label && sizeExpressions[c.label]
-            ? { ...c, expression: sizeExpressions[c.label] }
-            : c
-        ),
-      };
+    next = withSizeExpressions(sketch, next, sizeExpressions);
     const hints = polygonTool
       ? pendingSnaps.current.slice(0, 2)
       : end
@@ -1721,17 +1632,7 @@ export function CadEditor({
           )
         : null
     );
-    setSelected(
-      added
-        .filter(
-          e =>
-            tool !== 'centerRectangle' ||
-            next.constraints.some(
-              c => ['horizontal', 'vertical', 'parallel', 'perpendicular'].includes(c.type) && constraintEntityIds(c).includes(e.id)
-            )
-        )
-        .map(e => e.id)
-    );
+    setSelected(drawnSelection(sketch, next, tool));
     // Passive measured values leave shortcuts live; numeric typing turns them into drivers.
     setDimension(null);
     svg.current?.focus();
@@ -3569,6 +3470,7 @@ export function CadEditor({
     setPartCutting(null);
     setVariableDialog(null);
     setPlaneDialog(null);
+    setMirrorDialog(null);
     setTransformDialog(null);
     setChoosingFace(false);
     setPartId(partId);
@@ -3602,6 +3504,7 @@ export function CadEditor({
     setFeatureDialog(null);
     setVariableDialog(null);
     setPlaneDialog(null);
+    setMirrorDialog(null);
     setTransformDialog(null);
     setPartCutting(null);
     setChoosingFace(false);
@@ -3655,6 +3558,7 @@ export function CadEditor({
     if (studioSession && step.kind === 'copy') {
       const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
       if (copy?.offset) return openTransform(step.partId, copy.id);
+      if (copy?.mirror) return setMirrorDialog({ partId: step.partId, copyId: copy.id });
     }
     if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
     // A cut opens its part's sketch view from the studio: cancelling there goes back to the design as it is now.
@@ -3712,6 +3616,7 @@ export function CadEditor({
         setPartCutting(null);
         setTransformDialog(null);
         setPlaneDialog(null);
+        setMirrorDialog(null);
         return setVariableDialog({ id: entry.id });
       }
       if (action === 'delete') {
@@ -3758,6 +3663,7 @@ export function CadEditor({
     setPartCutting(null);
     setVariableDialog(null);
     setPlaneDialog(null);
+    setMirrorDialog(null);
     setChoosingFace(false);
     setPartId(partId);
     setShowWorkspace(true);
@@ -3846,6 +3752,7 @@ export function CadEditor({
     // Starting one step closes any other step's dialog.
     setVariableDialog(null);
     setPlaneDialog(null);
+    setMirrorDialog(null);
     setTransformDialog(null);
     if (command === 'sketch') {
       setFeatureDialog(null);
@@ -3868,6 +3775,8 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
+    } else if (command === 'mirror') {
+      if (part) setMirrorDialog({ partId: part.id });
     } else if (command === 'plane') {
       setFeatureDialog(null);
       setPartCutting(null);
@@ -4104,7 +4013,9 @@ export function CadEditor({
   // The parts, each with an eye to show or hide it in the view. In the studio they sit at the bottom left, below the
   // features, as in the reference.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
-  const builtParts = blankDesign ? [] : doc.parts.filter(isCadPart);
+  // A tool used up by its cut isn't a part of its own any more.
+  const usedUp = consumedTools(doc);
+  const builtParts = blankDesign ? [] : doc.parts.filter(part => isCadPart(part) && !usedUp.has(part.id));
   // An open sketch turned with its parts behind it, about the middle of the view.
   const turned = !!sketchBackdrop && sketchTurn !== straightOn;
   const [ta, tb, tc, td] = drawingMatrix(sketchTurn);
@@ -4123,6 +4034,8 @@ export function CadEditor({
         : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
     ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
   };
+  // A mirror image is of a part, as a pattern is.
+  if (studioDisabled.pattern) studioDisabled.mirror = studioDisabled.pattern;
   const featureShown = useCallback(
     (id: string) => {
       if (id in featureVisibility) return featureVisibility[id]!;
@@ -4216,11 +4129,13 @@ export function CadEditor({
                 ? 'cutParts'
                 : variableDialog
                   ? 'variable'
-                  : planeDialog
-                    ? 'plane'
-                    : transformDialog
-                      ? 'transform'
-                      : (featureDialog?.kind ?? null)
+                  : mirrorDialog
+                    ? 'mirror'
+                    : planeDialog
+                      ? 'plane'
+                      : transformDialog
+                        ? 'transform'
+                        : (featureDialog?.kind ?? null)
           }
           disabled={studioDisabled}
           canUndo={session.past.length > 0}
@@ -4555,6 +4470,23 @@ export function CadEditor({
               onCancel={() => setVariableDialog(null)}
             />
           )}
+          {showWorkspace && mirrorDialog && (
+            <MirrorDialog
+              key={mirrorDialog.copyId ?? mirrorDialog.partId}
+              document={doc}
+              {...mirrorDialog}
+              pickPlane={picked => setDirectionPicker(() => picked)}
+              onSave={next => {
+                commit(next);
+                setDirectionPicker(null);
+                setMirrorDialog(null);
+              }}
+              onCancel={() => {
+                setDirectionPicker(null);
+                setMirrorDialog(null);
+              }}
+            />
+          )}
           {showWorkspace && planeDialog && (
             <PlaneDialog
               key={planeDialog.id ?? 'new'}
@@ -4712,6 +4644,7 @@ export function CadEditor({
           {showWorkspace && (
             <Suspense fallback={<div className="cad-part-view" />}>
               <WorkspaceView
+                onReady={focusViewIfIdle}
                 document={shownDocument}
                 viewRequest={viewRequest}
                 onViewRequest={
@@ -4793,18 +4726,19 @@ export function CadEditor({
                         : undefined
                     }
                     onSave={change => {
-                      const { clearance, clearanceExpression, split, ...parts } = change;
-                      commit(
-                        partCutting.id
-                          ? updatePartCut(documentRef.current, partCutting.id, change)
-                          : addPartCut(
-                              documentRef.current,
-                              parts.tools,
-                              parts.targets,
-                              { value: clearance, expression: clearanceExpression },
-                              split
-                            ).document
-                      );
+                      const { clearance, clearanceExpression, split, consumeTools, ...parts } = change;
+                      const made = partCutting.id
+                        ? updatePartCut(documentRef.current, partCutting.id, change)
+                        : addPartCut(
+                            documentRef.current,
+                            parts.tools,
+                            parts.targets,
+                            { value: clearance, expression: clearanceExpression },
+                            split
+                          );
+                      const document = 'document' in made ? made.document : made;
+                      const id = 'document' in made ? made.id : partCutting.id!;
+                      commit(updatePartCut(document, id, { consumeTools }));
                       setPartCutting(null);
                     }}
                   />

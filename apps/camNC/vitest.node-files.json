@@ -9,5 +9,6 @@
   "src/cam/rebaseJob.sourceConflict.test.ts",
   "src/cam/boards.test.ts",
   "src/test/browserSequencer.test.ts",
-  "e2e/spec/session.test.mjs"
+  "e2e/spec/session.test.mjs",
+  "e2e/spec/headless.test.mjs"
 ]

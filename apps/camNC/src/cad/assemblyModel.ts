@@ -11,6 +11,7 @@ import {
   activeDesign,
   resolveDatumPlanes,
   isCadPart,
+  consumedTools,
   type CadDocument,
   type CadPart,
   type CadPlacement,
@@ -55,24 +56,28 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
   type Shape = ReturnType<typeof nativePart>;
   type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; copies: Shape[] };
   // A sketch not yet extruded has nothing to show in 3D.
-  const built = document.parts.filter(isCadPart).map((part): Built => {
-    const { part: profile } = evaluateCadPart(part);
-    if (!profile) return { part, problem: 'Its sketch needs fixing first.' };
-    try {
-      const evaluated: EvaluatedCadPart = withPartCuts(document, evaluateCadFeatures(part, profile).part);
-      const shape = nativePart(evaluated);
-      // A copy is meshed on its own only when it's mirrored or cut differently; the rest share the part's mesh.
-      let mirrored: Shape | undefined;
-      const copies = (part.copies ?? []).map(copy => {
-        if (evaluated.copyCuts?.[copy.id]) return nativePart(evaluatedPartCopy(evaluated, copy));
-        if (copy.mirrored) return (mirrored ??= nativePart(evaluatedPartCopy(evaluated, copy)));
-        return shape;
-      });
-      return { part, shape, copies };
-    } catch (cause) {
-      return { part, problem: cause instanceof Error ? cause.message : String(cause) };
-    }
-  });
+  // A tool used up by a cut is only the cut it made.
+  const consumed = consumedTools(document);
+  const built = document.parts
+    .filter(part => isCadPart(part) && !consumed.has(part.id))
+    .map((part): Built => {
+      const { part: profile } = evaluateCadPart(part);
+      if (!profile) return { part, problem: 'Its sketch needs fixing first.' };
+      try {
+        const evaluated: EvaluatedCadPart = withPartCuts(document, evaluateCadFeatures(part, profile).part);
+        const shape = nativePart(evaluated);
+        // A copy is meshed on its own only when it's mirrored or cut differently; the rest share the part's mesh.
+        let mirrored: Shape | undefined;
+        const copies = (part.copies ?? []).map(copy => {
+          if (evaluated.copyCuts?.[copy.id]) return nativePart(evaluatedPartCopy(evaluated, copy));
+          if (copy.mirrored) return (mirrored ??= nativePart(evaluatedPartCopy(evaluated, copy)));
+          return shape;
+        });
+        return { part, shape, copies };
+      } catch (cause) {
+        return { part, problem: cause instanceof Error ? cause.message : String(cause) };
+      }
+    });
   const pieces = built.flatMap(entry =>
     'shape' in entry
       ? [

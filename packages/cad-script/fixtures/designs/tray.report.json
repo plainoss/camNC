@@ -1,0 +1,693 @@
+{
+ "design": {
+  "name": "tray",
+  "revision": 1,
+  "version": 2
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "892ddcc1-9dc0-4195-8e99-9d548b26154d:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Tray",
+   "part": "Tray",
+   "settings": {
+    "on": "not placed"
+   },
+   "result": {
+    "sketch": "Tray / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "892ddcc1-9dc0-4195-8e99-9d548b26154d:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Tray",
+   "part": "Tray",
+   "settings": {
+    "thickness": {
+     "value": 24
+    }
+   },
+   "result": {
+    "thickness": 24,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      260,
+      160
+     ]
+    },
+    "holes": 0,
+    "notches": 0
+   }
+  },
+  {
+   "id": "bba8f9bb-fd77-49ba-bd56-7081c8a39043",
+   "kind": "faceSketch",
+   "label": "Sketch on the top · Tray",
+   "part": "Tray",
+   "settings": {
+    "on": "top"
+   },
+   "result": {
+    "sketch": "Tray / a8e7",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 2
+   }
+  },
+  {
+   "id": "87deb35e-1f25-4eec-8643-364d19bb9799",
+   "kind": "cut",
+   "label": "Cut 1 · Tray",
+   "part": "Tray",
+   "settings": {
+    "sketch": "Tray / a8e7",
+    "region": "r2",
+    "depth": {
+     "value": 8
+    }
+   },
+   "result": {
+    "cuts": [
+     {
+      "side": "top",
+      "from": 0,
+      "to": 8,
+      "through": false,
+      "at": [
+       15,
+       15
+      ],
+      "size": [
+       230,
+       130
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "2662b2bb-5719-4ee4-9a6a-2292e0f26a6e",
+   "kind": "faceSketch",
+   "label": "Sketch on a pocket floor · Tray",
+   "part": "Tray",
+   "settings": {
+    "on": {
+     "floorOf": "87deb35e-1f25-4eec-8643-364d19bb9799"
+    }
+   },
+   "result": {
+    "sketch": "Tray / 42dd",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 2
+   }
+  },
+  {
+   "id": "4a9fcc91-a1d0-4a3b-9bca-37f98ffec65f",
+   "kind": "cut",
+   "label": "Cut 2 · Tray",
+   "part": "Tray",
+   "settings": {
+    "sketch": "Tray / 42dd",
+    "region": "r2",
+    "depth": {
+     "value": 6
+    }
+   },
+   "result": {
+    "cuts": [
+     {
+      "side": "top",
+      "from": 8,
+      "to": 14,
+      "through": false,
+      "at": [
+       100,
+       50
+      ],
+      "size": [
+       60,
+       60
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Tray",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "equal": 3,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "pointOnLine": 8,
+    "positionX": 1,
+    "positionY": 1,
+    "radius": 1,
+    "tangent": 8
+   },
+   "entities": [
+    {
+     "ref": "bb07",
+     "type": "line",
+     "a": [
+      12,
+      0
+     ],
+     "b": [
+      248,
+      0
+     ],
+     "ends": [
+      "bed5",
+      "3869"
+     ]
+    },
+    {
+     "ref": "0992",
+     "type": "line",
+     "a": [
+      260,
+      12
+     ],
+     "b": [
+      260,
+      148
+     ],
+     "ends": [
+      "942d",
+      "0436"
+     ]
+    },
+    {
+     "ref": "d277",
+     "type": "line",
+     "a": [
+      248,
+      160
+     ],
+     "b": [
+      12,
+      160
+     ],
+     "ends": [
+      "b815",
+      "7452"
+     ]
+    },
+    {
+     "ref": "23bf",
+     "type": "line",
+     "a": [
+      0,
+      148
+     ],
+     "b": [
+      0,
+      12
+     ],
+     "ends": [
+      "00ad",
+      "97f3"
+     ]
+    },
+    {
+     "ref": "7f4c",
+     "type": "arc",
+     "at": [
+      12,
+      12
+     ],
+     "r": 12,
+     "a": [
+      0,
+      12
+     ],
+     "b": [
+      12,
+      0
+     ],
+     "ends": [
+      "97f3",
+      "bed5"
+     ]
+    },
+    {
+     "ref": "57ef",
+     "type": "arc",
+     "at": [
+      248,
+      12
+     ],
+     "r": 12,
+     "a": [
+      248,
+      0
+     ],
+     "b": [
+      260,
+      12
+     ],
+     "ends": [
+      "3869",
+      "942d"
+     ]
+    },
+    {
+     "ref": "d6a3",
+     "type": "arc",
+     "at": [
+      248,
+      148
+     ],
+     "r": 12,
+     "a": [
+      260,
+      148
+     ],
+     "b": [
+      248,
+      160
+     ],
+     "ends": [
+      "0436",
+      "b815"
+     ]
+    },
+    {
+     "ref": "ab83",
+     "type": "arc",
+     "at": [
+      12,
+      148
+     ],
+     "r": 12,
+     "a": [
+      12,
+      160
+     ],
+     "b": [
+      0,
+      148
+     ],
+     "ends": [
+      "7452",
+      "00ad"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      260,
+      160
+     ],
+     "area": 41475.924,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Tray",
+   "ref": "a8e7",
+   "on": "top",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "7f13",
+     "type": "line",
+     "a": [
+      15,
+      15
+     ],
+     "b": [
+      245,
+      15
+     ],
+     "ends": [
+      "74bc",
+      "9533"
+     ]
+    },
+    {
+     "ref": "41de",
+     "type": "line",
+     "a": [
+      245,
+      15
+     ],
+     "b": [
+      245,
+      145
+     ],
+     "ends": [
+      "ac89",
+      "0cd1"
+     ]
+    },
+    {
+     "ref": "bb96",
+     "type": "line",
+     "a": [
+      245,
+      145
+     ],
+     "b": [
+      15,
+      145
+     ],
+     "ends": [
+      "d964",
+      "88e6"
+     ]
+    },
+    {
+     "ref": "3fe6",
+     "type": "line",
+     "a": [
+      15,
+      145
+     ],
+     "b": [
+      15,
+      15
+     ],
+     "ends": [
+      "dfda",
+      "afed"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      260,
+      160
+     ],
+     "area": 11575.924,
+     "islands": 1
+    },
+    {
+     "ref": "r2",
+     "at": [
+      15,
+      15
+     ],
+     "size": [
+      230,
+      130
+     ],
+     "area": 29900,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Tray",
+   "ref": "42dd",
+   "on": {
+    "floorOf": "87de"
+   },
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "diameter": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "a9ac",
+     "type": "circle",
+     "at": [
+      130,
+      80
+     ],
+     "d": 60
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      260,
+      160
+     ],
+     "area": 38649.741,
+     "islands": 1
+    },
+    {
+     "ref": "r2",
+     "at": [
+      100,
+      50.01
+     ],
+     "size": [
+      60,
+      59.98
+     ],
+     "area": 2826.184,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Tray",
+   "thickness": 24,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     260,
+     160
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "87de",
+     "side": "top",
+     "from": 0,
+     "to": 8,
+     "through": false,
+     "at": [
+      15,
+      15
+     ],
+     "size": [
+      230,
+      130
+     ]
+    },
+    {
+     "ref": "4a9f",
+     "side": "top",
+     "from": 8,
+     "to": 14,
+     "through": false,
+     "at": [
+      100,
+      50
+     ],
+     "size": [
+      60,
+      60
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 2,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 100.2,
+    "operations": [
+     {
+      "label": "1 pocket 8 deep",
+      "depth": 8,
+      "steps": 6
+     },
+     {
+      "label": "1 pocket 14 deep, from 8",
+      "depth": 6,
+      "steps": 4
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 24.3,
+      "steps": 16
+     }
+    ],
+    "warnings": [
+     "Tray: pocket z=16: 2.2mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      24
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge bb07",
+     "looks": "-y",
+     "origin": [
+      12,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 0992",
+     "looks": "+x",
+     "origin": [
+      260,
+      12,
+      0
+     ]
+    },
+    {
+     "face": "edge d277",
+     "looks": "+y",
+     "origin": [
+      248,
+      160,
+      0
+     ]
+    },
+    {
+     "face": "edge 23bf",
+     "looks": "-x",
+     "origin": [
+      0,
+      148,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 24,
+   "sides": 1,
+   "size": [
+    273.4,
+    173.4
+   ],
+   "yield": 0.877,
+   "parts": [
+    {
+     "name": "Tray",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      260,
+      160
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Tray",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 100.2,
+   "operations": [
+    {
+     "label": "1 pocket 8 deep",
+     "depth": 8,
+     "steps": 6
+    },
+    {
+     "label": "1 pocket 14 deep, from 8",
+     "depth": 6,
+     "steps": 4
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 24.3,
+     "steps": 16
+    }
+   ],
+   "warnings": [
+    "Tray: pocket z=16: 2.2mm² left in corners/narrow spots with D=3.175"
+   ],
+   "blocked": []
+  }
+ ]
+}

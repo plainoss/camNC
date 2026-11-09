@@ -724,6 +724,7 @@ export function parseCadDocument(input: unknown): CadDocument {
       number(step.clearance);
       if (!validPartCutSplit(step.split)) throw new Error('Invalid CAD part cut');
       if (step.clearanceExpression !== undefined && typeof step.clearanceExpression !== 'string') throw new Error('Invalid CAD part cut');
+      if (step.consumeTools !== undefined && step.consumeTools !== true) throw new Error('Invalid CAD part cut');
     }
   }
   for (const p of d.parts) {
