@@ -768,6 +768,35 @@ it('saves a picked-direction distance expression and removes it when replaced by
   expect(latest().parts[0]!.copies![0]!.along).not.toHaveProperty('distanceExpression');
 });
 
+it('reorders parts by dragging a step onto another in the feature list', async () => {
+  const [a, b] = [
+    { ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name: 'A' },
+    { ...createPlateDocument({ width: 80, height: 40 }).parts[0]!, name: 'B' },
+  ];
+  const source: CadDocument = { ...createCadDocument(), parts: [a, b] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  const dragged = within(features).getByRole('button', { name: /Extrude · B/ });
+  const onto = within(features)
+    .getByRole('button', { name: /Sketch · A/ })
+    .closest('li')!;
+  const dataTransfer = new DataTransfer();
+  const drag = (target: Element, type: string) =>
+    target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer }));
+  drag(dragged, 'dragstart');
+  drag(onto, 'dragover');
+  drag(onto, 'drop');
+  await waitFor(() => expect(latest().parts.map(part => part.name)).toEqual(['B', 'A']));
+});
+
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {
   const { latest } = await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });

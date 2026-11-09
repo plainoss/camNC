@@ -53,6 +53,7 @@ export function FeatureList({
   onRename,
   rollback,
   onRollTo,
+  onReorder,
   selectedPlane,
   onPickPlane,
 }: {
@@ -69,6 +70,8 @@ export function FeatureList({
    * or Roll to here does in the reference. Without it the bar only shows while a step is edited.
    */
   onRollTo?: (stepId: string | null) => void;
+  /** A step dragged onto another, to go just before it. */
+  onReorder?: (stepId: string, beforeStepId: string) => void;
   /** The base plane picked, in the list or the view, and picking one, as the reference lists them first. */
   selectedPlane?: BasePlane | null;
   onPickPlane?: (plane: BasePlane) => void;
@@ -173,9 +176,19 @@ export function FeatureList({
             <li
               key={key(entry)}
               onDragOver={event => {
-                if (onRollTo && entry.kind === 'step' && event.dataTransfer.types.includes('text/x-cad-rollback')) event.preventDefault();
+                if (entry.kind !== 'step') return;
+                if (onRollTo && event.dataTransfer.types.includes('text/x-cad-rollback')) event.preventDefault();
+                if (onReorder && event.dataTransfer.types.includes('text/x-cad-step')) event.preventDefault();
               }}
               onDrop={event => {
+                if (entry.kind !== 'step') return;
+                if (event.dataTransfer.types.includes('text/x-cad-step')) {
+                  // A step dropped on another goes just before it.
+                  event.preventDefault();
+                  const dragged = event.dataTransfer.getData('text/x-cad-step');
+                  if (dragged && dragged !== entry.step.id) onReorder?.(dragged, entry.step.id);
+                  return;
+                }
                 if (!event.dataTransfer.types.includes('text/x-cad-rollback')) return;
                 event.preventDefault();
                 rollToIndex(index);
@@ -191,6 +204,12 @@ export function FeatureList({
                 aria-haspopup="menu"
                 onClick={() => onSelect(entry)}
                 onDoubleClick={() => onAction(entry, 'edit')}
+                draggable={!!onReorder && entry.kind === 'step' && entry.step.kind !== 'partCut'}
+                onDragStart={event => {
+                  if (entry.kind !== 'step') return;
+                  event.dataTransfer.setData('text/x-cad-step', entry.step.id);
+                  event.dataTransfer.effectAllowed = 'move';
+                }}
                 onContextMenu={event => open(entry, event)}
                 onKeyDown={event => {
                   if (event.key === 'Enter') {
