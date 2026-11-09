@@ -894,7 +894,6 @@ it('saves a picked-direction distance expression and removes it when replaced by
 
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {
   const { latest } = await studio();
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await editExtrude('Plate');
   let dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
   let thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
@@ -920,7 +919,6 @@ it('makes a variable from `#name = value` in a field and uses it there, and list
 
 it('keeps a value typed as `#name = value` when the tick is clicked straight after', async () => {
   const { latest } = await studio();
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await editExtrude('Plate');
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
   const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
@@ -1015,7 +1013,6 @@ it('lists the parts at the bottom of the sidebar, each with an eye to hide it in
 
 it('doesn’t apply a field after its dialog is cancelled, and applies a dimension through its form after #name = value', async () => {
   const { latest } = await studio();
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await editExtrude('Plate');
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
   const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
