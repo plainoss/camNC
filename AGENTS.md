@@ -44,6 +44,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 
 - During development, run the changed tests and relevant package lint/type checks first. `pnpm run check-types:fast` type-checks every package with tsgo in about 12 s; CI still runs `tsc`, so run `pnpm run check-types` once before pushing if you changed types across packages. Run the local fast suite once the change is ready, plus affected files excluded from it. After rebasing or resolving conflicts, rerun affected checks and `pnpm run check-format` before pushing; a previous green run validates the previous tree.
 - PR CI runs only the quick suites. The browser files and behaviour specs run in the merge queue, so run the ones your change touches locally before queueing, or label the PR `full-ci` to run them on the PR (docs/TESTING.md).
+- Report only what ran: in PRs and replies, say which checks and tests you ran and which you couldn't. A local pass is not CI, and a test you didn't run is not evidence.
 - Push coherent, validated milestones. Superseded PR commits cancel their CI, so avoid repeated pushes of incomplete fixes that discard useful validation.
 - Before repairing a shared test driver or CI failure, inspect open PRs and current main for an existing fix. Coordinate one shared repair rather than independently patching it into several feature branches.
 - Claim a shared failure before fixing it: comment on its open `flaky-test` issue (CI files one when a test fails and then passes on the same code), or open one if there is none, with the `flaky-test` label and a title CI would give it, so later flakes land on it: `Flaky test: ` and then the spec (`sketch/machine/edit-after-cut-keeps-boards`) or `file > describe > test`, and link your PR there. If someone already claimed it, wait for their fix or help on their PR.
@@ -59,7 +60,8 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 
 - Title format: `feat/fix/chore/docs(<project_name>) <Title>`
 - Open reviewable dependent PRs as soon as their work is ready; distinguish a dependency blocking merge from one blocking review or initial validation. State the dependency and base explicitly, and account for the workflow's target-branch triggers when deciding which checks can run before retargeting.
-- When asked to merge, use the active queue: once Mergify is enabled, comment `@mergifyio queue` (see `docs/TESTING.md`); until then, enable GitHub auto-merge. Continue monitoring until it merges or a concrete blocker needs action. After a queue rejection, inspect the reason and current candidate, address it, and requeue when appropriate; a retry of an obsolete candidate does not validate a new one.
+- Keep CI and workflow changes out of feature PRs. If a feature needs one, open a separate PR (or an issue) for it, so the change gets its own review and can be reverted alone.
+- When asked to merge, queue the PR in Mergify (see `docs/TESTING.md`): tick "Queue this pull request" in Mergify's comment on the PR, or comment `@mergifyio queue`, then check that the "Mergify Merge Queue" check shows it queued. Don't use GitHub auto-merge. Continue monitoring until it merges or a concrete blocker needs action. After a queue rejection, inspect the reason and current candidate, address it, and requeue when appropriate; a retry of an obsolete candidate does not validate a new one.
 - Do not routinely rebase a healthy queued PR just because main advanced; the queue validates the combined candidate. Update the branch when resolving an actual conflict or incorporating a required fix, then validate the changed tree.
 
 ## Code Style
@@ -67,6 +69,8 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - All source code is written in modern ES modules and TypeScript.
 - Lint with `pnpm run lint` (oxlint, configured in `.oxlintrc.json`; a whole run takes a few seconds).
 - Do not commit build artifacts or `node_modules` directories.
-- Put a new tool or feature in its own module rather than growing an existing file.
+- Put a new tool, feature or dialog in its own module rather than growing an existing file. Shared files (the CAD editor component, routes, registries) get only small, surgical edits that wire the new module in.
+- Other agents edit the same shared files in parallel: re-read a shared file just before you edit it, not from memory of an earlier read.
+- A check that looks removable (a guard, a readiness wait, an odd condition) carries a comment saying what it prevents. Read that comment before changing or removing it, and write one when you add such a check.
 - `scripts/file-size-ratchet.mjs` caps source files at 1000 lines, at commit and in CI. Files that were already longer are listed in `scripts/file-size-ceilings.json` and may only shrink; when one outgrows its cap, move code into a new module (nothing raises a ceiling).
 - After a refactor shrinks a listed file, run `node scripts/file-size-ratchet.mjs --update` to lower its ceiling (or drop it once it fits) and commit the result.
