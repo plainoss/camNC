@@ -420,11 +420,14 @@ export function TransformDialog({
   onSave,
   onCancel,
   pickDirection,
+  move,
 }: {
   document: CadDocument;
   part: CadPart;
   /** The transformed copy being changed, or none for a new one. */
   copyId?: string;
+  /** The part's own move being changed, rather than a copy. */
+  move?: boolean;
   variables?: CadValueScope;
   onSave: (document: CadDocument) => void;
   onCancel: () => void;
@@ -432,11 +435,15 @@ export function TransformDialog({
   pickDirection?: (picked: (on: CadDrawnOn['on']) => void) => void;
 }) {
   const copy = part.copies?.find(candidate => candidate.id === copyId);
+  const moved = move ? part.moved : undefined;
+  const alongNow = copy?.along ?? (moved && 'along' in moved ? moved : undefined);
+  // Copy part, as in the reference: off by default, so a transform moves the part itself.
+  const [copyPart, setCopyPart] = useState(!!copy);
   // By X, Y and Z, or by a distance along a picked plane's or face's normal, as the reference's Translate types.
-  const [kind, setKind] = useState<'xyz' | 'distance'>(copy?.along ? 'distance' : 'xyz');
-  const [direction, setDirection] = useState<CadDrawnOn['on'] | null>(copy?.along?.along ?? null);
-  const [flip, setFlip] = useState(!!copy?.along?.flip);
-  const [distanceText, setDistanceText] = useState(copy?.along ? formatCadValue(copy.along.distance) : '100');
+  const [kind, setKind] = useState<'xyz' | 'distance'>(alongNow ? 'distance' : 'xyz');
+  const [direction, setDirection] = useState<CadDrawnOn['on'] | null>(alongNow?.along ?? null);
+  const [flip, setFlip] = useState(!!alongNow?.flip);
+  const [distanceText, setDistanceText] = useState(alongNow ? formatCadValue(alongNow.distance) : '100');
   const [picking, setPicking] = useState(false);
   const pick = () => {
     if (!pickDirection) return;
@@ -447,7 +454,20 @@ export function TransformDialog({
     });
   };
   const typed = (axis: number) =>
-    copy?.offset ? (copy.offset.positionExpressions?.[axis] ?? formatCadValue(copy.offset.position[axis]!)) : '0';
+    copy?.offset
+      ? (copy.offset.positionExpressions?.[axis] ?? formatCadValue(copy.offset.position[axis]!))
+      : moved && 'by' in moved
+        ? formatCadValue(moved.by[axis]!)
+        : '0';
+  /** Moves the part itself, from where it's drawn. */
+  const saveMove = (next: NonNullable<CadPart['moved']>) => {
+    if (!part.drawnOn) return setError('Only a part drawn on a plane or a face can be moved.');
+    onSave({
+      ...document,
+      revision: document.revision + 1,
+      parts: document.parts.map(candidate => (candidate.id === part.id ? { ...candidate, moved: next } : candidate)),
+    });
+  };
   const [text, setText] = useState([typed(0), typed(1), typed(2)]);
   const [mirrored, setMirrored] = useState(!!copy?.mirrored);
   const [error, setError] = useState<string | null>(null);
@@ -457,6 +477,7 @@ export function TransformDialog({
       const distance = parseCadValue(distanceText, { unit: 'mm', variables });
       if ('error' in distance) return setError(distance.error);
       const along = { along: direction, distance: distance.value, ...(flip && { flip: true }) };
+      if (!copyPart) return saveMove(along);
       const vector = cadDirectionVector(document, along);
       if (!vector) return setError('The plane or face picked for the direction is gone. Pick another.');
       const offset = {
@@ -482,6 +503,7 @@ export function TransformDialog({
     const failed = parsed.find(result => 'error' in result);
     if (failed && 'error' in failed) return setError(failed.error);
     const values = parsed as { value: number; expression?: string }[];
+    if (!copyPart) return saveMove({ by: values.map(result => result.value) as [number, number, number] });
     const offset = {
       position: values.map(result => result.value) as [number, number, number],
       rotation: [0, 0, 0, 1] as [number, number, number, number],
@@ -512,7 +534,7 @@ export function TransformDialog({
   return (
     <FeatureDialog title={`Transform · ${part.name}`} onOk={save} onCancel={onCancel}>
       <div className="cad-feature-selection">
-        <small>Part to copy</small>
+        <small>{copyPart ? 'Part to copy' : 'Part to move'}</small>
         <span>{part.name}</span>
       </div>
       <label className="cad-number-field">
@@ -569,10 +591,18 @@ export function TransformDialog({
             mm
           </label>
         ))}
-      <label>
-        <input type="checkbox" checked={mirrored} onChange={event => setMirrored(event.target.checked)} />
-        Mirror image
-      </label>
+      {!copy && !move && (
+        <label>
+          <input type="checkbox" checked={copyPart} onChange={event => setCopyPart(event.target.checked)} />
+          Copy part
+        </label>
+      )}
+      {copyPart && (
+        <label>
+          <input type="checkbox" checked={mirrored} onChange={event => setMirrored(event.target.checked)} />
+          Mirror image
+        </label>
+      )}
       {error && (
         <p role="alert" className="cad-thickness-error">
           {error}

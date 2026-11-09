@@ -404,11 +404,43 @@ it('keeps steps already set when a cut’s sketch view is cancelled', async () =
   expect(latest().parts[0]!.thickness).toBe(24);
 });
 
+it('moves a part with a transform when Copy part is off, as the reference does by default, and edits the move from its step', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  source.parts[0]!.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  expect(within(dialog).getByRole('checkbox', { name: 'Copy part' })).toHaveProperty('checked', false);
+  const z = within(dialog).getAllByRole('textbox')[2]!;
+  await userEvent.clear(z);
+  await userEvent.type(z, '40');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.moved).toEqual({ by: [0, 0, 40] }));
+  expect(latest().parts[0]!.copies).toBeUndefined();
+  // It's a step of its own, opened again to change.
+  const features = screen.getByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate/ }));
+  const again = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  expect(within(again).queryByRole('checkbox', { name: 'Copy part' })).toBeNull();
+  expect(within(again).getAllByRole('textbox')[2]).toHaveProperty('value', '40');
+});
+
 it('copies a part with a transform, and edits the copy from its feature', async () => {
   const { latest } = await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
   let dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
+  // A transform moves the part unless Copy part is on, as in the reference.
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   const x = within(dialog).getAllByRole('textbox')[0]!;
   await userEvent.clear(x);
   await userEvent.type(x, '250');
@@ -652,6 +684,7 @@ it('copies a part by a distance along a plane picked for the direction, as the r
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'distance');
   // The Direction box waits for a plane or face; one from the feature list fills it.
   await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));

@@ -532,7 +532,7 @@ export function CadEditor({
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // A part being copied by a transform, or the transformed copy being changed.
-  const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string } | null>(null);
+  const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string; move?: boolean } | null>(null);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
@@ -3566,6 +3566,7 @@ export function CadEditor({
     // In the studio a step opens its dialog, and a sketch opens to be drawn on, as the reference does.
     if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
     if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
+    if (studioSession && step.kind === 'move') return openTransform(step.partId, undefined, true);
     if (studioSession && step.kind === 'copy') {
       const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
       if (copy?.offset) return openTransform(step.partId, copy.id);
@@ -3626,6 +3627,14 @@ export function CadEditor({
     if (action === 'rollTo') return setRolledTo(designSteps(current).at(-1)?.id === step.id ? null : step.id);
     if (action !== 'delete') return;
     setFeatureDialog(null);
+    if (step.kind === 'move')
+      return commit(
+        replacePart(current, step.partId, p => {
+          const next = { ...p };
+          delete next.moved;
+          return next;
+        })
+      );
     if (step.kind === 'sketch' || step.kind === 'extrude') {
       // A part is its sketch pushed out, so deleting either deletes the part.
       const parts = current.parts.filter(candidate => candidate.id !== step.partId);
@@ -3635,14 +3644,14 @@ export function CadEditor({
     else if (step.kind === 'partCut' && step.partCutId) commit(removePartCut(current, step.partCutId));
     else if (step.kind === 'cut' && step.cutId) commit(removeCadFeature(current, step.partId, step.cutId));
   };
-  const openTransform = (partId: string, copyId?: string) => {
+  const openTransform = (partId: string, copyId?: string, move?: boolean) => {
     setFeatureDialog(null);
     setPartCutting(null);
     setVariableDialog(null);
     setChoosingFace(false);
     setPartId(partId);
     setShowWorkspace(true);
-    setTransformDialog({ partId, ...(copyId && { copyId }) });
+    setTransformDialog({ partId, ...(copyId && { copyId }), ...(move && { move }) });
   };
   /** Starts a new part drawn on a base plane or a part's face, and opens its sketch. */
   const newPartOn = (on: CadDrawnOn['on']) => {
@@ -4353,6 +4362,7 @@ export function CadEditor({
                   document={doc}
                   part={target}
                   copyId={transformDialog.copyId}
+                  move={transformDialog.move}
                   variables={variableScope}
                   onSave={next => {
                     commit(next);

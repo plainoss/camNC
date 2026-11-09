@@ -1,3 +1,4 @@
+import { cadDirectionVector } from './directions';
 import { cadThinLine, evaluateCadPart, pointInPolygon } from './geometry';
 import { CAD_IDENTITY_PLACEMENT, placePoint, rotateVector, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadDrawnOn, CadPart, CadPlacement, CadPoint, EvaluatedCadPart } from './types';
@@ -158,6 +159,10 @@ export function resolveDrawnPlacements(
         rotation: rotationOf(frame),
       };
     }
+    // A transform without copying moves the part from where it's drawn.
+    const move = part.moved;
+    const moved = move && ('by' in move ? move.by : cadDirectionVector(document, move)?.map(value => value * move.distance));
+    if (moved) placement = { ...placement, position: placement.position.map((value, axis) => tidy(value + moved[axis]!)) as Vec3 };
     placed.set(part.id, placement);
     return placement;
   };
