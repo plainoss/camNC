@@ -225,6 +225,7 @@ import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintL
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
 import { FeatureDialog } from './FeatureDialog';
+import { offerFinalPreview } from './finalPreview';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
@@ -633,7 +634,19 @@ export function CadEditor({
           ? `${featureDialog.partId}:extrude`
           : (doc.parts.find(candidate => candidate.id === featureDialog.partId)?.pattern?.id ?? null)
         : (partCutting?.id ?? (rolledTo && designSteps(doc).some(step => step.id === rolledTo) ? rolledTo : null));
-  const shownDocument = useMemo(() => (rollbackStep ? rolledBackTo(doc, rollbackStep) : doc), [doc, rollbackStep]);
+  // Final shows the whole design while a step before the last is edited; it's off again for the next one.
+  const [showFinal, setShowFinal] = useState(false);
+  const editingStep = studioSession && showWorkspace && (featureDialog || partCutting) ? rollbackStep : null;
+  const offersFinal = !!editingStep && designSteps(doc).at(-1)?.id !== editingStep;
+  useEffect(() => setShowFinal(false), [editingStep]);
+  useEffect(() => {
+    offerFinalPreview(offersFinal ? { shown: showFinal, toggle: () => setShowFinal(shown => !shown) } : null);
+    return () => offerFinalPreview(null);
+  }, [offersFinal, showFinal]);
+  const shownDocument = useMemo(
+    () => (rollbackStep && !(offersFinal && showFinal && rollbackStep === editingStep) ? rolledBackTo(doc, rollbackStep) : doc),
+    [doc, rollbackStep, offersFinal, showFinal, editingStep]
+  );
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
   const finishing = useRef(false);
