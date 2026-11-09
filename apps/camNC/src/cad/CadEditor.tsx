@@ -504,17 +504,9 @@ export function CadEditor({
   // When a step's dialog closes, the view has the keyboard again, so its shortcuts work straight away.
   const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || transformDialog || partCutting);
   const dialogWasOpen = useRef(false);
-  useLayoutEffect(() => {
-    const closed = dialogWasOpen.current && !stepDialogOpen;
-    dialogWasOpen.current = stepDialogOpen;
-    if (!closed || !studioSession || !showWorkspace) return;
-    viewWantsKeyboard.current = true;
-    // The dialog has left the DOM. A background page may not receive another animation frame.
-    focusViewIfIdle();
-  }, [stepDialogOpen, studioSession, showWorkspace]);
   // A view still solving is inert: it takes the keyboard once it's done, unless something else has it by then.
   const viewWantsKeyboard = useRef(false);
-  const focusViewIfIdle = () => {
+  const focusViewIfIdle = useCallback(() => {
     const active = root.current?.ownerDocument.activeElement;
     if (!viewWantsKeyboard.current || (active && active !== root.current?.ownerDocument.body && active.isConnected)) {
       viewWantsKeyboard.current = false;
@@ -522,9 +514,17 @@ export function CadEditor({
     }
     const view = root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]');
     if (!view || view.closest('[inert]')) return;
-    viewWantsKeyboard.current = false;
     view.focus();
-  };
+    viewWantsKeyboard.current = view.ownerDocument.activeElement !== view;
+  }, []);
+  useLayoutEffect(() => {
+    const closed = dialogWasOpen.current && !stepDialogOpen;
+    dialogWasOpen.current = stepDialogOpen;
+    if (!closed || !studioSession || !showWorkspace) return;
+    viewWantsKeyboard.current = true;
+    // The dialog has left the DOM. A background page may not receive another animation frame.
+    focusViewIfIdle();
+  }, [stepDialogOpen, studioSession, showWorkspace, focusViewIfIdle]);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
@@ -659,7 +659,7 @@ export function CadEditor({
       if (field?.isConnected && (!active || active === field.ownerDocument.body)) field.focus();
       else focusViewIfIdle();
     }
-  }, [busy]);
+  }, [busy, focusViewIfIdle]);
   const restoreCanvasKeyboard = () => {
     const restore = () => {
       const canvas = svg.current,
@@ -4691,6 +4691,7 @@ export function CadEditor({
           {showWorkspace && (
             <Suspense fallback={<div className="cad-part-view" />}>
               <WorkspaceView
+                onReady={focusViewIfIdle}
                 document={shownDocument}
                 viewRequest={viewRequest}
                 onViewRequest={

@@ -7,6 +7,17 @@ import { endCadSession } from './session';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
+const workspace = vi.hoisted(() => ({ wait: null as Promise<void> | null }));
+vi.mock('./WorkspaceView', async original => {
+  const actual = await original<typeof import('./WorkspaceView')>();
+  return {
+    ...actual,
+    default: (props: Parameters<typeof actual.default>[0]) => {
+      if (workspace.wait) throw workspace.wait;
+      return <actual.default {...props} />;
+    },
+  };
+});
 
 const sessions: string[] = [];
 afterEach(() => {
@@ -82,5 +93,35 @@ it('returns the keyboard to the view after accepting a dialog while animation fr
     await waitFor(() => expect(vi.mocked(ModelViewport).mock.calls.at(-1)![0].planes).toBeUndefined());
   } finally {
     frame.mockRestore();
+  }
+});
+
+it('keeps the keyboard request when Enter accepts a dialog before the lazy view has mounted', async () => {
+  let ready!: () => void;
+  workspace.wait = new Promise<void>(resolve => {
+    ready = resolve;
+  });
+  try {
+    const { latest } = await studio();
+    const features = await screen.findByRole('region', { name: 'Features' });
+    await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+    const dialog = await screen.findByRole('dialog', { name: /^Extrude/ });
+    const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
+    await userEvent.clear(thickness);
+    await userEvent.type(thickness, '40{Enter}');
+    await waitFor(() => expect(latest().parts[0]!.thickness).toBe(40));
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Extrude/ })).toBeNull());
+    expect(screen.queryByTestId('workspace-3d')).toBeNull();
+    // Resolving a lazy child does not render the editor again or change its busy state.
+    workspace.wait = null;
+    ready();
+    const view = await screen.findByTestId('workspace-3d');
+    await waitFor(() => expect(document.activeElement).toBe(view));
+    await userEvent.keyboard('p');
+    await waitFor(() => expect(vi.mocked(ModelViewport).mock.calls.at(-1)![0].planes).toBeUndefined());
+  } finally {
+    workspace.wait = null;
+    ready();
   }
 });
