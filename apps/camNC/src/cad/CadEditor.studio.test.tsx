@@ -96,6 +96,19 @@ it('deletes a feature with the Delete key, as the reference does, and undo bring
   await waitFor(() => expect(latest().parts).toHaveLength(1));
 });
 
+it('routes cube requests through the studio sequence', async () => {
+  await studio();
+  const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().onViewRequest).toBeDefined());
+  props().onViewRequest!({ name: 'top' });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'top', seq: 1 }));
+  props().onViewRequest!({ name: 'iso', direction: [1, -1, 0] });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'iso', direction: [1, -1, 0], seq: 2 }));
+  fireEvent.keyDown(workspace, { key: 'f', code: 'KeyF' });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'fit', seq: 3 }));
+});
+
 it('leaves viewport shortcuts alone while typing in fields or using modifiers', async () => {
   await studio();
   const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
@@ -127,6 +140,27 @@ async function visibilityStudio() {
   await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate', 'Plate 2', 'Shelf']));
   return { workspace, panel, props };
 }
+
+it('toggles transparency for the selection or hovered instance and clears it with show all', async () => {
+  const { workspace, props } = await visibilityStudio();
+  const selected = props().instanceIds![0]!;
+  const copy = props().instanceIds![1]!;
+  const toggle = (repeat = false) => fireEvent.keyDown(workspace, { key: 'T', code: 'KeyT', shiftKey: true, repeat });
+  toggle();
+  await waitFor(() => expect(props().transparentIds).toEqual(new Set([selected])));
+  toggle(true);
+  expect(props().transparentIds).toEqual(new Set([selected]));
+  toggle();
+  await waitFor(() => expect(props().transparentIds?.size).toBe(0));
+  props().onHover?.(props().meshes[1]!.partId, 1);
+  toggle();
+  await waitFor(() => expect(props().transparentIds).toEqual(new Set([copy])));
+  props().onHover?.(null);
+  toggle();
+  await waitFor(() => expect(props().transparentIds).toEqual(new Set([copy, selected])));
+  fireEvent.keyDown(workspace, { key: 'Y', code: 'KeyY', shiftKey: true });
+  await waitFor(() => expect(props().transparentIds?.size).toBe(0));
+});
 
 it('hides the selected part with Y and shows all parts with Shift+Y', async () => {
   const { workspace, panel, props } = await visibilityStudio();

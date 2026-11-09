@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
+import { ViewCube } from './ViewCube';
 import { modelGeometry } from './modelGeometry';
 import { snapToFace } from './faceSnap';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
@@ -13,7 +14,7 @@ export type ModelView = 'assembled' | 'exploded' | 'flat';
 export interface ViewRequest {
   name: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'fit' | 'normal';
   seq: number;
-  /** For `normal`: the way the camera looks from, out of a plane or face, and which way is up on it. */
+  /** For `normal`: the way the camera looks from, out of a plane or face, and which way is up on it. For a cube edge or corner: the way it looks from, with Z up. */
   direction?: [number, number, number];
   up?: [number, number, number];
 }
@@ -184,7 +185,14 @@ function Body({
         // A drag that ended here was an orbit, not a click.
         if (e.delta <= 4) onSelect(e);
       }}>
-      <meshStandardMaterial vertexColors color={color} roughness={0.8} transparent={opacity < 1} opacity={opacity} />
+      <meshStandardMaterial
+        vertexColors
+        color={color}
+        roughness={0.8}
+        transparent={opacity < 1}
+        opacity={opacity}
+        depthWrite={opacity >= 1}
+      />
     </mesh>
   );
 }
@@ -221,11 +229,14 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
     const direction =
       name === 'fit'
         ? camera.getWorldDirection(new THREE.Vector3()).negate()
-        : name === 'normal'
+        : name === 'normal' || viewRequest?.direction
           ? new THREE.Vector3(...(viewRequest?.direction ?? [0, 0, 1])).normalize()
           : new THREE.Vector3(...kViewDirections[name]).normalize();
     if (name === 'normal') camera.up.set(...(viewRequest?.up ?? [0, 1, 0]));
-    else if (name !== 'fit') camera.up.set(0, name === 'top' || name === 'bottom' ? 1 : 0, name === 'top' || name === 'bottom' ? 0 : 1);
+    else if (name !== 'fit') {
+      const vertical = Math.abs(direction.z) > 1 - 1e-10;
+      camera.up.set(0, vertical ? 1 : 0, vertical ? 0 : 1);
+    }
     if (viewRequest) {
       // Fit every corner in the requested camera frame, including its depth toward the camera.
       const right = new THREE.Vector3().crossVectors(camera.up, direction).normalize();
@@ -331,6 +342,9 @@ export function ModelViewport({
   onHover,
   sketchView,
   viewRequest,
+  onViewRequest,
+  transparentIds,
+  instanceIds,
   planes = [],
   onPickPlane,
   sketchLines = kNoLines,
@@ -358,6 +372,11 @@ export function ModelViewport({
   /** Looks straight at a sketch's plane, following its drawing, in place of the orbiting camera. */
   sketchView?: SketchView;
   viewRequest?: ViewRequest;
+  /** Supplied by the studio, which owns all camera requests. */
+  onViewRequest?: (request: Omit<ViewRequest, 'seq'>) => void;
+  transparentIds?: ReadonlySet<string>;
+  /** Instance keys distinguish copies that share a part ID. */
+  instanceIds?: string[];
   /** Planes to show as designed, such as the base planes a sketch can be drawn on. */
   planes?: ViewPlane[];
   onPickPlane?: (id: string) => void;
@@ -463,7 +482,7 @@ export function ModelViewport({
                       ? kStudioPart
                       : kWood
             }
-            opacity={milled(m.partId) ? 1 : 0.35}
+            opacity={transparentIds?.has(instanceIds?.[i] ?? m.partId) ? 0.3 : milled(m.partId) ? 1 : 0.35}
             onSelect={e => pick(m, i, matrices[i]!, e)}
             onHover={hovered => onHover?.(hovered ? m.partId : null, hovered ? i : undefined)}
           />
@@ -487,6 +506,7 @@ export function ModelViewport({
       {shownPlanes.map(plane => (
         <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
       ))}
+      {!sketchView && onViewRequest && <ViewCube onViewRequest={onViewRequest} />}
       {!sketchView && <OrbitControls makeDefault dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />}
     </Canvas>
   );

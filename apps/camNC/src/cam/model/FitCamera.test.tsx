@@ -121,3 +121,24 @@ it('drops an orbit still easing out when a view is asked for', async () => {
   for (let frame = 0; frame < 20; frame++) await new Promise(resolve => requestAnimationFrame(resolve));
   expect(seen!.getWorldDirection(new THREE.Vector3()).distanceTo(new THREE.Vector3(0, 0, -1))).toBeLessThan(1e-6);
 });
+
+it.each([
+  [
+    [1, -1, 0],
+    [0, 0, 1],
+  ],
+  [
+    [0, 0, 1],
+    [0, 1, 0],
+  ],
+] as const)('uses an explicit camera offset %s with the appropriate up vector', async (offset, up) => {
+  const view = render(<View size={100} fitKey="assembled" viewRequest={{ name: 'front', direction: [...offset], seq: 1 }} />);
+  await waitFor(() => expect(controls?.target.toArray()).toEqual([50, 50, 50]));
+  const direction = seen!.position.clone().sub(controls!.target).normalize();
+  expect(direction.distanceTo(new THREE.Vector3(...offset).normalize())).toBeLessThan(1e-5);
+  expect(seen!.up.toArray()).toEqual(up);
+  const position = seen!.position.clone();
+  view.rerender(<View size={100} fitKey="assembled" viewRequest={{ name: 'front', direction: [-1, 1, 0], seq: 1 }} />);
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  expect(seen!.position.distanceTo(position)).toBeLessThan(1e-10);
+});
