@@ -287,7 +287,7 @@ export function FeatureList({
               items[(at + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
             }
           }}>
-          {menuItems(menu.entry, rollbackAt >= 0 && entries.indexOf(menu.entry) > rollbackAt).map(item => (
+          {menuItems(menu.entry, rollbackAt >= 0 && entries.findIndex(entry => key(entry) === key(menu.entry)) > rollbackAt).map(item => (
             <button
               key={item.action}
               type="button"

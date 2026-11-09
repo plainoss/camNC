@@ -732,6 +732,10 @@ it('suppresses an extrude from the feature list, and rolls the design back with 
         .closest('li')!.className
     ).toMatch(/cad-feature-rolled-back/)
   );
+  // A greyed step's menu offers Roll to end, found by the step itself even after the list re-renders.
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  expect(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Roll to end' })).toBeDefined();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
   // The bar steps down with the arrow keys, back to the end.
   const bar = within(features).getByRole('separator', { name: 'Shown up to here' });
   bar.focus();
