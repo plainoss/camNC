@@ -36,6 +36,16 @@ A scenario with a `flaky` field (the issue that tracks it) is quarantined: it st
 `FLAKY` and doesn't fail the run. Use it only for a race that blocks other PRs while its issue is open, and remove
 the field with the fix.
 
+## Settling
+
+Every step waits for the app to settle before the runner or a session reads or checks anything. The app's dev and test
+builds report what is still pending through `window.__camncSettled()` (`src/lib/settled.ts`): sketch solver calls, CAM
+worker calls, IndexedDB and draft saves, a loading route, fetching queries, and a frame not yet drawn since the last
+input or change. `settle.mjs` waits until all of these are zero on two frames in a row with the same document revision,
+so a step never needs its own pause or readiness wait. A step still busy after 90 s fails, naming what is pending, for
+example `The app did not settle within 90 s: still pending: worker 1`. Work the signal can't see (the 3D view drawing a
+new camera, the simulated machine) still has its own wait in the adapter.
+
 ## Without a browser
 
 `headless.test.mjs` runs the sketch scenarios that need no page against the editor's own drawing code in Node, through
@@ -189,4 +199,4 @@ picture can pin down. Don't capture a golden from behaviour known to be wrong.
 such as extrude, pockets, mirrored parts, patterns and assemblies get their own folder
 and adapter, reusing this runner, its step grammar and its result rules. A new domain
 adds its own steps and canonical state (for example bodies, faces, mates) through its
-adapter's `step` and `check` functions.
+adapter's `step` and `check` functions. Its steps settle through `settle.mjs` like the sketch adapter's.

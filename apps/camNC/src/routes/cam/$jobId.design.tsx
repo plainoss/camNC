@@ -19,6 +19,7 @@ import { CamPage } from '@/cam/CamPage';
 import { CamJobBar, type CamStageDestination } from '@/cam/CamJobBar';
 import { camKeys, useCamJob } from '@/cam/camQueries';
 import { acceptDesign, saveDesignDraft } from '@/cam/cadDesign';
+import { noteDocumentChange, trackPending } from '@/lib/settled';
 import {
   acknowledgePendingDesignDraft,
   discardPendingDesignDraft,
@@ -126,26 +127,30 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     if (recoveryInProgress.current || activeSession.current !== session) return;
     if (!keepPendingDesignDraft(initialJob.id, session.saved, document))
       setError('Reload recovery is unavailable. Wait for Draft saved before reloading.');
+    noteDocumentChange();
     setStatus('Saving draft…');
-    queue.current = queue.current
-      .then(async () => {
-        if (activeSession.current !== session) return;
-        const source = JSON.stringify(persisted.current.design!.draft);
-        if (source !== JSON.stringify(document) || source !== JSON.stringify(session.saved))
-          show(await saveDesignDraft(persisted.current, document, session.saved));
-        else acknowledgePendingDesignDraft(initialJob.id, document);
-        failure.current = null;
-        setError(null);
-        setStatus('Draft saved');
-      })
-      .catch((cause: unknown) => {
-        if (activeSession.current !== session) return;
-        const problem = cause instanceof Error ? cause : new Error(String(cause));
-        if (problem.name === 'CadDraftConflict') setConflicted(true);
-        failure.current = problem;
-        setError(problem.message);
-        setStatus('Draft could not be saved');
-      });
+    queue.current = trackPending(
+      'save',
+      queue.current
+        .then(async () => {
+          if (activeSession.current !== session) return;
+          const source = JSON.stringify(persisted.current.design!.draft);
+          if (source !== JSON.stringify(document) || source !== JSON.stringify(session.saved))
+            show(await saveDesignDraft(persisted.current, document, session.saved));
+          else acknowledgePendingDesignDraft(initialJob.id, document);
+          failure.current = null;
+          setError(null);
+          setStatus('Draft saved');
+        })
+        .catch((cause: unknown) => {
+          if (activeSession.current !== session) return;
+          const problem = cause instanceof Error ? cause : new Error(String(cause));
+          if (problem.name === 'CadDraftConflict') setConflicted(true);
+          failure.current = problem;
+          setError(problem.message);
+          setStatus('Draft could not be saved');
+        })
+    );
   };
   useEffect(() => {
     if (recovery && !recovery.conflict) draft(recovery.document);
