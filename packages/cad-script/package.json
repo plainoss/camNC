@@ -10,7 +10,7 @@
     "check": "vite-node --config vite.config.ts src/cli.ts",
     "mcp": "vite-node --config vite.config.ts src/mcpMain.ts",
     "test": "vitest",
-    "check-types": "tsgo --noEmit"
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
