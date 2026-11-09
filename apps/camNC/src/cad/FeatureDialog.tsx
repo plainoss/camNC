@@ -10,6 +10,7 @@ export function FeatureDialog({
   title,
   okLabel = 'OK',
   okDisabled,
+  okReason,
   onOk,
   onCancel,
   autoFocus = true,
@@ -19,6 +20,8 @@ export function FeatureDialog({
   title: string;
   okLabel?: string;
   okDisabled?: boolean;
+  /** Why OK can't be used yet, shown on it while it's disabled. */
+  okReason?: string | null;
   onOk: () => void;
   onCancel: () => void;
   /** Puts the keyboard in its first field on opening. A sketch's dialog leaves it on the drawing. */
@@ -70,7 +73,14 @@ export function FeatureDialog({
       }}>
       <div className="cad-feature-dialog-head">
         <h3>{title}</h3>
-        <button type="button" className="cad-feature-ok" aria-label={okLabel} title={okLabel} disabled={okDisabled} onClick={ok}>
+        <button
+          type="button"
+          className="cad-feature-ok"
+          aria-label={okLabel}
+          title={(okDisabled && okReason) || okLabel}
+          aria-description={(okDisabled && okReason) || undefined}
+          disabled={okDisabled}
+          onClick={ok}>
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M3 8.5 6.5 12 13 4.5" />
           </svg>
