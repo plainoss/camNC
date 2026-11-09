@@ -10,9 +10,12 @@ it('lays a finished sketch’s curves on its plane, and leaves out parts already
   const document: CadDocument = { ...createCadDocument(), parts: [part, sketch] };
   // The front plane runs along x and up z.
   expect(sketchLinesInModel(document)).toEqual([
-    [
-      [0, 0, 100],
-      [400, 0, 100],
-    ],
+    {
+      partId: sketch.id,
+      points: [
+        [0, 0, 100],
+        [400, 0, 100],
+      ],
+    },
   ]);
 });

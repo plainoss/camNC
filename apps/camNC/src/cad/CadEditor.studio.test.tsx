@@ -66,6 +66,36 @@ it('toggles base planes and requests named views and fit from workspace shortcut
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
 });
 
+it('looks straight at the selected part’s sketch plane with N, and from behind with N again, and colours parts as the reference does', async () => {
+  await studio();
+  const workspace = await screen.findByTestId('workspace-3d');
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().palette).toBe('studio'));
+  // Overlaps aren't coloured in the studio.
+  expect(props().warnIds).toBeUndefined();
+  fireEvent.keyDown(workspace, { key: 'n', code: 'KeyN' });
+  await waitFor(() => expect(props().viewRequest).toMatchObject({ name: 'normal', direction: [0, 0, 1], up: [0, 1, 0] }));
+  fireEvent.keyDown(workspace, { key: 'n', code: 'KeyN' });
+  await waitFor(() => expect(props().viewRequest).toMatchObject({ name: 'normal', direction: [-0, -0, -1] }));
+  // Hovering a feature row highlights its part.
+  const features = screen.getByRole('region', { name: 'Features' });
+  fireEvent.pointerEnter(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  await waitFor(() => expect(props().highlightIds).toHaveLength(1));
+  fireEvent.pointerLeave(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  await waitFor(() => expect(props().highlightIds).toBeUndefined());
+});
+
+it('deletes a feature with the Delete key, as the reference does, and undo brings it back', async () => {
+  const { latest } = await studio();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  const row = within(features).getByRole('button', { name: /Extrude · Plate/ });
+  row.focus();
+  await userEvent.keyboard('{Delete}');
+  await waitFor(() => expect(latest().parts).toHaveLength(0));
+  await userEvent.keyboard('{Control>}z{/Control}');
+  await waitFor(() => expect(latest().parts).toHaveLength(1));
+});
+
 it('leaves viewport shortcuts alone while typing in fields or using modifiers', async () => {
   await studio();
   const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
@@ -608,7 +638,9 @@ it('finishes a sketch as a sketch, and extrudes a one-line sketch as a thin boar
   await userEvent.clear(depth);
   await userEvent.type(depth, '380{Enter}');
   await waitFor(() => expect(latest().parts[1]!.thin).toEqual({ depth: 380, midPlane: true }));
-  // Enter in a field keeps the step, as the tick does.
+  // Enter applies the field and keeps the dialog open, as in the reference; Enter again keeps the step, as the tick does.
+  expect(screen.getByRole('dialog', { name: 'Extrude · Back' })).toBeDefined();
+  await userEvent.keyboard('{Enter}');
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Back' })).toBeNull());
   // Solid takes it back to a face pushed out by its thickness.
   await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Back/ }));

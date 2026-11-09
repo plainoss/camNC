@@ -125,3 +125,7 @@
   outline: 2px solid #2f80ed;
   outline-offset: 1px;
 }
+/** The list holds the keyboard after a row is deleted, without a ring around it. */
+.cad-studio-features:focus {
+  outline: none;
+}
