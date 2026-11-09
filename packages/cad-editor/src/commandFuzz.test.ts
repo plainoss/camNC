@@ -51,6 +51,8 @@ it.each(fuzzSeeds([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))(
       id = original.id;
       endCadSession(id);
       const session = cadSession(original);
+      // The session keeps the last 100 undo steps; once it drops older ones, undo all stops at the oldest one kept.
+      let historyTrimmed = false;
       for (let i = 0; i < STEPS; i++) {
         const roll = random.next();
         if (roll < 0.1) {
@@ -77,13 +79,15 @@ it.each(fuzzSeeds([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))(
         const solved = await solveCadDocument(outcome.document);
         const next = commitCadSession(session, solved.status === 'solved' ? solved.document : outcome.document);
         expectLoads(next);
+        historyTrimmed ||= session.past.length >= 100;
       }
       // A trailing Undo leaves later edits to redo; the newest edit is the far end of the history.
       while (session.future.length) redoCadSession(session);
       const edited = content(session.document);
+      const start = historyTrimmed ? content(session.past[0]!) : content(original);
       steps.push('undo all');
       while (session.past.length) undoCadSession(session);
-      expect(content(session.document), 'Undo all the way returns the opened design').toBe(content(original));
+      expect(content(session.document), 'Undo all the way returns the opened design, or the oldest step kept').toBe(start);
       steps.push('redo all');
       while (session.future.length) redoCadSession(session);
       expect(content(session.document), 'Redo all the way returns the edited design').toBe(edited);
