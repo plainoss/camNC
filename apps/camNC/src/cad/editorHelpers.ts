@@ -1,6 +1,15 @@
+import type { CadSnapResult } from './picking';
 import { entityPointIds as curvePointIds, evaluateCadPart, type CadDocument, type CadEntity, type CadPart } from '@wbcnc/cad';
 
 // Small helpers of the sketch editor, kept apart so the editor itself stays readable.
+
+export const snapLabels: Record<CadSnapResult['kind'], string> = {
+  endpoint: 'Endpoint',
+  center: 'Center',
+  point: 'Point',
+  midpoint: 'Midpoint',
+  pointOnCurve: 'On curve',
+};
 
 export const editable = (target: EventTarget | null) =>
   target instanceof HTMLElement && !!target.closest('input:not([type="checkbox"]),textarea,select,[contenteditable]');

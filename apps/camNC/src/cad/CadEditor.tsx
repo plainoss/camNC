@@ -225,11 +225,12 @@ import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
 import { FeatureDialog } from './FeatureDialog';
 import { PartsList } from './PartsList';
+import { usePointPicker } from './pointPicker';
 import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { editable, hasOutline, isBlank, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { editable, hasOutline, isBlank, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
 import { offerFinalPreview } from './finalPreview';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
@@ -253,13 +254,6 @@ type NumericConstraint = Extract<CadConstraint, { value: number }>;
 type Tool = SketchTool;
 type DimensionMode = CadDimensionMode;
 type ConstraintTool = ConstraintCommandTool;
-const snapLabels: Record<CadSnapResult['kind'], string> = {
-  endpoint: 'Endpoint',
-  center: 'Center',
-  point: 'Point',
-  midpoint: 'Midpoint',
-  pointOnCurve: 'On curve',
-};
 type View = { x: number; y: number; w: number; h: number };
 const initialView: View = { x: -35, y: -175, w: 300, h: 210 };
 const rounded = (n: number) => Math.round(n * 100) / 100;
@@ -452,6 +446,7 @@ export function CadEditor({
   const [selectedPlane, setSelectedPlane] = useState<string | null>(null);
   // A dialog waiting for a plane or face to be picked for a direction, as the Transform dialog's Direction box.
   const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on'], datum?: string) => void) | null>(null);
+  const pointPicker = usePointPicker();
   // Where the rollback bar was moved to in the feature list: the step it sits after. Null is the end.
   const [rolledTo, setRolledTo] = useState<string | null>(null);
   // The part whose row is hovered in the feature list, highlighted in the view as the reference does.
@@ -4455,6 +4450,7 @@ export function CadEditor({
                     setTransformDialog(null);
                   }}
                   pickDirection={picked => setDirectionPicker(() => picked)}
+                  pickPoint={pointPicker.start}
                 />
               ) : null;
             })()}
@@ -4683,6 +4679,7 @@ export function CadEditor({
                 }
                 regions={extrudeRegions}
                 onPickRegion={extrudeRegions.length ? pickRegion : undefined}
+                onPickPoint={pointPicker.onPick}
                 onSelectFace={on => {
                   if (directionPicker && on) {
                     directionPicker(on);
