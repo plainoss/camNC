@@ -17,7 +17,7 @@ import {
 } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
 import { acceptDesign, boardGeometryKey, hasDesignDraft, saveDesignDraft } from './cadDesign';
-import { createDesignJob, getJob, getModelBytes, modelKey, saveJob } from './jobDb';
+import { createDesignJob, getJob, getModelBytes, kUndersideUpSince, modelKey, normalizeJob, saveJob } from './jobDb';
 import { newBoard } from './boards';
 import { camWorker } from './camQueries';
 import { designGeometryKey } from './designGeometry';
@@ -208,21 +208,44 @@ describe('native design revisions', () => {
       expect(model.parts[0]!.summary.needsFlip).toBe(false);
     });
 
+    it('reads a job saved before the orientation was recorded the way up it was saved', async () => {
+      const first = await plateJob();
+      const document = rabbetBelow(first.design!.draft);
+      const accepted = await acceptDesign(await saveDesignDraft(first, document), document);
+      const design = { ...accepted.design! };
+      delete design.turnsUndersideUp;
+      const unrecorded = (updatedAt: number) => normalizeJob({ ...accepted, design, updatedAt });
+      // Saved before parts turned over: as designed. Saved since: turned over, as it was then.
+      expect(unrecorded(kUndersideUpSince - 1).design!.turnsUndersideUp).toBe(false);
+      expect(unrecorded(kUndersideUpSince).design!.turnsUndersideUp).toBe(true);
+      expect(modelKey(unrecorded(kUndersideUpSince - 1))).not.toBe(modelKey(unrecorded(kUndersideUpSince)));
+      // Once read, it's saved with the job, so a later save doesn't change it.
+      const resaved = await saveJob(unrecorded(kUndersideUpSince - 1), accepted);
+      expect(resaved.updatedAt).toBeGreaterThan(kUndersideUpSince);
+      expect((await getJob(resaved.id))!.design!.turnsUndersideUp).toBe(false);
+      // A design not yet accepted has nothing to settle.
+      const draftOnly = await createDesignJob('Draft');
+      expect(normalizeJob({ ...draftOnly, updatedAt: 0 }).design!.turnsUndersideUp).toBeUndefined();
+    });
+
     it('keeps an earlier job’s cut sheet the way up it was cut, until accepted again', async () => {
       const first = await plateJob();
       const document = rabbetBelow(first.design!.draft);
       const accepted = await acceptDesign(await saveDesignDraft(first, document), document);
       const partId = document.parts[0]!.id;
-      // As a job accepted before parts were turned over saved it: keyed as designed, without the flag.
-      const design = { ...accepted.design! };
-      delete design.turnsUndersideUp;
+      // As a job accepted before parts were turned over saved it: keyed as designed, not turned over.
       const earlier = await saveJob(
         {
           ...accepted,
-          design: { ...design, partGeometryKeys: { [partId]: await designGeometryKey(evaluateCadDocument(document).parts[0]!) } },
+          design: {
+            ...accepted.design!,
+            turnsUndersideUp: false,
+            partGeometryKeys: { [partId]: await designGeometryKey(evaluateCadDocument(document).parts[0]!) },
+          },
         },
         accepted
       );
+      expect((await getJob(earlier.id))!.design!.turnsUndersideUp).toBe(false);
       expect(modelKey(earlier)).not.toBe(modelKey(accepted));
       const model = await camWorker().importDesign(document, modelKey(earlier), { turnUndersideUp: false });
       expect(model.parts[0]!.summary.needsFlip).toBe(true);
