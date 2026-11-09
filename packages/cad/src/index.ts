@@ -21,6 +21,7 @@ export * from './suppression';
 export * from './extrudeSteps';
 
 export * from './dimensions';
+export * from './firstDimensionScale';
 export * from './dimensionPlacement';
 export * from './dimensionExpressions';
 export * from './valueExpressions';
