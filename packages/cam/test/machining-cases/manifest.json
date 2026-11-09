@@ -305,146 +305,6 @@
       ]
     },
     {
-      "id": "controlled-pocket-island",
-      "inputFile": "controlled-pocket-island.input.json",
-      "inputSha256": "6b3f1ce54e833520b4807a153db11b1acfeb91bea90203fa5a2113b5ca278c0b",
-      "warnings": [
-        "pocket z=3.5: 2.2mm² left in corners/narrow spots with D=3.175",
-        "2 roughing loops left for cleanup because the requested turn radius does not fit",
-        "1 controlled pocket entry locations require full-width entry; ramp feed and stepdown remain separate limits",
-        "Planar material-rate limits exclude axial removal in 40 descending moves; ramp/plunge feed and stepdown apply separately"
-      ],
-      "programs": [
-        {
-          "file": "controlled-pocket-island.nc",
-          "sha256": "37cda21a575ed9e337bd9426c0a1dfdba26c26b45952eb7fc9a5ecda394e8be8",
-          "bytes": 2121,
-          "operations": 1,
-          "passes": 2,
-          "toolNumbers": [
-            1
-          ],
-          "setup": {
-            "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-096d145a7f4826be",
-            "programName": "controlled-pocket-island",
-            "units": "mm",
-            "origin": {
-              "xy": "stock lower left",
-              "z": "stock bottom"
-            },
-            "stockSize": [
-              14,
-              12,
-              5
-            ],
-            "stockTop": 5,
-            "safeZ": 10,
-            "retractZ": 7,
-            "spindle": "hand",
-            "post": {
-              "profileId": "fluidnc",
-              "arcs": true,
-              "arcTolerance": 0.033884832772239096,
-              "spindleDwell": 3
-            },
-            "accuracy": {
-              "scope": "declared-source",
-              "budget": {
-                "total": 0.05,
-                "import": 0,
-                "offset": 0.004517977702965213,
-                "smoothing": 0.00677696655444782,
-                "fitting": 0.033884832772239096,
-                "polygonRounding": 0.002262741699796952,
-                "outputRounding": 0.0008660254037844386,
-                "controllerRounding": 0.0016914558667664816
-              }
-            },
-            "tools": [
-              {
-                "key": "[\"[\\\"analytic-bit-1\\\",1,3.175,12,2,null]\",15000]",
-                "tool": {
-                  "number": 1,
-                  "guid": "analytic-bit-1",
-                  "diameter": 3.175,
-                  "name": "synthetic flat end mill",
-                  "fluteLength": 12,
-                  "flutes": 2,
-                  "rpm": 15000
-                },
-                "rpm": 15000,
-                "maximumCutDepth": 1.5
-              }
-            ],
-            "operations": [
-              {
-                "name": "Pocket 1 z=3.5",
-                "feature": "pocket",
-                "toolKey": "[\"[\\\"analytic-bit-1\\\",1,3.175,12,2,null]\",15000]",
-                "feeds": [
-                  360,
-                  480,
-                  720
-                ],
-                "passes": 2,
-                "bounds": {
-                  "min": [
-                    3.5875000000000004,
-                    3.5875000000000004,
-                    3.5
-                  ],
-                  "max": [
-                    10.4125,
-                    7.9125000000000005,
-                    5
-                  ]
-                },
-                "roles": {
-                  "approach": 2,
-                  "ramp": 39,
-                  "finish": 140,
-                  "corner": 16
-                }
-              }
-            ],
-            "bounds": {
-              "min": [
-                3.5875000000000004,
-                3.5875000000000004,
-                3.5
-              ],
-              "max": [
-                10.4125,
-                7.9125000000000005,
-                5
-              ]
-            },
-            "warnings": [
-              "pocket z=3.5: 2.2mm² left in corners/narrow spots with D=3.175",
-              "2 roughing loops left for cleanup because the requested turn radius does not fit",
-              "1 controlled pocket entry locations require full-width entry; ramp feed and stepdown remain separate limits",
-              "Planar material-rate limits exclude axial removal in 40 descending moves; ramp/plunge feed and stepdown apply separately"
-            ],
-            "statistics": {
-              "bytes": 2121,
-              "executableBlocks": 96,
-              "motionBlocks": 88,
-              "arcBlocks": 8,
-              "cuttingLineBlocks": 72,
-              "feedChanges": 5,
-              "tinyCuttingLines": 0,
-              "tinySegmentThresholdMm": 0.1,
-              "unresolvedCuttingLines": 0,
-              "minimumCuttingLineMm": 0.49600000000000044,
-              "averageCuttingLineMm": 0.7563373203241938,
-              "maximumLineBytes": 127
-            }
-          }
-        }
-      ]
-    },
-    {
       "id": "pocket-island",
       "inputFile": "pocket-island.input.json",
       "inputSha256": "7634e14c98327f2e81434a413bac0199c175eecec4582531eccb42734d697422",
@@ -584,187 +444,15 @@
       ]
     },
     {
-      "id": "polished-profiles",
-      "inputFile": "polished-profiles.input.json",
-      "inputSha256": "a3ac683443978c0084b2c49bc8c3b03a1029a172d468cc956981b8f5dcf59d3a",
-      "warnings": [
-        "Vertical entry blend radius was reduced to fit the axial step and first segment",
-        "Vertical exit blend has no representable room on the first contour segment",
-        "Vertical exit blend radius was reduced to fit the first contour segment",
-        "Vertical exit blends are only supported inside holes; outside profiles retain their complete final contour lap"
-      ],
-      "programs": [
-        {
-          "file": "polished-profiles.nc",
-          "sha256": "b25137932831fb3236b4c87779a2b7fcc7e33087e204eaa2571e0efa05313152",
-          "bytes": 4218,
-          "operations": 2,
-          "passes": 23,
-          "toolNumbers": [
-            1
-          ],
-          "setup": {
-            "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-11bde6c02dac2054",
-            "programName": "polished-profiles",
-            "units": "mm",
-            "origin": {
-              "xy": "stock lower left",
-              "z": "stock bottom"
-            },
-            "stockSize": [
-              32,
-              22,
-              3
-            ],
-            "stockTop": 3,
-            "safeZ": 8,
-            "retractZ": 5,
-            "spindle": "hand",
-            "post": {
-              "profileId": "fluidnc",
-              "arcs": true,
-              "arcTolerance": 0.032384832772239094,
-              "spindleDwell": 3
-            },
-            "accuracy": {
-              "scope": "declared-source",
-              "budget": {
-                "total": 0.05,
-                "import": 0.002,
-                "offset": 0.004317977702965214,
-                "smoothing": 0.006476966554447819,
-                "fitting": 0.032384832772239094,
-                "polygonRounding": 0.002262741699796952,
-                "outputRounding": 0.0008660254037844386,
-                "controllerRounding": 0.0016914558667664816
-              }
-            },
-            "tools": [
-              {
-                "key": "[\"[\\\"analytic-bit-1\\\",1,3.175,12,2,null]\",15000]",
-                "tool": {
-                  "number": 1,
-                  "guid": "analytic-bit-1",
-                  "diameter": 3.175,
-                  "name": "synthetic flat end mill",
-                  "fluteLength": 12,
-                  "flutes": 2,
-                  "rpm": 15000
-                },
-                "rpm": 15000,
-                "maximumCutDepth": 3.3
-              }
-            ],
-            "operations": [
-              {
-                "name": "Polished inner wall",
-                "feature": "hole",
-                "toolKey": "[\"[\\\"analytic-bit-1\\\",1,3.175,12,2,null]\",15000]",
-                "feeds": [
-                  480,
-                  661.8379661694163,
-                  1800
-                ],
-                "passes": 12,
-                "bounds": {
-                  "min": [
-                    11.587900000000001,
-                    6.5879,
-                    -0.3
-                  ],
-                  "max": [
-                    20.412000000000003,
-                    15.412,
-                    2.1070414989618524
-                  ]
-                },
-                "roles": {
-                  "approach": 6,
-                  "lead-in": 25,
-                  "link": 6,
-                  "cut": 260,
-                  "finish": 519,
-                  "lead-out": 5
-                }
-              },
-              {
-                "name": "Polished outer wall",
-                "feature": "outline",
-                "toolKey": "[\"[\\\"analytic-bit-1\\\",1,3.175,12,2,null]\",15000]",
-                "feeds": [
-                  480,
-                  900,
-                  1800
-                ],
-                "passes": 11,
-                "bounds": {
-                  "min": [
-                    0.3125,
-                    0.3125,
-                    -0.3
-                  ],
-                  "max": [
-                    31.6875,
-                    21.6875,
-                    2.3
-                  ]
-                },
-                "roles": {
-                  "approach": 6,
-                  "lead-in": 40,
-                  "link": 5,
-                  "cut": 260,
-                  "finish": 503
-                }
-              }
-            ],
-            "bounds": {
-              "min": [
-                0.3125,
-                0.3125,
-                -0.3
-              ],
-              "max": [
-                31.6875,
-                21.6875,
-                2.3
-              ]
-            },
-            "warnings": [
-              "Vertical entry blend radius was reduced to fit the axial step and first segment",
-              "Vertical exit blend has no representable room on the first contour segment",
-              "Vertical exit blend radius was reduced to fit the first contour segment",
-              "Vertical exit blends are only supported inside holes; outside profiles retain their complete final contour lap"
-            ],
-            "statistics": {
-              "bytes": 4218,
-              "executableBlocks": 175,
-              "motionBlocks": 157,
-              "arcBlocks": 40,
-              "cuttingLineBlocks": 79,
-              "feedChanges": 24,
-              "tinyCuttingLines": 30,
-              "tinySegmentThresholdMm": 0.1,
-              "unresolvedCuttingLines": 0,
-              "minimumCuttingLineMm": 0.03258834147360068,
-              "averageCuttingLineMm": 7.459367773493441,
-              "maximumLineBytes": 120
-            }
-          }
-        }
-      ]
-    },
-    {
       "id": "profile-tab-shoulders",
       "inputFile": "profile-tab-shoulders.input.json",
-      "inputSha256": "bec87872c327d564c4eb7475cf34a48af07a87bfd113a6167c9effa48fc90132",
+      "inputSha256": "4ee51cf76328bca589faaa086c37071dd4feefca4d491db78389ba5554f77650",
       "warnings": [],
       "programs": [
         {
           "file": "profile-tab-shoulders.nc",
-          "sha256": "a9cb5922348f34b6f43e566752a84d50735380eefd6bec953e182fab49ac89f3",
-          "bytes": 4909,
+          "sha256": "93c51ca2032d9771884fb7ad11263999fa0d3e8ef9289e4110647d19e27bd42e",
+          "bytes": 4812,
           "operations": 1,
           "passes": 18,
           "toolNumbers": [
@@ -772,7 +460,7 @@
           ],
           "setup": {
             "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-82a4133ccfa44198",
+            "planFingerprint": "cam-plan-v1-3dd428ff02615af3",
             "programName": "profile-tab-shoulders",
             "units": "mm",
             "origin": {
@@ -872,7 +560,7 @@
             },
             "warnings": [],
             "statistics": {
-              "bytes": 4909,
+              "bytes": 4812,
               "executableBlocks": 229,
               "motionBlocks": 221,
               "arcBlocks": 82,
@@ -881,8 +569,8 @@
               "tinyCuttingLines": 0,
               "tinySegmentThresholdMm": 0.1,
               "unresolvedCuttingLines": 0,
-              "minimumCuttingLineMm": 1,
-              "averageCuttingLineMm": 11.151816161245033,
+              "minimumCuttingLineMm": 0.17399999999999993,
+              "averageCuttingLineMm": 11.190769582653301,
               "maximumLineBytes": 73
             }
           }
@@ -1146,140 +834,6 @@
               "minimumCuttingLineMm": 0.3099999999999987,
               "averageCuttingLineMm": 2.791010017122055,
               "maximumLineBytes": 73
-            }
-          }
-        }
-      ]
-    },
-    {
-      "id": "tangent-fallback",
-      "inputFile": "tangent-fallback.input.json",
-      "inputSha256": "a101aa17d5d5e3a66080c82e54f2bd68695ad2f11060c8cdd11dd3d6c8d203ac",
-      "warnings": [
-        "Tangent entry does not fit the cutter-centre region; using a contour ramp",
-        "Contour entry loop is too small for a ramp; using a bounded plunge"
-      ],
-      "programs": [
-        {
-          "file": "tangent-fallback.nc",
-          "sha256": "4dc8e124f34c4307ad64b30955df5eaffa519760e568c6707b3acb415e453d61",
-          "bytes": 1622,
-          "operations": 1,
-          "passes": 9,
-          "toolNumbers": [
-            1
-          ],
-          "setup": {
-            "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-5005b14bb6673d0f",
-            "programName": "tangent-fallback",
-            "units": "mm",
-            "origin": {
-              "xy": "stock lower left",
-              "z": "stock bottom"
-            },
-            "stockSize": [
-              14,
-              14,
-              3
-            ],
-            "stockTop": 3,
-            "safeZ": 8,
-            "retractZ": 5,
-            "spindle": "hand",
-            "post": {
-              "profileId": "fluidnc",
-              "arcs": true,
-              "arcTolerance": 0.032384832772239094,
-              "spindleDwell": 3
-            },
-            "accuracy": {
-              "scope": "declared-source",
-              "budget": {
-                "total": 0.05,
-                "import": 0.002,
-                "offset": 0.004317977702965214,
-                "smoothing": 0.006476966554447819,
-                "fitting": 0.032384832772239094,
-                "polygonRounding": 0.002262741699796952,
-                "outputRounding": 0.0008660254037844386,
-                "controllerRounding": 0.0016914558667664816
-              }
-            },
-            "tools": [
-              {
-                "key": "[\"[\\\"analytic-bit-1\\\",1,3.175,12,2,null]\",15000]",
-                "tool": {
-                  "number": 1,
-                  "guid": "analytic-bit-1",
-                  "diameter": 3.175,
-                  "name": "synthetic flat end mill",
-                  "fluteLength": 12,
-                  "flutes": 2,
-                  "rpm": 15000
-                },
-                "rpm": 15000,
-                "maximumCutDepth": 3.3
-              }
-            ],
-            "operations": [
-              {
-                "name": "Small hole",
-                "feature": "hole",
-                "toolKey": "[\"[\\\"analytic-bit-1\\\",1,3.175,12,2,null]\",15000]",
-                "feeds": [
-                  360,
-                  480,
-                  720
-                ],
-                "passes": 9,
-                "bounds": {
-                  "min": [
-                    6.9794,
-                    6.9794,
-                    -0.3
-                  ],
-                  "max": [
-                    7.0205,
-                    7.0205,
-                    2.34
-                  ]
-                },
-                "roles": {
-                  "approach": 9,
-                  "corner": 585
-                }
-              }
-            ],
-            "bounds": {
-              "min": [
-                6.9794,
-                6.9794,
-                -0.3
-              ],
-              "max": [
-                7.0205,
-                7.0205,
-                2.34
-              ]
-            },
-            "warnings": [
-              "Tangent entry does not fit the cutter-centre region; using a contour ramp",
-              "Contour entry loop is too small for a ramp; using a bounded plunge"
-            ],
-            "statistics": {
-              "bytes": 1622,
-              "executableBlocks": 56,
-              "motionBlocks": 48,
-              "arcBlocks": 9,
-              "cuttingLineBlocks": 18,
-              "feedChanges": 18,
-              "tinyCuttingLines": 9,
-              "tinySegmentThresholdMm": 0.1,
-              "unresolvedCuttingLines": 0,
-              "minimumCuttingLineMm": 0.002236067977499345,
-              "averageCuttingLineMm": 1.4177847006554165,
-              "maximumLineBytes": 83
             }
           }
         }

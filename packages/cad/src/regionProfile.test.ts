@@ -95,4 +95,22 @@ describe('regions put together', () => {
     expect(filled!.holes).toEqual([]);
     expect(Math.abs(polygonArea(filled!.outline))).toBeCloseTo(3200, 3);
   });
+
+  it('keeps a ring and a region inside its hole apart, each in a group of its own', () => {
+    const part = createCadPart('Rings', 18);
+    for (const [at, size] of [
+      [0, 100],
+      [10, 80],
+      [30, 40],
+    ] as const)
+      part.sketch = addRectangle(part.sketch, { x: at, y: at, width: size, height: size });
+    const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE);
+    const area = (region: (typeof regions)[number]) =>
+      Math.abs(polygonArea(region.points)) - region.holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0);
+    const outer = regions.find(region => Math.abs(area(region) - (100 * 100 - 80 * 80)) < 1e-6)!;
+    const inner = regions.find(region => Math.abs(area(region) - 40 * 40) < 1e-6)!;
+    const groups = regionGroups([outer, inner]);
+    expect(groups.map(group => group.regionIds)).toEqual([[outer.id], [inner.id]]);
+    expect(groups[0]!.holes).toHaveLength(1);
+  });
 });

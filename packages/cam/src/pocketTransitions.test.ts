@@ -180,10 +180,9 @@ describe('posted pocket cutting transitions', () => {
     }
   });
 
-  it('retains material-rate limits on controlled pocket stepovers', () => {
+  it('retains material-rate limits on pocket stepovers', () => {
     const job = camPart(machiningPart(), {
       tools: [{ number: 1, diameter: 4 }],
-      pocketStrategy: 'controlled',
       maxPlanarRemovalRate: 600,
       maxStepdown: 3,
       plungeFeed: 120,

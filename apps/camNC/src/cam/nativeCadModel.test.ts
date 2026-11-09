@@ -206,11 +206,15 @@ describe('native CAD to CAM', () => {
       cadSketchRegions(document.parts[0], sketchId)
         .filter(region => pointInPolygon({ x, y }, region.points) && !region.holes.some(hole => pointInPolygon({ x, y }, hole)))
         .sort((a, b) => Math.abs(polygonArea(a.points)) - Math.abs(polygonArea(b.points)))[0]!;
-    /** A through hole near the left, and a pocket from below near the right. */
-    function bothSides(depth = 4) {
-      const base = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
-        partId = base.parts[0].id;
+    /** A through hole near the left, a pocket from below near the right, and a shallow pocket from the top between them. */
+    function bothSides(depth = 4, { topPocket = true } = {}) {
+      let base = createPlateDocument({ width: 100, height: 60, thickness: 12 });
+      const partId = base.parts[0].id;
       base.parts[0].sketch = addCircle(base.parts[0].sketch, { x: 20, y: 30, radius: 6 });
+      if (topPocket) {
+        base.parts[0].sketch = addCircle(base.parts[0].sketch, { x: 45, y: 15, radius: 5 });
+        base = setCutDepth(base, partId, base.parts[0].sketch.id, regionAt(base, base.parts[0].sketch.id, 45, 15).id, 3);
+      }
       const added = addFaceSketch(base, partId, 'underside'),
         face = added.document.parts[0].features!.find(f => f.type === 'sketch')!;
       if (face.type !== 'sketch') throw new Error('Expected a sketch');
@@ -224,11 +228,50 @@ describe('native CAD to CAM', () => {
       return { x: points.reduce((sum, p) => sum + p.x, 0) / points.length, y: points.reduce((sum, p) => sum + p.y, 0) / points.length };
     };
 
+    it('turns a part cut only from below over, so it mills in one setup', async () => {
+      const { document, partId } = bothSides(4, { topPocket: false }),
+        { entries, model } = await nativeCadModel(document),
+        entry = entries.get(partId)!;
+      expect(entry.features.pockets.map(pocket => +pocket.floorZ.toFixed(3))).toEqual([8]);
+      // Turned over end for end: the pocket at x = 70 is now at 30, and the hole at 20 is at 80.
+      expect(center(entry.features.pockets[0]!.strictRegion).x).toBeCloseTo(30, 0);
+      expect(center(entry.features.throughHoles).x).toBeCloseTo(80, 0);
+      expect(center(entry.features.throughHoles).y).toBeCloseTo(30, 0);
+      expect(entry.features.bottomFaces).toEqual([]);
+      expect(entry.flipped).toBeUndefined();
+      expect(model.parts[0].summary.needsFlip).toBe(false);
+      expect(model.parts[0].holeIds).toHaveLength(1);
+      expect(model.parts[0].size).toEqual([100, 60, 12]);
+    });
+
+    it('mills a rabbet cut from below from the top, with no second side', async () => {
+      const base = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+        partId = base.parts[0].id,
+        added = addFaceSketch(base, partId, 'underside'),
+        face = added.document.parts[0].features!.find(f => f.type === 'sketch')!;
+      if (face.type !== 'sketch') throw new Error('Expected a sketch');
+      // Seen from below, X runs the other way: this rabbet runs along the part's right end, x = 80 to 100.
+      face.sketch = addLine(face.sketch, { x1: -80, y1: -5, x2: -80, y2: 65 });
+      const document = setCutDepth(added.document, partId, added.sketchId, regionAt(added.document, added.sketchId, -90, 30).id, 4),
+        key = `${document.id}:native-underside-rabbet`,
+        model = await camWorker().importDesign(document, key),
+        result = await camWorker().generate(key, partId, toCamSettings(kDefaultPlan));
+      expect(model.parts[0].summary.needsFlip).toBe(false);
+      expect(model.parts[0].shape.pockets.map(pocket => pocket.depth)).toEqual([4]);
+      // Turned over, the rabbet runs along the left end.
+      const xs = model.parts[0].shape.pockets[0]!.region.flat().map(p => p[0]);
+      expect(Math.min(...xs)).toBeCloseTo(0, 3);
+      expect(Math.max(...xs)).toBeCloseTo(20, 3);
+      expect(result.safety).toEqual([]);
+      expect(result.warnings.filter(w => w.includes('flipped'))).toEqual([]);
+      expect(result.ops.some(op => op.kind === 'pocket' && Math.abs(op.zBottom - 8) < 0.01)).toBe(true);
+    });
+
     it('leaves side A alone, and asks for a second side', async () => {
       const { document, partId } = bothSides(),
         { entries, model } = await nativeCadModel(document),
         { features } = entries.get(partId)!;
-      expect(features.pockets).toEqual([]);
+      expect(features.pockets.map(pocket => +pocket.floorZ.toFixed(3))).toEqual([9]);
       expect(features.throughHoles).toHaveLength(1);
       expect(features.bottomFaces.map(face => face.z)).toEqual([4]);
       expect(model.parts[0].summary.needsFlip).toBe(true);

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { applyFeedPolicy, type MotionPath } from './motion';
-import { profileEntryRegion, tangentLoopPass, lineInsideRegion } from './entry';
 import { applyTabMotion, repeatTabIntervals } from './tabMotion';
 import { difference, type PathD, type Vec3 } from './geom';
 
@@ -154,78 +153,8 @@ describe('semantic motion and feed scheduling', () => {
   });
 });
 
-describe('contained tangent leads', () => {
-  it.each([false, true])('keeps every lead segment in the cutter-centre region (inside=%s)', inside => {
-    const shape = rect(0, 0, 40, 30),
-      radius = 1.5;
-    const loop = inside ? rect(radius, radius, 40 - radius, 30 - radius) : [...rect(-radius, -radius, 40 + radius, 30 + radius)].reverse();
-    const free = profileEntryRegion(shape, radius, radius, inside);
-    const pass = tangentLoopPass(loop, 2, 1000, radius, free)!;
-    expect(pass).toBeDefined();
-    expect(pass.roles).toContain('lead-in');
-    expect(pass.roles).toContain('lead-out');
-    const leadPoints = pass.pts
-      .filter((_, i) => pass.roles[i] === 'lead-in' || pass.roles[i] === 'lead-out')
-      .map(p => ({ x: p[0], y: p[1] }));
-    for (const q of leadPoints) expect(lineInsideRegion([q, { x: q.x + 1e-8, y: q.y }], free)).toBe(true);
-    expect(pass.feeds).toHaveLength(pass.pts.length);
-    expect(pass.roles).toHaveLength(pass.pts.length);
-  });
-
-  it('checks whole lines against islands, including obstacles between endpoints', () => {
-    const free = difference([rect(0, 0, 20, 20)], [rect(9, 9, 11, 11)]);
-    expect(
-      lineInsideRegion(
-        [
-          { x: 2, y: 10 },
-          { x: 18, y: 10 },
-        ],
-        free
-      )
-    ).toBe(false);
-    expect(
-      lineInsideRegion(
-        [
-          { x: 2, y: 2 },
-          { x: 18, y: 2 },
-        ],
-        free
-      )
-    ).toBe(true);
-  });
-
-  it('refuses a lead when no cutter-centre room remains', () => {
-    expect(tangentLoopPass(rect(0, 0, 10, 10), 2, 1000, 1, [])).toBeUndefined();
-    expect(tangentLoopPass(rect(0, 0, 10, 10), 2, 1000, 0, [rect(0, 0, 10, 10)])).toBeUndefined();
-  });
-});
-
-describe('tab shoulders and repeated ramp laps', () => {
-  it('preserves the full plateau and ramps outside its borders without vertical jumps', () => {
-    const result = applyTabMotion(
-      path([
-        [0, 0, 0],
-        [20, 0, 0],
-      ]),
-      [[8, 12]],
-      2,
-      300,
-      2
-    );
-    expect(result.pts).toEqual([
-      [0, 0, 0],
-      [6, 0, 0],
-      [8, 0, 2],
-      [12, 0, 2],
-      [14, 0, 0],
-      [20, 0, 0],
-    ]);
-    expect(result.feeds[4]).toBe(300);
-    expect(result.roles.slice(2, 5)).toEqual(['tab', 'tab', 'tab']);
-    expect(result.pts.every((p, i) => i === 0 || p[0] > result.pts[i - 1][0])).toBe(true);
-  });
-
-  it('retains vertical tabs when ramp shoulders are disabled', () => {
+describe('tabs on repeated ramp laps', () => {
+  it('raises the pass with vertical steps at the tab borders', () => {
     const result = applyTabMotion(
       path([
         [0, 0, 0],
@@ -260,8 +189,7 @@ describe('tab shoulders and repeated ramp laps', () => {
       ]),
       intervals,
       2,
-      300,
-      1
+      300
     );
     expect(result.pts.filter(p => p[2] === 2).map(p => p[0])).toEqual([0, 2, 18, 22, 38, 42]);
   });

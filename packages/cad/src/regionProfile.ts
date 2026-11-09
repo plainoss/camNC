@@ -71,6 +71,21 @@ const regionArea = (region: Pick<CadSketchRegion, 'points' | 'holes'>) =>
 
 type Point = { x: number; y: number };
 
+/** A point in a region's area: inside its outline and outside its holes. */
+function areaPoint(region: CadSketchRegion): Point | null {
+  const outline = polygonArea(region.points) > 0 ? region.points : [...region.points].reverse();
+  for (let i = 0; i < outline.length; i++) {
+    const a = outline[i]!,
+      b = outline[(i + 1) % outline.length]!,
+      c = outline[(i + 2) % outline.length]!;
+    for (const t of [1 / 3, 0.1, 0.02]) {
+      const point = { x: b.x + (a.x + c.x - 2 * b.x) * t, y: b.y + (a.y + c.y - 2 * b.y) * t };
+      if (pointInPolygon(point, outline) && !region.holes.some(hole => pointInPolygon(point, hole))) return point;
+    }
+  }
+  return regionInteriorPoint(outline);
+}
+
 /**
  * The picked regions put together: the boundary pieces two of them share are left out, and what's left is chained into
  * outlines, each with the holes inside it. Regions side by side, or overlapping shapes' pieces, come out as one outline;
@@ -115,10 +130,7 @@ export function regionGroups(picked: CadSketchRegion[]): { outline: Point[]; hol
   const groups = outlines.map(loop => ({
     outline: loop.points,
     holes: [] as Point[][],
-    members: picked.flatMap((region, index) => {
-      const inside = regionInteriorPoint(oriented(region.points, true));
-      return inside && pointInPolygon(inside, loop.points) ? [index] : [];
-    }),
+    members: [] as number[],
   }));
   for (const hole of holes) {
     const around = groups
@@ -126,6 +138,14 @@ export function regionGroups(picked: CadSketchRegion[]): { outline: Point[]; hol
       .sort((a, b) => Math.abs(polygonArea(a.outline)) - Math.abs(polygonArea(b.outline)))[0];
     around?.holes.push([...hole.points].reverse());
   }
+  // Each picked region is in the group whose area, holes left out, holds a point of its own area.
+  picked.forEach((region, index) => {
+    const inside = areaPoint(region);
+    const group =
+      inside &&
+      groups.find(candidate => pointInPolygon(inside, candidate.outline) && !candidate.holes.some(hole => pointInPolygon(inside, hole)));
+    group?.members.push(index);
+  });
   return groups
     .filter(group => group.members.length)
     .sort((a, b) => Math.min(...a.members) - Math.min(...b.members))
