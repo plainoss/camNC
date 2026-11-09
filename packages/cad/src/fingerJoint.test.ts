@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { assemblyReport, cadPartsToCut, parseCadDocument, solveCadDocument } from './index';
+import {
+  addPartCut,
+  assemblyReport,
+  cadPartsToCut,
+  createCadDocument,
+  createPlateDocument,
+  parseCadDocument,
+  solveCadDocument,
+} from './index';
 
 const saved = () =>
   parseCadDocument(
@@ -33,4 +41,30 @@ it('keeps the face-extruded board connected when the tool and target are exchang
   expect(solved.parts.map(part => part.cuts?.length)).toEqual([2, 3]);
   expect(solved.parts[1]!.cuts!.every(cut => !cut.through)).toBe(true);
   expect(assemblyReport(solved.document, solved.parts)!.collisions).toEqual([]);
+});
+
+it.each([
+  [36, 18],
+  [18, 36],
+])('refuses coincident profiles with thicknesses %i and %i before severing the thinner board', async (a, b) => {
+  const parts = [a, b].map(thickness => ({
+    ...createPlateDocument({ width: 100, height: 50, thickness }).parts[0]!,
+    placement: { position: [0, 0, 0] as [number, number, number], rotation: [0, 0, 0, 1] as [number, number, number, number] },
+  }));
+  const document = addPartCut({ ...createCadDocument(), parts }, [parts[1]!.id], [parts[0]!.id], { value: 0.2 }, { fingers: 5 }).document;
+  const solved = await solveCadDocument(document);
+  expect(solved.parts.every(part => !part.cuts?.length)).toBe(true);
+  expect(solved.diagnostics).toContainEqual(
+    expect.objectContaining({ code: 'part-cut-unresolved', message: expect.stringContaining('each need material') })
+  );
+});
+
+it('refuses a clearance that removes the face-extruded board’s remaining backbone', async () => {
+  const document = saved();
+  document.partCuts![0]!.clearance = 52;
+  const solved = await solveCadDocument(document);
+  expect(solved.parts.every(part => !part.cuts?.length)).toBe(true);
+  expect(solved.diagnostics).toContainEqual(
+    expect.objectContaining({ code: 'part-cut-unresolved', message: expect.stringContaining('each need material') })
+  );
 });
