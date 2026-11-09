@@ -239,8 +239,25 @@ function mapPlacements(part: CadPart, edit: (placement: CadPlacement | undefined
       : { ...copy, ...(moved !== copy.placement && { placement: moved }), ...(offset !== copy.offset && { offset }) };
   });
   const copiesChanged = copies?.some((copy, index) => copy !== part.copies![index]);
-  if (placement === part.placement && !copiesChanged) return part;
-  return { ...part, ...(placement !== part.placement && { placement }), ...(copiesChanged && { copies }) };
+  // A move by X, Y and Z follows variables as a placement does.
+  let moved = part.moved;
+  if (moved && 'by' in moved) {
+    const asPlacement: CadPlacement = {
+      position: moved.by,
+      rotation: [0, 0, 0, 1],
+      ...(moved.byExpressions && { positionExpressions: moved.byExpressions }),
+    };
+    const edited = edit(asPlacement);
+    if (edited && edited !== asPlacement)
+      moved = { by: edited.position, ...(edited.positionExpressions && { byExpressions: edited.positionExpressions }) };
+  }
+  if (placement === part.placement && !copiesChanged && moved === part.moved) return part;
+  return {
+    ...part,
+    ...(placement !== part.placement && { placement }),
+    ...(copiesChanged && { copies }),
+    ...(moved !== part.moved && { moved }),
+  };
 }
 
 function copyDistanceOutcome(expression: string | undefined, scope: CadValueScope): Outcome | null {

@@ -3,7 +3,7 @@ import { cadCopyName, cadFaceSketches, faceIsUnderside, resolveExtrudeSteps, typ
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
   id: string;
-  kind: 'sketch' | 'extrude' | 'faceSketch' | 'cut' | 'copy' | 'pattern' | 'partCut';
+  kind: 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'copy' | 'pattern' | 'partCut';
   label: string;
   /** A short reading of the step's main value, such as a thickness or depth. */
   detail?: string;
@@ -77,6 +77,21 @@ export function designSteps(document: CadDocument): DesignStep[] {
               suppressed: !!part.suppressed,
             },
           ]),
+      // Moved without copying, by a Transform of its own.
+      ...(part.moved
+        ? [
+            {
+              id: `${part.id}:move`,
+              kind: 'move' as const,
+              label: `Transform · ${part.name}`,
+              detail:
+                'by' in part.moved
+                  ? `moved ${part.moved.by.map(value => +value.toFixed(3)).join(', ')} mm`
+                  : `moved ${+part.moved.distance.toFixed(3)} mm`,
+              partId: part.id,
+            },
+          ]
+        : []),
     ];
     let cut = 0;
     for (const feature of part.features ?? []) {
@@ -143,6 +158,8 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
       // Rolled back past its extrude, a part is only its sketch.
       const next: CadPart = kept.has(`${part.id}:extrude`) || part.extrude === false ? { ...part } : { ...part, extrude: false };
       // What Remove steps cut follows from those steps, below.
+      // Rolled back past its move, a part sits where it's drawn.
+      if (!kept.has(`${part.id}:move`)) delete next.moved;
       if (part.features) next.features = part.features.filter(feature => !feature.removedBy && kept.has(feature.id));
       const pattern = part.pattern && kept.has(part.pattern.id);
       if (!pattern) delete next.pattern;

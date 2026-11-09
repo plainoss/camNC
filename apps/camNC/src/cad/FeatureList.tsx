@@ -9,6 +9,7 @@ const kIcons: Record<DesignStep['kind'] | 'variable', string> = {
   variable: '(x)',
   sketch: '✎',
   extrude: '▮',
+  move: '⇥',
   faceSketch: '✎',
   cut: '⌴',
   copy: '⧉',
@@ -33,7 +34,7 @@ function menuItems(entry: FeatureEntry): { action: FeatureAction; label: string;
     { action: 'edit', label: 'Edit…' },
     ...(kind === 'extrude' ? [{ action: 'editSketch' as const, label: 'Edit sketch…' }] : []),
     // Sketches aren't suppressed on their own: their extrude is.
-    ...(kind === 'sketch' || kind === 'faceSketch'
+    ...(kind === 'sketch' || kind === 'faceSketch' || kind === 'move'
       ? []
       : [{ action: 'suppress' as const, label: entry.step.suppressed ? 'Unsuppress' : 'Suppress' }]),
     { action: 'rollTo', label: 'Roll to here' },
