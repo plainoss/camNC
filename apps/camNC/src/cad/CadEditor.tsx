@@ -49,7 +49,6 @@ import {
   isSplineTangentHandle,
   isOwnedSplineHandle,
   removeEntity,
-  originId,
   newCadId,
   pointEquivalence,
   resolveFilletCorners,
@@ -225,8 +224,12 @@ import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintL
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
 import { FeatureDialog } from './FeatureDialog';
-import { PartRowMenu } from './PartRowMenu';
-import { ShortcutList, sketchShortcuts, studioShortcuts } from './ShortcutList';
+import { PartsList } from './PartsList';
+import { ShortcutList } from './ShortcutList';
+import { sketchShortcuts, studioShortcuts } from './shortcuts';
+import { sketchSearchCommands } from './sketchSearchCommands';
+import { toggleFixed } from './sketchFix';
+import { chainGeometry, editable, hasOutline, isBlank, isSingleLine, replacePart, type ChainAnchor } from './editorHelpers';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
@@ -247,7 +250,6 @@ type NumericConstraint = Extract<CadConstraint, { value: number }>;
 type Tool = SketchTool;
 type DimensionMode = CadDimensionMode;
 type ConstraintTool = ConstraintCommandTool;
-type ChainAnchor = { pointId: string; curveId: string };
 const snapLabels: Record<CadSnapResult['kind'], string> = {
   endpoint: 'Endpoint',
   center: 'Center',
@@ -294,46 +296,9 @@ const rounded = (n: number) => Math.round(n * 100) / 100;
 const numeric = (c: CadConstraint): c is NumericConstraint => 'value' in c;
 
 const pointsOf = (sketch: CadSketch) => new Map(sketch.entities.flatMap(e => (e.type === 'point' ? [[e.id, e] as const] : [])));
-const editable = (target: EventTarget | null) =>
-  target instanceof HTMLElement && !!target.closest('input:not([type="checkbox"]),textarea,select,[contenteditable]');
-const entityPointIds = (entity: CadEntity): string[] => {
-  if (entity.type === 'point') return [entity.id];
-  return curvePointIds(entity);
-};
 const PartView3D = lazy(() => import('./PartView3D'));
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
 const SketchBackdrop = lazy(() => import('./SketchBackdrop'));
-/** A face sketch is drawn over the part's outline, so a part needs one first. */
-/** A sketch of one straight line and nothing else, as a board drawn edge-on is. */
-const isSingleLine = (part: CadPart) => {
-  const curves = part.sketch.entities.filter(entity => entity.type !== 'point' && !entity.construction);
-  return curves.length === 1 && curves[0]!.type === 'line';
-};
-/** A part with nothing drawn yet, such as a new design's first: the studio asks what it's sketched on first. */
-const isBlank = (part: CadPart) => !part.drawnOn && part.sketch.entities.every(entity => entity.type === 'point' && entity.fixed);
-const hasOutline = (document: CadDocument, partId: string) => !!evaluateCadPart(document.parts.find(part => part.id === partId)!).part;
-function replacePart(document: CadDocument, partId: string, change: (part: CadPart) => CadPart): CadDocument {
-  return { ...document, parts: document.parts.map(p => (p.id === partId ? change(p) : p)) };
-}
-function chainGeometry(sketch: CadSketch, chain: ChainAnchor | null) {
-  if (!chain) return null;
-  const points = pointsOf(sketch);
-  const point = points.get(chain.pointId);
-  const curve = sketch.entities.find(e => e.id === chain.curveId);
-  if (!point || !curve) return null;
-  if (curve.type === 'line') {
-    const other = points.get(curve.startId === point.id ? curve.endId : curve.startId);
-    if (other) return { point, tangent: { x: point.x - other.x, y: point.y - other.y }, curve };
-  }
-  if (curve.type === 'arc') {
-    const center = points.get(curve.centerId);
-    if (center) {
-      const direction = curve.endId === point.id ? 1 : -1;
-      return { point, tangent: { x: -(point.y - center.y) * direction, y: (point.x - center.x) * direction }, curve };
-    }
-  }
-  return null;
-}
 
 export interface CadEditorController {
   /** Commit valid open value fields to the draft without accepting it or navigating. */
@@ -548,10 +513,6 @@ export function CadEditor({
   const [sketchRowPicked, setSketchRowPicked] = useState<string | null>(null);
   const [featureVisibility, setFeatureVisibility] = useState<Readonly<Record<string, boolean>>>(savedShown.featureVisibility);
   useEffect(() => saveShownState(doc.id, { hiddenParts: [...hiddenParts], featureVisibility }), [doc.id, hiddenParts, featureVisibility]);
-  /** A Parts row's right-click menu, and the row being renamed in place, by its key (a part's ID, or `part/copy`). */
-  const [partMenu, setPartMenu] = useState<{ key: string; name: string; x: number; y: number } | null>(null);
-  const [renamingPart, setRenamingPart] = useState<string | null>(null);
-  const closePartMenu = useCallback(() => setPartMenu(null), []);
   const hoveredPart = useRef<string | null>(null);
   const onHoverPart = useCallback((id: string | null) => {
     hoveredPart.current = id;
@@ -2283,24 +2244,9 @@ export function CadEditor({
   /** Fixes the points of `targets`, or unfixes them when they are all fixed already. */
   const fixGeometry = (targets: string[]) => {
     if (!sketch) return;
-    const ids = new Set(
-      targets.flatMap(id => {
-        const entity = sketch.entities.find(e => e.id === id);
-        return entity ? entityPointIds(entity) : [];
-      })
-    );
-    ids.delete(originId(sketch));
-    for (const e of sketch.entities) if (e.faceEdge) ids.delete(e.id);
-    if (!ids.size) return setMessage('Select geometry to fix. The origin and the edges of the face it’s drawn on always stay fixed.');
-    const shouldFix = sketch.entities.some(e => e.type === 'point' && ids.has(e.id) && !e.fixed);
-    changeSketch({ ...sketch, entities: sketch.entities.map(e => (e.type === 'point' && ids.has(e.id) ? { ...e, fixed: shouldFix } : e)) });
-    setMessage(
-      fixMode
-        ? `${shouldFix ? 'Fixed' : 'Unfixed'}. Click more geometry, or press Escape to end Fix.`
-        : shouldFix
-          ? 'Selected geometry fixed. Shift+J unfixes it.'
-          : 'Selected geometry unfixed.'
-    );
+    const result = toggleFixed(sketch, targets, fixMode);
+    if (result.sketch) changeSketch(result.sketch);
+    setMessage(result.message);
   };
   const toggleConstruction = () => {
     if (sketch && selected.length) {
@@ -4269,120 +4215,47 @@ export function CadEditor({
           </button>
         )}
       </div>
-      <ul className="cad-part-list" aria-label="Parts" hidden={!!faceSketch}>
-        {(studioSession ? builtParts : doc.parts)
-          .flatMap(p => [
-            { key: p.id, part: p, name: p.name },
-            // In the studio every copy is a part of its own in the list, as the reference lists them, with its own eye.
-            ...(studioSession
-              ? (p.copies ?? []).map((copy, index) => ({ key: `${p.id}/${copy.id}`, part: p, name: cadCopyName(p, index) }))
-              : []),
-          ])
-          .map(({ key, part: p, name }) => (
-            <li key={key}>
-              {renamingPart === key ? (
-                <input
-                  className="cad-feature-rename"
-                  aria-label={`New name for ${name}`}
-                  defaultValue={name}
-                  autoFocus
-                  onFocus={event => event.currentTarget.select()}
-                  onBlur={event => {
-                    const next = event.currentTarget.value.trim();
-                    setRenamingPart(null);
-                    if (!next || next === name) return;
-                    const copyId = key === p.id ? null : key.slice(p.id.length + 1);
-                    commit(
-                      copyId
-                        ? renamePartCopy(documentRef.current, p.id, copyId, next)
-                        : replacePart(documentRef.current, p.id, current => ({
-                            ...current,
-                            // The features keep the names they had: renaming a part never renames them.
-                            sketchName: current.sketchName ?? `Sketch · ${current.name}`,
-                            extrudeName: current.extrudeName ?? `Extrude · ${current.name}`,
-                            name: next,
-                          }))
-                    );
-                  }}
-                  onKeyDown={event => {
-                    event.stopPropagation();
-                    if (event.key === 'Enter') event.currentTarget.blur();
-                    else if (event.key === 'Escape') {
-                      event.currentTarget.value = name;
-                      event.currentTarget.blur();
-                    }
-                  }}
-                />
-              ) : (
-                <button
-                  type="button"
-                  aria-pressed={key === part?.id}
-                  onContextMenu={event => {
-                    if (!studioSession) return;
-                    event.preventDefault();
-                    setPartMenu({ key, name, x: event.clientX, y: event.clientY });
-                  }}
-                  onClick={() => {
-                    if (partCutting && showWorkspace) return pickForCut(p.id);
-                    setPartId(p.id);
-                    setSelected([]);
-                    chooseTool('select');
-                  }}>
-                  <span aria-hidden="true">▱</span>
-                  <span>{name}</span>
-                  {key === p.id && partTrouble(p.id) && (
-                    <span className="cad-part-trouble" role="img" aria-label={partTrouble(p.id)!} title={partTrouble(p.id)!}>
-                      ⚠
-                    </span>
-                  )}
-                  <small>{p.thickness} mm</small>
-                </button>
-              )}
-              {studioSession && (
-                <button
-                  type="button"
-                  className="cad-part-eye"
-                  aria-label={`${hiddenParts.has(key) ? 'Show' : 'Hide'} ${name}`}
-                  title={hiddenParts.has(key) ? 'Show in the view' : 'Hide in the view'}
-                  aria-pressed={!hiddenParts.has(key)}
-                  onClick={() =>
-                    setHiddenParts(previous => {
-                      const next = new Set(previous);
-                      if (next.has(key)) next.delete(key);
-                      else next.add(key);
-                      return next;
-                    })
-                  }>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
-                    {hiddenParts.has(key) ? <path d="M4 4l16 16" /> : <circle cx="12" cy="12" r="3" />}
-                  </svg>
-                </button>
-              )}
-            </li>
-          ))}
-      </ul>
-      {partMenu && (
-        <PartRowMenu
-          name={partMenu.name}
-          x={partMenu.x}
-          y={partMenu.y}
-          onClose={closePartMenu}
-          items={[
-            { label: 'Rename', onSelect: () => setRenamingPart(partMenu.key) },
-            {
-              label: hiddenParts.has(partMenu.key) ? 'Show' : 'Hide',
-              onSelect: () =>
-                setHiddenParts(previous => {
-                  const next = new Set(previous);
-                  if (next.has(partMenu.key)) next.delete(partMenu.key);
-                  else next.add(partMenu.key);
-                  return next;
-                }),
-            },
-          ]}
-        />
-      )}
+      <PartsList
+        hidden={!!faceSketch}
+        studio={studioSession}
+        rows={(studioSession ? builtParts : doc.parts).flatMap(p => [
+          { key: p.id, part: p, name: p.name },
+          // In the studio every copy is a part of its own in the list, as the reference lists them, with its own eye.
+          ...(studioSession
+            ? (p.copies ?? []).map((copy, index) => ({ key: `${p.id}/${copy.id}`, part: p, name: cadCopyName(p, index) }))
+            : []),
+        ])}
+        selectedKey={part?.id}
+        hiddenParts={hiddenParts}
+        onToggleHidden={key =>
+          setHiddenParts(previous => {
+            const next = new Set(previous);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+          })
+        }
+        trouble={partTrouble}
+        onPick={partId => {
+          if (partCutting && showWorkspace) return pickForCut(partId);
+          setPartId(partId);
+          setSelected([]);
+          chooseTool('select');
+        }}
+        onRename={(partId, copyId, name) =>
+          commit(
+            copyId
+              ? renamePartCopy(documentRef.current, partId, copyId, name)
+              : replacePart(documentRef.current, partId, current => ({
+                  ...current,
+                  // The features keep the names they had: renaming a part never renames them.
+                  sketchName: current.sketchName ?? `Sketch · ${current.name}`,
+                  extrudeName: current.extrudeName ?? `Extrude · ${current.name}`,
+                  name,
+                }))
+          )
+        }
+      />
     </>
   );
   return (
@@ -5577,42 +5450,7 @@ export function CadEditor({
           )}
           {palette && searchMode && !(studioSession && showWorkspace) && (
             <CommandSearch
-              commands={[
-                ...tools.map(t => ({
-                  ...t,
-                  description:
-                    t.id === 'circumscribedPolygon'
-                      ? 'Sketch a regular polygon with its vertices on a circumscribing construction circle.'
-                      : t.id === 'inscribedPolygon'
-                        ? 'Sketch a regular polygon around an inscribed construction circle.'
-                        : t.id === 'centerPointArc'
-                          ? 'Sketch an arc by defining its center, start, and end points.'
-                          : t.id === 'ellipse'
-                            ? 'Sketch an ellipse by defining its center point and two perpendicular axis radii.'
-                            : t.id === 'threePointCircle'
-                              ? 'Sketch a circle by defining three points along its circumference.'
-                              : t.id === 'alignedRectangle'
-                                ? 'Sketch a rectangle from an oriented first edge and its perpendicular extent.'
-                                : undefined,
-                })),
-                ...(
-                  [
-                    'horizontal',
-                    'vertical',
-                    'coincident',
-                    'concentric',
-                    'symmetric',
-                    'midpoint',
-                    'parallel',
-                    'perpendicular',
-                    'equal',
-                    'tangent',
-                  ] as const
-                ).map(id => ({ id, label: id[0]!.toUpperCase() + id.slice(1), description: constraintPrompt(id) })),
-                { id: 'construction', label: 'Construction geometry', key: 'Q' },
-                { id: 'fix', label: 'Fix / unfix', key: 'Shift+J' },
-                { id: 'fit', label: 'Zoom to fit', key: 'F' },
-              ]}
+              commands={sketchSearchCommands}
               onHighlight={setSearchHighlight}
               onClose={(restoreFocus = true) => {
                 setPalette(false);
