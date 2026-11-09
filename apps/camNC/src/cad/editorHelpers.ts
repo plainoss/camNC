@@ -1,4 +1,13 @@
-import { entityPointIds as curvePointIds, evaluateCadPart, type CadDocument, type CadEntity, type CadPart } from '@wbcnc/cad';
+import {
+  CAD_CHORD_TOLERANCE,
+  entityPointIds as curvePointIds,
+  evaluateCadPart,
+  isCadPart,
+  sketchRegions,
+  type CadDocument,
+  type CadEntity,
+  type CadPart,
+} from '@wbcnc/cad';
 
 // Small helpers of the sketch editor, kept apart so the editor itself stays readable.
 
@@ -31,4 +40,23 @@ export function withoutExtrude(part: CadPart): CadPart {
   for (const key of ['extrudeName', 'remove', 'addTo', 'addedRegions', 'upTo', 'upToDatum', 'symmetric', 'suppressed'] as const)
     delete next[key];
   return next;
+}
+
+/**
+ * A sketch made a part by Extrude. A single line drawn on a plane or face is a thin board standing on it. A sketch on a
+ * part's face adds to that part by default, with it in the merge scope. Picked from its row in the feature list
+ * (`pickAll`), a sketch of several regions, such as overlapping shapes or outlines apart, starts with all of them; just
+ * finished, with none, for them to be picked in the view.
+ */
+export function extrudedSketch(document: CadDocument, sketch: CadPart, pickAll: boolean): CadPart {
+  const made = { ...sketch };
+  delete made.extrude;
+  if (made.drawnOn && !made.thin && isSingleLine(made)) return { ...made, thin: { depth: 100, midPlane: true } };
+  const face = made.drawnOn && !('plane' in made.drawnOn.on) ? made.drawnOn.on.partId : null;
+  const onto = face && document.parts.find(candidate => candidate.id === face);
+  if (onto && isCadPart(onto)) made.addTo = onto.id;
+  const regions = sketchRegions(made.sketch, CAD_CHORD_TOLERANCE);
+  if (pickAll && !made.regions && regions.length > 1 && evaluateCadPart(made).diagnostics.some(d => d.severity === 'error'))
+    made.regions = regions.map(region => region.id);
+  return made;
 }
