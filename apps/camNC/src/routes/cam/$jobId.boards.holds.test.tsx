@@ -158,6 +158,22 @@ describe('CAM boards.holds step', () => {
 
     afterEach(() => useStore.setState({ machineBounds: null }));
 
+    /**
+     * Machine bounds for this page only. The store saves them to localStorage, which test files running alongside
+     * share and read as they start: there, a small machine would split the boards they open.
+     */
+    async function withMachine(bounds: Box2, run: () => Promise<void>) {
+      const storage = useStore.persist.getOptions().storage;
+      useStore.persist.setOptions({ storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } });
+      try {
+        useStore.setState({ machineBounds: bounds });
+        await run();
+      } finally {
+        useStore.setState({ machineBounds: null });
+        useStore.persist.setOptions({ storage });
+      }
+    }
+
     it('grows it and says by how much, moves the holds there with the part, and Undo restores it', async () => {
       const job = await openKinderregal();
       openBoard('B');
@@ -215,13 +231,14 @@ describe('CAM boards.holds step', () => {
       openBoard('B');
       await waitFor(async () => expect((await boardB(job.id)).layout).toBeTruthy(), { timeout: 10_000 });
       const before = await boardB(job.id);
-      useStore.setState({ machineBounds: new Box2(new Vector2(0, 0), new Vector2(before.layout!.w + 2, before.layout!.h + 2)) });
-      // The store's bounds are read as the page renders: selecting the board again brings them in.
-      openBoard('A');
-      openBoard('B');
-      await suggestHolds();
-      await waitFor(() => expect(status()).toMatch(noRoom));
-      expect(await boardB(job.id)).toStrictEqual(before);
+      await withMachine(new Box2(new Vector2(0, 0), new Vector2(before.layout!.w + 2, before.layout!.h + 2)), async () => {
+        // The store's bounds are read as the page renders: selecting the board again brings them in.
+        openBoard('A');
+        openBoard('B');
+        await suggestHolds();
+        await waitFor(() => expect(status()).toMatch(noRoom));
+        expect(await boardB(job.id)).toStrictEqual(before);
+      });
     }, 90_000);
   });
 });
