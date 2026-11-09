@@ -1,5 +1,6 @@
 import { relieveLoopCorners } from './cornerRelief';
-import { newCadId, validPartCutSplit } from './document';
+import { newCadId } from './document';
+import { validPartCutSplit } from './partCutSplit';
 import { mirrorEvaluatedPart, sameCadCuts } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
