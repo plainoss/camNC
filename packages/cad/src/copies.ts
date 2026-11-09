@@ -9,12 +9,13 @@ import { activeDesign } from './suppression';
 export function addPartCopy(
   document: CadDocument,
   partId: string,
-  options: { mirrored?: boolean; offset?: CadPartCopy['offset'] } = {}
+  options: { mirrored?: boolean; offset?: CadPartCopy['offset']; turn?: CadPartCopy['turn'] } = {}
 ): { document: CadDocument; id: string } {
   const copy: CadPartCopy = {
     id: newCadId(),
     ...(options.mirrored && { mirrored: true }),
     ...(options.offset && { offset: options.offset }),
+    ...(options.turn && { turn: options.turn }),
   };
   return {
     id: copy.id,
@@ -31,7 +32,7 @@ export function setPartCopyOffset(
   document: CadDocument,
   partId: string,
   copyId: string,
-  change: { offset: NonNullable<CadPartCopy['offset']>; mirrored?: boolean }
+  change: { offset: NonNullable<CadPartCopy['offset']>; mirrored?: boolean; turn?: CadPartCopy['turn'] }
 ): CadDocument {
   return resolvePartPatterns({
     ...document,
@@ -46,6 +47,9 @@ export function setPartCopyOffset(
               const next: CadPartCopy = { ...copy, offset: change.offset };
               if (change.mirrored) next.mirrored = true;
               else delete next.mirrored;
+              // Turned before the offset, or not at all.
+              if (change.turn) next.turn = change.turn;
+              else delete next.turn;
               return next;
             }),
           }

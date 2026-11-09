@@ -1,7 +1,7 @@
 import { newCadId } from './document';
 import { cadDatumFrame } from './datumPlanes';
 import { cadDrawnOnSupports, cadFaceFrame, effectivePlacement } from './drawnOn';
-import { mirroredPlacement } from './placement';
+import { mirroredPlacement, turnAbout } from './placement';
 import { cadDirectionVector } from './directions';
 import type { CadDocument, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
 
@@ -69,8 +69,10 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
         if (!copy.offset) return copy;
         const { placement: _placement, ...rest } = copy;
         if (!at) return rest;
-        const position = at.position.map((value, axis) => value + copy.offset!.position[axis]!) as [number, number, number];
-        return { ...rest, placement: { position, rotation: at.rotation } };
+        // Turned first, about a line through where the part is.
+        const from = copy.turn ? turnAbout(at, copy.turn.about, copy.turn.axis, copy.turn.degrees) : at;
+        const position = from.position.map((value, axis) => value + copy.offset!.position[axis]!) as [number, number, number];
+        return { ...rest, placement: { position, rotation: from.rotation } };
       });
     const along = part.pattern?.direction ? cadDirectionVector(document, part.pattern.direction) : null;
     const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern, at, along) : [])];

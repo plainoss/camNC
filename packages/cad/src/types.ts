@@ -273,7 +273,12 @@ export interface CadPart {
    * distance along a picked direction. Applied after the part is placed on its plane or face, so it moves with that face.
    */
   moved?:
-    | { by: [number, number, number]; byExpressions?: [string | null, string | null, string | null] }
+    | {
+        by: [number, number, number];
+        byExpressions?: [string | null, string | null, string | null];
+        /** Turned first, as Rotate and mate connectors turn a part, then moved by `by`. */
+        turn?: CadTurn;
+      }
     | (CadDirection & { distance: number });
   /**
    * Extruded up to a plane or a part's face instead of a typed thickness: the thickness is the distance from the sketch's
@@ -353,6 +358,13 @@ export interface CadDrawnOn {
   /** Grows into the face rather than out from it. */
   inward?: boolean;
 }
+/** A turn about a line: through `about`, along `axis`, by `degrees` counterclockwise looking against the axis. */
+export interface CadTurn {
+  about: [number, number, number];
+  axis: [number, number, number];
+  degrees: number;
+  degreesExpression?: string;
+}
 export interface CadPlacement {
   position: [number, number, number];
   rotation: [number, number, number, number];
@@ -383,6 +395,8 @@ export interface CadPartCopy {
    * it, so it moves with the part. The position can use variables; the rotation is unused.
    */
   offset?: CadPlacement;
+  /** Turned about a line from where the part is, before `offset` moves it, as Rotate and mate connectors copy a part. */
+  turn?: CadTurn;
   /**
    * A mirror image of the part across a plane, a part's face, or a plane made to sketch on (`datum`). Its placement
    * follows from where the part and that plane are, so it stays mirrored as either moves. It's always `mirrored`.
