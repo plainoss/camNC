@@ -18,7 +18,7 @@ const kIcons: Record<DesignStep['kind'] | 'variable', string> = {
 
 /** A row of the list: a design variable, or a step of how the design is built. */
 export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'step'; step: DesignStep };
-export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'delete';
+export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'delete';
 
 /** What each row's menu offers, and why an item isn't there for it. */
 function menuItems(entry: FeatureEntry): { action: FeatureAction; label: string; disabled?: boolean }[] {
@@ -32,7 +32,11 @@ function menuItems(entry: FeatureEntry): { action: FeatureAction; label: string;
     ...(kind === 'sketch' || kind === 'extrude' ? [{ action: 'rename' as const, label: 'Rename' }] : []),
     { action: 'edit', label: 'Edit…' },
     ...(kind === 'extrude' ? [{ action: 'editSketch' as const, label: 'Edit sketch…' }] : []),
-    { action: 'suppress', label: 'Suppress', disabled: kind !== 'cut' },
+    // Sketches aren't suppressed on their own: their extrude is.
+    ...(kind === 'sketch' || kind === 'faceSketch'
+      ? []
+      : [{ action: 'suppress' as const, label: entry.step.suppressed ? 'Unsuppress' : 'Suppress' }]),
+    { action: 'rollTo', label: 'Roll to here' },
     { action: 'delete', label: 'Delete', disabled: kind === 'faceSketch' || kind === 'copy' },
   ];
 }
@@ -48,6 +52,7 @@ export function FeatureList({
   onAction,
   onRename,
   rollback,
+  onRollTo,
   selectedPlane,
   onPickPlane,
 }: {
@@ -59,6 +64,11 @@ export function FeatureList({
   onRename: (partId: string, name: string) => void;
   /** The step being edited: the ones after it are greyed out, as the design is shown only that far. */
   rollback?: string | null;
+  /**
+   * Moves the rollback bar to just after a step, or to the end with null, as dragging it, stepping it with the arrow keys
+   * or Roll to here does in the reference. Without it the bar only shows while a step is edited.
+   */
+  onRollTo?: (stepId: string | null) => void;
   /** The base plane picked, in the list or the view, and picking one, as the reference lists them first. */
   selectedPlane?: BasePlane | null;
   onPickPlane?: (plane: BasePlane) => void;
@@ -97,6 +107,16 @@ export function FeatureList({
   };
   const key = (entry: FeatureEntry) => (entry.kind === 'step' ? entry.step.id : entry.id);
   const rollbackAt = rollback ? entries.findIndex(entry => key(entry) === rollback) : -1;
+  // With the bar movable it's always there: after the step it's rolled to, or at the end.
+  const barAt = rollbackAt >= 0 ? rollbackAt : onRollTo ? entries.length - 1 : -1;
+  const [barMenu, setBarMenu] = useState<{ x: number; y: number } | null>(null);
+  const stepIds = entries.flatMap(entry => (entry.kind === 'step' ? [entry.step.id] : []));
+  /** Rolls to just after the entry at an index; past the last step is the end. */
+  const rollToIndex = (index: number) => {
+    const entry = entries[index];
+    if (!onRollTo || !entry || entry.kind !== 'step') return;
+    onRollTo(entry.step.id === stepIds.at(-1) ? null : entry.step.id);
+  };
   const open = (entry: FeatureEntry, event: MouseEvent) => {
     event.preventDefault();
     onSelect(entry);
@@ -150,7 +170,21 @@ export function FeatureList({
             );
           }
           return (
-            <li key={key(entry)} className={rollbackAt >= 0 && index > rollbackAt ? 'cad-feature-rolled-back' : undefined}>
+            <li
+              key={key(entry)}
+              onDragOver={event => {
+                if (onRollTo && entry.kind === 'step' && event.dataTransfer.types.includes('text/x-cad-rollback')) event.preventDefault();
+              }}
+              onDrop={event => {
+                if (!event.dataTransfer.types.includes('text/x-cad-rollback')) return;
+                event.preventDefault();
+                rollToIndex(index);
+              }}
+              className={
+                [rollbackAt >= 0 && index > rollbackAt && 'cad-feature-rolled-back', step?.suppressed && 'cad-feature-suppressed']
+                  .filter(Boolean)
+                  .join(' ') || undefined
+              }>
               <button
                 type="button"
                 aria-current={step && step.partId === selectedPartId ? 'true' : undefined}
@@ -173,13 +207,54 @@ export function FeatureList({
                 <span>{label(entry)}</span>
                 {step?.detail && <small>{step.detail}</small>}
               </button>
-              {index === rollbackAt && index < entries.length - 1 && (
-                <div className="cad-rollback-bar" role="separator" aria-label="Shown up to here" />
+              {index === barAt && (index < entries.length - 1 || onRollTo) && (
+                <div
+                  className="cad-rollback-bar"
+                  role="separator"
+                  aria-label="Shown up to here"
+                  aria-orientation="horizontal"
+                  tabIndex={onRollTo ? 0 : undefined}
+                  draggable={!!onRollTo}
+                  title={
+                    onRollTo ? 'Drag, or use the arrow keys, to show the design up to a step. Right-click to roll to the end.' : undefined
+                  }
+                  onDragStart={event => {
+                    event.dataTransfer.setData('text/x-cad-rollback', '');
+                    event.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onKeyDown={event => {
+                    if (!onRollTo || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const to = event.key === 'ArrowUp' ? index - 1 : index + 1;
+                    if (to >= 0 && to < entries.length) rollToIndex(to);
+                  }}
+                  onContextMenu={event => {
+                    if (!onRollTo) return;
+                    event.preventDefault();
+                    setBarMenu({ x: event.clientX, y: event.clientY });
+                  }}
+                />
               )}
             </li>
           );
         })}
       </ol>
+      {barMenu && onRollTo && (
+        <div className="cad-feature-menu" role="menu" aria-label="Rollback bar actions" style={{ left: barMenu.x, top: barMenu.y }}>
+          <button
+            type="button"
+            role="menuitem"
+            autoFocus
+            onBlur={() => setBarMenu(null)}
+            onClick={() => {
+              setBarMenu(null);
+              onRollTo(null);
+            }}>
+            Roll to end
+          </button>
+        </div>
+      )}
       {menu && (
         <div
           ref={menuRef}

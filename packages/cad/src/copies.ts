@@ -2,6 +2,7 @@ import { newCadId } from './document';
 import { isCadPart } from './features';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
 import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
+import { activeDesign } from './suppression';
 
 /** Adds another of a part, laid out with the unplaced parts until it's placed. */
 export function addPartCopy(
@@ -130,7 +131,9 @@ export function evaluatedPartCopy(part: EvaluatedCadPart, copy: CadPartCopy): Ev
 /**
  * What gets cut: pieces grouped by their cuts and whether they are mirrored, named as the assembly names them.
  */
-export function cadPartsToCut(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadPartToCut[] {
+export function cadPartsToCut(given: CadDocument, parts: readonly EvaluatedCadPart[]): CadPartToCut[] {
+  // Copies switched off in the feature list aren't cut.
+  const document = activeDesign(given);
   return parts.flatMap(part => {
     const source = document.parts.find(candidate => candidate.id === part.partId);
     // A sketch not yet extruded, or a step adding to or cutting others, isn't a part to cut.
