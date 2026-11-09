@@ -225,6 +225,7 @@ import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
 import { FeatureDialog } from './FeatureDialog';
 import { PartRowMenu } from './PartRowMenu';
+import { ShortcutList, sketchShortcuts, studioShortcuts } from './ShortcutList';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
@@ -405,6 +406,7 @@ export function CadEditor({
   const [constraintMode, setConstraintMode] = useState<ConstraintTool | null>(null);
   /** Fix chosen with nothing selected: each click fixes or unfixes what it hits until Escape. */
   const [fixMode, setFixMode] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
   const [snapCue, setSnapCue] = useState<{ point: Point; label: string } | null>(null);
   const lastSnap = useRef<CadSnapResult | null>(null);
@@ -2311,6 +2313,13 @@ export function CadEditor({
       return;
     }
     if (editable(event.target)) return;
+    // `?` (Shift+/) lists the shortcuts that work here; keys pressed in that list stay in it.
+    if (event.key === '?' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      if (!event.repeat) setShortcutsOpen(open => !open);
+      return;
+    }
+    if (shortcutsOpen) return;
     if (studioSession && showWorkspace && !event.ctrlKey && !event.metaKey && !event.altKey) {
       if (event.code === 'KeyY') {
         event.preventDefault();
@@ -5505,6 +5514,11 @@ export function CadEditor({
               }}
             />
           )}
+          <ShortcutList
+            sections={studioSession && showWorkspace ? studioShortcuts : sketchShortcuts}
+            open={shortcutsOpen}
+            onOpenChange={setShortcutsOpen}
+          />
           {palette && !searchMode && (
             <div className="cad-command-palette cad-quick-tools">
               <h3>Sketch tools</h3>

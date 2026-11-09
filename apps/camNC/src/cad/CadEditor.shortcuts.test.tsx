@@ -1,5 +1,5 @@
 import { addPoint, createCadDocument, createCadPart, type CadDocument } from '@wbcnc/cad';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { endCadSession } from './session';
@@ -71,4 +71,17 @@ it('never starts the unshifted tool for Shift+K, Shift+G or Shift+U', async () =
   }
   key('g');
   expect(screen.getByRole('button', { name: 'Select (Esc)' }).getAttribute('aria-pressed')).toBe('false');
+});
+
+it('lists the sketch shortcuts on ?, and closes the list with Escape', async () => {
+  await setup();
+  key('?', { shiftKey: true });
+  const list = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
+  const tools = within(list).getByRole('region', { name: 'Sketch tools' });
+  expect(within(tools).getByText('Corner rectangle')).toBeDefined();
+  expect(within(tools).getByText('G')).toBeDefined();
+  expect(within(within(list).getByRole('region', { name: 'Constraints' })).getByText('Shift+J')).toBeDefined();
+  fireEvent.keyDown(list, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).toBeNull());
+  expect(screen.getByRole('button', { name: 'Select (Esc)' }).getAttribute('aria-pressed')).toBe('true');
 });

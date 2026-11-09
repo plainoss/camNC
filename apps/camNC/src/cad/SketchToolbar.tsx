@@ -362,7 +362,7 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
   );
 }
 
-const constraints: { id: ConstraintCommandTool; label: string; key?: string }[] = [
+export const sketchConstraints: { id: ConstraintCommandTool; label: string; key?: string }[] = [
   { id: 'horizontal', label: 'Horizontal', key: 'H' },
   { id: 'vertical', label: 'Vertical', key: 'V' },
   { id: 'coincident', label: 'Coincident', key: 'I' },
@@ -565,7 +565,7 @@ export function SketchToolbar({
               constraintMode === 'fix'
                 ? 'Fix constraint'
                 : constraintMode
-                  ? `${constraints.find(c => c.id === constraintMode)?.label} constraint`
+                  ? `${sketchConstraints.find(c => c.id === constraintMode)?.label} constraint`
                   : 'Constraints'
             }>
             <DropdownMenuTrigger asChild>
@@ -573,7 +573,7 @@ export function SketchToolbar({
                 type="button"
                 className="cad-icon-button"
                 aria-label="Constraints"
-                data-command-highlight={constraints.some(c => c.id === searchHighlight) || searchHighlight === 'fix' || undefined}
+                data-command-highlight={sketchConstraints.some(c => c.id === searchHighlight) || searchHighlight === 'fix' || undefined}
                 aria-pressed={!!constraintMode}>
                 <SketchToolGlyph kind={constraintMode ?? 'constraints'} />
               </button>
@@ -588,7 +588,7 @@ export function SketchToolbar({
               onReturnToCanvas();
             }}
             onEscapeKeyDown={event => event.stopPropagation()}>
-            {constraints.map(c => (
+            {sketchConstraints.map(c => (
               <DropdownMenuItem key={c.id} onSelect={() => onConstraint(c.id)} aria-label={c.id}>
                 <SketchToolGlyph kind={c.id} />
                 <span>{c.label}</span>
