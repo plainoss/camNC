@@ -7,21 +7,10 @@ import { regionGroups } from './regionProfile';
 import { placePoint } from './placement';
 import type { CadDiagnostic, CadDocument, CadPart, EvaluatedCadPart } from './types';
 
-/** Face pockets keep their face-sketch features; positioned extrusions cut with their actual volume. */
+/** Plane and edge Removes cut by their extrusion volume; face Removes keep named cuts and pocket floors. */
 export function isSpatialRemoval(part: CadPart): boolean {
   const on = part.drawnOn?.on;
-  return (
-    !!part.remove &&
-    !part.hole &&
-    !!on &&
-    ('plane' in on ||
-      typeof on.face === 'object' ||
-      !!part.drawnOn?.offset ||
-      part.drawnOn?.inward !== undefined ||
-      !!part.symmetric ||
-      !!part.upTo ||
-      part.remove.targets !== undefined)
-  );
+  return !!part.remove && !part.hole && !!on && ('plane' in on || typeof on.face === 'object');
 }
 
 /** A face Remove grows into its support by default; one on a plane follows the plane's normal. */

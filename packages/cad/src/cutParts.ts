@@ -574,7 +574,7 @@ export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): Eva
     const profile = source && evaluateCadPart(source).part;
     return source && profile ? [evaluateCadFeatures(source, profile).part] : [];
   });
-  return applyExtrudeRemovals(document, applyPartCuts(document, [part, ...tools]).parts).parts[0]!;
+  return applyPartCuts(document, applyExtrudeRemovals(document, [part, ...tools]).parts).parts[0]!;
 }
 
 /** Adds a step that cuts the tool parts out of the target parts, with this much room around them. */

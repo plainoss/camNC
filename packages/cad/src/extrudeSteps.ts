@@ -1,3 +1,4 @@
+import { faceRemovalDepth } from './faceRemovalDepth';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
 import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
@@ -194,15 +195,20 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     if (!step.remove || step.suppressed || step.extrude === false || isSpatialRemoval(step)) continue;
     const support = removeSupport(resolved, step);
     if ('error' in support) continue;
+    const extent = faceRemovalDepth(step, support.board.thickness);
+    if ('error' in extent) continue;
     const face = removedSketch(step, support.face);
-    const typed = step.remove.depth !== 'through' && step.remove.depthExpression ? { depthExpression: step.remove.depthExpression } : {};
+    const typed =
+      !extent.derived && step.remove.depth !== 'through' && step.remove.depthExpression
+        ? { depthExpression: step.remove.depthExpression }
+        : {};
     const cuts = removedRegionIds(resolved, step).map(
       (regionId): CadCut => ({
         type: 'cut',
         id: `${step.id}:cut:${regionId}`,
         sketchId: step.sketch.id,
         regionId,
-        depth: step.remove!.depth,
+        depth: extent.depth,
         ...typed,
         removedBy: step.id,
       })
@@ -262,6 +268,8 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
     }
     const support = removeSupport(document, part);
     if ('error' in support) return support.error;
+    const extent = faceRemovalDepth(part, support.board.thickness);
+    if ('error' in extent) return extent.error;
     if (part.remove.depth !== 'through' && !(part.remove.depth > 0)) return 'A cut needs some depth.';
     if (!removedRegionIds(document, part).length) return 'Draw a closed shape on the face to cut it out.';
     // The board has to take the cuts, as CAM machines it: a through cut can't reach its edge, nor a pocket go through.

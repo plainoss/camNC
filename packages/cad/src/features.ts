@@ -1,4 +1,5 @@
-import { applyExtrudeRemovals } from './extrudeRemoval';
+import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
+import { faceRemovalDepth } from './faceRemovalDepth';
 import { newCadId, originId } from './document';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
@@ -20,7 +21,7 @@ import type {
   EvaluatedCadCut,
   EvaluatedCadPart,
 } from './types';
-import { isCadBody } from './extrudeSteps';
+import { isCadBody, resolveExtrudeSteps } from './extrudeSteps';
 
 /** Whether a part is one, rather than a sketch not yet extruded, a suppressed extrude, or an extrude that adds to or cuts others. */
 export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !part.suppressed && !part.addTo && !part.remove;
@@ -361,11 +362,21 @@ function cutFeatures(part: CadPart, profile: EvaluatedCadPart): { part: Evaluate
 
 export function evaluateCadDocument(given: CadDocument): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
   // What's suppressed in the feature list isn't built.
-  const document = activeDesign(given);
+  // Regenerate named face cuts before evaluating the sketches that reference their pocket floors.
+  const document = activeDesign(given.parts.some(part => part.remove && !isSpatialRemoval(part)) ? resolveExtrudeSteps(given) : given);
   const diagnostics = validateCadDocument(document);
   if (diagnostics.some(d => d.severity === 'error')) return { parts: [], diagnostics };
   const parts: EvaluatedCadPart[] = [];
   for (const part of document.parts) {
+    if (part.remove && !isSpatialRemoval(part) && part.extrude !== false && !part.suppressed) {
+      const on = part.drawnOn?.on;
+      const support = on && 'partId' in on && document.parts.find(candidate => candidate.id === on.partId);
+      if (support) {
+        const extent = faceRemovalDepth(part, support.thickness);
+        if ('error' in extent)
+          diagnostics.push({ code: 'extrude-remove-unresolved', severity: 'error', partId: part.id, message: extent.error });
+      }
+    }
     const result = evaluateCadPart(part);
     // A sketch not yet extruded needn't close into a profile, as a part's must: what's wrong with one is only a warning.
     diagnostics.push(
@@ -376,9 +387,10 @@ export function evaluateCadDocument(given: CadDocument): { parts: EvaluatedCadPa
     diagnostics.push(...evaluated.diagnostics);
     parts.push(evaluated.part);
   }
-  const cut = applyPartCuts(document, parts);
-  diagnostics.push(...cut.diagnostics);
-  const removed = applyExtrudeRemovals(document, cut.parts);
+  // Remove geometry is part of a body's shape before a later cut-parts step uses it as a tool.
+  const removed = applyExtrudeRemovals(document, parts);
   diagnostics.push(...removed.diagnostics);
-  return { parts: diagnostics.some(d => d.severity === 'error') ? [] : removed.parts, diagnostics };
+  const cut = applyPartCuts(document, removed.parts);
+  diagnostics.push(...cut.diagnostics);
+  return { parts: diagnostics.some(d => d.severity === 'error') ? [] : cut.parts, diagnostics };
 }

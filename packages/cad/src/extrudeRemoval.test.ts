@@ -15,6 +15,8 @@ import {
   solveCadDocument,
   setPartPattern,
   extrudeStepProblem,
+  resolveExtrudeSteps,
+  sketchRegions,
   type CadDocument,
   type CadPart,
 } from './index';
@@ -170,6 +172,72 @@ describe('positioned Extrude Remove', () => {
     expect(solved.diagnostics.some(problem => problem.code === 'corner-relief-skipped' && problem.severity === 'warning')).toBe(true);
     expect(solved.parts[0]!.cuts![0]!.to).toBe(5);
     expect(extrudeStepProblem(solved.document, solved.document.parts[1]!)).toBeNull();
+  });
+
+  it.each(['plane', 'face'])('uses prior %s removal geometry when a body becomes a cutting tool', async on => {
+    const document = design(6);
+    if (on === 'face') document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1 };
+    const receiver = {
+      ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!,
+      id: 'receiver',
+      drawnOn: { on: { plane: 'top' as const }, offset: 0 },
+    };
+    document.parts.push(receiver);
+    document.partCuts = [{ id: 'later-cut', tools: ['board'], targets: ['receiver'], clearance: 0 }];
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.diagnostics.some(problem => problem.message.includes('has a cut of its own'))).toBe(true);
+    expect(solved.parts.find(part => part.partId === 'receiver')!.cuts ?? []).toHaveLength(0);
+  });
+
+  it.each(['offset', 'symmetric'])('keeps dependent pocket-floor cuts after changing %s', async edit => {
+    let document = design(6);
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 0 };
+    document = resolveExtrudeSteps(document);
+    const floorId = document.parts[0]!.features!.find(feature => feature.type === 'cut')!.id;
+    const sketch = addRectangle(createCadPart().sketch, { x: 25, y: 35, width: 5, height: 5 });
+    document.parts[0]!.features!.push(
+      { type: 'sketch', id: 'dependent-sketch', on: { floorOf: floorId }, sketch },
+      { type: 'cut', id: 'dependent-cut', sketchId: sketch.id, regionId: sketchRegions(sketch)[0]!.id, depth: 2 }
+    );
+    if (edit === 'offset') document.parts[1]!.drawnOn!.offset = 1;
+    else document.parts[1]!.symmetric = true;
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.document.parts[0]!.features!.some(feature => feature.id === floorId)).toBe(true);
+    expect(solved.parts[0]!.cuts!.find(cut => cut.id === 'dependent-cut')).toMatchObject({
+      from: edit === 'offset' ? 5 : 3,
+      to: edit === 'offset' ? 7 : 5,
+    });
+  });
+
+  it('derives face-pocket depth from the current expressions without reapplying its original depth', async () => {
+    let document = design(6);
+    document.variables = [
+      { id: 'depth-value', name: 'pocketDepth', expression: '6 mm' },
+      { id: 'offset-value', name: 'startOffset', expression: '1 mm' },
+    ];
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1, offsetExpression: 'startOffset' };
+    document.parts[1]!.remove!.depthExpression = 'pocketDepth';
+    const first = await solveCadDocument(document);
+    expect(first.status).toBe('solved');
+    expect(first.parts[0]!.cuts![0]!.to).toBe(5);
+    document = first.document;
+    document.variables![0]!.expression = '8 mm';
+    document.variables![1]!.expression = '2 mm';
+    const second = await solveCadDocument(document);
+    expect(second.status).toBe('solved');
+    expect(second.parts[0]!.cuts![0]!.to).toBe(6);
+  });
+
+  it('reports a face removal that points away without removing its support', async () => {
+    const document = design(6);
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1, inward: false };
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('invalid');
+    expect(solved.diagnostics.some(problem => problem.severity === 'error' && problem.message.includes('does not reach the face'))).toBe(
+      true
+    );
   });
 
   it('rejects invalid saved removal scopes', () => {
