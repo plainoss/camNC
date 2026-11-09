@@ -11,6 +11,7 @@ import {
 import { assemblyModel, instanceKey } from './assemblyModel';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
+import type { StudioCameraRef } from './studioCamera';
 
 const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
@@ -29,6 +30,7 @@ const kDoubleClickMs = 400;
 /** Every part of the design where it sits. Click a part to select it, and double-click it to work on it. */
 export default function WorkspaceView({
   onReady,
+  cameraState,
   document,
   selectedId,
   onSelect,
@@ -57,6 +59,7 @@ export default function WorkspaceView({
 }: {
   /** The lazy view has mounted; a pending keyboard handoff can now focus it. */
   onReady?: () => void;
+  cameraState?: StudioCameraRef;
   document: CadDocument;
   selectedId: string | null;
   onSelect: (partId: string) => void;
@@ -239,6 +242,7 @@ export default function WorkspaceView({
         )}
       </div>
       <ModelViewport
+        cameraState={cameraState}
         meshes={model.meshes}
         parts={model.parts}
         view={view}

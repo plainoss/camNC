@@ -1,6 +1,7 @@
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
+import { faceExtrudeProblem, resolveFaceProfiles } from './faceExtrude';
 import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
 import { regionGroups } from './regionProfile';
@@ -123,6 +124,7 @@ function removedRegionIds(document: CadDocument, part: CadPart): string[] {
  * The design comes back unchanged when there's nothing to do.
  */
 export function resolveExtrudeSteps(document: CadDocument): CadDocument {
+  document = resolveFaceProfiles(document);
   const byId = new Map(document.parts.map(part => [part.id, part]));
   // A shared sketch's owner, following a chain left by an owner deleted in between.
   const owners = new Map<string, string>();
@@ -239,6 +241,11 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
 
 /** Why an Extrude → Add or Remove step can't do what it says, or null when it can. */
 export function extrudeStepProblem(document: CadDocument, part: CadPart): string | null {
+  if (part.faceProfile && part.drawnOn && 'partId' in part.drawnOn.on) {
+    const problem = faceExtrudeProblem(document, part.drawnOn.on, part.id);
+    if (problem) return problem;
+  }
+  if (part.addTo === '') return 'Pick a part for the merge scope.';
   if (part.addTo) {
     const target = document.parts.find(candidate => candidate.id === part.addTo);
     if (!target) return 'The part it adds to is gone. Pick another, or make a new part.';

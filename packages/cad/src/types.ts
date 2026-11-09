@@ -308,9 +308,11 @@ export interface CadPart {
    * editing the sketch there carries through; it's never edited here.
    */
   sketchOf?: string;
+  /** Extrudes the solid face named by drawnOn; its profile follows that face without a separate sketch step. */
+  faceProfile?: boolean;
   /**
    * Extrude → Add: the picked regions join this part, extruded from the same sketch, rather than making a part of
-   * their own. The step isn't a part itself.
+   * their own. The step isn't a part itself. An empty string is an Add waiting for a merge scope.
    */
   addTo?: string;
   /**

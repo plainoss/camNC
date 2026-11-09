@@ -1,0 +1,633 @@
+{
+  "version": 1,
+  "id": "face-bracket-1",
+  "name": "Face extrusion bracket",
+  "revision": 0,
+  "parts": [
+    {
+      "id": "face-bracket-2",
+      "name": "Panel",
+      "thickness": 25,
+      "sketch": {
+        "id": "face-bracket-3",
+        "entities": [
+          {
+            "id": "face-bracket-3:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "face-bracket-4",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-5",
+            "type": "point",
+            "x": 57.268,
+            "y": 0,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-6",
+            "type": "point",
+            "x": 57.268,
+            "y": 0,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-7",
+            "type": "point",
+            "x": 57.268,
+            "y": 63,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-8",
+            "type": "point",
+            "x": 57.268,
+            "y": 63,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-9",
+            "type": "point",
+            "x": 0,
+            "y": 63,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-10",
+            "type": "point",
+            "x": 0,
+            "y": 63,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-11",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-12",
+            "type": "line",
+            "startId": "face-bracket-4",
+            "endId": "face-bracket-5"
+          },
+          {
+            "id": "face-bracket-13",
+            "type": "line",
+            "startId": "face-bracket-6",
+            "endId": "face-bracket-7"
+          },
+          {
+            "id": "face-bracket-14",
+            "type": "line",
+            "startId": "face-bracket-8",
+            "endId": "face-bracket-9"
+          },
+          {
+            "id": "face-bracket-15",
+            "type": "line",
+            "startId": "face-bracket-10",
+            "endId": "face-bracket-11"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "face-bracket-16",
+            "type": "coincident",
+            "pointAId": "face-bracket-11",
+            "pointBId": "face-bracket-4"
+          },
+          {
+            "id": "face-bracket-17",
+            "type": "coincident",
+            "pointAId": "face-bracket-5",
+            "pointBId": "face-bracket-6"
+          },
+          {
+            "id": "face-bracket-18",
+            "type": "coincident",
+            "pointAId": "face-bracket-7",
+            "pointBId": "face-bracket-8"
+          },
+          {
+            "id": "face-bracket-19",
+            "type": "coincident",
+            "pointAId": "face-bracket-9",
+            "pointBId": "face-bracket-10"
+          },
+          {
+            "id": "face-bracket-20",
+            "type": "horizontal",
+            "entityId": "face-bracket-12"
+          },
+          {
+            "id": "face-bracket-21",
+            "type": "parallel",
+            "entityAId": "face-bracket-12",
+            "entityBId": "face-bracket-14"
+          },
+          {
+            "id": "face-bracket-22",
+            "type": "parallel",
+            "entityAId": "face-bracket-13",
+            "entityBId": "face-bracket-15"
+          },
+          {
+            "id": "face-bracket-23",
+            "type": "perpendicular",
+            "entityAId": "face-bracket-12",
+            "entityBId": "face-bracket-13"
+          },
+          {
+            "id": "face-bracket-24",
+            "type": "distanceX",
+            "pointAId": "face-bracket-4",
+            "pointBId": "face-bracket-5",
+            "value": 57.268,
+            "label": "Width",
+            "sourceEntityId": "face-bracket-12"
+          },
+          {
+            "id": "face-bracket-25",
+            "type": "distanceY",
+            "pointAId": "face-bracket-6",
+            "pointBId": "face-bracket-7",
+            "value": 63,
+            "label": "Height",
+            "sourceEntityId": "face-bracket-13"
+          },
+          {
+            "type": "coincident",
+            "pointAId": "face-bracket-4",
+            "pointBId": "face-bracket-3:origin",
+            "id": "face-bracket-26"
+          }
+        ]
+      },
+      "drawnOn": {
+        "on": {
+          "plane": "front"
+        },
+        "offset": 0
+      },
+      "placement": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0.707106781,
+          0,
+          0,
+          0.707106781
+        ]
+      }
+    },
+    {
+      "id": "face-bracket-27",
+      "name": "Shelf",
+      "thickness": 65.7,
+      "sketch": {
+        "id": "face-bracket-28",
+        "entities": [
+          {
+            "id": "face-bracket-28:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "face-bracket-29",
+            "type": "point",
+            "x": 0,
+            "y": 48.34,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-30",
+            "type": "point",
+            "x": 57.268,
+            "y": 48.34,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-31",
+            "type": "point",
+            "x": 57.268,
+            "y": 48.34,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-32",
+            "type": "point",
+            "x": 57.268,
+            "y": 63,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-33",
+            "type": "point",
+            "x": 57.268,
+            "y": 63,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-34",
+            "type": "point",
+            "x": 0,
+            "y": 63,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-35",
+            "type": "point",
+            "x": 0,
+            "y": 63,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-36",
+            "type": "point",
+            "x": 0,
+            "y": 48.34,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-37",
+            "type": "line",
+            "startId": "face-bracket-29",
+            "endId": "face-bracket-30"
+          },
+          {
+            "id": "face-bracket-38",
+            "type": "line",
+            "startId": "face-bracket-31",
+            "endId": "face-bracket-32"
+          },
+          {
+            "id": "face-bracket-39",
+            "type": "line",
+            "startId": "face-bracket-33",
+            "endId": "face-bracket-34"
+          },
+          {
+            "id": "face-bracket-40",
+            "type": "line",
+            "startId": "face-bracket-35",
+            "endId": "face-bracket-36"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "face-bracket-41",
+            "type": "coincident",
+            "pointAId": "face-bracket-36",
+            "pointBId": "face-bracket-29"
+          },
+          {
+            "id": "face-bracket-42",
+            "type": "coincident",
+            "pointAId": "face-bracket-30",
+            "pointBId": "face-bracket-31"
+          },
+          {
+            "id": "face-bracket-43",
+            "type": "coincident",
+            "pointAId": "face-bracket-32",
+            "pointBId": "face-bracket-33"
+          },
+          {
+            "id": "face-bracket-44",
+            "type": "coincident",
+            "pointAId": "face-bracket-34",
+            "pointBId": "face-bracket-35"
+          },
+          {
+            "id": "face-bracket-45",
+            "type": "horizontal",
+            "entityId": "face-bracket-37"
+          },
+          {
+            "id": "face-bracket-46",
+            "type": "parallel",
+            "entityAId": "face-bracket-37",
+            "entityBId": "face-bracket-39"
+          },
+          {
+            "id": "face-bracket-47",
+            "type": "parallel",
+            "entityAId": "face-bracket-38",
+            "entityBId": "face-bracket-40"
+          },
+          {
+            "id": "face-bracket-48",
+            "type": "perpendicular",
+            "entityAId": "face-bracket-37",
+            "entityBId": "face-bracket-38"
+          }
+        ]
+      },
+      "drawnOn": {
+        "on": {
+          "partId": "face-bracket-2",
+          "face": "top"
+        },
+        "offset": 0
+      },
+      "placement": {
+        "position": [
+          0,
+          -24.999999987,
+          1.3e-8
+        ],
+        "rotation": [
+          0.707106781,
+          0,
+          0,
+          0.707106782
+        ]
+      }
+    },
+    {
+      "id": "face-bracket-49",
+      "name": "Side",
+      "thickness": 3,
+      "sketch": {
+        "id": "face-bracket-50",
+        "entities": [
+          {
+            "id": "face-bracket-50:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "face-bracket-51",
+            "type": "point",
+            "x": 0,
+            "y": 25,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-52",
+            "type": "point",
+            "x": 63,
+            "y": 25,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-53",
+            "type": "point",
+            "x": 63,
+            "y": 25,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-54",
+            "type": "point",
+            "x": 63,
+            "y": 90.7,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-55",
+            "type": "point",
+            "x": 63,
+            "y": 90.7,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-56",
+            "type": "point",
+            "x": 0,
+            "y": 90.7,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-57",
+            "type": "point",
+            "x": 0,
+            "y": 90.7,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-58",
+            "type": "point",
+            "x": 0,
+            "y": 25,
+            "standalone": false
+          },
+          {
+            "id": "face-bracket-59",
+            "type": "line",
+            "startId": "face-bracket-51",
+            "endId": "face-bracket-52"
+          },
+          {
+            "id": "face-bracket-60",
+            "type": "line",
+            "startId": "face-bracket-53",
+            "endId": "face-bracket-54"
+          },
+          {
+            "id": "face-bracket-61",
+            "type": "line",
+            "startId": "face-bracket-55",
+            "endId": "face-bracket-56"
+          },
+          {
+            "id": "face-bracket-62",
+            "type": "line",
+            "startId": "face-bracket-57",
+            "endId": "face-bracket-58"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "face-bracket-63",
+            "type": "coincident",
+            "pointAId": "face-bracket-58",
+            "pointBId": "face-bracket-51"
+          },
+          {
+            "id": "face-bracket-64",
+            "type": "coincident",
+            "pointAId": "face-bracket-52",
+            "pointBId": "face-bracket-53"
+          },
+          {
+            "id": "face-bracket-65",
+            "type": "coincident",
+            "pointAId": "face-bracket-54",
+            "pointBId": "face-bracket-55"
+          },
+          {
+            "id": "face-bracket-66",
+            "type": "coincident",
+            "pointAId": "face-bracket-56",
+            "pointBId": "face-bracket-57"
+          },
+          {
+            "id": "face-bracket-67",
+            "type": "horizontal",
+            "entityId": "face-bracket-59"
+          },
+          {
+            "id": "face-bracket-68",
+            "type": "parallel",
+            "entityAId": "face-bracket-59",
+            "entityBId": "face-bracket-61"
+          },
+          {
+            "id": "face-bracket-69",
+            "type": "parallel",
+            "entityAId": "face-bracket-60",
+            "entityBId": "face-bracket-62"
+          },
+          {
+            "id": "face-bracket-70",
+            "type": "perpendicular",
+            "entityAId": "face-bracket-59",
+            "entityBId": "face-bracket-60"
+          }
+        ]
+      },
+      "drawnOn": {
+        "on": {
+          "partId": "face-bracket-2",
+          "face": {
+            "edge": "face-bracket-13"
+          }
+        },
+        "offset": 0
+      },
+      "placement": {
+        "position": [
+          57.268,
+          0,
+          0
+        ],
+        "rotation": [
+          0.707106781,
+          0,
+          0.707106781,
+          0
+        ]
+      }
+    },
+    {
+      "id": "face-bracket-71",
+      "name": "Face extension",
+      "thickness": 25,
+      "sketch": {
+        "id": "face-bracket-72",
+        "entities": [
+          {
+            "id": "face-bracket-72:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "type": "point",
+            "id": "face-bracket-72:profile:0:0",
+            "fixed": true
+          },
+          {
+            "x": 63,
+            "y": 0,
+            "type": "point",
+            "id": "face-bracket-72:profile:0:1",
+            "fixed": true
+          },
+          {
+            "x": 63,
+            "y": 3,
+            "type": "point",
+            "id": "face-bracket-72:profile:0:2",
+            "fixed": true
+          },
+          {
+            "x": 0,
+            "y": 3,
+            "type": "point",
+            "id": "face-bracket-72:profile:0:3",
+            "fixed": true
+          },
+          {
+            "type": "line",
+            "id": "face-bracket-72:profile:0:0:edge",
+            "startId": "face-bracket-72:profile:0:0",
+            "endId": "face-bracket-72:profile:0:1"
+          },
+          {
+            "type": "line",
+            "id": "face-bracket-72:profile:0:1:edge",
+            "startId": "face-bracket-72:profile:0:1",
+            "endId": "face-bracket-72:profile:0:2"
+          },
+          {
+            "type": "line",
+            "id": "face-bracket-72:profile:0:2:edge",
+            "startId": "face-bracket-72:profile:0:2",
+            "endId": "face-bracket-72:profile:0:3"
+          },
+          {
+            "type": "line",
+            "id": "face-bracket-72:profile:0:3:edge",
+            "startId": "face-bracket-72:profile:0:3",
+            "endId": "face-bracket-72:profile:0:0"
+          }
+        ],
+        "constraints": []
+      },
+      "faceProfile": true,
+      "drawnOn": {
+        "on": {
+          "partId": "face-bracket-49",
+          "face": {
+            "edge": "face-bracket-59"
+          }
+        },
+        "offset": 0
+      },
+      "upTo": {
+        "partId": "face-bracket-2",
+        "face": "underside"
+      },
+      "addTo": "face-bracket-49",
+      "placement": {
+        "position": [
+          57.268,
+          -24.999999974,
+          0
+        ],
+        "rotation": [
+          -0.499999999,
+          -0.5,
+          -0.5,
+          0.500000001
+        ]
+      }
+    }
+  ]
+}

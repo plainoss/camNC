@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { afterEach, expect, it } from 'vitest';
 import { FitCamera, type ViewRequest } from './ModelViewport';
+import type { StudioCameraRef } from '@/cad/studioCamera';
 
 let seen: THREE.Camera | null = null;
 let controls: OrbitControlsImpl | null = null;
@@ -21,17 +22,45 @@ function Probe() {
 
 const box = (size: number) => new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(size, size, size));
 
-function View({ size, fitKey, viewRequest }: { size: number; fitKey: string; viewRequest?: ViewRequest }) {
+function View({
+  size,
+  fitKey,
+  viewRequest,
+  cameraState,
+}: {
+  size: number;
+  fitKey: string;
+  viewRequest?: ViewRequest;
+  cameraState?: StudioCameraRef;
+}) {
   return (
     <div style={{ width: 400, height: 300 }}>
-      <Canvas camera={{ fov: 30 }}>
-        <FitCamera box={box(size)} fitKey={fitKey} viewRequest={viewRequest} />
+      <Canvas orthographic={!!cameraState} camera={{ fov: 30 }}>
+        <FitCamera box={box(size)} fitKey={fitKey} viewRequest={viewRequest} cameraState={cameraState} />
         <OrbitControls makeDefault />
         <Probe />
       </Canvas>
     </div>
   );
 }
+
+it('restores the studio camera after its canvas is replaced, without replaying a previous named view request', async () => {
+  const cameraState: StudioCameraRef = { current: null };
+  const request: ViewRequest = { name: 'front', seq: 3 };
+  const first = render(<View size={100} fitKey="assembled" viewRequest={request} cameraState={cameraState} />);
+  await waitFor(() => expect(cameraState.current?.seq).toBe(3), { timeout: 20000 });
+  seen!.position.set(30, -20000, 125);
+  controls!.target.set(15, 25, 35);
+  (seen as unknown as THREE.OrthographicCamera).zoom *= 1.7;
+  controls!.update();
+  await waitFor(() => expect(cameraState.current?.center).toEqual([15, 25, 35]), { timeout: 20000 });
+  const saved = structuredClone(cameraState.current!);
+  first.unmount();
+  render(<View size={400} fitKey="assembled" viewRequest={request} cameraState={cameraState} />);
+  await waitFor(() => expect(controls!.target.toArray()).toEqual(saved.center), { timeout: 20000 });
+  expect(seen!.getWorldDirection(new THREE.Vector3()).negate().toArray()).toEqual(saved.back);
+  expect(cameraState.current!.height).toBeCloseTo(saved.height, 8);
+});
 
 it('leaves the camera where it is when what it shows changes, and fits again only for a new view', async () => {
   const view = render(<View size={100} fitKey="assembled" />);

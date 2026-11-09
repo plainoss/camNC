@@ -44,10 +44,15 @@ export function cadSketchFrame(document: CadDocument, part: CadPart): Frame | nu
  * The corners of the other parts, as a sketch on `frame` sees them, so an edge used from the view can be tied to the
  * corners it runs between. Keys are positions rounded to a thousandth of a mm.
  */
-export function cadCornerSources(document: CadDocument, frame: Frame, except?: string): Map<string, NonNullable<CadPointEntity['used']>> {
+export function cadCornerSources(
+  document: CadDocument,
+  frame: Frame,
+  except?: string,
+  sourcePartId?: string
+): Map<string, NonNullable<CadPointEntity['used']>> {
   const sources = new Map<string, NonNullable<CadPointEntity['used']>>();
   for (const part of document.parts) {
-    if (part.id === except || !isCadPart(part) || part.thin || !part.drawnOn) continue;
+    if (part.id === except || (sourcePartId && part.id !== sourcePartId) || !isCadPart(part) || part.thin || !part.drawnOn) continue;
     for (const entity of part.sketch.entities) {
       if (entity.type !== 'point' || entity.construction) continue;
       for (const side of ['top', 'bottom'] as const) {

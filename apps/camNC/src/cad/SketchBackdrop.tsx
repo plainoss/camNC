@@ -1,6 +1,6 @@
 import type { CadDocument } from '@wbcnc/cad';
 import { useEffect, useMemo } from 'react';
-import { ModelViewport, type SketchView } from '@/cam/model/ModelViewport';
+import { ModelViewport, type SketchView, type ViewPlane } from '@/cam/model/ModelViewport';
 import { assemblyModel } from './assemblyModel';
 import { partEdgesOnPlane, type PartEdge } from './partEdges';
 
@@ -16,6 +16,7 @@ export default function SketchBackdrop({
   view,
   hiddenIds,
   onEdges,
+  planes,
 }: {
   /** The design as it was before this sketch's part. */
   document: CadDocument;
@@ -23,6 +24,7 @@ export default function SketchBackdrop({
   hiddenIds?: ReadonlySet<string>;
   /** The parts' edges as the sketch's plane sees them, for it to use or snap to. */
   onEdges?: (edges: PartEdge[]) => void;
+  planes?: ViewPlane[];
 }) {
   const model = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
   // Only where the plane is matters to the edges, not what part of it is in view.
@@ -41,6 +43,9 @@ export default function SketchBackdrop({
         milled={always}
         onSelect={nothing}
         sketchView={view}
+        palette="studio"
+        display="edges"
+        planes={planes}
       />
     </div>
   );
