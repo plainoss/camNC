@@ -92,10 +92,9 @@ import {
   CAD_CHORD_TOLERANCE,
   isCadPart,
   newExtrudeOf,
+  newExtrudeOnFace,
+  faceExtrudeProblem,
   resolveExtrudeSteps,
-  cadDrawnOnSupports,
-  CAD_IDENTITY_PLACEMENT,
-  withFaceEdges,
   cadVariableScope,
   addPartCut,
   updatePartCut,
@@ -249,13 +248,17 @@ import { PlaneDialog } from './PlaneDialog';
 import { ShapeStepDialogs } from './ShapeStepDialogs';
 import { HoleDialog } from './HoleDialog';
 import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
-import { pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
+import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
-import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
+import { designSteps, type DesignStep } from './designSteps';
 import { toggleSuppressed } from './toggleSuppressed';
 import { reorderedSteps } from './reorderSteps';
 import type { PartEdge } from './partEdges';
-import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
+import { drawingMatrix, edgeOn, normalTurn, straightOn, turnedBy, type SketchTurn } from './sketchOrbit';
+import { cameraFromSketch, sketchFromCamera, type StudioCameraState } from './studioCamera';
+import { sketchBackdropView } from './sketchBackdropView';
+import { bindPartCorners, partCornerInference } from './partCornerInference';
+import { newSketchPart } from './newSketchPart';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 import './cad.css';
@@ -473,6 +476,8 @@ export function CadEditor({
   const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
   const [sketchTurn, setSketchTurn] = useState<SketchTurn>(straightOn);
+  const studioCamera = useRef<StudioCameraState | null>(null);
+  const [sketchCameraShift, setSketchCameraShift] = useState<[number, number]>([0, 0]);
   // The edges of the parts behind a studio sketch, laid on its plane, and those picked to use in it with `u`.
   const [partEdges, setPartEdges] = useState<PartEdge[]>([]);
   const [pickedEdges, setPickedEdges] = useState<string[]>([]);
@@ -1448,12 +1453,21 @@ export function CadEditor({
         preferredPointIds: hoveredReferences.current,
         excludePointIds: [...(drag.current?.points ?? []), ...(tool === 'line' && startId && inference.current ? [startId] : [])],
       });
+      lastDrawingHint.current = partCornerInference(
+        sketchBackdrop?.document,
+        part,
+        partEdges,
+        raw,
+        lastDrawingHint.current,
+        projectPoint,
+        lockedAxes
+      );
       point = { ...lastDrawingHint.current.point };
     } else if (!hit) point = { x: Math.round(raw.x), y: Math.round(raw.y) };
     return point;
   };
   const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex: number | readonly number[] = -1) =>
-    sketch ? addDrawingRelations(sketch, source, hints, { tool, curvePointIndex }) : source;
+    sketch ? bindPartCorners(sketch, addDrawingRelations(sketch, source, hints, { tool, curvePointIndex }), hints) : source;
   const addShape = (end?: Point) => {
     if (!sketch || !pending[0]) return;
     const anchor = lineContinuation ? chainGeometry(sketch, chain) : null;
@@ -2322,6 +2336,7 @@ export function CadEditor({
     if (key === 'n' && sketchBackdrop) {
       event.preventDefault();
       setSketchTurn(normalTurn);
+      setSketchCameraShift([0, 0]);
       return;
     }
     if (key === 'escape' && usingEdges) {
@@ -3457,6 +3472,7 @@ export function CadEditor({
     }
   };
   const openFeature = (kind: 'extrude' | 'pattern' | 'hole', partId: string, before = documentRef.current) => {
+    setSelectedFace(null);
     setPartCutting(null);
     setVariableDialog(null);
     setPlaneDialog(null);
@@ -3487,9 +3503,19 @@ export function CadEditor({
   };
   /** Opens a part's sketch from the studio, remembering the design to go back to if it's cancelled. */
   const openSketch = (stepPartId: string, before = documentRef.current) => {
+    setSelectedFace(null);
     setCancelledSketch(null);
     // A shared sketch is edited where it's drawn, and every extrude of it follows.
     const partId = documentRef.current.parts.find(candidate => candidate.id === stepPartId)?.sketchOf ?? stepPartId;
+    const opening = documentRef.current.parts.find(candidate => candidate.id === partId);
+    if (opening?.faceProfile) return openFeature('extrude', partId);
+    const frame = opening && cadSketchFrame(documentRef.current, opening);
+    const bounds = root.current?.querySelector('[data-testid="workspace-3d"] canvas')?.getBoundingClientRect();
+    const carried =
+      studioCamera.current && frame && bounds?.height ? sketchFromCamera(studioCamera.current, frame, bounds.width / bounds.height) : null;
+    setSketchTurn(carried?.turn ?? straightOn);
+    setSketchCameraShift(carried?.shift ?? [0, 0]);
+    if (carried) setView(carried.view);
     sketchBefore.current = before;
     setFeatureDialog(null);
     setVariableDialog(null);
@@ -3514,6 +3540,22 @@ export function CadEditor({
         applyConicRho() ||
         (creationValues?.editing ? applyCreationValue({ advance: false }) : null);
       if (error) return setMessage(error);
+    }
+    const frame = part && cadSketchFrame(documentRef.current, part);
+    if (frame && canvasBox?.height) {
+      const scale = Math.min(canvasBox.width / view.w, canvasBox.height / view.h);
+      studioCamera.current = cameraFromSketch(
+        frame,
+        {
+          x: view.x + view.w / 2 - canvasBox.width / scale / 2,
+          y: view.y + view.h / 2 - canvasBox.height / scale / 2,
+          w: canvasBox.width / scale,
+          h: canvasBox.height / scale,
+        },
+        sketchTurn,
+        studioCamera.current,
+        sketchCameraShift
+      );
     }
     if (!keep && sketchBefore.current) {
       const cancelled = { document: structuredClone(documentRef.current), partId: part!.id, before: sketchBefore.current };
@@ -3650,7 +3692,12 @@ export function CadEditor({
         })
       );
     // In the studio a sketch stands on its own, as in the reference: deleting its Extrude leaves the sketch.
-    if (step.kind === 'extrude' && studioSession && !current.parts.find(p => p.id === step.partId)?.sketchOf)
+    if (
+      step.kind === 'extrude' &&
+      studioSession &&
+      !current.parts.find(p => p.id === step.partId)?.sketchOf &&
+      !current.parts.find(p => p.id === step.partId)?.faceProfile
+    )
       commit(replacePart(current, step.partId, withoutExtrude));
     else if (step.kind === 'sketch' || step.kind === 'extrude') {
       // A part is its sketch pushed out, so deleting either deletes the part.
@@ -3675,45 +3722,16 @@ export function CadEditor({
   /** Starts a new part drawn on a base plane or a part's face, or on one of the design's planes, and opens its sketch. */
   const newPartOn = (on: CadDrawnOn['on'], datum?: string) => {
     const before = documentRef.current;
-    // A design's board thickness, when it names one, is what a new part is made from.
-    const board = ['material', 'board', 'thickness'].find(name => Object.hasOwn(variableScope, name));
-    const added = createCadPart(
-      `Part ${documentRef.current.parts.length + 1}`,
-      board ? variableScope[board]!.value : (part?.thickness ?? 18)
-    );
-    // A design's blank first part is the one sketched, rather than a second beside it.
-    const blank = documentRef.current.parts.length === 1 && isBlank(documentRef.current.parts[0]!);
-    const base = blank ? documentRef.current.parts[0]! : added;
-    // In the studio a new sketch is a sketch until Extrude makes a part of it, as in the reference.
-    const placed = {
-      ...base,
-      ...(board && { thicknessExpression: board }),
-      drawnOn: {
-        on,
-        offset: (datum && documentRef.current.planes?.find(plane => plane.id === datum)?.offset) || 0,
-        ...(datum && { datum }),
-      },
-      ...(studioSession && { extrude: false as const }),
-    };
-    // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
-    const drawn = { ...placed, sketch: withFaceEdges(documentRef.current, placed) };
-    // A new feature goes in at the rollback bar, as in the reference: after the part the bar sits in, and the bar follows it.
-    const parts = documentRef.current.parts;
-    const atBar = rolledTo
-      ? parts.findIndex(
-          candidate =>
-            rolledTo.startsWith(`${candidate.id}:`) ||
-            candidate.features?.some(f => f.id === rolledTo) ||
-            candidate.copies?.some(c => c.id === rolledTo) ||
-            candidate.pattern?.id === rolledTo
-        )
-      : -1;
-    commit({
-      ...documentRef.current,
-      revision: documentRef.current.revision + 1,
-      parts: blank ? [drawn] : atBar >= 0 ? [...parts.slice(0, atBar + 1), drawn, ...parts.slice(atBar + 1)] : [...parts, drawn],
+    const made = newSketchPart(before, on, {
+      variables: variableScope,
+      studio: studioSession,
+      thickness: part?.thickness,
+      datum,
+      rolledTo,
     });
-    if (atBar >= 0) setRolledTo(`${drawn.id}:sketch`);
+    const drawn = made.part;
+    commit(made.document);
+    if (made.inserted) setRolledTo(`${drawn.id}:sketch`);
     const onName = (datum && pickedPlane(documentRef.current, datum)?.name) || drawnOnName(documentRef.current, on);
     setMessage(`Draw the new part's outline on ${onName}, then finish to see it in place.`);
     if (studioSession) return openSketch(drawn.id, before);
@@ -3795,6 +3813,15 @@ export function CadEditor({
       setFeatureDialog(null);
       setChoosingFace(false);
       setPartCutting({});
+    } else if (command === 'extrude' && selectedFace) {
+      const before = documentRef.current;
+      const problem = faceExtrudeProblem(before, selectedFace);
+      if (problem) return setStudioRefusal(problem);
+      const made = newExtrudeOnFace(before, selectedFace, `Part ${before.parts.length + 1}`);
+      if (!evaluateCadPart(made).part) return setStudioRefusal('Pick a planar face that can be extruded.');
+      commit({ ...before, revision: before.revision + 1, parts: [...before.parts, made] });
+      setSelectedFace(null);
+      openFeature('extrude', made.id, before);
     } else if (command === 'extrude' && part?.extrude === false) {
       // Extruding a sketch makes a part of it; cancelling leaves the sketch as it was. One line is a board edge-on.
       const before = documentRef.current;
@@ -3911,42 +3938,10 @@ export function CadEditor({
   };
   const sketchBackdrop = useMemo(() => {
     if (!studioSession || showWorkspace || show3D || !part || !canvasBox?.width || !canvasBox.height) return null;
-    const on = part.drawnOn?.on ?? { plane: 'top' as const };
-    const frame = cadFaceFrame(doc, on);
-    if ('error' in frame) return null;
-    const offset = part.drawnOn?.offset ?? 0;
-    const origin = frame.origin.map((value, axis) => value + frame.normal[axis]! * offset) as [number, number, number];
-    // The drawing keeps its view box whole, so its shorter side shows more than the box.
-    const scale = Math.min(canvasBox.width / view.w, canvasBox.height / view.h);
-    const steps = designSteps(doc);
-    const at = steps.findIndex(step => step.id === `${part.id}:sketch`);
-    const before = at > 0 ? rolledBackTo(doc, steps[at - 1]!.id) : { ...doc, parts: [] };
-    // A part something is drawn on stays where the drawing is, even when what's drawn on it is only this sketch's part.
-    const supports = cadDrawnOnSupports(doc);
-    return {
-      document: {
-        ...before,
-        parts: before.parts
-          .filter(candidate => candidate.id !== part.id)
-          .map(candidate =>
-            !candidate.placement && supports.has(candidate.id) ? { ...candidate, placement: CAD_IDENTITY_PLACEMENT } : candidate
-          ),
-      },
-      view: {
-        origin,
-        x: frame.x,
-        y: frame.y,
-        normal: frame.normal,
-        center: [view.x + view.w / 2, -(view.y + view.h / 2)] as [number, number],
-        width: canvasBox.width / scale,
-        height: canvasBox.height / scale,
-        turned: sketchTurn === straightOn ? undefined : turnAxes(sketchTurn),
-      },
-    };
-  }, [studioSession, showWorkspace, show3D, part, canvasBox, doc, view, sketchTurn]);
-  // Each sketch opens looking straight at its plane, with nothing of the parts behind it picked.
+    return sketchBackdropView(doc, part, view, sketchTurn, canvasBox, sketchCameraShift);
+  }, [studioSession, showWorkspace, show3D, part, canvasBox, doc, view, sketchTurn, sketchCameraShift]);
+  // Picking context is local to a sketch; opening it leaves the camera where the studio was looking.
   useEffect(() => {
-    setSketchTurn(straightOn);
     setPickedEdges([]);
   }, [part?.id, showWorkspace]);
   // The parts' edges the drawing shows: all of them looking straight at the plane, and once turned, those in it, the
@@ -4007,7 +4002,7 @@ export function CadEditor({
   const turned = !!sketchBackdrop && sketchTurn !== straightOn;
   const [ta, tb, tc, td] = drawingMatrix(sketchTurn);
   const middle = { x: view.x + view.w / 2, y: view.y + view.h / 2 };
-  const turnTransform = `translate(${middle.x} ${middle.y}) matrix(${ta} ${tb} ${tc} ${td} 0 0) translate(${-middle.x} ${-middle.y})`;
+  const turnTransform = `translate(${middle.x + sketchCameraShift[0]} ${middle.y + sketchCameraShift[1]}) matrix(${ta} ${tb} ${tc} ${td} 0 0) translate(${-middle.x} ${-middle.y})`;
   const turnDet = ta * td - tb * tc || 1;
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
@@ -4073,6 +4068,7 @@ export function CadEditor({
         }
         trouble={partTrouble}
         onPick={partId => {
+          setSelectedFace(null);
           if (partCutting && showWorkspace) return pickForCut(partId);
           setPartId(partId);
           setSelected([]);
@@ -4193,6 +4189,7 @@ export function CadEditor({
               selectedPartId={part?.id ?? null}
               onSelect={entry => {
                 setSketchRowPicked(entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.partId : null);
+                setSelectedFace(null);
                 if (entry.kind === 'step') {
                   setPartId(entry.step.partId);
                   setSelected([]);
@@ -4628,6 +4625,7 @@ export function CadEditor({
           {showWorkspace && (
             <Suspense fallback={<div className="cad-part-view" />}>
               <WorkspaceView
+                cameraState={studioCamera}
                 onReady={focusViewIfIdle}
                 document={shownDocument}
                 viewRequest={viewRequest}
@@ -4749,6 +4747,7 @@ export function CadEditor({
                 <SketchBackdrop
                   document={sketchBackdrop.document}
                   view={sketchBackdrop.view}
+                  planes={showPlanes ? basePlaneViews(doc).filter(plane => featureShown(plane.id)) : []}
                   hiddenIds={hiddenParts}
                   onEdges={setPartEdges}
                 />

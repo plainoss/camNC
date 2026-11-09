@@ -37,6 +37,7 @@ const names = (document: CadDocument, ids: string[]) =>
 
 /** What an extrude does: the thickness of a new part, the part it adds to, or how deep it removes. */
 function extrudeDetail(document: CadDocument, part: CadPart) {
+  if (part.addTo === '') return 'choose merge scope';
   if (part.addTo) return `add to ${names(document, [part.addTo])}`;
   if (part.remove)
     return `remove ${part.remove.depth === 'through' ? 'through all' : typed(part.remove.depthExpression, part.remove.depth)}`;
@@ -119,7 +120,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
   return document.parts.flatMap((part, partIndex) => {
     const steps: DesignStep[] = [
       // A part extruding another's sketch has none of its own.
-      ...(part.sketchOf
+      ...(part.sketchOf || part.faceProfile
         ? []
         : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: part.sketchName ?? `Sketch · ${part.name}`, partId: part.id }]),
       // A sketch not yet extruded is only its sketch.
@@ -220,7 +221,7 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
   if (at < 0 || at === steps.length - 1) return document;
   const kept = new Set(steps.slice(0, at + 1).map(step => step.id));
   const parts = document.parts
-    .filter(part => kept.has(`${part.id}:${part.sketchOf ? 'extrude' : 'sketch'}`))
+    .filter(part => kept.has(`${part.id}:${part.sketchOf || part.faceProfile ? 'extrude' : 'sketch'}`))
     .map(part => {
       // Rolled back past its extrude, a part is only its sketch.
       const next: CadPart = kept.has(`${part.id}:extrude`) || part.extrude === false ? { ...part } : { ...part, extrude: false };

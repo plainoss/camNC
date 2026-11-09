@@ -11,7 +11,7 @@ export function sketchLinesInModel(
   shown: (partId: string) => boolean = partId => !isCadPart(document.parts.find(part => part.id === partId)!)
 ): { partId: string; points: Vec3[] }[] {
   return document.parts
-    .filter(part => !part.sketchOf && shown(part.id))
+    .filter(part => !part.sketchOf && !part.faceProfile && shown(part.id))
     .flatMap(part => {
       const frame = cadFaceFrame(document, part.drawnOn?.on ?? { plane: 'top' });
       if ('error' in frame) return [];

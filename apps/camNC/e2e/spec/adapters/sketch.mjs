@@ -145,10 +145,25 @@ export async function createAdapter(page, url) {
   await page.getByRole('button', { name: /^New design/ }).click();
   const canvas = page.getByTestId('cad-canvas');
   const studioToolbar = page.getByRole('toolbar', { name: 'Part Studio toolbar' });
+  await page.getByTestId('model-origin').waitFor();
   // A new design opens in the Part Studio with no parts: scenarios start a sketch on the top plane.
   await studioToolbar.getByRole('button', { name: /Sketch/ }).click();
   await page.getByRole('list', { name: 'Default geometry' }).getByRole('button', { name: 'Top', exact: true }).click();
   await canvas.waitFor();
+  // These coordinate specs ask for a normal drawing view explicitly; opening a sketch preserves the studio camera.
+  await canvas.press('n');
+  await waitSettled(page);
+  const pan = await canvas.evaluate(svg => {
+    const view = svg.viewBox.baseVal, matrix = svg.getScreenCTM();
+    const center = new DOMPoint(view.x + view.width / 2, view.y + view.height / 2).matrixTransform(matrix);
+    const wanted = new DOMPoint(115, -70).matrixTransform(matrix);
+    return { x: center.x, y: center.y, dx: center.x - wanted.x, dy: center.y - wanted.y };
+  });
+  await page.mouse.move(pan.x, pan.y);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.move(pan.x + pan.dx, pan.y + pan.dy, { steps: 4 });
+  await page.mouse.up({ button: 'middle' });
+  await waitSettled(page);
   // Existing designs open in the Part Studio, and most steps work on the first part's sketch.
   const flatView = async () => {
     await page.getByRole('toolbar', { name: /^(Part Studio|Sketch) toolbar$/ }).first().waitFor();
@@ -158,6 +173,10 @@ export async function createAdapter(page, url) {
     const drawing = page.getByRole('group', { name: 'Show' }).getByRole('button', { name: 'Drawing', exact: true });
     if ((await drawing.isVisible()) && (await drawing.getAttribute('aria-pressed')) !== 'true') await drawing.click();
     await canvas.waitFor();
+    if ((await canvas.getAttribute('data-sketch-turned')) !== null) {
+      await canvas.press('n');
+      await waitSettled(page);
+    }
   };
   /** Closes the open sketch back to the studio with its dialog's tick. */
   const closeSketch = async () => {
@@ -196,7 +215,7 @@ export async function createAdapter(page, url) {
   const screen = async ([x, y]) => {
     await canvas.waitFor({ state: 'attached', timeout: 30_000 });
     return canvas.evaluate((svg, p) => {
-      const q = new DOMPoint(p[0], -p[1]).matrixTransform(svg.getScreenCTM());
+      const q = new DOMPoint(p[0], -p[1]).matrixTransform((svg.querySelector('[data-testid="cad-drawing"]') ?? svg).getScreenCTM());
       return [q.x, q.y];
     }, [x, y]);
   };

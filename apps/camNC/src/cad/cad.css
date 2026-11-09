@@ -352,6 +352,8 @@
 }
 .cad-canvas-bar {
   display: flex;
+  /* The studio and sketch share a viewport: changing the controls must not move its centre. */
+  flex: 0 0 45px;
   justify-content: space-between;
   align-items: center;
   padding: 6px 14px;
