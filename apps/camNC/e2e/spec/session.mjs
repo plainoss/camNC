@@ -51,6 +51,15 @@ export function createSession({ open, outDir }) {
       return { file: await artifact(rest || 'frame', 'svg', file => writeFile(file, svg)) };
     },
     shot: async ({ page }, rest) => ({ file: await artifact(rest || 'shot', 'png', file => page.screenshot({ path: file })) }),
+    render: async ({ adapter, page }, rest) => {
+      const files = [];
+      for (const view of rest ? rest.split(/\s+/) : ['iso']) {
+        await adapter.step(`view ${view}`);
+        files.push(await artifact(view, 'png', file => page.screenshot({ path: file })));
+      }
+      const { parts } = await adapter.state();
+      return { files, parts: parts.length };
+    },
   };
   const run = async line => {
     const text = line.trim();
@@ -101,7 +110,8 @@ function parseArgs(args) {
   return options;
 }
 
-async function browserSession(options) {
+/** A session on a real browser, starting its own dev server unless given `url`. */
+export async function browserSession(options) {
   let server = null;
   let browser = null;
   const open = async () => {
@@ -111,7 +121,7 @@ async function browserSession(options) {
     }
     browser ??= await createRequire(import.meta.url)('playwright').chromium.launch({ headless: !options.headed });
     const { createAdapter } = await import('./adapters/sketch.mjs');
-    const { context, page, runtime } = await openPage(browser);
+    const { context, page, runtime } = await openPage(browser, options.viewport);
     try {
       const adapter = await createAdapter(page, options.url);
       page.setDefaultTimeout(8000);
@@ -121,7 +131,7 @@ async function browserSession(options) {
       throw error;
     }
   };
-  const outDir = fileURLToPath(new URL('../../test-results/spec-session/', import.meta.url));
+  const outDir = options.outDir ?? fileURLToPath(new URL('../../test-results/spec-session/', import.meta.url));
   const session = createSession({ open, outDir });
   return {
     run: session.run,
