@@ -64,3 +64,6 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - All source code is written in modern ES modules and TypeScript.
 - Use the existing ESLint configuration by running `pnpm run lint`.
 - Do not commit build artifacts or `node_modules` directories.
+- Put a new tool or feature in its own module rather than growing an existing file.
+- `scripts/file-size-ratchet.mjs` caps source files at 1000 lines, at commit and in CI. Files that were already longer are listed in `scripts/file-size-ceilings.json` and may only shrink; when one outgrows its cap, move code into a new module (nothing raises a ceiling).
+- After a refactor shrinks a listed file, run `node scripts/file-size-ratchet.mjs --update` to lower its ceiling (or drop it once it fits) and commit the result.
