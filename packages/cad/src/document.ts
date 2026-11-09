@@ -748,6 +748,10 @@ export function parseCadDocument(input: unknown): CadDocument {
     for (const id of [p.sketchOf, p.addTo]) if (id !== undefined) reference(id);
     if (p.remove !== undefined) {
       if (!p.remove || typeof p.remove !== 'object') throw new Error('Invalid extrude remove');
+      if (p.remove.targets !== undefined) {
+        if (!Array.isArray(p.remove.targets)) throw new Error('Invalid extrude remove targets');
+        for (const id of p.remove.targets) reference(id);
+      }
       if (p.remove.depth !== 'through') number(p.remove.depth);
       if (p.remove.depthExpression !== undefined && typeof p.remove.depthExpression !== 'string') throw new Error('Invalid extrude remove');
     }

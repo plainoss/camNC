@@ -21,7 +21,13 @@
         {
           "item": "Extrude Add: another sketch's extrude joins a part",
           "status": "done",
-          "evidence": ["packages/cad/src/extrudeSteps.test.ts"]
+          "evidence": ["packages/cad/src/extrudeSteps.test.ts", "packages/cad/src/extrudeRemoval.test.ts", "apps/camNC/src/cad/CadEditor.extrudeOperations.test.tsx"]
+        },
+        {
+          "item": "Extrude Remove from a plane with depth, direction, offset and scope",
+          "status": "partial",
+          "evidence": ["packages/cad/src/extrudeRemoval.test.ts", "apps/camNC/src/cad/CadEditor.extrudeOperations.test.tsx"],
+          "note": "Cuts into earlier placed bodies, blind, through all or up to a face. The extrusion must be square to each target and reach a machinable face."
         },
         {
           "item": "Sketch on the top face, the underside and pocket floors",

@@ -1,0 +1,289 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import {
+  addCircle,
+  evaluatedPartCopy,
+  addRectangle,
+  createCadDocument,
+  createCadPart,
+  createPlateDocument,
+  cadPartsToCut,
+  evaluateCadDocument,
+  parseCadDocument,
+  partIsBuiltOn,
+  resolveDrawnPlacements,
+  solveCadDocument,
+  setPartPattern,
+  extrudeStepProblem,
+  resolveExtrudeSteps,
+  sketchRegions,
+  type CadDocument,
+  type CadPart,
+} from './index';
+import { withPartCuts } from './cutParts';
+
+function design(depth: number | 'through' = 6): CadDocument {
+  const board = {
+    ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!,
+    id: 'board',
+    drawnOn: { on: { plane: 'top' as const }, offset: 0 },
+  };
+  const tool: CadPart = {
+    ...createCadPart('Removal', 10),
+    id: 'tool',
+    drawnOn: { on: { plane: 'top' }, offset: 18, inward: true },
+    remove: { depth },
+  };
+  tool.sketch = addRectangle(tool.sketch, { x: 20, y: 30, width: 40, height: 20 });
+  return resolveDrawnPlacements({ ...createCadDocument(), parts: [board, tool] }).document;
+}
+const errors = (document: CadDocument) => evaluateCadDocument(document).diagnostics.filter(problem => problem.severity === 'error');
+const cut = (document: CadDocument) => evaluateCadDocument(document).parts[0]!.cuts![0]!;
+
+describe('positioned Extrude Remove', () => {
+  it('cuts a blind volume from a default plane and passes the same cut to CAM and individual-part views', () => {
+    const document = design();
+    expect(errors(document)).toEqual([]);
+    expect(cut(document)).toMatchObject({ side: 'top', from: 0, to: 6, through: false });
+    const evaluated = evaluateCadDocument(document);
+    expect(cadPartsToCut(document, evaluated.parts)).toHaveLength(1);
+    const original = evaluateCadDocument({ ...document, parts: [document.parts[0]!] }).parts[0]!;
+    expect(withPartCuts(document, original).cuts).toEqual(evaluated.parts[0]!.cuts);
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
+  });
+
+  it('uses direction, offset and symmetric extent rather than the source part thickness', () => {
+    const document = design(12);
+    const tool = document.parts[1]!;
+    tool.symmetric = true;
+    tool.drawnOn!.offset = 18;
+    expect(cut(document).to).toBeCloseTo(6);
+    delete tool.symmetric;
+    tool.drawnOn!.offset = 21;
+    expect(cut(document).to).toBeCloseTo(9);
+    tool.drawnOn!.inward = false;
+    expect(errors(document)[0]!.message).toMatch(/cuts nothing/);
+  });
+
+  it('cuts through all in the chosen direction and can limit its scope', () => {
+    const document = design('through');
+    expect(cut(document)).toMatchObject({ to: 18, through: true });
+    document.parts[1]!.remove!.targets = [];
+    expect(errors(document)[0]!.message).toMatch(/Pick a part/);
+    document.parts[1]!.remove!.targets = ['board'];
+    expect(errors(document)).toEqual([]);
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document))).parts[1]!.remove!.targets).toEqual(['board']);
+  });
+
+  it('cuts a round profile through a parallel face', () => {
+    const document = design();
+    document.parts[1]!.sketch = addCircle(createCadPart().sketch, { x: 50, y: 50, radius: 10 });
+    expect(errors(document)).toEqual([]);
+    expect(cut(document).outline.length).toBeGreaterThan(4);
+  });
+
+  it('follows an up-to face after solving', async () => {
+    const document = design();
+    document.parts[1]!.upTo = { partId: 'board', face: 'underside' };
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.document.parts[1]!.thickness).toBe(18);
+    expect(solved.parts[0]!.cuts![0]).toMatchObject({ through: true, to: 18 });
+  });
+
+  it('uses inward as the default for a face Remove up to the opposite face', async () => {
+    const document = design();
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 0 };
+    document.parts[1]!.upTo = { partId: 'board', face: 'underside' };
+    const solved = await solveCadDocument(document);
+    expect(solved.document.parts[1]!.thickness).toBe(18);
+    expect(solved.parts[0]!.cuts![0]).toMatchObject({ through: true, to: 18 });
+  });
+
+  it.each(['remove', 'cutParts'])('preserves cuts on individual copies after an earlier %s', earlier => {
+    const document = design();
+    document.parts[0]!.copies = [{ id: 'copy', placement: { position: [200, 0, 0], rotation: [0, 0, 0, 1] } }];
+    const second: CadPart = {
+      ...createCadPart('Second removal', 10),
+      id: 'second-removal',
+      drawnOn: { on: { plane: 'top' }, offset: 18, inward: true },
+      remove: { depth: 4 },
+    };
+    second.sketch = addRectangle(second.sketch, { x: 240, y: 30, width: 20, height: 20 });
+    document.parts.push(second);
+    if (earlier === 'cutParts') {
+      delete document.parts[1]!.remove;
+      document.parts[1]!.thickness = 6;
+      document.partCuts = [{ id: 'earlier-cut', tools: ['tool'], targets: ['board'], clearance: 0 }];
+    }
+    const placed = resolveDrawnPlacements(document).document;
+    const result = evaluateCadDocument(placed);
+    expect(result.diagnostics.filter(problem => problem.severity === 'error')).toEqual([]);
+    const board = result.parts[0]!;
+    const copy = evaluatedPartCopy(board, placed.parts[0]!.copies![0]!);
+    expect(board.cuts).toHaveLength(1);
+    expect(copy.cuts).toHaveLength(1);
+    expect(board.cuts![0]!.to).toBe(6);
+    expect(copy.cuts![0]!.to).toBe(4);
+    expect(Math.min(...copy.cuts![0]!.outline.map(point => point.x))).toBe(40);
+    expect(cadPartsToCut(placed, result.parts).filter(entry => entry.names.some(name => name.includes('Plate')))).toHaveLength(2);
+  });
+
+  it('keeps disconnected face pockets when offset or symmetric extrusion controls are changed', () => {
+    const document = design(6);
+    const tool = document.parts[1]!;
+    tool.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1 };
+    tool.sketch = addRectangle(tool.sketch, { x: 70, y: 70, width: 10, height: 10 });
+    expect(errors(document)).toEqual([]);
+    expect(evaluateCadDocument(document).parts[0]!.cuts!.map(cut => cut.to)).toEqual([5, 5]);
+    tool.drawnOn.offset = 0;
+    tool.symmetric = true;
+    expect(errors(document)).toEqual([]);
+    expect(evaluateCadDocument(document).parts[0]!.cuts!.map(cut => cut.to)).toEqual([3, 3]);
+  });
+
+  it('cuts through an unplaced support at the origin', () => {
+    const document = design('through');
+    delete document.parts[0]!.drawnOn;
+    delete document.parts[0]!.placement;
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1 };
+    expect(errors(document)).toEqual([]);
+    expect(cut(document)).toMatchObject({ through: true, to: 18 });
+  });
+
+  it.each([6, 'through'] as const)('updates patterned copy intersections after moving the source (%s)', async depth => {
+    let document = setPartPattern(design(depth), 'board', { axis: 'x', count: 2, spacing: 200 });
+    document.parts[0]!.moved = { by: [-200, 0, 0] };
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.diagnostics.filter(problem => problem.severity === 'error')).toEqual([]);
+    expect(solved.parts[0]!.cuts ?? []).toHaveLength(0);
+    expect(evaluatedPartCopy(solved.parts[0]!, solved.document.parts[0]!.copies![0]!).cuts).toHaveLength(1);
+  });
+
+  it('keeps an otherwise valid pocket when its corner relief cannot fit', async () => {
+    const document = design(6);
+    document.parts[0]!.cornerRelief = { diameter: 6 };
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1 };
+    document.parts[1]!.sketch = addRectangle(createCadPart().sketch, { x: 20, y: 20, width: 2, height: 2 });
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.diagnostics.filter(problem => problem.severity === 'error')).toEqual([]);
+    expect(solved.diagnostics.some(problem => problem.code === 'corner-relief-skipped' && problem.severity === 'warning')).toBe(true);
+    expect(solved.parts[0]!.cuts![0]!.to).toBe(5);
+    expect(extrudeStepProblem(solved.document, solved.document.parts[1]!)).toBeNull();
+  });
+
+  it.each(['plane', 'face'])('uses prior %s removal geometry when a body becomes a cutting tool', async on => {
+    const document = design(6);
+    if (on === 'face') document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1 };
+    const receiver = {
+      ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!,
+      id: 'receiver',
+      drawnOn: { on: { plane: 'top' as const }, offset: 0 },
+    };
+    document.parts.push(receiver);
+    document.partCuts = [{ id: 'later-cut', tools: ['board'], targets: ['receiver'], clearance: 0 }];
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.diagnostics.some(problem => problem.message.includes('has a cut of its own'))).toBe(true);
+    expect(solved.parts.find(part => part.partId === 'receiver')!.cuts ?? []).toHaveLength(0);
+  });
+
+  it.each(['offset', 'symmetric'])('keeps dependent pocket-floor cuts after changing %s', async edit => {
+    let document = design(6);
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 0 };
+    document = resolveExtrudeSteps(document);
+    const floorId = document.parts[0]!.features!.find(feature => feature.type === 'cut')!.id;
+    const sketch = addRectangle(createCadPart().sketch, { x: 25, y: 35, width: 5, height: 5 });
+    document.parts[0]!.features!.push(
+      { type: 'sketch', id: 'dependent-sketch', on: { floorOf: floorId }, sketch },
+      { type: 'cut', id: 'dependent-cut', sketchId: sketch.id, regionId: sketchRegions(sketch)[0]!.id, depth: 2 }
+    );
+    if (edit === 'offset') document.parts[1]!.drawnOn!.offset = 1;
+    else document.parts[1]!.symmetric = true;
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.document.parts[0]!.features!.some(feature => feature.id === floorId)).toBe(true);
+    expect(solved.parts[0]!.cuts!.find(cut => cut.id === 'dependent-cut')).toMatchObject({
+      from: edit === 'offset' ? 5 : 3,
+      to: edit === 'offset' ? 7 : 5,
+    });
+  });
+
+  it('derives face-pocket depth from the current expressions without reapplying its original depth', async () => {
+    let document = design(6);
+    document.variables = [
+      { id: 'depth-value', name: 'pocketDepth', expression: '6 mm' },
+      { id: 'offset-value', name: 'startOffset', expression: '1 mm' },
+    ];
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1, offsetExpression: 'startOffset' };
+    document.parts[1]!.remove!.depthExpression = 'pocketDepth';
+    const first = await solveCadDocument(document);
+    expect(first.status).toBe('solved');
+    expect(first.parts[0]!.cuts![0]!.to).toBe(5);
+    document = first.document;
+    document.variables![0]!.expression = '8 mm';
+    document.variables![1]!.expression = '2 mm';
+    const second = await solveCadDocument(document);
+    expect(second.status).toBe('solved');
+    expect(second.parts[0]!.cuts![0]!.to).toBe(6);
+  });
+
+  it('reports a face removal that points away without removing its support', async () => {
+    const document = design(6);
+    document.parts[1]!.drawnOn = { on: { partId: 'board', face: 'top' }, offset: 1, inward: false };
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('invalid');
+    expect(solved.diagnostics.some(problem => problem.severity === 'error' && problem.message.includes('does not reach the face'))).toBe(
+      true
+    );
+  });
+
+  it('rejects invalid saved removal scopes', () => {
+    const document = design();
+    const malformed = JSON.parse(JSON.stringify(document));
+    malformed.parts[1].remove.targets = 'board';
+    expect(() => parseCadDocument(malformed)).toThrow(/remove targets/);
+  });
+
+  it('suppresses the removal without leaving cuts behind', () => {
+    const document = design();
+    document.parts[1]!.suppressed = true;
+    expect(errors(document)).toEqual([]);
+    expect(evaluateCadDocument(document).parts[0]!.cuts).toBeUndefined();
+  });
+});
+
+describe('editing an earlier extrusion', () => {
+  const saved = () =>
+    parseCadDocument(
+      JSON.parse(readFileSync(new URL('../../cad-script/fixtures/designs/extrude-operation-history.json', import.meta.url), 'utf8'))
+    );
+  it('keeps a later split cut when New becomes an Add of a separate sketch', async () => {
+    const document = saved();
+    const [board, tool] = document.parts as [CadPart, CadPart];
+    expect(partIsBuiltOn(document, tool)).toMatch(/stays a part/);
+    expect(partIsBuiltOn(document, tool, board)).toBeNull();
+    const before = await solveCadDocument(structuredClone(document));
+    tool.addTo = board.id;
+    const after = await solveCadDocument(document);
+    expect(after.status).toBe('solved');
+    expect(after.diagnostics.filter(problem => problem.severity === 'error')).toEqual([]);
+    expect(after.document.partCuts).toEqual(before.document.partCuts);
+    expect(after.parts).toEqual(before.parts);
+    expect(cadPartsToCut(after.document, after.parts)).toHaveLength(2);
+  });
+
+  it('cuts the saved perpendicular board from its top-plane sketch', async () => {
+    const document = saved();
+    delete document.partCuts;
+    document.parts[1]!.remove = { depth: document.parts[1]!.thickness };
+    const solved = await solveCadDocument(document);
+    expect(solved.status).toBe('solved');
+    expect(solved.diagnostics.filter(problem => problem.severity === 'error')).toEqual([]);
+    expect(solved.parts[0]!.cuts).toHaveLength(1);
+    expect(solved.parts[0]!.cuts![0]).toMatchObject({ through: true, to: 18 });
+    expect(cadPartsToCut(solved.document, solved.parts)).toHaveLength(1);
+  });
+});

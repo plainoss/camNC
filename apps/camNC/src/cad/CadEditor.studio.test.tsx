@@ -924,14 +924,14 @@ it('adds regions to a part made from the same sketch with Extrude → Add', asyn
   expect(within(features).getByRole('button', { name: /Extrude · Part 2/ }).textContent).toMatch(/add to Shelf/);
 });
 
-it('refuses Add with no part of the same sketch to join, and Remove off a board', async () => {
+it('refuses Add and Remove when no earlier part exists', async () => {
   const { features } = await splitShelf();
   await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Shelf/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Shelf' });
   await userEvent.click(within(operation(dialog)).getByRole('tab', { name: 'Add' }));
   expect(within(dialog).getByRole('alert').textContent).toMatch(/Make one with New first/);
   await userEvent.click(within(operation(dialog)).getByRole('tab', { name: 'Remove' }));
-  expect(within(dialog).getByRole('alert').textContent).toMatch(/top or underside of a board/);
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/no part yet to cut/);
   expect(within(operation(dialog)).getByRole('tab', { name: 'New' }).getAttribute('aria-selected')).toBe('true');
 });
 

@@ -1088,8 +1088,8 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
   const resolved = resolveDrawnPlacements(next, evaluated.parts);
   diagnostics.push(...resolved.diagnostics);
   const placed = resolvePartPatterns(resolved.document);
-  // Parts cut by others are cut where those others now sit.
-  if (placed !== next && placed.partCuts?.length) evaluated = evaluateCadDocument(placed);
+  // Cut-parts and Remove volumes intersect copies where patterns and transforms place them now.
+  if (placed !== next && (placed.partCuts?.length || placed.parts.some(part => part.remove))) evaluated = evaluateCadDocument(placed);
   diagnostics.push(...evaluated.diagnostics);
   return {
     document: placed,
