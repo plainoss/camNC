@@ -57,6 +57,7 @@ import {
   setDimensionDriven,
   tessellateCurve,
   updateDimension,
+  applyNewDimension,
   visibleSketchPointIds,
   withDimensionPlacement,
   type CadConstraint,
@@ -1779,8 +1780,14 @@ export function CadEditor({
     if ('error' in parsed) return rejectValue(parsed.error, input);
     const valueError = dimensionValueError(currentDimension, parsed.value);
     if (valueError) return rejectValue(valueError, input);
-    const next = updateDimension(documentRef.current, currentDimension.id, parsed.value, parsed.expression);
     const command = newDimensionCommand.current;
+    // A newly placed first dimension sizes the whole sketch, keeping what was drawn in proportion.
+    const next = (command?.id === currentDimension.id ? applyNewDimension : updateDimension)(
+      documentRef.current,
+      currentDimension.id,
+      parsed.value,
+      parsed.expression
+    );
     const amended = command?.id === currentDimension.id ? amendCadSession(session, next, command.checkpoint) : null;
     if (amended) publish(amended);
     else commit(next);

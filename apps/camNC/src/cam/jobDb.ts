@@ -37,6 +37,12 @@ export interface CamJobV1 {
     partRevisions: Record<string, number>;
     /** Evaluated geometry content, independent of monotonic revision numbers and source annotations. */
     partGeometryKeys?: Record<string, string>;
+    /**
+     * Whether parts cut only from below lie turned over, as CAM has done since `kUndersideUpSince`. A job accepted
+     * before keeps them the other way up until accepted again, so its cut sheets still match. Unset only on jobs saved
+     * before this was recorded: `normalizeJob` settles it from when they were saved.
+     */
+    turnsUndersideUp?: boolean;
     /** Removed hole targets retain their choices for Undo, but never apply to another hole. */
     holeChoiceIssues?: import('./holeChoices').MissingHoleChoice[];
   };
@@ -257,7 +263,17 @@ export function listJobs(): Promise<CamJobV1[]> {
   return listJobsIn(captureStorageContext());
 }
 
-const normalizeJob = (job: CamJobV1): CamJobV1 => (job.carving ? { ...job, carving: normalizeCarving(job.carving) } : job);
+/** When CAM started laying parts cut only from below turned over. Jobs saved from then on were cut that way. */
+export const kUndersideUpSince = Date.parse('2026-11-09T10:57:02Z');
+
+/** Older jobs as current code reads them. */
+export function normalizeJob(job: CamJobV1): CamJobV1 {
+  if (job.carving) return { ...job, carving: normalizeCarving(job.carving) };
+  // Accepted before the orientation was recorded: saved since parts turned over means they were turned over then.
+  if (job.design?.accepted && job.design.turnsUndersideUp === undefined)
+    return { ...job, design: { ...job.design, turnsUndersideUp: job.updatedAt >= kUndersideUpSince } };
+  return job;
+}
 
 async function listJobsIn(context: StorageContext): Promise<CamJobV1[]> {
   if (context === 'rehearsal')
@@ -313,7 +329,7 @@ export const modelKey = (job: CamJobV1) =>
   job.carving
     ? `${job.id}:carving`
     : job.design
-      ? `${job.id}:cad:${job.design.acceptedRevision}`
+      ? `${job.id}:cad:${job.design.acceptedRevision}${job.design.turnsUndersideUp ? ':turned' : ''}`
       : `${job.id}:${job.fileName}:${job.modelRevision ?? 0}`;
 
 /**

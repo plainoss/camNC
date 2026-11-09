@@ -28,6 +28,174 @@
       }
     ]
   },
+    {
+      "id": "sketch/dimension/first-sizes-sketch-at-origin",
+      "title": "The first dimension on a rectangle drawn from the origin scales the sketch about the origin, with no solver error",
+      "evidence": "reference-live 2026-11-09",
+      "steps": [
+        "rect 0,0 20,10",
+        "key d",
+        "click 10,10",
+        "click 10,25",
+        "type 100",
+        "key Enter",
+        {
+          "expect": {
+            "dimensions": [
+              {
+                "value": 100
+              }
+            ],
+            "entitiesInclude": [
+              {
+                "type": "line",
+                "a": [
+                  0,
+                  0
+                ],
+                "b": [
+                  100,
+                  0
+                ]
+              },
+              {
+                "type": "line",
+                "a": [
+                  100,
+                  0
+                ],
+                "b": [
+                  100,
+                  50
+                ]
+              },
+              {
+                "type": "line",
+                "a": [
+                  100,
+                  50
+                ],
+                "b": [
+                  0,
+                  50
+                ]
+              },
+              {
+                "type": "line",
+                "a": [
+                  0,
+                  50
+                ],
+                "b": [
+                  0,
+                  0
+                ]
+              }
+            ],
+            "canFinish": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "sketch/dimension/first-sizes-free-sketch",
+      "title": "The first dimension on a free rectangle scales the whole drawing about the sketch origin",
+      "evidence": "reference-live 2026-11-09",
+      "steps": [
+        "rect 10,10 30,20",
+        "key d",
+        "click 20,20",
+        "click 20,35",
+        "type 100",
+        "key Enter",
+        {
+          "expect": {
+            "dimensions": [
+              {
+                "value": 100
+              }
+            ],
+            "entitiesInclude": [
+              {
+                "type": "line",
+                "a": [
+                  50,
+                  50
+                ],
+                "b": [
+                  150,
+                  50
+                ]
+              },
+              {
+                "type": "line",
+                "a": [
+                  150,
+                  100
+                ],
+                "b": [
+                  50,
+                  100
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sketch/dimension/second-does-not-scale",
+      "title": "Only the first dimension scales: a second one moves just its own geometry",
+      "evidence": "reference-live 2026-11-09",
+      "steps": [
+        "rect 0,0 20,10",
+        "key d",
+        "click 10,10",
+        "click 10,25",
+        "type 100",
+        "key Enter",
+        "click 100,25",
+        "click 115,25",
+        "type 20",
+        "key Enter",
+        {
+          "expect": {
+            "dimensions": [
+              {
+                "value": 100
+              },
+              {
+                "value": 20
+              }
+            ],
+            "entitiesInclude": [
+              {
+                "type": "line",
+                "a": [
+                  0,
+                  0
+                ],
+                "b": [
+                  100,
+                  0
+                ]
+              },
+              {
+                "type": "line",
+                "a": [
+                  100,
+                  20
+                ],
+                "b": [
+                  0,
+                  20
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
   {
     "id": "sketch/dimension/nested-point-line",
     "title": "A nested rectangle's corner and the outer edge dimension as their normal distance",
