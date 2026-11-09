@@ -9,17 +9,18 @@
 //   node scripts/file-size-ratchet.mjs --update             lower ceilings of files that shrank, drop entries that fit
 //
 // The pre-commit hook passes `--staged`, so the check reads each file's staged content with `git show :<path>`, which
-// ignores unstaged edits. nano-staged runs the hook's Prettier entry concurrently and stages its output only after every
+// ignores unstaged edits. nano-staged runs the hook's Biome entry concurrently and stages its output only after every
 // entry finishes, so for the files that entry formats, the check formats the staged content the same way first (same
-// config, same .prettierignore) and counts what the commit will actually contain.
+// biome.json, same ignores) and counts what the commit will actually contain.
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const CONFIG_FILE = 'scripts/file-size-ceilings.json';
 export const DEFAULT_LIMIT = 1000;
-// Files the hook's `prettier --write` entry rewrites before they are committed. Keep in sync with package.json.
+// Files the hook's `biome format --write` entry rewrites before they are committed. Keep in sync with package.json.
 export const FORMATTED_AT_COMMIT = /\.(ts|tsx)$/;
 
 const SOURCE = /\.(ts|tsx|mjs|js)$/;
@@ -133,18 +134,15 @@ export function saveConfig(root, config) {
   writeFileSync(resolve(root, CONFIG_FILE), `${JSON.stringify({ ...config, ceilings }, null, 2)}\n`);
 }
 
-/** Formats text as the hook's Prettier entry would format the file at `path`, unless Prettier ignores or can't parse it. */
+/** Formats text as the hook's Biome entry would format the file at `path`, unless Biome ignores or can't parse it. */
 export async function formatLikeHook(root, path, text) {
   if (!FORMATTED_AT_COMMIT.test(path)) return text;
-  const prettier = await import('prettier');
-  const file = resolve(root, path);
-  const info = await prettier.getFileInfo(file, { ignorePath: resolve(root, '.prettierignore') });
-  if (info.ignored || !info.inferredParser) return text;
-  const options = (await prettier.resolveConfig(file)) ?? {};
+  const biome = createRequire(import.meta.url).resolve('@biomejs/biome/bin/biome');
   try {
-    return await prettier.format(text, { ...options, filepath: file });
+    // An ignored file comes back unchanged.
+    return execFileSync(process.execPath, [biome, 'format', `--stdin-file-path=${path}`], { cwd: root, input: text, encoding: 'utf8', stdio: 'pipe' });
   } catch {
-    return text; // Prettier fails the commit on its own for a syntax error.
+    return text; // Biome fails the commit on its own for a syntax error.
   }
 }
 

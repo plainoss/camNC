@@ -99,7 +99,7 @@ describe('rapids and links over holds', () => {
     expect(cam.safeZ).toBeCloseTo(18.3 + 3 + 5, 6);
     expect(cam.retractZ).toBeCloseTo(18.3 + 3 + 2, 6);
     // Directly over a screw at that height: fine. At the old retract height, 2 mm above the stock: under its head's top.
-    const over = (z: number) => holdClashes([screw(100, 15)], [{ r: 3, pts: [[50, 15, z], [150, 15, z]] }], 18.3); // prettier-ignore
+    const over = (z: number) => holdClashes([screw(100, 15)], [{ r: 3, pts: [[50, 15, z], [150, 15, z]] }], 18.3); // biome-ignore format: keep the hand-aligned layout
     expect(over(cam.retractZ!)).toEqual([]);
     expect(over(18.3 + 2)).toHaveLength(1);
     // Without holds: the plain heights.
@@ -274,7 +274,7 @@ describe('pockets and what holds the parts', () => {
         .tabs.some(t => t.x > 50 && t.x < 450)
     ).toBe(true);
     // Forced there, the tab is thinner than assumed: not anchored.
-    const forced = board({ features: rabbeted(400, 100, 1, [...longRabbets, rect(0, 0, 15, 100), rect(385, 0, 400, 100)]), underside: undefined, tabsAt: [100, 300].flatMap(x => [{ x, y: 0 }, { x, y: 100 }]) }); // prettier-ignore
+    const forced = board({ features: rabbeted(400, 100, 1, [...longRabbets, rect(0, 0, 15, 100), rect(385, 0, 400, 100)]), underside: undefined, tabsAt: [100, 300].flatMap(x => [{ x, y: 0 }, { x, y: 100 }]) }); // biome-ignore format: keep the hand-aligned layout
     const [hold] = holdCheck(camBoard(forced, {}), forced, holdOptionsOf(forced));
     expect(hold.anchored).toBe(0);
   });
@@ -462,7 +462,7 @@ describe('freeing a skin', () => {
     for (const s of steps) expect(s).toBeLessThanOrEqual(1.6 + 1e-6);
     expect(free.cam.operations[0].passes.slice(1).every(p => p.link === 'direct')).toBe(true);
     // The usual skin: one lap.
-    expect(freePartsProgram(camBoard(board(1), {}), { feed: 900, plungeFeed: 300, finalZ: -0.3, stepdown }).cam.operations[0].passes).toHaveLength(1); // prettier-ignore
+    expect(freePartsProgram(camBoard(board(1), {}), { feed: 900, plungeFeed: 300, finalZ: -0.3, stepdown }).cam.operations[0].passes).toHaveLength(1); // biome-ignore format: keep the hand-aligned layout
   });
 
   it('turned over, the laps go down from the new top to just past the skin', () => {

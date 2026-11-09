@@ -23,7 +23,7 @@ describe('computeP3P', () => {
     // Image points - corners2 from Python example
     const markersInCam: Vector2[] = [new Vector2(1570, 418), new Vector2(2209, 1599), new Vector2(901, 1893), new Vector2(959, 456)];
 
-    // prettier-ignore
+    // biome-ignore format: keep the hand-aligned layout
     const camMatrix = new Matrix3().set(
       1576.70915, 0.0, 1481.05363,
       0.0, 1717.4288, 969.448282,
@@ -49,7 +49,7 @@ describe('projectPoints', () => {
 
   it('matches cv.projectPoints without distortion', () => {
     const points = [new Vector3(0, 0, 0), new Vector3(100, 0, 0), new Vector3(100, 200, 5), new Vector3(-30, 50, -10)];
-    // prettier-ignore
+    // biome-ignore format: keep the hand-aligned layout
     const K = new Matrix3().set(
       1500, 0, 960,
       0, 1600, 540,

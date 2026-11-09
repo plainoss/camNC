@@ -102,7 +102,13 @@ interface ConstraintBase {
 }
 /** User placement in a dimension's geometric frame; independent of camera scale. */
 export type CadDimensionPlacement =
-  | { kind: 'linear'; fraction: number; normalOffset: number; /** Signed endpoint overshoot in millimetres. */ overshoot?: number }
+  | {
+      kind: 'linear';
+      fraction: number;
+      normalOffset: number;
+      /** Signed endpoint overshoot in millimetres. */
+      overshoot?: number;
+    }
   | {
       kind: 'radial';
       angle: number;

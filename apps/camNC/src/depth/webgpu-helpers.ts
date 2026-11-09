@@ -4,7 +4,7 @@ import { RemapStepParams } from './remapPipeline';
 
 // Helper to pack a mat3x3 (column-major) into vec4 columns (std140).
 export function padMat3(mat: Matrix3) {
-  // prettier-ignore
+  // biome-ignore format: keep the hand-aligned layout
   return [
     mat.elements[0], mat.elements[1], mat.elements[2], 0,
     mat.elements[3], mat.elements[4], mat.elements[5], 0,

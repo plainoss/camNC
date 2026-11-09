@@ -38,14 +38,7 @@ export function createCadPart(name = 'Part 1', thickness = 18): CadPart {
   return { id: newCadId(), name, thickness, sketch };
 }
 
-export function createPlateDocument(
-  options: {
-    name?: string;
-    width?: number;
-    height?: number;
-    thickness?: number;
-  } = {}
-): CadDocument {
+export function createPlateDocument(options: { name?: string; width?: number; height?: number; thickness?: number } = {}): CadDocument {
   const document = createCadDocument(options.name ?? 'Plate');
   const part = createCadPart('Plate', options.thickness ?? 18);
   part.sketch = addRectangle(part.sketch, {

@@ -108,11 +108,10 @@ test('--staged counts staged content as the hook will format it, not the raw ind
   mkdirSync(join(root, 'scripts'));
   mkdirSync(join(root, 'apps/a/src'), { recursive: true });
   writeFileSync(join(root, 'scripts/file-size-ceilings.json'), JSON.stringify({ limit: 10, ceilings: { 'apps/a/src/listed.ts': 12 } }));
-  writeFileSync(join(root, '.prettierrc'), '{ "printWidth": 40 }');
-  writeFileSync(join(root, '.prettierignore'), 'apps/a/src/ignored.ts\n');
-  // One line that Prettier expands to one line per element.
+  writeFileSync(join(root, 'biome.json'), JSON.stringify({ files: { includes: ['**', '!apps/a/src/ignored.ts'] }, formatter: { lineWidth: 40 } }));
+  // One line that Biome expands to one line per element.
   const oneLiner = `export const xs = [${Array.from({ length: 12 }, (_, i) => `'item${i}'`).join(', ')}];\n`;
-  // Twenty-two lines (one number per line) that Prettier joins into a few.
+  // Twenty-two lines (one number per line) that Biome joins into a few.
   const sprawling = `export const ys = [\n${'  1,\n'.repeat(20)}];\n`;
   for (const [file, text] of [
     ['expanded.ts', oneLiner],
@@ -126,18 +125,17 @@ test('--staged counts staged content as the hook will format it, not the raw ind
   const run = file => main(['--staged', `apps/a/src/${file}`], { root, cwd: root });
 
   assert.equal(await run('expanded.ts'), 1, 'formatting grows the file past the limit');
-  assert.equal(await run('ignored.ts'), 0, '.prettierignore leaves the file as staged');
+  assert.equal(await run('ignored.ts'), 0, 'an ignored file stays as staged');
   assert.equal(await run('plain.mjs'), 0, 'the hook does not format .mjs files');
   assert.equal(await run('listed.ts'), 0, 'formatting shrinks the file below its ceiling');
 });
 
-test('the files the ratchet formats are the ones the hook formats with Prettier', () => {
+test('the files the ratchet formats are the ones the hook formats with Biome', () => {
   const hook = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))['nano-staged'];
-  const [glob] = Object.entries(hook).find(([, command]) => command === 'prettier --write');
+  const [glob] = Object.entries(hook).find(([, command]) => command.startsWith('biome format --write'));
   for (const ext of glob
     .match(/\{(.*)\}/)[1]
-    .split(',')
-    .filter(ext => ext !== 'md'))
+    .split(','))
     assert(FORMATTED_AT_COMMIT.test(`x.${ext}`), ext);
   assert(!FORMATTED_AT_COMMIT.test('x.mjs') && !FORMATTED_AT_COMMIT.test('x.js'));
 });

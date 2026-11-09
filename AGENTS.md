@@ -7,9 +7,10 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - Use **pnpm** (Node `^20.19` or `>=22.12`, see `.nvmrc`) for all package management tasks.
 - Only in cloud environments: After making changes, run `pnpm run lint`, `pnpm run check-types`, `pnpm run test` and `pnpm run build` from the repo root.
   - These commands execute turborepo tasks across all packages.
-- Formatting is automated — you do **not** need to run Prettier manually:
-  - A `pre-commit` git hook (simple-git-hooks + nano-staged) re-formats staged `.ts`/`.tsx`/`.md` files on every commit.
-  - It reuses the repo `.prettierrc`/`.prettierignore`, so the result always matches CI's `pnpm run check-format`.
+- Formatting is automated — you do **not** need to run the formatter manually:
+  - A `pre-commit` git hook (simple-git-hooks + nano-staged) re-formats staged `.ts`/`.tsx` files with Biome and `.md` files with Prettier on every commit.
+  - It reuses the repo `biome.json` and `.prettierrc`/`.prettierignore`, so the result always matches CI's `pnpm run check-format`.
+  - To keep a hand-aligned block (a matrix, a table of numbers), put `// biome-ignore format: <why>` above it.
   - The hook installs itself via the `prepare` script on `pnpm install`.
 - Keep generated files such as `routeTree.gen.ts` read-only; avoid editing them manually.
 - Keep external application comparison reports, captures and private document links in the private companion repository. Public documentation and examples describe application behavior without product comparisons.

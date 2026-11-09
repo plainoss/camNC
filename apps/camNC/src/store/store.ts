@@ -98,7 +98,7 @@ export interface PnPResult {
 (Vector2 as any)[immerable] = true;
 // Should we create slices? see https://github.com/pmndrs/zustand/discussions/2195#discussioncomment-7614103
 
-// prettier-ignore
+// biome-ignore format: keep the hand-aligned layout
 export const useStore = create(subscribeWithSelector(persist(immer(combine(
   {
     // new, should probably go into a backend instead at some point

@@ -189,7 +189,7 @@ pnpm dev
 Checks (also run in CI):
 
 ```bash
-pnpm run check-format  # prettier (a pre-commit hook formats staged files)
+pnpm run check-format  # Biome for TypeScript, Prettier for Markdown (a pre-commit hook formats staged files)
 pnpm run lint          # oxlint
 pnpm run check-types   # tsc --noEmit in every package
 pnpm run check-types:fast # the same with tsgo (TypeScript 7 preview), for local iteration
