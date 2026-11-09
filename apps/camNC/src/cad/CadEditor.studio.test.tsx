@@ -921,6 +921,42 @@ it('reorders parts by dragging a step onto another in the feature list', async (
   await waitFor(() => expect(latest().parts.map(part => part.name)).toEqual(['B', 'A']));
 });
 
+it('extrudes up to a picked plane, its thickness following the distance, or symmetrically about its own plane', async () => {
+  const post = { ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name: 'Post' };
+  // Drawn 300 mm in front of the Front plane, facing away from it.
+  post.drawnOn = { on: { plane: 'front' }, offset: -300 };
+  const source: CadDocument = { ...createCadDocument(), parts: [post] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Post/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Post' });
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Symmetric' }));
+  await waitFor(() => expect(latest().parts[0]!.symmetric).toBe(true));
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'upTo');
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Front/ }));
+  await waitFor(() => expect(latest().parts[0]!.upTo).toEqual({ plane: 'front' }));
+  expect(latest().parts[0]!.symmetric).toBeUndefined();
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(300));
+  // Thin has a depth of its own, so it leaves Up to face, and its thickness can be typed again.
+  await userEvent.click(within(dialog).getByRole('tab', { name: 'Thin' }));
+  await waitFor(() => expect(latest().parts[0]!.upTo).toBeUndefined());
+  await userEvent.click(within(dialog).getByRole('tab', { name: 'Solid' }));
+  // Choosing Blind while a face is still to be picked stops waiting for it: a plane clicked next is only selected.
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'upTo');
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'End type' }), 'blind');
+  expect((within(dialog).getByRole('combobox', { name: 'End type' }) as HTMLSelectElement).value).toBe('blind');
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Right/ }));
+  expect(latest().parts[0]!.upTo).toBeUndefined();
+});
+
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {
   const { latest } = await studio();
   await editExtrude('Plate');
