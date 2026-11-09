@@ -3,6 +3,7 @@ import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
+import { kPlaneMarker, planeGivesWay } from './planePicking';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { ViewCube } from './ViewCube';
 import { modelGeometry } from './modelGeometry';
@@ -90,14 +91,18 @@ function Region({ region, model, onPick }: { region: ViewRegion; model: THREE.Ma
   );
 }
 
-const kPlane = '#d08a3c';
+// Planes are a pale blue, and turn orange when hovered or picked.
+const kPlane = '#7aa6d8';
 /** A finished sketch's curve in the model, by the sketch's part. */
+/** How parts are drawn in the view. */
+export type ModelDisplay = 'edges' | 'shaded' | 'translucent';
+
 export interface SketchLine {
   partId: string;
   points: [number, number, number][];
 }
 const kNoLines: SketchLine[] = [];
-const kPlaneHighlight = '#2f80ed';
+const kPlaneHighlight = '#f0a020';
 
 function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number; model: THREE.Matrix4; onPick?: () => void }) {
   const [hovered, setHovered] = useState(false);
@@ -106,26 +111,47 @@ function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number;
     // A square centred on the plane's origin, the size of the model or a little more.
     return model.clone().multiply(new THREE.Matrix4().makeBasis(v(plane.x), v(plane.y), v(plane.normal)).setPosition(v(plane.origin)));
   }, [plane, model]);
-  const strong = hovered || plane.highlighted;
-  const color = strong ? kPlaneHighlight : kPlane;
+  // Hovered, only the outline lights up; picked, the whole plane does.
+  const color = plane.highlighted ? kPlaneHighlight : kPlane;
   return (
     <mesh
       matrixAutoUpdate={false}
       matrix={matrix}
       renderOrder={1}
+      userData={kPlaneMarker}
       onPointerOver={event => {
+        if (planeGivesWay(event.intersections)) return;
+        event.stopPropagation();
+        if (onPick) setHovered(true);
+      }}
+      onPointerMove={event => {
+        // A face or region under the pointer, even behind the plane, is what's hovered.
+        if (planeGivesWay(event.intersections)) return setHovered(false);
         event.stopPropagation();
         if (onPick) setHovered(true);
       }}
       onPointerOut={() => setHovered(false)}
       onClick={event => {
+        if (planeGivesWay(event.intersections)) return;
         event.stopPropagation();
         if (event.delta <= 4) onPick?.();
       }}>
       <planeGeometry args={[size, size]} />
-      <meshBasicMaterial color={color} transparent opacity={strong ? 0.22 : 0.1} side={THREE.DoubleSide} depthWrite={false} />
-      <Edges color={color} />
+      {/* Pushed back in depth, so a part's face lying on the plane covers it evenly instead of flickering through. */}
+      <meshBasicMaterial
+        color={color}
+        transparent
+        opacity={plane.highlighted ? 0.2 : 0.07}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={2}
+        polygonOffsetUnits={2}
+      />
+      <Edges color={hovered ? kPlaneHighlight : color} />
       <Html
+        // Under the dialogs and panels over the view, not on top of everything.
+        zIndexRange={[5, 0]}
         position={[-size / 2, size / 2, 0]}
         style={{ pointerEvents: 'none', color, font: '11px system-ui, sans-serif', whiteSpace: 'nowrap', userSelect: 'none' }}>
         {plane.label}
@@ -154,9 +180,12 @@ function Body({
   matrix,
   color,
   opacity,
+  edges,
   onSelect,
   onHover,
 }: {
+  /** Draws the part's edges over it in a dark line, as a model is shown with its edges. */
+  edges?: boolean;
   mesh: BodyMesh;
   matrix: THREE.Matrix4 | null;
   color: string;
@@ -193,6 +222,7 @@ function Body({
         opacity={opacity}
         depthWrite={opacity >= 1}
       />
+      {edges && <Edges threshold={20} color="#2b3646" />}
     </mesh>
   );
 }
@@ -206,6 +236,7 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
   const camera = useThree(s => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree(s => s.controls) as OrbitControlsImpl | null;
   const aspect = useThree(s => s.size.width / s.size.height);
+  const invalidate = useThree(s => s.invalidate);
   const fitted = useRef<{ key?: string; seq?: number; controls: OrbitControlsImpl | null } | null>(null);
   useEffect(() => {
     // Nothing to see yet, or no size to see it at.
@@ -262,7 +293,9 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
       controls.target.copy(center);
       controls.update();
     }
-  }, [box, camera, controls, aspect, fitKey, viewRequest]);
+    // The view draws only when something changes, and moving the camera is a change.
+    invalidate();
+  }, [box, camera, controls, aspect, fitKey, viewRequest, invalidate]);
   return null;
 }
 
@@ -284,6 +317,7 @@ export interface SketchView {
 function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 }) {
   const set = useThree(s => s.set);
   const size = useThree(s => s.size);
+  const invalidate = useThree(s => s.invalidate);
   const camera = useMemo(() => new THREE.OrthographicCamera(), []);
   useEffect(() => {
     set({ camera });
@@ -310,7 +344,8 @@ function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 
     camera.near = 1;
     camera.far = reach * 2;
     camera.updateProjectionMatrix();
-  }, [camera, view, model, size]);
+    invalidate();
+  }, [camera, view, model, size, invalidate]);
   return null;
 }
 
@@ -348,6 +383,8 @@ export function ModelViewport({
   planes = [],
   onPickPlane,
   sketchLines = kNoLines,
+  showOrigin = false,
+  display = 'shaded',
   palette,
   regions = [],
   onPickRegion,
@@ -382,6 +419,10 @@ export function ModelViewport({
   onPickPlane?: (id: string) => void;
   /** Finished sketches not yet extruded, as polylines in the model, shown on their planes. */
   sketchLines?: SketchLine[];
+  /** The design's origin, as a point where the base planes meet. */
+  showOrigin?: boolean;
+  /** How parts are drawn: shaded with their edges, shaded only, or see-through. */
+  display?: ModelDisplay;
   /** `studio` shows parts as the reference does: grey, picked in orange. */
   palette?: 'studio';
   /** A sketch's regions to pick for an extrude, and picking one. */
@@ -389,7 +430,8 @@ export function ModelViewport({
   onPickRegion?: (id: string) => void;
 }) {
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
-  const assembled = useMemo(() => centerAssembled(meshes), [meshes]);
+  // The studio shows a design where it is, about its origin, so hiding a part doesn't shift the rest.
+  const assembled = useMemo(() => (palette === 'studio' ? new THREE.Matrix4() : centerAssembled(meshes)), [meshes, palette]);
   const exploded = useMemo(() => explodeAssembled(meshes), [meshes]);
   const matrices = useMemo(
     () => (view === 'flat' ? flat : view === 'exploded' ? exploded : meshes.map(() => assembled)),
@@ -452,6 +494,8 @@ export function ModelViewport({
   };
   return (
     <Canvas
+      // Drawn when something changes, not every frame, so an idle view costs nothing.
+      frameloop="demand"
       camera={{ fov: 30 }}
       dpr={[1, 2]}
       onPointerLeave={() => onHover?.(null)}
@@ -482,7 +526,8 @@ export function ModelViewport({
                       ? kStudioPart
                       : kWood
             }
-            opacity={transparentIds?.has(instanceIds?.[i] ?? m.partId) ? 0.3 : milled(m.partId) ? 1 : 0.35}
+            opacity={display === 'translucent' || transparentIds?.has(instanceIds?.[i] ?? m.partId) ? 0.3 : milled(m.partId) ? 1 : 0.35}
+            edges={display === 'edges'}
             onSelect={e => pick(m, i, matrices[i]!, e)}
             onHover={hovered => onHover?.(hovered ? m.partId : null, hovered ? i : undefined)}
           />
@@ -503,6 +548,17 @@ export function ModelViewport({
       {view === 'assembled' &&
         onPickRegion &&
         regions.map(region => <Region key={region.id} region={region} model={assembled} onPick={() => onPickRegion(region.id)} />)}
+      {showOrigin && view === 'assembled' && (
+        <group matrixAutoUpdate={false} matrix={assembled}>
+          <Html center zIndexRange={[5, 0]} position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
+            <div
+              data-testid="model-origin"
+              aria-label="Origin"
+              style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', border: `2px solid ${kPlane}` }}
+            />
+          </Html>
+        </group>
+      )}
       {shownPlanes.map(plane => (
         <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
       ))}

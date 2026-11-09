@@ -38,4 +38,18 @@ describe('extruding up to a face', () => {
     const part = { ...plate('Mid'), drawnOn: { on: { plane: 'top' as const }, offset: 0 }, symmetric: true as const };
     expect(resolveDrawnPlacements({ ...createCadDocument(), parts: [part] }).document.parts[0]!.placement!.position[2]).toBe(-9);
   });
+
+  it('reaches a plane made to sketch on, and follows it', () => {
+    const post = {
+      ...plate('Post'),
+      drawnOn: { on: { plane: 'top' as const }, offset: 0 },
+      upTo: { plane: 'top' as const },
+      upToDatum: 'p1',
+    };
+    const at = (offset: number) =>
+      resolveUpTo({ ...createCadDocument(), parts: [post], planes: [{ id: 'p1', name: 'Plane 1', on: { plane: 'top' }, offset }] })
+        .parts[0]!.thickness;
+    expect(at(200)).toBe(200);
+    expect(at(250)).toBe(250);
+  });
 });

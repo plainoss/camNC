@@ -1,6 +1,13 @@
 import { activeDesign, assemblyReport, evaluateCadDocument, isCadPart, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ModelViewport, type ModelFacePick, type ModelView, type ViewRegion, type ViewRequest } from '@/cam/model/ModelViewport';
+import {
+  ModelViewport,
+  type ModelDisplay,
+  type ModelFacePick,
+  type ModelView,
+  type ViewRegion,
+  type ViewRequest,
+} from '@/cam/model/ModelViewport';
 import { assemblyModel, instanceKey } from './assemblyModel';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
@@ -9,6 +16,11 @@ const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
   { view: 'exploded', label: 'Exploded' },
   { view: 'flat', label: 'Laid flat' },
+];
+const kDisplays: { display: ModelDisplay; label: string }[] = [
+  { display: 'edges', label: 'Shaded with edges' },
+  { display: 'shaded', label: 'Shaded' },
+  { display: 'translucent', label: 'Translucent' },
 ];
 const always = () => true;
 /** Two clicks this close together open a part, rather than selecting it twice. */
@@ -27,6 +39,7 @@ export default function WorkspaceView({
   onChoosingChange,
   highlightIds,
   hiddenIds,
+  featureShown,
   transparentIds,
   selectedPlane,
   onSelectPlane,
@@ -60,6 +73,11 @@ export default function WorkspaceView({
   highlightIds?: readonly string[];
   /** Parts hidden from the view, as the parts list's eye toggles them. */
   hiddenIds?: ReadonlySet<string>;
+  /**
+   * Whether a sketch (by its step's id), a plane or the origin is shown, as its eye in the feature list says. Without it
+   * the planes show, and the sketches not yet extruded.
+   */
+  featureShown?: (id: string) => boolean;
   transparentIds?: ReadonlySet<string>;
   /** A base plane picked to draw the next sketch on, and picking one outside of choosing. */
   selectedPlane?: string | null;
@@ -95,8 +113,16 @@ export default function WorkspaceView({
     );
   }, [document]);
   const [view, setView] = useState<ModelView>('assembled');
-  const planes = useMemo(() => basePlaneViews(document, selectedPlane), [document, selectedPlane]);
-  const sketchLines = useMemo(() => sketchLinesInModel(document), [document]);
+  // The studio shows parts with their edges, as a model usually is.
+  const [display, setDisplay] = useState<ModelDisplay>('edges');
+  const planes = useMemo(
+    () => basePlaneViews(document, selectedPlane).filter(plane => featureShown?.(plane.id) ?? true),
+    [document, selectedPlane, featureShown]
+  );
+  const sketchLines = useMemo(
+    () => sketchLinesInModel(document, featureShown && (partId => featureShown(`${partId}:sketch`))),
+    [document, featureShown]
+  );
   // Choosing what a new part is drawn on: a plane, or a face clicked in the view.
   const [ownChoosing, setOwnChoosing] = useState(false);
   const controlled = choosingProp !== undefined;
@@ -163,6 +189,15 @@ export default function WorkspaceView({
             </button>
           ))}
         </div>
+        {controlled && (
+          <select aria-label="Display" value={display} onChange={event => setDisplay(event.target.value as ModelDisplay)}>
+            {kDisplays.map(option => (
+              <option key={option.display} value={option.display}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        )}
         {onNewPart && !controlled && (
           <button
             type="button"
@@ -205,6 +240,8 @@ export default function WorkspaceView({
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
+        display={controlled ? display : 'shaded'}
+        showOrigin={!!onNewPart && showPlanes && (featureShown?.('origin') ?? true)}
         regions={regions}
         onPickRegion={onPickRegion}
         onPickPlane={id => {

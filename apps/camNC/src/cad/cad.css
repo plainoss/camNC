@@ -1215,3 +1215,34 @@
 .cad-using-edges {
   cursor: copy;
 }
+/** In a turned sketch, labels and points are turned back where they stand, to stay readable and round. */
+.cad-drawing-turned text:not([transform]),
+.cad-drawing-turned .cad-point {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: var(--unturn);
+}
+/** The Extrude dialog's flip, an arrow each way, pressed while the extrude goes the other way. */
+.cad-editor .cad-flip-direction {
+  float: right;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  color: #5f7186;
+}
+.cad-editor .cad-flip-direction[aria-pressed='true'] {
+  color: #2f80ed;
+  background: #dbe8f8;
+}
+.cad-flip-direction svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

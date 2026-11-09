@@ -68,7 +68,9 @@ export function CadPartPatternField({
   const latestApply = useRef(apply);
   latestApply.current = apply;
   const keys = (event: React.KeyboardEvent) => {
-    event.stopPropagation();
+    // In a step's dialog, Enter and Escape go on to the dialog: Enter again accepts it, Escape cancels it.
+    const inDialog = !!(event.currentTarget as HTMLElement).closest('.cad-feature-dialog');
+    if (!(inDialog && (event.key === 'Enter' || event.key === 'Escape'))) event.stopPropagation();
     if (event.key === 'Enter') {
       apply();
       onDone?.();

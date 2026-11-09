@@ -839,7 +839,7 @@ it('refuses Add with no part of the same sketch to join, and Remove off a board'
   expect(within(operation(dialog)).getByRole('tab', { name: 'New' }).getAttribute('aria-selected')).toBe('true');
 });
 
-it('waits for a region to be picked when extruding a sketch that isn’t one outline', async () => {
+it('picks every region of a sketch that isn’t one outline when it’s extruded from its row', async () => {
   const shelf = { ...createCadPart('Shelf', 18), drawnOn: { on: { plane: 'top' as const }, offset: 0 }, extrude: false as const };
   shelf.sketch = addRectangle(shelf.sketch, { x: 0, y: 0, width: 100, height: 50 });
   shelf.sketch = addLine(shelf.sketch, { x1: 30, y1: 0, x2: 30, y2: 50 });
@@ -858,11 +858,12 @@ it('waits for a region to be picked when extruding a sketch that isn’t one out
   await userEvent.click(within(features).getByRole('button', { name: /Sketch · Shelf/ }));
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Extrude/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Shelf' });
-  // Split in two, the sketch isn't one outline: Extrude waits for a region.
-  expect(within(dialog).getByRole('alert').textContent).toMatch(/Pick a region/);
-  expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true);
+  // Split in two, the sketch isn't one outline. Picked from its row, it starts with both regions.
   const regions = sketchRegions(latest().parts[1]!.sketch, CAD_CHORD_TOLERANCE);
   expect(regions).toHaveLength(2);
+  await waitFor(() => expect(latest().parts[1]!.regions).toHaveLength(2));
+  expect(within(dialog).queryByRole('alert')).toBeNull();
+  expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', false);
 });
 
 it('sketches on a base plane picked before Sketch or Shift+S, as on one picked after it', async () => {
@@ -1424,14 +1425,16 @@ it('shows the parts built before a sketch behind it, seen straight at its plane 
   for (const dx of [20, 40, 60]) pointer('pointermove', dx, 2);
   pointer('pointerup', 60, 0);
   await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(true));
-  expect(canvas.style.transform).toMatch(/^matrix\(/);
+  // The drawing turns inside the canvas, so its lines keep their width.
+  expect(screen.getByTestId('cad-drawing').getAttribute('transform')).toMatch(/matrix\(/);
+  expect(canvas.style.transform).toBe('');
   expect(screen.queryByRole('menu')).toBeNull();
   // n looks straight at the plane again, and once more, at its other side.
   canvas.focus();
   await userEvent.keyboard('n');
   await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(false));
   await userEvent.keyboard('n');
-  await waitFor(() => expect(canvas.style.transform).toBe('matrix(-1, 0, 0, 1, 0, 0)'));
+  await waitFor(() => expect(screen.getByTestId('cad-drawing').getAttribute('transform')).toMatch(/matrix\(-1 0 0 1 0 0\)/));
   // Seen from behind, a middle drag to the right still carries the drawing to the right.
   const viewX = () => Number(canvas.getAttribute('viewBox')!.split(' ')[0]);
   const x0 = viewX();

@@ -106,7 +106,7 @@
   {
     "id": "sketch/mirror/circle-linked",
     "title": "Mirror about a construction line makes a linked copy",
-    "evidence": "Codex native check 2026-11-06: editing the source diameter changed both",
+    "evidence": "Codex native check 2026-11-06: editing the source diameter changed both. Being the sketch's first dimension, it also sizes the whole sketch about the origin (by 25/40).",
     "steps": [
       "line 100,10 100,110",
       "click 100,60",
@@ -151,16 +151,16 @@
             {
               "type": "circle",
               "c": [
-                60,
-                60
+                37.5,
+                37.5
               ],
               "r": 12.5
             },
             {
               "type": "circle",
               "c": [
-                140,
-                60
+                87.5,
+                37.5
               ],
               "r": 12.5
             }
