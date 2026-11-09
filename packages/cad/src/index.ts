@@ -17,6 +17,7 @@ export * from './directions';
 export * from './usedEdges';
 export * from './upTo';
 export * from './datumPlanes';
+export * from './consumedTools';
 export * from './suppression';
 export * from './extrudeSteps';
 

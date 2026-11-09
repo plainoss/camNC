@@ -161,6 +161,35 @@ function toolBoxes(
 }
 
 /**
+ * A tool standing on a target's face, its sketch's plane parallel to the target's, cuts its own outline in, whatever its
+ * shape: a round dowel makes a round hole. Its outline and holes are carried into the target's frame, and its reach is
+ * how far it goes in from that face. None when it isn't parallel or doesn't reach in.
+ */
+function toolOutlineCut(
+  tool: EvaluatedCadPart,
+  toolAt: CadPlacement,
+  into: EvaluatedCadPart,
+  intoAt: CadPlacement
+): { outline: CadPoint[]; islands: CadPoint[][]; lo: number; hi: number } | null {
+  const normal = rotateVector(conjugate(intoAt.rotation), rotateVector(toolAt.rotation, [0, 0, 1]));
+  if (Math.abs(Math.abs(normal[2]) - 1) > kSquare) return null;
+  const carried = (loop: CadPoint[], z: number) => loop.map(p => toLocal(intoAt, toWorld(toolAt, [p.x, p.y, z])));
+  const bottom = carried(tool.outline, 0),
+    top = carried(tool.outline, tool.thickness);
+  const lo = Math.max(0, Math.min(bottom[0]![2], top[0]![2])),
+    hi = Math.min(into.thickness, Math.max(bottom[0]![2], top[0]![2]));
+  if (hi - lo < kSquare) return null;
+  const flat = (points: Vec3[]) => {
+    const loop = points.map(([x, y]) => ({ x, y }));
+    return polygonArea(loop) < 0 ? loop.reverse() : loop;
+  };
+  const outline = flat(bottom);
+  const [ilo, ihi] = box(into);
+  if (areaWithin(outline, ilo, ihi) < kSquare) return null;
+  return { outline, islands: tool.holes.map(hole => flat(carried(hole, 0)).reverse()), lo, hi };
+}
+
+/**
  * The cuts each "cut parts" step makes, added to the parts it cuts. Wherever a tool part reaches into a target part, as
  * placed, that much of the target is cut away, widened by the step's clearance on every side inside the target, and as
  * deep as the tool reaches in plus the clearance, from whichever face it enters. It follows the parts as they move and change size. The
@@ -331,6 +360,35 @@ export function applyPartCuts(
               continue;
             }
             const found = toolBoxes(shape, at, into, intoAt);
+            // A round or slanted tool entering a face cuts its own outline in.
+            const outlined = 'refused' in found && !step.split ? toolOutlineCut(shape, at, into, intoAt) : null;
+            if (outlined) {
+              const t = into.thickness,
+                fromTop = outlined.hi >= t - kSquare,
+                fromBelow = outlined.lo <= kSquare;
+              if (!fromTop && !fromBelow) {
+                refused = true;
+                warn(`${name} sits inside ${intoSource.name} without reaching either face, so it can't be cut.`);
+                continue;
+              }
+              // The clearance deepens it, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
+              const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - outlined.lo : outlined.hi) + step.clearance),
+                through = reach >= t - kSquare;
+              const id = `cut-parts:${step.id}:${partId}${key}`;
+              const cut: EvaluatedCadCut = {
+                id,
+                regionId: id,
+                side: fromTop ? 'top' : 'underside',
+                from: 0,
+                to: through ? t : reach,
+                through,
+                outline: outlined.outline,
+                islands: outlined.islands,
+              };
+              target.shape = { ...target.shape, cuts: [...(target.shape.cuts ?? []), cut] };
+              made++;
+              continue;
+            }
             if ('refused' in found) {
               refused = true;
               warn(`${name} ${found.refused} where it reaches into ${intoSource.name}, so it can't be cut from it yet.`);
@@ -478,6 +536,8 @@ export function updatePartCut(document: CadDocument, id: string, change: Partial
       const next = { ...step, ...change };
       if (change.clearance !== undefined && !change.clearanceExpression) delete next.clearanceExpression;
       if (Object.hasOwn(change, 'split') && change.split === undefined) delete next.split;
+      // Kept is the default, so it's only stored when the tools are used up.
+      if (Object.hasOwn(change, 'consumeTools') && !change.consumeTools) delete next.consumeTools;
       return next;
     }),
   };
