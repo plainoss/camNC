@@ -57,7 +57,7 @@ placements and holding settings stay with the project. Geometry changes regenera
 longer resolve remain visible for repair. Running and resumable programs keep their original design and setup snapshot.
 Sketch drafts are autosaved separately from the geometry accepted for CAM. Trim supports line, circle and arc segments;
 rational curves can act as boundaries. CAD currently creates through-cuts; pocket features come later. See
-[CAD status](docs/CAD_STATUS.md) for supported tools and current limits.
+[Status](docs/STATUS.md) for supported tools, current limits and known gaps.
 
 ## Preview the cut in 3D
 

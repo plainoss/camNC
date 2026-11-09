@@ -16,6 +16,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - Keep external application comparison reports, captures and private document links in the private companion repository. Public documentation and examples describe application behavior without product comparisons.
 - Public tests and scripts must work without private reference files.
 - During long-running branch work, commit and push meaningful milestones and at least every two hours as a backup.
+- Pick work from the known gaps in `docs/STATUS.md`. It is generated: edit its sources (scenarios, `docs/status-checklist.json`), run `pnpm run status` and commit the result; CI fails when it is stale or a domain's passing specs drop below their floor.
 
 ## Dev Environment Tips
 

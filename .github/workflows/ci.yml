@@ -54,6 +54,8 @@ jobs:
         run: pnpm run check-format
       - name: Check file sizes
         run: pnpm run check-file-size
+      - name: Check status scorecard
+        run: pnpm run check-status
       - name: Run linting
         run: pnpm run lint
       - name: Check types
