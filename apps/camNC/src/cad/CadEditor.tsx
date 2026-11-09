@@ -497,6 +497,8 @@ export function CadEditor({
   const [choosingFace, setChoosingFace] = useState(startsBlank);
   // A base plane picked in the studio, in its view or feature list, for the next sketch to be drawn on.
   const [selectedPlane, setSelectedPlane] = useState<BasePlane | null>(null);
+  // A dialog waiting for a plane or face to be picked for a direction, as the Transform dialog's Direction box.
+  const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on']) => void) | null>(null);
   // Where the rollback bar was moved to in the feature list: the step it sits after. Null is the end.
   const [rolledTo, setRolledTo] = useState<string | null>(null);
   // The part whose row is hovered in the feature list, highlighted in the view as the reference does.
@@ -3714,6 +3716,10 @@ export function CadEditor({
   };
   /** A base plane clicked in the view or the feature list: drawn on while choosing, otherwise picked for the next sketch. */
   const pickPlane = (plane: BasePlane) => {
+    if (directionPicker) {
+      directionPicker({ plane });
+      return setDirectionPicker(null);
+    }
     if (choosingFace) {
       setChoosingFace(false);
       setSelectedPlane(null);
@@ -4375,9 +4381,14 @@ export function CadEditor({
                   variables={variableScope}
                   onSave={next => {
                     commit(next);
+                    setDirectionPicker(null);
                     setTransformDialog(null);
                   }}
-                  onCancel={() => setTransformDialog(null)}
+                  onCancel={() => {
+                    setDirectionPicker(null);
+                    setTransformDialog(null);
+                  }}
+                  pickDirection={picked => setDirectionPicker(() => picked)}
                 />
               ) : null;
             })()}
@@ -4556,6 +4567,10 @@ export function CadEditor({
                 regions={extrudeRegions}
                 onPickRegion={extrudeRegions.length ? pickRegion : undefined}
                 onSelectFace={on => {
+                  if (directionPicker && on) {
+                    directionPicker(on);
+                    return setDirectionPicker(null);
+                  }
                   setSelectedFace(on);
                   if (on) setSelectedPlane(null);
                 }}>
