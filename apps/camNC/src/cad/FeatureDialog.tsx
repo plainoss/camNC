@@ -4,7 +4,7 @@ import './featureDialog.css';
 
 /**
  * A design step's settings, over the top left of the 3D view: its name, a green tick to keep them and a red cross to
- * leave them as they were. Changes show in the view as they're made. Enter in a field keeps them, Escape leaves them.
+ * leave them as they were. Changes show in the view as they’re made. Enter applies a field, Enter again keeps them, Escape leaves them.
  */
 export function FeatureDialog({
   title,
@@ -27,6 +27,8 @@ export function FeatureDialog({
   children: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
+  // The field Enter last applied, and what it held: Enter on it again, unchanged, accepts the dialog.
+  const lastEnter = useRef<{ input: HTMLInputElement; value: string } | null>(null);
   // As of the latest render: a field's Enter may have just found its value wrong, which shows a frame later.
   const latest = useRef({ okDisabled, onOk });
   latest.current = { okDisabled, onOk };
@@ -56,9 +58,15 @@ export function FeatureDialog({
         // Typing stays in the dialog; any other key, such as a tool's shortcut after ticking a box, reaches the editor.
         if (typing || event.key === 'Escape' || event.key === 'Enter') event.stopPropagation();
         if (event.key === 'Escape') onCancel();
-        // A field applies its value on Enter first, then the dialog is done.
-        else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox')
-          requestAnimationFrame(ok);
+        // Enter applies a field's value and keeps the dialog open; Enter again, with nothing changed, accepts it, as in the
+        // reference.
+        else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox') {
+          const input = event.target;
+          if (lastEnter.current?.input === input && lastEnter.current.value === input.value) {
+            lastEnter.current = null;
+            requestAnimationFrame(ok);
+          } else lastEnter.current = { input, value: input.value };
+        }
       }}>
       <div className="cad-feature-dialog-head">
         <h3>{title}</h3>

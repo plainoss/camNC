@@ -11,8 +11,11 @@ import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
 export interface ViewRequest {
-  name: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'fit';
+  name: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'fit' | 'normal';
   seq: number;
+  /** For `normal`: the way the camera looks from, out of a plane or face, and which way is up on it. */
+  direction?: [number, number, number];
+  up?: [number, number, number];
 }
 
 const kViewDirections = {
@@ -23,7 +26,7 @@ const kViewDirections = {
   top: [0, 0, 1],
   bottom: [0, 0, -1],
   iso: [0.2, -0.75, 1],
-} satisfies Record<Exclude<ViewRequest['name'], 'fit'>, [number, number, number]>;
+} satisfies Record<Exclude<ViewRequest['name'], 'fit' | 'normal'>, [number, number, number]>;
 
 /** A plane shown in the view to draw on, as a translucent square with its name at a corner. */
 export interface ViewPlane {
@@ -87,7 +90,12 @@ function Region({ region, model, onPick }: { region: ViewRegion; model: THREE.Ma
 }
 
 const kPlane = '#d08a3c';
-const kNoLines: [number, number, number][][] = [];
+/** A finished sketch's curve in the model, by the sketch's part. */
+export interface SketchLine {
+  partId: string;
+  points: [number, number, number][];
+}
+const kNoLines: SketchLine[] = [];
 const kPlaneHighlight = '#2f80ed';
 
 function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number; model: THREE.Matrix4; onPick?: () => void }) {
@@ -137,6 +145,9 @@ const kWood = '#c9a477';
 const kSelected = '#8b5cf6';
 const kOff = '#71717a';
 const kClash = '#dc2626';
+// The studio's parts, as the reference shows them: a neutral grey, picked in orange, with no colour for overlaps.
+const kStudioPart = '#b8c0c9';
+const kStudioPicked = '#f39c2c';
 function Body({
   mesh,
   matrix,
@@ -208,8 +219,13 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
     let dist = radius / tan;
     const name = viewRequest?.name ?? 'iso';
     const direction =
-      name === 'fit' ? camera.getWorldDirection(new THREE.Vector3()).negate() : new THREE.Vector3(...kViewDirections[name]).normalize();
-    if (name !== 'fit') camera.up.set(0, name === 'top' || name === 'bottom' ? 1 : 0, name === 'top' || name === 'bottom' ? 0 : 1);
+      name === 'fit'
+        ? camera.getWorldDirection(new THREE.Vector3()).negate()
+        : name === 'normal'
+          ? new THREE.Vector3(...(viewRequest?.direction ?? [0, 0, 1])).normalize()
+          : new THREE.Vector3(...kViewDirections[name]).normalize();
+    if (name === 'normal') camera.up.set(...(viewRequest?.up ?? [0, 1, 0]));
+    else if (name !== 'fit') camera.up.set(0, name === 'top' || name === 'bottom' ? 1 : 0, name === 'top' || name === 'bottom' ? 0 : 1);
     if (viewRequest) {
       // Fit every corner in the requested camera frame, including its depth toward the camera.
       const right = new THREE.Vector3().crossVectors(camera.up, direction).normalize();
@@ -318,6 +334,7 @@ export function ModelViewport({
   planes = [],
   onPickPlane,
   sketchLines = kNoLines,
+  palette,
   regions = [],
   onPickRegion,
 }: {
@@ -345,7 +362,9 @@ export function ModelViewport({
   planes?: ViewPlane[];
   onPickPlane?: (id: string) => void;
   /** Finished sketches not yet extruded, as polylines in the model, shown on their planes. */
-  sketchLines?: [number, number, number][][];
+  sketchLines?: SketchLine[];
+  /** `studio` shows parts as the reference does: grey, picked in orange. */
+  palette?: 'studio';
   /** A sketch's regions to pick for an extrude, and picking one. */
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
@@ -357,20 +376,24 @@ export function ModelViewport({
     () => (view === 'flat' ? flat : view === 'exploded' ? exploded : meshes.map(() => assembled)),
     [view, flat, exploded, assembled, meshes]
   );
-  // Base planes a little larger than the model, as the reference shows them, and a sensible size before there's one.
+  // Base planes centred on the origin and big enough to take in the whole model, as the reference sizes them, so a
+  // part drawn away from the origin still sits on its plane. A sensible size before there's anything.
   const planeSize = useMemo(() => {
-    const size = boundsOf(
+    const reach = boundsOf(
       meshes,
-      meshes.map(() => assembled)
-    ).getSize(new THREE.Vector3());
-    return Math.max(100, Math.max(size.x, size.y, size.z) * 0.75);
-  }, [meshes, assembled]);
+      meshes.map(() => new THREE.Matrix4())
+    );
+    for (const line of sketchLines) for (const point of line.points) reach.expandByPoint(new THREE.Vector3(...point));
+    if (reach.isEmpty()) return 100;
+    const half = Math.max(...reach.min.toArray().map(Math.abs), ...reach.max.toArray().map(Math.abs));
+    return Math.max(100, half * 2.2);
+  }, [meshes, sketchLines]);
   const shownPlanes = view === 'assembled' ? planes : [];
   const box = useMemo(() => {
     const fit = boundsOf(meshes, matrices);
     // Finished sketches are in view too, as a first one is before it has any part.
     for (const line of view === 'assembled' ? sketchLines : [])
-      for (const point of line) fit.expandByPoint(new THREE.Vector3(...point).applyMatrix4(assembled));
+      for (const point of line.points) fit.expandByPoint(new THREE.Vector3(...point).applyMatrix4(assembled));
     // So are the regions to pick for an extrude, as when the sketch can't be a part as a whole.
     for (const region of view === 'assembled' ? regions : [])
       for (const point of region.outline)
@@ -429,12 +452,16 @@ export function ModelViewport({
             matrix={matrices[i]!}
             color={
               (selectedIndexes ? selectedIndexes.includes(i) : m.partId === selectedId) || highlightIds.includes(m.partId)
-                ? kSelected
+                ? palette === 'studio'
+                  ? kStudioPicked
+                  : kSelected
                 : warnIds.includes(m.partId)
                   ? kClash
-                  : milled(m.partId)
-                    ? kWood
-                    : kOff
+                  : !milled(m.partId)
+                    ? kOff
+                    : palette === 'studio'
+                      ? kStudioPart
+                      : kWood
             }
             opacity={milled(m.partId) ? 1 : 0.35}
             onSelect={e => pick(m, i, matrices[i]!, e)}
@@ -444,8 +471,13 @@ export function ModelViewport({
       </group>
       {view === 'assembled' && sketchLines.length > 0 && (
         <group matrixAutoUpdate={false} matrix={assembled}>
-          {sketchLines.map((points, i) => (
-            <Line key={i} points={points} color="#1f6fc5" lineWidth={1.5} />
+          {sketchLines.map((line, i) => (
+            <Line
+              key={i}
+              points={line.points}
+              color={highlightIds.includes(line.partId) || line.partId === selectedId ? kStudioPicked : '#1f6fc5'}
+              lineWidth={highlightIds.includes(line.partId) || line.partId === selectedId ? 2.5 : 1.5}
+            />
           ))}
         </group>
       )}

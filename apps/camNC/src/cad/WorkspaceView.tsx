@@ -31,6 +31,7 @@ export default function WorkspaceView({
   onSelectPlane,
   onSelectFace,
   picked,
+  hoverIds,
   regions,
   onPickRegion,
   viewRequest,
@@ -63,6 +64,8 @@ export default function WorkspaceView({
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
   /** The name of the plane or face picked for the next sketch, said in the status line so the pick isn't hidden. */
   picked?: string | null;
+  /** Parts shown highlighted, as when their row in the feature list is hovered. */
+  hoverIds?: readonly string[];
   /** A sketch's regions to pick for its extrude, while its Extrude dialog is open. */
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
@@ -185,7 +188,10 @@ export default function WorkspaceView({
         viewRequest={viewRequest}
         selectedId={selectedId}
         selectedIndexes={selectedIndexes}
-        warnIds={clashes.flatMap(clash => clash.partIds)}
+        // The studio shows parts as the reference does, and says in its status line when two overlap rather than colouring them.
+        warnIds={controlled ? undefined : clashes.flatMap(clash => clash.partIds)}
+        palette={controlled ? 'studio' : undefined}
+        highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
         onPickFace={choosing ? pickFace : undefined}
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}

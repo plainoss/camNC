@@ -504,6 +504,8 @@ export function CadEditor({
   const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on']) => void) | null>(null);
   // Where the rollback bar was moved to in the feature list: the step it sits after. Null is the end.
   const [rolledTo, setRolledTo] = useState<string | null>(null);
+  // The part whose row is hovered in the feature list, highlighted in the view as the reference does.
+  const [hoveredStepPart, setHoveredStepPart] = useState<string | null>(null);
   // The face of the part last clicked in the studio, which the next sketch is drawn on, as with a picked plane.
   const [selectedFace, setSelectedFace] = useState<Extract<CadDrawnOn['on'], { partId: string }> | null>(null);
   // A picked face goes with its part.
@@ -2288,6 +2290,27 @@ export function CadEditor({
         if (!event.repeat) setShowPlanes(previous => !previous);
         return;
       }
+      // N looks straight at the picked plane or face, or the selected part's sketch plane; again, from its other side.
+      if (!event.shiftKey && event.key.toLowerCase() === 'n') {
+        const on = selectedPlane
+          ? { plane: selectedPlane }
+          : (selectedFace ?? (part ? (part.drawnOn?.on ?? { plane: 'top' as const }) : null));
+        const frame = on && cadFaceFrame(documentRef.current, on);
+        if (!frame || 'error' in frame) return;
+        event.preventDefault();
+        if (event.repeat) return;
+        setViewRequest(previous => {
+          const same =
+            previous?.name === 'normal' && previous.direction?.every((value, axis) => Math.abs(value - frame.normal[axis]!) < 1e-9);
+          return {
+            name: 'normal',
+            seq: (previous?.seq ?? 0) + 1,
+            direction: same ? (frame.normal.map(value => -value) as [number, number, number]) : frame.normal,
+            up: frame.y,
+          };
+        });
+        return;
+      }
     }
     // Shift+E extrudes the selected sketch or part, as in the reference.
     if (
@@ -3629,6 +3652,7 @@ export function CadEditor({
     }
     if (action === 'suppress') return commit(toggleSuppressed(current, step));
     if (action === 'rollTo') return setRolledTo(designSteps(current).at(-1)?.id === step.id ? null : step.id);
+    if (action === 'rollToEnd') return setRolledTo(null);
     if (action !== 'delete') return;
     setFeatureDialog(null);
     if (step.kind === 'move')
@@ -4170,6 +4194,7 @@ export function CadEditor({
               onAction={featureAction}
               rollback={rollbackStep}
               onRollTo={showWorkspace ? setRolledTo : undefined}
+              onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
               onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
             />
@@ -4561,6 +4586,7 @@ export function CadEditor({
                 onNewPart={newPartOn}
                 selectedPlane={selectedPlane}
                 onSelectPlane={pickPlane}
+                hoverIds={hoveredStepPart ? [hoveredStepPart] : undefined}
                 picked={selectedPlane ? drawnOnName(doc, { plane: selectedPlane }) : selectedFace ? drawnOnName(doc, selectedFace) : null}
                 regions={extrudeRegions}
                 onPickRegion={extrudeRegions.length ? pickRegion : undefined}

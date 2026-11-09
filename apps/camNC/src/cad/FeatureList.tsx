@@ -19,10 +19,10 @@ const kIcons: Record<DesignStep['kind'] | 'variable', string> = {
 
 /** A row of the list: a design variable, or a step of how the design is built. */
 export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'step'; step: DesignStep };
-export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'delete';
+export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete';
 
 /** What each row's menu offers, and why an item isn't there for it. */
-function menuItems(entry: FeatureEntry): { action: FeatureAction; label: string; disabled?: boolean }[] {
+function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAction; label: string; disabled?: boolean }[] {
   if (entry.kind === 'variable')
     return [
       { action: 'edit', label: 'Edit…' },
@@ -38,6 +38,8 @@ function menuItems(entry: FeatureEntry): { action: FeatureAction; label: string;
       ? []
       : [{ action: 'suppress' as const, label: entry.step.suppressed ? 'Unsuppress' : 'Suppress' }]),
     { action: 'rollTo', label: 'Roll to here' },
+    // A step past the bar also takes the design back to its end, as the reference's menu does.
+    ...(rolledBack ? [{ action: 'rollToEnd' as const, label: 'Roll to end' }] : []),
     { action: 'delete', label: 'Delete', disabled: kind === 'faceSketch' || kind === 'copy' },
   ];
 }
@@ -54,6 +56,7 @@ export function FeatureList({
   onRename,
   rollback,
   onRollTo,
+  onHover,
   selectedPlane,
   onPickPlane,
 }: {
@@ -70,6 +73,8 @@ export function FeatureList({
    * or Roll to here does in the reference. Without it the bar only shows while a step is edited.
    */
   onRollTo?: (stepId: string | null) => void;
+  /** A row hovered, for the view to highlight what it made; null when the pointer leaves. */
+  onHover?: (entry: FeatureEntry | null) => void;
   /** The base plane picked, in the list or the view, and picking one, as the reference lists them first. */
   selectedPlane?: BasePlane | null;
   onPickPlane?: (plane: BasePlane) => void;
@@ -124,7 +129,7 @@ export function FeatureList({
     setMenu({ entry, x: event.clientX, y: event.clientY });
   };
   return (
-    <section className="cad-studio-features" aria-label="Features">
+    <section className="cad-studio-features" aria-label="Features" tabIndex={-1}>
       <div className="cad-panel-heading">
         <h2>Features ({entries.length})</h2>
       </div>
@@ -193,10 +198,20 @@ export function FeatureList({
                 onClick={() => onSelect(entry)}
                 onDoubleClick={() => onAction(entry, 'edit')}
                 onContextMenu={event => open(entry, event)}
+                onPointerEnter={() => onHover?.(entry)}
+                onPointerLeave={() => onHover?.(null)}
                 onKeyDown={event => {
                   if (event.key === 'Enter') {
                     event.preventDefault();
                     onAction(entry, 'edit');
+                  } else if (event.key === 'Delete' || event.key === 'Backspace') {
+                    // Delete removes the step straight away, as in the reference; undo brings it back.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (menuItems(entry).find(item => item.action === 'delete')?.disabled) return;
+                    // The list keeps the keyboard once the row is gone, so undo works straight away.
+                    event.currentTarget.closest<HTMLElement>('section')?.focus();
+                    onAction(entry, 'delete');
                   } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
                     const box = event.currentTarget.getBoundingClientRect();
                     event.preventDefault();
@@ -273,7 +288,7 @@ export function FeatureList({
               items[(at + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
             }
           }}>
-          {menuItems(menu.entry).map(item => (
+          {menuItems(menu.entry, rollbackAt >= 0 && entries.findIndex(entry => key(entry) === key(menu.entry)) > rollbackAt).map(item => (
             <button
               key={item.action}
               type="button"
