@@ -413,7 +413,8 @@ export function SketchToolbar({
   onSearch?: () => void;
   tool: SketchTool;
   construction: boolean;
-  constraintMode: ConstraintCommandTool | null;
+  /** The constraint tool that is active; `fix` while Fix waits for geometry to click. */
+  constraintMode: ConstraintCommandTool | 'fix' | null;
   busy: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -559,7 +560,14 @@ export function SketchToolbar({
         </ToolHint>
         <span className="cad-toolbar-divider" aria-hidden="true" />
         <DropdownMenu modal={false}>
-          <ToolHint label={constraintMode ? `${constraints.find(c => c.id === constraintMode)?.label} constraint` : 'Constraints'}>
+          <ToolHint
+            label={
+              constraintMode === 'fix'
+                ? 'Fix constraint'
+                : constraintMode
+                  ? `${constraints.find(c => c.id === constraintMode)?.label} constraint`
+                  : 'Constraints'
+            }>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"

@@ -403,6 +403,8 @@ export function CadEditor({
   const [chain, setChain] = useState<ChainAnchor | null>(null);
   const [contextualArc, setContextualArc] = useState(false);
   const [constraintMode, setConstraintMode] = useState<ConstraintTool | null>(null);
+  /** Fix chosen with nothing selected: each click fixes or unfixes what it hits until Escape. */
+  const [fixMode, setFixMode] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
   const [snapCue, setSnapCue] = useState<{ point: Point; label: string } | null>(null);
   const lastSnap = useRef<CadSnapResult | null>(null);
@@ -1195,6 +1197,7 @@ export function CadEditor({
     setCreationValues(null);
     drawingGesture.current = idleDrawingGesture();
     setConstraintMode(null);
+    setFixMode(false);
     setDimension(null);
     setPalette(false);
     setFilletEditing(false);
@@ -2231,6 +2234,7 @@ export function CadEditor({
     const references = [...dimensionSelection];
     // Constraint commands replace drawing/dimension placement just like the other sketch tools.
     chooseTool('select');
+    setFixMode(false);
     setSelected(references);
     if (constraintMode === type) {
       setConstraintMode(null);
@@ -2255,8 +2259,20 @@ export function CadEditor({
   };
   const toggleFix = () => {
     if (!sketch) return;
+    if (!selected.length) {
+      chooseTool('select');
+      setFixMode(true);
+      setMessage('Click geometry to fix or unfix it. Escape ends Fix.');
+      svg.current?.focus();
+      return;
+    }
+    fixGeometry(selected);
+  };
+  /** Fixes the points of `targets`, or unfixes them when they are all fixed already. */
+  const fixGeometry = (targets: string[]) => {
+    if (!sketch) return;
     const ids = new Set(
-      selected.flatMap(id => {
+      targets.flatMap(id => {
         const entity = sketch.entities.find(e => e.id === id);
         return entity ? entityPointIds(entity) : [];
       })
@@ -2266,7 +2282,13 @@ export function CadEditor({
     if (!ids.size) return setMessage('Select geometry to fix. The origin and the edges of the face it’s drawn on always stay fixed.');
     const shouldFix = sketch.entities.some(e => e.type === 'point' && ids.has(e.id) && !e.fixed);
     changeSketch({ ...sketch, entities: sketch.entities.map(e => (e.type === 'point' && ids.has(e.id) ? { ...e, fixed: shouldFix } : e)) });
-    setMessage(shouldFix ? 'Selected geometry fixed. Shift+J unfixes it.' : 'Selected geometry unfixed.');
+    setMessage(
+      fixMode
+        ? `${shouldFix ? 'Fixed' : 'Unfixed'}. Click more geometry, or press Escape to end Fix.`
+        : shouldFix
+          ? 'Selected geometry fixed. Shift+J unfixes it.'
+          : 'Selected geometry unfixed.'
+    );
   };
   const toggleConstruction = () => {
     if (sketch && selected.length) {
@@ -2464,7 +2486,7 @@ export function CadEditor({
       return;
     }
     // `u` uses the edges picked, or with none picked, starts Use: click edges to use them, as the reference teaches.
-    if (key === 'u' && sketchBackdrop) {
+    if (key === 'u' && !event.shiftKey && sketchBackdrop) {
       event.preventDefault();
       if (pickedEdges.length) takeEdges();
       else if (usingEdges) {
@@ -2543,6 +2565,12 @@ export function CadEditor({
     if (event.shiftKey && key === 'j') {
       event.preventDefault();
       toggleFix();
+      return;
+    }
+    // Normal, Pierce and Equal curvature have their keys reserved, so they never start the unshifted tool.
+    if (event.shiftKey && (key === 'k' || key === 'g' || key === 'u')) {
+      event.preventDefault();
+      setMessage(`The ${key === 'k' ? 'Normal' : key === 'g' ? 'Pierce' : 'Equal curvature'} constraint isn’t available yet.`);
       return;
     }
     const constraintKey =
@@ -2637,7 +2665,8 @@ export function CadEditor({
       event.preventDefault();
       beginDimension();
     } else {
-      const command = tools.find(t => t.key?.toLowerCase() === key)?.id;
+      // Drawing tools have single-letter keys; with Shift held, the key means something else.
+      const command = event.shiftKey ? undefined : tools.find(t => t.key?.toLowerCase() === key)?.id;
       if (command) {
         event.preventDefault();
         chooseTool(command);
@@ -2822,6 +2851,10 @@ export function CadEditor({
       pendingSnaps.current = [];
       setLineContinuation(true);
       setMessage('Click the tangent arc end.');
+      return;
+    }
+    if (fixMode) {
+      if (id) fixGeometry([id]);
       return;
     }
     if (constraintMode) {
@@ -3966,7 +3999,8 @@ export function CadEditor({
           -14
         )
       : undefined;
-  const canEditCanvasDimensions = !constraintMode && dimensionFlow.phase === 'idle' && (tool === 'select' || tool === 'dimension');
+  const canEditCanvasDimensions =
+    !constraintMode && !fixMode && dimensionFlow.phase === 'idle' && (tool === 'select' || tool === 'dimension');
   const activeSketchStatus = sketchStatuses[part?.id ?? ''];
   const variableProblems = cadVariableProblems(doc);
   // The face a part is drawn on, outlined on its drawing so it can be traced and lined up with.
@@ -4371,7 +4405,7 @@ export function CadEditor({
           }}
           tool={tool}
           construction={construction}
-          constraintMode={constraintMode}
+          constraintMode={fixMode ? 'fix' : constraintMode}
           busy={busy}
           canUndo={session.past.length > 0}
           canRedo={session.future.length > 0}
@@ -5098,7 +5132,7 @@ export function CadEditor({
                   entityStatus={entityStatus}
                   pixelScale={markerScale}
                   hoveredPointId={hoveredPoint}
-                  interactive={tool === 'select' && !constraintMode && !placingDimension}
+                  interactive={tool === 'select' && !constraintMode && !fixMode && !placingDimension}
                   onEditConic={id => {
                     const curve = sketch?.entities.find(entity => entity.id === id);
                     if (curve?.type === 'conic') {
@@ -5253,7 +5287,7 @@ export function CadEditor({
                   scale={markerScale}
                   selectedConstraintIds={selectedConstraints}
                   conflictedConstraintIds={shownConflicts}
-                  interactive={tool === 'select' && !constraintMode && !placingDimension}
+                  interactive={tool === 'select' && !constraintMode && !fixMode && !placingDimension}
                   onSelect={(id, additive) => {
                     setSelectedConstraints(previous =>
                       additive ? (previous.includes(id) ? previous.filter(existing => existing !== id) : [...previous, id]) : [id]
