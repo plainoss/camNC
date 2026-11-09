@@ -2,14 +2,15 @@ import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { parseCadDocument } from '@wbcnc/cad';
+import { parseCadDocument, type CadDocument } from '@wbcnc/cad';
 import { editCad, type CadScript } from './edit';
 import { renderCadSvg } from './render';
+import { fullCadReport, fullReportText } from './fullReport';
 import { inspectCadDocument } from './inspect';
 import { typeErrors } from './typecheck';
 
 function parseArgs(args: string[]) {
-  const options: { file?: string; from?: string; out?: string; svg?: string } = {};
+  const options: { file?: string; from?: string; out?: string; svg?: string; full?: boolean } = {};
   const cwd = process.env.INIT_CWD ?? process.cwd();
   for (let i = 0; i < args.length; i++) {
     const flag = args[i]!;
@@ -17,11 +18,15 @@ function parseArgs(args: string[]) {
     if (flag === '--from') options.from = path.resolve(cwd, args[++i]!);
     else if (flag === '--out') options.out = path.resolve(cwd, args[++i]!);
     else if (flag === '--svg') options.svg = path.resolve(cwd, args[++i]!);
-    else if (flag.startsWith('--')) throw new Error(`Unknown option: ${flag}`);
+    else if (flag === '--report') {
+      const kind = args[++i];
+      if (kind !== 'full' && kind !== 'check') throw new Error(`--report takes full or check, not ${kind ?? 'nothing'}.`);
+      options.full = kind === 'full';
+    } else if (flag.startsWith('--')) throw new Error(`Unknown option: ${flag}`);
     else options.file = path.resolve(cwd, flag);
   }
   if (!options.file && !options.from)
-    throw new Error('Usage: check [design.cad.ts] [--from document.json] [--out document.json] [--svg drawing.svg]');
+    throw new Error('Usage: check [design.cad.ts] [--from document.json] [--out document.json] [--svg drawing.svg] [--report full]');
   return options;
 }
 
@@ -31,14 +36,19 @@ console.log = console.error.bind(console);
 
 const options = parseArgs(process.argv.slice(2));
 const start = options.from ? parseCadDocument(JSON.parse(await readFile(options.from, 'utf8'))) : null;
-const finish = async (ok: boolean, output: object, document?: unknown, svg?: string) => {
+type Inspected = Awaited<ReturnType<typeof inspectCadDocument>> & { scriptError?: string };
+const finish = async (ok: boolean, output: object, document?: unknown, svg?: string, inspected?: Inspected) => {
   // A design that doesn't check out is never written where it could be imported by mistake.
   if (ok && options.out) await writeFile(options.out, `${JSON.stringify(document, null, 1)}\n`);
   else if (!ok && options.out) await rm(options.out, { force: true });
   if (svg && options.svg) await writeFile(options.svg, svg);
   else if (!ok && options.svg) await rm(options.svg, { force: true });
-  // Printed once the files are written, so a passing report means they're there.
-  print(JSON.stringify(output, null, 1));
+  // Printed once the files are written, so a passing report means they're there. The full report is of the design as
+  // written, or as it was when the script failed.
+  if (options.full && document) {
+    const full = await fullCadReport(document as CadDocument, inspected);
+    process.stdout.write(fullReportText(full));
+  } else print(JSON.stringify(output, null, 1));
   process.exitCode = ok ? 0 : 1;
 };
 
@@ -66,10 +76,17 @@ if (options.file) {
     if ('thrown' in result) await finish(false, { ok: false, scriptError: `The script threw: ${result.thrown}` });
     else {
       const scriptError = result.scriptError && { scriptError: result.scriptError };
-      await finish(result.ok, { ...scriptError, ...result.report, ok: result.ok }, result.document, renderCadSvg(result.parts));
+      await finish(
+        result.ok,
+        { ...scriptError, ...result.report, ok: result.ok },
+        result.document,
+        renderCadSvg(result.parts),
+        // A script that stopped leaves the design as it was, which is what the check reported on.
+        result
+      );
     }
   }
 } else {
-  const { document, report, parts } = await inspectCadDocument(start!);
-  await finish(report.ok, report, document, renderCadSvg(parts));
+  const inspected = await inspectCadDocument(start!);
+  await finish(inspected.report.ok, inspected.report, inspected.document, renderCadSvg(inspected.parts), inspected);
 }

@@ -314,7 +314,7 @@ export function cadFaceFrame(document: CadDocument, on: CadDrawnOn['on']): CadFa
 }
 
 /** Every flat face of a part a new part can be drawn on, with where it is in the studio. */
-function partFaces(document: CadDocument, part: CadPart) {
+export function cadPartFaces(document: CadDocument, part: CadPart) {
   const shape = evaluateCadPart(part).part;
   if (!shape) return null;
   const faces: { face: Extract<CadDrawnOn['on'], { partId: string }>['face']; frame: CadFaceFrame }[] = [];
@@ -346,7 +346,7 @@ export function cadFaceFacing(
 ): { face: Extract<CadDrawnOn['on'], { partId: string }>['face'] } | { error: string } {
   const part = document.parts.find(candidate => candidate.id === partId);
   if (!part) return { error: 'That part is gone.' };
-  const faces = partFaces(document, part);
+  const faces = cadPartFaces(document, part);
   if (!faces) return { error: `${part.name} can’t be worked out until its sketch is fixed.` };
   const want = kDirections[direction];
   const facing = faces

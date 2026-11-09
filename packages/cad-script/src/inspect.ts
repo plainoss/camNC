@@ -21,6 +21,7 @@ import {
   type EvaluatedCadPart,
   evaluateCadDocument,
   cadCopyName,
+  isCadPart,
 } from '@wbcnc/cad';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
@@ -237,6 +238,11 @@ function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof pr
       underside: (_, rotated) => profile.turned?.(rotated ? 'y' : 'x') ?? profile.features,
     }
   );
+  return { bit: DEFAULT_SETTINGS.tools[0]!.diameter, ...planSummary(plan) };
+}
+
+/** A planned board's operations, time, CAM warnings, and what would block the job, side B included. */
+export function planSummary(plan: PlanResult): Omit<CadToolpathSummary, 'bit'> {
   const sideB = plan.sideB;
   const operations = (from: PlanResult, prefix: string) =>
     from.ops.map(op => ({
@@ -245,7 +251,6 @@ function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof pr
       steps: op.depthSteps,
     }));
   return {
-    bit: DEFAULT_SETTINGS.tools[0]!.diameter,
     minutes: Math.round((plan.timeMin + (sideB?.timeMin ?? 0)) * 10) / 10,
     operations: [...operations(plan, ''), ...(sideB ? operations(sideB, 'Side B: ') : [])],
     warnings: [...plan.warnings, ...(sideB?.warnings ?? [])],
@@ -359,18 +364,23 @@ export async function inspectCadDocument(
       return `${featureHandles.get(base!) ?? base}${copy === undefined ? '' : `~${copy}`}`;
     };
     const sketchHandles = shortHandles(faces.map(face => face.sketch.id));
-    const sketches = [
+    const sketches: { sketch: CadSketch; ref: string; on: CadReportPart['sketches'][number]['on'] }[] = [
       { sketch: part.sketch, ref: 'profile', on: 'profile' as const },
       ...faces.map(face => ({
         sketch: face.sketch,
         ref: sketchHandles.get(face.sketch.id)!,
         on: typeof face.on === 'object' ? { floorOf: featureHandles.get(face.on.floorOf) ?? face.on.floorOf } : face.on,
       })),
-    ].map(({ sketch, ref, on }, i) => ({
+    ];
+    // The solver reports on the sketches it solves here, in this order: a shared or Remove step's sketch is solved where
+    // it's drawn, so it has no status of its own on this part.
+    const solvedHere = [!part.sketchOf, ...faces.map(face => !face.removedBy)];
+    const statusOf = (i: number) => (solvedHere[i] ? statusesOf[solvedHere.slice(0, i).filter(Boolean).length] : undefined);
+    const reported = sketches.map(({ sketch, ref, on }, i) => ({
       ref,
       on,
-      freedom: statusesOf[i]?.dof ?? null,
-      status: statusesOf[i]?.status ?? 'invalid',
+      freedom: statusOf(i)?.dof ?? null,
+      status: solvedHere[i] ? (statusOf(i)?.status ?? 'invalid') : 'shared',
       entities: reportEntities(sketch),
       constraints: sketch.constraints.length,
       ...(() => {
@@ -466,7 +476,8 @@ export async function inspectCadDocument(
     }
     let cam: CadReportPart['cam'];
     let toolpaths: CadToolpathSummary | undefined;
-    if (evaluated) {
+    // A sketch not yet extruded, or a step that adds to or cuts another part, isn't machined on its own.
+    if (evaluated && isCadPart(part)) {
       {
         const profile = profileFeatures(evaluated);
         cam = {
@@ -511,12 +522,12 @@ export async function inspectCadDocument(
         evaluated.holes.length + (evaluated.cuts ?? []).filter(cut => cut.through && !isEdgeNotch(cut, evaluated.outline)).length,
       notches: evaluated && (evaluated.cuts ?? []).filter(cut => isEdgeNotch(cut, evaluated.outline)).length,
       cuts,
-      sketches,
+      sketches: reported,
       ...(cam && { cam }),
       ...(pieces && { pieces }),
       ...(toolpaths && { toolpaths }),
     };
-    const freedom = sketches.reduce((sum, sketch) => sum + (sketch.freedom ?? 0), 0);
+    const freedom = reported.reduce((sum, sketch) => sum + (sketch.freedom ?? 0), 0);
     for (const want of expectations.get(part.id) ?? [])
       for (const failure of checkExpectation(want, report, freedom, solved.document))
         errors.push({ code: 'expect-failed', message: failure, part: part.name });

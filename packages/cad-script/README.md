@@ -33,6 +33,54 @@ file in camNC's CAM page to get it as a new job. `--svg` draws
 the parts. A failed check removes any existing `--out` file and any existing `--svg`
 file unless it writes a new SVG for that run. See `examples/` for more.
 
+## The full report
+
+```sh
+pnpm --silent --filter @wbcnc/cad-script check --from design.json --report full
+```
+
+`--report full` prints everything the design is and makes, instead of the check report,
+so a Part Studio or CAM change can be checked from a saved design in seconds, without
+the app:
+
+- `features`: the feature list in the studio's order (variables, planes, then each part's
+  sketch, extrude, transform, face sketches, cuts, copies, patterns and cut-parts steps),
+  each with its `settings` (thickness, end conditions such as up to a face, Add and
+  Remove, the plane or face it's drawn on, depths as typed and as worked out, counts,
+  clearances) and its `result`, or an `error` saying why it couldn't be made.
+- `sketches`: each sketch's free movement and solver status (`solved`, `conflict`,
+  `invalid`, or `shared` when it's solved where another step draws it), constraints by
+  kind, geometry, and its regions as `r1`, `r2`, … from the bottom left. Steps name
+  regions by these.
+- `bodies`: each part as made: size, thickness, holes, cuts, the faces another part can
+  be drawn on, what CAM received and its toolpath summary, planned alone.
+- `assembly`: each placed part's box, and collisions.
+- `boards`: every piece to cut, nested on boards fitted to them, one set per thickness,
+  with pieces cut from both sides on boards turned over. Each board is planned together
+  as the app plans one, with the default bit, settings and tabs: placements, how each
+  piece is held, time, operations, CAM warnings and what would block the job.
+
+The JSON is canonical: keys in a fixed order, numbers rounded to 0.001, and the only IDs
+are the document's own, so the same design always prints the same text and a diff of
+two reports shows what changed. With a script it reports on the design the script made;
+the exit code still follows the check.
+
+### Golden reports
+
+`fixtures/designs/` holds saved designs, each with its full report next to it as
+`<name>.report.json`. A test checks every design against its report:
+
+```sh
+pnpm --filter @wbcnc/cad-script exec vitest run designs
+UPDATE_GOLDENS=1 pnpm --filter @wbcnc/cad-script exec vitest run designs   # rewrite them
+```
+
+To reproduce a bug from the app: save the design with Save to file (#351) in the design's top
+bar, drop the `.json` in `fixtures/designs/`, run the update, and review the new report.
+After a fix, run the update again and review the diff of the reports: it should change
+only what the fix meant to. A design without a report fails with the command that makes
+one. Scripts make designs for this folder too: `check examples/tray.cad.ts --out fixtures/designs/tray.json`.
+
 ## From an MCP client
 
 Agents without a shell, such as Claude Desktop, use the same check through an MCP
