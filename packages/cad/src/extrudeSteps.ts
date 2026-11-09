@@ -1,9 +1,9 @@
-import { newCadId } from './document';
+import { entityPointIds, newCadId } from './document';
 import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
 import { regionGroups } from './regionProfile';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
-import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart } from './types';
+import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart, CadSketch } from './types';
 
 /** The part or sketch feature whose sketch a part extrudes: its own, or the one it shares. */
 export const sketchOwnerId = (part: CadPart): string => part.sketchOf ?? part.id;
@@ -41,8 +41,32 @@ export function removeSupport(document: CadDocument, part: CadPart): { board: Ca
 
 const removedSketchId = (part: CadPart) => `${part.id}:removed`;
 
+/**
+ * A Hole step's sketch as the board sees it: a circle round each point that isn't the end or centre of a line or curve,
+ * as wide as the hole. The circles take their IDs from their points, so the holes keep theirs as the design changes.
+ */
+export function holeSketch(part: CadPart): CadSketch {
+  const used = new Set(
+    part.sketch.entities.flatMap(entity => (entity.type === 'point' ? [] : entityPointIds(entity).filter(id => id !== entity.id)))
+  );
+  const centres = part.sketch.entities.filter(
+    (entity): entity is Extract<CadEntity, { type: 'point' }> =>
+      entity.type === 'point' && !entity.construction && !entity.faceEdge && !used.has(entity.id)
+  );
+  const radius = part.hole!.diameter / 2;
+  return {
+    ...part.sketch,
+    entities: centres.flatMap(point => [
+      { ...point, construction: true },
+      { id: `${point.id}:hole`, type: 'circle' as const, centerId: point.id, radius },
+    ]),
+    constraints: [],
+  };
+}
+
 /** A Remove step's sketch as the board it cuts sees it: on its face, with the face's edges as plain construction. */
 function removedSketch(part: CadPart, face: 'top' | 'underside'): CadFaceSketch {
+  if (part.hole) return { type: 'sketch', id: removedSketchId(part), on: face, sketch: holeSketch(part), removedBy: part.id };
   const entities = part.sketch.entities.map((entity): CadEntity => {
     if (!entity.faceEdge) return entity;
     const { faceEdge: _faceEdge, ...kept } = entity;
