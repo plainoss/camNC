@@ -19,6 +19,7 @@ export function toggleSuppressed(document: CadDocument, step: DesignStep): CadDo
   const change = (part: CadPart): CadPart => {
     if (step.kind === 'extrude') return flip(part);
     if (step.kind === 'pattern' && part.pattern) return { ...part, pattern: flip(part.pattern) };
+    if (step.kind === 'fillet') return { ...part, fillets: part.fillets?.map(fillet => (fillet.id === step.id ? flip(fillet) : fillet)) };
     if (step.kind === 'copy') return { ...part, copies: part.copies?.map(copy => (copy.id === step.copyId ? flip(copy) : copy)) };
     return part;
   };

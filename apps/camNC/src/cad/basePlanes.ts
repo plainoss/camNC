@@ -42,3 +42,14 @@ export function basePlaneViews(document: CadDocument, picked?: string | null): V
     return frame ? [{ id, label, origin: frame.origin, x: frame.x, y: frame.y, normal: frame.normal, highlighted: picked === id }] : [];
   });
 }
+
+/** What a new plane is offset from when one is picked first: a base plane, or a part's face that's still there. */
+export function planeOffsetFrom(
+  document: CadDocument,
+  selectedPlane: string | null,
+  selectedFace: Extract<CadDrawnOn['on'], { partId: string }> | null
+): CadDrawnOn['on'] | null {
+  const plane = selectedPlane && pickedPlane(document, selectedPlane);
+  const face = selectedFace && cadFaceFrame(document, selectedFace);
+  return plane && !plane.datum ? plane.on : face && !('error' in face) ? selectedFace : null;
+}

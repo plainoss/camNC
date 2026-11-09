@@ -356,6 +356,13 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     const removal = sized.remove && depthOutcome(sized.remove, scope);
     if (removal && 'value' in removal && removal.value !== sized.remove!.depth)
       sized = { ...sized, remove: { ...sized.remove!, depth: removal.value } };
+    // Fillet radii follow their variables; one that can't be worked out keeps its last good radius.
+    const radii = sized.fillets?.map(fillet => {
+      if (!usesVariables(fillet.radiusExpression)) return fillet;
+      const parsed = parseCadValue(fillet.radiusExpression, { unit: 'mm', variables: scope });
+      return 'value' in parsed && parsed.value > 0 && parsed.value !== fillet.radius ? { ...fillet, radius: parsed.value } : fillet;
+    });
+    if (radii?.some((fillet, index) => fillet !== sized.fillets![index])) sized = { ...sized, fillets: radii };
     // A Hole step's diameter follows its variables too; one that can't be worked out keeps its last good size.
     const hole =
       sized.hole &&
@@ -561,6 +568,11 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
                 }),
                 ...(part.thin?.depthExpression && { thin: { ...part.thin, depthExpression: edit(part.thin.depthExpression) } }),
                 ...(part.hole?.diameterExpression && { hole: { ...part.hole, diameterExpression: edit(part.hole.diameterExpression) } }),
+                ...(part.fillets && {
+                  fillets: part.fillets.map(fillet =>
+                    fillet.radiusExpression ? { ...fillet, radiusExpression: edit(fillet.radiusExpression) } : fillet
+                  ),
+                }),
                 ...(part.remove?.depthExpression && { remove: { ...part.remove, depthExpression: edit(part.remove.depthExpression) } }),
                 ...(part.drawnOn?.offsetExpression && {
                   drawnOn: { ...part.drawnOn, offsetExpression: edit(part.drawnOn.offsetExpression) },
