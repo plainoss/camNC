@@ -230,12 +230,23 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { editable, extrudedSketch, hasOutline, isBlank, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
+import {
+  asHole,
+  editable,
+  extrudedSketch,
+  hasOutline,
+  isBlank,
+  isSingleLine,
+  replacePart,
+  snapLabels,
+  withoutExtrude,
+} from './editorHelpers';
 import { offerFinalPreview } from './finalPreview';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
 import { MirrorDialog } from './MirrorDialog';
+import { HoleDialog } from './HoleDialog';
 import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
 import { pickedPlane, pickedPlaneFrame } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
@@ -434,7 +445,7 @@ export function CadEditor({
   const pickForCut = (partId: string) => setCutPick(previous => ({ partId, seq: (previous?.seq ?? 0) + 1 }));
   // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
   const [featureDialog, setFeatureDialog] = useState<{
-    kind: 'extrude' | 'pattern';
+    kind: 'extrude' | 'pattern' | 'hole';
     partId: string;
     before: CadDocument;
   } | null>(null);
@@ -3461,7 +3472,7 @@ export function CadEditor({
       setBusy(false);
     }
   };
-  const openFeature = (kind: 'extrude' | 'pattern', partId: string, before = documentRef.current) => {
+  const openFeature = (kind: 'extrude' | 'pattern' | 'hole', partId: string, before = documentRef.current) => {
     setPartCutting(null);
     setVariableDialog(null);
     setPlaneDialog(null);
@@ -3548,7 +3559,8 @@ export function CadEditor({
   const openStep = (step: DesignStep) => {
     // In the studio a step opens its dialog, and a sketch opens to be drawn on, as the reference does.
     if (studioSession && step.kind === 'sketch') return openSketch(step.partId);
-    if (studioSession && step.kind === 'extrude') return openFeature('extrude', step.partId);
+    if (studioSession && step.kind === 'extrude')
+      return openFeature(documentRef.current.parts.find(p => p.id === step.partId)?.hole ? 'hole' : 'extrude', step.partId);
     if (studioSession && step.kind === 'move') return openTransform(step.partId, undefined, true);
     if (studioSession && step.kind === 'copy') {
       const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
@@ -3770,6 +3782,10 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
+    } else if (command === 'hole' && part?.extrude === false) {
+      const before = documentRef.current;
+      commit(replacePart(before, part.id, asHole));
+      openFeature('hole', part.id, before);
     } else if (command === 'mirror') {
       if (part) setMirrorDialog({ partId: part.id });
     } else if (command === 'plane') {
@@ -4454,15 +4470,8 @@ export function CadEditor({
               document={doc}
               {...mirrorDialog}
               pickPlane={picked => setDirectionPicker(() => picked)}
-              onSave={next => {
-                commit(next);
-                setDirectionPicker(null);
-                setMirrorDialog(null);
-              }}
-              onCancel={() => {
-                setDirectionPicker(null);
-                setMirrorDialog(null);
-              }}
+              onSave={next => (commit(next), setDirectionPicker(null), setMirrorDialog(null))}
+              onCancel={() => (setDirectionPicker(null), setMirrorDialog(null))}
             />
           )}
           {showWorkspace && planeDialog && (
@@ -4497,6 +4506,7 @@ export function CadEditor({
                 onOk: () => closeFeature(true),
                 onCancel: () => closeFeature(false),
               };
+              if (featureDialog.kind === 'hole') return <HoleDialog key={target.id} {...props} />;
               return featureDialog.kind === 'extrude' ? (
                 <ExtrudeDialog
                   key={target.id}
