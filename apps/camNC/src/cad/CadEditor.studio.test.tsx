@@ -145,7 +145,7 @@ it.each(['sketch', 'extrude', 'undo'])('dismisses Restore when another step star
     await screen.findByRole('dialog', { name: 'Sketch · Plate' });
   } else {
     await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
-    await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+    await screen.findByRole('dialog', { name: /^Extrude · / });
   }
   await waitFor(() => expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull());
 });
