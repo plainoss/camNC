@@ -916,7 +916,7 @@ it('adds regions to a part made from the same sketch with Extrude → Add', asyn
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
   await userEvent.click(within(operation(dialog)).getByRole('tab', { name: 'Add' }));
   await waitFor(() => expect(latest().parts[1]!.addTo).toBe(latest().parts[0]!.id));
-  expect((within(dialog).getByRole('combobox', { name: 'Merge with' }) as HTMLSelectElement).value).toBe(latest().parts[0]!.id);
+  expect((within(dialog).getByRole('combobox', { name: 'Merge scope' }) as HTMLSelectElement).value).toBe(latest().parts[0]!.id);
   await waitFor(() => expect(latest().parts[0]!.addedRegions).toEqual([narrow]));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Part 2' })).toBeNull());

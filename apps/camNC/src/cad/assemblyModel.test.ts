@@ -107,3 +107,31 @@ describe('hidden parts', () => {
     expect(shown.placements.get('second')).toEqual(all.placements.get('second'));
   });
 });
+
+describe('a body joined to a part', () => {
+  /** A block with a boss added on its top, and a copy of the block 200 mm along. */
+  function bossed(): CadDocument {
+    const block = {
+      ...panel('Block', 100, 100),
+      placement: { position: [0, 0, 0] as [number, number, number], rotation: [0, 0, 0, 1] as [number, number, number, number] },
+    };
+    const boss = { ...createPlateDocument({ width: 20, height: 20, thickness: 10 }).parts[0]!, name: 'Boss', addTo: block.id };
+    boss.placement = { position: [40, 40, 18], rotation: [0, 0, 0, 1] };
+    block.copies = [{ id: 'along', placement: { position: [200, 0, 0], rotation: [0, 0, 0, 1] } }];
+    return { ...createCadDocument(), parts: [block, boss] };
+  }
+
+  it('goes with each copy of the part, where the copy is', () => {
+    const model = assemblyModel(bossed());
+    const bosses = model.instances.flatMap((instance, index) => (instance.name.startsWith('Boss') ? [bounds(model.meshes[index]!)] : []));
+    expect(bosses).toHaveLength(2);
+    expect(bosses.map(box => Math.round(box.min.x)).sort((a, b) => a - b)).toEqual([40, 240]);
+  });
+
+  it('is hidden with the part it’s joined to', () => {
+    const document = bossed();
+    const model = assemblyModel(document, new Set([document.parts[0]!.id]));
+    expect(model.instances.filter(instance => instance.partId === document.parts[1]!.id && !instance.copyId)).toEqual([]);
+    expect(model.instances.filter(instance => instance.partId === document.parts[1]!.id)).toHaveLength(1);
+  });
+});

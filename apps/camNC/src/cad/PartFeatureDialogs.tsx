@@ -105,10 +105,12 @@ export function ExtrudeDialog({
   };
   const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo ? 'add' : 'new';
   const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
-  // The parts an Add can join: made from the same sketch, of regions picked from it.
-  const mergeable = document.parts.filter(
-    candidate => candidate.id !== part.id && isCadPart(candidate) && sharesSketch(candidate, part) && !!candidate.regions
-  );
+  // The parts an Add can join: those made from the same sketch, of regions picked from it, which it adds regions to, and
+  // any other part, which it's joined to as a body of its own. The part its sketch is drawn on comes first.
+  const drawnOnPart = part.drawnOn && !('plane' in part.drawnOn.on) ? part.drawnOn.on.partId : null;
+  const mergeable = document.parts
+    .filter(candidate => candidate.id !== part.id && isCadPart(candidate) && (!sharesSketch(candidate, part) || !!candidate.regions))
+    .sort((a, b) => Number(b.id === drawnOnPart) - Number(a.id === drawnOnPart));
   const [operationError, setOperationError] = useState<string | null>(null);
   const [removeDepthText, setRemoveDepthText] = useState(() =>
     part.remove && part.remove.depth !== 'through' ? (part.remove.depthExpression ?? formatCadValue(part.remove.depth)) : '6'
@@ -123,7 +125,7 @@ export function ExtrudeDialog({
       const refused =
         (part.thin && 'A thin board can only be a new part.') ||
         (isCadPart(part) && partIsBuiltOn(document, part)) ||
-        (next === 'add' && !mergeable.length && 'Add joins regions to a part made from the same sketch. Make one with New first.') ||
+        (next === 'add' && !mergeable.length && 'There’s no part yet to add to. Make one with New first.') ||
         (next === 'remove' &&
           (() => {
             const support = removeSupport(document, part);
@@ -153,8 +155,13 @@ export function ExtrudeDialog({
                 );
           if (regions?.length) made.regions = regions;
         } else if (next === 'add') {
-          made.addTo = mergeable[0]!.id;
-          made.regions = (keptRegions(p, own) ?? []).filter(id => !mergeable[0]!.regions!.includes(id));
+          const into = mergeable[0]!;
+          made.addTo = into.id;
+          if (sharesSketch(into, p)) made.regions = (keptRegions(p, own) ?? []).filter(id => !into.regions!.includes(id));
+          else {
+            const regions = keptRegions(p, own);
+            if (regions?.length || p.sketchOf) made.regions = regions ?? [];
+          }
         } else {
           const regions = keptRegions(p, own);
           if (regions?.length || p.sketchOf) made.regions = regions ?? [];
@@ -257,7 +264,7 @@ export function ExtrudeDialog({
       {operation === 'add' ? (
         <>
           <label className="cad-number-field">
-            Merge with
+            Merge scope
             <select
               value={part.addTo}
               onChange={event => onChange(current => changePart(current, part.id, p => ({ ...p, addTo: event.target.value })))}>

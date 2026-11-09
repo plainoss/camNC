@@ -19,6 +19,7 @@ import type {
   EvaluatedCadCut,
   EvaluatedCadPart,
 } from './types';
+import { isCadBody } from './extrudeSteps';
 
 /** Whether a part is one, rather than a sketch not yet extruded, a suppressed extrude, or an extrude that adds to or cuts others. */
 export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !part.suppressed && !part.addTo && !part.remove;
@@ -366,7 +367,9 @@ export function evaluateCadDocument(given: CadDocument): { parts: EvaluatedCadPa
   for (const part of document.parts) {
     const result = evaluateCadPart(part);
     // A sketch not yet extruded needn't close into a profile, as a part's must: what's wrong with one is only a warning.
-    diagnostics.push(...(isCadPart(part) ? result.diagnostics : result.diagnostics.map(d => ({ ...d, severity: 'warning' as const }))));
+    diagnostics.push(
+      ...(isCadBody(document, part) ? result.diagnostics : result.diagnostics.map(d => ({ ...d, severity: 'warning' as const })))
+    );
     if (!result.part) continue;
     const evaluated = evaluateCadFeatures(part, result.part);
     diagnostics.push(...evaluated.diagnostics);
