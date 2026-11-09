@@ -26,11 +26,17 @@ export async function createAdapter(page, url) {
     const workspaceHeading = page.getByText('PART STUDIO', { exact: true });
     const workspaceLabel = await workspaceHeading.count() === 1 ? await workspaceHeading.locator('..').innerText() : '';
     const workspacePartCount = !workspaceLabel ? null : /\bone part\b/.test(workspaceLabel) ? 1 : Number(/\b(\d+) parts\b/.exec(workspaceLabel)?.[1]);
-    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialog: await dialog.count() ? await dialog.getAttribute('aria-label') : null };
+    const dialogSelections = {};
+    for (const name of ['Tools', 'Targets']) {
+      const group = dialog.getByRole('group', { name, exact: true });
+      if (await group.count()) dialogSelections[name] = await group.getByRole('listitem').evaluateAll(items => items.map(item =>
+        [...item.childNodes].filter(node => node.nodeName !== 'BUTTON').map(node => node.textContent).join('').trim()));
+    }
+    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, dialog: await dialog.count() ? await dialog.getAttribute('aria-label') : null };
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
     if (verb === 'studiotool') {
@@ -39,6 +45,14 @@ export async function createAdapter(page, url) {
       const rows = page.getByRole('list', { name: 'Parts', exact: true }).getByRole('listitem').filter({ has: page.getByText(rest, { exact: true }) });
       if (await rows.count() !== 1) throw new Error(`Part name must identify one rendered row: ${rest}`);
       await rows.getByRole('button').first().click();
+    } else if (verb === 'dialogfocus') {
+      await page.getByRole('dialog').getByRole('group', { name: rest, exact: true }).click();
+    } else if (verb === 'dialogremove') {
+      const at = rest.indexOf(' = ');
+      if (at < 0) throw new Error('dialogremove takes Box = Part name');
+      const name = rest.slice(0, at), part = rest.slice(at + 3);
+      await page.getByRole('dialog').getByRole('group', { name, exact: true })
+        .getByRole('button', { name: `Take ${part} out of ${name.toLowerCase()}`, exact: true }).click();
     } else if (verb === 'dialogselect' || verb === 'dialogcheck') {
       const at = rest.indexOf(' = ');
       if (at < 0) throw new Error(`${verb} takes Label = value`);

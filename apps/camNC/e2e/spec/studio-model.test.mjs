@@ -53,3 +53,14 @@ it('retained identities keep their named source owner when panels are swapped', 
   expect(failures[0]).toContain('/Bottom/0');
   expect(failures[1]).toContain('/Top/0');
 });
+it('names the exact persisted copy tool and rejects a sibling despite unchanged body counts', () => {
+  const design=structuredClone(cupboard),shelf=design.parts.find(p=>p.name==='Shelf');
+  shelf.copies=[{id:'pattern:1'},{id:'pattern:2'}];
+  design.partCuts[0].tools=[`${shelf.id}:pattern:2`];
+  const state=studioState(design);
+  expect(state.cutSettings[0].tools).toEqual(['Shelf 3']);
+  const expected={cutSettings:state.cutSettings};
+  design.partCuts[0].tools=[`${shelf.id}:pattern:1`];
+  expect(checkStudio(expected,studioState(design))).toHaveLength(1);
+  expect(checkStudio({dialogSelections:{Tools:['Shelf 3'],Targets:['Side']}},{dialogSelections:{Tools:['Shelf'],Targets:['Side']}})).toHaveLength(1);
+});

@@ -32,7 +32,7 @@ export function PartsList({
   onToggleHidden: (key: string) => void;
   /** What's wrong with a part, shown as a warning on its row. */
   trouble: (partId: string) => string | null | undefined;
-  onPick: (partId: string) => void;
+  onPick: (partId: string, copyId?: string) => void;
   /** A part, or one of its copies, named anew. */
   onRename: (partId: string, copyId: string | null, name: string) => void;
 }) {
@@ -74,7 +74,7 @@ export function PartsList({
                   event.preventDefault();
                   setMenu({ key, name, x: event.clientX, y: event.clientY });
                 }}
-                onClick={() => onPick(p.id)}>
+                onClick={() => onPick(p.id, key === p.id ? undefined : key.slice(p.id.length + 1))}>
                 <span aria-hidden="true">▱</span>
                 <span>{name}</span>
                 {key === p.id && trouble(p.id) && (

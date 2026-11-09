@@ -223,6 +223,7 @@ import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintL
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
 import { builtStudioParts } from './studioParts';
+import { usePartCutSelection } from './usePartCutSelection';
 import { FeatureDialog } from './FeatureDialog';
 import { PartsList } from './PartsList';
 import { usePointPicker } from './pointPicker';
@@ -439,14 +440,7 @@ export function CadEditor({
   const [showPlanes, setShowPlanes] = useState(true);
   // A "cut parts" step being added, or the one being changed.
   const [partCutting, setPartCutting] = useState<{ id?: string } | null>(null);
-  // A part clicked while a cut-parts step is open, which goes into the box being filled, and what both boxes hold.
-  const [cutPick, setCutPick] = useState<{ partId: string; seq: number } | null>(null);
-  const [cutPicked, setCutPicked] = useState<string[]>([]);
-  const showCutPicked = useCallback(
-    ({ tools, targets }: { tools: string[]; targets: string[] }) => setCutPicked([...tools, ...targets]),
-    []
-  );
-  const pickForCut = (partId: string) => setCutPick(previous => ({ partId, seq: (previous?.seq ?? 0) + 1 }));
+  const cutSelection = usePartCutSelection(doc, part, setPartId);
   // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
   const [featureDialog, setFeatureDialog] = useState<{
     kind: 'extrude' | 'pattern' | 'hole';
@@ -3479,7 +3473,7 @@ export function CadEditor({
     setMirrorDialog(null);
     setTransformDialog(null);
     setChoosingFace(false);
-    setPartId(partId);
+    cutSelection.selectPart(partId);
     setSelected([]);
     chooseTool('select');
     setShowWorkspace(true);
@@ -3524,7 +3518,7 @@ export function CadEditor({
     setTransformDialog(null);
     setPartCutting(null);
     setChoosingFace(false);
-    setPartId(partId);
+    cutSelection.selectPart(partId);
     setSelected([]);
     setShowWorkspace(false);
     setShow3D(false);
@@ -4054,7 +4048,7 @@ export function CadEditor({
             ? (p.copies ?? []).map((copy, index) => ({ key: `${p.id}/${copy.id}`, part: p, name: cadCopyName(p, index) }))
             : []),
         ])}
-        selectedKey={part?.id}
+        selectedKey={cutSelection.selectedKey}
         hiddenParts={hiddenParts}
         onToggleHidden={key =>
           setHiddenParts(previous => {
@@ -4065,10 +4059,10 @@ export function CadEditor({
           })
         }
         trouble={partTrouble}
-        onPick={partId => {
+        onPick={(partId, copyId) => {
           setSelectedFace(null);
-          if (partCutting && showWorkspace) return pickForCut(partId);
-          setPartId(partId);
+          if (partCutting && showWorkspace) return cutSelection.pickForCut(partId, copyId);
+          cutSelection.selectPart(partId, copyId);
           setSelected([]);
           chooseTool('select');
         }}
@@ -4189,7 +4183,7 @@ export function CadEditor({
                 setSketchRowPicked(entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.partId : null);
                 setSelectedFace(null);
                 if (entry.kind === 'step') {
-                  setPartId(entry.step.partId);
+                  cutSelection.selectPart(entry.step.partId);
                   setSelected([]);
                 }
               }}
@@ -4632,19 +4626,20 @@ export function CadEditor({
                 }
                 transparentIds={transparentParts}
                 showPlanes={showPlanes}
-                selectedId={part?.id ?? null}
-                onSelect={id => {
+                selectedId={cutSelection.selectedTool ? part!.id : null}
+                selectedCopyId={cutSelection.selectedCopyId}
+                onSelect={(id, copyId) => {
                   setSketchRowPicked(null);
-                  if (partCutting) return pickForCut(id);
-                  setPartId(id);
+                  if (partCutting) return cutSelection.pickForCut(id, copyId);
+                  cutSelection.selectPart(id, copyId);
                   setSelected([]);
                 }}
-                highlightIds={partCutting ? cutPicked : undefined}
+                highlightIds={partCutting ? cutSelection.cutPicked : undefined}
                 hiddenIds={hiddenParts}
                 featureShown={featureShown}
                 onHover={onHoverPart}
-                onOpen={id => {
-                  if (partCutting) return pickForCut(id);
+                onOpen={(id, copyId) => {
+                  if (partCutting) return cutSelection.pickForCut(id, copyId);
                   if (studioSession) return openSketch(id);
                   setPartId(id);
                   setSelected([]);
@@ -4693,10 +4688,10 @@ export function CadEditor({
                     key={partCutting.id ?? 'new'}
                     document={doc}
                     step={doc.partCuts?.find(step => step.id === partCutting.id)}
-                    tool={part?.id}
+                    tool={cutSelection.selectedTool}
                     variables={variableScope}
-                    pick={cutPick}
-                    onPicked={showCutPicked}
+                    pick={cutSelection.cutPick}
+                    onPicked={cutSelection.showCutPicked}
                     onClose={() => setPartCutting(null)}
                     onRemove={
                       partCutting.id
