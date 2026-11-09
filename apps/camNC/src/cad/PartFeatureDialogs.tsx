@@ -552,8 +552,17 @@ export function PartPatternDialog({
 }
 
 const kAxisLabels = ['X', 'Y', 'Z'] as const;
-type TransformKind = 'xyz' | 'distance' | 'mate' | 'rotate';
-const kKindLabels = { from: 'Mate connector', to: 'Mate connector to move to', axis: 'Axis' } as const;
+type TransformKind = 'xyz' | 'distance' | 'mate' | 'rotate' | 'line';
+/** The points each kind picks in the view, with what each is called on its button and above its value. */
+const kPicks = {
+  from: { label: 'Mate connector', title: 'Connector on the part' },
+  to: { label: 'Mate connector to move to', title: 'Connector to move to' },
+  axis: { label: 'Axis', title: 'Axis' },
+  start: { label: 'Line start', title: 'Line from' },
+  end: { label: 'Line end', title: 'Line to' },
+} as const;
+type PickEnd = keyof typeof kPicks;
+const kKindPicks: Partial<Record<TransformKind, PickEnd[]>> = { mate: ['from', 'to'], rotate: ['axis'], line: ['start', 'end'] };
 
 /** An implicit mate connector picked in the view: where on a part, in the design's space. */
 export interface CadConnectorPick {
@@ -651,15 +660,14 @@ export function TransformDialog({
   const [mirrored, setMirrored] = useState(!!copy?.mirrored);
   const [error, setError] = useState<string | null>(null);
   // Transform by mate connectors: a corner or face middle on the part, and the one it goes to.
-  const [mateFrom, setMateFrom] = useState<CadConnectorPick | null>(null);
-  const [mateTo, setMateTo] = useState<CadConnectorPick | null>(null);
-  const [pickingMate, setPickingMate] = useState<'from' | 'to' | 'axis' | null>(null);
-  // Rotate: about the line out of a picked face, through the point picked on it.
-  const [axisPick, setAxisPick] = useState<CadConnectorPick | null>(null);
+  // Rotate: about the line out of a picked face, through the point picked on it. Translate by line: from one point to another.
+  const [picks, setPicks] = useState<Partial<Record<PickEnd, CadConnectorPick>>>({});
+  const { from: mateFrom, to: mateTo, axis: axisPick } = picks;
+  const [pickingMate, setPickingMate] = useState<PickEnd | null>(null);
   const [angleText, setAngleText] = useState('30');
   // Closed while picking, the view stops picking.
   useEffect(() => () => pickPoint?.(null), [pickPoint]);
-  const pickMate = (end: 'from' | 'to' | 'axis') => {
+  const pickMate = (end: PickEnd) => {
     if (!pickPoint) return;
     setPickingMate(end);
     setError(null);
@@ -667,7 +675,7 @@ export function TransformDialog({
       setPickingMate(null);
       if (end === 'from' && (picked.partId !== part.id || picked.copy)) return setError(`Pick the first connector on ${part.name} itself.`);
       if (end === 'to' && picked.partId === part.id) return setError('Pick the connector to move to on another part.');
-      (end === 'from' ? setMateFrom : end === 'to' ? setMateTo : setAxisPick)(picked);
+      setPicks(before => ({ ...before, [end]: picked }));
     });
   };
   const save = () => {
@@ -719,6 +727,11 @@ export function TransformDialog({
       const mate = mateMove(unmoved(mateFrom), mateTo);
       values = mate.by.map(value => ({ value }));
       turn = mate.turn;
+    } else if (kind === 'line') {
+      // Along the line, by its length, as the reference translates by a line or two points.
+      const { start, end } = picks;
+      if (!start || !end) return setError('Pick two points for the line: where it starts and where it ends.');
+      values = end.point.map((value, axis) => ({ value: +(value - start.point[axis]!).toFixed(6) }));
     } else if (kind === 'rotate') {
       if (!axisPick) return setError('Pick a face for the axis: the part turns about the line straight out of it.');
       const angle = parseCadValue(angleText, { unit: 'deg', variables });
@@ -786,6 +799,7 @@ export function TransformDialog({
           <option value="distance">Translate by distance</option>
           {pickPoint && <option value="mate">Transform by mate connectors</option>}
           {pickPoint && <option value="rotate">Rotate</option>}
+          {pickPoint && <option value="line">Translate by line</option>}
         </select>
       </label>
       {kind === 'distance' && (
@@ -818,26 +832,25 @@ export function TransformDialog({
           </label>
         </>
       )}
-      {(kind === 'mate' || kind === 'rotate') &&
-        (kind === 'mate' ? (['from', 'to'] as const) : (['axis'] as const)).map(end => {
-          const picked = end === 'from' ? mateFrom : end === 'to' ? mateTo : axisPick;
-          return (
-            <button
-              key={end}
-              type="button"
-              className="cad-feature-selection"
-              data-active={pickingMate === end || !picked ? '' : undefined}
-              aria-label={kKindLabels[end]}
-              onClick={() => pickMate(end)}>
-              <small>{end === 'from' ? `Connector on ${part.name}` : end === 'to' ? 'Connector to move to' : 'Axis'}</small>
-              <span>
-                {picked
-                  ? `${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part'} at ${picked.point.map(value => +value.toFixed(2)).join(', ')}`
-                  : 'Click a corner or the middle of a face'}
-              </span>
-            </button>
-          );
-        })}
+      {kKindPicks[kind]?.map(end => {
+        const picked = picks[end];
+        return (
+          <button
+            key={end}
+            type="button"
+            className="cad-feature-selection"
+            data-active={pickingMate === end || !picked ? '' : undefined}
+            aria-label={kPicks[end].label}
+            onClick={() => pickMate(end)}>
+            <small>{end === 'from' ? `Connector on ${part.name}` : kPicks[end].title}</small>
+            <span>
+              {picked
+                ? `${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part'} at ${picked.point.map(value => +value.toFixed(2)).join(', ')}`
+                : 'Click a corner or the middle of a face'}
+            </span>
+          </button>
+        );
+      })}
       {kind === 'rotate' && (
         <label className="cad-number-field">
           Angle
