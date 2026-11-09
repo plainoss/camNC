@@ -475,6 +475,7 @@ export function ExtrudeDialog({
           {part.drawnOn && (
             <CadDrawnOnField
               key={`${part.id}:drawn-on`}
+              inwardToggle={false}
               document={document}
               part={part as CadPart & { drawnOn: NonNullable<CadPart['drawnOn']> }}
               variables={variables}

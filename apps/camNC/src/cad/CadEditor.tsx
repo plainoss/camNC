@@ -534,6 +534,8 @@ export function CadEditor({
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   // Sketches, planes and the origin shown or hidden with their eyes in the feature list, where that differs from how
   // they start: a sketch shows until Extrude makes a part of it, and the rest show.
+  // The sketch whose row in the feature list was clicked last, while nothing else has been picked since.
+  const [sketchRowPicked, setSketchRowPicked] = useState<string | null>(null);
   const [featureVisibility, setFeatureVisibility] = useState<Readonly<Record<string, boolean>>>({});
   const hoveredPart = useRef<string | null>(null);
   const onHoverPart = useCallback((id: string | null) => {
@@ -3606,6 +3608,8 @@ export function CadEditor({
     }
     if (!keep && sketchBefore.current) commit(sketchBefore.current);
     sketchBefore.current = null;
+    // A sketch just finished is extruded with nothing picked yet.
+    setSketchRowPicked(null);
     setMessage('');
     chooseTool('select');
     setSelected([]);
@@ -3861,7 +3865,14 @@ export function CadEditor({
           if (made.drawnOn && !made.thin && isSingleLine(made)) return { ...made, thin: { depth: 100, midPlane: true } };
           // A sketch of several regions, such as overlapping shapes or outlines apart, starts with all of them picked.
           const regions = sketchRegions(made.sketch, CAD_CHORD_TOLERANCE);
-          if (!made.regions && regions.length > 1 && evaluateCadPart(made).diagnostics.some(d => d.severity === 'error'))
+          // Picked from its row in the feature list, a sketch of several regions starts with all of them; just finished,
+          // with none, for them to be picked in the view.
+          if (
+            sketchRowPicked === made.id &&
+            !made.regions &&
+            regions.length > 1 &&
+            evaluateCadPart(made).diagnostics.some(d => d.severity === 'error')
+          )
             made.regions = regions.map(region => region.id);
           return made;
         })
@@ -4296,6 +4307,7 @@ export function CadEditor({
               document={doc}
               selectedPartId={part?.id ?? null}
               onSelect={entry => {
+                setSketchRowPicked(entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.partId : null);
                 if (entry.kind === 'step') {
                   setPartId(entry.step.partId);
                   setSelected([]);
@@ -4719,6 +4731,7 @@ export function CadEditor({
                 showPlanes={showPlanes}
                 selectedId={part?.id ?? null}
                 onSelect={id => {
+                  setSketchRowPicked(null);
                   if (partCutting) return pickForCut(id);
                   setPartId(id);
                   setSelected([]);
