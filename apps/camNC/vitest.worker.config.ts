@@ -7,7 +7,9 @@ export default defineWorkersProject(async () => {
   return {
     test: {
       name: 'worker',
-      reporters: ['default', new TimingReporter({ suite: 'worker' })],
+      // A JUnit report for Mergify instead of its reporter, whose runner setup cannot load in workerd.
+      reporters: ['default', new TimingReporter({ suite: 'worker' }), 'junit'],
+      outputFile: { junit: 'test-results/junit/worker.xml' },
       include: ['worker/**/*.test.ts'],
       setupFiles: ['worker/test/apply-migrations.ts'],
       poolOptions: {

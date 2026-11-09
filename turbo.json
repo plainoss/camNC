@@ -2,6 +2,9 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
   "globalDependencies": [".nvmrc"],
+  // The Mergify test reporters read their key, job name and the run they belong to from these. Not hashed: a replayed
+  // task uploads nothing, and the key or run never changes what a test does.
+  "globalPassThroughEnv": ["MERGIFY_*", "GITHUB_*", "RUNNER_*"],
   "tasks": {
     "build": {
       "dependsOn": [
@@ -27,7 +30,8 @@
     "test": {
       "dependsOn": ["^transit"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/test-timings.mjs", "$TURBO_ROOT$/scripts/balanced-shards.mjs"],
-      "outputs": ["test-results/**"],
+      // JUnit reports are uploaded as the run's results, so a replay must not restore them.
+      "outputs": ["test-results/**", "!test-results/junit/**"],
       "env": ["CI", "FLUIDNC_SIM_HOST", "FLUIDNC_SIM_VARIANT"],
       "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH", "CAM_OUT_DIR"]
     },

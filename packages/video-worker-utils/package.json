@@ -17,6 +17,7 @@
     "three": "catalog:"
   },
   "devDependencies": {
+    "@mergifyio/vitest": "catalog:",
     "@types/three": "catalog:",
     "@vitest/browser": "catalog:",
     "@wbcnc/typescript-config": "workspace:*",

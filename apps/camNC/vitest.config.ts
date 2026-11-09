@@ -44,7 +44,7 @@ export default defineConfig({
     testNamePattern: /^(?!.*\[performance\]).*$/,
     globals: false,
     sequence: { sequencer: BalancedBrowserSequencer },
-    reporters: ['default', new TimingReporter({ suite: 'browser' })],
+    reporters: ['default', new TimingReporter({ suite: 'browser' }), '@mergifyio/vitest'],
     // CAD WASM workers and WebGL simulations share the GPU/process budget with each browser test page.
     // Keep parallel coverage without flooding the renderer with one page per available CPU thread.
     maxWorkers: 4,
