@@ -109,7 +109,8 @@
       "cache": false,
       "env": ["CAMNC_SMOKE_URL", "CAMNC_SMOKE_HEADED", "CAMNC_SMOKE_OUTPUT"]
     },
-    "lint": { "dependsOn": ["^transit"] },
+    // Lint rules live in the root .oxlintrc.json, which no package task sees otherwise.
+    "lint": { "dependsOn": ["^transit"], "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc.json"] },
     "check-types": { "dependsOn": ["^transit"] },
     "check-types:fast": { "dependsOn": ["^transit"] },
     "dev": {
