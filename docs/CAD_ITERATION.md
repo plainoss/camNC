@@ -32,7 +32,9 @@ Run the interface lane separately:
 pnpm --silent cad:iterate:ui
 ```
 
-This uses the existing behavior-spec runner and a real browser. The initial complete-cabinet scenario checks feature editing, cancel, confirm, shared stock thickness, the visible Parts list, saved identities and reload. It verifies interface/document effects; core geometry and mesh validity remain separate gates. Browser artifacts are in `apps/camNC/test-results/spec/all/`.
+This uses the existing behavior-spec runner and a real browser. The complete-cabinet scenario follows all eight core checkpoints through visible controls: shared stock and width edits, variable creation, three then four shelves, a shelf offset expression, clearance, suppression, restoration and reload. It checks the saved settings, the visible Parts list and physical-part count, and retains each named source part and copy identity in its instance slot when the shelf count grows. Smaller cancel/edit/reload, part-counter and copy-suppression scenarios remain separate diagnostics. Suppressed mirrored and patterned copies leave the displayed list and count while retaining their source identities for restoration.
+
+The browser checks interface and document effects. Reading a saved offset or thickness does not establish correct geometry; the core and mesh gates remain separate. Browser artifacts are in `apps/camNC/test-results/spec/all/`.
 
 Use the existing interactive session or render command to investigate a failure instead of repeating a long scenario manually; see [behavior specs](../apps/camNC/e2e/spec/README.md).
 

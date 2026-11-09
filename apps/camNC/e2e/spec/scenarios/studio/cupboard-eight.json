@@ -1,0 +1,599 @@
+[
+  {
+    "id": "studio/cupboard/eight-checkpoint-regeneration",
+    "title": "A complete cabinet keeps all bodies and identities through stock, shelf, clearance and suppression edits",
+    "evidence": "design eight-checkpoint multi-part cabinet regeneration; real user controls and saved-state persistence",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/cupboard.json",
+      "closesketch",
+      "checkpoint assembled",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Side",
+              "Bottom",
+              "Top",
+              "Back",
+              "Shelf"
+            ],
+            "variables": {
+              "board": "18mm",
+              "width": "600mm"
+            },
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Right side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              }
+            ],
+            "copies": {
+              "Side": 1,
+              "Shelf": 0
+            },
+            "partIssues": [],
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              }
+            ],
+            "dialog": null,
+            "workspacePartCount": 6
+          }
+        }
+      },
+      "feature #board",
+      "dialogfill Value = 24mm",
+      "dialogcancel",
+      {
+        "expect": {
+          "studio": {
+            "unchangedSince": "assembled",
+            "dialog": null
+          }
+        }
+      },
+      "feature #board",
+      "dialogfill Value = 21mm",
+      "dialogconfirm",
+      "feature #width",
+      "dialogfill Value = 760mm",
+      "dialogconfirm",
+      "checkpoint resize-stock-and-width",
+      {
+        "expect": {
+          "studio": {
+            "variables": {
+              "board": "21mm",
+              "width": "760mm"
+            },
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              }
+            ],
+            "sameIdsSince": "assembled",
+            "thicknesses": {
+              "Side": 21,
+              "Bottom": 21,
+              "Top": 21,
+              "Shelf": 21,
+              "Back": 6
+            },
+            "partIssues": [],
+            "dialog": null,
+            "workspacePartCount": 6
+          }
+        }
+      },
+      "studiotool Variable",
+      "dialogfill Name = shelves",
+      "dialogfill Value = 3",
+      "dialogconfirm",
+      "selectpart Shelf",
+      "studiotool Pattern",
+      "dialogselect Along = z",
+      "dialogfill How many = shelves",
+      "dialogfill Spacing = 120",
+      "dialogconfirm",
+      "checkpoint repeat-shelves",
+      {
+        "expect": {
+          "studio": {
+            "variables": {
+              "shelves": "3"
+            },
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 21
+              }
+            ],
+            "copies": {
+              "Side": 1,
+              "Shelf": 2
+            },
+            "patterns": {
+              "Shelf": {
+                "axis": "z",
+                "count": 3,
+                "countExpression": "shelves",
+                "spacing": 120
+              }
+            },
+            "retainedIdsSince": "assembled",
+            "addedCopyIdsSince": {
+              "checkpoint": "assembled",
+              "part": "Shelf",
+              "count": 2
+            },
+            "partIssues": [],
+            "dialog": null,
+            "workspacePartCount": 8
+          }
+        }
+      },
+      "feature #shelves",
+      "dialogfill Value = 4",
+      "dialogconfirm",
+      "checkpoint grow-shelf-count",
+      {
+        "expect": {
+          "studio": {
+            "variables": {
+              "shelves": "4"
+            },
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 4",
+                "thickness": 21
+              }
+            ],
+            "copies": {
+              "Shelf": 3
+            },
+            "patterns": {
+              "Shelf": {
+                "axis": "z",
+                "count": 4,
+                "countExpression": "shelves",
+                "spacing": 120
+              }
+            },
+            "retainedIdsSince": "repeat-shelves",
+            "samePatternIdsSince": "repeat-shelves",
+            "addedCopyIdsSince": {
+              "checkpoint": "repeat-shelves",
+              "part": "Shelf",
+              "count": 1
+            },
+            "partIssues": [],
+            "dialog": null,
+            "workspacePartCount": 9
+          }
+        }
+      },
+      "feature Extrude \u00b7 Shelf",
+      "dialogfill Offset = board + margin + 4*pitch + pin/2",
+      "dialogconfirm",
+      "checkpoint move-shelf-stack",
+      {
+        "expect": {
+          "studio": {
+            "offsets": {
+              "Shelf": {
+                "value": 231.5,
+                "expression": "board + margin + 4*pitch + pin/2"
+              }
+            },
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 4",
+                "thickness": 21
+              }
+            ],
+            "sameIdsSince": "grow-shelf-count",
+            "samePatternIdsSince": "repeat-shelves",
+            "partIssues": [],
+            "dialog": null,
+            "workspacePartCount": 9
+          }
+        }
+      },
+      "feature Cut Side with Top, Bottom, Back",
+      "dialogfill Clearance = 0.2",
+      "dialogcheck Keep tools = true",
+      "dialogconfirm",
+      "checkpoint clearance",
+      {
+        "expect": {
+          "studio": {
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              }
+            ],
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 4",
+                "thickness": 21
+              }
+            ],
+            "sameIdsSince": "move-shelf-stack",
+            "samePatternIdsSince": "repeat-shelves",
+            "partIssues": [],
+            "dialog": null,
+            "workspacePartCount": 9
+          }
+        }
+      },
+      "featureaction Cut Side with Top, Bottom, Back = Suppress",
+      "checkpoint suppress-housings",
+      {
+        "expect": {
+          "studio": {
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": true,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              }
+            ],
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 4",
+                "thickness": 21
+              }
+            ],
+            "sameIdsSince": "clearance",
+            "partIssues": [],
+            "dialog": null,
+            "workspacePartCount": 9
+          }
+        }
+      },
+      "featureaction Cut Side with Top, Bottom, Back = Unsuppress",
+      "checkpoint before-reload",
+      {
+        "expect": {
+          "studio": {
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              }
+            ],
+            "sameIdsSince": "clearance"
+          }
+        }
+      },
+      "reload",
+      "checkpoint restore-and-reload",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Side",
+              "Bottom",
+              "Top",
+              "Back",
+              "Shelf"
+            ],
+            "variables": {
+              "board": "21mm",
+              "width": "760mm",
+              "shelves": "4"
+            },
+            "patterns": {
+              "Shelf": {
+                "axis": "z",
+                "count": 4,
+                "countExpression": "shelves",
+                "spacing": 120
+              }
+            },
+            "offsets": {
+              "Shelf": {
+                "value": 231.5,
+                "expression": "board + margin + 4*pitch + pin/2"
+              }
+            },
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              }
+            ],
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 4",
+                "thickness": 21
+              }
+            ],
+            "sameIdsSince": "before-reload",
+            "unchangedSince": "before-reload",
+            "samePatternIdsSince": "repeat-shelves",
+            "partIssues": [],
+            "dialog": null,
+            "workspacePartCount": 9
+          }
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,239 @@
+[
+  {
+    "id": "studio/cupboard/suppressed-copies-restore-membership",
+    "title": "Suppressed mirrored and patterned copies leave the Parts list and restore with their identities",
+    "evidence": "design suppressed physical pieces retain source settings and identity for restoration",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/cupboard.json",
+      "closesketch",
+      "selectpart Shelf",
+      "studiotool Pattern",
+      "dialogselect Along = z",
+      "dialogfill How many = 3",
+      "dialogfill Spacing = 120",
+      "dialogconfirm",
+      "checkpoint patterned",
+      {
+        "expect": {
+          "studio": {
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Right side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 18
+              }
+            ],
+            "workspacePartCount": 8,
+            "sameIdsSince": "patterned"
+          }
+        }
+      },
+      "featureaction Pattern \u00b7 Shelf = Suppress",
+      {
+        "expect": {
+          "studio": {
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Right side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              }
+            ],
+            "workspacePartCount": 6,
+            "sameIdsSince": "patterned"
+          }
+        }
+      },
+      "featureaction Mirrored copy \u00b7 Right side = Suppress",
+      {
+        "expect": {
+          "studio": {
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              }
+            ],
+            "workspacePartCount": 5,
+            "sameIdsSince": "patterned"
+          }
+        }
+      },
+      "reload",
+      {
+        "expect": {
+          "studio": {
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              }
+            ],
+            "workspacePartCount": 5,
+            "sameIdsSince": "patterned"
+          }
+        }
+      },
+      "featureaction Pattern \u00b7 Shelf = Unsuppress",
+      {
+        "expect": {
+          "studio": {
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 18
+              }
+            ],
+            "workspacePartCount": 7,
+            "sameIdsSince": "patterned"
+          }
+        }
+      },
+      "featureaction Mirrored copy \u00b7 Right side = Unsuppress",
+      {
+        "expect": {
+          "studio": {
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Right side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 18
+              }
+            ],
+            "workspacePartCount": 8,
+            "sameIdsSince": "patterned"
+          }
+        }
+      }
+    ]
+  }
+]
