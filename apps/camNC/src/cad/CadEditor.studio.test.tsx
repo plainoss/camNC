@@ -275,8 +275,9 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
     within(menu)
       .getAllByRole('menuitem')
       .map(item => item.textContent)
-  ).toEqual(['Rename', 'Edit…', 'Edit sketch…', 'Suppress', 'Delete']);
-  expect(within(menu).getByRole('menuitem', { name: 'Suppress' }).getAttribute('aria-disabled')).toBe('true');
+  ).toEqual(['Rename', 'Edit…', 'Edit sketch…', 'Suppress', 'Roll to here', 'Delete']);
+  // An extrude can be suppressed, as any step but a sketch.
+  expect(within(menu).getByRole('menuitem', { name: 'Suppress' }).getAttribute('aria-disabled')).toBeNull();
   await userEvent.click(within(menu).getByRole('menuitem', { name: 'Rename' }));
   const name = within(features).getByRole('textbox', { name: 'New name' });
   await userEvent.clear(name);
@@ -664,6 +665,54 @@ it('copies a part by a distance along a plane picked for the direction, as the r
   await waitFor(() => expect(latest().parts[0]!.copies?.[0]?.along).toMatchObject({ along: { plane: 'front' }, distance: 30 }));
   // The front plane faces -Y, so the copy sits 30 mm that way.
   expect(latest().parts[0]!.copies![0]!.offset!.position).toEqual([0, -30, 0]);
+  // Switched to X, Y and Z, it no longer follows the plane.
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Transform · / }));
+  await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Edit…' }));
+  const again = await screen.findByRole('dialog', { name: /^Transform/ });
+  await userEvent.selectOptions(within(again).getByRole('combobox', { name: 'Transform type' }), 'xyz');
+  await userEvent.click(within(again).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.copies![0]!.along).toBeUndefined());
+});
+
+it('suppresses an extrude from the feature list, and rolls the design back with the bar', async () => {
+  const { latest } = await studio();
+  const features = await screen.findByRole('region', { name: 'Features' });
+  const parts = screen.getByRole('region', { name: 'Parts panel' });
+  // Suppressed, the extrude is struck through and its part is gone from the parts, as in the reference.
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Suppress' }));
+  await waitFor(() => expect(latest().parts[0]!.suppressed).toBe(true));
+  expect(
+    within(features)
+      .getByRole('button', { name: /Extrude · Plate/ })
+      .closest('li')!.className
+  ).toMatch(/cad-feature-suppressed/);
+  expect(within(parts).queryByText('Plate')).toBeNull();
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Plate/ }));
+  await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Unsuppress' }));
+  await waitFor(() => expect(latest().parts[0]!.suppressed).toBeUndefined());
+  expect(within(parts).getByText('Plate')).toBeDefined();
+  // Roll to here puts the bar after the sketch: the extrude after it is greyed out.
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Sketch · Plate/ }));
+  await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Roll to here' }));
+  await waitFor(() =>
+    expect(
+      within(features)
+        .getByRole('button', { name: /Extrude · Plate/ })
+        .closest('li')!.className
+    ).toMatch(/cad-feature-rolled-back/)
+  );
+  // The bar steps down with the arrow keys, back to the end.
+  const bar = within(features).getByRole('separator', { name: 'Shown up to here' });
+  bar.focus();
+  await userEvent.keyboard('{ArrowDown}');
+  await waitFor(() =>
+    expect(
+      within(features)
+        .getByRole('button', { name: /Extrude · Plate/ })
+        .closest('li')!.className
+    ).not.toMatch(/cad-feature-rolled-back/)
+  );
 });
 
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {

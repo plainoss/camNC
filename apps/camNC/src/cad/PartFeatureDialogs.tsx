@@ -489,11 +489,25 @@ export function TransformDialog({
         positionExpressions: values.map(result => result.expression ?? null) as [string | null, string | null, string | null],
       }),
     };
-    onSave(
-      copy
-        ? setPartCopyOffset(document, part.id, copy.id, { offset, mirrored })
-        : addPartCopy(document, part.id, { offset, mirrored }).document
-    );
+    if (!copy) return onSave(addPartCopy(document, part.id, { offset, mirrored }).document);
+    // By X, Y and Z, a copy no longer follows the direction it was picked along.
+    const moved = setPartCopyOffset(document, part.id, copy.id, { offset, mirrored });
+    onSave({
+      ...moved,
+      parts: moved.parts.map(candidate =>
+        candidate.id !== part.id
+          ? candidate
+          : {
+              ...candidate,
+              copies: candidate.copies?.map(c => {
+                if (c.id !== copy.id || !c.along) return c;
+                const next = { ...c };
+                delete next.along;
+                return next;
+              }),
+            }
+      ),
+    });
   };
   return (
     <FeatureDialog title={`Transform · ${part.name}`} onOk={save} onCancel={onCancel}>

@@ -14,6 +14,7 @@ export * from './sketchRegions';
 export * from './featureModel';
 export * from './features';
 export * from './directions';
+export * from './suppression';
 export * from './extrudeSteps';
 
 export * from './dimensions';

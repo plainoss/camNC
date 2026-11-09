@@ -221,6 +221,7 @@ import { VariableDialog } from './VariableDialog';
 import type { BasePlane } from './basePlanes';
 import type { ViewRegion, ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
+import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
@@ -498,6 +499,8 @@ export function CadEditor({
   const [selectedPlane, setSelectedPlane] = useState<BasePlane | null>(null);
   // A dialog waiting for a plane or face to be picked for a direction, as the Transform dialog's Direction box.
   const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on']) => void) | null>(null);
+  // Where the rollback bar was moved to in the feature list: the step it sits after. Null is the end.
+  const [rolledTo, setRolledTo] = useState<string | null>(null);
   // The face of the part last clicked in the studio, which the next sketch is drawn on, as with a picked plane.
   const [selectedFace, setSelectedFace] = useState<Extract<CadDrawnOn['on'], { partId: string }> | null>(null);
   // A picked face goes with its part.
@@ -617,7 +620,8 @@ export function CadEditor({
     [doc.variables, variableScope]
   );
   useProvideCadVariableFields(variableFields);
-  // The step being edited in its dialog. Like the reference, the studio shows the design only as far as that step.
+  // The step being edited in its dialog, or where the rollback bar was moved to. Like the reference, the studio shows the
+  // design only as far as that step.
   const rollbackStep =
     !studioSession || !showWorkspace
       ? null
@@ -625,7 +629,7 @@ export function CadEditor({
         ? featureDialog.kind === 'extrude'
           ? `${featureDialog.partId}:extrude`
           : (doc.parts.find(candidate => candidate.id === featureDialog.partId)?.pattern?.id ?? null)
-        : (partCutting?.id ?? null);
+        : (partCutting?.id ?? (rolledTo && designSteps(doc).some(step => step.id === rolledTo) ? rolledTo : null));
   const shownDocument = useMemo(() => (rollbackStep ? rolledBackTo(doc, rollbackStep) : doc), [doc, rollbackStep]);
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
@@ -3618,6 +3622,8 @@ export function CadEditor({
       const cut = current.parts.find(candidate => candidate.id === step.partId)?.features?.find(feature => feature.id === step.cutId);
       return commit(setCutSuppressed(current, step.partId, step.cutId, !(cut?.type === 'cut' && cut.suppressed)));
     }
+    if (action === 'suppress') return commit(toggleSuppressed(current, step));
+    if (action === 'rollTo') return setRolledTo(designSteps(current).at(-1)?.id === step.id ? null : step.id);
     if (action !== 'delete') return;
     setFeatureDialog(null);
     if (step.kind === 'sketch' || step.kind === 'extrude') {
@@ -3659,11 +3665,23 @@ export function CadEditor({
     };
     // The face's edges are in the sketch from the start, to draw onto so the part follows the face.
     const drawn = { ...placed, sketch: withFaceEdges(documentRef.current, placed) };
+    // A new feature goes in at the rollback bar, as in the reference: after the part the bar sits in, and the bar follows it.
+    const parts = documentRef.current.parts;
+    const atBar = rolledTo
+      ? parts.findIndex(
+          candidate =>
+            rolledTo.startsWith(`${candidate.id}:`) ||
+            candidate.features?.some(f => f.id === rolledTo) ||
+            candidate.copies?.some(c => c.id === rolledTo) ||
+            candidate.pattern?.id === rolledTo
+        )
+      : -1;
     commit({
       ...documentRef.current,
       revision: documentRef.current.revision + 1,
-      parts: blank ? [drawn] : [...documentRef.current.parts, drawn],
+      parts: blank ? [drawn] : atBar >= 0 ? [...parts.slice(0, atBar + 1), drawn, ...parts.slice(atBar + 1)] : [...parts, drawn],
     });
+    if (atBar >= 0) setRolledTo(`${drawn.id}:sketch`);
     setMessage(`Draw the new part's outline on ${drawnOnName(documentRef.current, on)}, then finish to see it in place.`);
     if (studioSession) return openSketch(drawn.id, before);
     setPartId(drawn.id);
@@ -4130,6 +4148,7 @@ export function CadEditor({
               }}
               onAction={featureAction}
               rollback={rollbackStep}
+              onRollTo={showWorkspace ? setRolledTo : undefined}
               onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
             />

@@ -260,6 +260,8 @@ export interface CadPart {
    * the 3D view and machining until Extrude makes a part of it.
    */
   extrude?: false;
+  /** Its extrude switched off in the feature list: its sketch stays, as a sketch not yet extruded does. */
+  suppressed?: true;
   /**
    * The regions of the sketch extruded, by their stable IDs. Left out, the whole sketch is: its outer outline, with the
    * loops inside it as holes.
@@ -342,6 +344,8 @@ export interface CadPartCopy {
    * normal, wherever that face is now. It sets `offset` whenever the design is laid out.
    */
   along?: CadDirection & { distance: number };
+  /** Switched off in the feature list: the design is built as if it weren't there, and it keeps its settings. */
+  suppressed?: true;
   placement?: CadPlacement;
   mirrored?: boolean;
   /** Its own name, rather than the part's with a number. */
@@ -364,6 +368,8 @@ export interface CadPartPattern {
   id: string;
   /** Picked from a plane or face; it overrides `axis` while that face is there, and follows it when it moves. */
   direction?: CadDirection;
+  /** Switched off in the feature list: no copies, and the count and spacing are kept. */
+  suppressed?: true;
   axis: 'x' | 'y' | 'z';
   /** How many in all, counting the part itself. */
   count: number;
@@ -418,6 +424,8 @@ export interface CadDocument {
  */
 export interface CadPartCut {
   id: string;
+  /** Switched off in the feature list: nothing is cut, and the step keeps its settings. */
+  suppressed?: true;
   /** Part IDs cut with the part and all its copies; `<partId>:<copyId>` cuts with only that copy, as placed and mirrored. */
   tools: string[];
   targets: string[];
