@@ -1,5 +1,5 @@
 import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
@@ -41,6 +41,13 @@ it('hides and shows sketches, planes and the origin with the eye on their rows, 
   // The extruded plate's sketch is hidden, the one not yet extruded shows.
   await waitFor(() => expect(new Set(props().sketchLines?.map(line => line.partId))).toEqual(new Set(['drawn'])));
   expect(row(/Sketch · Plate/).className).toContain('cad-feature-hidden');
+  // Rolled back to just after it, the plate isn't extruded yet, so its sketch shows.
+  fireEvent.contextMenu(within(row(/Sketch · Plate/)).getByRole('button', { name: /Sketch · Plate/ }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Roll to here' }));
+  await waitFor(() => expect(props().sketchLines?.map(line => line.partId)).toContain(source.parts[0]!.id));
+  fireEvent.contextMenu(within(row(/Extrude · Plate/)).getByRole('button', { name: /Extrude · Plate/ }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Roll to end' }));
+  await waitFor(() => expect(props().sketchLines?.map(line => line.partId)).not.toContain(source.parts[0]!.id));
   await userEvent.click(within(row(/Sketch · Plate/)).getByRole('button', { name: 'Show' }));
   await waitFor(() => expect(new Set(props().sketchLines?.map(line => line.partId))).toEqual(new Set(['drawn', source.parts[0]!.id])));
   await userEvent.click(within(row(/Sketch · Drawn/)).getByRole('button', { name: 'Hide' }));
