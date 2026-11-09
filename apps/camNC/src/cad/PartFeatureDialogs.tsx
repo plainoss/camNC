@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import {
   addPartCopy,
+  CAD_CHORD_TOLERANCE,
   evaluateCadPart,
+  extrudeStepProblem,
+  isCadPart,
+  partIsBuiltOn,
+  removalRegions,
+  removeSupport,
+  sharesSketch,
+  sketchOwnerId,
+  sketchRegions,
   setPartCopyOffset,
   setPartPattern,
   renamePartCopy,
-  type CadCutDepth,
   type CadDocument,
   type CadPart,
   type CadValueScope,
@@ -35,15 +43,12 @@ const changePart = (document: CadDocument, partId: string, change: (part: CadPar
   parts: document.parts.map(part => (part.id === partId ? change(part) : part)),
 });
 
-/** How deep Extrude → Remove cuts, as typed. */
-export interface ExtrudeRemoval {
-  depth: CadCutDepth;
-  depthExpression?: string;
-}
+type ExtrudeOperation = 'new' | 'add' | 'remove';
 
 /**
- * A part's sketch pushed out into a board: how thick, where it starts from its plane or face, and which way it grows.
- * Drawn on a board's top or underside, it can instead be removed from that board, as a pocket or a hole.
+ * A sketch pushed out, as the reference's Extrude: New makes a part of it, how thick, where it starts from its plane or
+ * face, and which way it grows. Add joins its regions to a part made from the same sketch, and Remove cuts them into
+ * the board the sketch is drawn on, as a pocket or a hole.
  */
 export function ExtrudeDialog({
   document,
@@ -53,32 +58,93 @@ export function ExtrudeDialog({
   onOk,
   onCancel,
   onEditSketch,
-  removal,
-  onRemoval,
-}: PartDialogProps & {
-  onEditSketch: () => void;
-  /** Set while the sketch is cut into the board it's drawn on, rather than made a part. */
-  removal?: ExtrudeRemoval | null;
-  /** Switches to Remove with a depth, or back to New; says why not when it can't. Left out where Remove can't apply. */
-  onRemoval?: (removal: ExtrudeRemoval | null) => string | null;
-}) {
+}: PartDialogProps & { onEditSketch: () => void }) {
+  const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo ? 'add' : 'new';
+  const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
+  // The parts an Add can join: made from the same sketch, of regions picked from it.
+  const mergeable = document.parts.filter(
+    candidate => candidate.id !== part.id && isCadPart(candidate) && sharesSketch(candidate, part) && !!candidate.regions
+  );
+  const [operationError, setOperationError] = useState<string | null>(null);
   const [removeDepthText, setRemoveDepthText] = useState(() =>
-    removal && removal.depth !== 'through' ? (removal.depthExpression ?? formatCadValue(removal.depth)) : '6'
+    part.remove && part.remove.depth !== 'through' ? (part.remove.depthExpression ?? formatCadValue(part.remove.depth)) : '6'
   );
   const [removeError, setRemoveError] = useState<string | null>(null);
+  /** Regions kept that the extrude can still take, given which of them it picks from. */
+  const keptRegions = (p: CadPart, available: string[]) => p.regions?.filter(id => available.includes(id));
+  const switchTo = (next: ExtrudeOperation) => {
+    setOperationError(null);
+    if (next === operation) return;
+    if (next !== 'new') {
+      const refused =
+        (part.thin && 'A thin board can only be a new part.') ||
+        (isCadPart(part) && partIsBuiltOn(document, part)) ||
+        (next === 'add' && !mergeable.length && 'Add joins regions to a part made from the same sketch. Make one with New first.') ||
+        (next === 'remove' &&
+          (() => {
+            const support = removeSupport(document, part);
+            return 'error' in support ? support.error : null;
+          })());
+      if (refused) return setOperationError(refused);
+    }
+    const parsed = parseCadValue(removeDepthText, { unit: 'mm', variables });
+    onChange(current =>
+      changePart(current, part.id, p => {
+        const made: CadPart = { ...p };
+        delete made.addTo;
+        delete made.remove;
+        delete made.regions;
+        const own = sketchRegions(p.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+        if (next === 'remove') {
+          made.remove =
+            'error' in parsed || !(parsed.value > 0) ? { depth: 6 } : { depth: parsed.value, depthExpression: parsed.expression };
+          if (!made.remove.depthExpression) delete made.remove.depthExpression;
+          const found = removalRegions(current, made);
+          const regions =
+            'error' in found
+              ? undefined
+              : keptRegions(
+                  p,
+                  found.regions.map(region => region.id)
+                );
+          if (regions?.length) made.regions = regions;
+        } else if (next === 'add') {
+          made.addTo = mergeable[0]!.id;
+          made.regions = (keptRegions(p, own) ?? []).filter(id => !mergeable[0]!.regions!.includes(id));
+        } else {
+          const regions = keptRegions(p, own);
+          if (regions?.length || p.sketchOf) made.regions = regions ?? [];
+        }
+        return made;
+      })
+    );
+  };
   /** Remove with the depth as typed, or all the way through. Whether it was taken. */
   const remove = (through: boolean, text = removeDepthText) => {
-    if (!onRemoval) return false;
-    if (through) {
-      const refused = onRemoval({ depth: 'through' });
-      setRemoveError(refused);
-      return !refused;
-    }
-    const parsed = parseCadValue(text, { unit: 'mm', variables });
-    const refused = 'error' in parsed ? parsed.error : onRemoval({ depth: parsed.value, depthExpression: parsed.expression });
+    const parsed = through ? { value: 'through' as const } : parseCadValue(text, { unit: 'mm', variables });
+    const refused = 'error' in parsed ? parsed.error : parsed.value !== 'through' && !(parsed.value > 0) ? 'A cut needs some depth.' : null;
     setRemoveError(refused);
-    return !refused;
+    if ('error' in parsed || refused) return false;
+    onChange(current =>
+      changePart(current, part.id, p => ({
+        ...p,
+        remove:
+          parsed.value === 'through' || !('expression' in parsed) || !parsed.expression
+            ? { depth: parsed.value }
+            : { depth: parsed.value, depthExpression: parsed.expression },
+      }))
+    );
+    return true;
   };
+  const stepProblem = operation === 'new' ? null : extrudeStepProblem(document, part);
+  const regionCount = operation === 'remove' && !part.regions ? null : (part.regions?.length ?? null);
+  const selection =
+    regionCount === null
+      ? `${owner.name}’s sketch`
+      : regionCount === 1
+        ? `A region of ${owner.name}’s sketch`
+        : `${regionCount} regions of ${owner.name}’s sketch`;
+  const board = operation === 'remove' ? removeSupport(document, part) : null;
   // A thickness that can't be used keeps the dialog open until it's fixed or cancelled.
   const [thicknessValid, setThicknessValid] = useState(true);
   const [depthError, setDepthError] = useState<string | null>(null);
@@ -110,44 +176,69 @@ export function ExtrudeDialog({
   return (
     <FeatureDialog
       title={`Extrude · ${part.name}`}
-      okDisabled={removal ? !!removeError : !thicknessValid || !!depthError || !!profileError}
+      okDisabled={operation === 'new' ? !thicknessValid || !!depthError || !!profileError : !!stepProblem || !!removeError}
       onOk={onOk}
       onCancel={onCancel}>
-      {onRemoval && (
-        // New makes the sketch a part of its own; Remove cuts it out of the board it's drawn on.
-        <div className="cad-feature-tabs" role="tablist" aria-label="Extrude operation">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!removal}
-            onClick={() => {
-              setRemoveError(null);
-              onRemoval(null);
-            }}>
-            New
+      {/* New makes the sketch a part of its own; Add joins it to one; Remove cuts it out of the board it's drawn on. */}
+      <div className="cad-feature-tabs" role="tablist" aria-label="Extrude operation">
+        {(['new', 'add', 'remove'] as const).map(choice => (
+          <button key={choice} type="button" role="tab" aria-selected={operation === choice} onClick={() => switchTo(choice)}>
+            {choice === 'new' ? 'New' : choice === 'add' ? 'Add' : 'Remove'}
           </button>
-          <button type="button" role="tab" aria-selected={!!removal} onClick={() => removal || remove(false)}>
-            Remove
+        ))}
+      </div>
+      {operationError && (
+        <p role="alert" className="cad-thickness-error">
+          {operationError}
+        </p>
+      )}
+      {operation !== 'new' && (
+        <div className="cad-feature-selection" data-active={stepProblem ? '' : undefined}>
+          <small>{operation === 'add' ? 'Regions to add' : 'Sketch to cut'}</small>
+          <span>{selection}</span>
+          <button type="button" onClick={onEditSketch}>
+            Edit sketch
           </button>
         </div>
       )}
-      {removal ? (
+      {operation === 'add' ? (
         <>
-          <div className="cad-feature-selection">
-            <small>Sketch to cut</small>
-            <span>{part.name}’s sketch</span>
-            <button type="button" onClick={onEditSketch}>
-              Edit sketch
-            </button>
-          </div>
+          <label className="cad-number-field">
+            Merge with
+            <select
+              value={part.addTo}
+              onChange={event => onChange(current => changePart(current, part.id, p => ({ ...p, addTo: event.target.value })))}>
+              {mergeable.map(candidate => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {stepProblem && (
+            <p role="alert" className="cad-thickness-error">
+              {stepProblem}
+            </p>
+          )}
+        </>
+      ) : operation === 'remove' ? (
+        <>
+          {board && !('error' in board) && (
+            <div className="cad-feature-selection">
+              <small>Parts to cut</small>
+              <span>{board.board.name}</span>
+            </div>
+          )}
           <label className="cad-number-field">
             End type
-            <select value={removal.depth === 'through' ? 'through' : 'blind'} onChange={event => remove(event.target.value === 'through')}>
+            <select
+              value={part.remove!.depth === 'through' ? 'through' : 'blind'}
+              onChange={event => remove(event.target.value === 'through')}>
               <option value="blind">Blind</option>
               <option value="through">Through all</option>
             </select>
           </label>
-          {removal.depth !== 'through' && (
+          {part.remove!.depth !== 'through' && (
             <label className="cad-number-field">
               Depth
               <span>
@@ -170,19 +261,14 @@ export function ExtrudeDialog({
               mm
             </label>
           )}
-          {removeError && (
+          {(removeError || stepProblem) && (
             <p role="alert" className="cad-thickness-error">
-              {removeError}
+              {removeError || stepProblem}
             </p>
           )}
         </>
       ) : (
         <>
-          {removeError && (
-            <p role="alert" className="cad-thickness-error">
-              {removeError}
-            </p>
-          )}
           {part.drawnOn && (
             // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
             <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
@@ -203,14 +289,14 @@ export function ExtrudeDialog({
           )}
           <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
             <small>Sketch to extrude</small>
-            <span>{part.regions?.length ? `A region of ${part.name}’s sketch` : `${part.name}’s sketch`}</span>
+            <span>{selection}</span>
             <button type="button" onClick={onEditSketch}>
               Edit sketch
             </button>
           </div>
           {profileError && (
             <p role="alert" className="cad-thickness-error">
-              {part.regions?.length ? profileError.message : 'Pick a region of the sketch in the view.'}
+              {part.regions ? profileError.message : 'Pick a region of the sketch in the view.'}
             </p>
           )}
           <CadThicknessField

@@ -378,10 +378,11 @@ it('cuts a sketch on a board’s top into it with Extrude → Remove, and makes 
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Pocket' });
   const operation = within(dialog).getByRole('tablist', { name: 'Extrude operation' });
   await userEvent.click(within(operation).getByRole('tab', { name: 'Remove' }));
-  // The pocket is cut into the board, 6 mm deep to start with, and is no longer a part.
-  await waitFor(() => expect(latest().parts.map(part => part.name)).toEqual(['Board']));
+  // The pocket is cut into the board, 6 mm deep to start with. It stays a step with its own sketch, and isn't a part.
   const cuts = () => (latest().parts[0]!.features ?? []).filter(feature => feature.type === 'cut');
-  expect(cuts().map(cut => cut.type === 'cut' && cut.depth)).toEqual([6]);
+  await waitFor(() => expect(cuts().map(cut => cut.type === 'cut' && cut.depth)).toEqual([6]));
+  expect(latest().parts[1]!.remove).toEqual({ depth: 6 });
+  expect(within(dialog).getByText('Board')).toBeDefined();
   const depth = within(dialog).getByRole('textbox', { name: 'Cut depth' });
   await userEvent.clear(depth);
   await userEvent.type(depth, '8');
@@ -391,19 +392,101 @@ it('cuts a sketch on a board’s top into it with Extrude → Remove, and makes 
   await waitFor(() => expect(cuts().map(cut => cut.type === 'cut' && cut.depth)).toEqual(['through']));
   // New makes it a part again, as it was.
   await userEvent.click(within(operation).getByRole('tab', { name: 'New' }));
-  await waitFor(() => expect(latest().parts.map(part => part.name)).toEqual(['Board', 'Pocket']));
-  expect(cuts()).toEqual([]);
-  // Removed and kept, the board is left with its cut, listed as a step of its own.
+  await waitFor(() => expect(cuts()).toEqual([]));
+  expect(latest().parts[1]!.remove).toBeUndefined();
+  // Removed again, at the depth last typed, and kept: the board is cut, and the step is listed as an extrude, not as
+  // the board's own cut.
   await userEvent.click(within(operation).getByRole('tab', { name: 'Remove' }));
-  await waitFor(() => expect(latest().parts).toHaveLength(1));
+  await waitFor(() => expect(cuts()).toHaveLength(1));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Pocket' })).toBeNull());
-  expect(latest().parts.map(part => part.name)).toEqual(['Board']);
+  expect(within(features).getByRole('button', { name: /Extrude · Pocket/ }).textContent).toMatch(/remove 8 mm/);
   expect(
     within(features)
       .getAllByRole('button')
-      .some(button => /Cut/.test(button.textContent ?? ''))
-  ).toBe(true);
+      .some(button => /Cut 1/.test(button.textContent ?? ''))
+  ).toBe(false);
+});
+
+/** A 100 × 50 shelf split at x = 30, extruded from its wider region, beside a side board. */
+async function splitShelf() {
+  const shelf = { ...createCadPart('Shelf', 18), drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
+  shelf.sketch = addRectangle(shelf.sketch, { x: 0, y: 0, width: 100, height: 50 });
+  shelf.sketch = addLine(shelf.sketch, { x1: 30, y1: 0, x2: 30, y2: 50 });
+  const regions = sketchRegions(shelf.sketch, CAD_CHORD_TOLERANCE);
+  const wide = regions.find(region => region.points.some(point => point.x > 99))!.id;
+  const narrow = regions.find(region => region.id !== wide)!.id;
+  const source: CadDocument = { ...createCadDocument(), parts: [{ ...shelf, regions: [wide] }] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  return { latest, features, wide, narrow };
+}
+
+it('extrudes a sketch already used again, as a new part of the regions left, sharing the sketch', async () => {
+  const { latest, features, narrow } = await splitShelf();
+  await userEvent.click(within(features).getByRole('button', { name: /Sketch · Shelf/ }));
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Extrude/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
+  expect(within(operation(dialog)).getByRole('tab', { name: 'New' }).getAttribute('aria-selected')).toBe('true');
+  await waitFor(() => expect(latest().parts).toHaveLength(2));
+  const made = latest().parts[1]!;
+  expect(made).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [narrow] });
+  expect(within(dialog).getByText('A region of Shelf’s sketch')).toBeDefined();
+  // The regions show in the view, the one picked marked.
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() =>
+    expect(
+      props()
+        .regions?.filter(region => region.picked)
+        .map(region => region.id)
+    ).toEqual([narrow])
+  );
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  // The second part is listed by its extrude alone: its sketch is the shelf's.
+  await waitFor(() => expect(within(features).getByRole('button', { name: /Extrude · Part 2/ })).toBeDefined());
+  expect(within(features).queryByRole('button', { name: /Sketch · Part 2/ })).toBeNull();
+  // Editing it from the second part opens the shelf's sketch.
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Part 2/ }));
+  await userEvent.click(
+    within(await screen.findByRole('dialog', { name: 'Extrude · Part 2' })).getByRole('button', { name: 'Edit sketch' })
+  );
+  expect(await screen.findByRole('dialog', { name: 'Sketch · Shelf' })).toBeDefined();
+});
+
+const operation = (dialog: HTMLElement) => within(dialog).getByRole('tablist', { name: 'Extrude operation' });
+
+it('adds regions to a part made from the same sketch with Extrude → Add', async () => {
+  const { latest, features, wide, narrow } = await splitShelf();
+  await userEvent.click(within(features).getByRole('button', { name: /Sketch · Shelf/ }));
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Extrude/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
+  await userEvent.click(within(operation(dialog)).getByRole('tab', { name: 'Add' }));
+  await waitFor(() => expect(latest().parts[1]!.addTo).toBe(latest().parts[0]!.id));
+  expect((within(dialog).getByRole('combobox', { name: 'Merge with' }) as HTMLSelectElement).value).toBe(latest().parts[0]!.id);
+  await waitFor(() => expect(latest().parts[0]!.addedRegions).toEqual([narrow]));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Part 2' })).toBeNull());
+  expect(latest().parts[0]!.regions).toEqual([wide]);
+  expect(within(features).getByRole('button', { name: /Extrude · Part 2/ }).textContent).toMatch(/add to Shelf/);
+});
+
+it('refuses Add with no part of the same sketch to join, and Remove off a board', async () => {
+  const { features } = await splitShelf();
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Shelf/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Shelf' });
+  await userEvent.click(within(operation(dialog)).getByRole('tab', { name: 'Add' }));
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/Make one with New first/);
+  await userEvent.click(within(operation(dialog)).getByRole('tab', { name: 'Remove' }));
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/top or underside of a board/);
+  expect(within(operation(dialog)).getByRole('tab', { name: 'New' }).getAttribute('aria-selected')).toBe('true');
 });
 
 it('waits for a region to be picked when extruding a sketch that isn’t one outline', async () => {

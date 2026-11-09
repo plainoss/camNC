@@ -11,6 +11,7 @@ import {
   createPlateDocument,
   evaluateCadDocument,
   extrudeStepProblem,
+  newExtrudeOf,
   parseCadDocument,
   polygonArea,
   removalRegions,
@@ -80,6 +81,16 @@ describe('a part extruding another part’s sketch', () => {
     expect(document.parts[0]!.sketchOf).toBeUndefined();
     expect(document.parts[1]!.sketchOf).toBe('second');
     expect(document.parts[1]!.sketch).toBe(document.parts[0]!.sketch);
+  });
+
+  it('is made from the regions its sketch’s extrudes don’t use yet, and not for a part that’s its whole sketch', () => {
+    const { owner, narrow } = splitDesign();
+    const made = newExtrudeOf(design(owner), owner, 'Part 2')!;
+    expect(made).toMatchObject({ sketchOf: 'shelf', regions: [narrow], thickness: 18, drawnOn: { on: { plane: 'top' } } });
+    expect(newExtrudeOf(design(owner, made), made, 'Part 3')).toBeNull();
+    const whole = { ...owner };
+    delete whole.regions;
+    expect(newExtrudeOf(design(whole), whole, 'Part 2')).toBeNull();
   });
 
   it('asks for regions while it has none picked', () => {

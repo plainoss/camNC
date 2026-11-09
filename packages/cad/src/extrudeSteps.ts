@@ -1,6 +1,7 @@
+import { newCadId } from './document';
 import { cadSketchRegions, evaluateCadFeatures } from './features';
-import { evaluateCadPart, polygonArea } from './geometry';
-import type { CadSketchRegion } from './sketchRegions';
+import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
+import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart } from './types';
 
 /** The part or sketch feature whose sketch a part extrudes: its own, or the one it shares. */
@@ -224,4 +225,46 @@ export function partIsBuiltOn(document: CadDocument, part: CadPart): string | nu
     return `Other parts are drawn on ${part.name}, so it stays a part.`;
   if (document.parts.some(candidate => candidate.addTo === part.id)) return `Other steps add to ${part.name}, so it stays a part.`;
   return null;
+}
+
+/**
+ * The regions of a part's sketch that none of its extrudes use yet. A part that's its whole sketch uses all of them,
+ * islands too, since those are its holes.
+ */
+export function unusedRegions(document: CadDocument, part: CadPart): string[] {
+  const users = sketchUsers(document, part);
+  if (users.some(user => !user.regions && !user.remove)) return [];
+  const used = new Set(
+    users.flatMap(user => {
+      if (!user.remove) return [...(user.regions ?? []), ...(user.addedRegions ?? [])];
+      const found = removalRegions(document, user);
+      return 'error' in found ? [] : (user.regions ?? found.cut);
+    })
+  );
+  return sketchRegions(part.sketch, CAD_CHORD_TOLERANCE)
+    .map(region => region.id)
+    .filter(id => !used.has(id));
+}
+
+/**
+ * Another extrude of a part's sketch, as the reference extrudes a sketch again, when some of its regions are still
+ * unused: a new part, of the same thickness, starting with those regions when they make one part. Null when every
+ * region is used already.
+ */
+export function newExtrudeOf(document: CadDocument, part: CadPart, name: string): CadPart | null {
+  const unused = unusedRegions(document, part);
+  if (!unused.length) return null;
+  const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
+  const made: CadPart = {
+    id: newCadId(),
+    name,
+    thickness: part.thickness,
+    ...(part.thicknessExpression && { thicknessExpression: part.thicknessExpression }),
+    sketch: owner.sketch,
+    sketchOf: owner.id,
+    regions: unused,
+    ...(owner.drawnOn && { drawnOn: { on: owner.drawnOn.on, offset: 0 } }),
+    ...(!owner.drawnOn && owner.placement && { placement: owner.placement }),
+  };
+  return evaluateCadPart(made).part ? made : { ...made, regions: [] };
 }
