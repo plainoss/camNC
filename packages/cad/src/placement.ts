@@ -142,3 +142,46 @@ export function setPartPlacements(document: CadDocument, changes: CadPlacementCh
     }),
   };
 }
+
+/** A rotation's quaternion from where it turns the x, y and z axes. */
+function quaternionOf([x, y, z]: [Vec3, Vec3, Vec3]): Quat {
+  const trace = x[0] + y[1] + z[2];
+  let q: Quat;
+  if (trace > 0) {
+    const s = Math.sqrt(trace + 1) * 2;
+    q = [(y[2] - z[1]) / s, (z[0] - x[2]) / s, (x[1] - y[0]) / s, s / 4];
+  } else if (x[0] > y[1] && x[0] > z[2]) {
+    const s = Math.sqrt(1 + x[0] - y[1] - z[2]) * 2;
+    q = [s / 4, (y[0] + x[1]) / s, (z[0] + x[2]) / s, (y[2] - z[1]) / s];
+  } else if (y[1] > z[2]) {
+    const s = Math.sqrt(1 + y[1] - x[0] - z[2]) * 2;
+    q = [(y[0] + x[1]) / s, s / 4, (z[1] + y[2]) / s, (z[0] - x[2]) / s];
+  } else {
+    const s = Math.sqrt(1 + z[2] - x[0] - y[1]) * 2;
+    q = [(z[0] + x[2]) / s, (z[1] + y[2]) / s, s / 4, (x[1] - y[0]) / s];
+  }
+  const length = Math.hypot(...q);
+  return q.map(value => snap(value / length)) as Quat;
+}
+
+/**
+ * Where a part's mirror image across a plane goes, as a copy that's mirrored in its own sketch (x turned to -x): the
+ * mirrored part's sketch axes are the part's reflected, with x reversed so the turn stays a rotation.
+ */
+export function mirroredPlacement(placement: CadPlacement, plane: { origin: Vec3; normal: Vec3 }): CadPlacement {
+  const n = unit(plane.normal);
+  const reflect = (v: Vec3): Vec3 => {
+    const along = 2 * dot(v, n);
+    return [v[0] - along * n[0], v[1] - along * n[1], v[2] - along * n[2]];
+  };
+  const [x, y, z] = (
+    [
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ] as Vec3[]
+  ).map(axis => reflect(rotateVector(placement.rotation, axis)));
+  const from = placement.position.map((value, axis) => value - plane.origin[axis]!) as Vec3;
+  const position = reflect(from).map((value, axis) => tidy(value + plane.origin[axis]!)) as Vec3;
+  return { position, rotation: quaternionOf([x!.map(value => -value) as Vec3, y!, z!]) };
+}

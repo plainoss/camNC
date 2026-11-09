@@ -1,4 +1,5 @@
 import { getActiveCamSource, ICamSource, useStore } from '@/store/store';
+import { createStorage } from '@/store/store-storage';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import type { ComponentProps } from 'react';
@@ -20,7 +21,11 @@ const camera: ICamSource = {
   markerPosInCam: [new Vector2(100, 100)],
 };
 
+const { name: originalStorageName, storage: originalStorage } = useStore.persist.getOptions();
+
 beforeEach(() => {
+  // Browser test files share an origin. Other settings tests must not overwrite this fixture's saved choice.
+  useStore.persist.setOptions({ name: `camera-picker-${crypto.randomUUID()}`, storage: createStorage() });
   useStore.setState({
     camSources: { workshop: camera },
     activeCamId: 'workshop',
@@ -30,7 +35,10 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   useStore.setState({ camSources: {}, activeCamId: null, machineBounds: null });
+  useStore.persist.clearStorage();
+  useStore.persist.setOptions({ name: originalStorageName, storage: originalStorage });
 });
 
 describe('camera picker', () => {
@@ -59,11 +67,20 @@ describe('camera picker', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Camera' }));
     await userEvent.click(screen.getByRole('menuitem', { name: /No camera/ }));
     // Storage batches writes; wait for the off choice, then simulate a reload from those settings.
-    await waitFor(() => expect(localStorage.getItem('settings')).toContain('"activeCamId":null'));
+    const options = useStore.persist.getOptions();
+    const name = options.name!;
+    await waitFor(() => expect(localStorage.getItem(name)).toContain('"activeCamId":null'));
+    const savedSettings = localStorage.getItem(name);
+    // Reset memory without persisting it: a new page cannot write the old camera choice before it loads settings.
+    // Using the normal setter without pausing writes raced with the storage throttle and overwrote the off choice.
+    const save = vi.spyOn(options.storage!, 'setItem').mockImplementation(() => {});
     act(() => {
       useStore.getState().setActiveCam('workshop');
-      void useStore.persist.rehydrate();
     });
+    save.mockRestore();
+    expect(useStore.getState().activeCamId).toBe('workshop');
+    expect(localStorage.getItem(name)).toBe(savedSettings);
+    await act(async () => useStore.persist.rehydrate());
     expect(useStore.getState().activeCamId).toBeNull();
     expect(getActiveCamSource()).toBeNull();
     expect(useStore.getState().camSources.workshop).toEqual(camera);
