@@ -1,5 +1,6 @@
 import { newCadId } from './document';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
+import { cadDirectionVector } from './directions';
 import type { CadDocument, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
 
 const kAxes = { x: 0, y: 1, z: 2 } as const;
@@ -14,7 +15,12 @@ export const cadCopyName = (part: Pick<CadPart, 'name' | 'copies'>, index: numbe
  * A pattern's copies, laid out from where the part sits, which for an unplaced part others are drawn on is the origin.
  * Copies keep their names from one layout to the next.
  */
-function patternCopies(part: CadPart, pattern: CadPartPattern, at: CadPlacement | undefined): CadPartCopy[] {
+function patternCopies(
+  part: CadPart,
+  pattern: CadPartPattern,
+  at: CadPlacement | undefined,
+  along: [number, number, number] | null
+): CadPartCopy[] {
   const before = new Map((part.copies ?? []).map(copy => [copy.id, copy]));
   const axis = kAxes[pattern.axis];
   return Array.from({ length: Math.max(0, pattern.count - 1) }, (_, i) => {
@@ -23,7 +29,8 @@ function patternCopies(part: CadPart, pattern: CadPartPattern, at: CadPlacement 
     const copy: CadPartCopy = { id, pattern: pattern.id, ...(name && { name }) };
     if (at) {
       const position = [...at.position] as [number, number, number];
-      position[axis] += (i + 1) * pattern.spacing;
+      if (along) for (const k of [0, 1, 2]) position[k]! += (i + 1) * pattern.spacing * along[k]!;
+      else position[axis] += (i + 1) * pattern.spacing;
       copy.placement = { position, rotation: at.rotation };
     }
     return copy;
@@ -38,19 +45,27 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
   let changed = false;
   const supports = cadDrawnOnSupports(document);
   const parts = document.parts.map(part => {
-    if (!part.pattern && !part.copies?.some(copy => copy.pattern || copy.offset)) return part;
+    if (!part.pattern && !part.copies?.some(copy => copy.pattern || copy.offset || copy.along)) return part;
     const at = effectivePlacement(part, supports);
     // A transformed copy sits where its offset puts it from the part.
     const own = (part.copies ?? [])
       .filter(copy => !copy.pattern)
       .map(copy => {
+        // Along a picked direction, the offset follows from where that face is now.
+        const vector = copy.along && cadDirectionVector(document, copy.along);
+        if (copy.along && vector)
+          copy = {
+            ...copy,
+            offset: { position: vector.map(value => value * copy.along!.distance) as [number, number, number], rotation: [0, 0, 0, 1] },
+          };
         if (!copy.offset) return copy;
         const { placement: _placement, ...rest } = copy;
         if (!at) return rest;
         const position = at.position.map((value, axis) => value + copy.offset!.position[axis]!) as [number, number, number];
         return { ...rest, placement: { position, rotation: at.rotation } };
       });
-    const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern, at) : [])];
+    const along = part.pattern?.direction ? cadDirectionVector(document, part.pattern.direction) : null;
+    const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern, at, along) : [])];
     if (JSON.stringify(copies) === JSON.stringify(part.copies ?? [])) return part;
     changed = true;
     const next: CadPart = { ...part, copies };

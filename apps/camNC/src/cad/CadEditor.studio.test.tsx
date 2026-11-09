@@ -647,6 +647,33 @@ it('sketches on a base plane picked before Sketch or Shift+S, as on one picked a
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
 });
 
+it('copies a part by a distance along a plane picked for the direction, as the reference’s Translate by distance', async () => {
+  const { latest } = await studio();
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'distance');
+  // The Direction box waits for a plane or face; one from the feature list fills it.
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
+  const features = screen.getByRole('region', { name: 'Features' });
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Front/ }));
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Direction' }).textContent).toMatch(/front plane/i));
+  const distance = within(dialog).getByRole('textbox', { name: 'Distance' });
+  await userEvent.clear(distance);
+  await userEvent.type(distance, '30');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.copies?.[0]?.along).toMatchObject({ along: { plane: 'front' }, distance: 30 }));
+  // The front plane faces -Y, so the copy sits 30 mm that way.
+  expect(latest().parts[0]!.copies![0]!.offset!.position).toEqual([0, -30, 0]);
+  // Switched to X, Y and Z, it no longer follows the plane.
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Transform · / }));
+  await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Edit…' }));
+  const again = await screen.findByRole('dialog', { name: /^Transform/ });
+  await userEvent.selectOptions(within(again).getByRole('combobox', { name: 'Transform type' }), 'xyz');
+  await userEvent.click(within(again).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.copies![0]!.along).toBeUndefined());
+});
+
 it('suppresses an extrude from the feature list, and rolls the design back with the bar', async () => {
   const { latest } = await studio();
   const features = await screen.findByRole('region', { name: 'Features' });
