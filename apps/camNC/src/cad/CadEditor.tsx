@@ -229,6 +229,7 @@ import { offerFinalPreview } from './finalPreview';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
+import { MirrorDialog } from './MirrorDialog';
 import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
 import { pickedPlane, pickedPlaneFrame } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
@@ -499,12 +500,13 @@ export function CadEditor({
   // A variable being added, or the one being changed.
   const [variableDialog, setVariableDialog] = useState<{ id?: string } | null>(null);
   const [planeDialog, setPlaneDialog] = useState<{ id?: string; preselected?: CadDrawnOn['on'] } | null>(null);
+  const [mirrorDialog, setMirrorDialog] = useState<{ partId: string; copyId?: string } | null>(null);
   // Why something asked for in the studio wasn't done, such as deleting a variable that's in use.
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // A part being copied by a transform, or the transformed copy being changed.
   const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string; move?: boolean } | null>(null);
   // When a step's dialog closes, the view has the keyboard again, so its shortcuts work straight away.
-  const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || transformDialog || partCutting);
+  const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || mirrorDialog || transformDialog || partCutting);
   const dialogWasOpen = useRef(false);
   useEffect(() => {
     const closed = dialogWasOpen.current && !stepDialogOpen;
@@ -3437,6 +3439,7 @@ export function CadEditor({
     setPartCutting(null);
     setVariableDialog(null);
     setPlaneDialog(null);
+    setMirrorDialog(null);
     setTransformDialog(null);
     setChoosingFace(false);
     setPartId(partId);
@@ -3470,6 +3473,7 @@ export function CadEditor({
     setFeatureDialog(null);
     setVariableDialog(null);
     setPlaneDialog(null);
+    setMirrorDialog(null);
     setTransformDialog(null);
     setPartCutting(null);
     setChoosingFace(false);
@@ -3523,6 +3527,7 @@ export function CadEditor({
     if (studioSession && step.kind === 'copy') {
       const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
       if (copy?.offset) return openTransform(step.partId, copy.id);
+      if (copy?.mirror) return setMirrorDialog({ partId: step.partId, copyId: copy.id });
     }
     if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
     // A cut opens its part's sketch view from the studio: cancelling there goes back to the design as it is now.
@@ -3579,6 +3584,7 @@ export function CadEditor({
         setPartCutting(null);
         setTransformDialog(null);
         setPlaneDialog(null);
+        setMirrorDialog(null);
         return setVariableDialog({ id: entry.id });
       }
       if (action === 'delete') {
@@ -3622,6 +3628,7 @@ export function CadEditor({
     setPartCutting(null);
     setVariableDialog(null);
     setPlaneDialog(null);
+    setMirrorDialog(null);
     setChoosingFace(false);
     setPartId(partId);
     setShowWorkspace(true);
@@ -3702,6 +3709,7 @@ export function CadEditor({
     // Starting one step closes any other step's dialog.
     setVariableDialog(null);
     setPlaneDialog(null);
+    setMirrorDialog(null);
     setTransformDialog(null);
     if (command === 'sketch') {
       setFeatureDialog(null);
@@ -3724,6 +3732,8 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
+    } else if (command === 'mirror') {
+      if (part) setMirrorDialog({ partId: part.id });
     } else if (command === 'plane') {
       setFeatureDialog(null);
       setPartCutting(null);
@@ -3980,6 +3990,8 @@ export function CadEditor({
         : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
     ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
   };
+  // A mirror image is of a part, as a pattern is.
+  if (studioDisabled.pattern) studioDisabled.mirror = studioDisabled.pattern;
   const featureShown = useCallback(
     (id: string) => {
       if (id in featureVisibility) return featureVisibility[id]!;
@@ -4085,11 +4097,13 @@ export function CadEditor({
                 ? 'cutParts'
                 : variableDialog
                   ? 'variable'
-                  : planeDialog
-                    ? 'plane'
-                    : transformDialog
-                      ? 'transform'
-                      : (featureDialog?.kind ?? null)
+                  : mirrorDialog
+                    ? 'mirror'
+                    : planeDialog
+                      ? 'plane'
+                      : transformDialog
+                        ? 'transform'
+                        : (featureDialog?.kind ?? null)
           }
           disabled={studioDisabled}
           canUndo={session.past.length > 0}
@@ -4416,6 +4430,23 @@ export function CadEditor({
                 setVariableDialog(null);
               }}
               onCancel={() => setVariableDialog(null)}
+            />
+          )}
+          {showWorkspace && mirrorDialog && (
+            <MirrorDialog
+              key={mirrorDialog.copyId ?? mirrorDialog.partId}
+              document={doc}
+              {...mirrorDialog}
+              pickPlane={picked => setDirectionPicker(() => picked)}
+              onSave={next => {
+                commit(next);
+                setDirectionPicker(null);
+                setMirrorDialog(null);
+              }}
+              onCancel={() => {
+                setDirectionPicker(null);
+                setMirrorDialog(null);
+              }}
             />
           )}
           {showWorkspace && planeDialog && (
