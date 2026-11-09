@@ -229,6 +229,7 @@ import { pickedPlane, pickedPlaneFrame } from './basePlanes';
 import type { ViewRegion, ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import { toggleSuppressed } from './toggleSuppressed';
+import { reorderedSteps } from './reorderSteps';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
@@ -4292,6 +4293,20 @@ export function CadEditor({
               onAction={featureAction}
               rollback={rollbackStep}
               onRollTo={showWorkspace ? setRolledTo : undefined}
+              onReorder={
+                showWorkspace
+                  ? (stepId, beforeId) => {
+                      const steps = designSteps(documentRef.current);
+                      const dragged = steps.find(step => step.id === stepId),
+                        target = steps.find(step => step.id === beforeId);
+                      if (!dragged || !target) return;
+                      const result = reorderedSteps(documentRef.current, dragged, target);
+                      if ('error' in result) return setStudioRefusal(result.error);
+                      setStudioRefusal(null);
+                      commit(result.document);
+                    }
+                  : undefined
+              }
               onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
               onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
