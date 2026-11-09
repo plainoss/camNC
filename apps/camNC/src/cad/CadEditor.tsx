@@ -224,6 +224,7 @@ import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintL
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
 import { FeatureDialog } from './FeatureDialog';
+import { PartRowMenu } from './PartRowMenu';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
@@ -538,6 +539,10 @@ export function CadEditor({
   // The sketch whose row in the feature list was clicked last, while nothing else has been picked since.
   const [sketchRowPicked, setSketchRowPicked] = useState<string | null>(null);
   const [featureVisibility, setFeatureVisibility] = useState<Readonly<Record<string, boolean>>>({});
+  /** A Parts row's right-click menu, and the row being renamed in place, by its key (a part's ID, or `part/copy`). */
+  const [partMenu, setPartMenu] = useState<{ key: string; name: string; x: number; y: number } | null>(null);
+  const [renamingPart, setRenamingPart] = useState<string | null>(null);
+  const closePartMenu = useCallback(() => setPartMenu(null), []);
   const hoveredPart = useRef<string | null>(null);
   const onHoverPart = useCallback((id: string | null) => {
     hoveredPart.current = id;
@@ -4204,24 +4209,64 @@ export function CadEditor({
           ])
           .map(({ key, part: p, name }) => (
             <li key={key}>
-              <button
-                type="button"
-                aria-pressed={key === part?.id}
-                onClick={() => {
-                  if (partCutting && showWorkspace) return pickForCut(p.id);
-                  setPartId(p.id);
-                  setSelected([]);
-                  chooseTool('select');
-                }}>
-                <span aria-hidden="true">▱</span>
-                <span>{name}</span>
-                {key === p.id && partTrouble(p.id) && (
-                  <span className="cad-part-trouble" role="img" aria-label={partTrouble(p.id)!} title={partTrouble(p.id)!}>
-                    ⚠
-                  </span>
-                )}
-                <small>{p.thickness} mm</small>
-              </button>
+              {renamingPart === key ? (
+                <input
+                  className="cad-feature-rename"
+                  aria-label={`New name for ${name}`}
+                  defaultValue={name}
+                  autoFocus
+                  onFocus={event => event.currentTarget.select()}
+                  onBlur={event => {
+                    const next = event.currentTarget.value.trim();
+                    setRenamingPart(null);
+                    if (!next || next === name) return;
+                    const copyId = key === p.id ? null : key.slice(p.id.length + 1);
+                    commit(
+                      copyId
+                        ? renamePartCopy(documentRef.current, p.id, copyId, next)
+                        : replacePart(documentRef.current, p.id, current => ({
+                            ...current,
+                            // The features keep the names they had: renaming a part never renames them.
+                            sketchName: current.sketchName ?? `Sketch · ${current.name}`,
+                            extrudeName: current.extrudeName ?? `Extrude · ${current.name}`,
+                            name: next,
+                          }))
+                    );
+                  }}
+                  onKeyDown={event => {
+                    event.stopPropagation();
+                    if (event.key === 'Enter') event.currentTarget.blur();
+                    else if (event.key === 'Escape') {
+                      event.currentTarget.value = name;
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  aria-pressed={key === part?.id}
+                  onContextMenu={event => {
+                    if (!studioSession) return;
+                    event.preventDefault();
+                    setPartMenu({ key, name, x: event.clientX, y: event.clientY });
+                  }}
+                  onClick={() => {
+                    if (partCutting && showWorkspace) return pickForCut(p.id);
+                    setPartId(p.id);
+                    setSelected([]);
+                    chooseTool('select');
+                  }}>
+                  <span aria-hidden="true">▱</span>
+                  <span>{name}</span>
+                  {key === p.id && partTrouble(p.id) && (
+                    <span className="cad-part-trouble" role="img" aria-label={partTrouble(p.id)!} title={partTrouble(p.id)!}>
+                      ⚠
+                    </span>
+                  )}
+                  <small>{p.thickness} mm</small>
+                </button>
+              )}
               {studioSession && (
                 <button
                   type="button"
@@ -4246,6 +4291,27 @@ export function CadEditor({
             </li>
           ))}
       </ul>
+      {partMenu && (
+        <PartRowMenu
+          name={partMenu.name}
+          x={partMenu.x}
+          y={partMenu.y}
+          onClose={closePartMenu}
+          items={[
+            { label: 'Rename', onSelect: () => setRenamingPart(partMenu.key) },
+            {
+              label: hiddenParts.has(partMenu.key) ? 'Show' : 'Hide',
+              onSelect: () =>
+                setHiddenParts(previous => {
+                  const next = new Set(previous);
+                  if (next.has(partMenu.key)) next.delete(partMenu.key);
+                  else next.add(partMenu.key);
+                  return next;
+                }),
+            },
+          ]}
+        />
+      )}
     </>
   );
   return (
@@ -4364,7 +4430,13 @@ export function CadEditor({
                   : undefined
               }
               onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
-              onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
+              onRename={(step, name) =>
+                commit(
+                  replacePart(documentRef.current, step.partId, p =>
+                    step.kind === 'extrude' ? { ...p, extrudeName: name } : { ...p, sketchName: name }
+                  )
+                )
+              }
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
               shown={featureShown}
               onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}
@@ -4645,7 +4717,7 @@ export function CadEditor({
           {studioSession && !showWorkspace && part && (
             // The open sketch, closed from here as the reference's sketch dialog is: away from the studio's Done.
             <FeatureDialog
-              title={`Sketch · ${part.name}`}
+              title={part.sketchName ?? `Sketch · ${part.name}`}
               okLabel="✓ Finish sketch"
               okDisabled={!sketchCanFinish}
               okReason={sketchFinishReason}

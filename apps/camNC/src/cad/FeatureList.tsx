@@ -90,8 +90,8 @@ export function FeatureList({
   selectedPartId: string | null;
   onSelect: (entry: FeatureEntry) => void;
   onAction: (entry: FeatureEntry, action: FeatureAction) => void;
-  /** A part's new name, typed in place of its step's. */
-  onRename: (partId: string, name: string) => void;
+  /** A step's new name, typed in place of its row. It names that feature only, never the part it makes. */
+  onRename: (step: DesignStep, name: string) => void;
   /** The step being edited: the ones after it are greyed out, as the design is shown only that far. */
   rollback?: string | null;
   /**
@@ -198,25 +198,24 @@ export function FeatureList({
         {entries.map((entry, index) => {
           const step = entry.kind === 'step' ? entry.step : null;
           if (step && renaming === step.id) {
-            const part = document.parts.find(candidate => candidate.id === step.partId);
             return (
               <li key={key(entry)}>
                 <input
                   className="cad-feature-rename"
                   aria-label="New name"
-                  defaultValue={part?.name ?? ''}
+                  defaultValue={step.label}
                   autoFocus
                   onFocus={event => event.currentTarget.select()}
                   onBlur={event => {
                     const name = event.currentTarget.value.trim();
-                    if (name && part && name !== part.name) onRename(part.id, name);
+                    if (name && name !== step.label) onRename(step, name);
                     setRenaming(null);
                   }}
                   onKeyDown={event => {
                     event.stopPropagation();
                     if (event.key === 'Enter') event.currentTarget.blur();
                     else if (event.key === 'Escape') {
-                      event.currentTarget.value = part?.name ?? '';
+                      event.currentTarget.value = step.label;
                       event.currentTarget.blur();
                     }
                   }}

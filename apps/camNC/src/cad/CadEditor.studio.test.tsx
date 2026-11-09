@@ -461,6 +461,24 @@ it('opens a sketch from its step and closes it back to the studio, cancelling wh
   await waitFor(() => expect(finish).toHaveBeenCalled());
 });
 
+it('renames a part from its row in the Parts list, leaving its features named as they were', async () => {
+  const { latest } = await studio();
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  const before = latest().parts[0]!.name;
+  const parts = screen.getByRole('region', { name: 'Parts panel' });
+  fireEvent.contextMenu(within(parts).getByRole('button', { name: new RegExp(`^${before}$`) }));
+  const menu = screen.getByRole('menu', { name: `${before} actions` });
+  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual(['Rename', 'Hide']);
+  await userEvent.click(within(menu).getByRole('menuitem', { name: 'Rename' }));
+  const name = within(parts).getByRole('textbox', { name: `New name for ${before}` });
+  await userEvent.clear(name);
+  await userEvent.type(name, 'Side{Enter}');
+  await waitFor(() => expect(latest().parts[0]!.name).toBe('Side'));
+  const features = screen.getByRole('region', { name: 'Features' });
+  expect(within(features).getByRole('button', { name: new RegExp(`Sketch · ${before}`) })).toBeDefined();
+  expect(within(parts).getByRole('button', { name: /^Side$/ })).toBeDefined();
+});
+
 it('lists variables with the steps, edits them in a dialog, and offers a menu on each feature', async () => {
   const { latest } = await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
@@ -495,14 +513,17 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
   const name = within(features).getByRole('textbox', { name: 'New name' });
   await userEvent.clear(name);
   await userEvent.type(name, 'Shelf{Enter}');
-  await waitFor(() => expect(latest().parts[0]!.name).toBe('Shelf'));
-  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Shelf/ }));
+  // The feature is renamed on its own: its sketch and the part it makes keep their names.
+  await waitFor(() => expect(latest().parts[0]!.extrudeName).toBe('Shelf'));
+  const partName = latest().parts[0]!.name;
+  expect(within(features).getByRole('button', { name: new RegExp(`Sketch · ${partName}`) })).toBeDefined();
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Shelf/ }));
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Edit…' }));
-  expect(await screen.findByRole('dialog', { name: 'Extrude · Shelf' })).toBeDefined();
+  expect(await screen.findByRole('dialog', { name: 'Shelf' })).toBeDefined();
 
   // Deleting the extrude deletes the part, and undo brings it back.
-  await userEvent.click(screen.getByRole('dialog', { name: 'Extrude · Shelf' }).querySelector('.cad-feature-cancel')!);
-  fireEvent.contextMenu(within(features).getByRole('button', { name: /Extrude · Shelf/ }));
+  await userEvent.click(screen.getByRole('dialog', { name: 'Shelf' }).querySelector('.cad-feature-cancel')!);
+  fireEvent.contextMenu(within(features).getByRole('button', { name: /Shelf/ }));
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Delete' }));
   await waitFor(() => expect(latest().parts).toHaveLength(0));
   await userEvent.click(within(toolbar).getByRole('button', { name: /^Undo/ }));

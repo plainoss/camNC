@@ -63,7 +63,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
   return document.parts.flatMap((part, partIndex) => {
     const steps: DesignStep[] = [
       // A part extruding another's sketch has none of its own.
-      ...(part.sketchOf ? [] : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: `Sketch · ${part.name}`, partId: part.id }]),
+      ...(part.sketchOf
+        ? []
+        : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: part.sketchName ?? `Sketch · ${part.name}`, partId: part.id }]),
       // A sketch not yet extruded is only its sketch.
       ...(part.extrude === false
         ? []
@@ -71,7 +73,7 @@ export function designSteps(document: CadDocument): DesignStep[] {
             {
               id: `${part.id}:extrude`,
               kind: 'extrude' as const,
-              label: `Extrude · ${part.name}`,
+              label: part.extrudeName ?? `Extrude · ${part.name}`,
               detail: extrudeDetail(document, part),
               partId: part.id,
               suppressed: !!part.suppressed,

@@ -738,6 +738,8 @@ export function parseCadDocument(input: unknown): CadDocument {
       throw new Error('Invalid CAD part');
     number(p.thickness);
     if (p.thicknessExpression !== undefined && typeof p.thicknessExpression !== 'string') throw new Error('Invalid CAD part');
+    for (const key of ['sketchName', 'extrudeName'] as const)
+      if (p[key] !== undefined && typeof p[key] !== 'string') throw new Error('Invalid CAD part');
     if (p.thin !== undefined) {
       if (!p.thin || typeof p.thin !== 'object') throw new Error('Invalid thin extrude');
       number(p.thin.depth);
