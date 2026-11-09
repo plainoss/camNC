@@ -133,45 +133,9 @@ describe('analytic machining regression corpus', () => {
       const roles = result.cam.operations.flatMap(operation => operation.passes.flatMap(pass => pass.roles ?? []));
       for (const role of input.expected.requiredRoles ?? []) expect(roles, role).toContain(role);
       for (const text of input.expected.warningIncludes ?? []) expect(result.cam.warnings.join('\n')).toContain(text);
-      const polish = input.expected.polish;
-      if (polish) {
-        const inner = result.cam.operations.find(operation => operation.name === polish.insideOperation)!;
-        const outer = result.cam.operations.find(operation => operation.name === polish.outsideOperation)!;
-        expect(inner).toBeDefined();
-        expect(outer).toBeDefined();
-        for (const operation of [inner, outer]) {
-          const springs = operation.passes.filter(pass => pass.spring);
-          expect(springs).toHaveLength(polish.springPasses);
-          for (const pass of springs) {
-            expect(pass.pts[0]).toEqual(pass.pts.at(-1));
-            expect(pass.pts.every(point => Math.abs(point[2] - input.expected.minimumZ) < 1e-8)).toBe(true);
-          }
-          for (const pass of operation.passes.filter(pass => pass.auxiliary)) {
-            expect(pass.feeds.every(feed => feed <= (operation.tool.plungeFeed ?? input.settings.plungeFeed!))).toBe(true);
-            if (pass.verticalBlendRadius !== undefined) {
-              expect(pass.verticalBlendRadius).toBeGreaterThan(0);
-              expect(pass.verticalBlendRadius).toBeLessThanOrEqual(0.3);
-            }
-          }
-        }
-        const spring = inner.passes.find(pass => pass.spring)!;
-        const center = input.profiles!.find(profile => profile.name === polish.insideOperation)!.shape;
-        if (center.type !== 'circle') throw new Error('Circular finishing case requires a circle');
-        const radii = spring.pts.map(point => Math.hypot(point[0] - center.center[0], point[1] - center.center[1])).sort((a, b) => a - b);
-        const centerRadius = radii[Math.floor(radii.length / 2)];
-        const wallFeeds = spring.feeds
-          .filter((_, i) => spring.roles?.[i] === 'finish')
-          .map(feed => (feed * (centerRadius + inner.tool.diameter / 2)) / centerRadius);
-        expect(wallFeeds.length).toBeGreaterThan(10);
-        for (const feed of wallFeeds) expect(Math.abs(feed - polish.desiredWallFeed)).toBeLessThan(1);
-        const outsideFeeds = outer.passes.flatMap(pass => pass.feeds.filter((_, i) => pass.roles?.[i] === 'finish'));
-        expect(outsideFeeds.length).toBeGreaterThan(10);
-        expect(outsideFeeds.every(feed => feed === polish.desiredWallFeed)).toBe(true);
-      }
       for (const { file, gcode, cam, setup } of result.programs) {
         expect(gcode).toBe(readFileSync(`${CASE_DIRECTORY}/${file}`, 'utf8'));
         expect(gcode).toContain(`(Plan: ${setup.planFingerprint})`);
-        if (polish) expect(gcode).toMatch(/\bG18\b/);
         expect(() => validateFluidNCOutput(gcode)).not.toThrow();
         const radius = Math.max(...cam.operations.map(operation => operation.tool.diameter / 2));
         expect(

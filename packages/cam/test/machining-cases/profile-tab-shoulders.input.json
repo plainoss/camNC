@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "profile-tab-shoulders",
-  "description": "A bounded-depth outline with repeated ramp laps, one holding tab, and 1 mm shoulders.",
+  "description": "A bounded-depth outline with repeated ramp laps and one holding tab.",
   "mode": "part",
   "stockSize": [
     30,
@@ -75,8 +75,7 @@
           "x": 15,
           "y": 3
         }
-      ],
-      "rampLength": 1
+      ]
     },
     "cutThrough": true,
     "cornerFeed": {

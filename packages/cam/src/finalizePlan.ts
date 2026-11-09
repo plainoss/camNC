@@ -22,7 +22,6 @@ export interface FinalizeSettings {
   stepoverFactor: number;
   geometryTolerance?: number;
   sourceTolerance?: number;
-  pocketStrategy?: 'offset' | 'controlled';
   maxPlanarRemovalRate?: number;
   minimumCuttingFeed?: number;
 }
@@ -50,11 +49,7 @@ export function finalizePlan(cam: PartCam, settings: FinalizeSettings, blank?: P
     conservativeFrontierSegments: 0,
   };
   const operations = cam.operations.map(operation => {
-    const rate =
-      settings.maxPlanarRemovalRate ??
-      (settings.pocketStrategy === 'controlled' && operation.kind === 'pocket'
-        ? (operation.tool.feed ?? settings.feed) * (operation.tool.stepover ?? operation.tool.diameter * settings.stepoverFactor)
-        : undefined);
+    const rate = settings.maxPlanarRemovalRate;
     if (rate !== undefined) {
       // Resolve engaging bridges before limiting their explicit cutting segments, while
       // keeping the limiter's removal history at the start of this operation.
