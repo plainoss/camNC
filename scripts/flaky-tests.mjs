@@ -115,7 +115,7 @@ async function main() {
       await report(repo, failure.id, failure.run_attempt,
         `A Mergify batch failed ${failedUrl} for ${list}, and a later batch with the same commits passed: https://github.com/${repo}/actions/runs/${run.id}. It can also be an interaction with a PR that was in the failed batch only.`);
     }
-    return;
+    // A batch that passed on a rerun also reports its failed attempt, below.
   }
 
   const attempt = attemptToRead(run);
