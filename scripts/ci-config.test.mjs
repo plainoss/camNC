@@ -12,6 +12,16 @@ const read = file => readFileSync(new URL(file, root), 'utf8');
 const lock = parse(read('pnpm-lock.yaml'));
 const require = createRequire(import.meta.url);
 
+// Evaluates a workflow `if:` the way Actions would for these tests: `always()` is true, as for a gate after a failed
+// dependency, and `a.*.b` maps over a list.
+const actionsIf = (expression, github) =>
+  new Function('github', 'always', 'contains', 'fromJSON', `return (${expression.replace(/\.\*\.(\w+)/g, '.map(item => item.$1)')});`)(
+    { event: {}, ...github },
+    () => true,
+    (list, item) => list.includes(item),
+    JSON.parse
+  );
+
 test('desktop cache restores rediscover CMake tools while preserving compiled artifacts', t => {
   const steps = parse(read('.github/workflows/desktop.yml')).jobs.build.steps;
   const resetIndex = steps.findIndex(step => step.name === 'Reset restored CMake configuration');
@@ -93,14 +103,20 @@ test('the required Run tests check waits for every validation job and cannot hid
 
 test('the required check rejects a failed, cancelled or skipped dependency', () => {
   const gate = parse(read('.github/workflows/ci.yml')).jobs.results.steps[0];
-  const allPassed = Object.fromEntries(Object.keys(gate.env).map(key => [key, 'success']));
+  const results = Object.keys(gate.env).filter(key => key.endsWith('_RESULT'));
+  const allPassed = { ...Object.fromEntries(results.map(key => [key, 'success'])), SPECS_OPTIONAL: 'false' };
   const run = statuses => spawnSync('bash', ['-e', '-c', gate.run], { env: { PATH: process.env.PATH, ...statuses } });
   assert.equal(run(allPassed).status, 0);
-  for (const key of Object.keys(allPassed)) {
+  for (const key of results) {
     for (const status of ['failure', 'cancelled', 'skipped']) {
       assert.notEqual(run({ ...allPassed, [key]: status }).status, 0, `${key}=${status} must fail the required check`);
     }
   }
+  // Only a PR without `full-ci` may skip the specs, and even there they must not fail.
+  const light = { ...allPassed, SPECS_OPTIONAL: 'true' };
+  assert.equal(run({ ...light, SPECS_RESULT: 'skipped' }).status, 0);
+  assert.notEqual(run({ ...light, SPECS_RESULT: 'failure' }).status, 0);
+  assert.notEqual(run({ ...light, SIM_RESULT: 'skipped' }).status, 0);
 });
 
 test('CI covers every runtime task and both browser shards, without duplicating other tests', () => {
@@ -145,16 +161,25 @@ test('merge queue runs all validation and isolates concurrent candidate builds',
   assert(workflow.on.push, 'main checks must still run');
   assert.equal(workflow.concurrency.group, 'ci-${{ github.event.pull_request.number || github.run_id }}');
   assert.equal(workflow.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
-  // Evaluate each job's condition the way Actions would, with always() true as for a gate after a failed dependency.
-  const runs = (job, event_name) =>
-    job.if === undefined || new Function('github', 'always', `return (${job.if});`)({ event_name }, () => true);
+  const pr = labels => ({ event_name: 'pull_request', event: { pull_request: { labels: labels.map(name => ({ name })) } } });
+  const runs = (job, github) => job.if === undefined || actionsIf(job.if, github);
   for (const [id, job] of Object.entries(workflow.jobs)) {
-    for (const event of ['pull_request', 'merge_group']) {
-      assert(runs(job, event), `${id} must not skip validation on ${event} events`);
+    for (const github of [{ event_name: 'merge_group' }, pr(['full-ci'])]) {
+      assert(runs(job, github), `${id} must not skip validation on ${github.event_name} events`);
     }
   }
+  // A PR runs the quick suites; the merge queue validates the whole batch with everything once.
+  const onPr = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], pr(['enhancement'])));
+  assert.deepEqual(onPr.sort(), ['checks', 'fluidnc-sim', 'results', 'test']);
+  const suites = github =>
+    workflow.jobs.test.strategy.matrix.include
+      .map(entry => entry.suite)
+      .filter(suite => !actionsIf(workflow.jobs.test.strategy.matrix.exclude.replace(/^\$\{\{|\}\}$/g, ''), github).some(e => e.suite === suite));
+  assert.deepEqual(suites(pr([])), ['headless']);
+  assert.deepEqual(suites(pr(['full-ci'])), ['headless', 'app-browser-1', 'app-browser-2']);
+  assert.deepEqual(suites({ event_name: 'merge_group' }), ['headless', 'app-browser-1', 'app-browser-2']);
   // The queue validated the commit that lands on main, so main only warms caches through the checks job.
-  const onMain = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], 'push'));
+  const onMain = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], { event_name: 'push' }));
   assert.deepEqual(onMain, ['checks']);
 });
 

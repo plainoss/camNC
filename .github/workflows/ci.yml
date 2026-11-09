@@ -72,6 +72,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # A pull request runs only the headless suites, and the merge queue runs everything once for a whole batch of
+        # PRs. The `full-ci` label runs the browser suites and specs on a PR too, from its next push.
+        exclude: ${{ fromJSON(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && '[{"suite":"app-browser-1"},{"suite":"app-browser-2"}]' || '[]') }}
         include:
           - suite: headless
             tasks: test @wbcnc/camNC#test:domain @wbcnc/camNC#test:worker @wbcnc/camNC#test:licenses
@@ -140,8 +143,8 @@ jobs:
 
   specs:
     name: Behaviour specs (${{ matrix.shard }})
-    # Like test, only on pull requests and in the merge queue.
-    if: github.event_name != 'push'
+    # Only in the merge queue, or on a PR labelled `full-ci` (see the test matrix).
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     permissions:
       contents: read
       id-token: write
@@ -204,10 +207,12 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
           SPECS_RESULT: ${{ needs.specs.result }}
           SIM_RESULT: ${{ needs.fluidnc-sim.result }}
+          # The specs are skipped on purpose on a PR without `full-ci`; the merge queue requires them.
+          SPECS_OPTIONAL: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') }}
         run: |
           test "$CHECKS_RESULT" = success
           test "$TEST_RESULT" = success
-          test "$SPECS_RESULT" = success
+          if [ "$SPECS_OPTIONAL" != true ] || [ "$SPECS_RESULT" != skipped ]; then test "$SPECS_RESULT" = success; fi
           test "$SIM_RESULT" = success
 
   fluidnc-sim:

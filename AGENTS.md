@@ -41,6 +41,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 ## Iteration and CI failures
 
 - During development, run the changed tests and relevant package lint/type checks first. Run the local fast suite once the change is ready, plus affected files excluded from it. After rebasing or resolving conflicts, rerun affected checks and `pnpm run check-format` before pushing; a previous green run validates the previous tree.
+- PR CI runs only the quick suites. The browser files and behaviour specs run in the merge queue, so run the ones your change touches locally before queueing, or label the PR `full-ci` to run them on the PR (docs/TESTING.md).
 - Push coherent, validated milestones. Superseded PR commits cancel their CI, so avoid repeated pushes of incomplete fixes that discard useful validation.
 - Before repairing a shared test driver or CI failure, inspect open PRs and current main for an existing fix. Coordinate one shared repair rather than independently patching it into several feature branches.
 - Claim a shared failure before fixing it: comment on its open `flaky-test` issue (CI files one when a test fails and then passes on the same code), or open one if there is none, with the `flaky-test` label and a title CI would give it, so later flakes land on it: `Flaky test: ` and then the spec (`sketch/machine/edit-after-cut-keeps-boards`) or `file > describe > test`, and link your PR there. If someone already claimed it, wait for their fix or help on their PR.
