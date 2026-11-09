@@ -1,39 +1,13 @@
-import {
-  camPart,
-  detectFlat,
-  extractFeatures,
-  flatMatrix,
-  flipPart,
-  groupIdentical,
-  kMaxSlopedShare,
-  loadStep,
-  loadStl,
-  planBoard,
-  summarizePart,
-  summarizePlan,
-  type BoardPartSource,
-  type CamSettings,
-  type FlatPart,
-  type OnProgress,
-  type PartFeatures,
-  type StepBody,
-} from '@wbcnc/cam';
+import { camPart, loadStep, loadStl, planBoard, summarizePlan, type CamSettings, type OnProgress, type StepBody } from '@wbcnc/cam';
 import * as Comlink from 'comlink';
 // Lazy: this worker only starts when a model is opened, and occt only loads the wasm on the first STEP file.
 import occtWasmUrl from 'occt-import-js/dist/occt-import-js.wasm?url';
-import type { BoardRequest, BodyMesh, CamPartInfo, ModelImport, Outline2D, PlanResult } from '../cam/camTypes';
+import type { BoardRequest, ModelImport, PlanResult } from '../cam/camTypes';
 import type { CadDocument } from '@wbcnc/cad';
 import { nativeCadModel } from '../cam/nativeCadModel';
+import { loadedPart, modelOfBodies, partSource, type ModelEntry } from '../cam/importedModel';
 
 /** Parts of the models imported in this worker, by model key, so generating G-code needs no re-import. */
-/** A loaded part: its features, and those of its underside once turned over (side B), by turn axis. */
-interface ModelEntry {
-  part: FlatPart;
-  features: PartFeatures;
-  flipped?: Partial<Record<'x' | 'y', PartFeatures>>;
-  /** The bit diameter a native design relieved its inside corners for. */
-  cornerRelief?: number;
-}
 const models = new Map<string, Map<string, ModelEntry>>();
 
 async function readBodies(bytes: Uint8Array, fileName: string): Promise<{ bodies: StepBody[]; readMs: number }> {
@@ -58,47 +32,11 @@ const api = {
   /** STEP or STL → flat parts, identical ones grouped, with feature summaries and display meshes. */
   async importModel(bytes: Uint8Array, fileName: string, key = fileName): Promise<ModelImport> {
     const { bodies, readMs } = await readBodies(bytes, fileName);
-    const t0 = performance.now();
-    const flat = bodies.map(b => detectFlat(b));
-    const groups = groupIdentical(flat);
-    const partOf = new Map<FlatPart, string>();
-    const cache = new Map<string, ModelEntry>();
-    models.set(key, cache);
-    const parts: CamPartInfo[] = groups.map((g, i) => {
-      const id = `part-${i}`;
-      g.members.forEach(part => partOf.set(part, id));
-      const notFlat = g.part.slopedShare > kMaxSlopedShare;
-      // 3D parts (350k triangles of knife slots take ~30s) are only analysed if milled anyway (see loaded()).
-      const features = notFlat ? emptyFeatures(g.part) : extractFeatures(g.part.mesh, g.part.thickness);
-      cache.set(id, { part: g.part, features });
-      const summary = summarizePart(g.part, features);
-      const shape = (paths: { x: number; y: number }[][]): Outline2D => paths.map(p => p.map(q => [+q.x.toFixed(2), +q.y.toFixed(2)]));
-      return {
-        id,
-        name: g.names[0],
-        names: g.names,
-        size: g.part.size,
-        thickness: g.part.thickness,
-        summary,
-        shape: {
-          outlines: shape(features.outlines),
-          holes: shape(features.throughHoles),
-          pockets: features.pockets.map(p => ({ depth: g.part.thickness - p.floorZ, region: shape(p.strictRegion) })),
-        },
-      };
-    });
-    const meshes: BodyMesh[] = bodies.map((b, i) => ({
-      name: b.name,
-      partId: partOf.get(flat[i]) ?? parts[0].id,
-      positions: Float32Array.from(b.mesh.positions),
-      // A copy: the transfer detaches it, and a 3D part milled anyway still needs its mesh here (loaded()).
-      indices: b.mesh.indices.slice(),
-      flat: flatMatrix(flat[i]),
-    }));
-    const result: ModelImport = { parts, meshes, readMs, analyzeMs: performance.now() - t0 };
+    const { model, entries } = modelOfBodies(bodies, readMs);
+    models.set(key, entries);
     return Comlink.transfer(
-      result,
-      meshes.flatMap(m => [m.positions.buffer as ArrayBuffer, m.indices.buffer as ArrayBuffer])
+      model,
+      model.meshes.flatMap(m => [m.positions.buffer as ArrayBuffer, m.indices.buffer as ArrayBuffer])
     );
   },
 
@@ -118,7 +56,7 @@ const api = {
     onProgress?: OnProgress
   ): Promise<PlanResult> {
     try {
-      return planBoard(board, settings, partSource(key), { ...options, onProgress: onProgress && throttled(onProgress) });
+      return planBoard(board, settings, partSource(models.get(key)), { ...options, onProgress: onProgress && throttled(onProgress) });
     } finally {
       // The page's end of the callback stays open until it's let go.
       (onProgress as Comlink.Remote<OnProgress> | undefined)?.[Comlink.releaseProxy]();
@@ -137,42 +75,8 @@ function throttled(onProgress: OnProgress): OnProgress {
   };
 }
 
-/** The parts of an imported model, with each one's turned-over features worked out once and kept. */
-function partSource(key: string): BoardPartSource {
-  return {
-    part: partId => {
-      const entry = loaded(key, partId);
-      return { size: entry.part.size, features: entry.features, ...(entry.cornerRelief && { cornerRelief: entry.cornerRelief }) };
-    },
-    underside(partId, rotated) {
-      const entry = loaded(key, partId);
-      const cache = (entry.flipped ??= {});
-      const axis = rotated ? 'y' : 'x';
-      return (cache[axis] ??= extractFeatures(flipPart(entry.part, axis).mesh, entry.part.thickness));
-    },
-  };
-}
-
 function loaded(key: string, partId: string) {
-  const entry = models.get(key)?.get(partId);
-  if (!entry) throw new Error('Open the model again: this part is not loaded.');
-  // A 3D part milled as flat anyway: extract its features now.
-  if (!entry.features.levels.length && entry.part.slopedShare > kMaxSlopedShare)
-    entry.features = extractFeatures(entry.part.mesh, entry.part.thickness);
-  return entry;
-}
-
-function emptyFeatures(part: FlatPart): PartFeatures {
-  return {
-    thickness: part.thickness,
-    footprint: [],
-    outlines: [],
-    throughHoles: [],
-    levels: [],
-    pockets: [],
-    bottomFaces: [],
-    slopedArea: 0,
-  };
+  return loadedPart(models.get(key), partId);
 }
 
 export type CamWorkerAPI = typeof api;

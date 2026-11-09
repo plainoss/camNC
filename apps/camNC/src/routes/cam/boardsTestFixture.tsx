@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components -- Shared browser test harness. */
 
 import { createJob } from '@/cam/jobDb';
+import { wrapCamWorker } from '@/cam/camQueries';
+import { camWorkerCache } from '@/test/camWorkerCache';
 // Pointer coordinates and fitted SVG dimensions must use the page's real layout, including the fixed-height status.
 import '@/style.css';
 
@@ -27,6 +29,9 @@ vi.mock('@/components/page-header', () => ({ PageHeader: () => null }));
 vi.mock('@wbcnc/ui/components/sonner', () => ({
   toast: Object.assign(vi.fn(), { error: toastError, success: toastSuccess, warning: vi.fn() }),
 }));
+
+// Each test opens the same STEP file as a new job: read it and plan its boards once for the file.
+wrapCamWorker(camWorkerCache);
 
 export const BoardsStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
 

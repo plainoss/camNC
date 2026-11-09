@@ -1,5 +1,5 @@
 import { instancesOf, reconcileBoards, type BoardV1 } from '@/cam/boards';
-import { camWorker, modelKey } from '@/cam/camQueries';
+import { wrapCamWorker, camWorker, modelKey } from '@/cam/camQueries';
 import type { BoardRequest, PlanResult, ReleaseProgram } from '@/cam/camTypes';
 import { withPartNames } from '@/cam/partNames';
 import { createJob, saveJob } from '@/cam/jobDb';
@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import besteckUrl from '../../../../../packages/cam/test/fixtures/besteckkasten.step?url';
 import stepUrl from '../../../../../packages/cam/test/fixtures/kinderregal-eiche.step?url';
 import { Route } from './$jobId.plan';
+import { camWorkerCache } from '@/test/camWorkerCache';
 
 const params = vi.hoisted(() => ({ jobId: '' }));
 /** Changes what the plans come back as, and keeps the last ones. */
@@ -48,6 +49,9 @@ vi.mock('@/cam/camQueries', async importOriginal => {
 });
 
 const PlanStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
+
+// Tests open the same models as new jobs: read them and plan each board once for the file.
+wrapCamWorker(camWorkerCache);
 
 afterEach(() => {
   cleanup();

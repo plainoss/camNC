@@ -19,6 +19,8 @@ The application keeps compatibility facades for editor imports. Headless package
 
 The board browser suite is divided into replacement/auto-fill, dragging, holds, and settings. Each file uses the same real STEP fixture and creates fresh jobs and query clients. Only immutable input bytes are shared within a file. The varied-board workflow generates through the page once; kernel and worker tests retain direct output checks.
 
+The Boards and Plan route tests put `src/test/camWorkerCache.ts` in front of the CAM worker (`wrapCamWorker`). Within a test file, a model with the same bytes is read once and a board with the same request and settings is planned once, so each test opens its new job without reading and planning it again, and picks up the plans the test before it started instead of queueing behind them. The results are the real worker's from that run, so the route assertions still see real CAM output. Pipeline checks that don't need the page go in Node: `src/cam/importedModel.ts` is the worker's import, usable there with `loadStep`, and `src/cam/variedBoards.test.ts` checks holds and plans for every varied-board model, while the route test shows one held and one blocked board.
+
 ## Scheduling and cache correctness
 
 A pull request runs only the checks, the `headless` entry and the simulator tests, a few minutes in all. The browser shards and the behaviour specs run in the merge queue, once for a batch of up to three PRs (the queue waits up to five minutes to form a pair). So run the browser files and scenarios your change touches locally before queueing, or add the `full-ci` label: from the PR's next push, it runs everything there too. A browser failure in the queue drops the PR from its batch, and the other PRs are tested again without it.
