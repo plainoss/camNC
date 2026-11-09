@@ -83,15 +83,15 @@ listening session.
 
 Besides the steps below, a line can be:
 
-| Line             | Meaning                                                              |
-| ---------------- | -------------------------------------------------------------------- |
-| `state`          | The state now, without doing anything                                |
-| `expect <json>`  | Check any expectation from a scenario; failures fail the line        |
-| `frame [name]`   | Write the normalized SVG to `apps/camNC/test-results/spec-session/`  |
-| `shot [name]`    | Write a screenshot to the same folder                                |
-| `render [views]` | Show each named view of the Part Studio and write `<view>.png` there |
-| `reset`          | Start again on a fresh page with nothing saved                       |
-| `quit`           | Stop                                                                 |
+| Line             | Meaning                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| `state`          | The state now, without doing anything                                                                 |
+| `expect <json>`  | Check any expectation from a scenario; failures fail the line                                         |
+| `frame [name]`   | Write the normalized SVG to `apps/camNC/test-results/spec-session/`                                   |
+| `shot [name]`    | Write a screenshot to the same folder                                                                 |
+| `render [views]` | Show each named view of the Part Studio and write `<view>.png` there; `page` writes the page as it is |
+| `reset`          | Start again on a fresh page with nothing saved                                                        |
+| `quit`           | Stop                                                                                                  |
 
 Once a behaviour works, write the steps that showed it as a scenario.
 
@@ -119,13 +119,52 @@ pnpm --silent --filter @wbcnc/camNC render designs/plate.json --view top --view 
 # {"ok":true,"files":[".../test-results/spec-render/plate/top.png",".../iso.png"],"parts":1,"errors":[],"ms":41614}
 ```
 
-Options: `--view <front|back|left|right|top|bottom|iso>` (repeat, or separate with commas; `iso` by default),
+Options: `--view <front|back|left|right|top|bottom|iso|page>` (repeat, or separate with commas; `iso` by default),
 `--out <dir>` (default `apps/camNC/test-results/spec-render/<design>/`), `--size <W>x<H>` (default `1440x1000`),
 `--planes` (keep the origin and base planes, which are hidden by default so the view frames the parts),
-`--url <running dev server>`, `--headed`. The design path is read from where the command was typed, else from this
+`--steps <step> ...` and `--steps-file <file>` (see below), `--url <running dev server>`, `--headed`. The design path is read from where the command was typed, else from this
 folder. It prints one JSON line with the files, the design's part count, any page errors and `ms`, and exits non-zero
 if anything failed, including a page or console error (as in a behaviour spec; its pictures are still written). A picture is written once two frames in a row of the 3D view look the same, so the camera has
 moved and been drawn. In a session, `render top iso` does the same on the open design.
+
+### Rendering after steps
+
+To render a state rather than only a saved design, give the render a step script. The steps run in order through the
+same adapter as a scenario, each settling before the next, after the design opens and before the planes are hidden and
+the views are written. Without a design they start where a scenario starts: a new design with a sketch open on the top
+plane, so a design is optional once there are steps.
+
+```sh
+pnpm --silent --filter @wbcnc/camNC render --steps 'rect 10,10 100,60' 'circle 55,35 15' --view top --view iso
+pnpm --silent --filter @wbcnc/camNC render designs/plate.json --steps-file my-steps.txt --view page
+```
+
+- `--steps <step> ...` takes every following argument up to the next option as one step each, and can be repeated.
+  Put the design before it, since an argument after `--steps` is read as a step.
+- `--steps-file <file>` reads one step per line; blank lines and lines starting with `#` or `//` are skipped. The path
+  is found as the design's is.
+- A step is any scenario step (see [Steps](#steps)), or a session line such as `expect <json>`, `frame <name>` or
+  `shot <name>`. A scenario's `{"expect": {...}}` object works on its own line too. `reset` and `quit` are refused.
+  Both options can be given; their steps run in the order given.
+- The named views show the Part Studio, closing an open sketch. For a state outside it, such as the Plan stage after
+  `goto Plan`, use `--view page`: a picture of the page as the steps left it. A render of only `page` doesn't hide the
+  planes.
+- The default output folder is `spec-render/new/` when there is no design.
+
+A failed step, or a failed `expect`, stops the render. The JSON line then names the step's number and text, the error,
+and `file`, a screenshot of the page as the failure left it (`failed-step-<n>.png` in the output folder):
+
+```json
+{
+  "ok": false,
+  "step": 2,
+  "text": "goto Nowhere",
+  "file": ".../failed-step-2.png",
+  "error": "locator.click: Timeout 30000ms exceeded…",
+  "errors": [],
+  "ms": 70489
+}
+```
 
 `pnpm --filter @wbcnc/camNC test:render` checks the command end to end on `designs/plate.json`. It starts a dev
 server and a browser, so it isn't part of `pnpm test`; CI runs it in the behaviour-spec job.

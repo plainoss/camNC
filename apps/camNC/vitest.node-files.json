@@ -10,6 +10,7 @@
   "src/cam/boards.test.ts",
   "src/cam/variedBoards.test.ts",
   "src/test/browserSequencer.test.ts",
+  "e2e/spec/renderSteps.test.mjs",
   "e2e/spec/session.test.mjs",
   "e2e/spec/settle.test.mjs",
   "e2e/spec/headless.test.mjs"
