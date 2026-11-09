@@ -1,5 +1,6 @@
 import {
   cadFaceFrame,
+  cadSketchFrame,
   CAD_CHORD_TOLERANCE,
   evaluateCadPart,
   removalRegions,
@@ -19,8 +20,8 @@ export function extrudeRegionViews(document: CadDocument, target: CadPart): View
   if (target.remove) {
     const found = removalRegions(document, target);
     if ('error' in found) return [];
-    const frame = cadFaceFrame(document, target.drawnOn!.on);
-    if ('error' in frame) return [];
+    const frame = cadSketchFrame(document, target);
+    if (!frame) return [];
     const origin = frame.origin.map((value, axis) => value + frame.normal[axis]! * 0.1) as [number, number, number];
     const picked = target.regions ?? found.cut;
     return found.regions.map(region => ({

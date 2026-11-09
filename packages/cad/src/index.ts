@@ -64,3 +64,5 @@ export { reflectAcrossLine } from './symmetry';
 export * from './circularPattern';
 
 export * from './slot';
+
+export * from './extrudeRemoval';

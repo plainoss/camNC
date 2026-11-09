@@ -1,3 +1,4 @@
+import { applyExtrudeRemovals } from './extrudeRemoval';
 import { newCadId, originId } from './document';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
@@ -377,5 +378,7 @@ export function evaluateCadDocument(given: CadDocument): { parts: EvaluatedCadPa
   }
   const cut = applyPartCuts(document, parts);
   diagnostics.push(...cut.diagnostics);
-  return { parts: diagnostics.some(d => d.severity === 'error') ? [] : cut.parts, diagnostics };
+  const removed = applyExtrudeRemovals(document, cut.parts);
+  diagnostics.push(...removed.diagnostics);
+  return { parts: diagnostics.some(d => d.severity === 'error') ? [] : removed.parts, diagnostics };
 }

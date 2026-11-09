@@ -1,0 +1,548 @@
+{
+ "design": {
+  "name": "Plane extrusion removal",
+  "revision": 51,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "c4622bb7-37d6-49fb-80d4-824a4f3585ff:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 2",
+   "part": "Part 2",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Part 2 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "c4622bb7-37d6-49fb-80d4-824a4f3585ff:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 2",
+   "part": "Part 2",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "symmetric": true,
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": 0
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      -114,
+      -202
+     ],
+     "size": [
+      228,
+      404
+     ]
+    },
+    "holes": 0,
+    "notches": 1,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "7b6e98b0-f47d-45fa-a40e-346b3618a83f:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 3",
+   "part": "Part 3",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Part 3 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "7b6e98b0-f47d-45fa-a40e-346b3618a83f:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 3",
+   "part": "Part 3",
+   "settings": {
+    "thickness": {
+     "value": 27.638
+    },
+    "remove": {
+     "depth": {
+      "value": 27.638
+     }
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": -202
+     }
+    }
+   },
+   "result": {
+    "removesFrom": [
+     "Part 2"
+    ],
+    "cuts": [
+     {
+      "part": "Part 2",
+      "side": "top",
+      "from": 0,
+      "to": 18,
+      "through": true
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Part 2",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 5,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "midpoint": 1,
+    "parallel": 2,
+    "perpendicular": 1
+   },
+   "entities": [
+    {
+     "ref": "0a76",
+     "type": "line",
+     "a": [
+      -114,
+      -202
+     ],
+     "b": [
+      114,
+      -202
+     ],
+     "ends": [
+      "4672",
+      "5983"
+     ]
+    },
+    {
+     "ref": "8df6",
+     "type": "line",
+     "a": [
+      114,
+      -202
+     ],
+     "b": [
+      114,
+      202
+     ],
+     "ends": [
+      "26c3",
+      "3f10"
+     ]
+    },
+    {
+     "ref": "3eae",
+     "type": "line",
+     "a": [
+      114,
+      202
+     ],
+     "b": [
+      -114,
+      202
+     ],
+     "ends": [
+      "b2f3",
+      "c7d9"
+     ]
+    },
+    {
+     "ref": "5740",
+     "type": "line",
+     "a": [
+      -114,
+      202
+     ],
+     "b": [
+      -114,
+      -202
+     ],
+     "ends": [
+      "bb67",
+      "20b6"
+     ]
+    },
+    {
+     "ref": "1504",
+     "type": "line",
+     "a": [
+      -114,
+      -202
+     ],
+     "b": [
+      114,
+      202
+     ],
+     "ends": [
+      "4672",
+      "b2f3"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "f27b",
+     "type": "line",
+     "a": [
+      114,
+      -202
+     ],
+     "b": [
+      -114,
+      202
+     ],
+     "ends": [
+      "5983",
+      "c7d9"
+     ],
+     "construction": true
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -114,
+      -202
+     ],
+     "size": [
+      228,
+      404
+     ],
+     "area": 92112,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Part 3",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "2f15",
+     "type": "line",
+     "a": [
+      -114,
+      -9
+     ],
+     "b": [
+      114,
+      -9
+     ],
+     "ends": [
+      "5fb2",
+      "dfb7"
+     ]
+    },
+    {
+     "ref": "d4a2",
+     "type": "line",
+     "a": [
+      114,
+      -9
+     ],
+     "b": [
+      114,
+      61
+     ],
+     "ends": [
+      "88b4",
+      "336e"
+     ]
+    },
+    {
+     "ref": "7be1",
+     "type": "line",
+     "a": [
+      114,
+      61
+     ],
+     "b": [
+      -114,
+      61
+     ],
+     "ends": [
+      "c331",
+      "8d2c"
+     ]
+    },
+    {
+     "ref": "fbb9",
+     "type": "line",
+     "a": [
+      -114,
+      61
+     ],
+     "b": [
+      -114,
+      -9
+     ],
+     "ends": [
+      "2d5a",
+      "2a52"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -114,
+      -9
+     ],
+     "size": [
+      228,
+      70
+     ],
+     "area": 15960,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Part 2",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     -114,
+     -202
+    ],
+    "size": [
+     228,
+     404
+    ]
+   },
+   "holes": 0,
+   "notches": 1,
+   "cuts": [
+    {
+     "ref": "Part 3",
+     "side": "top",
+     "from": 0,
+     "to": 18,
+     "through": true,
+     "at": [
+      -114,
+      -202
+     ],
+     "size": [
+      228,
+      27.638
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 9.8,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      -9,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      9,
+      0
+     ]
+    },
+    {
+     "face": "edge 0a76",
+     "looks": "-z",
+     "origin": [
+      -114,
+      9,
+      -202
+     ]
+    },
+    {
+     "face": "edge 8df6",
+     "looks": "+x",
+     "origin": [
+      114,
+      9,
+      -202
+     ]
+    },
+    {
+     "face": "edge 3eae",
+     "looks": "+z",
+     "origin": [
+      114,
+      9,
+      202
+     ]
+    },
+    {
+     "face": "edge 5740",
+     "looks": "-x",
+     "origin": [
+      -114,
+      9,
+      202
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "remove",
+   "name": "Part 3",
+   "thickness": 27.638,
+   "outline": {
+    "at": [
+     -114,
+     -9
+    ],
+    "size": [
+     228,
+     70
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": []
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Part 2",
+    "at": [
+     -114,
+     -9,
+     -202
+    ],
+    "size": [
+     228,
+     18,
+     404
+    ]
+   },
+   {
+    "name": "Part 3",
+    "at": [
+     -114,
+     -9,
+     -202
+    ],
+    "size": [
+     228,
+     70,
+     27.638
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    241.4,
+    417.4
+   ],
+   "yield": 0.914,
+   "parts": [
+    {
+     "name": "Part 2",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      228,
+      404
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Part 2",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 9.8,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}

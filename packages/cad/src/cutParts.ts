@@ -1,3 +1,4 @@
+import { applyExtrudeRemovals } from './extrudeRemoval';
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
 import { validPartCutSplit } from './partCutSplit';
@@ -561,7 +562,7 @@ export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): Eva
   const steps = (document.partCuts ?? []).filter(
     step => step.targets.includes(part.partId) || (step.split && step.tools.some(id => id.split(':')[0] === part.partId))
   );
-  if (!steps.length) return part;
+  if (!steps.length && !document.parts.some(candidate => candidate.remove)) return part;
   const toolIds = [...new Set(steps.flatMap(step => [...step.targets, ...step.tools.map(id => id.split(':')[0]!)]))].filter(
     id => id !== part.partId
   );
@@ -570,7 +571,7 @@ export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): Eva
     const profile = source && evaluateCadPart(source).part;
     return source && profile ? [evaluateCadFeatures(source, profile).part] : [];
   });
-  return applyPartCuts(document, [part, ...tools]).parts[0]!;
+  return applyExtrudeRemovals(document, applyPartCuts(document, [part, ...tools]).parts).parts[0]!;
 }
 
 /** Adds a step that cuts the tool parts out of the target parts, with this much room around them. */

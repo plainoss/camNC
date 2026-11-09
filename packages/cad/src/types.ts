@@ -315,9 +315,10 @@ export interface CadPart {
   addTo?: string;
   /**
    * Extrude → Remove: the picked regions, or every closed region but what's left of the face, are cut into the board
-   * the sketch is drawn on, this deep. The step isn't a part itself.
+   * the sketch is drawn on, this deep. A plane-based extrusion removes its volume from earlier bodies, optionally
+   * limited to `targets`. The step isn't a part itself.
    */
-  remove?: { depth: CadCutDepth; depthExpression?: string };
+  remove?: { depth: CadCutDepth; depthExpression?: string; targets?: string[] };
   /**
    * A Hole step: a Remove whose sketch's points are the holes' centres, each cut as a round hole this wide, as deep as
    * `remove` says. The sketch's lines and curves only place the points.

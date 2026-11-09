@@ -1,3 +1,4 @@
+import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
 import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
@@ -81,6 +82,10 @@ function removedSketch(part: CadPart, face: 'top' | 'underside'): CadFaceSketch 
  * the board's outline, the largest is the board, not a notch.
  */
 export function removalRegions(document: CadDocument, part: CadPart): { regions: CadSketchRegion[]; cut: string[] } | { error: string } {
+  if (part.drawnOn && ('plane' in part.drawnOn.on || typeof part.drawnOn.on.face === 'object')) {
+    const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE);
+    return { regions, cut: regions.map(region => region.id) };
+  }
   const support = removeSupport(document, part);
   if ('error' in support) return support;
   const board = {
@@ -186,7 +191,7 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
   const resolved = { ...document, parts };
   for (const step of parts) {
     // A suppressed Remove cuts nothing, and nor does a sketch not extruded.
-    if (!step.remove || step.suppressed || step.extrude === false) continue;
+    if (!step.remove || step.suppressed || step.extrude === false || isSpatialRemoval(step)) continue;
     const support = removeSupport(resolved, step);
     if ('error' in support) continue;
     const face = removedSketch(step, support.face);
@@ -245,6 +250,13 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
     return problem ? (problem.code === 'region-count' ? `The regions don’t touch ${target.name}.` : problem.message) : null;
   }
   if (part.remove) {
+    if (isSpatialRemoval(part)) {
+      const shapes = document.parts.flatMap(candidate => {
+        const profile = evaluateCadPart(candidate).part;
+        return profile ? [evaluateCadFeatures(candidate, profile).part] : [];
+      });
+      return applyExtrudeRemovals(document, shapes).diagnostics.find(problem => problem.partId === part.id)?.message ?? null;
+    }
     const support = removeSupport(document, part);
     if ('error' in support) return support.error;
     if (part.remove.depth !== 'through' && !(part.remove.depth > 0)) return 'A cut needs some depth.';
@@ -264,15 +276,23 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
   return null;
 }
 
-/** Whether other steps build on a part, so it has to stay one rather than become an Add or Remove step. */
-export function partIsBuiltOn(document: CadDocument, part: CadPart): string | null {
+/**
+ * Why converting an extrude would discard a body other steps need. Adding another sketch retains its body and IDs,
+ * so copies, face sketches and later cuts still work. A same-sketch Add or Remove has no body of its own.
+ */
+export function partIsBuiltOn(document: CadDocument, part: CadPart, addTo?: CadPart): string | null {
+  const keepsBody = !!addTo && !sharesSketch(addTo, part);
   if (
-    part.copies?.length ||
-    part.pattern ||
-    document.partCuts?.some(step => [...step.tools, ...step.targets].some(id => id.split(':')[0] === part.id))
+    !keepsBody &&
+    (part.copies?.length ||
+      part.pattern ||
+      document.partCuts?.some(step => [...step.tools, ...step.targets].some(id => id.split(':')[0] === part.id)))
   )
     return `${part.name} is copied or cut by other steps, so it stays a part.`;
-  if (document.parts.some(candidate => candidate.drawnOn && !('plane' in candidate.drawnOn.on) && candidate.drawnOn.on.partId === part.id))
+  if (
+    !keepsBody &&
+    document.parts.some(candidate => candidate.drawnOn && !('plane' in candidate.drawnOn.on) && candidate.drawnOn.on.partId === part.id)
+  )
     return `Other parts are drawn on ${part.name}, so it stays a part.`;
   if (document.parts.some(candidate => candidate.addTo === part.id)) return `Other steps add to ${part.name}, so it stays a part.`;
   return null;
