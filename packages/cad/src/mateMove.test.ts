@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyCadVariables,
+  cadVariableUses,
   createCadDocument,
   createPlateDocument,
   mateMove,
   placePoint,
   resolveDrawnPlacements,
   resolvePartPatterns,
+  setCadVariable,
   unmovedPick,
+  type CadDocument,
   type CadPart,
 } from './index';
 
@@ -51,5 +55,48 @@ describe('mate connectors', () => {
     const copy = resolvePartPatterns({ ...createCadDocument(), parts: [part] }).parts[0]!.copies![0]!;
     close(placePoint(copy.placement, [100, 100, 20]), [300, 0, 50]);
     close(placePoint(copy.placement, [100, 100, 21]), [301, 0, 50]);
+  });
+});
+
+describe('a turn typed with variables', () => {
+  const turned = (): CadDocument => ({
+    ...createCadDocument(),
+    variables: [
+      { id: 'a', name: 'tilt', expression: '60 deg' },
+      { id: 'l', name: 'lift', expression: '45 mm' },
+    ],
+    parts: [
+      {
+        ...plate(),
+        moved: {
+          by: [0, 0, 30],
+          byExpressions: [null, null, 'lift'],
+          turn: { about: [0, 0, 0], axis: [0, 0, 1], degrees: 30, degreesExpression: 'tilt' },
+        },
+        copies: [
+          {
+            id: 'c',
+            offset: { position: [0, 0, 0], rotation: [0, 0, 0, 1] },
+            turn: { about: [0, 0, 0], axis: [0, 0, 1], degrees: 30, degreesExpression: 'tilt' },
+          },
+        ],
+      },
+    ],
+  });
+
+  it('follows them, and keeps turning as the move follows its own', () => {
+    const part = applyCadVariables(turned()).parts[0]!;
+    expect(part.moved).toMatchObject({ by: [0, 0, 45], turn: { degrees: 60 } });
+    expect(part.copies![0]!.turn).toMatchObject({ degrees: 60 });
+  });
+
+  it('counts the angle as a use of the variable, and carries a rename through', () => {
+    const document = turned();
+    expect(cadVariableUses(document, 'tilt')).toBe(2);
+    const renamed = setCadVariable(document, { id: 'a', name: 'slant', expression: '60 deg' });
+    if ('error' in renamed) throw new Error(renamed.error);
+    const part = renamed.document.parts[0]!;
+    expect(part.moved).toMatchObject({ turn: { degreesExpression: 'slant', degrees: 60 } });
+    expect(part.copies![0]!.turn).toMatchObject({ degreesExpression: 'slant' });
   });
 });

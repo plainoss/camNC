@@ -1099,6 +1099,35 @@ it('moves a part so a corner of it lands on a corner of another, by mate connect
   await waitFor(() => expect(latest().parts[1]!.moved).toMatchObject({ by: [-40, -40, -18], turn: { about: [40, 40, 36], degrees: 180 } }));
 });
 
+it('mates a part moved by a distance from where it’s drawn, not from where the distance put it', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  const base = source.parts[0]!;
+  source.parts.push({
+    ...createPlateDocument({ width: 40, height: 40 }).parts[0]!,
+    id: 'boss',
+    name: 'Boss',
+    drawnOn: { on: { partId: base.id, face: 'top' }, offset: 0 },
+    moved: { along: { plane: 'top' }, distance: 10 },
+  });
+  const { latest } = await studio(source);
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  const click = (partId: string, point: [number, number, number], normal: [number, number, number]) => {
+    const index = props().instanceIds!.indexOf(partId);
+    act(() => props().onSelect!(partId, index, { partId, index, point, normal }));
+  };
+  const features = await screen.findByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Boss/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Transform · Boss' });
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'mate');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Mate connector' }));
+  // Its underside, lifted 10 mm off the base.
+  click('boss', [40, 40, 28], [0, 0, -1]);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Mate connector to move to' }));
+  click(base.id, [200, 100, 18], [0, 0, 1]);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[1]!.moved).toEqual({ by: [160, 60, 0] }));
+});
+
 it('rotates a part about the line out of a face picked for the axis', async () => {
   const source = createPlateDocument({ width: 200, height: 100 });
   source.parts[0]!.drawnOn = { on: { plane: 'top' }, offset: 0 };

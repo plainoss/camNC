@@ -700,8 +700,12 @@ export function TransformDialog({
     // By X, Y and Z, a turned part or copy stays turned.
     let turn = kind === 'xyz' ? (copy ? copy.turn : move && part.moved && 'by' in part.moved ? part.moved.turn : undefined) : undefined;
     // Changing the part's own move, what's picked on it sits where that move put it.
+    // A move by a distance along a direction is undone as the step it makes now.
+    const along = part.moved && !('by' in part.moved) ? part.moved : undefined;
+    const alongStep = along && cadDirectionVector(document, along)?.map(value => value * along.distance);
+    const current = part.moved && 'by' in part.moved ? part.moved : alongStep && { by: alongStep as [number, number, number] };
     const unmoved = (pick: CadConnectorPick) =>
-      !copyPart && move && pick.partId === part.id && part.moved && 'by' in part.moved ? unmovedPick(pick, part.moved) : pick;
+      !copyPart && move && pick.partId === part.id && current ? unmovedPick(pick, current) : pick;
     if (kind === 'mate') {
       // The part turns so its connector's face meets the other's, then moves so the two points touch.
       if (!mateFrom || !mateTo) return setError(`Pick a corner or face middle on ${part.name}, then one to move it to.`);

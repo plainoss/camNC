@@ -10,6 +10,7 @@ import type {
   CadPartCut,
   CadPart,
   CadPlacement,
+  CadTurn,
   CadSketch,
   CadVariable,
 } from './types';
@@ -250,7 +251,12 @@ function mapPlacements(part: CadPart, edit: (placement: CadPlacement | undefined
     };
     const edited = edit(asPlacement);
     if (edited && edited !== asPlacement)
-      moved = { by: edited.position, ...(edited.positionExpressions && { byExpressions: edited.positionExpressions }) };
+      moved = {
+        by: edited.position,
+        ...(edited.positionExpressions && { byExpressions: edited.positionExpressions }),
+        // A turned move stays turned.
+        ...(moved.turn && { turn: moved.turn }),
+      };
   }
   if (placement === part.placement && !copiesChanged && moved === part.moved) return part;
   return {
@@ -259,6 +265,26 @@ function mapPlacements(part: CadPart, edit: (placement: CadPlacement | undefined
     ...(copiesChanged && { copies }),
     ...(moved !== part.moved && { moved }),
   };
+}
+
+/** The part's turned move and turned copies, each turn passed through `edit`, keeping objects that didn't change. */
+function mapTurns(part: CadPart, edit: (turn: CadTurn) => CadTurn): CadPart {
+  const moveTurn = part.moved && 'by' in part.moved ? part.moved.turn : undefined;
+  const turned = moveTurn && edit(moveTurn);
+  const copies = part.copies?.map(copy => {
+    const turn = copy.turn && edit(copy.turn);
+    return turn === copy.turn ? copy : { ...copy, turn };
+  });
+  const copiesChanged = copies?.some((copy, index) => copy !== part.copies![index]);
+  if (turned === moveTurn && !copiesChanged) return part;
+  return { ...part, ...(turned !== moveTurn && { moved: { ...part.moved!, turn: turned } }), ...(copiesChanged && { copies }) };
+}
+
+/** A turn's angle as its variables now say, or the same turn. */
+function followTurn(turn: CadTurn, scope: CadValueScope): CadTurn {
+  if (!usesVariables(turn.degreesExpression)) return turn;
+  const parsed = parseCadValue(turn.degreesExpression!, { unit: 'deg', variables: scope });
+  return 'error' in parsed || parsed.value === turn.degrees ? turn : { ...turn, degrees: parsed.value };
 }
 
 function copyDistanceOutcome(expression: string | undefined, scope: CadValueScope): Outcome | null {
@@ -308,6 +334,7 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     const thickness = thicknessOutcome(part, scope);
     let sized = thickness && 'value' in thickness && thickness.value !== part.thickness ? { ...part, thickness: thickness.value } : part;
     sized = mapPlacements(sized, placement => followPlacement(placement, scope));
+    sized = mapTurns(sized, turn => followTurn(turn, scope));
     const copies = sized.copies?.map(copy => {
       const outcome = copyDistanceOutcome(copy.along?.distanceExpression, scope);
       return outcome && 'value' in outcome && outcome.value !== copy.along!.distance
@@ -517,31 +544,35 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
       mapSketches(
         mapCuts(
           withPlacementExpressions(
-            {
-              ...part,
-              ...(part.thicknessExpression && { thicknessExpression: edit(part.thicknessExpression) }),
-              ...(part.cornerRelief?.diameterExpression && {
-                cornerRelief: { ...part.cornerRelief, diameterExpression: edit(part.cornerRelief.diameterExpression) },
-              }),
-              ...(part.thin?.depthExpression && { thin: { ...part.thin, depthExpression: edit(part.thin.depthExpression) } }),
-              ...(part.drawnOn?.offsetExpression && {
-                drawnOn: { ...part.drawnOn, offsetExpression: edit(part.drawnOn.offsetExpression) },
-              }),
-              ...(part.copies && {
-                copies: part.copies.map(copy =>
-                  copy.along?.distanceExpression
-                    ? { ...copy, along: { ...copy.along, distanceExpression: edit(copy.along.distanceExpression) } }
-                    : copy
-                ),
-              }),
-              ...(part.pattern && {
-                pattern: {
-                  ...part.pattern,
-                  ...(part.pattern.countExpression && { countExpression: edit(part.pattern.countExpression) }),
-                  ...(part.pattern.spacingExpression && { spacingExpression: edit(part.pattern.spacingExpression) }),
-                },
-              }),
-            },
+            mapTurns(
+              {
+                ...part,
+                ...part,
+                ...(part.thicknessExpression && { thicknessExpression: edit(part.thicknessExpression) }),
+                ...(part.cornerRelief?.diameterExpression && {
+                  cornerRelief: { ...part.cornerRelief, diameterExpression: edit(part.cornerRelief.diameterExpression) },
+                }),
+                ...(part.thin?.depthExpression && { thin: { ...part.thin, depthExpression: edit(part.thin.depthExpression) } }),
+                ...(part.drawnOn?.offsetExpression && {
+                  drawnOn: { ...part.drawnOn, offsetExpression: edit(part.drawnOn.offsetExpression) },
+                }),
+                ...(part.copies && {
+                  copies: part.copies.map(copy =>
+                    copy.along?.distanceExpression
+                      ? { ...copy, along: { ...copy.along, distanceExpression: edit(copy.along.distanceExpression) } }
+                      : copy
+                  ),
+                }),
+                ...(part.pattern && {
+                  pattern: {
+                    ...part.pattern,
+                    ...(part.pattern.countExpression && { countExpression: edit(part.pattern.countExpression) }),
+                    ...(part.pattern.spacingExpression && { spacingExpression: edit(part.pattern.spacingExpression) }),
+                  },
+                }),
+              },
+              turn => (turn.degreesExpression ? { ...turn, degreesExpression: edit(turn.degreesExpression) } : turn)
+            ),
             edit
           ),
           cut => (cut.depthExpression ? { ...cut, depthExpression: edit(cut.depthExpression) } : cut)
