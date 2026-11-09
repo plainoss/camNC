@@ -711,5 +711,35 @@
         }
       }
     ]
+  },
+  {
+    "id": "sketch/file/open-saved-design",
+    "title": "A saved design file opens as a new project with its sketch, dimensions and pocket, ready to edit",
+    "evidence": "design a saved file reproduces a reported bug",
+    "steps": [
+      "open designs/plate.json",
+      {
+        "expect": {
+          "entityCount": 8,
+          "regions": 1,
+          "dimensionsInclude": [
+            {
+              "kind": "horizontal",
+              "value": 400
+            },
+            {
+              "kind": "diameter",
+              "value": 8
+            }
+          ]
+        }
+      },
+      "line 100,100 200,100",
+      {
+        "expect": {
+          "entityCount": 9
+        }
+      }
+    ]
   }
 ]
