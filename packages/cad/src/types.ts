@@ -337,6 +337,11 @@ export interface CadPlacement {
  */
 export interface CadPartCopy {
   id: string;
+  /**
+   * A transform by a distance along a picked direction: the copy sits that far from the part along the plane's or face's
+   * normal, wherever that face is now. It sets `offset` whenever the design is laid out.
+   */
+  along?: CadDirection & { distance: number };
   placement?: CadPlacement;
   mirrored?: boolean;
   /** Its own name, rather than the part's with a number. */
@@ -350,8 +355,15 @@ export interface CadPartCopy {
   offset?: CadPlacement;
 }
 /** Copies of a part in a row along an axis, each `spacing` on from the last. */
+/** A direction taken from a plane or a part's face, as the reference picks one: out of it, or into it with `flip`. */
+export interface CadDirection {
+  along: CadDrawnOn['on'];
+  flip?: boolean;
+}
 export interface CadPartPattern {
   id: string;
+  /** Picked from a plane or face; it overrides `axis` while that face is there, and follows it when it moves. */
+  direction?: CadDirection;
   axis: 'x' | 'y' | 'z';
   /** How many in all, counting the part itself. */
   count: number;

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import {
   addPartCopy,
+  cadDirectionVector,
+  resolvePartPatterns,
+  type CadDrawnOn,
   CAD_CHORD_TOLERANCE,
   evaluateCadPart,
   extrudeStepProblem,
@@ -26,6 +29,7 @@ import { CadThicknessField } from './CadThicknessField';
 import { FeatureDialog } from './FeatureDialog';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 import { CadValueInput } from './CadValueInput';
+import { drawnOnName } from './drawnOnName';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -415,6 +419,7 @@ export function TransformDialog({
   variables,
   onSave,
   onCancel,
+  pickDirection,
 }: {
   document: CadDocument;
   part: CadPart;
@@ -423,14 +428,56 @@ export function TransformDialog({
   variables?: CadValueScope;
   onSave: (document: CadDocument) => void;
   onCancel: () => void;
+  /** Starts picking a plane or a face in the view or the feature list, for a direction; the pick comes back once. */
+  pickDirection?: (picked: (on: CadDrawnOn['on']) => void) => void;
 }) {
   const copy = part.copies?.find(candidate => candidate.id === copyId);
+  // By X, Y and Z, or by a distance along a picked plane's or face's normal, as the reference's Translate types.
+  const [kind, setKind] = useState<'xyz' | 'distance'>(copy?.along ? 'distance' : 'xyz');
+  const [direction, setDirection] = useState<CadDrawnOn['on'] | null>(copy?.along?.along ?? null);
+  const [flip, setFlip] = useState(!!copy?.along?.flip);
+  const [distanceText, setDistanceText] = useState(copy?.along ? formatCadValue(copy.along.distance) : '100');
+  const [picking, setPicking] = useState(false);
+  const pick = () => {
+    if (!pickDirection) return;
+    setPicking(true);
+    pickDirection(on => {
+      setDirection(on);
+      setPicking(false);
+    });
+  };
   const typed = (axis: number) =>
     copy?.offset ? (copy.offset.positionExpressions?.[axis] ?? formatCadValue(copy.offset.position[axis]!)) : '0';
   const [text, setText] = useState([typed(0), typed(1), typed(2)]);
   const [mirrored, setMirrored] = useState(!!copy?.mirrored);
   const [error, setError] = useState<string | null>(null);
   const save = () => {
+    if (kind === 'distance') {
+      if (!direction) return setError('Pick a plane or a face for the direction.');
+      const distance = parseCadValue(distanceText, { unit: 'mm', variables });
+      if ('error' in distance) return setError(distance.error);
+      const along = { along: direction, distance: distance.value, ...(flip && { flip: true }) };
+      const vector = cadDirectionVector(document, along);
+      if (!vector) return setError('The plane or face picked for the direction is gone. Pick another.');
+      const offset = {
+        position: vector.map(value => value * distance.value) as [number, number, number],
+        rotation: [0, 0, 0, 1] as [number, number, number, number],
+      };
+      const placed = copy
+        ? { document: setPartCopyOffset(document, part.id, copy.id, { offset, mirrored }), id: copy.id }
+        : addPartCopy(document, part.id, { offset, mirrored });
+      const copyIdNow = placed.id;
+      return onSave(
+        resolvePartPatterns({
+          ...placed.document,
+          parts: placed.document.parts.map(candidate =>
+            candidate.id !== part.id
+              ? candidate
+              : { ...candidate, copies: candidate.copies?.map(c => (c.id === copyIdNow ? { ...c, along } : c)) }
+          ),
+        })
+      );
+    }
     const parsed = text.map(value => parseCadValue(value, { unit: 'mm', variables }));
     const failed = parsed.find(result => 'error' in result);
     if (failed && 'error' in failed) return setError(failed.error);
@@ -454,23 +501,60 @@ export function TransformDialog({
         <small>Part to copy</small>
         <span>{part.name}</span>
       </div>
-      <p className="cad-feature-hint">Translate by X, Y and Z</p>
-      {kAxisLabels.map((label, axis) => (
-        <label key={label} className="cad-number-field">
-          {label}
-          <span>
-            <CadValueInput
-              bare
-              aria-label={label}
-              value={text[axis]}
-              spellCheck={false}
-              aria-invalid={error ? true : undefined}
-              onChange={event => setText(values => values.map((value, index) => (index === axis ? event.target.value : value)))}
-            />
-          </span>
-          mm
-        </label>
-      ))}
+      <label className="cad-number-field">
+        Type
+        <select aria-label="Transform type" value={kind} onChange={event => setKind(event.target.value as 'xyz' | 'distance')}>
+          <option value="xyz">Translate by XYZ</option>
+          <option value="distance">Translate by distance</option>
+        </select>
+      </label>
+      {kind === 'distance' && (
+        <>
+          <button
+            type="button"
+            className="cad-feature-selection"
+            data-active={picking || !direction ? '' : undefined}
+            onClick={pick}
+            aria-label="Direction">
+            <small>Direction</small>
+            <span>{direction ? drawnOnName(document, direction) : 'Pick a plane or a face'}</span>
+          </button>
+          <label className="cad-number-field">
+            Distance
+            <span>
+              <CadValueInput
+                bare
+                aria-label="Distance"
+                value={distanceText}
+                spellCheck={false}
+                onChange={event => setDistanceText(event.target.value)}
+              />
+            </span>
+            mm
+          </label>
+          <label>
+            <input type="checkbox" checked={flip} onChange={event => setFlip(event.target.checked)} />
+            Flip direction
+          </label>
+        </>
+      )}
+      {kind === 'xyz' &&
+        kAxisLabels.map((label, axis) => (
+          <label key={label} className="cad-number-field">
+            {label}
+            <span>
+              <CadValueInput
+                bare
+                aria-label={label}
+                value={text[axis]}
+                spellCheck={false}
+                aria-invalid={error ? true : undefined}
+                onChange={event => setText(values => values.map((value, index) => (index === axis ? event.target.value : value)))}
+              />
+            </span>
+            mm
+          </label>
+        ))}
       <label>
         <input type="checkbox" checked={mirrored} onChange={event => setMirrored(event.target.checked)} />
         Mirror image
