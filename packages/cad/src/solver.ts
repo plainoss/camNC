@@ -2,6 +2,7 @@ import { reconcileSlot } from './slot';
 import { slotPrimitives, slotArcRuleOverrides } from './slotConstraint';
 import { Algorithm, GcsWrapper, init_planegcs_module, SolveStatus, type ModuleStatic, type SketchPrimitive } from '@salusoft89/planegcs';
 import { resolveExtrudeSteps } from './extrudeSteps';
+import { withUsedPoints } from './usedEdges';
 import { sketchTargets } from './featureModel';
 import { evaluateCadDocument } from './features';
 import { validateCadDocument, CAD_GEOMETRY_TOLERANCE } from './geometry';
@@ -617,6 +618,8 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
     // drawn on another is solved after it, with that face's edges where they now are, so what's tied to them follows.
     for (const part of supportsFirst(next.parts).flatMap(sketchTargets)) {
       if (part.drawnOn) part.sketch = withFaceEdges(next, part);
+      // Points used from other parts' corners go where those corners now are.
+      part.sketch = withUsedPoints(next, part);
       const fixedConflicts = fixedConstraintConflicts(part);
       if (fixedConflicts.length) {
         diagnostics.push(...fixedConflicts);

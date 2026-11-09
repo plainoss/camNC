@@ -236,8 +236,8 @@ The studio follows a parametric part studio's workflow. Where it still differs, 
   It cuts the sketch into that board, Blind to a depth or Through all, as a face sketch with its cuts. It cuts every
   closed region except what's left of the face: of the regions bounded partly by the board's outline, the largest is
   taken to be the board. Picking regions comes with region selection. The per-part pocket view still works alongside.
-- **Used edges are fixed copies.** Use (U) puts a part's edges in a sketch where they are, picked first, then U. They
-  don't follow the part when it changes.
+- **Use follows corners, not faces or curves.** An edge used (U) from a part behind a sketch is tied to the corners it
+  runs between, so it follows that part's outline. Using a face's outline, a curve, or an edge of a copy isn't there yet.
 - **Pattern and Transform directions are typed axes**, not an edge or face picked in the view.
 - **Booleans only subtract** (Cut parts); there is no union or intersect, since parts are boards.
 

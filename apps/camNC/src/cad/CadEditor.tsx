@@ -84,6 +84,9 @@ import {
   cadVariableProblems,
   drawnOnOutline,
   cadFaceFrame,
+  cadCornerSources,
+  cadSketchFrame,
+  cornerKey,
   sketchRegions,
   CAD_CHORD_TOLERANCE,
   isCadPart,
@@ -3953,9 +3956,17 @@ export function CadEditor({
     const before = new Set(sketch.entities.map(entity => entity.id));
     const added = next.entities.filter(entity => !before.has(entity.id) && entity.type === 'line');
     const ends = new Set(added.flatMap(line => (line.type === 'line' ? [line.startId, line.endId] : [])));
+    // Each end at a corner of a part behind the sketch is tied to it, so the used edge follows that part, as in the reference.
+    const source = sketchBackdrop?.document ?? documentRef.current;
+    const frame = part && cadSketchFrame(documentRef.current, part);
+    const corners = frame ? cadCornerSources(source, frame, part?.id) : new Map();
     changeSketch({
       ...next,
-      entities: next.entities.map(entity => (entity.type === 'point' && ends.has(entity.id) ? { ...entity, fixed: true } : entity)),
+      entities: next.entities.map(entity => {
+        if (entity.type !== 'point' || !ends.has(entity.id)) return entity;
+        const used = corners.get(cornerKey(entity.x, entity.y));
+        return { ...entity, fixed: true, ...(used && { used }) };
+      }),
     });
     setPickedEdges([]);
     setSelected(added.map(line => line.id));
