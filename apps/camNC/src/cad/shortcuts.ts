@@ -1,4 +1,4 @@
-import { sketchConstraints } from './SketchToolbar';
+import { sketchConstraints } from './sketchConstraints';
 import { sketchTools } from './sketchTools';
 
 export interface ShortcutSection {

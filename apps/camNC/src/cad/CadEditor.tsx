@@ -65,7 +65,6 @@ import {
   type CadDocument,
   type CadDrawnOn,
   type CadEntity,
-  type CadPart,
   type CadSketch,
   type CadSketchSolveStatus,
   type CadSolveOptions,
