@@ -19,6 +19,8 @@ import {
   resolveExtrudeSteps,
   sketchRegions,
   splitApartRegions,
+  isJoinedBody,
+  isCadPart,
   evaluateCadPart,
   solveCadDocument,
   validateCadDocument,
@@ -118,9 +120,8 @@ describe('Extrude → Add', () => {
   it('says why when it can’t add', () => {
     const { owner, narrow } = splitDesign();
     const other = { ...createCadPart('Other', 18), id: 'other' };
-    expect(extrudeStepProblem(design(owner, other), second(owner, [narrow], { addTo: 'other' }))).toBe(
-      'Add joins regions of the sketch Other is made from.'
-    );
+    // Added to a part of another sketch, it's joined as a body of its own: only its own profile can stop it.
+    expect(extrudeStepProblem(design(owner, other), second(owner, [narrow], { addTo: 'other' }))).not.toMatch(/joins regions/);
     expect(extrudeStepProblem(design(owner), second(owner, [], { addTo: owner.id }))).toBe('Pick the regions to add in the view.');
     expect(extrudeStepProblem(design(owner), second(owner, [narrow], { addTo: 'gone' }))).toMatch(/gone/);
   });
@@ -221,5 +222,20 @@ describe('a New extrude of regions apart', () => {
     expect(split.parts[1]).toMatchObject({ sketchOf: part.id, thickness: 25, drawnOn: part.drawnOn });
     expect(split.parts.map(made => made.regions!.length)).toEqual([1, 1]);
     expect(split.parts.every(made => evaluateCadPart(made).part)).toBe(true);
+  });
+});
+
+describe('Extrude → Add of another sketch', () => {
+  it('is a body joined to the part it adds to: built and made, not a part of its own', () => {
+    const block = { ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!, name: 'Block' };
+    block.drawnOn = { on: { plane: 'top' as const }, offset: 0 };
+    const boss = { ...createCadPart('Boss', 10), drawnOn: { on: { partId: block.id, face: 'top' as const }, offset: 0 }, addTo: block.id };
+    boss.sketch = addCircle(boss.sketch, { x: 50, y: 50, radius: 10 });
+    const document = { ...createCadDocument(), parts: [block, boss] };
+    expect(isJoinedBody(document, boss)).toBe(true);
+    expect(isCadPart(boss)).toBe(false);
+    const evaluated = evaluateCadDocument(document);
+    expect(evaluated.parts.map(part => part.partId)).toEqual([block.id, boss.id]);
+    expect(cadPartsToCut(document, evaluated.parts).map(entry => entry.part.name)).toEqual(['Block', 'Boss']);
   });
 });
