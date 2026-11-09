@@ -1,5 +1,7 @@
 import { newCadId } from './document';
-import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
+import { cadDatumFrame } from './datumPlanes';
+import { cadDrawnOnSupports, cadFaceFrame, effectivePlacement } from './drawnOn';
+import { mirroredPlacement } from './placement';
 import { cadDirectionVector } from './directions';
 import type { CadDocument, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
 
@@ -45,7 +47,7 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
   let changed = false;
   const supports = cadDrawnOnSupports(document);
   const parts = document.parts.map(part => {
-    if (!part.pattern && !part.copies?.some(copy => copy.pattern || copy.offset || copy.along)) return part;
+    if (!part.pattern && !part.copies?.some(copy => copy.pattern || copy.offset || copy.along || copy.mirror)) return part;
     const at = effectivePlacement(part, supports);
     // A transformed copy sits where its offset puts it from the part.
     const own = (part.copies ?? [])
@@ -58,6 +60,12 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
             ...copy,
             offset: { position: vector.map(value => value * copy.along!.distance) as [number, number, number], rotation: [0, 0, 0, 1] },
           };
+        // A mirror image sits across its plane from where the part is now.
+        if (copy.mirror) {
+          const frame = copy.mirror.datum ? cadDatumFrame(document, copy.mirror.datum) : cadFaceFrame(document, copy.mirror.across);
+          if (!at || !frame || 'error' in frame) return copy;
+          return { ...copy, mirrored: true, placement: mirroredPlacement(at, frame) };
+        }
         if (!copy.offset) return copy;
         const { placement: _placement, ...rest } = copy;
         if (!at) return rest;
@@ -114,4 +122,20 @@ export function renamePartCopy(document: CadDocument, partId: string, copyId: st
           }
     ),
   };
+}
+
+/** Adds a mirror image of a part across a plane or a face; its placement follows from both. */
+export function addPartMirror(
+  document: CadDocument,
+  partId: string,
+  across: NonNullable<CadPartCopy['mirror']>
+): { document: CadDocument; id: string } {
+  const id = newCadId();
+  const copy: CadPartCopy = { id, mirrored: true, mirror: across.datum ? across : { across: across.across } };
+  const next = {
+    ...document,
+    revision: document.revision + 1,
+    parts: document.parts.map(part => (part.id === partId ? { ...part, copies: [...(part.copies ?? []), copy] } : part)),
+  };
+  return { document: resolvePartPatterns(next), id };
 }
