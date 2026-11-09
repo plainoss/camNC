@@ -17,6 +17,7 @@
     "playwright": "catalog:"
   },
   "devDependencies": {
+    "@mergifyio/vitest": "catalog:",
     "@vitest/browser": "catalog:",
     "@wbcnc/typescript-config": "workspace:*",
     "vitest": "catalog:"

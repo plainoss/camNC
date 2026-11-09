@@ -9,6 +9,6 @@ export default defineConfig({
     include: ['src/settle.test.ts'],
     testNamePattern: /\[performance\]/,
     fileParallelism: false,
-    reporters: ['default', new TimingReporter({ suite: 'cam-performance' })],
+    reporters: ['default', new TimingReporter({ suite: 'cam-performance' }), '@mergifyio/vitest'],
   },
 });

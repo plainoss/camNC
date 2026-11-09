@@ -9,6 +9,6 @@ export default defineConfig({
     maxWorkers: 2,
     // Checks solve designs and plan their toolpaths, which takes seconds when the machine is busy.
     testTimeout: 20_000,
-    reporters: ['default', new TimingReporter({ suite: 'cad-script' })],
+    reporters: ['default', new TimingReporter({ suite: 'cad-script' }), '@mergifyio/vitest'],
   },
 });

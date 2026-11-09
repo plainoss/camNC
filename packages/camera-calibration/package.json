@@ -29,6 +29,7 @@
     ".": "./src/index.ts"
   },
   "devDependencies": {
+    "@mergifyio/vitest": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",

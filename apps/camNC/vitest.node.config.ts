@@ -12,7 +12,7 @@ export default defineConfig({
     testNamePattern: /^(?!.*\[performance\]).*$/,
     include: files,
     maxWorkers: 2,
-    reporters: ['default', new TimingReporter({ suite: 'domain' })],
+    reporters: ['default', new TimingReporter({ suite: 'domain' }), '@mergifyio/vitest'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },

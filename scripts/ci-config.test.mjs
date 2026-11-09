@@ -436,3 +436,38 @@ test('desktop builds run nightly and on demand, not on every merge, and skip a n
   assert.match(pick.run, /releases\/latest/);
   assert.equal(workflow.jobs.build.if, "needs.platforms.outputs.include != '[]'");
 });
+
+test('every CI test run reports its results to Mergify, and fork PRs without the key skip the uploads', () => {
+  const { jobs } = parse(read('.github/workflows/ci.yml'));
+  const testRun = step => /vitest|turbo-shared-cache\.mjs run|test:performance/.test(step.run ?? '') && !/spec:cad/.test(step.run);
+  for (const [id, job] of Object.entries(jobs)) {
+    for (const [index, step] of job.steps?.entries() ?? []) {
+      if (testRun(step)) assert(step.env?.MERGIFY_TOKEN, `${id} ${step.name}: Vitest needs MERGIFY_TOKEN`);
+      const junit = /--test-reporter-destination=(test-results\/junit\/[\w.-]+)/.exec(step.env?.NODE_OPTIONS ?? '')?.[1];
+      const uploads = job.steps.filter(other => other.uses?.startsWith('mergifyio/gha-mergify-ci@'));
+      if (!junit) continue;
+      assert(uploads.some(upload => upload.with.report_path.endsWith(junit)), `${id} ${step.name}: no upload of ${junit}`);
+      assert(job.steps.slice(0, index).some(other => other.run?.startsWith('mkdir -p') && other.run.endsWith(dirname(junit))),
+        `${id} ${step.name}: node --test does not create ${dirname(junit)}`);
+    }
+    for (const upload of job.steps?.filter(step => step.uses?.startsWith('mergifyio/gha-mergify-ci@')) ?? []) {
+      assert.equal(job.env?.HAS_MERGIFY_TOKEN, "${{ secrets.MERGIFY_TOKEN != '' }}", `${id}: uploads need the key guard`);
+      assert.match(upload.if, /^\(success\(\) \|\| failure\(\)\) && .*env\.HAS_MERGIFY_TOKEN == 'true' && hashFiles\('/);
+      assert(upload.with.job_name && upload.with.test_step_outcome, `${id} ${upload.name}`);
+    }
+  }
+  const configs = ['apps', 'packages'].flatMap(dir =>
+    readdirSync(new URL(`${dir}/`, root)).flatMap(pkg => {
+      const scripts = existsSync(new URL(`${dir}/${pkg}/package.json`, root)) ? JSON.parse(read(`${dir}/${pkg}/package.json`)).scripts ?? {} : {};
+      if (!Object.values(scripts).some(script => /\bvitest\b/.test(script))) return [];
+      const files = readdirSync(new URL(`${dir}/${pkg}/`, root)).filter(file => /^vitest\..*config\.ts$/.test(file));
+      assert(files.length, `${dir}/${pkg} runs Vitest without a config that adds the Mergify reporter`);
+      return files.map(file => `${dir}/${pkg}/${file}`);
+    })
+  );
+  for (const file of configs) {
+    // The fast set merges the browser config, so it keeps its reporters.
+    // The Workers pool cannot load the reporter's runner setup, so those suites write a JUnit report for an upload step.
+    if (!file.endsWith('vitest.fast.config.ts')) assert.match(read(file), /'@mergifyio\/vitest'|outputFile: \{ junit: 'test-results\/junit\/worker\.xml' \}/, file);
+  }
+});

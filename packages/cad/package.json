@@ -9,6 +9,7 @@
   "license": "Apache-2.0",
   "dependencies": { "@salusoft89/planegcs": "1.3.0" },
   "devDependencies": {
+    "@mergifyio/vitest": "catalog:",
     "@types/node": "catalog:",
     "@wbcnc/typescript-config": "workspace:*",
     "vitest": "catalog:"

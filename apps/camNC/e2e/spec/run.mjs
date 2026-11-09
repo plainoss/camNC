@@ -7,6 +7,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { openPage, startDevServer } from './harness.mjs';
+import { junitReport } from './junit.mjs';
 import { failsRun, scenarioResult } from './results.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -113,6 +114,7 @@ if (options.list) {
 }
 const shardName = options.shard ? `${options.shard.index}-of-${options.shard.count}` : 'all';
 const outDir = fileURLToPath(new URL(`../../test-results/spec/${shardName}/`, import.meta.url));
+const junitDir = fileURLToPath(new URL('../../test-results/junit/', import.meta.url));
 await mkdir(outDir, { recursive: true });
 let server = null;
 if (!options.url) {
@@ -157,5 +159,8 @@ await browser.close();
 server?.stop();
 await writeFile(path.join(outDir, 'results.json'), JSON.stringify(results, null, 2) + '\n');
 await writeFile(path.join(outDir, 'summary.json'), JSON.stringify({ shard: options.shard, workers, wallMs: performance.now() - runStarted, scenarios: scenarios.length, counts }, null, 2) + '\n');
+// Outside the cached test-results/spec, so a replayed run leaves no report for CI to upload as this commit's results.
+await mkdir(junitDir, { recursive: true });
+await writeFile(path.join(junitDir, `spec-${shardName}.xml`), junitReport(results));
 console.log(`\n${scenarios.length} scenarios: ${counts.PASS} pass, ${counts.FAIL} fail, ${counts.XFAIL} known gaps, ${counts.XPASS} newly passing, ${counts.FLAKY} quarantined failures`);
 if (failsRun(counts)) process.exitCode = 1;
