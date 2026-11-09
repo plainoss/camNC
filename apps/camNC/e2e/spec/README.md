@@ -220,6 +220,7 @@ Part Studio scenarios also use these steps, all through visible controls:
 | `feature <name>`                                                                                          | Double-click one named feature to open its dialog.                                  |
 | `featureaction <name> = <action>`                                                                         | Open the feature's context menu and choose its named action.                        |
 | `dialogfill <label> = <value>` / `dialogselect <label> = <value>` / `dialogcheck <label> = <true\|false>` | Edit a dialog textbox, select or checkbox. Textbox names may include a unit suffix. |
+| `dialogfocus <box>` / `dialogremove <box> = <part name>`                                                  | Activate a selection box or remove its named selection through the visible control. |
 | `dialogconfirm` / `dialogcancel`                                                                          | Confirm with OK or Save, or cancel the dialog.                                      |
 | `checkpoint <name>`                                                                                       | Remember the settled saved source and visible parts for later checks.               |
 
@@ -231,7 +232,7 @@ Dimensions and relations: `dimensions`, `dimensionsInclude`, `constraintsAtLeast
 `canRedo`, `stage`, `cursor`. Appearance: `previewCount`, `strokePx`, `colors`,
 `annotation`. See `adapters/sketch.mjs` for exact meanings and default tolerances.
 
-The `studio` expectations check source variables, thicknesses, patterns, offsets and cut settings separately from the rendered `listedParts` and `workspacePartCount`. `sameIdsSince` checks unchanged identities; `addedCopyIdsSince` requires prior copy IDs to retain their instance slots and allows the stated number of new IDs. `samePatternIdsSince` checks the pattern feature's identity. These are interface/source checks; source coordinates and part lists do not establish geometry correctness.
+The `studio` expectations check source variables, thicknesses, patterns, offsets and cut settings separately from the rendered `listedParts` and `workspacePartCount`. `dialogSelections` checks the names actually displayed in a dialog's Tools and Targets boxes. Copy tool names resolve the exact persisted source/copy reference. `sameIdsSince` checks unchanged identities; `addedCopyIdsSince` requires prior copy IDs to retain their instance slots and allows the stated number of new IDs. `samePatternIdsSince` checks the pattern feature's identity. These are interface/source checks; source coordinates and part lists do not establish geometry correctness.
 
 ## Goldens
 

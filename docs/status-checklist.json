@@ -92,6 +92,16 @@
           "evidence": ["packages/cad/src/cutParts.test.ts", "apps/camNC/src/cad/PartCutDialog.test.tsx"]
         },
         {
+          "item": "Select one physical copy as a cut tool",
+          "status": "partial",
+          "evidence": [
+            "apps/camNC/src/cad/CadEditor.partCutCopies.test.tsx",
+            "packages/cad/src/partReferences.test.ts",
+            "studio/tray/selected-copy-tool"
+          ],
+          "note": "Parts-list and viewport picks retain the exact copy tool, including a copy selected before Cut parts opens. A complete tray checks movement, pattern growth and reload. Copy-only targets and consuming a single copy remain unsupported and are explicitly refused."
+        },
+        {
           "item": "Overlapping parts are reported",
           "status": "done",
           "evidence": ["packages/cad/src/assemblyCollisions.test.ts"]

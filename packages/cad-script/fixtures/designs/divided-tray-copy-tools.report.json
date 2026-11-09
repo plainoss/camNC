@@ -1,0 +1,2122 @@
+{
+ "design": {
+  "name": "Divided tray regeneration",
+  "revision": 20,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "482b6484-8019-44f0-8ca8-117542cb6838",
+   "kind": "variable",
+   "label": "#width",
+   "settings": {
+    "expression": "420mm"
+   },
+   "result": {
+    "value": 420,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "5e1fc37e-225a-4e55-8bc6-c3c715965673",
+   "kind": "variable",
+   "label": "#depth",
+   "settings": {
+    "expression": "240mm"
+   },
+   "result": {
+    "value": 240,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "eff0963b-5198-4657-8974-13fb51e4f7d5",
+   "kind": "variable",
+   "label": "#height",
+   "settings": {
+    "expression": "80mm"
+   },
+   "result": {
+    "value": 80,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "b679ad81-5945-49ab-8fd1-3aa61aa09d86",
+   "kind": "variable",
+   "label": "#board",
+   "settings": {
+    "expression": "15mm"
+   },
+   "result": {
+    "value": 15,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "a1541232-51d0-4147-83e5-f38caf22d78b",
+   "kind": "variable",
+   "label": "#rebate",
+   "settings": {
+    "expression": "4mm"
+   },
+   "result": {
+    "value": 4,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "ba2cd63c-cd40-48b7-80fe-2138a57878dd",
+   "kind": "variable",
+   "label": "#dividers",
+   "settings": {
+    "expression": "4"
+   },
+   "result": {
+    "value": 4,
+    "kind": "number"
+   }
+  },
+  {
+   "id": "3c0f4643-c18c-41a4-867a-b693117d451f",
+   "kind": "variable",
+   "label": "#shift",
+   "settings": {
+    "expression": "0mm"
+   },
+   "result": {
+    "value": 0,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "6a3f19df-e05b-4be1-8468-d741837d1f55",
+   "kind": "variable",
+   "label": "#fit",
+   "settings": {
+    "expression": "0mm"
+   },
+   "result": {
+    "value": 0,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "9e68632c-48e5-47f9-8004-873251b9af05",
+   "kind": "variable",
+   "label": "#pitch",
+   "settings": {
+    "expression": "(width - 2*board)/(dividers + 1)"
+   },
+   "result": {
+    "value": 78,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "588b8e8a-0956-4462-84ea-9561b779411e:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Base",
+   "part": "Base",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Base / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "588b8e8a-0956-4462-84ea-9561b779411e:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Base",
+   "part": "Base",
+   "settings": {
+    "thickness": {
+     "value": 15,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 15,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      420,
+      240
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "9aaec509-7cdf-4386-882c-35d352088a7f:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Left wall",
+   "part": "Left wall",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Left wall / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "9aaec509-7cdf-4386-882c-35d352088a7f:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Left wall",
+   "part": "Left wall",
+   "settings": {
+    "thickness": {
+     "value": 15,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 0,
+      "expression": "0mm"
+     }
+    }
+   },
+   "result": {
+    "thickness": 15,
+    "outline": {
+     "at": [
+      0,
+      15
+     ],
+     "size": [
+      240,
+      65
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "451d74a6-65c0-471d-8073-e43e550b355b:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Right wall",
+   "part": "Right wall",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Right wall / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "451d74a6-65c0-471d-8073-e43e550b355b:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Right wall",
+   "part": "Right wall",
+   "settings": {
+    "thickness": {
+     "value": 15,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 405,
+      "expression": "width - board"
+     }
+    }
+   },
+   "result": {
+    "thickness": 15,
+    "outline": {
+     "at": [
+      0,
+      15
+     ],
+     "size": [
+      240,
+      65
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "2ba1e7f4-8d69-4cec-8913-f65a7903786a:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Front wall",
+   "part": "Front wall",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Front wall / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "2ba1e7f4-8d69-4cec-8913-f65a7903786a:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Front wall",
+   "part": "Front wall",
+   "settings": {
+    "thickness": {
+     "value": 15,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": 0,
+      "expression": "0mm"
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 15,
+    "outline": {
+     "at": [
+      15,
+      15
+     ],
+     "size": [
+      390,
+      65
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "75f6ae2d-3963-41ed-8f9e-9314c1fa2303:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Back wall",
+   "part": "Back wall",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Back wall / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "75f6ae2d-3963-41ed-8f9e-9314c1fa2303:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Back wall",
+   "part": "Back wall",
+   "settings": {
+    "thickness": {
+     "value": 15,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -225,
+      "expression": "-(depth - board)"
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 15,
+    "outline": {
+     "at": [
+      15,
+      15
+     ],
+     "size": [
+      390,
+      65
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "003fd972-33e3-4eb6-8350-1a3aacfbff49:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Divider",
+   "part": "Divider",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Divider / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "003fd972-33e3-4eb6-8350-1a3aacfbff49:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Divider",
+   "part": "Divider",
+   "settings": {
+    "thickness": {
+     "value": 15,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 85.5,
+      "expression": "board/2 + pitch + shift"
+     }
+    }
+   },
+   "result": {
+    "thickness": 15,
+    "outline": {
+     "at": [
+      15,
+      11
+     ],
+     "size": [
+      210,
+      69
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "27b43ee9-8fe6-4ffa-855f-1b022f98b9f7",
+   "kind": "pattern",
+   "label": "Pattern · Divider × 4 along x",
+   "part": "Divider",
+   "settings": {
+    "axis": "x",
+    "count": {
+     "value": 4,
+     "expression": "dividers"
+    },
+    "spacing": {
+     "value": 78,
+     "expression": "pitch"
+    }
+   },
+   "result": {
+    "copies": [
+     {
+      "name": "Divider 2",
+      "position": [
+       163.5,
+       0,
+       0
+      ]
+     },
+     {
+      "name": "Divider 3",
+      "position": [
+       241.5,
+       0,
+       0
+      ]
+     },
+     {
+      "name": "Divider 4",
+      "position": [
+       319.5,
+       0,
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "8961ee94-ebf7-41de-83df-d6edfef885c1",
+   "kind": "partCut",
+   "label": "Cut Base with Divider",
+   "part": "Base",
+   "settings": {
+    "tools": [
+     "Divider"
+    ],
+    "targets": [
+     "Base"
+    ],
+    "clearance": {
+     "value": 0,
+     "expression": "fit"
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Base",
+      "tool": "Divider",
+      "side": "top",
+      "width": 15,
+      "length": 210,
+      "depth": 4,
+      "through": false,
+      "at": {
+       "x": 85.5,
+       "y": 15
+      }
+     },
+     {
+      "target": "Base",
+      "tool": "Divider 2",
+      "side": "top",
+      "width": 15,
+      "length": 210,
+      "depth": 4,
+      "through": false,
+      "at": {
+       "x": 163.5,
+       "y": 15
+      }
+     },
+     {
+      "target": "Base",
+      "tool": "Divider 3",
+      "side": "top",
+      "width": 15,
+      "length": 210,
+      "depth": 4,
+      "through": false,
+      "at": {
+       "x": 241.5,
+       "y": 15
+      }
+     },
+     {
+      "target": "Base",
+      "tool": "Divider 4",
+      "side": "top",
+      "width": 15,
+      "length": 210,
+      "depth": 4,
+      "through": false,
+      "at": {
+       "x": 319.5,
+       "y": 15
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Base",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "fdc0",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      420,
+      0
+     ],
+     "ends": [
+      "a98f",
+      "d215"
+     ]
+    },
+    {
+     "ref": "16d9",
+     "type": "line",
+     "a": [
+      420,
+      0
+     ],
+     "b": [
+      420,
+      240
+     ],
+     "ends": [
+      "fcf1",
+      "47b9"
+     ]
+    },
+    {
+     "ref": "d2fd",
+     "type": "line",
+     "a": [
+      420,
+      240
+     ],
+     "b": [
+      0,
+      240
+     ],
+     "ends": [
+      "cd27",
+      "33de"
+     ]
+    },
+    {
+     "ref": "e829",
+     "type": "line",
+     "a": [
+      0,
+      240
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "4270",
+      "2a9b"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      420,
+      240
+     ],
+     "area": 100800,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Left wall",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "d357",
+     "type": "line",
+     "a": [
+      0,
+      15
+     ],
+     "b": [
+      240,
+      15
+     ],
+     "ends": [
+      "c0b8",
+      "3980"
+     ]
+    },
+    {
+     "ref": "3cf2",
+     "type": "line",
+     "a": [
+      240,
+      15
+     ],
+     "b": [
+      240,
+      80
+     ],
+     "ends": [
+      "57a2",
+      "a776"
+     ]
+    },
+    {
+     "ref": "9576",
+     "type": "line",
+     "a": [
+      240,
+      80
+     ],
+     "b": [
+      0,
+      80
+     ],
+     "ends": [
+      "eed7",
+      "1417"
+     ]
+    },
+    {
+     "ref": "98ab",
+     "type": "line",
+     "a": [
+      0,
+      80
+     ],
+     "b": [
+      0,
+      15
+     ],
+     "ends": [
+      "b590",
+      "a450"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      15
+     ],
+     "size": [
+      240,
+      65
+     ],
+     "area": 15600,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Right wall",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "4688",
+     "type": "line",
+     "a": [
+      0,
+      15
+     ],
+     "b": [
+      240,
+      15
+     ],
+     "ends": [
+      "f629",
+      "02c4"
+     ]
+    },
+    {
+     "ref": "2010",
+     "type": "line",
+     "a": [
+      240,
+      15
+     ],
+     "b": [
+      240,
+      80
+     ],
+     "ends": [
+      "d8d3",
+      "cf43"
+     ]
+    },
+    {
+     "ref": "380e",
+     "type": "line",
+     "a": [
+      240,
+      80
+     ],
+     "b": [
+      0,
+      80
+     ],
+     "ends": [
+      "4740",
+      "5707"
+     ]
+    },
+    {
+     "ref": "66f6",
+     "type": "line",
+     "a": [
+      0,
+      80
+     ],
+     "b": [
+      0,
+      15
+     ],
+     "ends": [
+      "610b",
+      "c682"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      15
+     ],
+     "size": [
+      240,
+      65
+     ],
+     "area": 15600,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Front wall",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "b815",
+     "type": "line",
+     "a": [
+      15,
+      15
+     ],
+     "b": [
+      405,
+      15
+     ],
+     "ends": [
+      "f1ce",
+      "152b"
+     ]
+    },
+    {
+     "ref": "e291",
+     "type": "line",
+     "a": [
+      405,
+      15
+     ],
+     "b": [
+      405,
+      80
+     ],
+     "ends": [
+      "8286",
+      "15de"
+     ]
+    },
+    {
+     "ref": "b45a",
+     "type": "line",
+     "a": [
+      405,
+      80
+     ],
+     "b": [
+      15,
+      80
+     ],
+     "ends": [
+      "19dc",
+      "56ad"
+     ]
+    },
+    {
+     "ref": "0e60",
+     "type": "line",
+     "a": [
+      15,
+      80
+     ],
+     "b": [
+      15,
+      15
+     ],
+     "ends": [
+      "11d1",
+      "b325"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      15,
+      15
+     ],
+     "size": [
+      390,
+      65
+     ],
+     "area": 25350,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Back wall",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "0e99",
+     "type": "line",
+     "a": [
+      15,
+      15
+     ],
+     "b": [
+      405,
+      15
+     ],
+     "ends": [
+      "7e35",
+      "7de1"
+     ]
+    },
+    {
+     "ref": "2471",
+     "type": "line",
+     "a": [
+      405,
+      15
+     ],
+     "b": [
+      405,
+      80
+     ],
+     "ends": [
+      "3ab6",
+      "7696"
+     ]
+    },
+    {
+     "ref": "db0a",
+     "type": "line",
+     "a": [
+      405,
+      80
+     ],
+     "b": [
+      15,
+      80
+     ],
+     "ends": [
+      "23c0",
+      "d825"
+     ]
+    },
+    {
+     "ref": "0997",
+     "type": "line",
+     "a": [
+      15,
+      80
+     ],
+     "b": [
+      15,
+      15
+     ],
+     "ends": [
+      "3fa1",
+      "0bec"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      15,
+      15
+     ],
+     "size": [
+      390,
+      65
+     ],
+     "area": 25350,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Divider",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "6934",
+     "type": "line",
+     "a": [
+      15,
+      11
+     ],
+     "b": [
+      225,
+      11
+     ],
+     "ends": [
+      "6255",
+      "6ea8"
+     ]
+    },
+    {
+     "ref": "ba31",
+     "type": "line",
+     "a": [
+      225,
+      11
+     ],
+     "b": [
+      225,
+      80
+     ],
+     "ends": [
+      "1223",
+      "e0d9"
+     ]
+    },
+    {
+     "ref": "dc0f",
+     "type": "line",
+     "a": [
+      225,
+      80
+     ],
+     "b": [
+      15,
+      80
+     ],
+     "ends": [
+      "4457",
+      "fa63"
+     ]
+    },
+    {
+     "ref": "34f2",
+     "type": "line",
+     "a": [
+      15,
+      80
+     ],
+     "b": [
+      15,
+      11
+     ],
+     "ends": [
+      "85e0",
+      "cd72"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      15,
+      11
+     ],
+     "size": [
+      210,
+      69
+     ],
+     "area": 14490,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Base",
+   "thickness": 15,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     420,
+     240
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Divider",
+     "side": "top",
+     "from": 0,
+     "to": 4,
+     "through": false,
+     "at": [
+      85.5,
+      15
+     ],
+     "size": [
+      15,
+      210
+     ]
+    },
+    {
+     "ref": "Divider 2",
+     "side": "top",
+     "from": 0,
+     "to": 4,
+     "through": false,
+     "at": [
+      163.5,
+      15
+     ],
+     "size": [
+      15,
+      210
+     ]
+    },
+    {
+     "ref": "Divider 3",
+     "side": "top",
+     "from": 0,
+     "to": 4,
+     "through": false,
+     "at": [
+      241.5,
+      15
+     ],
+     "size": [
+      15,
+      210
+     ]
+    },
+    {
+     "ref": "Divider 4",
+     "side": "top",
+     "from": 0,
+     "to": 4,
+     "through": false,
+     "at": [
+      319.5,
+      15
+     ],
+     "size": [
+      15,
+      210
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 24.9,
+    "operations": [
+     {
+      "label": "4 pockets 4 deep",
+      "depth": 4,
+      "steps": 3
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 15.3,
+      "steps": 10
+     }
+    ],
+    "warnings": [
+     "Base: pocket z=11: 8.7mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      15
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge fdc0",
+     "looks": "-y",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 16d9",
+     "looks": "+x",
+     "origin": [
+      420,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge d2fd",
+     "looks": "+y",
+     "origin": [
+      420,
+      240,
+      0
+     ]
+    },
+    {
+     "face": "edge e829",
+     "looks": "-x",
+     "origin": [
+      0,
+      240,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Left wall",
+   "thickness": 15,
+   "outline": {
+    "at": [
+     0,
+     15
+    ],
+    "size": [
+     240,
+     65
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 4.6,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 15.3,
+      "steps": 10
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      15,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge d357",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      15
+     ]
+    },
+    {
+     "face": "edge 3cf2",
+     "looks": "+y",
+     "origin": [
+      0,
+      240,
+      15
+     ]
+    },
+    {
+     "face": "edge 9576",
+     "looks": "+z",
+     "origin": [
+      0,
+      240,
+      80
+     ]
+    },
+    {
+     "face": "edge 98ab",
+     "looks": "-y",
+     "origin": [
+      0,
+      0,
+      80
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Right wall",
+   "thickness": 15,
+   "outline": {
+    "at": [
+     0,
+     15
+    ],
+    "size": [
+     240,
+     65
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 4.6,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 15.3,
+      "steps": 10
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      420,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      405,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 4688",
+     "looks": "-z",
+     "origin": [
+      405,
+      0,
+      15
+     ]
+    },
+    {
+     "face": "edge 2010",
+     "looks": "+y",
+     "origin": [
+      405,
+      240,
+      15
+     ]
+    },
+    {
+     "face": "edge 380e",
+     "looks": "+z",
+     "origin": [
+      405,
+      240,
+      80
+     ]
+    },
+    {
+     "face": "edge 66f6",
+     "looks": "-y",
+     "origin": [
+      405,
+      0,
+      80
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Front wall",
+   "thickness": 15,
+   "outline": {
+    "at": [
+     15,
+     15
+    ],
+    "size": [
+     390,
+     65
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 6.5,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 15.3,
+      "steps": 10
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      15,
+      0
+     ]
+    },
+    {
+     "face": "edge b815",
+     "looks": "-z",
+     "origin": [
+      15,
+      15,
+      15
+     ]
+    },
+    {
+     "face": "edge e291",
+     "looks": "+x",
+     "origin": [
+      405,
+      15,
+      15
+     ]
+    },
+    {
+     "face": "edge b45a",
+     "looks": "+z",
+     "origin": [
+      405,
+      15,
+      80
+     ]
+    },
+    {
+     "face": "edge 0e60",
+     "looks": "-x",
+     "origin": [
+      15,
+      15,
+      80
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Back wall",
+   "thickness": 15,
+   "outline": {
+    "at": [
+     15,
+     15
+    ],
+    "size": [
+     390,
+     65
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 6.5,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 15.3,
+      "steps": 10
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      225,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      240,
+      0
+     ]
+    },
+    {
+     "face": "edge 0e99",
+     "looks": "-z",
+     "origin": [
+      15,
+      240,
+      15
+     ]
+    },
+    {
+     "face": "edge 2471",
+     "looks": "+x",
+     "origin": [
+      405,
+      240,
+      15
+     ]
+    },
+    {
+     "face": "edge db0a",
+     "looks": "+z",
+     "origin": [
+      405,
+      240,
+      80
+     ]
+    },
+    {
+     "face": "edge 0997",
+     "looks": "-x",
+     "origin": [
+      15,
+      240,
+      80
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Divider",
+   "thickness": 15,
+   "outline": {
+    "at": [
+     15,
+     11
+    ],
+    "size": [
+     210,
+     69
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "pieces": {
+    "names": [
+     "Divider",
+     "Divider 2",
+     "Divider 3",
+     "Divider 4"
+    ],
+    "mirrored": []
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 4.3,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 15.3,
+      "steps": 10
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      100.5,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      85.5,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 6934",
+     "looks": "-z",
+     "origin": [
+      85.5,
+      15,
+      11
+     ]
+    },
+    {
+     "face": "edge ba31",
+     "looks": "+y",
+     "origin": [
+      85.5,
+      225,
+      11
+     ]
+    },
+    {
+     "face": "edge dc0f",
+     "looks": "+z",
+     "origin": [
+      85.5,
+      225,
+      80
+     ]
+    },
+    {
+     "face": "edge 34f2",
+     "looks": "-y",
+     "origin": [
+      85.5,
+      15,
+      80
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Base",
+    "at": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     420,
+     240,
+     15
+    ]
+   },
+   {
+    "name": "Left wall",
+    "at": [
+     0,
+     0,
+     15
+    ],
+    "size": [
+     15,
+     240,
+     65
+    ]
+   },
+   {
+    "name": "Right wall",
+    "at": [
+     405,
+     0,
+     15
+    ],
+    "size": [
+     15,
+     240,
+     65
+    ]
+   },
+   {
+    "name": "Front wall",
+    "at": [
+     15,
+     0,
+     15
+    ],
+    "size": [
+     390,
+     15,
+     65
+    ]
+   },
+   {
+    "name": "Back wall",
+    "at": [
+     15,
+     225,
+     15
+    ],
+    "size": [
+     390,
+     15,
+     65
+    ]
+   },
+   {
+    "name": "Divider",
+    "at": [
+     85.5,
+     15,
+     11
+    ],
+    "size": [
+     15,
+     210,
+     69
+    ]
+   },
+   {
+    "name": "Divider 2",
+    "at": [
+     163.5,
+     15,
+     11
+    ],
+    "size": [
+     15,
+     210,
+     69
+    ]
+   },
+   {
+    "name": "Divider 3",
+    "at": [
+     241.5,
+     15,
+     11
+    ],
+    "size": [
+     15,
+     210,
+     69
+    ]
+   },
+   {
+    "name": "Divider 4",
+    "at": [
+     319.5,
+     15,
+     11
+    ],
+    "size": [
+     15,
+     210,
+     69
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 15,
+   "sides": 1,
+   "size": [
+    653.4,
+    469.4
+   ],
+   "yield": 0.785,
+   "parts": [
+    {
+     "name": "Base",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      420,
+      240
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Left wall",
+     "at": [
+      406.7,
+      322.7
+     ],
+     "size": [
+      240,
+      65
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Right wall",
+     "at": [
+      406.7,
+      397.7
+     ],
+     "size": [
+      240,
+      65
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Front wall",
+     "at": [
+      6.7,
+      256.7
+     ],
+     "size": [
+      390,
+      65
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Back wall",
+     "at": [
+      6.7,
+      331.7
+     ],
+     "size": [
+      390,
+      65
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Divider",
+     "at": [
+      436.7,
+      6.7
+     ],
+     "size": [
+      210,
+      69
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Divider 2",
+     "at": [
+      436.7,
+      85.7
+     ],
+     "size": [
+      210,
+      69
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Divider 3",
+     "at": [
+      436.7,
+      164.7
+     ],
+     "size": [
+      210,
+      69
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Divider 4",
+     "at": [
+      436.7,
+      243.7
+     ],
+     "size": [
+      210,
+      69
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Base",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Left wall",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Right wall",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Front wall",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Back wall",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Divider",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Divider 2",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Divider 3",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Divider 4",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 64.3,
+   "operations": [
+    {
+     "label": "4 pockets 4 deep",
+     "depth": 4,
+     "steps": 3
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 15.3,
+     "steps": 10
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 15.3,
+     "steps": 10
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 15.3,
+     "steps": 10
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 15.3,
+     "steps": 10
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 15.3,
+     "steps": 10
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 15.3,
+     "steps": 10
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 15.3,
+     "steps": 10
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 15.3,
+     "steps": 10
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 15.3,
+     "steps": 10
+    }
+   ],
+   "warnings": [
+    "Base: pocket z=11: 8.7mm² left in corners/narrow spots with D=3.175"
+   ],
+   "blocked": []
+  }
+ ]
+}

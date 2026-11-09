@@ -36,6 +36,8 @@ This uses the existing behavior-spec runner and a real browser. The complete-cab
 
 The browser checks interface and document effects. Reading a saved offset or thickness does not establish correct geometry; the core and mesh gates remain separate. Browser artifacts are in `apps/camNC/test-results/spec/all/`.
 
+The saved `divided-tray-copy-tools.json` diagnostic keeps a complete tray while the `studio/tray/selected-copy-tool` scenario selects its third divider through the Parts list, moves the stack, grows the pattern, reloads and restores family selection. Reduced browser tests cover viewport picks, exact highlighting and selecting a copy before opening Cut parts. These checks retain physical copy identity; they do not establish the tray's complete geometry or reference equivalence. Copy-only targets and consuming one copy remain unsupported and are explicitly refused.
+
 Use the existing interactive session or render command to investigate a failure instead of repeating a long scenario manually; see [behavior specs](../apps/camNC/e2e/spec/README.md).
 
 ## Agent procedure

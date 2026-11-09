@@ -1,0 +1,192 @@
+[
+  {
+    "id": "studio/tray/selected-copy-tool",
+    "title": "A complete divided tray keeps the exact third divider as its floor-cut tool through movement, growth and reload",
+    "evidence": "design physical-copy tool selection regression; real list/dialog controls and saved source identity",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/divided-tray-copy-tools.json",
+      "closesketch",
+      "checkpoint initial",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 9,
+            "partIssues": [],
+            "copies": {
+              "Divider": 3
+            }
+          }
+        }
+      },
+      "feature Cut Base with Divider",
+      "dialogremove Tools = Divider",
+      "dialogfocus Tools",
+      "selectpart Divider 3",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": [
+                "Divider 3"
+              ],
+              "Targets": [
+                "Base"
+              ]
+            }
+          }
+        }
+      },
+      "dialogcancel",
+      {
+        "expect": {
+          "studio": {
+            "unchangedSince": "initial",
+            "dialog": null
+          }
+        }
+      },
+      "feature Cut Base with Divider",
+      "dialogremove Tools = Divider",
+      "dialogfocus Tools",
+      "selectpart Divider 3",
+      "dialogconfirm",
+      "checkpoint selected",
+      {
+        "expect": {
+          "studio": {
+            "retainedIdsSince": "initial",
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider 3"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "feature Cut Base with Divider 3",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": [
+                "Divider 3"
+              ],
+              "Targets": [
+                "Base"
+              ]
+            }
+          }
+        }
+      },
+      "dialogcancel",
+      "feature #shift",
+      "dialogfill Value = 10mm",
+      "dialogconfirm",
+      "feature #dividers",
+      "dialogfill Value = 5",
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 10,
+            "retainedIdsSince": "selected",
+            "addedCopyIdsSince": {
+              "checkpoint": "selected",
+              "part": "Divider",
+              "count": 1
+            },
+            "samePatternIdsSince": "selected",
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider 3"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "reload",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 10,
+            "retainedIdsSince": "selected",
+            "variables": {
+              "shift": "10mm",
+              "dividers": "5"
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider 3"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "feature Cut Base with Divider 3",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": [
+                "Divider 3"
+              ],
+              "Targets": [
+                "Base"
+              ]
+            }
+          }
+        }
+      },
+      "dialogremove Tools = Divider 3",
+      "dialogfocus Tools",
+      "selectpart Divider",
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 10,
+            "retainedIdsSince": "selected",
+            "partIssues": [],
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+]
