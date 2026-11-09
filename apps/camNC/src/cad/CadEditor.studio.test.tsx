@@ -1424,14 +1424,16 @@ it('shows the parts built before a sketch behind it, seen straight at its plane 
   for (const dx of [20, 40, 60]) pointer('pointermove', dx, 2);
   pointer('pointerup', 60, 0);
   await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(true));
-  expect(canvas.style.transform).toMatch(/^matrix\(/);
+  // The drawing turns inside the canvas, so its lines keep their width.
+  expect(screen.getByTestId('cad-drawing').getAttribute('transform')).toMatch(/matrix\(/);
+  expect(canvas.style.transform).toBe('');
   expect(screen.queryByRole('menu')).toBeNull();
   // n looks straight at the plane again, and once more, at its other side.
   canvas.focus();
   await userEvent.keyboard('n');
   await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(false));
   await userEvent.keyboard('n');
-  await waitFor(() => expect(canvas.style.transform).toBe('matrix(-1, 0, 0, 1, 0, 0)'));
+  await waitFor(() => expect(screen.getByTestId('cad-drawing').getAttribute('transform')).toMatch(/matrix\(-1 0 0 1 0 0\)/));
   // Seen from behind, a middle drag to the right still carries the drawing to the right.
   const viewX = () => Number(canvas.getAttribute('viewBox')!.split(' ')[0]);
   const x0 = viewX();
