@@ -4161,10 +4161,11 @@ export function CadEditor({
   const featureShown = useCallback(
     (id: string) => {
       if (id in featureVisibility) return featureVisibility[id]!;
-      const sketched = id.endsWith(':sketch') && doc.parts.find(candidate => `${candidate.id}:sketch` === id);
+      // As the design is shown: rolled back to its sketch, a part isn't extruded yet, so its sketch shows.
+      const sketched = id.endsWith(':sketch') && shownDocument.parts.find(candidate => `${candidate.id}:sketch` === id);
       return !sketched || !isCadPart(sketched);
     },
-    [featureVisibility, doc]
+    [featureVisibility, shownDocument]
   );
   const partsPanel = (
     <>

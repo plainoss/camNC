@@ -71,19 +71,26 @@ const regionArea = (region: Pick<CadSketchRegion, 'points' | 'holes'>) =>
 
 type Point = { x: number; y: number };
 
-/** A point in a region's area: inside its outline and outside its holes. */
+/**
+ * A point in a region's area: inside its outline and outside its holes. Just inside the middle of one of its outline's
+ * edges is in its area however narrow it is, as a thin ring's is.
+ */
 function areaPoint(region: CadSketchRegion): Point | null {
   const outline = polygonArea(region.points) > 0 ? region.points : [...region.points].reverse();
+  const inArea = (point: Point) => pointInPolygon(point, outline) && !region.holes.some(hole => pointInPolygon(point, hole));
   for (let i = 0; i < outline.length; i++) {
     const a = outline[i]!,
-      b = outline[(i + 1) % outline.length]!,
-      c = outline[(i + 2) % outline.length]!;
-    for (const t of [1 / 3, 0.1, 0.02]) {
-      const point = { x: b.x + (a.x + c.x - 2 * b.x) * t, y: b.y + (a.y + c.y - 2 * b.y) * t };
-      if (pointInPolygon(point, outline) && !region.holes.some(hole => pointInPolygon(point, hole))) return point;
+      b = outline[(i + 1) % outline.length]!;
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length < 1e-9) continue;
+    // Counterclockwise, the inside is to the left of each edge.
+    for (const step of [1e-3, 1e-4]) {
+      const point = { x: (a.x + b.x) / 2 - ((b.y - a.y) / length) * step, y: (a.y + b.y) / 2 + ((b.x - a.x) / length) * step };
+      if (inArea(point)) return point;
     }
   }
-  return regionInteriorPoint(outline);
+  const fallback = regionInteriorPoint(outline);
+  return fallback && inArea(fallback) ? fallback : null;
 }
 
 /**

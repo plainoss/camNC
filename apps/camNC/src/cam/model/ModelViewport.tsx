@@ -91,14 +91,15 @@ function Region({ region, model, onPick }: { region: ViewRegion; model: THREE.Ma
   );
 }
 
-const kPlane = '#d08a3c';
+// Planes are a pale blue, and turn orange when hovered or picked.
+const kPlane = '#7aa6d8';
 /** A finished sketch's curve in the model, by the sketch's part. */
 export interface SketchLine {
   partId: string;
   points: [number, number, number][];
 }
 const kNoLines: SketchLine[] = [];
-const kPlaneHighlight = '#2f80ed';
+const kPlaneHighlight = '#f0a020';
 
 function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number; model: THREE.Matrix4; onPick?: () => void }) {
   const [hovered, setHovered] = useState(false);
@@ -137,7 +138,7 @@ function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number;
       <meshBasicMaterial
         color={color}
         transparent
-        opacity={plane.highlighted ? 0.22 : 0.1}
+        opacity={plane.highlighted ? 0.2 : 0.07}
         side={THREE.DoubleSide}
         depthWrite={false}
         polygonOffset
@@ -226,6 +227,7 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
   const camera = useThree(s => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree(s => s.controls) as OrbitControlsImpl | null;
   const aspect = useThree(s => s.size.width / s.size.height);
+  const invalidate = useThree(s => s.invalidate);
   const fitted = useRef<{ key?: string; seq?: number; controls: OrbitControlsImpl | null } | null>(null);
   useEffect(() => {
     // Nothing to see yet, or no size to see it at.
@@ -282,7 +284,9 @@ export function FitCamera({ box, fitKey, viewRequest }: { box: THREE.Box3; fitKe
       controls.target.copy(center);
       controls.update();
     }
-  }, [box, camera, controls, aspect, fitKey, viewRequest]);
+    // The view draws only when something changes, and moving the camera is a change.
+    invalidate();
+  }, [box, camera, controls, aspect, fitKey, viewRequest, invalidate]);
   return null;
 }
 
@@ -304,6 +308,7 @@ export interface SketchView {
 function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 }) {
   const set = useThree(s => s.set);
   const size = useThree(s => s.size);
+  const invalidate = useThree(s => s.invalidate);
   const camera = useMemo(() => new THREE.OrthographicCamera(), []);
   useEffect(() => {
     set({ camera });
@@ -330,7 +335,8 @@ function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 
     camera.near = 1;
     camera.far = reach * 2;
     camera.updateProjectionMatrix();
-  }, [camera, view, model, size]);
+    invalidate();
+  }, [camera, view, model, size, invalidate]);
   return null;
 }
 
@@ -476,6 +482,8 @@ export function ModelViewport({
   };
   return (
     <Canvas
+      // Drawn when something changes, not every frame, so an idle view costs nothing.
+      frameloop="demand"
       camera={{ fov: 30 }}
       dpr={[1, 2]}
       onPointerLeave={() => onHover?.(null)}

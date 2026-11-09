@@ -113,4 +113,15 @@ describe('regions put together', () => {
     expect(groups.map(group => group.regionIds)).toEqual([[outer.id], [inner.id]]);
     expect(groups[0]!.holes).toHaveLength(1);
   });
+
+  it('puts a narrow ring together with the region beside it', () => {
+    const part = createCadPart('Frame', 18);
+    part.sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 100, height: 100 });
+    part.sketch = addRectangle(part.sketch, { x: 1, y: 1, width: 98, height: 98 });
+    part.sketch = addRectangle(part.sketch, { x: 100, y: 0, width: 50, height: 100 });
+    const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE);
+    const ring = regions.find(region => region.holes.length === 1)!;
+    const beside = regions.find(region => Math.abs(Math.abs(polygonArea(region.points)) - 5000) < 1e-6)!;
+    expect(regionGroups([ring, beside]).map(group => group.regionIds.length)).toEqual([2]);
+  });
 });
