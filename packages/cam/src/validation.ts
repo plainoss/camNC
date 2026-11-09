@@ -86,7 +86,6 @@ export function validateCamSettings(settings: CamSettings): void {
     'profileStepdown',
     'profileFinishStepdown',
     'pocketFinishStepdown',
-    'profileLeadRadius',
     'rampFeed',
     'leadFeed',
     'leadOutFeed',
@@ -94,15 +93,12 @@ export function validateCamSettings(settings: CamSettings): void {
     'reducedFeed',
     'transitionFeed',
     'spindleRpm',
-    'minimumRoughingRadius',
     'maxPlanarRemovalRate',
     'minimumCuttingFeed',
   ] as const)
     if (settings[key] !== undefined) positiveValue(key, settings[key]);
   if (settings.minimumCuttingFeed !== undefined && settings.minimumCuttingFeed < 0.001)
     fail('minimumCuttingFeed', 'must be representable at the posted feed precision');
-  if (settings.pocketStrategy !== undefined && !['offset', 'controlled'].includes(settings.pocketStrategy))
-    fail('pocketStrategy', 'must be offset or controlled');
   if (settings.sourceTolerance !== undefined) nonnegative('sourceTolerance', settings.sourceTolerance);
   try {
     planAccuracy(settings.geometryTolerance, settings.sourceTolerance);
@@ -117,16 +113,8 @@ export function validateCamSettings(settings: CamSettings): void {
       fail('stepoverFactor', 'must produce at least 0.001 mm between passes');
   for (const key of ['leaveStock', 'pocketWallAllowance', 'innerCornerRadius'] as const) nonnegative(key, settings[key]);
   if (settings.openWallAllowance !== undefined) nonnegative('openWallAllowance', settings.openWallAllowance);
-  if (settings.pocketFloorAllowance !== undefined) nonnegative('pocketFloorAllowance', settings.pocketFloorAllowance);
-  if (settings.profileVerticalLeadRadius !== undefined) nonnegative('profileVerticalLeadRadius', settings.profileVerticalLeadRadius);
-  if (settings.profileVerticalExitRadius !== undefined) nonnegative('profileVerticalExitRadius', settings.profileVerticalExitRadius);
-  for (const field of ['profileSpringPasses', 'pocketSpringPasses'] as const)
-    if (settings[field] !== undefined && (!Number.isInteger(settings[field]) || settings[field]! < 0 || settings[field]! > 5))
-      fail(field, 'must be an integer from 0 to 5');
-  if (settings.circularFinishFeed !== undefined && typeof settings.circularFinishFeed !== 'boolean')
-    fail('circularFinishFeed', 'must be true or false');
-  if (settings.profileEntry !== undefined && !['plunge', 'ramp', 'tangent'].includes(settings.profileEntry))
-    fail('profileEntry', 'must be plunge, ramp, or tangent');
+  if (settings.profileEntry !== undefined && !['plunge', 'ramp'].includes(settings.profileEntry))
+    fail('profileEntry', 'must be plunge or ramp');
   if (settings.cornerFeed) {
     for (const key of ['factor', 'minAngleDeg', 'maxRadius', 'distance'] as const)
       positiveValue(`cornerFeed.${key}`, settings.cornerFeed[key]);
@@ -141,7 +129,6 @@ export function validateCamSettings(settings: CamSettings): void {
   if (settings.tabs) {
     for (const key of ['height', 'width', 'spacing', 'minCount'] as const) positiveValue(`tabs.${key}`, settings.tabs[key]);
     if (!Number.isInteger(settings.tabs.minCount)) fail('tabs.minCount', 'must be an integer');
-    if (settings.tabs.rampLength !== undefined) nonnegative('tabs.rampLength', settings.tabs.rampLength);
     settings.tabs.centers?.forEach((point, i) => {
       finiteValue(`tabs.centers[${i}].x`, point.x);
       finiteValue(`tabs.centers[${i}].y`, point.y);

@@ -14,33 +14,16 @@ export function repeatTabIntervals(intervals: (readonly [number, number])[], per
   return out;
 }
 
-/** Ramped shoulders add to the plateau width, preserving the requested holding material. */
+/** Raise the pass to the tab height over each interval, with vertical steps at the tab borders. */
 export function applyTabMotion<T extends MotionPath>(
   pass: T,
   intervals: (readonly [number, number])[],
   tabZ: number,
-  plungeFeed: number,
-  rampLength = 0
+  plungeFeed: number
 ): T & { roles: MotionRole[] } {
   const inside = (s: number) => intervals.some(([a, b]) => s > a && s < b);
-  const fraction = (s: number) =>
-    intervals.reduce(
-      (f, [a, b]) =>
-        Math.max(
-          f,
-          s >= a && s <= b
-            ? 1
-            : rampLength > 0 && s > a - rampLength && s < a
-              ? (s - a + rampLength) / rampLength
-              : rampLength > 0 && s > b && s < b + rampLength
-                ? (b + rampLength - s) / rampLength
-                : 0
-        ),
-      0
-    );
-  const height = (base: number, s: number) => base + Math.max(0, tabZ - base) * fraction(s);
   const first = [...pass.pts[0]] as Vec3;
-  first[2] = rampLength > 0 ? height(first[2], 0) : inside(1e-7) ? Math.max(first[2], tabZ) : first[2];
+  if (inside(1e-7)) first[2] = Math.max(first[2], tabZ);
   const pts: Vec3[] = [first],
     feeds = [pass.feeds[0]],
     roles: MotionRole[] = [pass.roles?.[0] ?? 'approach'];
@@ -55,25 +38,17 @@ export function applyTabMotion<T extends MotionPath>(
     const a = pass.pts[i - 1],
       b = pass.pts[i],
       len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const boundaries = intervals.flatMap(([start, end]) =>
-      rampLength > 0 ? [start - rampLength, start, end, end + rampLength] : [start, end]
-    );
+    const boundaries = intervals.flatMap(([start, end]) => [start, end]);
     const cuts = [...new Set(boundaries.filter(s => s > along + 1e-8 && s <= along + len + 1e-8))].sort((x, y) => x - y);
     if (!cuts.length || Math.abs(cuts.at(-1)! - (along + len)) > 1e-8) cuts.push(along + len);
     for (const s of cuts) {
       const t = len > 1e-8 ? (s - along) / len : 1;
       const p = Math.abs(s - (along + len)) < 1e-8 ? ([...b] as Vec3) : (a.map((v, axis) => v + t * (b[axis] - v)) as Vec3);
       const baseRole = pass.roles?.[i] ?? (b[2] < a[2] - 1e-8 ? (len > 1e-8 ? 'ramp' : 'plunge') : 'cut');
-      if (rampLength > 0) {
-        const raised = height(p[2], s);
-        const previous = pts.at(-1)!;
-        append([p[0], p[1], raised], pass.feeds[i], raised > p[2] + 1e-8 || previous[2] > a[2] + 1e-8 ? 'tab' : baseRole);
-      } else {
-        const before = inside(s - 1e-7) ? Math.max(p[2], tabZ) : p[2];
-        const after = inside(s + 1e-7) ? Math.max(p[2], tabZ) : p[2];
-        append([p[0], p[1], before], pass.feeds[i], before > p[2] + 1e-8 ? 'tab' : baseRole);
-        if (Math.abs(after - before) > 1e-8) append([p[0], p[1], after], pass.feeds[i], 'tab');
-      }
+      const before = inside(s - 1e-7) ? Math.max(p[2], tabZ) : p[2];
+      const after = inside(s + 1e-7) ? Math.max(p[2], tabZ) : p[2];
+      append([p[0], p[1], before], pass.feeds[i], before > p[2] + 1e-8 ? 'tab' : baseRole);
+      if (Math.abs(after - before) > 1e-8) append([p[0], p[1], after], pass.feeds[i], 'tab');
     }
     along += len;
   }

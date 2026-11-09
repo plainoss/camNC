@@ -25,45 +25,6 @@ describe('integrated stock and geometry planning', () => {
     expect(() => camPart(machiningCases.rectangle(), { geometryTolerance: 0.001 })).toThrow(/geometryTolerance/);
   });
 
-  it('runs the controlled strategy through actual CAM with explicit cleanup, residual stock and a bounded planar rate', () => {
-    const cam = camPart(machiningPart(undefined, 10.5), {
-      cutThrough: false,
-      maxStepdown: 1.5,
-      pocketStrategy: 'controlled',
-      minimumRoughingRadius: 1,
-      maxPlanarRemovalRate: 1200,
-    });
-    const op = cam.operations[0];
-    expect(op.residualStock!.minimumTurnRadius).toBe(1);
-    expect(op.residualStock!.remaining.length).toBeGreaterThan(0);
-    expect(op.residualStock!.reachableArea).toBeLessThan(3);
-    expect(op.passes.some(pass => pass.phase === 'rough')).toBe(true);
-    expect(op.passes.some(pass => pass.phase === 'finish')).toBe(true);
-    expect(cam.warnings.some(warning => warning.includes('full-width entry'))).toBe(true);
-    expect(cam.stockSummary!.limitedSegments).toBeGreaterThan(0);
-    expect(cam.stockSummary!.maximumPlanarRemovalRate).toBeLessThanOrEqual(1200 + 1e-6);
-    expect(op.passes.every(pass => pass.roles?.length === pass.pts.length && pass.feeds.length === pass.pts.length)).toBe(true);
-    expect(checkGcodeSafety(toGcode(cam), { stockTop: 12, size: [100, 70], minZ: 10.5, toolRadius: 3.175 / 2 })).toEqual([]);
-  });
-
-  it('keeps the complete cutter out of the island through roughing and explicit cleanup', () => {
-    const features = machiningCases.island();
-    features.pockets[0].floorZ = 10.5;
-    const cam = camPart(features, { cutThrough: false, maxStepdown: 1.5, pocketStrategy: 'controlled', minimumRoughingRadius: 1 });
-    const radius = 3.175 / 2;
-    for (const pass of cam.operations[0].passes)
-      for (let i = 1; i < pass.pts.length; i++) {
-        const a = pass.pts[i - 1],
-          b = pass.pts[i];
-        for (const t of [0, 0.25, 0.5, 0.75, 1]) {
-          const x = a[0] + t * (b[0] - a[0]),
-            y = a[1] + t * (b[1] - a[1]);
-          const distance = Math.hypot(Math.max(38 - x, 0, x - 53), Math.max(28 - y, 0, y - 43));
-          expect(distance).toBeGreaterThanOrEqual(radius - 0.01);
-        }
-      }
-  });
-
   it('stores the actual rotated board blank and preserves metadata across physical-tool programs', () => {
     const angle = (17 * Math.PI) / 180;
     const board = camBoard(
@@ -98,28 +59,6 @@ describe('integrated stock and geometry planning', () => {
     const cam = camPart(machiningCases.rectangle(), { cutThrough: false, blankFootprint: blank });
     expect(cam.stockFootprint).toEqual(blank);
     expect(cam.stockFootprint).not.toBe(blank);
-    expect(() =>
-      camPart(machiningCases.rectangle(), { pocketStrategy: 'controlled', maxPlanarRemovalRate: 0.001, minimumCuttingFeed: 100 })
-    ).toThrow(/minimum/);
-  });
-
-  it('bounds controlled finishing depths and preserves diagnostics through floor-allowance planning', () => {
-    const cam = camPart(machiningPart([[rectangle(20, 20, 40, 32)]], 10.5), {
-      cutThrough: false,
-      maxStepdown: 1.5,
-      pocketStrategy: 'controlled',
-      minimumRoughingRadius: 1,
-      pocketFloorAllowance: 0.2,
-      pocketFinishStepdown: 0.4,
-    });
-    const op = cam.operations[0];
-    const levels = [
-      12,
-      ...new Set(op.passes.filter(pass => pass.phase === 'finish').map(pass => Math.min(...pass.pts.map(point => point[2])))),
-    ];
-    for (let i = 1; i < levels.length; i++) expect(levels[i - 1] - levels[i]).toBeLessThanOrEqual(0.4 + 1e-8);
-    expect(op.residualStock!.floorZ).toBe(10.5);
-    expect(op.warnings!.some(warning => warning.includes('full-width entry'))).toBe(true);
-    expect(cam.warnings.some(warning => warning.includes('full-width entry'))).toBe(true);
+    expect(() => camPart(machiningCases.rectangle(), { maxPlanarRemovalRate: 0.001, minimumCuttingFeed: 100 })).toThrow(/minimum/);
   });
 });

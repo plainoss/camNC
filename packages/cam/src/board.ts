@@ -1,6 +1,6 @@
 import { readGcode } from './analyze';
 import { toolProgramKey } from './toolIdentity';
-import { pocketOperationClashes, tangentEntryClashes } from './boardEntrySafety';
+import { pocketOperationClashes } from './boardEntrySafety';
 import { finalizePlan } from './finalizePlan';
 import { geometryTolerances } from './accuracy';
 import { openPocketRegion, type PartFeatures } from './features';
@@ -434,24 +434,6 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
       }),
     };
     let cam = camPart(part.features, requested, context);
-    if (requested.profileEntry === 'tangent') {
-      const neighbors = board.parts
-        .filter(other => other.id !== part.id)
-        .flatMap(other =>
-          other.features.footprint.map(loop =>
-            loop.map(q => {
-              const [x, y] = partToBoard(other, [q.x, q.y, 0]);
-              return { x, y };
-            })
-          )
-        );
-      const tolerance =
-        'geometryTolerance' in settings && typeof settings.geometryTolerance === 'number' ? settings.geometryTolerance : 0.05;
-      if (tangentEntryClashes(cam, neighbors, q => partToBoard(part, q), tolerance)) {
-        cam = camPart(part.features, { ...requested, profileEntry: 'ramp' }, context);
-        cam.warnings.push('Tangent profile lead intersects a neighboring part; using contour ramps');
-      }
-    }
     // The usual allowance fits the required gap; more can push the roughing path into a neighbor.
     if (
       (requested.leaveStock ?? 0) > (DEFAULT_SETTINGS.leaveStock ?? 0) &&
