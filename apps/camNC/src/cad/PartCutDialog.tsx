@@ -1,4 +1,4 @@
-import type { CadDocument, CadPartCut, CadValueScope } from '@wbcnc/cad';
+import { cadPartReferenceName, type CadDocument, type CadPartCut, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useRef, useState } from 'react';
 import { FeatureDialog } from './FeatureDialog';
 import { formatCadValue, parseCadValue } from './valueExpressions';
@@ -74,14 +74,24 @@ export function PartCutDialog({
   useEffect(() => {
     if (!pick || pick.seq === seen.current) return;
     seen.current = pick.seq;
+    // Core targets name a whole source family. A copy-only target would save a
+    // reference the evaluator cannot apply, or unexpectedly cut its siblings.
+    if (active === 'targets' && !document.parts.some(part => part.id === pick.partId)) {
+      return setError('Pick the original part as a target; targets include its copies.');
+    }
     if (active === 'tools') setTools(list => toggle(list, pick.partId));
     else setTargets(list => toggle(list, pick.partId));
     setError(null);
-  }, [pick, active]);
+  }, [pick, active, document.parts]);
   useEffect(() => onPicked?.({ tools, targets }), [tools, targets, onPicked]);
   const save = () => {
     if (!tools.length || !targets.length) return setError('Pick at least one part to cut out, and one to cut it from.');
-    if (tools.every(id => targets.every(target => target === id))) return setError('A part can’t be cut out of itself.');
+    if (targets.some(id => !document.parts.some(part => part.id === id)))
+      return setError('Pick the original part as a target; targets include its copies.');
+    if (tools.every(id => targets.every(target => target === id || id.startsWith(`${target}:`))))
+      return setError('A part can’t be cut out of itself.');
+    if (joint === 'none' && !keepTools && tools.some(id => !document.parts.some(part => part.id === id)))
+      return setError('Using up a single copy is not supported. Keep tools to cut with a copy.');
     const parsed = parseCadValue(text, { unit: 'mm', variables });
     if ('error' in parsed) return setError(parsed.error);
     if (parsed.value < 0) return setError('A clearance can’t be less than nothing.');
@@ -101,7 +111,7 @@ export function PartCutDialog({
       consumeTools: !split && !keepTools ? true : undefined,
     });
   };
-  const name = (id: string) => document.parts.find(part => part.id === id)?.name ?? 'a removed part';
+  const name = (id: string) => cadPartReferenceName(document, id) ?? 'a removed part';
   const box = (which: Box, label: string, chosen: string[], choose: (ids: string[]) => void) => (
     <div
       className="cad-feature-selection cad-part-cut-box"

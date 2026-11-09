@@ -1,4 +1,13 @@
-import { activeDesign, assemblyReport, evaluateCadDocument, isCadBody, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import {
+  activeDesign,
+  assemblyReport,
+  cadPartReferenceMatches,
+  evaluateCadDocument,
+  isCadBody,
+  partFaceAt,
+  type CadDocument,
+  type CadDrawnOn,
+} from '@wbcnc/cad';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ModelViewport,
@@ -33,6 +42,7 @@ export default function WorkspaceView({
   cameraState,
   document,
   selectedId,
+  selectedCopyId,
   onSelect,
   onHover,
   onOpen,
@@ -62,9 +72,10 @@ export default function WorkspaceView({
   cameraState?: StudioCameraRef;
   document: CadDocument;
   selectedId: string | null;
-  onSelect: (partId: string) => void;
+  selectedCopyId?: string;
+  onSelect: (partId: string, copyId?: string) => void;
   onHover?: (id: string | null) => void;
-  onOpen: (partId: string) => void;
+  onOpen: (partId: string, copyId?: string) => void;
   /** Starts a new part drawn on a base plane or a part's face. */
   /** A new part drawn on a plane or a face, or on one of the design's planes, offset from what it's on. */
   onNewPart?: (on: CadDrawnOn['on'], datum?: string) => void;
@@ -169,7 +180,13 @@ export default function WorkspaceView({
     onNewPart?.({ partId: part.id, face });
   };
   const selectedIndexes = model.instances.flatMap((instance, index) =>
-    (highlightIds ? highlightIds.includes(instance.partId) : instance.partId === selectedId) ? [index] : []
+    (
+      highlightIds
+        ? cadPartReferenceMatches(highlightIds, instance.partId, instance.copyId)
+        : instance.partId === selectedId && (selectedCopyId === undefined || instance.copyId === selectedCopyId)
+    )
+      ? [index]
+      : []
   );
   const status = notice
     ? notice
@@ -275,7 +292,8 @@ export default function WorkspaceView({
           } else onSelectPlane?.(id);
         }}
         onSelect={(_, index, pick) => {
-          const partId = model.instances[index]!.partId;
+          const instance = model.instances[index]!,
+            partId = instance.partId;
           if (onPickPoint) {
             if (!pick) return setNotice('Click a face of a part: its corners and middle snap.');
             setNotice(null);
@@ -291,12 +309,13 @@ export default function WorkspaceView({
           const found = pick && faceAt(pick);
           onSelectFace?.(found ? { partId: found.part.id, face: found.face } : null);
           const now = Date.now();
-          if (lastClick.current?.partId === partId && now - lastClick.current.at < kDoubleClickMs) {
+          const key = instanceKey(instance);
+          if (lastClick.current?.partId === key && now - lastClick.current.at < kDoubleClickMs) {
             lastClick.current = null;
-            return onOpen(partId);
+            return onOpen(partId, instance.copyId);
           }
-          lastClick.current = { partId, at: now };
-          onSelect(partId);
+          lastClick.current = { partId: key, at: now };
+          onSelect(partId, instance.copyId);
           frame.current?.focus();
         }}
       />

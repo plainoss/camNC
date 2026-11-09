@@ -1,6 +1,14 @@
 /** Source-document expectations shared by browser workflows and small adapter tests. */
 export function studioState(document) {
   if (!document) throw new Error('The studio has no saved design');
+  const referenceName = id => {
+    for (const part of document.parts) {
+      if (part.id === id) return part.name;
+      const index = (part.copies ?? []).findIndex(copy => `${part.id}:${copy.id}` === id);
+      if (index >= 0) return part.copies[index].name ?? `${part.name} ${index + 2}`;
+    }
+    return null;
+  };
   return {
     sourceParts: document.parts.map(part => part.name),
     variables: Object.fromEntries((document.variables ?? []).map(variable => [variable.name, variable.expression])),
@@ -19,8 +27,8 @@ export function studioState(document) {
     copyIds: Object.fromEntries(document.parts.map(part => [part.name, (part.copies ?? []).map(copy => copy.id)])),
     cutSettings: (document.partCuts ?? []).map(cut => ({
       clearance: cut.clearance, suppressed: !!cut.suppressed, keepTools: !cut.consumeTools,
-      tools: cut.tools.map(id => document.parts.find(part => part.id === id)?.name).sort(),
-      targets: cut.targets.map(id => document.parts.find(part => part.id === id)?.name).sort(),
+      tools: cut.tools.map(referenceName).sort(),
+      targets: cut.targets.map(referenceName).sort(),
     })),
   };
 }
@@ -45,6 +53,7 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
         else for (const [field, value] of Object.entries(fields)) equal(`${key}/${name}/${field}`, value, actual[key]?.[name]?.[field]);
       }
     } else if (key === 'cutSettings') equal(key, wanted, actual.cutSettings);
+    else if (key === 'dialogSelections') equal(key, wanted, actual.dialogSelections);
     else if (key === 'retainedIdsSince') {
       const before = checkpoints.get(wanted);
       if (!before) failures.push(`studio/${key}: unknown checkpoint ${wanted}`);

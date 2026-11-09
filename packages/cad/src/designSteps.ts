@@ -1,6 +1,7 @@
 import { resolveExtrudeSteps } from './extrudeSteps';
 import { cadFaceSketches, faceIsUnderside } from './featureModel';
 import { cadCopyName } from './partPatterns';
+import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import type { CadDocument, CadPart } from './types';
 
 /** One step of how the design is built, in the order it applies. */
@@ -32,8 +33,7 @@ function faceName(part: CadPart, on: ReturnType<typeof cadFaceSketches>[number][
   return on === 'underside' ? 'the underside' : 'the top';
 }
 
-const names = (document: CadDocument, ids: string[]) =>
-  ids.map(id => document.parts.find(part => part.id === id)?.name ?? 'a removed part').join(', ');
+const names = (document: CadDocument, ids: string[]) => ids.map(id => cadPartReferenceName(document, id) ?? 'a removed part').join(', ');
 
 /** What an extrude does: the thickness of a new part, the part it adds to, or how deep it removes. */
 function extrudeDetail(document: CadDocument, part: CadPart) {
@@ -103,7 +103,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
   const order = new Map(document.parts.map((part, index) => [part.id, index]));
   const after = new Map<number, DesignStep[]>();
   for (const step of document.partCuts ?? []) {
-    const last = Math.max(0, ...[...step.tools, ...step.targets].map(id => order.get(id) ?? 0));
+    const last = Math.max(0, ...[...step.tools, ...step.targets].map(id => order.get(cadPartReferenceOwner(document, id)?.id ?? id) ?? 0));
     after.set(last, [
       ...(after.get(last) ?? []),
       {
