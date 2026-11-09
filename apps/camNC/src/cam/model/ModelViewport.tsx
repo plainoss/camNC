@@ -371,6 +371,15 @@ export function ModelViewport({
     // Finished sketches are in view too, as a first one is before it has any part.
     for (const line of view === 'assembled' ? sketchLines : [])
       for (const point of line) fit.expandByPoint(new THREE.Vector3(...point).applyMatrix4(assembled));
+    // So are the regions to pick for an extrude, as when the sketch can't be a part as a whole.
+    for (const region of view === 'assembled' ? regions : [])
+      for (const point of region.outline)
+        fit.expandByPoint(
+          new THREE.Vector3(...region.frame.origin)
+            .addScaledVector(new THREE.Vector3(...region.frame.x), point.x)
+            .addScaledVector(new THREE.Vector3(...region.frame.y), point.y)
+            .applyMatrix4(assembled)
+        );
     if (!shownPlanes.length) return fit;
     // The planes are in view too, so a design with no parts yet still shows them.
     const corner = new THREE.Vector3();
@@ -389,7 +398,7 @@ export function ModelViewport({
     return fit;
     // The planes' identity changes with their highlight, which shouldn't move the camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meshes, matrices, shownPlanes.length, planeSize, assembled, sketchLines, view]);
+  }, [meshes, matrices, shownPlanes.length, planeSize, assembled, sketchLines, regions, view]);
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
     if (!e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.

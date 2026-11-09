@@ -22,7 +22,7 @@ export interface CadSketchRegionOptions {
   boundary?: { id: string; points: CadPoint[] };
 }
 /** A point strictly inside a simple counterclockwise polygon: the centre of its first triangle that lies inside. */
-function interiorPoint(points: CadPoint[]): CadPoint | null {
+export function regionInteriorPoint(points: CadPoint[]): CadPoint | null {
   for (let i = 0; i < points.length; i++) {
     const a = points[i]!,
       b = points[(i + 1) % points.length]!,
@@ -300,7 +300,7 @@ export function sketchRegions(sketch: CadSketch, tolerance = 0.01, options: CadS
   const named = faces
     .filter(face => {
       if (!options.boundary) return true;
-      const inside = interiorPoint(face.points);
+      const inside = regionInteriorPoint(face.points);
       return !!inside && pointInPolygon(inside, boundary);
     })
     .map(face => {

@@ -1,5 +1,7 @@
 import {
   addCircle,
+  addRectangle,
+  resolveExtrudeSteps,
   addPartCopy,
   addPartCut,
   setPartPattern,
@@ -89,5 +91,28 @@ describe('the design’s steps', () => {
     expect(atPattern.partCuts).toBeUndefined();
     // The last step shows everything.
     expect(rolledBackTo(document, document.partCuts![0]!.id)).toBe(document);
+  });
+
+  it('lists an extrude of a shared sketch without a sketch of its own, and a Remove as an extrude rather than as the board’s cut', () => {
+    const board = { ...createPlateDocument({ width: 200, height: 100, thickness: 18 }).parts[0]!, id: 'board', name: 'Board' };
+    const pocket = { ...createCadPart('Pocket', 18), id: 'pocket', drawnOn: { on: { partId: 'board', face: 'top' as const }, offset: 0 } };
+    pocket.sketch = addRectangle(pocket.sketch, { x: 50, y: 30, width: 40, height: 20 });
+    const again = { ...createCadPart('Plug', 12), id: 'plug', sketchOf: 'pocket', regions: [] };
+    const document = resolveExtrudeSteps({
+      ...createPlateDocument({ width: 1, height: 1 }),
+      parts: [board, { ...pocket, remove: { depth: 6 } }, again],
+    });
+    expect(designSteps(document).map(step => [step.kind, step.label, step.detail])).toEqual([
+      ['sketch', 'Sketch · Board', undefined],
+      ['extrude', 'Extrude · Board', '18 mm'],
+      ['sketch', 'Sketch · Pocket', undefined],
+      ['extrude', 'Extrude · Pocket', 'remove 6 mm'],
+      ['extrude', 'Extrude · Plug', '12 mm'],
+    ]);
+    // Rolled back before the Remove, the board isn't cut; at it, it is, and the later extrude is gone.
+    expect(rolledBackTo(document, 'board:extrude').parts.map(part => part.features ?? [])).toEqual([[]]);
+    const atRemove = rolledBackTo(document, 'pocket:extrude');
+    expect(atRemove.parts.map(part => part.id)).toEqual(['board', 'pocket']);
+    expect(atRemove.parts[0]!.features).toHaveLength(2);
   });
 });

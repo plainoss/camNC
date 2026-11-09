@@ -13,7 +13,7 @@ export * from './curveContacts';
 export * from './sketchRegions';
 export * from './featureModel';
 export * from './features';
-export * from './extrudeRemove';
+export * from './extrudeSteps';
 
 export * from './dimensions';
 export * from './dimensionPlacement';

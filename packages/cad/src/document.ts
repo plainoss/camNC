@@ -718,6 +718,16 @@ export function parseCadDocument(input: unknown): CadDocument {
       if (p.thin.depthExpression !== undefined && typeof p.thin.depthExpression !== 'string') throw new Error('Invalid thin extrude');
       if (p.thin.midPlane !== undefined && typeof p.thin.midPlane !== 'boolean') throw new Error('Invalid thin extrude');
     }
+    for (const regions of [p.regions, p.addedRegions])
+      if (regions !== undefined && (!Array.isArray(regions) || !regions.every(id => typeof id === 'string')))
+        throw new Error('Invalid CAD part regions');
+    if (p.sketchOf !== undefined) reference(p.sketchOf);
+    if (p.addTo !== undefined) reference(p.addTo);
+    if (p.remove !== undefined) {
+      if (!p.remove || typeof p.remove !== 'object') throw new Error('Invalid extrude remove');
+      if (p.remove.depth !== 'through') number(p.remove.depth);
+      if (p.remove.depthExpression !== undefined && typeof p.remove.depthExpression !== 'string') throw new Error('Invalid extrude remove');
+    }
     if (p.cornerRelief !== undefined) {
       if (!p.cornerRelief || typeof p.cornerRelief !== 'object') throw new Error('Invalid corner relief');
       number(p.cornerRelief.diameter);
@@ -769,7 +779,8 @@ export function parseCadDocument(input: unknown): CadDocument {
     }
     if (d.version === 1 && p.features !== undefined) throw new Error('Invalid CAD document');
     if (p.features !== undefined && !Array.isArray(p.features)) throw new Error('Invalid CAD features');
-    const sketches = [p.sketch];
+    // A shared sketch, and a Remove step's sketch on the board it cuts, are copies: their IDs are the original's.
+    const sketches = p.sketchOf ? [] : [p.sketch];
     for (const f of p.features ?? []) {
       if (!f || typeof f !== 'object') throw new Error('Invalid CAD feature');
       addId(f.id);
@@ -778,7 +789,8 @@ export function parseCadDocument(input: unknown): CadDocument {
           throw new Error('Invalid CAD feature');
         if (f.on !== 'top' && f.on !== 'underside' && (typeof f.on !== 'object' || !f.on)) throw new Error('Invalid CAD feature');
         if (typeof f.on === 'object') reference(f.on.floorOf);
-        sketches.push(f.sketch);
+        if (f.removedBy !== undefined) reference(f.removedBy);
+        else sketches.push(f.sketch);
       } else if (f.type === 'cut') {
         reference(f.sketchId);
         reference(f.regionId);

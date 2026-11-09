@@ -19,8 +19,8 @@ import type {
   EvaluatedCadPart,
 } from './types';
 
-/** Whether a part is one, rather than a sketch not yet extruded. */
-export const isCadPart = (part: CadPart): boolean => part.extrude !== false;
+/** Whether a part is one, rather than a sketch not yet extruded, or an extrude that adds to or cuts others. */
+export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !part.addTo && !part.remove;
 
 /** Features belong to the newer format, so an older build refuses the file instead of silently cutting without them. */
 export function withFeatureVersion(document: CadDocument): CadDocument {

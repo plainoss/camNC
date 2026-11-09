@@ -265,6 +265,24 @@ export interface CadPart {
    * loops inside it as holes.
    */
   regions?: string[];
+  /**
+   * Another part's or sketch feature's ID, whose sketch this one extrudes instead of its own, as the reference extrudes
+   * one sketch several times. Its `sketch` is a copy the design keeps in step with that one (`resolveExtrudeSteps`), so
+   * editing the sketch there carries through; it's never edited here.
+   */
+  sketchOf?: string;
+  /**
+   * Extrude → Add: the picked regions join this part, extruded from the same sketch, rather than making a part of
+   * their own. The step isn't a part itself.
+   */
+  addTo?: string;
+  /**
+   * Extrude → Remove: the picked regions, or every closed region but what's left of the face, are cut into the board
+   * the sketch is drawn on, this deep. The step isn't a part itself.
+   */
+  remove?: { depth: CadCutDepth; depthExpression?: string };
+  /** Regions Extrude → Add steps join to this part. The design writes it from those steps; it's never edited. */
+  addedRegions?: string[];
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
   placement?: CadPlacement;
   /** What the part was drawn on. When it's set, the placement follows from it, so the part moves with that face. */
@@ -349,6 +367,8 @@ export interface CadFaceSketch {
   id: string;
   on: CadFaceRef;
   sketch: CadSketch;
+  /** The Extrude → Remove step whose sketch this is, kept in step with it by the design. It's never edited here. */
+  removedBy?: string;
 }
 /** mm below the sketch's face. Zero leaves the region uncut, which is how an inner loop stops being a through-hole. */
 export type CadCutDepth = number | 'through';
@@ -363,6 +383,8 @@ export interface CadCut {
   depthExpression?: string;
   /** Switched off: the part evaluates as if the cut weren't there, and it keeps its depth for when it's back on. */
   suppressed?: boolean;
+  /** The Extrude → Remove step that makes this cut, kept in step with it by the design. */
+  removedBy?: string;
 }
 export type CadFeature = CadFaceSketch | CadCut;
 export interface CadDocument {

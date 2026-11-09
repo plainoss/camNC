@@ -1,6 +1,7 @@
 import { reconcileSlot } from './slot';
 import { slotPrimitives, slotArcRuleOverrides } from './slotConstraint';
 import { Algorithm, GcsWrapper, init_planegcs_module, SolveStatus, type ModuleStatic, type SketchPrimitive } from '@salusoft89/planegcs';
+import { resolveExtrudeSteps } from './extrudeSteps';
 import { sketchTargets } from './featureModel';
 import { evaluateCadDocument } from './features';
 import { validateCadDocument, CAD_GEOMETRY_TOLERANCE } from './geometry';
@@ -514,7 +515,7 @@ function supportsFirst(parts: CadPart[]): CadPart[] {
 
 export async function solveCadDocument(document: CadDocument, options: CadSolveOptions = {}): Promise<CadSolveResult> {
   // Values that use variables follow them before anything is solved.
-  const next = migrateDimensionPlacements(applyCadVariables(document));
+  let next = migrateDimensionPlacements(applyCadVariables(resolveExtrudeSteps(document)));
   for (const part of next.parts) {
     part.sketch = withSplineHandleSegments(part.sketch);
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);
@@ -1065,6 +1066,8 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
     const detail = error instanceof Error ? error.message : String(error);
     diagnostics.push({ code: 'solver-error', message: `Could not solve this sketch: ${detail}`, severity: 'error' });
   }
+  // Shared sketches, and what Add and Remove steps make, follow the sketches as solved.
+  next = resolveExtrudeSteps(next);
   if (diagnostics.some(d => d.severity === 'error')) {
     return {
       document: next,
