@@ -37,6 +37,11 @@ export interface CamJobV1 {
     partRevisions: Record<string, number>;
     /** Evaluated geometry content, independent of monotonic revision numbers and source annotations. */
     partGeometryKeys?: Record<string, string>;
+    /**
+     * Set when the design was accepted with parts cut only from below laid turned over, as CAM has done since. Jobs
+     * accepted before keep those parts the other way up until accepted again, so their cut sheets still match.
+     */
+    turnsUndersideUp?: true;
     /** Removed hole targets retain their choices for Undo, but never apply to another hole. */
     holeChoiceIssues?: import('./holeChoices').MissingHoleChoice[];
   };
@@ -313,7 +318,7 @@ export const modelKey = (job: CamJobV1) =>
   job.carving
     ? `${job.id}:carving`
     : job.design
-      ? `${job.id}:cad:${job.design.acceptedRevision}`
+      ? `${job.id}:cad:${job.design.acceptedRevision}${job.design.turnsUndersideUp ? ':turned' : ''}`
       : `${job.id}:${job.fileName}:${job.modelRevision ?? 0}`;
 
 /**
