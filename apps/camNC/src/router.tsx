@@ -4,6 +4,7 @@ import { routeTree } from './routeTree.gen';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DefaultLoadingOverlay } from './components/DefaultLoadingOverlay';
+import { trackAppState } from './lib/settled';
 
 /**
  * Hack for hydrating zustand, prefer using it from the context elsewhere.
@@ -33,6 +34,7 @@ export function createRouter() {
   //   queryClient
   // );
   // @snippet end example
+  trackAppState(router, queryClient);
 
   return router;
 }
