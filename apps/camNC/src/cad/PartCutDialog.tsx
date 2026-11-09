@@ -42,6 +42,7 @@ export function PartCutDialog({
     clearance: number;
     clearanceExpression?: string;
     split?: CadPartCut['split'];
+    consumeTools?: true;
   }) => void;
   onRemove?: () => void;
   onClose: () => void;
@@ -52,6 +53,8 @@ export function PartCutDialog({
   // A new step has its tool already, so the targets are picked next.
   const [active, setActive] = useState<Box>(step || !tool ? 'tools' : 'targets');
   const [text, setText] = useState(step ? (step.clearanceExpression ?? formatCadValue(step.clearance)) : (fit ?? kDefaultClearance));
+  // Kept, the tools stay parts of their own, as a tenon does; not kept, only the cut they make is left.
+  const [keepTools, setKeepTools] = useState(!step?.consumeTools);
   const [joint, setJoint] = useState<Joint>(step?.split === 'half' ? 'half' : step?.split ? 'fingers' : 'none');
   const [fingersText, setFingersText] = useState(
     step?.split && typeof step.split === 'object' ? (step.split.fingersExpression ?? String(step.split.fingers)) : '5'
@@ -89,7 +92,14 @@ export function PartCutDialog({
         : joint === 'fingers' && !('error' in fingers)
           ? { fingers: fingers.value, ...(fingers.expression && { fingersExpression: fingers.expression }) }
           : undefined;
-    onSave({ tools, targets, clearance: parsed.value, clearanceExpression: parsed.expression, split });
+    onSave({
+      tools,
+      targets,
+      clearance: parsed.value,
+      clearanceExpression: parsed.expression,
+      split,
+      ...(!keepTools && { consumeTools: true as const }),
+    });
   };
   const name = (id: string) => document.parts.find(part => part.id === id)?.name ?? 'a removed part';
   const box = (which: Box, label: string, chosen: string[], choose: (ids: string[]) => void) => (
@@ -143,6 +153,10 @@ export function PartCutDialog({
           onChange={event => setText(event.target.value)}
         />
         mm
+      </label>
+      <label>
+        <input type="checkbox" checked={keepTools} onChange={event => setKeepTools(event.target.checked)} />
+        Keep tools
       </label>
       <label>
         Joint

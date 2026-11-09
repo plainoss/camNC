@@ -17,6 +17,7 @@ export * from './directions';
 export * from './usedEdges';
 export * from './upTo';
 export * from './datumPlanes';
+export * from './consumedTools';
 export * from './suppression';
 export * from './extrudeSteps';
 
@@ -32,6 +33,7 @@ export * from './faceEdges';
 export * from './cutParts';
 export * from './partPatterns';
 export * from './stepReport';
+export * from './designSteps';
 export * from './assemblyCollisions';
 export * from './copies';
 export * from './cornerRelief';

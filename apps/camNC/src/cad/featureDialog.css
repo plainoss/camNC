@@ -22,6 +22,17 @@
   padding: 6px 6px 6px 10px;
   border-bottom: 1px solid #e3e8ef;
 }
+.cad-editor .cad-feature-dialog-head .cad-feature-final {
+  width: auto;
+  padding: 0 7px;
+  font-size: 11px;
+  color: #52647d;
+  background: #eef2f6;
+}
+.cad-editor .cad-feature-dialog-head .cad-feature-final[aria-pressed='true'] {
+  color: #fff;
+  background: #2762a8;
+}
 .cad-feature-dialog-head h3 {
   flex: 1;
   margin: 0;

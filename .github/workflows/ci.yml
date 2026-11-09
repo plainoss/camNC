@@ -6,8 +6,10 @@ on:
   push:
     branches:
       - main
+  # Retain GitHub's queue during the Mergify pilot and for rollback.
   merge_group:
     types: [checks_requested]
+  # Mergify tests cumulative batches through temporary draft PRs targeting main.
   pull_request:
     branches:
       - main
@@ -60,10 +62,10 @@ jobs:
 
   test:
     name: Tests (${{ matrix.suite }})
-    # The merge queue already validated this exact commit, and Turborepo's remote cache holds its results. On main the
-    # checks job alone keeps the dependency and build caches warm.
+    # The queue validated the combined changes. Squash merges have new SHAs; Turbo caches by task inputs.
+    # On main, checks keeps build caches warm.
     if: github.event_name != 'push'
-    permissions:
+    permissions: &turbo-permissions
       contents: read
       id-token: write
     # CAD/WASM, the app browser suite, and OpenCV must not compete for one runner's CPUs. Each browser shard gets its
@@ -78,25 +80,15 @@ jobs:
             args: ''
             filter: --filter=!@wbcnc/camNC --concurrency=1
             performance: pnpm run test:performance
-          - suite: app-browser-1
-            tasks: test:browser
-            args: --shard=1/2
-            filter: --filter=@wbcnc/camNC
-            performance: ''
-          - suite: app-browser-2
-            tasks: test:browser
-            args: --shard=2/2
-            filter: --filter=@wbcnc/camNC
-            performance: ''
     runs-on: ubuntu-24.04
-    container:
+    container: &browser-container
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.
       image: mcr.microsoft.com/playwright:v1.54.1-noble
       options: --ipc=host
-    defaults:
+    defaults: &bash
       run:
         shell: bash
-    steps:
+    steps: &test-steps
       - uses: actions/checkout@v7
       - name: Install dependencies
         uses: ./.github/actions/install-dependencies
@@ -138,10 +130,35 @@ jobs:
             apps/camNC/test-results
             packages/*/test-results
 
+  browser:
+    name: Tests (${{ matrix.suite }})
+    # Both queues run the browser shards once per batch, including Mergify draft PRs.
+    # Ordinary PRs run headless suites unless labelled `full-ci`. Same container and steps as test.
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci')))
+    permissions: *turbo-permissions
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: app-browser-1
+            tasks: test:browser
+            args: --shard=1/2
+            filter: --filter=@wbcnc/camNC
+            performance: ''
+          - suite: app-browser-2
+            tasks: test:browser
+            args: --shard=2/2
+            filter: --filter=@wbcnc/camNC
+            performance: ''
+    runs-on: ubuntu-24.04
+    container: *browser-container
+    defaults: *bash
+    steps: *test-steps
+
   specs:
     name: Behaviour specs (${{ matrix.shard }})
-    # Like test, only on pull requests and in the merge queue.
-    if: github.event_name != 'push'
+    # Like browser, on GitHub merge groups, Mergify batch PRs, or PRs labelled `full-ci`.
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci')))
     permissions:
       contents: read
       id-token: write
@@ -195,19 +212,24 @@ jobs:
     # Keep the check required by main's ruleset, including builds now running in checks.
     name: Run tests
     if: always() && github.event_name != 'push'
-    needs: [checks, test, specs, fluidnc-sim]
+    needs: [checks, test, browser, specs, fluidnc-sim]
     runs-on: ubuntu-24.04
     steps:
       - name: Require all validation jobs to pass
         env:
           CHECKS_RESULT: ${{ needs.checks.result }}
           TEST_RESULT: ${{ needs.test.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
           SPECS_RESULT: ${{ needs.specs.result }}
           SIM_RESULT: ${{ needs.fluidnc-sim.result }}
+          # Only ordinary PRs without `full-ci` may skip browser suites; both queues require them.
+          QUEUE_ONLY_OPTIONAL: ${{ github.event_name == 'pull_request' && !startsWith(github.head_ref, 'mergify/merge-queue/') && !contains(github.event.pull_request.labels.*.name, 'full-ci') }}
         run: |
           test "$CHECKS_RESULT" = success
           test "$TEST_RESULT" = success
-          test "$SPECS_RESULT" = success
+          for result in "$BROWSER_RESULT" "$SPECS_RESULT"; do
+            if [ "$QUEUE_ONLY_OPTIONAL" != true ] || [ "$result" != skipped ]; then test "$result" = success; fi
+          done
           test "$SIM_RESULT" = success
 
   fluidnc-sim:

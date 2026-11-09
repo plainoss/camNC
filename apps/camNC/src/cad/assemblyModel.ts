@@ -12,6 +12,7 @@ import {
   resolveDatumPlanes,
   isCadBody,
   isJoinedBody,
+  consumedTools,
   type CadDocument,
   type CadPart,
   type CadPlacement,
@@ -56,9 +57,10 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
   type Shape = ReturnType<typeof nativePart>;
   type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; copies: Shape[] };
   // A sketch not yet extruded has nothing to show in 3D.
-  // Bodies joined to a part by Extrude → Add are built as it is.
+  // Bodies joined to a part by Extrude → Add are built as it is; a tool used up by a cut is only the cut it made.
+  const consumed = consumedTools(document);
   const built = document.parts
-    .filter(part => isCadBody(document, part))
+    .filter(part => isCadBody(document, part) && !consumed.has(part.id))
     .map((part): Built => {
       const { part: profile } = evaluateCadPart(part);
       if (!profile) return { part, problem: 'Its sketch needs fixing first.' };

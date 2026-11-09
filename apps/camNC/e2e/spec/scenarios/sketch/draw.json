@@ -50,6 +50,115 @@
     ]
   },
   {
+    "id": "sketch/draw/rectangle-two-clicks",
+    "title": "Two clicks draw a square-cornered rectangle with no sizes",
+    "evidence": "design: a drawn rectangle keeps its right angles and is sized later",
+    "steps": [
+      "rect 20,20 80,60",
+      {
+        "expect": {
+          "entities": [
+            {
+              "type": "line",
+              "a": [
+                20,
+                20
+              ],
+              "b": [
+                80,
+                20
+              ],
+              "construction": false
+            },
+            {
+              "type": "line",
+              "a": [
+                80,
+                20
+              ],
+              "b": [
+                80,
+                60
+              ],
+              "construction": false
+            },
+            {
+              "type": "line",
+              "a": [
+                80,
+                60
+              ],
+              "b": [
+                20,
+                60
+              ],
+              "construction": false
+            },
+            {
+              "type": "line",
+              "a": [
+                20,
+                60
+              ],
+              "b": [
+                20,
+                20
+              ],
+              "construction": false
+            }
+          ],
+          "dimensions": [],
+          "constraintsAtLeast": {
+            "horizontal": 1,
+            "parallel": 2,
+            "perpendicular": 1
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "sketch/draw/rectangle-joins-corner",
+    "title": "A rectangle started on another's corner shares that corner",
+    "evidence": "design: a click on a point snaps to it",
+    "steps": [
+      "rect 20,20 80,60",
+      "rect 80,60 120,100",
+      {
+        "expect": {
+          "entityCount": 8,
+          "entitiesInclude": [
+            {
+              "type": "line",
+              "a": [
+                80,
+                60
+              ],
+              "b": [
+                120,
+                60
+              ]
+            },
+            {
+              "type": "line",
+              "a": [
+                80,
+                60
+              ],
+              "b": [
+                80,
+                100
+              ]
+            }
+          ],
+          "constraintsAtLeast": {
+            "coincident": 9
+          }
+        }
+      }
+    ]
+  },
+  {
     "id": "sketch/draw/drag-circle",
     "title": "Press, drag and release draws a circle and leaves no stuck preview",
     "evidence": "reference-live 2026-11-06",
