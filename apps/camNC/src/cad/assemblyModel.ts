@@ -10,14 +10,15 @@ import {
   resolveDrawnPlacements,
   activeDesign,
   resolveDatumPlanes,
-  isCadPart,
+  isCadBody,
+  isJoinedBody,
   consumedTools,
   type CadDocument,
   type CadPart,
   type CadPlacement,
   type EvaluatedCadPart,
 } from '@wbcnc/cad';
-import { Matrix4, Vector3 } from 'three';
+import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { BodyMesh, CamPartInfo } from '@/cam/camTypes';
 import { nativePart } from '@/cam/nativeCadModel';
 
@@ -56,10 +57,10 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
   type Shape = ReturnType<typeof nativePart>;
   type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; copies: Shape[] };
   // A sketch not yet extruded has nothing to show in 3D.
-  // A tool used up by a cut is only the cut it made.
+  // Bodies joined to a part by Extrude → Add are built as it is; a tool used up by a cut is only the cut it made.
   const consumed = consumedTools(document);
   const built = document.parts
-    .filter(part => isCadPart(part) && !consumed.has(part.id))
+    .filter(part => isCadBody(document, part) && !consumed.has(part.id))
     .map((part): Built => {
       const { part: profile } = evaluateCadPart(part);
       if (!profile) return { part, problem: 'Its sketch needs fixing first.' };
@@ -78,6 +79,30 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
         return { part, problem: cause instanceof Error ? cause.message : String(cause) };
       }
     });
+  const byId = new Map(document.parts.map(part => [part.id, part]));
+  /** A body joined to a part goes with each copy of it, where the copy is as the body is to the part. */
+  const withParentCopies = (part: CadPart, shape: Shape) => {
+    const parent = isJoinedBody(document, part) ? byId.get(part.addTo!) : undefined;
+    if (!parent?.placement || !part.placement) return [];
+    const relative = new Matrix4()
+      .fromArray(placementMatrix(parent.placement))
+      .invert()
+      .multiply(new Matrix4().fromArray(placementMatrix(part.placement)));
+    return (parent.copies ?? []).flatMap((copy, index) => {
+      if (!copy.placement) return [];
+      const matrix = new Matrix4().fromArray(placementMatrix(copy.placement)).multiply(relative);
+      const position = new Vector3(),
+        rotation = new Quaternion();
+      matrix.decompose(position, rotation, new Vector3());
+      return [
+        {
+          instance: { partId: part.id, copyId: copy.id, name: `${part.name} · ${cadCopyName(parent, index)}` },
+          placement: { position: position.toArray(), rotation: rotation.toArray() } as CadPlacement,
+          shape,
+        },
+      ];
+    });
+  };
   const pieces = built.flatMap(entry =>
     'shape' in entry
       ? [
@@ -87,9 +112,16 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
             placement: copy.placement,
             shape: entry.copies[index]!,
           })),
+          ...withParentCopies(entry.part, entry.shape),
         ]
       : []
   );
+  /** A joined body is hidden with the part, or the copy of it, that it's joined to. */
+  const isHidden = (instance: { partId: string; copyId?: string }) => {
+    if (hidden.has(instanceKey(instance))) return true;
+    const part = byId.get(instance.partId);
+    return !!part && isJoinedBody(document, part) && hidden.has(instanceKey({ partId: part.addTo!, copyId: instance.copyId }));
+  };
   // The local mesh starts at the outline's lower corner; this puts it back in sketch coordinates.
   const local = ([x, y]: [number, number] = [0, 0]) => new Matrix4().makeTranslation(x, y, 0);
   // A part others are drawn on stays where they were placed against it, at the origin, rather than in the row.
@@ -115,7 +147,7 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
     };
     if (!given) cursor += shape.info.size[0] + kGap;
     // A hidden part keeps its place in the row, so showing it again doesn't move the others.
-    if (hidden.has(instanceKey(instance))) continue;
+    if (isHidden(instance)) continue;
     const matrix = new Matrix4().fromArray(placementMatrix(placement)).multiply(local(shape.info.sourceOrigin));
     const positions = shape.mesh.positions.slice(),
       v = new Vector3();
