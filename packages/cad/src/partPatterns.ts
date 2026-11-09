@@ -74,7 +74,7 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
         const position = from.position.map((value, axis) => value + copy.offset!.position[axis]!) as [number, number, number];
         return { ...rest, placement: { position, rotation: from.rotation } };
       });
-    const along = part.pattern?.direction ? cadDirectionVector(document, part.pattern.direction) : null;
+    const along = part.pattern?.direction ? cadDirectionVector(document, part.pattern.direction) : (part.pattern?.vector ?? null);
     const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern, at, along) : [])];
     if (JSON.stringify(copies) === JSON.stringify(part.copies ?? [])) return part;
     changed = true;
