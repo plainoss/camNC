@@ -5,6 +5,7 @@ import {
   cadVariableProblems,
   removeCadVariable,
   addCircle,
+  polygonArea,
   addLine,
   createCadPart,
   addPartCut,
@@ -472,7 +473,7 @@ describe('tools that only fill part of where they reach', () => {
     ]);
   });
 
-  it('refuses a slanted tool whose area happens to match a box', async () => {
+  it('cuts a slanted tool’s own outline, as it’s parallel to the face it enters', async () => {
     const slanted = outlined(
       'Brace',
       [
@@ -484,17 +485,17 @@ describe('tools that only fill part of where they reach', () => {
       10
     );
     const { cuts, messages } = await cut(slanted);
-    expect(cuts).toEqual([]);
-    expect(messages).toEqual(["Brace isn't square-cornered and straight-sided where it reaches into Leg, so it can't be cut from it yet."]);
+    expect(cuts).toHaveLength(1);
+    expect(messages).toEqual([]);
   });
 
-  it('says only why a refused tool can’t cut, not that the step cuts nothing', async () => {
+  it('cuts a round tool reaching over the edge as a round notch', async () => {
     const round = createCadPart('Dowel', 18);
     round.placement = { position: [0, 0, 10], rotation: [0, 0, 0, 1] };
     round.sketch = addCircle(round.sketch, { x: 100, y: 50, radius: 10 });
     const { cuts, messages } = await cut(round);
-    expect(cuts).toEqual([]);
-    expect(messages).toEqual(["Dowel isn't square-cornered and straight-sided where it reaches into Leg, so it can't be cut from it yet."]);
+    expect(cuts).toHaveLength(1);
+    expect(messages).toEqual([]);
   });
 });
 
@@ -789,5 +790,55 @@ describe('half-lap and finger joints', () => {
     const solved = await solveCadDocument(document);
     expect(solved.parts.every(part => !part.cuts?.length)).toBe(true);
     expect(solved.diagnostics).toContainEqual(expect.objectContaining({ code: 'part-cut-unresolved' }));
+  });
+});
+
+describe('a round tool cut from a board', () => {
+  it('cuts its round outline into the face it enters, as deep as it reaches', async () => {
+    const block = { ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!, name: 'Block' };
+    block.drawnOn = { on: { plane: 'top' }, offset: 0 };
+    const peg = createCadPart('Peg', 10);
+    peg.sketch = addCircle(peg.sketch, { x: 50, y: 50, radius: 8 });
+    // Started 2 mm above the block's top and extruded 10 mm down into it: 8 mm in.
+    peg.drawnOn = { on: { partId: block.id, face: 'top' }, offset: 2, inward: true };
+    let document: CadDocument = { ...createCadDocument(), parts: [block, peg] };
+    document = addPartCut(document, [peg.id], [block.id], { value: 0 }).document;
+    const solved = await solveCadDocument(document);
+    const cut = solved.parts.find(part => part.partId === block.id)!.cuts!.find(c => c.id.startsWith('cut-parts:'))!;
+    expect(cut).toMatchObject({ side: 'top', through: false });
+    expect(cut.to).toBeCloseTo(8, 6);
+    expect(Math.abs(polygonArea(cut.outline))).toBeCloseTo(Math.PI * 64, 0);
+    expect(solved.diagnostics.filter(d => d.code === 'part-cut-unresolved')).toEqual([]);
+  });
+});
+
+describe('tools used up by their cut', () => {
+  it('leave only the cut: they are no longer parts to cut', async () => {
+    const block = { ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!, name: 'Block' };
+    block.drawnOn = { on: { plane: 'top' }, offset: 0 };
+    const peg = createCadPart('Peg', 10);
+    peg.sketch = addCircle(peg.sketch, { x: 50, y: 50, radius: 8 });
+    peg.drawnOn = { on: { partId: block.id, face: 'top' }, offset: 2, inward: true };
+    const added = addPartCut({ ...createCadDocument(), parts: [block, peg] }, [peg.id], [block.id], { value: 0 });
+    const document = updatePartCut(added.document, added.id, { consumeTools: true });
+    const solved = await solveCadDocument(document);
+    expect(cadPartsToCut(solved.document, solved.parts).map(entry => entry.part.name)).toEqual(['Block']);
+    expect(solved.parts.find(part => part.partId === block.id)!.cuts!.some(cut => cut.id.startsWith('cut-parts:'))).toBe(true);
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document))).partCuts![0]!.consumeTools).toBe(true);
+    expect(updatePartCut(document, added.id, { consumeTools: undefined }).partCuts![0]).not.toHaveProperty('consumeTools');
+  });
+
+  it('widens the round cut by the clearance all round', async () => {
+    const block = { ...createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!, name: 'Block' };
+    block.drawnOn = { on: { plane: 'top' }, offset: 0 };
+    const peg = createCadPart('Peg', 10);
+    peg.sketch = addCircle(peg.sketch, { x: 50, y: 50, radius: 8 });
+    peg.drawnOn = { on: { partId: block.id, face: 'top' }, offset: 2, inward: true };
+    const document = addPartCut({ ...createCadDocument(), parts: [block, peg] }, [peg.id], [block.id], { value: 0.5 }).document;
+    const solved = await solveCadDocument(document);
+    const cut = solved.parts.find(part => part.partId === block.id)!.cuts!.find(c => c.id.startsWith('cut-parts:'))!;
+    const xs = cut.outline.map(p => p.x);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(17, 1);
+    expect(cut.to).toBeCloseTo(8.5, 6);
   });
 });

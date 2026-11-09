@@ -100,6 +100,20 @@ describe('the cut parts dialog', () => {
     );
   });
 
+  it('uses the tools up when Keep tools is unticked', async () => {
+    const document = design();
+    const onSave = vi.fn();
+    const dialog = (pick: { partId: string; seq: number } | null) => (
+      <PartCutDialog document={document} tool="back" pick={pick} onSave={onSave} onClose={() => {}} />
+    );
+    const view = render(dialog(null));
+    view.rerender(dialog({ partId: document.parts[0]!.id, seq: 1 }));
+    expect(screen.getByRole('checkbox', { name: 'Keep tools' })).toHaveProperty('checked', true);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Keep tools' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cut' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ consumeTools: true })));
+  });
+
   function edit(split: CadPartCut['split'], withVariable = false) {
     const document = design();
     if (withVariable) document.variables = [{ id: 'count', name: 'count', expression: '7' }];

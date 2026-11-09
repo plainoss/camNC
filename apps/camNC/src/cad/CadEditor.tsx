@@ -74,6 +74,7 @@ import {
   removeCadFeature,
   removeCadVariable,
   removeDatumPlane,
+  consumedTools,
   splitApartRegions,
   cadCopyName,
   setCadVariable,
@@ -3945,7 +3946,9 @@ export function CadEditor({
   // The parts, each with an eye to show or hide it in the view. In the studio they sit at the bottom left, below the
   // features, as in the reference.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
-  const builtParts = doc.parts.filter(isCadPart);
+  // A tool used up by its cut isn't a part of its own any more.
+  const usedUp = consumedTools(doc);
+  const builtParts = doc.parts.filter(part => isCadPart(part) && !usedUp.has(part.id));
   // An open sketch turned with its parts behind it, about the middle of the view.
   const turned = !!sketchBackdrop && sketchTurn !== straightOn;
   const [ta, tb, tc, td] = drawingMatrix(sketchTurn);
@@ -4640,18 +4643,19 @@ export function CadEditor({
                         : undefined
                     }
                     onSave={change => {
-                      const { clearance, clearanceExpression, split, ...parts } = change;
-                      commit(
-                        partCutting.id
-                          ? updatePartCut(documentRef.current, partCutting.id, change)
-                          : addPartCut(
-                              documentRef.current,
-                              parts.tools,
-                              parts.targets,
-                              { value: clearance, expression: clearanceExpression },
-                              split
-                            ).document
-                      );
+                      const { clearance, clearanceExpression, split, consumeTools, ...parts } = change;
+                      const made = partCutting.id
+                        ? updatePartCut(documentRef.current, partCutting.id, change)
+                        : addPartCut(
+                            documentRef.current,
+                            parts.tools,
+                            parts.targets,
+                            { value: clearance, expression: clearanceExpression },
+                            split
+                          );
+                      const document = 'document' in made ? made.document : made;
+                      const id = 'document' in made ? made.id : partCutting.id!;
+                      commit(updatePartCut(document, id, { consumeTools }));
                       setPartCutting(null);
                     }}
                   />
