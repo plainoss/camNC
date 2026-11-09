@@ -81,6 +81,10 @@ After a fix, run the update again and review the diff of the reports: it should 
 only what the fix meant to. A design without a report fails with the command that makes
 one. Scripts make designs for this folder too: `check examples/tray.cad.ts --out fixtures/designs/tray.json`.
 
+## Complete Part Studio workflows
+
+`pnpm --silent cad:iterate` from the repository root runs the cabinet edit sequence headlessly and writes named source checkpoints with a first-failure report. `pnpm --silent cad:iterate:ui` exercises the corresponding browser workflow. See [the iteration loop](../../docs/CAD_ITERATION.md) for commands, coverage and the agent procedure.
+
 ## From an MCP client
 
 Agents without a shell, such as Claude Desktop, use the same check through an MCP

@@ -101,6 +101,42 @@
           "evidence": ["packages/cad/src/variables.test.ts", "apps/camNC/src/cad/CadVariablesPanel.test.tsx"]
         },
         {
+          "item": "Complete multi-part cabinet edit sequence",
+          "status": "partial",
+          "evidence": ["packages/cad-script/src/iteration/workflow.test.ts", "studio/cupboard/shared-variable-cancel-edit-reload"],
+          "note": "Covers shared dimensions, shelf patterns, placement, housings, suppression, identities and reload. Divided-tray workflows, complete interface details and toolpath equivalence remain outside this sequence."
+        },
+        {
+          "item": "Split a part by a plane",
+          "status": "gap",
+          "evidence": [],
+          "note": "Sketch-edge splitting and split joints exist; splitting a solid part into separate boards is not implemented."
+        },
+        {
+          "item": "Circular pattern of parts",
+          "status": "gap",
+          "evidence": [],
+          "note": "Circular sketch patterns exist; the part pattern is linear only."
+        },
+        {
+          "item": "Boolean Union and Intersect between existing parts",
+          "status": "gap",
+          "evidence": [],
+          "note": "Cut parts subtracts tools from targets; existing bodies cannot be joined or intersected by a Boolean feature."
+        },
+        {
+          "item": "Measure and section view in the Part Studio",
+          "status": "gap",
+          "evidence": [],
+          "note": "Sketch measurements exist. Measuring and sectioning the assembled parts are not available."
+        },
+        {
+          "item": "Variable types and ordered definitions",
+          "status": "gap",
+          "evidence": [],
+          "note": "Variables are inferred from expressions and apply globally; explicit types, measured values and positional scope are not implemented."
+        },
+        {
           "item": "Accepted geometry and draft edits persist with the project",
           "status": "done",
           "evidence": ["sketch/persist/reload-keeps-design", "sketch/persist/reload-keeps-accepted", "sketch/persist/last-edit-saved-immediately"]
