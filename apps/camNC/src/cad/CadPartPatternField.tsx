@@ -6,6 +6,7 @@ import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 
 type Pattern = Omit<CadPartPattern, 'id'>;
+type Vec3 = [number, number, number];
 const kStart: Pattern = { axis: 'x', count: 2, spacing: 100 };
 
 /** Copies of a part in a row along an axis. The count and the spacing can use variables, such as a number of shelves. */
@@ -13,6 +14,7 @@ export function CadPartPatternField({
   pattern,
   document,
   pickDirection,
+  pickEdge,
   variables,
   onChange,
   onDone,
@@ -21,6 +23,8 @@ export function CadPartPatternField({
   pattern: CadPartPattern | undefined;
   document?: CadDocument;
   pickDirection?: (picked: (on: CadDrawnOn['on']) => void) => void;
+  /** Starts picking a part's edge in the view for the direction; the edge comes back once, or null for a click off an edge. */
+  pickEdge?: (picked: (edge: { a: Vec3; b: Vec3 } | null) => void) => void;
   variables?: CadValueScope;
   /** The new pattern, or `null` to take it away. */
   onChange: (pattern: Pattern | null) => void;
@@ -36,6 +40,7 @@ export function CadPartPatternField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [picking, setPicking] = useState(false);
+  const [pickingEdge, setPickingEdge] = useState(false);
   const current = pattern ?? kStart;
   const typedCount = current.countExpression ?? String(current.count),
     typedSpacing = current.spacingExpression ?? formatCadValue(current.spacing);
@@ -51,7 +56,11 @@ export function CadPartPatternField({
       setError(null);
     }
   }, [typedCount, typedSpacing]);
-  const apply = (axis = current.axis, direction: Pattern['direction'] | null = current.direction) => {
+  const apply = (
+    axis = current.axis,
+    direction: Pattern['direction'] | null = current.direction,
+    vector: Vec3 | null = direction ? null : (current.vector ?? null)
+  ) => {
     const parsedCount = parseCadValue(count, { unit: 'scalar', variables });
     if ('error' in parsedCount) return setError(parsedCount.error);
     const n = Math.floor(parsedCount.value + 1e-9);
@@ -63,6 +72,7 @@ export function CadPartPatternField({
     const next: Pattern = {
       axis,
       ...(direction && { direction }),
+      ...(vector && { vector }),
       count: n,
       spacing: parsedSpacing.value,
       ...(parsedCount.expression && { countExpression: parsedCount.expression }),
@@ -70,7 +80,9 @@ export function CadPartPatternField({
     };
     const same =
       pattern &&
-      (['axis', 'direction', 'count', 'spacing', 'countExpression', 'spacingExpression'] as const).every(key => pattern[key] === next[key]);
+      (['axis', 'direction', 'vector', 'count', 'spacing', 'countExpression', 'spacingExpression'] as const).every(
+        key => pattern[key] === next[key]
+      );
     if (!same) onChange(next);
   };
   // A pick lands after later renders, so it applies with the count and spacing as they are then, not as they were.
@@ -119,10 +131,47 @@ export function CadPartPatternField({
                 });
               }}>
               <small>Direction</small>
-              <span>{pattern.direction && document ? drawnOnName(document, pattern.direction.along) : 'Pick a plane or a face'}</span>
+              <span>
+                {pattern.direction && document
+                  ? drawnOnName(document, pattern.direction.along)
+                  : pattern.vector
+                    ? `Along an edge (${pattern.vector.map(value => +value.toFixed(3)).join(', ')})`
+                    : 'Pick a plane or a face'}
+              </span>
             </button>
           )}
-          {pattern.direction ? (
+          {pickEdge && (
+            <button
+              type="button"
+              className="cad-feature-selection"
+              data-active={pickingEdge ? '' : undefined}
+              aria-label="Direction edge"
+              onClick={() => {
+                setPickingEdge(true);
+                setError(null);
+                pickEdge(edge => {
+                  setPickingEdge(false);
+                  if (!edge) return setError('Click close to an edge of a part.');
+                  const along = edge.b.map((value, axis) => value - edge.a[axis]!) as Vec3;
+                  const length = Math.hypot(...along);
+                  latestApply.current(undefined, null, along.map(value => +(value / length).toFixed(9)) as Vec3);
+                });
+              }}>
+              <small>Or along an edge</small>
+              <span>{pickingEdge ? 'Click an edge of a part' : 'Pick an edge'}</span>
+            </button>
+          )}
+          {pattern.vector && !pattern.direction ? (
+            <div className="cad-feature-selection">
+              <button type="button" onClick={() => apply(current.axis, null, null)}>
+                Clear
+              </button>
+              {/* The edge's direction turned the other way. */}
+              <button type="button" onClick={() => apply(current.axis, null, pattern.vector!.map(value => -value || 0) as Vec3)}>
+                Flip direction
+              </button>
+            </div>
+          ) : pattern.direction ? (
             <>
               <div className="cad-feature-selection">
                 <button type="button" onClick={() => apply(current.axis, null)}>

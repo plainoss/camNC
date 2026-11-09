@@ -998,6 +998,36 @@ it('sketches on a base plane picked before Sketch or Shift+S, as on one picked a
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
 });
 
+it('patterns a part along an edge picked in the view', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  source.parts[0]!.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  const { latest } = await studio(source);
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().instanceIds?.length).toBeGreaterThan(0), { timeout: 10_000 });
+  const part = latest().parts[0]!;
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Linear pattern/ });
+  const click = (edge?: { a: [number, number, number]; b: [number, number, number] }) => {
+    const { instanceIds, onSelect } = props();
+    const index = instanceIds!.indexOf(part.id);
+    act(() => onSelect!(part.id, index, { partId: part.id, index, point: [0, 50, 18], normal: [0, 0, 1], ...(edge && { edge }) }));
+  };
+  // A click off every edge says so.
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Direction edge' }));
+  click();
+  await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toMatch(/close to an edge/));
+  // The plate's left edge, picked from its far end, runs along -y.
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Direction edge' }));
+  click({ a: [0, 100, 18], b: [0, 0, 18] });
+  await waitFor(() => expect(latest().parts[0]!.pattern?.vector).toEqual([0, -1, 0]));
+  expect(within(dialog).getByRole('button', { name: 'Direction' }).textContent).toMatch(/Along an edge/);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Flip direction' }));
+  await waitFor(() => expect(latest().parts[0]!.pattern?.vector).toEqual([0, 1, 0]));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  expect(latest().parts[0]!.copies?.map(copy => copy.placement?.position)).toEqual([[0, 100, 0]]);
+});
+
 it('patterns a part along a picked Front plane', async () => {
   // Copies are laid out from where their part is, so the part is placed first.
   const source = createPlateDocument({ width: 200, height: 100 });
@@ -1155,8 +1185,21 @@ it('copies a part along a line from one picked point to another, as Translate by
   // Along the plate's long edge, by its length.
   await userEvent.click(within(dialog).getByRole('button', { name: 'Line start' }));
   click([0, 0, 18]);
+  // The end picked near an edge, after the start, is still just a point: the diagonal, not the edge.
   await userEvent.click(within(dialog).getByRole('button', { name: 'Line end' }));
-  click([200, 0, 18]);
+  {
+    const { instanceIds, onSelect } = props();
+    const index = instanceIds!.indexOf(part.id);
+    act(() =>
+      onSelect!(part.id, index, {
+        partId: part.id,
+        index,
+        point: [200, 0, 18],
+        normal: [0, 0, 1],
+        edge: { a: [200, 0, 18], b: [200, 100, 18] },
+      })
+    );
+  }
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts[0]!.copies?.[0]?.offset?.position).toEqual([200, 0, 0]));
 });
