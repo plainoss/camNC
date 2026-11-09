@@ -522,6 +522,7 @@ export function CadEditor({
   // Use, started with `u` and nothing picked: each part edge clicked goes into the sketch, until Escape or another tool.
   const [usingEdges, setUsingEdges] = useState(false);
   useEffect(() => setUsingEdges(false), [part?.id, showWorkspace]);
+  const [transparentParts, setTransparentParts] = useState<ReadonlySet<string>>(() => new Set());
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   const hoveredPart = useRef<string | null>(null);
@@ -2249,11 +2250,26 @@ export function CadEditor({
       if (event.code === 'KeyY') {
         event.preventDefault();
         if (event.repeat) return;
-        if (event.shiftKey) setHiddenParts(new Set());
-        else {
+        if (event.shiftKey) {
+          setHiddenParts(new Set());
+          setTransparentParts(new Set());
+        } else {
           const key = hoveredPart.current ?? part?.id;
           if (key) setHiddenParts(previous => (previous.has(key) ? previous : new Set([...previous, key])));
         }
+        return;
+      }
+      if (event.shiftKey && event.code === 'KeyT') {
+        event.preventDefault();
+        if (event.repeat) return;
+        const key = hoveredPart.current ?? part?.id;
+        if (key)
+          setTransparentParts(previous => {
+            const next = new Set(previous);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+          });
         return;
       }
       if (event.shiftKey && event.code === 'KeyI') {
@@ -4562,6 +4578,10 @@ export function CadEditor({
               <WorkspaceView
                 document={shownDocument}
                 viewRequest={viewRequest}
+                onViewRequest={
+                  studioSession ? request => setViewRequest(previous => ({ ...request, seq: (previous?.seq ?? 0) + 1 })) : undefined
+                }
+                transparentIds={transparentParts}
                 showPlanes={showPlanes}
                 selectedId={part?.id ?? null}
                 onSelect={id => {
