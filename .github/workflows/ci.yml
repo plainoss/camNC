@@ -26,19 +26,11 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        name: Install pnpm
-        with:
-          run_install: false
-
-      - name: Install Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: "pnpm"
-
+      # The only job that saves the pnpm store, and only on main: PR and merge-queue jobs read main's entry.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        uses: ./.github/actions/install-dependencies
+        with:
+          save-cache: ${{ github.event_name == 'push' }}
       - name: Check CI configuration
         run: pnpm run test:ci
       # Turborepo's local cache, so packages whose inputs did not change replay their result.
@@ -74,21 +66,18 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    # CAD/WASM, the app browser suite, and OpenCV must not compete for one runner's CPUs.
+    # CAD/WASM, the app browser suite, and OpenCV must not compete for one runner's CPUs. Each browser shard gets its
+    # own runner; the headless suites take seconds each, so they share one runner (and one setup) and run one task at a
+    # time. They need no `vitest run`: Vitest never watches in CI.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - suite: cam
-            tasks: test
-            args: run
-            filter: --filter=@wbcnc/cam
-            performance: pnpm --filter @wbcnc/cam test:performance
-          - suite: app-core
-            tasks: test:domain test:worker test:licenses
+          - suite: headless
+            tasks: test @wbcnc/camNC#test:domain @wbcnc/camNC#test:worker @wbcnc/camNC#test:licenses
             args: ''
-            filter: --filter=@wbcnc/camNC
-            performance: pnpm --filter @wbcnc/camNC test:performance
+            filter: --filter=!@wbcnc/camNC --concurrency=1
+            performance: pnpm run test:performance
           - suite: app-browser-1
             tasks: test:browser
             args: --shard=1/2
@@ -98,11 +87,6 @@ jobs:
             tasks: test:browser
             args: --shard=2/2
             filter: --filter=@wbcnc/camNC
-            performance: ''
-          - suite: packages
-            tasks: test
-            args: run
-            filter: --filter=!@wbcnc/cam --filter=!@wbcnc/camNC --concurrency=1
             performance: ''
     runs-on: ubuntu-24.04
     container:
@@ -114,19 +98,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        name: Install pnpm
-        with:
-          run_install: false
-
-      - name: Install Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: "pnpm"
-
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        uses: ./.github/actions/install-dependencies
       # Turborepo's local cache, so packages whose inputs did not change replay their result.
       # Git refuses this container's checkout, so scripts/turbo-shared-cache.mjs can't find the git dir. Name the
       # directory here, or the cache action saves a path turbo never wrote.
@@ -151,7 +124,8 @@ jobs:
         env:
           TURBO_CACHE_DIR: .turbo/cache
         run: node scripts/turbo-shared-cache.mjs run ${{ matrix.tasks }} --log-order=stream ${{ matrix.filter }} -- ${{ matrix.args }}
-      # Each gate gets an otherwise idle runner, just as in the root test script.
+      # Like the root test script: both gates run one after the other on a runner whose functional tests have finished,
+      # directly rather than through turbo, so a cached result never stands in for a measurement.
       - name: Performance gates
         if: matrix.performance != ''
         run: ${{ matrix.performance }}
@@ -185,19 +159,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        name: Install pnpm
-        with:
-          run_install: false
-
-      - name: Install Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: "pnpm"
-
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        uses: ./.github/actions/install-dependencies
       # Fork PRs keep local snapshots; only trusted repository jobs may exchange an identity token.
       - name: Authenticate remote cache
         if: vars.TURBO_TEAM != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
@@ -254,17 +217,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        name: Install pnpm
-        with:
-          run_install: false
-      - name: Install Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: "pnpm"
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        uses: ./.github/actions/install-dependencies
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"

@@ -145,3 +145,17 @@
   color: #50739b;
   font-style: italic;
 }
+/** A checkbox in a step's dialog sits on the line before its label, as anywhere else. */
+.cad-feature-dialog-body > label:has(> input[type='checkbox']) {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.cad-editor .cad-feature-dialog-body > label > input[type='checkbox'] {
+  flex: none;
+  width: 14px;
+  min-height: 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: #2762a8;
+}

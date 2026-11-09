@@ -277,6 +277,8 @@ export interface CadPart {
    * plane to it, and follows it when it moves.
    */
   upTo?: CadDrawnOn['on'];
+  /** A plane made to sketch on that the extrude goes up to, offset from `upTo`; it follows that plane. */
+  upToDatum?: string;
   /** Extruded half to each side of the sketch's plane. */
   symmetric?: true;
   /** Its extrude switched off in the feature list: its sketch stays, as a sketch not yet extruded does. */

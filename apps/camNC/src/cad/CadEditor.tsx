@@ -57,6 +57,7 @@ import {
   setDimensionDriven,
   tessellateCurve,
   updateDimension,
+  applyNewDimension,
   visibleSketchPointIds,
   withDimensionPlacement,
   type CadConstraint,
@@ -76,6 +77,7 @@ import {
   removeCadVariable,
   removeDatumPlane,
   consumedTools,
+  splitApartRegions,
   cadCopyName,
   setCadVariable,
   type CadFaceRef,
@@ -508,7 +510,7 @@ export function CadEditor({
   // A base plane, or one of the design's planes, by its id.
   const [selectedPlane, setSelectedPlane] = useState<string | null>(null);
   // A dialog waiting for a plane or face to be picked for a direction, as the Transform dialog's Direction box.
-  const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on']) => void) | null>(null);
+  const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on'], datum?: string) => void) | null>(null);
   // Where the rollback bar was moved to in the feature list: the step it sits after. Null is the end.
   const [rolledTo, setRolledTo] = useState<string | null>(null);
   // The part whose row is hovered in the feature list, highlighted in the view as the reference does.
@@ -534,6 +536,8 @@ export function CadEditor({
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
   // Sketches, planes and the origin shown or hidden with their eyes in the feature list, where that differs from how
   // they start: a sketch shows until Extrude makes a part of it, and the rest show.
+  // The sketch whose row in the feature list was clicked last, while nothing else has been picked since.
+  const [sketchRowPicked, setSketchRowPicked] = useState<string | null>(null);
   const [featureVisibility, setFeatureVisibility] = useState<Readonly<Record<string, boolean>>>({});
   const hoveredPart = useRef<string | null>(null);
   const onHoverPart = useCallback((id: string | null) => {
@@ -550,6 +554,23 @@ export function CadEditor({
   const [studioRefusal, setStudioRefusal] = useState<string | null>(null);
   // A part being copied by a transform, or the transformed copy being changed.
   const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string; move?: boolean } | null>(null);
+  // When a step's dialog closes, the view has the keyboard again, so its shortcuts work straight away.
+  const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || transformDialog || partCutting);
+  const dialogWasOpen = useRef(false);
+  useEffect(() => {
+    const closed = dialogWasOpen.current && !stepDialogOpen;
+    dialogWasOpen.current = stepDialogOpen;
+    if (!closed || !studioSession || !showWorkspace) return;
+    const focusView = (frames: number) =>
+      requestAnimationFrame(() => {
+        const active = root.current?.ownerDocument.activeElement;
+        if (active && active !== root.current?.ownerDocument.body && active.isConnected) return;
+        const view = root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]');
+        if (view && !view.closest('[inert]')) view.focus();
+        else if (frames > 0) focusView(frames - 1);
+      });
+    focusView(30);
+  }, [stepDialogOpen, studioSession, showWorkspace]);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
   const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
@@ -672,11 +693,16 @@ export function CadEditor({
   const mounted = useRef(true);
   callbacks.current = { onDraftChange, onFinish, onCancel, onFinishBlocked };
   const deferredCanvasFocus = useRef<(() => void) | null>(null);
+  // The field of a step's dialog last typed in: solving makes the view inert, which drops the keyboard, and it goes back.
+  const dialogFocus = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     if (!busy) {
       const restore = deferredCanvasFocus.current;
       deferredCanvasFocus.current = null;
       restore?.();
+      const field = dialogFocus.current;
+      const active = field?.ownerDocument.activeElement;
+      if (field?.isConnected && (!active || active === field.ownerDocument.body)) field.focus();
     }
   }, [busy]);
   const restoreCanvasKeyboard = () => {
@@ -1777,8 +1803,14 @@ export function CadEditor({
     if ('error' in parsed) return rejectValue(parsed.error, input);
     const valueError = dimensionValueError(currentDimension, parsed.value);
     if (valueError) return rejectValue(valueError, input);
-    const next = updateDimension(documentRef.current, currentDimension.id, parsed.value, parsed.expression);
     const command = newDimensionCommand.current;
+    // A newly placed first dimension sizes the whole sketch, keeping what was drawn in proportion.
+    const next = (command?.id === currentDimension.id ? applyNewDimension : updateDimension)(
+      documentRef.current,
+      currentDimension.id,
+      parsed.value,
+      parsed.expression
+    );
     const amended = command?.id === currentDimension.id ? amendCadSession(session, next, command.checkpoint) : null;
     if (amended) publish(amended);
     else commit(next);
@@ -3579,6 +3611,11 @@ export function CadEditor({
   const closeFeature = (keep: boolean) => {
     setDirectionPicker(null);
     if (!keep && featureDialog) commit(featureDialog.before);
+    // Regions picked apart are a part each.
+    if (keep && featureDialog?.kind === 'extrude') {
+      const split = splitApartRegions(documentRef.current, featureDialog.partId);
+      if (split !== documentRef.current) commit(split);
+    }
     // A Remove is a cut in the board its sketch is drawn on, so that board is the one selected.
     const step = keep && featureDialog && documentRef.current.parts.find(p => p.id === featureDialog.partId);
     const on = step && step.remove && step.drawnOn?.on;
@@ -3622,6 +3659,8 @@ export function CadEditor({
       if (studioSession) setCancelledSketch(cancelled);
     }
     sketchBefore.current = null;
+    // A sketch just finished is extruded with nothing picked yet.
+    setSketchRowPicked(null);
     setMessage('');
     chooseTool('select');
     setSelected([]);
@@ -3810,7 +3849,7 @@ export function CadEditor({
     const picked = pickedPlane(documentRef.current, plane);
     if (!picked) return;
     if (directionPicker) {
-      directionPicker(picked.on);
+      directionPicker(picked.on, picked.datum);
       return setDirectionPicker(null);
     }
     if (choosingFace) {
@@ -3874,7 +3913,19 @@ export function CadEditor({
         replacePart(before, part.id, p => {
           const made = { ...p };
           delete made.extrude;
-          return made.drawnOn && !made.thin && isSingleLine(made) ? { ...made, thin: { depth: 100, midPlane: true } } : made;
+          if (made.drawnOn && !made.thin && isSingleLine(made)) return { ...made, thin: { depth: 100, midPlane: true } };
+          // A sketch of several regions, such as overlapping shapes or outlines apart, starts with all of them picked.
+          const regions = sketchRegions(made.sketch, CAD_CHORD_TOLERANCE);
+          // Picked from its row in the feature list, a sketch of several regions starts with all of them; just finished,
+          // with none, for them to be picked in the view.
+          if (
+            sketchRowPicked === made.id &&
+            !made.regions &&
+            regions.length > 1 &&
+            evaluateCadPart(made).diagnostics.some(d => d.severity === 'error')
+          )
+            made.regions = regions.map(region => region.id);
+          return made;
         })
       );
       openFeature('extrude', part.id, before);
@@ -4229,6 +4280,10 @@ export function CadEditor({
       aria-busy={busy}
       data-demo-mode={isDemoMode() || undefined}
       onKeyDown={keyDown}
+      onFocus={event => {
+        const target = event.target as HTMLElement;
+        dialogFocus.current = target.closest('.cad-feature-dialog') ? target : null;
+      }}
       onKeyUp={event => event.stopPropagation()}>
       {studioSession && showWorkspace ? (
         <StudioToolbar
@@ -4314,6 +4369,7 @@ export function CadEditor({
               document={doc}
               selectedPartId={part?.id ?? null}
               onSelect={entry => {
+                setSketchRowPicked(entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.partId : null);
                 if (entry.kind === 'step') {
                   setPartId(entry.step.partId);
                   setSelected([]);
@@ -4738,6 +4794,7 @@ export function CadEditor({
                 showPlanes={showPlanes}
                 selectedId={part?.id ?? null}
                 onSelect={id => {
+                  setSketchRowPicked(null);
                   if (partCutting) return pickForCut(id);
                   setPartId(id);
                   setSelected([]);

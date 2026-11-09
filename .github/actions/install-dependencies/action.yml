@@ -1,0 +1,57 @@
+name: Install dependencies
+description: >-
+  Installs pnpm, Node.js and the workspace's packages from one pnpm store cache shared by every CI job. Only a job that
+  passes save-cache writes the cache; every other job only restores it, so no post-job save delays its result.
+inputs:
+  save-cache:
+    description: Save the pnpm store when no entry matches the lockfile yet. Only the checks job on main passes true.
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v6
+      with:
+        run_install: false
+    # No `cache:` here: setup-node would save the store after every job, about a minute on each job's critical path.
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+    # Inside the workspace, so the cached path is the same on the runner and in the Playwright container, whose
+    # workspace and home directories differ. pnpm can also hard-link from it into node_modules. Git ignores it.
+    - name: Keep the pnpm store in the workspace
+      shell: bash
+      run: echo "npm_config_store_dir=$GITHUB_WORKSPACE/.pnpm-store" >> "$GITHUB_ENV"
+    # The Playwright image has no zstd, so actions/cache archives with gzip there, and the compression is part of an
+    # entry's version: a zstd entry saved on the runner never restores in a container. Hide zstd from the pnpm cache
+    # steps so every job shares one gzip entry; the last step brings it back for later cache steps.
+    - name: Use the container's cache compression
+      shell: bash
+      run: |
+        mkdir -p "$RUNNER_TEMP/no-zstd"
+        printf '#!/bin/sh\nexit 127\n' > "$RUNNER_TEMP/no-zstd/zstd"
+        chmod +x "$RUNNER_TEMP/no-zstd/zstd"
+        echo "$RUNNER_TEMP/no-zstd" >> "$GITHUB_PATH"
+    - name: Restore pnpm store
+      id: restore
+      uses: actions/cache/restore@v6
+      with:
+        path: .pnpm-store
+        key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: pnpm-store-${{ runner.os }}-
+    - name: Install packages
+      shell: bash
+      run: pnpm install --frozen-lockfile
+    # A store restored from an older lockfile's entry also holds packages the lockfile no longer uses.
+    - name: Prune pnpm store
+      if: inputs.save-cache == 'true' && steps.restore.outputs.cache-hit != 'true'
+      shell: bash
+      run: pnpm store prune
+    - name: Save pnpm store
+      if: inputs.save-cache == 'true' && steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: .pnpm-store
+        key: ${{ steps.restore.outputs.cache-primary-key }}
+    - name: Restore zstd for later cache steps
+      shell: bash
+      run: rm -f "$RUNNER_TEMP/no-zstd/zstd"
