@@ -30,7 +30,8 @@ export function cutPartMesh(features: PartFeatures, underside?: PartFeatures): {
   const triangle = (a: [number, number, number], b: [number, number, number], c: [number, number, number]) =>
     positions.push(...a, ...b, ...c);
   const cap = (region: Path[], z: number, up: boolean) => {
-    for (const { outer, holes } of shapes(region)) {
+    // Match the walls' Clipper precision, including the original footprint whose curve vertices can have more digits.
+    for (const { outer, holes } of shapes(unionPaths(region))) {
       const contour = outer.map(p => new Vector2(p.x, p.y)),
         rings = holes.map(hole => hole.map(p => new Vector2(p.x, p.y))),
         all = [...contour, ...rings.flat()];
@@ -44,10 +45,10 @@ export function cutPartMesh(features: PartFeatures, underside?: PartFeatures): {
       }
     }
   };
-  const levels = [...features.levels].sort((a, b) => b.z - a.z);
+  const levels = [...(features.meshLevels ?? features.levels)].sort((a, b) => b.z - a.z);
   for (const level of levels) cap(level.region, level.z, true);
   // The underside is the same stack seen from the other face, with its heights turned over.
-  const below = [...(underside?.levels ?? [])].sort((a, b) => b.z - a.z),
+  const below = [...(underside?.meshLevels ?? underside?.levels ?? [])].sort((a, b) => b.z - a.z),
     thickness = features.thickness;
   if (below.length) for (const level of below) cap(level.region, thickness - level.z, false);
   else cap(features.footprint, 0, false);

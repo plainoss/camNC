@@ -43,6 +43,11 @@ export interface PartFeatures {
   throughHoles: PathsD;
   /** Distinct up-facing horizontal heights, top first. */
   levels: Level[];
+  /**
+   * Unsmoothed height regions for solid construction. Cleaning each CAM level separately can move a shared curved
+   * boundary differently on either side, leaving seams that must never become walls in the part's mesh.
+   */
+  meshLevels?: Level[];
   pockets: PocketFeature[];
   /** Down-facing horizontal faces strictly inside the stock: features that must be cut from the bottom. */
   bottomFaces: { z: number; area: number }[];
