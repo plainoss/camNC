@@ -249,13 +249,11 @@ export function unusedRegions(document: CadDocument, part: CadPart): string[] {
 }
 
 /**
- * Another extrude of a part's sketch, as the reference extrudes a sketch again, when some of its regions are still
- * unused: a new part, of the same thickness, starting with those regions when they make one part. Null when every
- * region is used already.
+ * Another extrude of a part's sketch, as Extrude always starts one: a new part, of the same thickness, starting with the
+ * regions its sketch's extrudes leave unused when they make one part, and with none picked otherwise.
  */
-export function newExtrudeOf(document: CadDocument, part: CadPart, name: string): CadPart | null {
+export function newExtrudeOf(document: CadDocument, part: CadPart, name: string): CadPart {
   const unused = unusedRegions(document, part);
-  if (!unused.length) return null;
   const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
   const made: CadPart = {
     id: newCadId(),
@@ -268,5 +266,5 @@ export function newExtrudeOf(document: CadDocument, part: CadPart, name: string)
     ...(owner.drawnOn && { drawnOn: { on: owner.drawnOn.on, offset: 0 } }),
     ...(!owner.drawnOn && owner.placement && { placement: owner.placement }),
   };
-  return evaluateCadPart(made).part ? made : { ...made, regions: [] };
+  return unused.length && evaluateCadPart(made).part ? made : { ...made, regions: [] };
 }
