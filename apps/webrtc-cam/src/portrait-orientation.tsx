@@ -6,7 +6,7 @@ import { isMobile } from 'react-device-detect';
 // TypeScript declarations for Screen Orientation API
 declare global {
   interface ScreenOrientation {
-    lock?(orientation: OrientationLockType): Promise<void>;
+    lock(orientation: OrientationLockType): Promise<void>;
   }
 }
 

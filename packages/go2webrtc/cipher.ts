@@ -5,7 +5,7 @@ export interface CryptoHelper {
   nonce: string;
 }
 
-function encode(str: string): Uint8Array {
+function encode(str: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(str, c => c.charCodeAt(0));
 }
 

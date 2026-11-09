@@ -16,13 +16,13 @@ describe('initUndistortRectifyMapTyped', () => {
       [0, 62, 23.5],
       [0, 0, 1],
     ];
-    // prettier-ignore
+    // biome-ignore format: keep the hand-aligned layout
     const Kthree = new Matrix3().set(
       K[0][0], K[0][1], K[0][2],
       K[1][0], K[1][1], K[1][2],
       K[2][0], K[2][1], K[2][2]
     );
-    // prettier-ignore
+    // biome-ignore format: keep the hand-aligned layout
     const newK = new Matrix3().set(
       55, 0, 30,
       0, 57, 22,

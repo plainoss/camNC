@@ -7,9 +7,10 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - Use **pnpm** (Node `^20.19` or `>=22.12`, see `.nvmrc`) for all package management tasks.
 - Only in cloud environments: After making changes, run `pnpm run lint`, `pnpm run check-types`, `pnpm run test` and `pnpm run build` from the repo root.
   - These commands execute turborepo tasks across all packages.
-- Formatting is automated — you do **not** need to run Prettier manually:
-  - A `pre-commit` git hook (simple-git-hooks + nano-staged) re-formats staged `.ts`/`.tsx`/`.md` files on every commit.
-  - It reuses the repo `.prettierrc`/`.prettierignore`, so the result always matches CI's `pnpm run check-format`.
+- Formatting is automated — you do **not** need to run the formatter manually:
+  - A `pre-commit` git hook (simple-git-hooks + nano-staged) re-formats staged `.ts`/`.tsx` files with Biome and `.md` files with Prettier on every commit.
+  - It reuses the repo `biome.json` and `.prettierrc`/`.prettierignore`, so the result always matches CI's `pnpm run check-format`.
+  - To keep a hand-aligned block (a matrix, a table of numbers), put `// biome-ignore format: <why>` above it.
   - The hook installs itself via the `prepare` script on `pnpm install`.
 - Keep generated files such as `routeTree.gen.ts` read-only; avoid editing them manually.
 - Keep external application comparison reports, captures and private document links in the private companion repository. Public documentation and examples describe application behavior without product comparisons.
@@ -41,7 +42,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 
 ## Iteration and CI failures
 
-- During development, run the changed tests and relevant package lint/type checks first. Run the local fast suite once the change is ready, plus affected files excluded from it. After rebasing or resolving conflicts, rerun affected checks and `pnpm run check-format` before pushing; a previous green run validates the previous tree.
+- During development, run the changed tests and relevant package lint/type checks first. `pnpm run check-types:fast` type-checks every package with tsgo in about 12 s; CI still runs `tsc`, so run `pnpm run check-types` once before pushing if you changed types across packages. Run the local fast suite once the change is ready, plus affected files excluded from it. After rebasing or resolving conflicts, rerun affected checks and `pnpm run check-format` before pushing; a previous green run validates the previous tree.
 - PR CI runs only the quick suites. The browser files and behaviour specs run in the merge queue, so run the ones your change touches locally before queueing, or label the PR `full-ci` to run them on the PR (docs/TESTING.md).
 - Push coherent, validated milestones. Superseded PR commits cancel their CI, so avoid repeated pushes of incomplete fixes that discard useful validation.
 - Before repairing a shared test driver or CI failure, inspect open PRs and current main for an existing fix. Coordinate one shared repair rather than independently patching it into several feature branches.
@@ -64,7 +65,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 ## Code Style
 
 - All source code is written in modern ES modules and TypeScript.
-- Use the existing ESLint configuration by running `pnpm run lint`.
+- Lint with `pnpm run lint` (oxlint, configured in `.oxlintrc.json`; a whole run takes a few seconds).
 - Do not commit build artifacts or `node_modules` directories.
 - Put a new tool or feature in its own module rather than growing an existing file.
 - `scripts/file-size-ratchet.mjs` caps source files at 1000 lines, at commit and in CI. Files that were already longer are listed in `scripts/file-size-ceilings.json` and may only shrink; when one outgrows its cap, move code into a new module (nothing raises a ceiling).

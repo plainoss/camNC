@@ -4,9 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "lint": "eslint . --max-warnings 0",
+    "lint": "oxlint --max-warnings 0",
     "test": "vitest",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "check-types:fast": "tsgo --noEmit"
   },
   "dependencies": {
     "@react-spring/web": "catalog:",
@@ -29,21 +30,14 @@
     ".": "./src/index.ts"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "@vitest/browser": "catalog:",
-    "@wbcnc/eslint-config": "workspace:*",
     "@wbcnc/load-opencv": "workspace:*",
     "@wbcnc/typescript-config": "workspace:*",
     "@wbcnc/ui": "workspace:*",
-    "eslint": "catalog:",
-    "eslint-plugin-react-hooks": "catalog:",
-    "eslint-plugin-react-refresh": "catalog:",
-    "globals": "catalog:",
     "typescript": "~5.8.3",
-    "typescript-eslint": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
     "@webgpu/types": "catalog:"

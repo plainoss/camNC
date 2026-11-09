@@ -29,7 +29,8 @@
   },
   "scripts": {
     "test": "vitest",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "check-types:fast": "tsgo --noEmit"
   },
   "dependencies": {
     "@wbcnc/cad": "workspace:*"
