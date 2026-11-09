@@ -18,7 +18,7 @@ export const isBasePlane = (id: string): id is BasePlane => kBasePlanes.some(({ 
  */
 export function pickedPlane(document: CadDocument, id: string): { on: CadDrawnOn['on']; datum?: string; name: string } | null {
   const base = kBasePlanes.find(({ plane }) => plane === id);
-  if (base) return { on: { plane: base.plane }, name: base.label };
+  if (base) return { on: { plane: base.plane }, name: `the ${base.plane} plane` };
   const datum = document.planes?.find(plane => plane.id === id);
   return datum ? { on: datum.on, datum: datum.id, name: datum.name } : null;
 }
