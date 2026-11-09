@@ -19,12 +19,14 @@ const LENGTH_DIMENSIONS = new Set<CadConstraint['type']>([
 /**
  * The first length dimension of a sketch sizes the whole drawing: everything is scaled about the sketch origin so that
  * dimension measures `value`, keeping the drawn proportions. Returns null when the sketch already has a driving
- * dimension, is tied to geometry outside it (face edges, used corners, fixed points), or nothing would change.
+ * dimension or a pattern, is tied to geometry outside it (face edges, used corners, fixed points), or nothing would change.
  */
 export function scaleSketchForFirstDimension(sketch: CadSketch, dimensionId: string, value: number): CadSketch | null {
   const dimension = sketch.constraints.find(c => c.id === dimensionId);
   if (!dimension || !('value' in dimension) || dimension.driven || !LENGTH_DIMENSIONS.has(dimension.type)) return null;
   if (sketch.constraints.some(c => c.id !== dimensionId && 'value' in c && !c.driven)) return null;
+  // A pattern's spacing and master position act like dimensions of their own, so scaling would pull its copies apart.
+  if (sketch.constraints.some(c => c.type === 'linearPattern' || c.type === 'circularPattern')) return null;
   const origin = originId(sketch);
   const anchored = sketch.entities.some(e => e.faceEdge || (e.type === 'point' && e.id !== origin && (e.fixed || e.used)));
   if (anchored) return null;

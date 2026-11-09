@@ -86,4 +86,15 @@ describe('first dimension sizes the sketch', () => {
     };
     expect(scaleSketchForFirstDimension(fixed, 'width', 100)).toBeNull();
   });
+
+  it('leaves a sketch with a pattern alone, since its spacing would no longer match', () => {
+    const part = rectangleWithTopWidth(0, 0, false);
+    const pattern = {
+      id: 'p',
+      type: 'linearPattern',
+      stepX: { x: 30, y: 0 },
+      stepY: { x: 0, y: 0 },
+    } as unknown as CadSketch['constraints'][number];
+    expect(scaleSketchForFirstDimension({ ...part.sketch, constraints: [...part.sketch.constraints, pattern] }, 'width', 100)).toBeNull();
+  });
 });
