@@ -229,7 +229,7 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { chainGeometry, editable, hasOutline, isBlank, isSingleLine, replacePart, type ChainAnchor } from './editorHelpers';
+import { chainGeometry, editable, hasOutline, isBlank, isSingleLine, replacePart, withoutExtrude, type ChainAnchor } from './editorHelpers';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
@@ -3752,16 +3752,10 @@ export function CadEditor({
           return next;
         })
       );
-    if (step.kind === 'extrude' && studioSession) {
-      // In the studio a sketch stands on its own, as in the reference: deleting its Extrude leaves the sketch.
-      commit(
-        replacePart(current, step.partId, p => {
-          const next: CadPart = { ...p, extrude: false };
-          delete next.extrudeName;
-          return next;
-        })
-      );
-    } else if (step.kind === 'sketch' || step.kind === 'extrude') {
+    // In the studio a sketch stands on its own, as in the reference: deleting its Extrude leaves the sketch.
+    if (step.kind === 'extrude' && studioSession && !current.parts.find(p => p.id === step.partId)?.sketchOf)
+      commit(replacePart(current, step.partId, withoutExtrude));
+    else if (step.kind === 'sketch' || step.kind === 'extrude') {
       // A part is its sketch pushed out, so deleting either deletes the part.
       const parts = current.parts.filter(candidate => candidate.id !== step.partId);
       commit(withFeatureVersion({ ...current, parts }));

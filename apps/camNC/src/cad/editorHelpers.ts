@@ -51,3 +51,14 @@ export function chainGeometry(sketch: CadSketch, chain: ChainAnchor | null) {
   }
   return null;
 }
+
+/**
+ * A part's sketch left on its own once its Extrude is deleted: what the extrude added to, removed from or went up to
+ * goes with it. A part extruding another's sketch has no sketch of its own, so it's deleted rather than left.
+ */
+export function withoutExtrude(part: CadPart): CadPart {
+  const next: CadPart = { ...part, extrude: false };
+  for (const key of ['extrudeName', 'remove', 'addTo', 'addedRegions', 'upTo', 'upToDatum', 'symmetric', 'suppressed'] as const)
+    delete next[key];
+  return next;
+}
