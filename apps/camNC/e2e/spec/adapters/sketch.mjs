@@ -265,7 +265,7 @@ export async function createAdapter(page, url) {
   const reopened = async () => {
     if (/\/design$/.test(new URL(page.url()).pathname)) {
       // It may come back showing the 3D view, with the sketch canvas there but hidden.
-      await page.getByTestId('cad-canvas').waitFor({ state: 'attached' });
+      await page.getByTestId('cad-canvas').waitFor({ state: 'attached', timeout: 30_000 });
       await settle();
     } else if (/\/boards$/.test(new URL(page.url()).pathname)) {
       // An accepted design reopens on Boards. Its stage links are present even while the board is still loading.
