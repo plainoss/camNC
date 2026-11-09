@@ -194,6 +194,7 @@ import { DrawingInferencePreview } from './DrawingInferencePreview';
 import { tangentLineAxis, type InferredLineAxis } from './lineInference';
 import { buildConstraintForSelection, constraintPrompt, type ConstraintCommandTool } from './constraintCommands';
 import { cadViewState, saveCadViewState } from './viewState';
+import { loadShownState, saveShownState } from './shownState';
 import { dragTargets, hasDragMovement } from './drag';
 import { dragSnapConstraints, inferDragPoint } from './dragSnap';
 import { boxSelectSketch, type CadSelectionBox } from './boxSelection';
@@ -537,12 +538,15 @@ export function CadEditor({
   useEffect(() => setUsingEdges(false), [part?.id, showWorkspace]);
   const [transparentParts, setTransparentParts] = useState<ReadonlySet<string>>(() => new Set());
   // Parts hidden from the studio's view by their eye in the parts list.
-  const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
+  // Both are kept for the design in this browser, so a reload shows it as it was left.
+  const [savedShown] = useState(() => loadShownState(session.document.id));
+  const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set(savedShown.hiddenParts));
   // Sketches, planes and the origin shown or hidden with their eyes in the feature list, where that differs from how
   // they start: a sketch shows until Extrude makes a part of it, and the rest show.
   // The sketch whose row in the feature list was clicked last, while nothing else has been picked since.
   const [sketchRowPicked, setSketchRowPicked] = useState<string | null>(null);
-  const [featureVisibility, setFeatureVisibility] = useState<Readonly<Record<string, boolean>>>({});
+  const [featureVisibility, setFeatureVisibility] = useState<Readonly<Record<string, boolean>>>(savedShown.featureVisibility);
+  useEffect(() => saveShownState(doc.id, { hiddenParts: [...hiddenParts], featureVisibility }), [doc.id, hiddenParts, featureVisibility]);
   /** A Parts row's right-click menu, and the row being renamed in place, by its key (a part's ID, or `part/copy`). */
   const [partMenu, setPartMenu] = useState<{ key: string; name: string; x: number; y: number } | null>(null);
   const [renamingPart, setRenamingPart] = useState<string | null>(null);

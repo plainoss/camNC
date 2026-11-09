@@ -362,6 +362,19 @@ it('hides the hovered part or copy before the selection, and falls back after ho
   expect(props().meshes).toHaveLength(0);
 });
 
+it('keeps a part hidden with its eye when the design is opened again', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  const name = source.parts[0]!.name;
+  await studio(source);
+  fireEvent.click(within(screen.getByRole('region', { name: 'Parts panel' })).getByRole('button', { name: `Hide ${name}` }));
+  await waitFor(() => expect(screen.getByRole('button', { name: `Show ${name}` })).toBeDefined());
+  cleanup();
+  await studio(source);
+  expect(within(screen.getByRole('region', { name: 'Parts panel' })).getByRole('button', { name: `Show ${name}` })).toBeDefined();
+  fireEvent.click(screen.getByRole('button', { name: `Show ${name}` }));
+  await waitFor(() => expect(localStorage.getItem(`camnc:cad-shown:${source.id}`)).toBeNull());
+});
+
 it('isolates the selected part including hiding copies, then restores the previous hidden set', async () => {
   const { workspace, panel, props } = await visibilityStudio();
   fireEvent.click(within(panel).getByRole('button', { name: 'Hide Shelf' }));
