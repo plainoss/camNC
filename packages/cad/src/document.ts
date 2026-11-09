@@ -5,8 +5,8 @@ import { refreshDimensionMeasurement } from './dimensions';
 import { cadVariableNameError } from './valueExpressions';
 import { migrateDimensionPlacements } from './dimensionPlacement';
 import { nestedDeeperThan } from './nestingDepth';
+import { validPartCutSplit } from './partCutSplit';
 import type {
-  CadPartCut,
   CadDirection,
   CadArcEntity,
   CadCircleEntity,
@@ -1106,18 +1106,4 @@ export function parseCadDocument(input: unknown): CadDocument {
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);
   }
   return parsed;
-}
-
-/** Whether a split describes alternating segments that can form a joint. */
-export function validPartCutSplit(split: unknown): split is CadPartCut['split'] {
-  return (
-    split === undefined ||
-    split === 'half' ||
-    (!!split &&
-      typeof split === 'object' &&
-      'fingers' in split &&
-      Number.isInteger(split.fingers) &&
-      (split.fingers as number) >= 2 &&
-      (!('fingersExpression' in split) || split.fingersExpression === undefined || typeof split.fingersExpression === 'string'))
-  );
 }
