@@ -100,6 +100,9 @@ folder. It prints one JSON line with the files, the design's part count, any pag
 if anything failed. A picture is written once two frames in a row of the 3D view look the same, so the camera has
 moved and been drawn. In a session, `render top iso` does the same on the open design.
 
+`pnpm --filter @wbcnc/camNC test:render` checks the command end to end on `designs/plate.json`. It starts a dev
+server and a browser, so it isn't part of `pnpm test`; CI runs it in the behaviour-spec job.
+
 ## Scenario format
 
 ```json

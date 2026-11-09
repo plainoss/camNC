@@ -23,6 +23,7 @@
     "spec:cad": "node e2e/spec/run.mjs",
     "spec:session": "node e2e/spec/session.mjs",
     "render": "node e2e/spec/render.mjs",
+    "test:render": "node --test e2e/spec/render.node.mjs",
     "test:domain": "vitest run --config vitest.node.config.ts",
     "test:worker": "vitest run --config vitest.worker.config.ts",
     "test:browser": "vitest run"

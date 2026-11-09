@@ -1,3 +1,4 @@
+// Starts a dev server and a browser, so it runs in CI's behaviour-spec job rather than the unit suites.
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -6,7 +7,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { onTestFinished, test } from 'vitest';
+import { test } from 'node:test';
 import { parseRenderArgs } from './render.mjs';
 
 /** Width and height from a PNG's header chunk. */
@@ -28,10 +29,10 @@ test('render options name a design, its views and a picture size', () => {
   assert.throws(() => parseRenderArgs(['designs/plate.json', '--url', 'https://app.example.com']), /local dev server/);
 });
 
-test('a saved design renders to one PNG per view, at the asked size', { timeout: 240_000 }, async () => {
+test('a saved design renders to one PNG per view, at the asked size', { timeout: 240_000 }, async t => {
   const outDir = await mkdtemp(path.join(tmpdir(), 'camnc-render-'));
-  onTestFinished(() => rm(outDir, { recursive: true, force: true }));
-  // As its own process, the way it's used: the adapter's in-page functions must reach the browser as written, untransformed.
+  t.after(() => rm(outDir, { recursive: true, force: true }));
+  // As its own process, the way it's used.
   const cli = fileURLToPath(new URL('./render.mjs', import.meta.url));
   const args = [cli, 'designs/plate.json', '--view', 'top', '--size', '1000x700', '--out', outDir];
   const { stdout } = await promisify(execFile)(process.execPath, args, { timeout: 230_000 });
