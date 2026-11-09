@@ -21,7 +21,7 @@ export interface RectangleInput {
 
 export type RectangleResult =
   | { sketch: CadSketch; sizeExpressions: Record<string, string | undefined>; error?: undefined }
-  | { error: string; sketch?: undefined };
+  | { error: string; sketch?: undefined; sizeExpressions?: undefined };
 
 /**
  * Adds a corner or center rectangle. Drawn to a point it is only shaped; made from typed sizes it is dimensioned, and an
