@@ -1,6 +1,6 @@
 (camNC CAM)
 (board-neighbor-open-pocket)
-(Plan: cam-plan-v1-5baab53238e5620e)
+(Plan: cam-plan-v1-844fa02e6559c31a)
 (Post: fluidnc. Safe Z17. Retract Z14)
 (Planned bounds: X38..102 Y33..39 Z6..12)
 (Stock: 140 x 120 x 12 mm)
@@ -9,7 +9,8 @@
 (  T1 D=6 CR=0 - ZMIN=6 - synthetic flat end mill )
 ( )
 (WARNING: Main: Pocket 1: Open-pocket path would reach a neighboring part using a path inside the pocket)
-(WARNING: Main: pocket z=6: 7.7mm² left in corners/narrow spots with D=6)
+(WARNING: Main: Pocket 1: 3.9mm² left along the open edge with D=6: the path stays inside the pocket to keep clear of a neigh)
+(WARNING: Main: pocket z=6: 3.9mm² left in corners/narrow spots with D=6)
 G21 G90 G94 G17
 G40 G49 G80
 G0 Z17
