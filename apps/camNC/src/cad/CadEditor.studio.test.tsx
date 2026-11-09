@@ -16,7 +16,7 @@ import {
   setCutDepth,
   type CadDocument,
 } from '@wbcnc/cad';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
@@ -52,6 +52,123 @@ async function studio(source = createPlateDocument({ width: 200, height: 100 }))
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
   return { latest, finish };
 }
+
+async function newStudioSketch() {
+  const result = await studio();
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Sketch/ }));
+  await userEvent.click(within(screen.getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Top/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Sketch · / });
+  await settled();
+  const canvas = screen.getByTestId('cad-canvas') as unknown as SVGSVGElement;
+  vi.spyOn(canvas, 'setPointerCapture').mockImplementation(() => {});
+  return { ...result, dialog, canvas };
+}
+
+async function drawStudioLine(canvas: SVGSVGElement) {
+  fireEvent.keyDown(canvas, { key: 'l' });
+  for (const [x, y] of [
+    [20, 20],
+    [80, 40],
+  ]) {
+    const at = new DOMPoint(x, -y).matrixTransform(canvas.getScreenCTM()!);
+    fireEvent.pointerDown(canvas, { button: 0, pointerId: 1, clientX: at.x, clientY: at.y });
+    fireEvent.pointerUp(canvas, { button: 0, pointerId: 1, clientX: at.x, clientY: at.y });
+  }
+  fireEvent.keyDown(canvas, { key: 'Escape' });
+  await settled();
+}
+
+async function blankSketchMenu(canvas: SVGSVGElement) {
+  const box = canvas.getBoundingClientRect();
+  const position = { clientX: box.right - 30, clientY: box.bottom - 30, button: 2, pointerId: 1 };
+  fireEvent.pointerDown(canvas, position);
+  fireEvent.pointerUp(canvas, position);
+  return screen.findByRole('menu', { name: 'Sketch menu' });
+}
+
+it.each(['Cancel', 'Escape'])('restores a cancelled studio sketch and its drawn line after %s', async cancel => {
+  const { latest, dialog, canvas } = await newStudioSketch();
+  await drawStudioLine(canvas);
+  const kept = structuredClone(latest().parts.at(-1)!);
+  const line = kept.sketch.entities.find(entity => entity.type === 'line')!;
+  expect(line).toBeDefined();
+  if (cancel === 'Escape') fireEvent.keyDown(dialog, { key: 'Escape' });
+  else await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  const restore = await screen.findByRole('button', { name: 'Restore' });
+  expect(restore.closest('[role="status"]')?.textContent).toContain('Sketch cancelled.');
+  expect(latest().parts.some(part => part.id === kept.id)).toBe(false);
+  await userEvent.click(restore);
+  await screen.findByRole('dialog', { name: `Sketch · ${kept.name}` });
+  await settled();
+  expect(latest().parts.find(part => part.id === kept.id)?.sketch).toEqual(kept.sketch);
+  expect(screen.getByTestId('cad-canvas').querySelector(`[data-entity-id="${line.id}"]`)).not.toBeNull();
+  expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
+  // Restoring is a normal edit in the document's undo history.
+  fireEvent.keyDown(screen.getByTestId('cad-canvas'), { key: 'z', ctrlKey: true });
+  await waitFor(() => expect(latest().parts.some(part => part.id === kept.id)).toBe(false));
+});
+
+it('confirms a studio sketch from the empty-canvas context menu and keeps its line', async () => {
+  const { latest, canvas } = await newStudioSketch();
+  await drawStudioLine(canvas);
+  const kept = structuredClone(latest().parts.at(-1)!);
+  const menu = await blankSketchMenu(canvas);
+  expect(within(menu).getByRole('menuitem', { name: 'Zoom to fit' })).toBeDefined();
+  const confirm = within(menu).getByRole('menuitem', { name: 'Confirm sketch' });
+  expect(confirm.getAttribute('aria-disabled')).not.toBe('true');
+  await userEvent.click(confirm);
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull();
+  expect(latest().parts.find(part => part.id === kept.id)?.sketch).toEqual(kept.sketch);
+});
+
+it('disables Confirm sketch with the same reason as the empty sketch dialog', async () => {
+  const { dialog, canvas } = await newStudioSketch();
+  const finish = within(dialog).getByRole('button', { name: '✓ Finish sketch' });
+  expect(finish).toHaveProperty('disabled', true);
+  const menu = await blankSketchMenu(canvas);
+  const confirm = within(menu).getByRole('menuitem', { name: 'Confirm sketch' });
+  expect(confirm.getAttribute('aria-disabled')).toBe('true');
+  const reason = confirm.getAttribute('title');
+  expect(reason).toBeTruthy();
+  expect(confirm.getAttribute('aria-description')).toBe(reason);
+  expect(finish.getAttribute('title')).toBe(reason);
+  fireEvent.click(confirm);
+  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+});
+
+it.each(['sketch', 'extrude', 'undo'])('dismisses Restore when another step starts: %s', async step => {
+  await studio();
+  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Plate/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await screen.findByRole('button', { name: 'Restore' });
+  const toolbar = screen.getByRole('toolbar', { name: 'Part Studio toolbar' });
+  if (step === 'undo') fireEvent.keyDown(toolbar, { key: 'z', ctrlKey: true });
+  else if (step === 'sketch') {
+    await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Plate/ }));
+    await screen.findByRole('dialog', { name: 'Sketch · Plate' });
+  } else {
+    await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+    await screen.findByRole('dialog', { name: /^Extrude · / });
+  }
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull());
+});
+
+it('expires Restore after twelve seconds', async () => {
+  const { dialog } = await newStudioSketch();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeDefined();
+    act(() => vi.advanceTimersByTime(11_999));
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeDefined();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 it('toggles base planes and requests named views and fit from workspace shortcuts', async () => {
   await studio();

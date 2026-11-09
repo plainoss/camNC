@@ -1,5 +1,5 @@
 import { Fragment, useRef } from 'react';
-import { Focus, Maximize, MousePointer2, Pencil, Ruler, Trash2 } from 'lucide-react';
+import { Check, Focus, Maximize, MousePointer2, Pencil, Ruler, Trash2 } from 'lucide-react';
 import type { CadSketch } from '@wbcnc/cad';
 import {
   DropdownMenu,
@@ -20,6 +20,8 @@ export interface SketchContextMenuProps {
   onClose: () => void;
   onAction: (action: SketchContextAction, context: SketchContext) => void;
   onReturnToCanvas: () => void;
+  /** Finishes the sketch from the empty-canvas menu; disabled with `reason` when it can't be finished yet. */
+  confirm?: { reason: string | null; onConfirm: () => void };
 }
 const icons = {
   'delete-entities': Trash2,
@@ -33,7 +35,7 @@ const icons = {
 };
 
 /** A collision-aware portal keeps menu navigation and focus ownership out of the sketch gesture handlers. */
-export function SketchContextMenu({ sketch, context, busy = false, onClose, onAction, onReturnToCanvas }: SketchContextMenuProps) {
+export function SketchContextMenu({ sketch, context, busy = false, onClose, onAction, onReturnToCanvas, confirm }: SketchContextMenuProps) {
   const restoreCanvasFocus = useRef(true);
   if (!context) return null;
   const items = sketchContextItems(sketch, context, busy);
@@ -88,6 +90,24 @@ export function SketchContextMenu({ sketch, context, busy = false, onClose, onAc
           if (restoreCanvasFocus.current) onReturnToCanvas();
           restoreCanvasFocus.current = true;
         }}>
+        {confirm && context.target.kind === 'blank' && (
+          <>
+            <DropdownMenuItem
+              className="cad-context-item"
+              disabled={busy || !!confirm.reason}
+              title={confirm.reason ?? undefined}
+              aria-description={confirm.reason ?? undefined}
+              onSelect={() => {
+                restoreCanvasFocus.current = false;
+                onClose();
+                confirm.onConfirm();
+              }}>
+              <Check aria-hidden="true" />
+              <span>Confirm sketch</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         {items.map(item => {
           const Icon = item.action === 'construction' ? null : icons[item.action];
           const content = (
