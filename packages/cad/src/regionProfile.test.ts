@@ -39,6 +39,17 @@ describe('a part extruded from picked regions', () => {
     expect(evaluated.diagnostics).toEqual([]);
     expect(Math.abs(polygonArea(evaluated.part!.outline))).toBeCloseTo(5000, 3);
   });
+
+  it('joins two rectangles drawn side by side, over the edge they share', () => {
+    const part = createCadPart('Board', 18);
+    let sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 30, height: 50 });
+    sketch = addRectangle(sketch, { x: 30, y: 0, width: 70, height: 50 });
+    const regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE);
+    expect(regions).toHaveLength(2);
+    const evaluated = evaluateCadPart({ ...part, sketch, regions: regions.map(region => region.id) });
+    expect(evaluated.diagnostics).toEqual([]);
+    expect(Math.abs(polygonArea(evaluated.part!.outline))).toBeCloseTo(5000, 3);
+  });
 });
 
 describe('the holes of a region', () => {

@@ -1,5 +1,5 @@
-import { CAD_CHORD_TOLERANCE, polygonArea } from './geometry';
-import { sketchRegions } from './sketchRegions';
+import { CAD_CHORD_TOLERANCE, pointInPolygon, polygonArea } from './geometry';
+import { regionInteriorPoint, sketchRegions } from './sketchRegions';
 import type { CadSketchRegion } from './sketchRegions';
 import type { CadDiagnostic, CadPart, CadSketch, EvaluatedCadPart } from './types';
 
@@ -69,14 +69,10 @@ export function regionProfile(part: CadPart & { regions: string[] }): { part?: E
 const regionArea = (region: Pick<CadSketchRegion, 'points' | 'holes'>) =>
   Math.abs(polygonArea(region.points)) - region.holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0);
 
-/**
- * Regions side by side as one: the region the sketch has where the curves between them are left out. Regions that
- * don't touch, or whose curves between them also bound others, have none.
- */
-export function joinedRegions(sketch: CadSketch, picked: CadSketchRegion[]): CadSketchRegion | null {
-  // A region's ID lists the side of each curve it lies on: a curve with picked regions on both sides is between them.
+/** The curves with picked regions on both sides: a region's ID lists the side of each curve it lies on. */
+function curvesBetween(regions: CadSketchRegion[]): Set<string> {
   const sides = new Map<string, Set<string>>();
-  for (const region of picked)
+  for (const region of regions)
     for (const side of region.id
       .slice(region.id.indexOf(':region:') + ':region:'.length)
       .replace(/#\d+$/, '')
@@ -84,11 +80,34 @@ export function joinedRegions(sketch: CadSketch, picked: CadSketchRegion[]): Cad
       const curve = side.slice(0, side.lastIndexOf(':'));
       sides.set(curve, (sides.get(curve) ?? new Set()).add(side));
     }
-  const between = new Set([...sides].filter(([, on]) => on.size > 1).map(([id]) => id));
-  if (!between.size) return null;
-  const joined = sketchRegions({ ...sketch, entities: sketch.entities.filter(entity => !between.has(entity.id)) }, CAD_CHORD_TOLERANCE);
+  return new Set([...sides].filter(([, on]) => on.size > 1).map(([id]) => id));
+}
+
+/**
+ * Regions side by side as one: the region the sketch has where the curves between them are left out. Curves drawn over
+ * each other are left out in turn. Regions that don't touch, or whose curves between them also bound others, have none.
+ */
+export function joinedRegions(sketch: CadSketch, picked: CadSketchRegion[]): CadSketchRegion | null {
   const area = picked.reduce((sum, region) => sum + regionArea(region), 0);
-  const match = joined.find(candidate => Math.abs(regionArea(candidate) - area) < 1e-3 * Math.max(1, area));
-  // Every picked region lies in it, and nothing else does, as the area says.
-  return match && picked.every(region => region.curveIds.some(id => !between.has(id) && match.curveIds.includes(id))) ? match : null;
+  const inside = picked.map(region => regionInteriorPoint(region.points));
+  if (inside.some(point => !point)) return null;
+  let entities = sketch.entities,
+    current = picked;
+  for (let round = 0; round < 8; round++) {
+    const between = curvesBetween(current);
+    if (!between.size) return null;
+    entities = entities.filter(entity => !between.has(entity.id));
+    const regions = sketchRegions({ ...sketch, entities }, CAD_CHORD_TOLERANCE);
+    // Each picked region is now in the smallest region around a point inside it.
+    const holding = inside.map(point =>
+      regions
+        .filter(region => pointInPolygon(point!, region.points))
+        .reduce<CadSketchRegion | null>((best, region) => (!best || regionArea(region) < regionArea(best) ? region : best), null)
+    );
+    if (holding.some(region => !region)) return null;
+    current = [...new Set(holding as CadSketchRegion[])];
+    // One region, and nothing more than the picked ones, as the area says.
+    if (current.length === 1) return Math.abs(regionArea(current[0]!) - area) < 1e-3 * Math.max(1, area) ? current[0]! : null;
+  }
+  return null;
 }

@@ -4364,7 +4364,7 @@ export function CadEditor({
           <div className="cad-canvas-bar">
             {showWorkspace ? (
               <span>
-                <strong>PART STUDIO</strong> · {doc.parts.length === 1 ? 'one part' : `${doc.parts.length} parts`}
+                <strong>PART STUDIO</strong> · {builtParts.length === 1 ? 'one part' : `${builtParts.length} parts`}
               </span>
             ) : studioSession && part ? (
               <span>
