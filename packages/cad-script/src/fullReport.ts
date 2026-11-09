@@ -9,6 +9,8 @@ import {
   designSteps,
   extrudeStepProblem,
   isCadPart,
+  isSpatialRemoval,
+  removalTargets,
   polygonArea,
   type CadDirection,
   type CadDocument,
@@ -416,6 +418,16 @@ export async function fullCadReport(
               ? { addsTo: partName(part.addTo) }
               : part.remove
                 ? (() => {
+                    if (isSpatialRemoval(part)) {
+                      return {
+                        removesFrom: removalTargets(document, part).map(target => target.name),
+                        cuts: parts.flatMap(target =>
+                          (target.cuts ?? [])
+                            .filter(cut => cut.id.startsWith(`cut-parts:remove-${part.id}:`))
+                            .map(cut => ({ part: target.name, side: cut.side, from: cut.from, to: cut.to, through: cut.through }))
+                        ),
+                      };
+                    }
                     const target = document.parts.find(candidate =>
                       candidate.features?.some(feature => feature.type === 'cut' && feature.removedBy === part.id)
                     );
@@ -442,7 +454,12 @@ export async function fullCadReport(
             ...(part.regions && { regions: regionIds(part.regions) }),
             ...(part.addedRegions && { addedRegions: regionIds(part.addedRegions) }),
             ...(part.addTo && { addTo: partName(part.addTo) }),
-            ...(part.remove && { remove: { depth: typed(part.remove.depth, part.remove.depthExpression) } }),
+            ...(part.remove && {
+              remove: {
+                depth: typed(part.remove.depth, part.remove.depthExpression),
+                ...(part.remove.targets && { targets: part.remove.targets.map(partName) }),
+              },
+            }),
             ...(part.upTo && { upTo: faceOn(part.upTo) }),
             ...(part.symmetric && { symmetric: true }),
             ...(part.thin && {

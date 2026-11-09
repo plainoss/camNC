@@ -1,7 +1,8 @@
+import { applyExtrudeRemovals } from './extrudeRemoval';
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
 import { validPartCutSplit } from './partCutSplit';
-import { mirrorEvaluatedPart, sameCadCuts } from './copies';
+import { evaluatedPartCopy, mirrorEvaluatedPart, sameCadCuts } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
 import { evaluateCadFeatures } from './features';
@@ -261,7 +262,8 @@ export function applyPartCuts(
         ...(sources.get(part.partId)?.copies ?? []).map(copy => ({
           key: copy.id,
           at: copy.placement,
-          shape: copy.mirrored ? mirrorEvaluatedPart(part) : part,
+          // A preceding removal can give each instance different cuts; don't copy the original's cuts over them.
+          shape: evaluatedPartCopy(part, copy),
           mirrored: !!copy.mirrored,
         })),
       ],
@@ -272,8 +274,8 @@ export function applyPartCuts(
       refused = false;
     // Each copy of a target is cut on its own, so the same problem is said once per step, not once per copy.
     const said = new Set<string>();
-    const warn = (message: string) => {
-      if (!said.has(message)) diagnostics.push({ code: 'part-cut-unresolved', severity: 'warning', message });
+    const warn = (message: string, code = 'part-cut-unresolved') => {
+      if (!said.has(message)) diagnostics.push({ code, severity: 'warning', message });
       said.add(message);
     };
     const cutBoxes = (
@@ -331,7 +333,8 @@ export function applyPartCuts(
           : { points: outline, skipped: [] };
         if (relief.skipped.length)
           warn(
-            `${relief.skipped.length} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`
+            `${relief.skipped.length} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`,
+            'corner-relief-skipped'
           );
         const current = target.shape;
         // The first piece keeps the ID a tool's one cut always had.
@@ -387,7 +390,7 @@ export function applyPartCuts(
                     {
                       key: `:${copy.id}`,
                       at: copy.placement,
-                      shape: copy.mirrored ? mirrorEvaluatedPart(tool) : tool,
+                      shape: evaluatedPartCopy(tool, copy),
                       name: cadCopyName(toolSource, index),
                     },
                   ]
@@ -548,7 +551,8 @@ export function applyPartCuts(
       const cuts = (copy.mirrored ? mirrorEvaluatedPart(copy.shape) : copy.shape).cuts ?? [];
       if (!sameCadCuts(original.cuts, cuts)) copyCuts[copy.key] = cuts;
     }
-    byId.set(id, { ...original, ...(Object.keys(copyCuts).length && { copyCuts }) });
+    const { copyCuts: _previousCopyCuts, ...shape } = original;
+    byId.set(id, { ...shape, ...(Object.keys(copyCuts).length && { copyCuts }) });
   }
   return { parts: parts.map(part => byId.get(part.partId)!), diagnostics };
 }
@@ -561,7 +565,7 @@ export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): Eva
   const steps = (document.partCuts ?? []).filter(
     step => step.targets.includes(part.partId) || (step.split && step.tools.some(id => id.split(':')[0] === part.partId))
   );
-  if (!steps.length) return part;
+  if (!steps.length && !document.parts.some(candidate => candidate.remove)) return part;
   const toolIds = [...new Set(steps.flatMap(step => [...step.targets, ...step.tools.map(id => id.split(':')[0]!)]))].filter(
     id => id !== part.partId
   );
@@ -570,7 +574,7 @@ export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): Eva
     const profile = source && evaluateCadPart(source).part;
     return source && profile ? [evaluateCadFeatures(source, profile).part] : [];
   });
-  return applyPartCuts(document, [part, ...tools]).parts[0]!;
+  return applyPartCuts(document, applyExtrudeRemovals(document, [part, ...tools]).parts).parts[0]!;
 }
 
 /** Adds a step that cuts the tool parts out of the target parts, with this much room around them. */

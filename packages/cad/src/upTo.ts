@@ -1,3 +1,4 @@
+import { removalInward } from './extrudeRemoval';
 import { cadDatumFrame } from './datumPlanes';
 import { cadFaceFrame, resolveDrawnPlacements } from './drawnOn';
 import { cadSketchFrame } from './usedEdges';
@@ -21,7 +22,7 @@ export function resolveUpTo(document: CadDocument): CadDocument {
     const to = (part.upToDatum && cadDatumFrame(placed, part.upToDatum)) || cadFaceFrame(placed, part.upTo);
     if (!from || 'error' in to) return part;
     const reach = [0, 1, 2].reduce((sum, axis) => sum + (to.origin[axis]! - from.origin[axis]!) * from.normal[axis]!, 0);
-    const thickness = Math.round((part.drawnOn.inward ? -reach : reach) * 1e6) / 1e6;
+    const thickness = Math.round(((part.remove ? removalInward(part) : part.drawnOn.inward) ? -reach : reach) * 1e6) / 1e6;
     if (!(thickness > kThinnest) || Math.abs(thickness - part.thickness) < 1e-9) return part;
     changed = true;
     const next = { ...part, thickness };
