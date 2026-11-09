@@ -2,7 +2,7 @@ import { activeDesign, assemblyReport, evaluateCadDocument, isCadPart, partFaceA
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ModelViewport, type ModelFacePick, type ModelView, type ViewRegion, type ViewRequest } from '@/cam/model/ModelViewport';
 import { assemblyModel, instanceKey } from './assemblyModel';
-import { basePlaneViews, type BasePlane } from './basePlanes';
+import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
 
 const kViews: { view: ModelView; label: string }[] = [
@@ -27,6 +27,7 @@ export default function WorkspaceView({
   onChoosingChange,
   highlightIds,
   hiddenIds,
+  transparentIds,
   selectedPlane,
   onSelectPlane,
   onSelectFace,
@@ -35,6 +36,7 @@ export default function WorkspaceView({
   regions,
   onPickRegion,
   viewRequest,
+  onViewRequest,
   showPlanes = true,
   children,
 }: {
@@ -44,7 +46,8 @@ export default function WorkspaceView({
   onHover?: (id: string | null) => void;
   onOpen: (partId: string) => void;
   /** Starts a new part drawn on a base plane or a part's face. */
-  onNewPart?: (on: CadDrawnOn['on']) => void;
+  /** A new part drawn on a plane or a face, or on one of the design's planes, offset from what it's on. */
+  onNewPart?: (on: CadDrawnOn['on'], datum?: string) => void;
   /** Starts a step cutting some parts out of others. */
   onCutParts?: () => void;
   /**
@@ -57,9 +60,10 @@ export default function WorkspaceView({
   highlightIds?: readonly string[];
   /** Parts hidden from the view, as the parts list's eye toggles them. */
   hiddenIds?: ReadonlySet<string>;
+  transparentIds?: ReadonlySet<string>;
   /** A base plane picked to draw the next sketch on, and picking one outside of choosing. */
-  selectedPlane?: BasePlane | null;
-  onSelectPlane?: (plane: BasePlane) => void;
+  selectedPlane?: string | null;
+  onSelectPlane?: (plane: string) => void;
   /** The face of the part last clicked, for a sketch started next to be drawn on, as the reference sketches on a selection. */
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
   /** The name of the plane or face picked for the next sketch, said in the status line so the pick isn't hidden. */
@@ -70,6 +74,7 @@ export default function WorkspaceView({
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
   viewRequest?: ViewRequest;
+  onViewRequest?: (request: Omit<ViewRequest, 'seq'>) => void;
   showPlanes?: boolean;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
@@ -186,6 +191,9 @@ export default function WorkspaceView({
         parts={model.parts}
         view={view}
         viewRequest={viewRequest}
+        onViewRequest={onViewRequest}
+        transparentIds={transparentIds}
+        instanceIds={model.instances.map(instanceKey)}
         selectedId={selectedId}
         selectedIndexes={selectedIndexes}
         // The studio shows parts as the reference does, and says in its status line when two overlap rather than colouring them.
@@ -200,13 +208,13 @@ export default function WorkspaceView({
         regions={regions}
         onPickRegion={onPickRegion}
         onPickPlane={id => {
-          const plane = id as BasePlane;
           // Picked while choosing, the new part is drawn on it; otherwise it's picked for the next sketch, as a face is.
-          if (choosing) {
+          const plane = pickedPlane(document, id);
+          if (choosing && plane) {
             setChoosing(false);
             setNotice(null);
-            onNewPart?.({ plane });
-          } else onSelectPlane?.(plane);
+            onNewPart?.(plane.on, plane.datum);
+          } else onSelectPlane?.(id);
         }}
         onSelect={(_, index, pick) => {
           const partId = model.instances[index]!.partId;

@@ -26,6 +26,11 @@ afterEach(() => {
   cleanup();
   sessions.splice(0).forEach(endCadSession);
 });
+/** Opens a part's extrude from its step in the feature list, as the reference edits a feature. */
+const editExtrude = async (part: string) =>
+  userEvent.dblClick(
+    within(await screen.findByRole('region', { name: 'Features' })).getByRole('button', { name: new RegExp(`Extrude · ${part}`) })
+  );
 const settled = () =>
   waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
 
@@ -96,6 +101,19 @@ it('deletes a feature with the Delete key, as the reference does, and undo bring
   await waitFor(() => expect(latest().parts).toHaveLength(1));
 });
 
+it('routes cube requests through the studio sequence', async () => {
+  await studio();
+  const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await waitFor(() => expect(props().onViewRequest).toBeDefined());
+  props().onViewRequest!({ name: 'top' });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'top', seq: 1 }));
+  props().onViewRequest!({ name: 'iso', direction: [1, -1, 0] });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'iso', direction: [1, -1, 0], seq: 2 }));
+  fireEvent.keyDown(workspace, { key: 'f', code: 'KeyF' });
+  await waitFor(() => expect(props().viewRequest).toEqual({ name: 'fit', seq: 3 }));
+});
+
 it('leaves viewport shortcuts alone while typing in fields or using modifiers', async () => {
   await studio();
   const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
@@ -127,6 +145,27 @@ async function visibilityStudio() {
   await waitFor(() => expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate', 'Plate 2', 'Shelf']));
   return { workspace, panel, props };
 }
+
+it('toggles transparency for the selection or hovered instance and clears it with show all', async () => {
+  const { workspace, props } = await visibilityStudio();
+  const selected = props().instanceIds![0]!;
+  const copy = props().instanceIds![1]!;
+  const toggle = (repeat = false) => fireEvent.keyDown(workspace, { key: 'T', code: 'KeyT', shiftKey: true, repeat });
+  toggle();
+  await waitFor(() => expect(props().transparentIds).toEqual(new Set([selected])));
+  toggle(true);
+  expect(props().transparentIds).toEqual(new Set([selected]));
+  toggle();
+  await waitFor(() => expect(props().transparentIds?.size).toBe(0));
+  props().onHover?.(props().meshes[1]!.partId, 1);
+  toggle();
+  await waitFor(() => expect(props().transparentIds).toEqual(new Set([copy])));
+  props().onHover?.(null);
+  toggle();
+  await waitFor(() => expect(props().transparentIds).toEqual(new Set([copy, selected])));
+  fireEvent.keyDown(workspace, { key: 'Y', code: 'KeyY', shiftKey: true });
+  await waitFor(() => expect(props().transparentIds?.size).toBe(0));
+});
 
 it('hides the selected part with Y and shows all parts with Shift+Y', async () => {
   const { workspace, panel, props } = await visibilityStudio();
@@ -215,9 +254,17 @@ it('opens as a studio, with its own toolbar and steps set in dialogs that keep o
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   expect(screen.queryByRole('toolbar', { name: 'Sketch toolbar' })).toBeNull();
 
-  // A changed thickness shows straight away, and the cross puts it back.
+  // Extrude always starts a new extrude: of the selected part's sketch, with nothing picked once it's all used.
   await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
-  let dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  let dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
+  await waitFor(() => expect(latest().parts[1]).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [] }));
+  expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(latest().parts).toHaveLength(1));
+
+  // A part's extrude is edited from its step. A changed thickness shows straight away, and the cross puts it back.
+  await editExtrude('Plate');
+  dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
   const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
   await userEvent.clear(thickness);
   await userEvent.type(thickness, '30');
@@ -230,7 +277,7 @@ it('opens as a studio, with its own toolbar and steps set in dialogs that keep o
   expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull();
 
   // A thickness that can't be used can't be kept.
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  await editExtrude('Plate');
   dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
   await userEvent.clear(within(dialog).getByRole('textbox', { name: /Thickness/ }));
   await userEvent.type(within(dialog).getByRole('textbox', { name: /Thickness/ }), '0');
@@ -240,7 +287,7 @@ it('opens as a studio, with its own toolbar and steps set in dialogs that keep o
   expect(latest().parts[0]!.thickness).toBe(18);
 
   // The tick keeps it.
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  await editExtrude('Plate');
   dialog = screen.getByRole('dialog', { name: 'Extrude · Plate' });
   await userEvent.clear(within(dialog).getByRole('textbox', { name: /Thickness/ }));
   await userEvent.type(within(dialog).getByRole('textbox', { name: /Thickness/ }), '24');
@@ -402,7 +449,7 @@ it('closes an open variable dialog when another step is started', async () => {
   await userEvent.click(within(toolbar).getByRole('button', { name: /Variable/ }));
   expect(screen.getByRole('dialog', { name: 'Variable' })).toBeDefined();
   await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
-  expect(await screen.findByRole('dialog', { name: 'Extrude · Plate' })).toBeDefined();
+  expect(await screen.findByRole('dialog', { name: /^Extrude · Part / })).toBeDefined();
   expect(screen.queryByRole('dialog', { name: 'Variable' })).toBeNull();
 });
 
@@ -845,6 +892,35 @@ it('saves a picked-direction distance expression and removes it when replaced by
   expect(latest().parts[0]!.copies![0]!.along).not.toHaveProperty('distanceExpression');
 });
 
+it('reorders parts by dragging a step onto another in the feature list', async () => {
+  const [a, b] = [
+    { ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name: 'A' },
+    { ...createPlateDocument({ width: 80, height: 40 }).parts[0]!, name: 'B' },
+  ];
+  const source: CadDocument = { ...createCadDocument(), parts: [a, b] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const features = await screen.findByRole('region', { name: 'Features' });
+  const dragged = within(features).getByRole('button', { name: /Extrude · B/ });
+  const onto = within(features)
+    .getByRole('button', { name: /Sketch · A/ })
+    .closest('li')!;
+  const dataTransfer = new DataTransfer();
+  const drag = (target: Element, type: string) =>
+    target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer }));
+  drag(dragged, 'dragstart');
+  drag(onto, 'dragover');
+  drag(onto, 'drop');
+  await waitFor(() => expect(latest().parts.map(part => part.name)).toEqual(['B', 'A']));
+});
+
 it('extrudes up to a picked plane, its thickness following the distance, or symmetrically about its own plane', async () => {
   const post = { ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name: 'Post' };
   // Drawn 300 mm in front of the Front plane, facing away from it.
@@ -873,8 +949,7 @@ it('extrudes up to a picked plane, its thickness following the distance, or symm
 
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {
   const { latest } = await studio();
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  await editExtrude('Plate');
   let dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
   let thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
   await userEvent.clear(thickness);
@@ -885,7 +960,7 @@ it('makes a variable from `#name = value` in a field and uses it there, and list
 
   // Typing # offers the design's variables, and picking one puts it in the field.
   dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' }).catch(async () => {
-    await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+    await editExtrude('Plate');
     return screen.findByRole('dialog', { name: 'Extrude · Plate' });
   });
   thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
@@ -899,8 +974,7 @@ it('makes a variable from `#name = value` in a field and uses it there, and list
 
 it('keeps a value typed as `#name = value` when the tick is clicked straight after', async () => {
   const { latest } = await studio();
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  await editExtrude('Plate');
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
   const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
   await userEvent.clear(thickness);
@@ -994,8 +1068,7 @@ it('lists the parts at the bottom of the sidebar, each with an eye to hide it in
 
 it('doesn’t apply a field after its dialog is cancelled, and applies a dimension through its form after #name = value', async () => {
   const { latest } = await studio();
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
+  await editExtrude('Plate');
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
   const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
   await userEvent.clear(thickness);

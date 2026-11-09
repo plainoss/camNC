@@ -1,12 +1,13 @@
 import { cadVariableValues, type CadDocument } from '@wbcnc/cad';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { kBasePlanes, type BasePlane } from './basePlanes';
+import { kBasePlanes } from './basePlanes';
 import { designSteps, type DesignStep } from './designSteps';
 import { formatCadValue } from './valueExpressions';
 import './featureList.css';
 
-const kIcons: Record<DesignStep['kind'] | 'variable', string> = {
+const kIcons: Record<DesignStep['kind'] | 'variable' | 'plane', string> = {
   variable: '(x)',
+  plane: '▱',
   sketch: '✎',
   extrude: '▮',
   move: '⇥',
@@ -17,13 +18,13 @@ const kIcons: Record<DesignStep['kind'] | 'variable', string> = {
   partCut: '⊟',
 };
 
-/** A row of the list: a design variable, or a step of how the design is built. */
-export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'step'; step: DesignStep };
+/** A row of the list: a design variable, a plane made to sketch on, or a step of how the design is built. */
+export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'plane'; id: string } | { kind: 'step'; step: DesignStep };
 export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete';
 
 /** What each row's menu offers, and why an item isn't there for it. */
 function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAction; label: string; disabled?: boolean }[] {
-  if (entry.kind === 'variable')
+  if (entry.kind === 'variable' || entry.kind === 'plane')
     return [
       { action: 'edit', label: 'Edit…' },
       { action: 'delete', label: 'Delete' },
@@ -56,6 +57,7 @@ export function FeatureList({
   onRename,
   rollback,
   onRollTo,
+  onReorder,
   onHover,
   selectedPlane,
   onPickPlane,
@@ -73,11 +75,13 @@ export function FeatureList({
    * or Roll to here does in the reference. Without it the bar only shows while a step is edited.
    */
   onRollTo?: (stepId: string | null) => void;
+  /** A step dragged onto another, to go just before it. */
+  onReorder?: (stepId: string, beforeStepId: string) => void;
   /** A row hovered, for the view to highlight what it made; null when the pointer leaves. */
   onHover?: (entry: FeatureEntry | null) => void;
   /** The base plane picked, in the list or the view, and picking one, as the reference lists them first. */
-  selectedPlane?: BasePlane | null;
-  onPickPlane?: (plane: BasePlane) => void;
+  selectedPlane?: string | null;
+  onPickPlane?: (plane: string) => void;
 }) {
   const { scope } = cadVariableValues(document);
   const blank = new Set(
@@ -87,6 +91,7 @@ export function FeatureList({
   );
   const entries: FeatureEntry[] = [
     ...(document.variables ?? []).map(variable => ({ kind: 'variable' as const, id: variable.id })),
+    ...(document.planes ?? []).map(plane => ({ kind: 'plane' as const, id: plane.id })),
     // A part with nothing drawn yet, such as a new design's, isn't a feature until it's sketched.
     ...designSteps(document)
       .filter(step => !blank.has(step.partId))
@@ -106,6 +111,7 @@ export function FeatureList({
   }, [menu]);
   const label = (entry: FeatureEntry) => {
     if (entry.kind === 'step') return entry.step.label;
+    if (entry.kind === 'plane') return document.planes!.find(candidate => candidate.id === entry.id)!.name;
     const variable = document.variables!.find(candidate => candidate.id === entry.id)!;
     const result = scope[variable.name];
     const unit = result?.kind === 'length' ? ' mm' : result?.kind === 'angle' ? '°' : '';
@@ -179,9 +185,19 @@ export function FeatureList({
             <li
               key={key(entry)}
               onDragOver={event => {
-                if (onRollTo && entry.kind === 'step' && event.dataTransfer.types.includes('text/x-cad-rollback')) event.preventDefault();
+                if (entry.kind !== 'step') return;
+                if (onRollTo && event.dataTransfer.types.includes('text/x-cad-rollback')) event.preventDefault();
+                if (onReorder && event.dataTransfer.types.includes('text/x-cad-step')) event.preventDefault();
               }}
               onDrop={event => {
+                if (entry.kind !== 'step') return;
+                if (event.dataTransfer.types.includes('text/x-cad-step')) {
+                  // A step dropped on another goes just before it.
+                  event.preventDefault();
+                  const dragged = event.dataTransfer.getData('text/x-cad-step');
+                  if (dragged && dragged !== entry.step.id) onReorder?.(dragged, entry.step.id);
+                  return;
+                }
                 if (!event.dataTransfer.types.includes('text/x-cad-rollback')) return;
                 event.preventDefault();
                 rollToIndex(index);
@@ -194,9 +210,20 @@ export function FeatureList({
               <button
                 type="button"
                 aria-current={step && step.partId === selectedPartId ? 'true' : undefined}
+                aria-pressed={entry.kind === 'plane' ? selectedPlane === entry.id : undefined}
                 aria-haspopup="menu"
-                onClick={() => onSelect(entry)}
+                onClick={() => {
+                  // A plane is picked to sketch on, as a base plane is.
+                  if (entry.kind === 'plane') onPickPlane?.(entry.id);
+                  onSelect(entry);
+                }}
                 onDoubleClick={() => onAction(entry, 'edit')}
+                draggable={!!onReorder && entry.kind === 'step' && entry.step.kind !== 'partCut'}
+                onDragStart={event => {
+                  if (entry.kind !== 'step') return;
+                  event.dataTransfer.setData('text/x-cad-step', entry.step.id);
+                  event.dataTransfer.effectAllowed = 'move';
+                }}
                 onContextMenu={event => open(entry, event)}
                 onPointerEnter={() => onHover?.(entry)}
                 onPointerLeave={() => onHover?.(null)}
@@ -219,7 +246,7 @@ export function FeatureList({
                     setMenu({ entry, x: box.left + 24, y: box.bottom });
                   }
                 }}>
-                <span aria-hidden="true">{kIcons[step ? step.kind : 'variable']}</span>
+                <span aria-hidden="true">{kIcons[step ? step.kind : (entry.kind as 'variable' | 'plane')]}</span>
                 <span>{label(entry)}</span>
                 {step?.detail && <small>{step.detail}</small>}
               </button>
