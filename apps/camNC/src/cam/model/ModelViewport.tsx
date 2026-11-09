@@ -146,6 +146,8 @@ function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number;
       />
       <Edges color={hovered ? kPlaneHighlight : color} />
       <Html
+        // Under the dialogs and panels over the view, not on top of everything.
+        zIndexRange={[5, 0]}
         position={[-size / 2, size / 2, 0]}
         style={{ pointerEvents: 'none', color, font: '11px system-ui, sans-serif', whiteSpace: 'nowrap', userSelect: 'none' }}>
         {plane.label}
@@ -529,7 +531,7 @@ export function ModelViewport({
         regions.map(region => <Region key={region.id} region={region} model={assembled} onPick={() => onPickRegion(region.id)} />)}
       {showOrigin && view === 'assembled' && (
         <group matrixAutoUpdate={false} matrix={assembled}>
-          <Html center position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
+          <Html center zIndexRange={[5, 0]} position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
             <div
               data-testid="model-origin"
               aria-label="Origin"
