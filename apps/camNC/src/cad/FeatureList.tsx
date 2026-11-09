@@ -184,7 +184,8 @@ export function FeatureList({
           )}
         </h2>
       </div>
-      {onPickPlane && (
+      {/* Listed in a sketch too, as in the reference, to show or hide; a plane is picked to sketch on from the studio. */}
+      {(onPickPlane || onToggleShown) && (
         <ul className="cad-default-geometry" aria-label="Default geometry">
           {onToggleShown && (
             <li className={shown?.('origin') === false ? 'cad-feature-hidden' : undefined}>
@@ -197,7 +198,7 @@ export function FeatureList({
           )}
           {kBasePlanes.map(({ plane, label: name }) => (
             <li key={plane} className={shown?.(plane) === false ? 'cad-feature-hidden' : undefined}>
-              <button type="button" aria-pressed={selectedPlane === plane} onClick={() => onPickPlane(plane)}>
+              <button type="button" aria-pressed={selectedPlane === plane} onClick={() => onPickPlane?.(plane)}>
                 <span aria-hidden="true">▱</span>
                 <span>{name}</span>
               </button>

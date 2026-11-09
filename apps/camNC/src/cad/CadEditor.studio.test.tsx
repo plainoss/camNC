@@ -362,6 +362,21 @@ it('hides the hovered part or copy before the selection, and falls back after ho
   expect(props().meshes).toHaveLength(0);
 });
 
+it('keeps the default planes listed while a sketch is open', async () => {
+  await newStudioSketch();
+  const planes = within(screen.getByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' });
+  expect(
+    within(planes)
+      .getAllByRole('listitem')
+      .map(item => item.textContent?.replace(/\s+/g, ' ').trim())
+  ).toEqual([
+    expect.stringContaining('Origin'),
+    expect.stringContaining('Top'),
+    expect.stringContaining('Front'),
+    expect.stringContaining('Right'),
+  ]);
+});
+
 it('keeps a part hidden with its eye when the design is opened again', async () => {
   const source = createPlateDocument({ width: 200, height: 100 });
   const name = source.parts[0]!.name;
