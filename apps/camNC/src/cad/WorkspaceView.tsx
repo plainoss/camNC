@@ -1,5 +1,5 @@
 import { activeDesign, assemblyReport, evaluateCadDocument, isCadPart, partFaceAt, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ModelViewport,
   type ModelDisplay,
@@ -28,6 +28,7 @@ const kDoubleClickMs = 400;
 
 /** Every part of the design where it sits. Click a part to select it, and double-click it to work on it. */
 export default function WorkspaceView({
+  onReady,
   document,
   selectedId,
   onSelect,
@@ -53,6 +54,8 @@ export default function WorkspaceView({
   showPlanes = true,
   children,
 }: {
+  /** The lazy view has mounted; a pending keyboard handoff can now focus it. */
+  onReady?: () => void;
   document: CadDocument;
   selectedId: string | null;
   onSelect: (partId: string) => void;
@@ -98,6 +101,9 @@ export default function WorkspaceView({
   children?: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    onReady?.();
+  }, [onReady]);
   const lastClick = useRef<{ partId: string; at: number } | null>(null);
   const model = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
   const clashes = useMemo(() => {
