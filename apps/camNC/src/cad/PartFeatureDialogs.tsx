@@ -572,7 +572,18 @@ export interface CadConnectorPick {
   normal: [number, number, number];
   /** Picked on a copy of the part rather than the part itself. */
   copy?: boolean;
+  /** The part's straight edge the click was on, end to end. */
+  edge?: { a: [number, number, number]; b: [number, number, number] };
 }
+
+/** A picked edge as a line: through its start, along it. A face's pick is the line straight out of it. */
+const pickedLine = (pick: CadConnectorPick): CadConnectorPick => {
+  if (!pick.edge) return pick;
+  const { a, b } = pick.edge;
+  const along = b.map((value, axis) => value - a[axis]!) as [number, number, number];
+  const length = Math.hypot(...along);
+  return { ...pick, point: a, normal: along.map(value => value / length) as [number, number, number] };
+};
 
 /**
  * A copy of a whole part, moved along the studio's axes, as the reference's transform with "Copy part": the copy follows
@@ -675,6 +686,13 @@ export function TransformDialog({
       setPickingMate(null);
       if (end === 'from' && (picked.partId !== part.id || picked.copy)) return setError(`Pick the first connector on ${part.name} itself.`);
       if (end === 'to' && picked.partId === part.id) return setError('Pick the connector to move to on another part.');
+      // An edge picked for the line is the whole line, from one end to the other.
+      if ((end === 'start' || end === 'end') && picked.edge)
+        return setPicks(before => ({
+          ...before,
+          start: { ...picked, point: picked.edge!.a },
+          end: { ...picked, point: picked.edge!.b },
+        }));
       setPicks(before => ({ ...before, [end]: picked }));
     });
   };
@@ -730,13 +748,13 @@ export function TransformDialog({
     } else if (kind === 'line') {
       // Along the line, by its length, as the reference translates by a line or two points.
       const { start, end } = picks;
-      if (!start || !end) return setError('Pick two points for the line: where it starts and where it ends.');
+      if (!start || !end) return setError('Pick an edge for the line, or two points: where it starts and where it ends.');
       values = end.point.map((value, axis) => ({ value: +(value - start.point[axis]!).toFixed(6) }));
     } else if (kind === 'rotate') {
-      if (!axisPick) return setError('Pick a face for the axis: the part turns about the line straight out of it.');
+      if (!axisPick) return setError('Pick an edge for the axis, or a face: the part turns about the line straight out of it.');
       const angle = parseCadValue(angleText, { unit: 'deg', variables });
       if ('error' in angle) return setError(angle.error);
-      const axis = unmoved(axisPick);
+      const axis = unmoved(pickedLine(axisPick));
       values = [{ value: 0 }, { value: 0 }, { value: 0 }];
       turn = {
         about: axis.point,
@@ -845,8 +863,12 @@ export function TransformDialog({
             <small>{end === 'from' ? `Connector on ${part.name}` : kPicks[end].title}</small>
             <span>
               {picked
-                ? `${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part'} at ${picked.point.map(value => +value.toFixed(2)).join(', ')}`
-                : 'Click a corner or the middle of a face'}
+                ? picked.edge
+                  ? `Edge of ${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'a part'}, ${formatCadValue(Math.hypot(...picked.edge.b.map((value, axis) => value - picked.edge!.a[axis]!)))} mm`
+                  : `${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part'} at ${picked.point.map(value => +value.toFixed(2)).join(', ')}`
+                : end === 'from' || end === 'to'
+                  ? 'Click a corner or the middle of a face'
+                  : 'Click an edge, a corner or the middle of a face'}
             </span>
           </button>
         );
