@@ -26,11 +26,18 @@ describe('a part extruded from picked regions', () => {
     expect(evaluateCadDocument(document).diagnostics.filter(d => d.severity === 'error')).toEqual([]);
   });
 
-  it('says when a picked region is gone, or more than one is picked', () => {
+  it('says when a picked region is gone, or none is picked', () => {
+    const part = splitSketch();
+    expect(evaluateCadPart({ ...part, regions: ['gone'] }).diagnostics[0]!.code).toBe('region-missing');
+    expect(evaluateCadPart({ ...part, regions: [] }).diagnostics[0]!.code).toBe('region-count');
+  });
+
+  it('is both regions as one, when they’re picked side by side', () => {
     const part = splitSketch();
     const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE);
-    expect(evaluateCadPart({ ...part, regions: ['gone'] }).diagnostics[0]!.code).toBe('region-missing');
-    expect(evaluateCadPart({ ...part, regions: regions.map(region => region.id) }).diagnostics[0]!.code).toBe('region-count');
+    const evaluated = evaluateCadPart({ ...part, regions: regions.map(region => region.id) });
+    expect(evaluated.diagnostics).toEqual([]);
+    expect(Math.abs(polygonArea(evaluated.part!.outline))).toBeCloseTo(5000, 3);
   });
 });
 
