@@ -78,7 +78,7 @@ export interface CadFullSketch {
 export interface CadFullFeature {
   /** The step's own ID in the document. */
   id: string;
-  kind: 'variable' | 'plane' | 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'copy' | 'pattern' | 'partCut';
+  kind: 'variable' | 'plane' | 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'copy' | 'pattern' | 'partCut';
   /** As the feature list names it. */
   label: string;
   part?: string;
@@ -521,6 +521,14 @@ export async function fullCadReport(
             spacing: typed(pattern.spacing, pattern.spacingExpression),
           },
           result: made ? { copies: made.copies } : { error: 'The pattern made no copies.' },
+        };
+      }
+      if (step.kind === 'fillet') {
+        const fillet = part.fillets!.find(candidate => candidate.id === step.id)!;
+        return {
+          ...base,
+          settings: { corners: fillet.corners.length, radius: typed(fillet.radius, fillet.radiusExpression) },
+          result: { corners: fillet.corners.length },
         };
       }
       // Cut parts.

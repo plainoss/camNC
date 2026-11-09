@@ -6,7 +6,7 @@ import type { CadDocument, CadPart } from './types';
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
   id: string;
-  kind: 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'copy' | 'pattern' | 'partCut';
+  kind: 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'copy' | 'pattern' | 'partCut';
   label: string;
   /** A short reading of the step's main value, such as a thickness or depth. */
   detail?: string;
@@ -177,6 +177,15 @@ function listedSteps(document: CadDocument): DesignStep[] {
         });
       }
     }
+    for (const fillet of part.fillets ?? [])
+      steps.push({
+        id: fillet.id,
+        kind: 'fillet',
+        label: `Fillet · ${part.name}`,
+        detail: fillet.suppressed ? 'off' : `r ${typed(fillet.radiusExpression, fillet.radius)}`,
+        partId: part.id,
+        suppressed: !!fillet.suppressed,
+      });
     (part.copies ?? []).forEach((copy, index) => {
       if (!copy.pattern)
         steps.push({
@@ -224,6 +233,9 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
       const copies = (part.copies ?? []).filter(copy => (copy.pattern ? pattern : kept.has(copy.id)));
       if (copies.length) next.copies = copies;
       else delete next.copies;
+      const fillets = part.fillets?.filter(fillet => kept.has(fillet.id));
+      if (fillets?.length) next.fillets = fillets;
+      else delete next.fillets;
       return next;
     });
   const next: CadDocument = { ...document, parts };

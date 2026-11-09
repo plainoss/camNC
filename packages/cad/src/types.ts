@@ -323,6 +323,11 @@ export interface CadPart {
    * `remove` says. The sketch's lines and curves only place the points.
    */
   hole?: { diameter: number; diameterExpression?: string };
+  /**
+   * Fillet steps: the part's edges through its thickness, at these corners of its sketch, rounded to a radius. The sketch
+   * itself keeps its sharp corners; the part is rounded where it's made.
+   */
+  fillets?: CadEdgeFillet[];
   /** Regions Extrude → Add steps join to this part. The design writes it from those steps; it's never edited. */
   addedRegions?: string[];
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
@@ -575,4 +580,14 @@ export interface CadSolveResult {
   diagnostics: CadDiagnostic[];
   parts: EvaluatedCadPart[];
   sketches: CadSketchSolveStatus[];
+}
+
+/** One Fillet step: corners of a part's sketch, rounded to a radius, as the edges through the part there. */
+export interface CadEdgeFillet {
+  id: string;
+  /** Corner points of the part's sketch, each where two straight sides meet. */
+  corners: string[];
+  radius: number;
+  radiusExpression?: string;
+  suppressed?: true;
 }
