@@ -9,7 +9,6 @@
     "lint": "oxlint --max-warnings 0",
     "preview": "vite preview",
     "check-types": "tsc --noEmit",
-    "check-types:fast": "tsgo --noEmit",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
