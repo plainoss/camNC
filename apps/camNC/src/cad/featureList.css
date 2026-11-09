@@ -129,3 +129,55 @@
 .cad-studio-features:focus {
   outline: none;
 }
+/** Each sketch, plane and the origin has an eye after its name, shown while the row is hovered or when it's hidden. */
+.cad-studio-features li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.cad-editor .cad-studio-features li > button:first-child,
+.cad-studio-features li > .cad-default-origin {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.cad-studio-features li > .cad-rollback-bar,
+.cad-studio-features li > input {
+  flex-basis: 100%;
+}
+.cad-editor .cad-studio-features .cad-feature-eye {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  color: #6b7c91;
+  opacity: 0;
+}
+.cad-studio-features li:hover > .cad-feature-eye,
+.cad-feature-eye:focus-visible,
+.cad-feature-hidden > .cad-feature-eye {
+  opacity: 1;
+}
+.cad-feature-eye svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+/** A hidden feature's row is greyed, as the reference shows it. */
+.cad-feature-hidden > button > span,
+.cad-feature-hidden > .cad-default-origin > span {
+  color: #a3afbd;
+}
+.cad-default-origin {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+}

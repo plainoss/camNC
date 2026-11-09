@@ -18,6 +18,28 @@ const kIcons: Record<DesignStep['kind'] | 'variable' | 'plane', string> = {
   partCut: '⊟',
 };
 
+/** The eye on a row whose feature shows in the view: a sketch, a plane or the origin. */
+function Eye({ name, shown, onToggle }: { name: string; shown: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      className="cad-feature-eye"
+      // Named for what it does only, so the row keeps its name to itself; its title says which feature.
+      aria-label={shown ? 'Hide' : 'Show'}
+      title={`${shown ? 'Hide' : 'Show'} ${name} in the view`}
+      aria-pressed={shown}
+      onClick={event => {
+        event.stopPropagation();
+        onToggle();
+      }}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+        {shown ? <circle cx="12" cy="12" r="3" /> : <path d="M4 4l16 16" />}
+      </svg>
+    </button>
+  );
+}
+
 /** A row of the list: a design variable, a plane made to sketch on, or a step of how the design is built. */
 export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'plane'; id: string } | { kind: 'step'; step: DesignStep };
 export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete';
@@ -60,6 +82,8 @@ export function FeatureList({
   onHover,
   selectedPlane,
   onPickPlane,
+  shown,
+  onToggleShown,
 }: {
   document: CadDocument;
   selectedPartId: string | null;
@@ -79,6 +103,12 @@ export function FeatureList({
   /** The base plane picked, in the list or the view, and picking one, as the reference lists them first. */
   selectedPlane?: string | null;
   onPickPlane?: (plane: string) => void;
+  /**
+   * Whether a sketch (by its step's id), a plane or the origin shows in the view, and switching it, with the eye each
+   * such row has. Hidden, its row is greyed.
+   */
+  shown?: (id: string) => boolean;
+  onToggleShown?: (id: string) => void;
 }) {
   const { scope } = cadVariableValues(document);
   const blank = new Set(
@@ -114,6 +144,9 @@ export function FeatureList({
     const unit = result?.kind === 'length' ? ' mm' : result?.kind === 'angle' ? '°' : '';
     return `#${variable.name} = ${result ? `${formatCadValue(result.value)}${unit}` : variable.expression}`;
   };
+  /** What a row's eye shows or hides: a sketch, by its step's id, or a plane. */
+  const visibilityId = (entry: FeatureEntry) =>
+    entry.kind === 'plane' ? entry.id : entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.id : null;
   const key = (entry: FeatureEntry) => (entry.kind === 'step' ? entry.step.id : entry.id);
   const rollbackAt = rollback ? entries.findIndex(entry => key(entry) === rollback) : -1;
   // With the bar movable it's always there: after the step it's rolled to, or at the end.
@@ -138,12 +171,22 @@ export function FeatureList({
       </div>
       {onPickPlane && (
         <ul className="cad-default-geometry" aria-label="Default geometry">
+          {onToggleShown && (
+            <li className={shown?.('origin') === false ? 'cad-feature-hidden' : undefined}>
+              <span className="cad-default-origin">
+                <span aria-hidden="true">⊙</span>
+                <span>Origin</span>
+              </span>
+              <Eye name="Origin" shown={shown?.('origin') ?? true} onToggle={() => onToggleShown('origin')} />
+            </li>
+          )}
           {kBasePlanes.map(({ plane, label: name }) => (
-            <li key={plane}>
+            <li key={plane} className={shown?.(plane) === false ? 'cad-feature-hidden' : undefined}>
               <button type="button" aria-pressed={selectedPlane === plane} onClick={() => onPickPlane(plane)}>
                 <span aria-hidden="true">▱</span>
                 <span>{name}</span>
               </button>
+              {onToggleShown && <Eye name={name} shown={shown?.(plane) ?? true} onToggle={() => onToggleShown(plane)} />}
             </li>
           ))}
         </ul>
@@ -190,7 +233,11 @@ export function FeatureList({
                 rollToIndex(index);
               }}
               className={
-                [rollbackAt >= 0 && index > rollbackAt && 'cad-feature-rolled-back', step?.suppressed && 'cad-feature-suppressed']
+                [
+                  rollbackAt >= 0 && index > rollbackAt && 'cad-feature-rolled-back',
+                  step?.suppressed && 'cad-feature-suppressed',
+                  visibilityId(entry) && shown?.(visibilityId(entry)!) === false && 'cad-feature-hidden',
+                ]
                   .filter(Boolean)
                   .join(' ') || undefined
               }>
@@ -231,6 +278,13 @@ export function FeatureList({
                 <span>{label(entry)}</span>
                 {step?.detail && <small>{step.detail}</small>}
               </button>
+              {onToggleShown && visibilityId(entry) && (
+                <Eye
+                  name={label(entry)}
+                  shown={shown?.(visibilityId(entry)!) ?? true}
+                  onToggle={() => onToggleShown(visibilityId(entry)!)}
+                />
+              )}
               {index === barAt && (index < entries.length - 1 || onRollTo) && (
                 <div
                   className="cad-rollback-bar"

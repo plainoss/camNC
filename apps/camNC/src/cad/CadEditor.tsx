@@ -219,6 +219,7 @@ import { useSvgPixelScale, SKETCH_APPEARANCE } from './sketchAppearance';
 import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
+import { kStudioCommands } from './studioCommands';
 import { FeatureDialog } from './FeatureDialog';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
 import { VariableDialog } from './VariableDialog';
@@ -528,6 +529,9 @@ export function CadEditor({
   const [transparentParts, setTransparentParts] = useState<ReadonlySet<string>>(() => new Set());
   // Parts hidden from the studio's view by their eye in the parts list.
   const [hiddenParts, setHiddenParts] = useState<ReadonlySet<string>>(() => new Set());
+  // Sketches, planes and the origin shown or hidden with their eyes in the feature list, where that differs from how
+  // they start: a sketch shows until Extrude makes a part of it, and the rest show.
+  const [featureVisibility, setFeatureVisibility] = useState<Readonly<Record<string, boolean>>>({});
   const hoveredPart = useRef<string | null>(null);
   const onHoverPart = useCallback((id: string | null) => {
     hoveredPart.current = id;
@@ -4085,6 +4089,24 @@ export function CadEditor({
   // features, as in the reference.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   const builtParts = doc.parts.filter(isCadPart);
+  // Studio commands that need something first, with why.
+  const studioDisabled: Partial<Record<StudioCommand, string>> = {
+    // A sketch not yet extruded can be extruded; patterns and transforms need a part.
+    ...(part?.extrude === false
+      ? { pattern: 'Extrude the sketch first', transform: 'Extrude the sketch first' }
+      : part && !isCadPart(part)
+        ? { pattern: 'Select a part first', transform: 'Select a part first' }
+        : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
+    ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
+  };
+  const featureShown = useCallback(
+    (id: string) => {
+      if (id in featureVisibility) return featureVisibility[id]!;
+      const sketched = id.endsWith(':sketch') && doc.parts.find(candidate => `${candidate.id}:sketch` === id);
+      return !sketched || !isCadPart(sketched);
+    },
+    [featureVisibility, doc]
+  );
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>
@@ -4177,25 +4199,30 @@ export function CadEditor({
                 ? 'cutParts'
                 : variableDialog
                   ? 'variable'
-                  : transformDialog
-                    ? 'transform'
-                    : (featureDialog?.kind ?? null)
+                  : planeDialog
+                    ? 'plane'
+                    : transformDialog
+                      ? 'transform'
+                      : (featureDialog?.kind ?? null)
           }
-          disabled={{
-            // A sketch not yet extruded can be extruded; patterns and transforms need a part.
-            ...(part?.extrude === false
-              ? { pattern: 'Extrude the sketch first', transform: 'Extrude the sketch first' }
-              : part && !isCadPart(part)
-                ? { pattern: 'Select a part first', transform: 'Select a part first' }
-                : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
-            ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
-          }}
+          disabled={studioDisabled}
           canUndo={session.past.length > 0}
           canRedo={session.future.length > 0}
           canFinish={
-            thicknessValid && !solving && !problems.length && !featureDialog && !partCutting && !variableDialog && !transformDialog
+            thicknessValid &&
+            !solving &&
+            !problems.length &&
+            !featureDialog &&
+            !partCutting &&
+            !variableDialog &&
+            !planeDialog &&
+            !transformDialog
           }
           onCommand={studioCommand}
+          onSearch={() => {
+            setSearchMode(true);
+            setPalette(value => !value);
+          }}
           onUndo={() => navigateHistory()}
           onRedo={() => navigateHistory(true)}
           onCancel={() => void cancel()}
@@ -4257,6 +4284,8 @@ export function CadEditor({
               onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
               onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
+              shown={featureShown}
+              onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}
             />
           )}
           {!faceSketch && !studioSession && <CadVariablesPanel document={doc} onChange={commit} />}
@@ -4654,6 +4683,7 @@ export function CadEditor({
                 }}
                 highlightIds={partCutting ? cutPicked : undefined}
                 hiddenIds={hiddenParts}
+                featureShown={featureShown}
                 onHover={onHoverPart}
                 onOpen={id => {
                   if (partCutting) return pickForCut(id);
@@ -5283,7 +5313,24 @@ export function CadEditor({
               ))}
             </div>
           )}
-          {palette && searchMode && (
+          {palette && searchMode && studioSession && showWorkspace && (
+            // In the studio the search is of its commands; in a sketch, of the sketch's tools.
+            <CommandSearch
+              commands={kStudioCommands
+                .filter(command => !studioDisabled[command.id])
+                .map(({ id, label, hint, glyph }) => ({ id, label, description: hint, glyph }))}
+              onHighlight={() => {}}
+              onClose={(restoreFocus = true) => {
+                setPalette(false);
+                if (restoreFocus) root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]')?.focus();
+              }}
+              onChoose={id => {
+                setPalette(false);
+                studioCommand(id as StudioCommand);
+              }}
+            />
+          )}
+          {palette && searchMode && !(studioSession && showWorkspace) && (
             <CommandSearch
               commands={[
                 ...tools.map(t => ({

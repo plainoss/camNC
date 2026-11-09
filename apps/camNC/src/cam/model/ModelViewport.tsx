@@ -106,8 +106,8 @@ function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number;
     // A square centred on the plane's origin, the size of the model or a little more.
     return model.clone().multiply(new THREE.Matrix4().makeBasis(v(plane.x), v(plane.y), v(plane.normal)).setPosition(v(plane.origin)));
   }, [plane, model]);
-  const strong = hovered || plane.highlighted;
-  const color = strong ? kPlaneHighlight : kPlane;
+  // Hovered, only the outline lights up; picked, the whole plane does.
+  const color = plane.highlighted ? kPlaneHighlight : kPlane;
   return (
     <mesh
       matrixAutoUpdate={false}
@@ -123,8 +123,18 @@ function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number;
         if (event.delta <= 4) onPick?.();
       }}>
       <planeGeometry args={[size, size]} />
-      <meshBasicMaterial color={color} transparent opacity={strong ? 0.22 : 0.1} side={THREE.DoubleSide} depthWrite={false} />
-      <Edges color={color} />
+      {/* Pushed back in depth, so a part's face lying on the plane covers it evenly instead of flickering through. */}
+      <meshBasicMaterial
+        color={color}
+        transparent
+        opacity={plane.highlighted ? 0.22 : 0.1}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={2}
+        polygonOffsetUnits={2}
+      />
+      <Edges color={hovered ? kPlaneHighlight : color} />
       <Html
         position={[-size / 2, size / 2, 0]}
         style={{ pointerEvents: 'none', color, font: '11px system-ui, sans-serif', whiteSpace: 'nowrap', userSelect: 'none' }}>
@@ -348,6 +358,7 @@ export function ModelViewport({
   planes = [],
   onPickPlane,
   sketchLines = kNoLines,
+  showOrigin = false,
   palette,
   regions = [],
   onPickRegion,
@@ -382,6 +393,8 @@ export function ModelViewport({
   onPickPlane?: (id: string) => void;
   /** Finished sketches not yet extruded, as polylines in the model, shown on their planes. */
   sketchLines?: SketchLine[];
+  /** The design's origin, as a point where the base planes meet. */
+  showOrigin?: boolean;
   /** `studio` shows parts as the reference does: grey, picked in orange. */
   palette?: 'studio';
   /** A sketch's regions to pick for an extrude, and picking one. */
@@ -389,7 +402,8 @@ export function ModelViewport({
   onPickRegion?: (id: string) => void;
 }) {
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
-  const assembled = useMemo(() => centerAssembled(meshes), [meshes]);
+  // The studio shows a design where it is, about its origin, so hiding a part doesn't shift the rest.
+  const assembled = useMemo(() => (palette === 'studio' ? new THREE.Matrix4() : centerAssembled(meshes)), [meshes, palette]);
   const exploded = useMemo(() => explodeAssembled(meshes), [meshes]);
   const matrices = useMemo(
     () => (view === 'flat' ? flat : view === 'exploded' ? exploded : meshes.map(() => assembled)),
@@ -503,6 +517,17 @@ export function ModelViewport({
       {view === 'assembled' &&
         onPickRegion &&
         regions.map(region => <Region key={region.id} region={region} model={assembled} onPick={() => onPickRegion(region.id)} />)}
+      {showOrigin && view === 'assembled' && (
+        <group matrixAutoUpdate={false} matrix={assembled}>
+          <Html center position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
+            <div
+              data-testid="model-origin"
+              aria-label="Origin"
+              style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', border: `2px solid ${kPlane}` }}
+            />
+          </Html>
+        </group>
+      )}
       {shownPlanes.map(plane => (
         <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
       ))}
