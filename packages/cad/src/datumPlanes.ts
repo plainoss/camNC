@@ -37,10 +37,16 @@ export const nextDatumName = (document: CadDocument) => `Plane ${(document.plane
 /** Deletes a datum plane. Parts drawn on it stay where they are, on what it was offset from. */
 export function removeDatumPlane(document: CadDocument, planeId: string): CadDocument {
   const parts = resolveDatumPlanes(document).parts.map(part => {
-    if (part.drawnOn?.datum !== planeId) return part;
+    let next = part;
+    // Up to a plane that's gone: up to what it was offset from.
+    if (part.upToDatum === planeId) {
+      next = { ...next };
+      delete next.upToDatum;
+    }
+    if (part.drawnOn?.datum !== planeId) return next;
     const drawnOn = { ...part.drawnOn };
     delete drawnOn.datum;
-    return { ...part, drawnOn };
+    return { ...next, drawnOn };
   });
   const planes = document.planes?.filter(plane => plane.id !== planeId);
   return { ...document, revision: document.revision + 1, parts, ...(planes?.length ? { planes } : { planes: undefined }) };

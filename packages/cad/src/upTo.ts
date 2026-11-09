@@ -1,3 +1,4 @@
+import { cadDatumFrame } from './datumPlanes';
 import { cadFaceFrame, resolveDrawnPlacements } from './drawnOn';
 import { cadSketchFrame } from './usedEdges';
 import type { CadDocument } from './types';
@@ -17,7 +18,7 @@ export function resolveUpTo(document: CadDocument): CadDocument {
   const parts = document.parts.map(part => {
     if (!part.upTo || part.thin || !part.drawnOn) return part;
     const from = cadSketchFrame(placed, placed.parts.find(candidate => candidate.id === part.id)!);
-    const to = cadFaceFrame(placed, part.upTo);
+    const to = (part.upToDatum && cadDatumFrame(placed, part.upToDatum)) || cadFaceFrame(placed, part.upTo);
     if (!from || 'error' in to) return part;
     const reach = [0, 1, 2].reduce((sum, axis) => sum + (to.origin[axis]! - from.origin[axis]!) * from.normal[axis]!, 0);
     const thickness = Math.round((part.drawnOn.inward ? -reach : reach) * 1e6) / 1e6;
