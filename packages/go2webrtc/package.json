@@ -4,8 +4,7 @@
   "description": "",
   "scripts": {
     "test": "vitest",
-    "check-types": "tsc --noEmit",
-    "check-types:fast": "tsgo --noEmit"
+    "check-types": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
