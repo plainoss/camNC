@@ -14,7 +14,7 @@ export function matrix3ToCV(matrix: Matrix3, type: number = cv2.CV_64F): cv2.Mat
   const elements = matrix.elements;
 
   // Rearrange to row-major for OpenCV
-  // prettier-ignore
+  // biome-ignore format: keep the hand-aligned layout
   const rowMajorData = [
     elements[0], elements[3], elements[6], // First row
     elements[1], elements[4], elements[7], // Second row
@@ -50,7 +50,7 @@ export function cvToMatrix3(cvMat: cv2.Mat): Matrix3 {
   }
 
   // Convert from row-major (OpenCV) to column-major (Three.js)
-  // prettier-ignore
+  // biome-ignore format: keep the hand-aligned layout
   return new Matrix3().set(
     data[0], data[1], data[2],
     data[3], data[4], data[5],

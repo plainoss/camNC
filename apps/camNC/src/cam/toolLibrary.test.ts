@@ -20,7 +20,7 @@ const library = JSON.stringify({
 });
 
 /** A one-file zip (deflated), like Fusion's .tools export. CRCs aren't checked by the reader. */
-async function zip(name: string, text: string): Promise<Uint8Array> {
+async function zip(name: string, text: string): Promise<Uint8Array<ArrayBuffer>> {
   const data = new TextEncoder().encode(text);
   const deflated = new Uint8Array(
     await new Response(new Blob([data]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()

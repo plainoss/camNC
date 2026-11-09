@@ -108,7 +108,7 @@ async function _readTextureToPackedUint8ClampedArray(
   width: number,
   height: number,
   bytesPerPixel: number
-): Promise<Uint8ClampedArray> {
+): Promise<Uint8ClampedArray<ArrayBuffer>> {
   const bytesPerRow = Math.ceil((width * bytesPerPixel) / 256) * 256; // WebGPU alignment requirement
   const bufferSize = bytesPerRow * height;
 

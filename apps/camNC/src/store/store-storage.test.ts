@@ -34,7 +34,7 @@ describe('createStorage', () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('/api/settings');
     expect(init?.method).toBe('PUT');
-    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer token');
+    expect((init!.headers as Record<string, string>).Authorization).toBe('Bearer token');
     expect(superjson.deserialize(JSON.parse(init!.body as string))).toEqual(value);
   });
 
