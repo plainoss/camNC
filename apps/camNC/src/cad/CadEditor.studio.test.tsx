@@ -5,6 +5,10 @@ import {
   addPartCopy,
   addCircle,
   addLine,
+  addConstraint,
+  cadCornerSources,
+  cadSketchFrame,
+  cornerKey,
   cadSketchRegions,
   createCadDocument,
   createCadPart,
@@ -16,6 +20,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
+import { solveCadDocument } from './solveCad';
 import { endCadSession } from './session';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 
@@ -1155,6 +1160,68 @@ it('uses an edge of a part behind a sketch in it, fixed where it is, picked then
   await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(true));
   await userEvent.keyboard('u');
   await waitFor(() => expect(screen.getByTestId('cad-canvas').classList.contains('cad-using-edges')).toBe(false));
+});
+
+it('resizes a part drawn against an edge used from another, when that other’s sketch changes', async () => {
+  // An L: the side board stands on the Front plane, and the back board on the Right plane runs along its 500 mm edge.
+  const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };
+  side.drawnOn = { on: { plane: 'front' as const }, offset: 0 };
+  const back = { ...createCadPart('Back', 20), drawnOn: { on: { plane: 'right' as const }, offset: 0 } };
+  const placed = (await solveCadDocument({ ...createCadDocument(), parts: [side] })).document;
+  const corners = cadCornerSources(placed, cadSketchFrame(placed, back)!);
+  const tall = [...corners.keys()].map(key => key.split(',').map(Number) as [number, number]).filter(([x]) => x !== 0);
+  expect(tall.map(([, y]) => y).sort((a, b) => a - b)).toEqual([0, 500]);
+  const x = tall[0]![0];
+  let sketch = addLine(back.sketch, { x1: x, y1: 0, x2: x, y2: 500 });
+  sketch = {
+    ...sketch,
+    entities: sketch.entities.map(entity =>
+      entity.type === 'point' && !entity.fixed ? { ...entity, fixed: true, used: corners.get(cornerKey(entity.x, entity.y)) } : entity
+    ),
+  };
+  const [bottom, top] = sketch.entities
+    .filter(entity => entity.type === 'point' && entity.used)
+    .sort((a, b) => (a.type === 'point' && b.type === 'point' ? a.y - b.y : 0));
+  const usedIds = new Set(sketch.entities.map(entity => entity.id));
+  sketch = addRectangle(sketch, { x: x < 0 ? x - 300 : x, y: 0, width: 300, height: 500 });
+  const own = sketch.entities.filter(entity => entity.type === 'point' && !usedIds.has(entity.id));
+  for (const used of [bottom!, top!]) {
+    const corner = own.find(entity => entity.type === 'point' && used.type === 'point' && entity.x === used.x && entity.y === used.y)!;
+    sketch = addConstraint(sketch, { type: 'coincident', pointAId: corner.id, pointBId: used.id });
+  }
+  back.sketch = sketch;
+  // Extruded as the studio does, by the region the rectangle closes.
+  back.regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+  expect(back.regions).toHaveLength(1);
+  // As saved: the side board where the Front plane puts it.
+  const source: CadDocument = { ...createCadDocument(), parts: [placed.parts[0]!, back] };
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
+  const backHeight = () => {
+    const ys = latest().parts[1]!.sketch.entities.flatMap(entity =>
+      entity.type === 'point' && own.some(p => p.id === entity.id) ? [entity.y] : []
+    );
+    return Math.max(...ys) - Math.min(...ys);
+  };
+  // The side board made 100 mm taller in its sketch: the back board, tied to its edge, grows with it.
+  await userEvent.dblClick(within(await screen.findByRole('region', { name: 'Features' })).getByRole('button', { name: /Sketch · Side/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Sketch · Side' });
+  // The tall sketch is partly under its dialog, so the label is opened directly.
+  fireEvent.doubleClick(await screen.findByRole('button', { name: /^Edit Height: 500 mm/ }));
+  const height = await screen.findByRole('textbox', { name: /Height/ });
+  await userEvent.clear(height);
+  await userEvent.type(height, '600{Enter}');
+  await settled();
+  await userEvent.click(within(dialog).getByRole('button', { name: /Finish sketch/ }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch · Side' })).toBeNull());
+  await waitFor(() => expect(backHeight()).toBeCloseTo(600, 6));
 });
 
 it('shows the parts built before a sketch behind it, seen straight at its plane and turned by a right drag, and none of its own', async () => {
