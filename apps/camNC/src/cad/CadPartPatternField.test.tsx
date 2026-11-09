@@ -1,3 +1,4 @@
+import { createPlateDocument, type CadDrawnOn, type CadPartPattern } from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadPartPatternField } from './CadPartPatternField';
@@ -18,6 +19,65 @@ describe('the part pattern field', () => {
     expect(onChange).toHaveBeenLastCalledWith({ axis: 'x', count: 5, spacing: 60, countExpression: 'dividers', spacingExpression: 'gap' });
     fireEvent.change(screen.getByLabelText('Along'), { target: { value: 'y' } });
     expect(onChange).toHaveBeenLastCalledWith({ axis: 'y', count: 5, spacing: 60, countExpression: 'dividers', spacingExpression: 'gap' });
+  });
+
+  it('picks a direction, preserves it while editing, flips it and clears back to the axis', () => {
+    const document = createPlateDocument({ width: 100, height: 50 });
+    let pattern: CadPartPattern = { id: 'p', axis: 'x', count: 3, spacing: 20 };
+    const onChange = vi.fn();
+    let picked: (on: CadDrawnOn['on']) => void = () => {};
+    const pickDirection = vi.fn(callback => {
+      picked = callback;
+    });
+    const field = () => <CadPartPatternField document={document} pattern={pattern} pickDirection={pickDirection} onChange={onChange} />;
+    const { rerender } = render(field());
+    const update = () => {
+      pattern = { id: 'p', ...onChange.mock.calls.at(-1)![0] };
+      rerender(field());
+    };
+    expect(screen.getByLabelText('Along')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Direction' }));
+    expect(pickDirection).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Direction' })).toHaveAttribute('data-active');
+    picked({ plane: 'front' });
+    update();
+    expect(screen.getByRole('button', { name: 'Direction' }).textContent).toContain('the front plane');
+    expect(screen.getByRole('button', { name: 'Direction' })).not.toHaveAttribute('data-active');
+    expect(screen.queryByLabelText('Along')).toBeNull();
+    fireEvent.change(screen.getByLabelText('How many'), { target: { value: '4' } });
+    fireEvent.blur(screen.getByLabelText('How many'));
+    update();
+    expect(pattern.direction).toEqual({ along: { plane: 'front' } });
+    fireEvent.click(screen.getByLabelText('Flip direction'));
+    update();
+    expect(pattern.direction).toEqual({ along: { plane: 'front' }, flip: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    update();
+    expect(pattern).not.toHaveProperty('direction');
+    expect(screen.getByLabelText('Along')).toHaveValue('x');
+    expect(screen.queryByLabelText('Flip direction')).toBeNull();
+  });
+
+  it('keeps a count changed while a direction is being picked', () => {
+    const document = createPlateDocument({ width: 100, height: 50 });
+    let pattern: CadPartPattern = { id: 'p', axis: 'x', count: 3, spacing: 20 };
+    const onChange = vi.fn();
+    let picked: (on: CadDrawnOn['on']) => void = () => {};
+    const field = () => (
+      <CadPartPatternField document={document} pattern={pattern} pickDirection={callback => (picked = callback)} onChange={onChange} />
+    );
+    const { rerender } = render(field());
+    const update = () => {
+      pattern = { id: 'p', ...onChange.mock.calls.at(-1)![0] };
+      rerender(field());
+    };
+    fireEvent.click(screen.getByRole('button', { name: 'Direction' }));
+    fireEvent.change(screen.getByLabelText('How many'), { target: { value: '5' } });
+    fireEvent.blur(screen.getByLabelText('How many'));
+    update();
+    picked({ plane: 'front' });
+    update();
+    expect(pattern).toMatchObject({ count: 5, direction: { along: { plane: 'front' } } });
   });
 
   it('says why a count can’t be used, and takes the pattern away when unticked', () => {

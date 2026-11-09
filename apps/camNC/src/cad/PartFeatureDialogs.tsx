@@ -388,7 +388,17 @@ export function ExtrudeDialog({
 }
 
 /** Copies of a whole part in a row, and what each piece is called. */
-export function PartPatternDialog({ part, variables, onChange, onOk, onCancel }: PartDialogProps) {
+export function PartPatternDialog({
+  document,
+  part,
+  variables,
+  onChange,
+  onOk,
+  onCancel,
+  pickDirection,
+}: PartDialogProps & {
+  pickDirection?: (picked: (on: CadDrawnOn['on']) => void) => void;
+}) {
   return (
     <FeatureDialog title={`Linear pattern · ${part.name}`} onOk={onOk} onCancel={onCancel}>
       <div className="cad-feature-selection">
@@ -398,6 +408,8 @@ export function PartPatternDialog({ part, variables, onChange, onOk, onCancel }:
       <CadPartPatternField
         key={`${part.id}:pattern`}
         pattern={part.pattern}
+        document={document}
+        pickDirection={pickDirection}
         variables={variables}
         onChange={pattern => onChange(document => setPartPattern(document, part.id, pattern))}
       />
@@ -443,7 +455,9 @@ export function TransformDialog({
   const [kind, setKind] = useState<'xyz' | 'distance'>(alongNow ? 'distance' : 'xyz');
   const [direction, setDirection] = useState<CadDrawnOn['on'] | null>(alongNow?.along ?? null);
   const [flip, setFlip] = useState(!!alongNow?.flip);
-  const [distanceText, setDistanceText] = useState(alongNow ? formatCadValue(alongNow.distance) : '100');
+  const [distanceText, setDistanceText] = useState(
+    alongNow ? (copy?.along?.distanceExpression ?? formatCadValue(alongNow.distance)) : '100'
+  );
   const [picking, setPicking] = useState(false);
   const pick = () => {
     if (!pickDirection) return;
@@ -493,8 +507,13 @@ export function TransformDialog({
       if (!direction) return setError('Pick a plane or a face for the direction.');
       const distance = parseCadValue(distanceText, { unit: 'mm', variables });
       if ('error' in distance) return setError(distance.error);
-      const along = { along: direction, distance: distance.value, ...(flip && { flip: true }) };
-      if (!copyPart) return saveMove(along);
+      const along = {
+        along: direction,
+        distance: distance.value,
+        ...(distance.expression && { distanceExpression: distance.expression }),
+        ...(flip && { flip: true }),
+      };
+      if (!copyPart) return saveMove({ along: along.along, distance: along.distance, ...(flip && { flip: true }) });
       const vector = cadDirectionVector(document, along);
       if (!vector) return setError('The plane or face picked for the direction is gone. Pick another.');
       const offset = {

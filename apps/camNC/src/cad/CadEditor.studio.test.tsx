@@ -688,6 +688,33 @@ it('sketches on a base plane picked before Sketch or Shift+S, as on one picked a
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
 });
 
+it('patterns a part along a picked Front plane', async () => {
+  // Copies are laid out from where their part is, so the part is placed first.
+  const source = createPlateDocument({ width: 200, height: 100 });
+  source.parts[0]!.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  const { latest } = await studio(source);
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
+  const dialog = await screen.findByRole('dialog', { name: /^Linear pattern/ });
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Pattern copies in a row' }));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
+  const features = screen.getByRole('region', { name: 'Features' });
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Front/ }));
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Direction' }).textContent).toMatch(/front plane/i));
+  await userEvent.clear(within(dialog).getByRole('textbox', { name: 'How many' }));
+  await userEvent.type(within(dialog).getByRole('textbox', { name: 'How many' }), '3');
+  await userEvent.clear(within(dialog).getByRole('textbox', { name: /Spacing/ }));
+  await userEvent.type(within(dialog).getByRole('textbox', { name: /Spacing/ }), '20');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() =>
+    expect(latest().parts[0]!.copies?.map(copy => copy.placement?.position)).toEqual([
+      [0, -20, 0],
+      [0, -40, 0],
+    ])
+  );
+  expect(latest().parts[0]!.pattern?.direction).toEqual({ along: { plane: 'front' } });
+});
+
 it('copies a part by a distance along a plane picked for the direction, as the reference’s Translate by distance', async () => {
   const { latest } = await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
@@ -755,6 +782,33 @@ it('suppresses an extrude from the feature list, and rolls the design back with 
         .closest('li')!.className
     ).not.toMatch(/cad-feature-rolled-back/)
   );
+});
+
+it('saves a picked-direction distance expression and removes it when replaced by a number', async () => {
+  const source = createPlateDocument({ width: 200, height: 100 });
+  source.variables = [{ id: 'gap-variable', name: 'gap', expression: '30mm' }];
+  const { latest } = await studio(source);
+  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  let dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
+  await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'distance');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
+  const features = screen.getByRole('region', { name: 'Features' });
+  await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Front/ }));
+  const distance = within(dialog).getByRole('textbox', { name: 'Distance' });
+  await userEvent.clear(distance);
+  await userEvent.type(distance, '#gap');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.copies?.[0]?.along).toMatchObject({ distance: 30, distanceExpression: '#gap' }));
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · Plate 2/ }));
+  dialog = await screen.findByRole('dialog', { name: /^Transform/ });
+  expect(within(dialog).getByRole('textbox', { name: 'Distance' })).toHaveValue('#gap');
+  await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Distance' }));
+  await userEvent.type(within(dialog).getByRole('textbox', { name: 'Distance' }), '40');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.copies?.[0]?.along?.distance).toBe(40));
+  expect(latest().parts[0]!.copies![0]!.along).not.toHaveProperty('distanceExpression');
 });
 
 it('makes a variable from `#name = value` in a field and uses it there, and lists variables after `#`', async () => {

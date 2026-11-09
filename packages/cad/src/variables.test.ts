@@ -9,6 +9,8 @@ import {
   sketchRegions,
   applyCadVariables,
   cadVariableProblems,
+  cadVariableUses,
+  resolvePartPatterns,
   cadVariableValues,
   createCadDocument,
   createPlateDocument,
@@ -202,6 +204,52 @@ describe('design variables', () => {
     expect(cadVariableProblems(document).map(p => p.message)).toContain(
       'Position x carcass - board: Put units on each added value, or put the whole sum in parentheses before its unit.'
     );
+  });
+
+  it('follows, renames and round trips a copy distance expression, keeping its last valid distance on errors', () => {
+    let document = variable(createPlateDocument({ width: 100, height: 50 }), 'gap', '30mm');
+    const part = document.parts[0]!;
+    part.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    part.copies = [{ id: 'copy', along: { along: { plane: 'front' }, distance: 30, distanceExpression: 'gap' } }];
+    document = resolvePartPatterns(document);
+    expect(document.parts[0]!.copies![0]!.offset!.position).toEqual([0, -30, 0]);
+    expect(cadVariableUses(document, 'gap')).toBe(1);
+    const id = document.variables![0]!.id;
+    document = resolvePartPatterns(variable(document, 'gap', '40mm', id));
+    expect(document.parts[0]!.copies![0]!.along!.distance).toBe(40);
+    expect(document.parts[0]!.copies![0]!.offset!.position).toEqual([0, -40, 0]);
+    document = variable(document, 'spacing', '40mm', id);
+    expect(document.parts[0]!.copies![0]!.along!.distanceExpression).toBe('spacing');
+    expect(cadVariableUses(document, 'gap')).toBe(0);
+    expect(cadVariableUses(document, 'spacing')).toBe(1);
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
+    document = resolvePartPatterns(variable(document, 'spacing', '5deg', id));
+    expect(document.parts[0]!.copies![0]!.along!.distance).toBe(40);
+    expect(document.parts[0]!.copies![0]!.offset!.position).toEqual([0, -40, 0]);
+    expect(cadVariableProblems(document)).toEqual([
+      expect.objectContaining({
+        code: 'variable-value',
+        severity: 'error',
+        partId: part.id,
+        message: expect.stringContaining('Copy distance spacing:'),
+      }),
+    ]);
+  });
+
+  it('validates copy distances and their expressions when reading a document', () => {
+    const document = createPlateDocument({ width: 100, height: 50 });
+    const copy = { id: 'copy', along: { along: { plane: 'front' as const }, distance: 30, distanceExpression: 'gap' } };
+    document.parts[0]!.copies = [copy];
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document))).parts[0]!.copies).toEqual([copy]);
+    for (const invalid of [
+      { ...copy.along, distanceExpression: 3 },
+      { ...copy.along, distance: '30' },
+      { ...copy.along, flip: 'yes' },
+    ]) {
+      const raw = JSON.parse(JSON.stringify(document));
+      raw.parts[0].copies[0].along = invalid;
+      expect(() => parseCadDocument(raw)).toThrow();
+    }
   });
 
   it('cuts to a depth that uses a variable, and says when it can’t', () => {

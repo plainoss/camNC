@@ -350,7 +350,7 @@ export interface CadPartCopy {
    * A transform by a distance along a picked direction: the copy sits that far from the part along the plane's or face's
    * normal, wherever that face is now. It sets `offset` whenever the design is laid out.
    */
-  along?: CadDirection & { distance: number };
+  along?: CadDirection & { distance: number; distanceExpression?: string };
   /** Switched off in the feature list: the design is built as if it weren't there, and it keeps its settings. */
   suppressed?: true;
   placement?: CadPlacement;

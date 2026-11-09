@@ -3507,6 +3507,7 @@ export function CadEditor({
     setFeatureDialog({ kind, partId, before });
   };
   const closeFeature = (keep: boolean) => {
+    setDirectionPicker(null);
     if (!keep && featureDialog) commit(featureDialog.before);
     // A Remove is a cut in the board its sketch is drawn on, so that board is the one selected.
     const step = keep && featureDialog && documentRef.current.parts.find(p => p.id === featureDialog.partId);
@@ -4237,6 +4238,8 @@ export function CadEditor({
                   <CadPartPatternField
                     key={`${part.id}:pattern`}
                     pattern={part.pattern}
+                    document={doc}
+                    pickDirection={picked => setDirectionPicker(() => picked)}
                     variables={variableScope}
                     onDone={() => svg.current?.focus()}
                     onChange={pattern => commit(setPartPattern(documentRef.current, part.id, pattern))}
@@ -4405,7 +4408,7 @@ export function CadEditor({
               return featureDialog.kind === 'extrude' ? (
                 <ExtrudeDialog key={target.id} {...props} onEditSketch={() => openSketch(target.id)} />
               ) : (
-                <PartPatternDialog key={target.id} {...props} />
+                <PartPatternDialog key={target.id} {...props} pickDirection={picked => setDirectionPicker(() => picked)} />
               );
             })()}
           {studioSession && !showWorkspace && part && (

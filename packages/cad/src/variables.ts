@@ -260,6 +260,10 @@ function mapPlacements(part: CadPart, edit: (placement: CadPlacement | undefined
   };
 }
 
+function copyDistanceOutcome(expression: string | undefined, scope: CadValueScope): Outcome | null {
+  return usesVariables(expression) ? parseCadValue(expression!, { unit: 'mm', variables: scope }) : null;
+}
+
 function depthOutcome(cut: Pick<CadCut, 'depthExpression'>, scope: CadValueScope): Outcome | null {
   if (!usesVariables(cut.depthExpression)) return null;
   const parsed = parseCadValue(cut.depthExpression, { unit: 'mm', variables: scope });
@@ -303,6 +307,13 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     const thickness = thicknessOutcome(part, scope);
     let sized = thickness && 'value' in thickness && thickness.value !== part.thickness ? { ...part, thickness: thickness.value } : part;
     sized = mapPlacements(sized, placement => followPlacement(placement, scope));
+    const copies = sized.copies?.map(copy => {
+      const outcome = copyDistanceOutcome(copy.along?.distanceExpression, scope);
+      return outcome && 'value' in outcome && outcome.value !== copy.along!.distance
+        ? { ...copy, along: { ...copy.along!, distance: outcome.value } }
+        : copy;
+    });
+    if (copies?.some((copy, index) => copy !== sized.copies![index])) sized = { ...sized, copies };
     const offset = offsetOutcome(sized, scope);
     if (offset && 'value' in offset && offset.value !== sized.drawnOn!.offset)
       sized = { ...sized, drawnOn: { ...sized.drawnOn!, offset: offset.value } };
@@ -377,6 +388,16 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
         partId: part.id,
         message: `Corner relief ${part.cornerRelief!.diameterExpression}: ${relief.error}`,
       });
+    for (const copy of part.copies ?? []) {
+      const outcome = copyDistanceOutcome(copy.along?.distanceExpression, scope);
+      if (outcome && 'error' in outcome)
+        problems.push({
+          code: 'variable-value',
+          severity: 'error',
+          partId: part.id,
+          message: `Copy distance ${copy.along!.distanceExpression}: ${outcome.error}`,
+        });
+    }
     const pattern = partPatternOutcome(part, scope);
     if (pattern && 'error' in pattern)
       problems.push({
@@ -495,6 +516,13 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
               ...(part.thin?.depthExpression && { thin: { ...part.thin, depthExpression: edit(part.thin.depthExpression) } }),
               ...(part.drawnOn?.offsetExpression && {
                 drawnOn: { ...part.drawnOn, offsetExpression: edit(part.drawnOn.offsetExpression) },
+              }),
+              ...(part.copies && {
+                copies: part.copies.map(copy =>
+                  copy.along?.distanceExpression
+                    ? { ...copy, along: { ...copy.along, distanceExpression: edit(copy.along.distanceExpression) } }
+                    : copy
+                ),
               }),
               ...(part.pattern && {
                 pattern: {
