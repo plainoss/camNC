@@ -80,11 +80,14 @@ export function featuresFromCuts(
     holeSources = [...kept, ...added].map(entry => entry.source);
   }
 
-  const levels: Level[] = [...heights]
+  const meshLevels: Level[] = [...heights]
     .sort((a, b) => b[0] - a[0])
-    .map(([z, region]) => {
-      const cleaned = cleanRegion(region);
-      return { z, region: cleaned, area: polyArea(cleaned) };
+    .map(([z, region]) => ({ z, region, area: polyArea(region) }))
+    .filter(level => level.area > 0);
+  const levels: Level[] = meshLevels
+    .map(level => {
+      const region = cleanRegion(level.region);
+      return { z: level.z, region, area: polyArea(region) };
     })
     .filter(level => level.area > 0.5);
   // Measured from the thickness, not the highest level: cuts can cover the whole top, and each one starts at the surface.
@@ -102,7 +105,7 @@ export function featuresFromCuts(
     pockets.push({ ...pocket, region: openPocketRegion(outlines, pocket, extendOpen) });
   }
   return {
-    features: { thickness, footprint, outlines, throughHoles, levels, pockets, bottomFaces: [], slopedArea: 0 },
+    features: { thickness, footprint, outlines, throughHoles, levels, meshLevels, pockets, bottomFaces: [], slopedArea: 0 },
     holeSources,
   };
 }

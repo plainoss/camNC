@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { camPart } from './toolpaths';
 import { featuresFromCuts, type FlatCut } from './cutFeatures';
-import { intersect, polyArea, type PathD } from './geom';
+import { difference, intersect, polyArea, union, type PathD } from './geom';
 
 const rect = (x: number, y: number, w: number, h: number): PathD => [
   { x, y },
@@ -61,6 +61,22 @@ describe('features from cuts', () => {
     expect(pocket.area).toBeCloseTo(6400 - 0.04, 2);
     expect(polyArea(intersect([island], pocket.strictRegion))).toBeCloseTo(0, 6);
     expect(polyArea(intersect([island], pocket.region))).toBeCloseTo(0, 6);
+  });
+
+  it('keeps exact solid levels complementary around curved islands, including small holes', () => {
+    const circle = (radius: number) =>
+        Array.from({ length: 64 }, (_, i) => ({
+          x: 50 + radius * Math.cos((i * Math.PI) / 32),
+          y: 50 + radius * Math.sin((i * Math.PI) / 32),
+        })),
+      hole = circle(0.08),
+      { features } = featuresFromCuts(profile([cut('a', rect(20, 20, 80, 80), 6, { islands: [circle(5)] })], [hole])),
+      allSurfaces = union(features.meshLevels!.flatMap(level => level.region));
+    // Every point of the footprint has exactly one up-facing surface, even when CAM cleaning drops a small loop.
+    expect(polyArea(difference(features.footprint, allSurfaces))).toBe(0);
+    expect(polyArea(difference(allSurfaces, features.footprint))).toBe(0);
+    expect(features.meshLevels![0]!.region.some(path => Math.abs(polyArea([path])) < 0.05)).toBe(true);
+    expect(features.levels[0]!.region.every(path => Math.abs(polyArea([path])) >= 0.05)).toBe(true);
   });
 
   it('keeps a hole beside a floor cut, naming only the hole the cut really made', () => {
