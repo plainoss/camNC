@@ -98,7 +98,7 @@ Options: `--view <front|back|left|right|top|bottom|iso>` (repeat, or separate wi
 `--planes` (keep the origin and base planes, which are hidden by default so the view frames the parts),
 `--url <running dev server>`, `--headed`. The design path is read from where the command was typed, else from this
 folder. It prints one JSON line with the files, the design's part count, any page errors and `ms`, and exits non-zero
-if anything failed. A picture is written once two frames in a row of the 3D view look the same, so the camera has
+if anything failed, including a page or console error (as in a behaviour spec; its pictures are still written). A picture is written once two frames in a row of the 3D view look the same, so the camera has
 moved and been drawn. In a session, `render top iso` does the same on the open design.
 
 `pnpm --filter @wbcnc/camNC test:render` checks the command end to end on `designs/plate.json`. It starts a dev

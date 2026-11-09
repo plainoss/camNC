@@ -8,7 +8,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { test } from 'node:test';
-import { parseRenderArgs } from './render.mjs';
+import { parseRenderArgs, renderIn } from './render.mjs';
 
 /** Width and height from a PNG's header chunk. */
 const pngSize = bytes => {
@@ -29,6 +29,40 @@ test('render options name a design, its views and a picture size', () => {
   assert.throws(() => parseRenderArgs(['designs/plate.json', '--size', 'big']), /WIDTHxHEIGHT/);
   assert.throws(() => parseRenderArgs(['designs/missing.json']), /No such design/);
   assert.throws(() => parseRenderArgs(['designs/plate.json', '--url', 'https://app.example.com']), /local dev server/);
+});
+
+/** A session that answers each line as given, recording what it was sent. */
+const fakeSession = answers => {
+  const sent = [];
+  return { sent, run: async line => (sent.push(line), { ok: true, ...answers[line.split(' ')[0]] }) };
+};
+
+test('a render opens the design, hides the planes and renders each view', async () => {
+  const session = fakeSession({ render: { files: ['/out/top.png'], parts: 1 } });
+  const result = await renderIn(session, { design: '/d/plate.json', views: ['top', 'iso'], planes: false });
+  assert.deepEqual(session.sent, ['open /d/plate.json', 'hideplanes', 'render top iso']);
+  assert.deepEqual([result.ok, result.files, result.parts, result.errors], [true, ['/out/top.png'], 1, []]);
+  const kept = fakeSession({ render: { files: [], parts: 0 } });
+  await renderIn(kept, { design: '/d/plate.json', views: ['iso'], planes: true });
+  assert.deepEqual(kept.sent, ['open /d/plate.json', 'render iso']);
+});
+
+test('a page error while opening or rendering fails the render, as it fails a behaviour spec', async () => {
+  const session = fakeSession({ open: { errors: ['console error: boom'] }, render: { files: ['/out/iso.png'], parts: 1 } });
+  const result = await renderIn(session, { design: '/d/plate.json', views: ['iso'], planes: false });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /reported errors/);
+  assert.deepEqual(result.errors, ['console error: boom']);
+  assert.deepEqual(result.files, ['/out/iso.png']);
+});
+
+test('a failed line stops the render with its error', async () => {
+  const session = {
+    sent: [],
+    run: async line => (line === 'hideplanes' ? { ok: false, error: 'no list', errors: ['page error: x'] } : { ok: true }),
+  };
+  const result = await renderIn(session, { design: '/d/plate.json', views: ['iso'], planes: false });
+  assert.deepEqual([result.ok, result.error, result.errors], [false, 'no list', ['page error: x']]);
 });
 
 test('a saved design renders to one PNG per view, at the asked size', { timeout: 240_000 }, async t => {

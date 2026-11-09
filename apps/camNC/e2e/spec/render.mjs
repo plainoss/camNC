@@ -54,21 +54,35 @@ export function parseRenderArgs(args) {
   return options;
 }
 
-/** Opens the design as a new project, the way a person opens a saved file, and writes one PNG per named view. */
-export async function render(options) {
+/**
+ * Opens the design as a new project, the way a person opens a saved file, and writes one PNG per named view. As in the
+ * behaviour specs, a page error or console error fails the render, though its pictures are still written and listed.
+ */
+export async function renderIn(session, options) {
   const started = Date.now();
+  // Unless asked for, the origin and base planes are hidden, so each view frames the parts alone.
+  const lines = [`open ${options.design}`, ...(options.planes ? [] : ['hideplanes']), `render ${options.views.join(' ')}`];
+  const errors = [];
+  let result;
+  for (const line of lines) {
+    result = await session.run(line);
+    errors.push(...(result.errors ?? []));
+    if (!result.ok) return { ok: false, error: result.error, errors, ms: Date.now() - started };
+  }
+  return {
+    ok: !errors.length,
+    ...(errors.length && { error: 'The page reported errors while opening or rendering the design' }),
+    files: result.files,
+    parts: result.parts,
+    errors,
+    ms: Date.now() - started,
+  };
+}
+
+export async function render(options) {
   const session = await browserSession(options);
   try {
-    // Unless asked for, the origin and base planes are hidden, so each view frames the parts alone.
-    const lines = [`open ${options.design}`, ...(options.planes ? [] : ['hideplanes']), `render ${options.views.join(' ')}`];
-    const errors = [];
-    let result;
-    for (const line of lines) {
-      result = await session.run(line);
-      errors.push(...(result.errors ?? []));
-      if (!result.ok) return { ok: false, error: result.error, errors, ms: Date.now() - started };
-    }
-    return { ok: true, files: result.files, parts: result.parts, errors, ms: Date.now() - started };
+    return await renderIn(session, options);
   } finally {
     await session.close();
   }
