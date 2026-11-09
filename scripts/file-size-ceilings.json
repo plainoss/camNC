@@ -1,6 +1,8 @@
 {
   "limit": 1000,
-  "exclude": ["**/public/**"],
+  "exclude": [
+    "**/public/**"
+  ],
   "ceilings": {
     "apps/camNC/src/cad/CadEditor.tsx": 5752,
     "apps/camNC/src/cam/boards.ts": 1477,
