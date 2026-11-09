@@ -8,6 +8,7 @@
   "src/cam/rebaseJob.physicalSheet.test.ts",
   "src/cam/rebaseJob.sourceConflict.test.ts",
   "src/cam/boards.test.ts",
+  "src/cam/variedBoards.test.ts",
   "src/test/browserSequencer.test.ts",
   "e2e/spec/session.test.mjs"
 ]

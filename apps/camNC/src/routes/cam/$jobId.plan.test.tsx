@@ -1,5 +1,5 @@
 import { createJob, getJob, saveJob } from '@/cam/jobDb';
-import { camWorker, modelKey } from '@/cam/camQueries';
+import { wrapCamWorker, camWorker, modelKey } from '@/cam/camQueries';
 import { useCuttingData } from '@/cam/cuttingData';
 import { usePlanLayout } from '@/cam/plan/planLayoutStore';
 import { instancesOf, reconcileBoards } from '@/cam/boards';
@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import stepUrl from '../../../../../packages/cam/test/fixtures/kinderregal-eiche.step?url';
 import messerUrl from '../../../../../packages/cam/test/fixtures/messerblock-klein.step?url';
 import { Route } from './$jobId.plan';
+import { camWorkerCache } from '@/test/camWorkerCache';
 
 const params = vi.hoisted(() => ({ jobId: '' }));
 const bed = vi.hoisted(() => ({ bounds: {} as object | null }));
@@ -36,6 +37,9 @@ vi.mock('@/store/store', () => ({
 vi.mock('@/visualize/depthViewStore', () => ({ useDepthView: { getState: () => depth } }));
 
 const PlanStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
+
+// Tests open the same models as new jobs: read them and plan each board once for the file.
+wrapCamWorker(camWorkerCache);
 
 beforeEach(() => {
   // Persisted recipes from another browser test must not change this job's initial depth or planning workload.
