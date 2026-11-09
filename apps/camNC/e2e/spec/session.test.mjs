@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { onTestFinished, test } from 'vitest';
@@ -12,7 +12,7 @@ async function fixture(overrides = {}) {
   const adapter = {
     inDemo: async () => true,
     settle: async () => {},
-    state: async () => ({ steps: log.steps.length }),
+    state: async () => ({ steps: log.steps.length, parts: [{}] }),
     step: async line => {
       if (line === 'bad') throw new Error('Unknown step: bad');
       log.steps.push(line);
@@ -23,7 +23,8 @@ async function fixture(overrides = {}) {
   };
   const open = async () => {
     log.opened++;
-    return { adapter, page: {}, runtime: log.runtime, close: async () => void log.closed++ };
+    const page = { screenshot: ({ path: file }) => writeFile(file, `png after ${log.steps.at(-1)}`) };
+    return { adapter, page, runtime: log.runtime, close: async () => void log.closed++ };
   };
   return { log, session: createSession({ open, outDir }), outDir };
 }
@@ -73,6 +74,16 @@ test('frame writes the normalized drawing, and names cannot leave the output fol
 test('frame says so when there is no canvas', async () => {
   const { session } = await fixture({ frame: async () => null });
   assert.match((await session.run('frame x')).error, /no sketch canvas/);
+});
+
+test('render sets each named view and writes a picture of it', async () => {
+  const { log, session, outDir } = await fixture();
+  const result = await session.run('render top iso');
+  assert.deepEqual(log.steps, ['view top', 'view iso']);
+  assert.deepEqual(result.files, [path.join(outDir, 'top.png'), path.join(outDir, 'iso.png')]);
+  assert.equal(await readFile(result.files[0], 'utf8'), 'png after view top');
+  assert.equal(result.parts, 1);
+  assert.deepEqual((await session.run('render')).files, [path.join(outDir, 'iso.png')]);
 });
 
 test('reset starts over on a fresh page', async () => {

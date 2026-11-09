@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 /** Design files named by `open` are relative to the spec folder, so `designs/x.json` is `e2e/spec/designs/x.json`. */
 const SPEC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+/** The Part Studio's named views, in the order of their Shift+1 to Shift+7 shortcuts. */
+export const NAMED_VIEWS = ['front', 'back', 'left', 'right', 'top', 'bottom', 'iso'];
+
 const POSITION_TOLERANCE_MM = 1.5;
 const VALUE_TOLERANCE = 0.05;
 
@@ -479,6 +482,28 @@ export async function createAdapter(page, url) {
         else await page.mouse.click(x, y);
         await page.waitForTimeout(100);
         return;
+      }
+      case 'view': {
+        // A named view of the Part Studio's 3D view, by its keyboard shortcut (the studio toolbar's Views help).
+        const digit = NAMED_VIEWS.indexOf(rest) + 1;
+        if (!digit) throw new Error(`Unknown view: ${rest}. Use one of ${NAMED_VIEWS.join(', ')}`);
+        await settle();
+        if (!(await studioToolbar.isVisible())) await closeSketch();
+        const workspace = page.getByTestId('workspace-3d');
+        const scene = workspace.locator('canvas').first();
+        await scene.waitFor({ timeout: 30_000 });
+        await workspace.focus();
+        await page.keyboard.press(`Shift+Digit${digit}`);
+        await settle();
+        // The camera moves in an effect and is drawn on a later frame: done once two frames in a row look the same.
+        let last = null;
+        for (let attempt = 0; ; attempt++) {
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+          const picture = await scene.screenshot({ animations: 'disabled' });
+          if (last?.equals(picture)) return;
+          if (attempt >= 30) throw new Error(`The 3D view kept changing after choosing the ${rest} view`);
+          last = picture;
+        }
       }
       case 'addpart': {
         // In the Part Studio a new part is sketched from the studio: close the open sketch, then Sketch on the top plane.

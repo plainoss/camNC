@@ -57,14 +57,15 @@ listening session.
 
 Besides the steps below, a line can be:
 
-| Line            | Meaning                                                             |
-| --------------- | ------------------------------------------------------------------- |
-| `state`         | The state now, without doing anything                               |
-| `expect <json>` | Check any expectation from a scenario; failures fail the line       |
-| `frame [name]`  | Write the normalized SVG to `apps/camNC/test-results/spec-session/` |
-| `shot [name]`   | Write a screenshot to the same folder                               |
-| `reset`         | Start again on a fresh page with nothing saved                      |
-| `quit`          | Stop                                                                |
+| Line             | Meaning                                                              |
+| ---------------- | -------------------------------------------------------------------- |
+| `state`          | The state now, without doing anything                                |
+| `expect <json>`  | Check any expectation from a scenario; failures fail the line        |
+| `frame [name]`   | Write the normalized SVG to `apps/camNC/test-results/spec-session/`  |
+| `shot [name]`    | Write a screenshot to the same folder                                |
+| `render [views]` | Show each named view of the Part Studio and write `<view>.png` there |
+| `reset`          | Start again on a fresh page with nothing saved                       |
+| `quit`           | Stop                                                                 |
 
 Once a behaviour works, write the steps that showed it as a scenario.
 
@@ -80,6 +81,24 @@ printf 'open designs/plate.json\nstate\n' | pnpm --silent --filter @wbcnc/camNC 
 A scenario does the same with `"open designs/<name>.json"` as its first step. Outside the editor,
 `pnpm --filter @wbcnc/cad-script check --from <file.json>` loads it headless, and a unit test can read it with
 `parseCadDocument(JSON.parse(text))` and render `<CadEditor document={…} />`.
+
+## Rendering a saved design
+
+To look at a design's result without driving the editor, render it. This starts its own dev server, opens the file
+the way `open` does, shows each named view of the Part Studio's 3D view with its keyboard shortcut and writes one PNG
+per view at a fixed viewport and a device scale of 1:
+
+```sh
+pnpm --silent --filter @wbcnc/camNC render designs/plate.json --view top --view iso
+# {"ok":true,"files":[".../test-results/spec-render/plate/top.png",".../iso.png"],"parts":1,"errors":[],"ms":41614}
+```
+
+Options: `--view <front|back|left|right|top|bottom|iso>` (repeat, or separate with commas; `iso` by default),
+`--out <dir>` (default `apps/camNC/test-results/spec-render/<design>/`), `--size <W>x<H>` (default `1440x1000`),
+`--url <running dev server>`, `--headed`. The design path is read from where the command was typed, else from this
+folder. It prints one JSON line with the files, the design's part count, any page errors and `ms`, and exits non-zero
+if anything failed. A picture is written once two frames in a row of the 3D view look the same, so the camera has
+moved and been drawn. In a session, `render top iso` does the same on the open design.
 
 ## Scenario format
 
@@ -119,6 +138,7 @@ The comparison reports themselves are kept outside this repository.
 | `uncheck <label>` / `hold <key>` / `release <key>` / `selectdim` / `editdim` / `addpart` | Hold a modifier, select or edit the first dimension label, add a part                           |
 | `handle <start\|end> <point\|segment> [add]`                                             | Click a spline's own tangent handle, optionally adding to the selection                         |
 | `open <file.json>`                                                                       | Open a saved design file (relative to this folder) as a new project, on its first sketch        |
+| `view <name>`                                                                            | Show the Part Studio's 3D view from `front`, `back`, `left`, `right`, `top`, `bottom` or `iso`  |
 | `frame <name>`                                                                           | Compare this moment with a reviewed golden, if one exists                                       |
 | `{ "expect": { ... } }`                                                                  | Check the state at this moment                                                                  |
 
