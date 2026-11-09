@@ -219,10 +219,18 @@ export async function createAdapter(page, url) {
     await page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: /Finish sketch/ }).click();
     await studioToolbar.waitFor();
   };
-  /** A finished sketch is a sketch until it's extruded: Shift+E extrudes it as it is, as the reference's Extrude. */
+  /**
+   * A finished sketch is a sketch until it's extruded: Shift+E extrudes it as it is, as the reference's Extrude. A part
+   * already extruded is left as it is, since Extrude would start another extrude of it.
+   */
   const extrudeSketch = async () => {
     const extrude = page.getByRole('dialog', { name: /^Extrude ·/ });
-    if (!(await extrude.isVisible())) {
+    // Each step's label, without the value shown under it.
+    const rows = await page.getByRole('region', { name: 'Features' }).locator('button > span:not([aria-hidden])').allTextContents();
+    const named = kind => rows.flatMap(text => (text.startsWith(`${kind} · `) ? [text.slice(kind.length + 3)] : []));
+    const extruded = new Set(named('Extrude'));
+    const unextruded = named('Sketch').some(name => !extruded.has(name));
+    if (!(await extrude.isVisible()) && unextruded) {
       await page.keyboard.press('Shift+E');
       await extrude.waitFor({ timeout: 3000 }).catch(() => {});
     }

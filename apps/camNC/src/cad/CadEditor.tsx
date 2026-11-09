@@ -225,6 +225,7 @@ import type { BasePlane } from './basePlanes';
 import type { ViewRegion, ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, rolledBackTo, type DesignStep } from './designSteps';
 import { toggleSuppressed } from './toggleSuppressed';
+import { reorderedSteps } from './reorderSteps';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnAxes, turnedBy, type SketchTurn } from './sketchOrbit';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
@@ -3823,11 +3824,10 @@ export function CadEditor({
       );
       openFeature('extrude', part.id, before);
     } else if (command === 'extrude' && part) {
-      // Extruding a sketch again, as the reference does, makes another part of the regions its extrudes leave. When
-      // they use it all, Extrude opens the part's own.
+      // Extrude always starts a new extrude, of the part's sketch here, as in the reference: it starts with the regions
+      // the sketch's extrudes leave, or none. An extrude already made is edited from its step in the feature list.
       const before = documentRef.current;
       const made = newExtrudeOf(before, part, `Part ${before.parts.length + 1}`);
-      if (!made) return openFeature('extrude', part.id);
       commit({ ...before, revision: before.revision + 1, parts: [...before.parts, made] });
       openFeature('extrude', made.id, before);
     } else if (part) openFeature(command, part.id);
@@ -4233,6 +4233,20 @@ export function CadEditor({
               onAction={featureAction}
               rollback={rollbackStep}
               onRollTo={showWorkspace ? setRolledTo : undefined}
+              onReorder={
+                showWorkspace
+                  ? (stepId, beforeId) => {
+                      const steps = designSteps(documentRef.current);
+                      const dragged = steps.find(step => step.id === stepId),
+                        target = steps.find(step => step.id === beforeId);
+                      if (!dragged || !target) return;
+                      const result = reorderedSteps(documentRef.current, dragged, target);
+                      if ('error' in result) return setStudioRefusal(result.error);
+                      setStudioRefusal(null);
+                      commit(result.document);
+                    }
+                  : undefined
+              }
               onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
               onRename={(partId, name) => commit(replacePart(documentRef.current, partId, p => ({ ...p, name })))}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane })}
