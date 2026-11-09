@@ -9,6 +9,11 @@ import {
   addPartCopy,
   mirroredPartId,
   evaluateCadDocument,
+  addFaceSketch,
+  cadSketchRegions,
+  pointInPolygon,
+  setCutDepth,
+  type CadDocument,
   type CadSolveResult,
 } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
@@ -67,6 +72,56 @@ describe('CAD tab boundary lineage', () => {
     // A tab on the far edge, the plate's left edge, ends 120 mm across instead of 100.
     const far = { ...board, tabsAt: { [instance]: [{ x: 100, y: 30 }] } };
     expect(carryDesignTabs([far], result(document), result(widened))![0]!.tabsAt![instance]![0]!.x).toBeCloseTo(120, 6);
+  });
+
+  describe('on a part milled turned over', () => {
+    const result = (source: CadDocument): CadSolveResult => ({
+      ...evaluateCadDocument(source),
+      document: source,
+      status: 'solved',
+      sketches: [],
+    });
+    /** A plate with a pocket cut only from below, which puts it on the board turned over end for end. */
+    function cutFromBelow(document: CadDocument) {
+      const partId = document.parts[0]!.id,
+        added = addFaceSketch(document, partId, 'underside'),
+        face = added.document.parts[0]!.features!.find(f => f.type === 'sketch')!;
+      if (face.type !== 'sketch') throw new Error('Expected a sketch');
+      face.sketch = addLine(face.sketch, { x1: -20, y1: -5, x2: -20, y2: 65 });
+      const region = cadSketchRegions(added.document.parts[0]!, added.sketchId).find(r => pointInPolygon({ x: -10, y: 30 }, r.points))!;
+      return setCutDepth(added.document, partId, added.sketchId, region.id, 4);
+    }
+    const widen = (document: CadDocument) => {
+      const widened = structuredClone(document);
+      widened.parts[0]!.sketch.entities = widened.parts[0]!.sketch.entities.map(entity =>
+        entity.type === 'point' && entity.x === 100 ? { ...entity, x: 120 } : entity
+      );
+      return widened;
+    };
+
+    it('moves a tab with the edge it sits on', () => {
+      const document = cutFromBelow(createPlateDocument({ width: 100, height: 60, thickness: 12 }));
+      // Turned over, the plate's right edge lies on the left, and moves out by 20 mm.
+      const instance = `${document.parts[0]!.id}#0`;
+      const board = { ...newBoard([], 12, 'plywood', [instance]), tabsAt: { [instance]: [{ x: 0, y: 30 }] } };
+      const carried = carryDesignTabs([board], result(document), result(widen(document)))![0]!;
+      expect(carried.designIssues).toBeUndefined();
+      expect(carried.tabsAt![instance]![0]!.x).toBeCloseTo(0, 6);
+      expect(carried.tabsAt![instance]![0]!.y).toBeCloseTo(30, 6);
+    });
+
+    it('moves a tab to where its edge goes when the part turns over', () => {
+      const plain = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
+        instance = `${plain.parts[0]!.id}#0`;
+      const board = { ...newBoard([], 12, 'plywood', [instance]), tabsAt: { [instance]: [{ x: 10, y: 0 }] } };
+      const turned = carryDesignTabs([board], result(plain), result(cutFromBelow(plain)))![0]!;
+      expect(turned.designIssues).toBeUndefined();
+      expect(turned.tabsAt![instance]![0]!.x).toBeCloseTo(90, 6);
+      expect(turned.tabsAt![instance]![0]!.y).toBeCloseTo(0, 6);
+      // And back when it no longer needs to.
+      const back = carryDesignTabs([turned], result(cutFromBelow(plain)), result(plain))![0]!;
+      expect(back.tabsAt![instance]![0]!.x).toBeCloseTo(10, 6);
+    });
   });
 
   it('retains changed-source tab repair state if an unrequested preparation rolls back', () => {

@@ -12,6 +12,7 @@ import {
 } from '@wbcnc/cad';
 import { isCut, type BoardV1 } from './boards';
 import { designGeometryFingerprint } from './designGeometry';
+import { asMilled, millsUndersideUp } from './millSide';
 
 type Curve = Exclude<CadEntity, { type: 'point' }>;
 const tau = Math.PI * 2;
@@ -111,10 +112,14 @@ export function carryDesignTabs(
       // follow that part's curves, mirrored.
       const sourceId = partId.split(':')[0]!,
         mirrored = partId.startsWith(mirroredPartId(sourceId));
-      const flip = (p: CadPoint): CadPoint => (mirrored ? { x: -p.x, y: p.y } : p);
+      // A part with cuts only from its underside lies turned over about the same axis, and can turn back when that changes.
+      const flipFor = (shapes: Map<string, EvaluatedCadPart>) => {
+        const turned = mirrored !== millsUndersideUp(shapes.get(sourceId) ?? {});
+        return (p: CadPoint): CadPoint => (turned ? { x: -p.x, y: p.y } : p);
+      };
       const shape = (shapes: Map<string, EvaluatedCadPart>) => {
         const found = shapes.get(sourceId);
-        return found && mirrored ? mirrorEvaluatedPart(found) : found;
+        return found && asMilled(mirrored ? mirrorEvaluatedPart(found) : found);
       };
       const oldPart = oldParts.get(sourceId),
         nextPart = newParts.get(sourceId);
@@ -146,9 +151,11 @@ export function carryDesignTabs(
       const outerIds = new Set(oldShape.loops.filter(l => l.kind === 'outer').flatMap(l => l.entityIds));
       const nextOuterIds = new Set(nextShape.loops.filter(l => l.kind === 'outer').flatMap(l => l.entityIds));
       const curves = oldPart.sketch.entities.filter((e): e is Curve => e.type !== 'point' && outerIds.has(e.id));
+      const flipOld = flipFor(oldShapes),
+        flipNext = flipFor(newShapes);
       let failed = false;
       const mapped = tabs.map(at => {
-        const sourceAt = flip({ x: at.x + oldOrigin.x, y: at.y + oldOrigin.y });
+        const sourceAt = flipOld({ x: at.x + oldOrigin.x, y: at.y + oldOrigin.y });
         const anchor = curves
           .flatMap(curve => {
             const hit = project(curve, oldPart, sourceAt);
@@ -161,7 +168,7 @@ export function carryDesignTabs(
           failed = true;
           return at;
         }
-        const placed = flip(point);
+        const placed = flipNext(point);
         return { x: placed.x - nextOrigin.x, y: placed.y - nextOrigin.y };
       });
       if (failed) designIssues[instanceId] = 'A tab boundary changed. Reset or place this part’s tabs again on Boards.';
