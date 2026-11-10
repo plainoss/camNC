@@ -265,7 +265,7 @@ import { designSteps, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnedBy, type SketchTurn } from './sketchOrbit';
-import { captureSketchCamera, carriedSketchCamera, type StudioCameraRef, type StudioCameraState } from './studioCamera';
+import { captureSketchCamera, carriedSketchCamera, type StudioCameraState } from './studioCamera';
 import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
@@ -4040,8 +4040,16 @@ export function CadEditor({
           onUndo={() => navigateHistory()}
           onRedo={() => navigateHistory(true)}
           onCancel={() => void cancel()}
-          onFinish={() => void finish()}
-        />
+          onFinish={() => void finish()}>
+          <StudioProposals
+            key={doc.id}
+            document={doc}
+            session={session}
+            selection={part && { partId: part.id, copyId: cutSelection.selectedCopyId }}
+            disabled={busy || !!rollbackStep || !!featureDialog || !!partCutting}
+            onApply={publish}
+          />
+        </StudioToolbar>
       ) : (
         <SketchToolbar
           tools={tools}
@@ -4070,16 +4078,6 @@ export function CadEditor({
           onFinish={() => (studioSession ? closeSketch(true) : void finish())}
           onReturnToCanvas={restoreCanvasKeyboard}
           closeElsewhere={studioSession}
-        />
-      )}
-      {studioSession && showWorkspace && (
-        <StudioProposals
-          key={doc.id}
-          document={doc}
-          session={session}
-          selection={part && { partId: part.id, copyId: cutSelection.selectedCopyId }}
-          disabled={busy || !!rollbackStep || !!featureDialog || !!partCutting}
-          onApply={publish}
         />
       )}
       <div className="cad-workspace" inert={busy}>

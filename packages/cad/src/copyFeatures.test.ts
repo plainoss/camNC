@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCircle,
   addCopyFaceSketch,
+  addFaceSketch,
   addPartCopy,
   cadPartsToCut,
   cadSketchRegions,
@@ -42,6 +43,20 @@ function hole(document: CadDocument, copyId: string, on: 'top' | { floorOf: stri
   )!;
   document = setCutDepth(document, partId, face.sketch.id, region.id, depth);
   return { document, sketchId: made.sketchId, cutId: document.parts[0]!.features!.at(-1)!.id };
+}
+
+function familyPocket(document: CadDocument, on: 'top' | { floorOf: string }, radius: number, depth: number) {
+  const partId = document.parts[0]!.id;
+  const made = addFaceSketch(document, partId, on);
+  document = made.document;
+  const face = document.parts[0]!.features!.find(feature => feature.type === 'sketch' && feature.sketch.id === made.sketchId)!;
+  if (face.type !== 'sketch') throw new Error('No face sketch');
+  face.sketch = addCircle(face.sketch, { x: 150, y: 100, radius, dimensioned: true, positioned: true });
+  const region = cadSketchRegions(document.parts[0]!, face.sketch.id).find(region =>
+    region.points.every(point => Math.abs(point.x - 150) <= radius + 1e-6)
+  )!;
+  document = setCutDepth(document, partId, face.sketch.id, region.id, depth);
+  return { document, sketchId: made.sketchId, regionId: region.id, cutId: document.parts[0]!.features!.at(-1)!.id };
 }
 
 describe('features on one physical copy', () => {
@@ -109,6 +124,64 @@ describe('features on one physical copy', () => {
     expect(solved.status, JSON.stringify(solved.diagnostics)).toBe('solved');
     expect(solved.parts[0]!.cuts!.map(cut => cut.to)).toEqual([4]);
     expect(solved.parts[0]!.copyCuts![copyId]!.map(cut => cut.to)).toEqual([9]);
+  });
+  it('keeps shared and copy-specific child floors attached when a copy overrides a family pocket', async () => {
+    let document = shelves();
+    const sourceId = document.parts[0]!.id;
+    const copyId = document.parts[0]!.copies![0]!.id;
+    const parent = familyPocket(document, 'top', 40, 4);
+    const child = familyPocket(parent.document, { floorOf: parent.cutId }, 5, 3);
+    document = child.document;
+    let solved = await solveCadDocument(document);
+    expect(solved.status, JSON.stringify(solved.diagnostics)).toBe('solved');
+    expect(solved.parts[0]!.cuts!.map(cut => [cut.from, cut.to])).toEqual([
+      [0, 4],
+      [4, 7],
+    ]);
+    const originalIds = document.parts[0]!.features!.map(feature => feature.id);
+    document = setCopyCutDepth(document, sourceId, copyId, parent.sketchId, parent.regionId, 8);
+    const override = document.parts[0]!.features!.find(feature => feature.type === 'cut' && feature.copyId === copyId)!;
+    expect(document.parts[0]!.features!.filter(feature => originalIds.includes(feature.id)).map(feature => feature.id)).toEqual(
+      originalIds
+    );
+    expect(document.parts[0]!.features!.findIndex(feature => feature.id === override.id)).toBeLessThan(
+      document.parts[0]!.features!.findIndex(feature => feature.type === 'sketch' && feature.sketch.id === child.sketchId)
+    );
+    const sharedFloor = document.parts[0]!.features!.find(feature => feature.type === 'sketch' && feature.sketch.id === child.sketchId)!;
+    if (sharedFloor.type !== 'sketch') throw new Error('No shared floor');
+    expect(sharedFloor.on).toEqual({ floorOf: parent.cutId });
+    solved = await solveCadDocument(parseCadDocument(JSON.parse(JSON.stringify(document))));
+    expect(solved.status, JSON.stringify(solved.diagnostics)).toBe('solved');
+    expect(solved.parts[0]!.cuts!.map(cut => [cut.from, cut.to])).toEqual([
+      [0, 4],
+      [4, 7],
+    ]);
+    expect(solved.parts[0]!.copyCuts![copyId]!.map(cut => [cut.from, cut.to])).toEqual([
+      [0, 8],
+      [8, 11],
+    ]);
+
+    // Both saved ways of naming that physical floor remain valid: the shared parent and the copy override itself.
+    document = hole(solved.document, copyId, { floorOf: parent.cutId }, 1).document;
+    document = hole(document, copyId, { floorOf: override.id }, 2).document;
+    solved = await solveCadDocument(document);
+    expect(solved.status, JSON.stringify(solved.diagnostics)).toBe('solved');
+    expect(solved.parts[0]!.copyCuts![copyId]!.map(cut => [cut.from, cut.to])).toEqual([
+      [0, 8],
+      [8, 11],
+      [8, 9],
+      [8, 10],
+    ]);
+    const detached = detachPartCopy(solved.document, sourceId, copyId);
+    if ('error' in detached) throw new Error(detached.error);
+    const detachedSolved = await solveCadDocument(parseCadDocument(detached.document));
+    expect(detachedSolved.status, JSON.stringify(detachedSolved.diagnostics)).toBe('solved');
+    expect(detachedSolved.parts.find(part => part.partId === detached.partId)!.cuts!.map(cut => [cut.from, cut.to])).toEqual([
+      [0, 8],
+      [8, 11],
+      [8, 9],
+      [8, 10],
+    ]);
   });
   it('preserves actual material when one copy fills a through-hole and another makes it a blind pocket', async () => {
     let document = shelves();

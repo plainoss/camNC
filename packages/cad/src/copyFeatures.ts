@@ -3,20 +3,31 @@ import { addFaceSketch, setCutDepth, withFeatureVersion } from './features';
 import { resolveDrawnPlacements } from './drawnOn';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
 import { detachedMirroredPart } from './detachedMirror';
-import type { CadCutDepth, CadDocument, CadFaceRef, CadFeature, CadPart } from './types';
+import type { CadCut, CadCutDepth, CadDocument, CadFaceRef, CadFeature, CadPart } from './types';
 
 /** A copy keeps the family's features and adds only those explicitly addressed to it. */
 export function featuresForCopy(part: CadPart, copyId?: string): CadFeature[] {
-  const own = (part.features ?? []).filter(feature => feature.copyId === copyId && copyId !== undefined && feature.type === 'cut');
-  return (part.features ?? []).filter(
-    feature =>
-      (!feature.copyId || feature.copyId === copyId) &&
-      !(
-        feature.type === 'cut' &&
-        !feature.copyId &&
-        own.some(other => other.type === 'cut' && other.sketchId === feature.sketchId && other.regionId === feature.regionId)
-      )
-  );
+  const features = part.features ?? [];
+  if (copyId === undefined) return features.filter(feature => !feature.copyId);
+  const own = features.filter((feature): feature is CadCut => feature.copyId === copyId && feature.type === 'cut');
+  const replacements = new Map<string, CadCut>();
+  for (const feature of features) {
+    if (feature.type !== 'cut' || feature.copyId) continue;
+    const override = own.find(other => other.sketchId === feature.sketchId && other.regionId === feature.regionId);
+    if (override) replacements.set(feature.id, override);
+  }
+  const replaced = new Set([...replacements.values()].map(feature => feature.id));
+  return features.flatMap(feature => {
+    if ((feature.copyId && feature.copyId !== copyId) || replaced.has(feature.id)) return [];
+    // A changed family cut stays in its original place. Children on its floor follow the replacement only in this
+    // copy's evaluated projection; saved source IDs and references remain the family's ordinary editable steps.
+    const projected = replacements.get(feature.id) ?? feature;
+    if (projected.type === 'sketch' && typeof projected.on === 'object') {
+      const floor = replacements.get(projected.on.floorOf);
+      if (floor) return [{ ...projected, on: { floorOf: floor.id } }];
+    }
+    return [projected];
+  });
 }
 
 export function addCopyFaceSketch(
@@ -103,6 +114,11 @@ export function setCopyCutDepth(
   const added = setCutDepth(withoutFamilyCut, partId, sketchId, regionId, depth, expression);
   const updated = added.parts.find(candidate => candidate.id === partId)!;
   const created = updated.features!.find(feature => !before.has(feature.id))!;
+  const familyAt =
+    part.features?.findIndex(
+      feature => feature.type === 'cut' && !feature.copyId && feature.sketchId === sketchId && feature.regionId === regionId
+    ) ?? -1;
+  const insertAt = familyAt < 0 ? (part.features?.length ?? 0) : familyAt + 1;
   return withFeatureVersion({
     ...document,
     parts: document.parts.map(candidate =>
@@ -110,7 +126,11 @@ export function setCopyCutDepth(
         ? candidate
         : {
             ...candidate,
-            features: [...(candidate.features ?? []), { ...created, copyId }],
+            features: [
+              ...(candidate.features ?? []).slice(0, insertAt),
+              { ...created, copyId },
+              ...(candidate.features ?? []).slice(insertAt),
+            ],
           }
     ),
   });

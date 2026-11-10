@@ -1,6 +1,6 @@
 import '@/style.css';
 import { createPlateDocument } from '@wbcnc/cad';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CamPage } from '@/cam/CamPage';
@@ -48,6 +48,14 @@ describe.each([true, false])('Design viewport (studio: %s)', studio => {
       });
     }
     await page.viewport(390, 720);
+    if (studio) {
+      const height = toolbar.getBoundingClientRect().height;
+      const input = toolbar.querySelector<HTMLInputElement>('input[type="file"]')!;
+      fireEvent.change(input, { target: { files: [new File(['{'], 'broken.json', { type: 'application/json' })] } });
+      await screen.findByRole('alert', {}, { timeout: 20_000 });
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
+      expect(toolbar.getBoundingClientRect().height).toBe(height);
+    }
     // Keyboard navigation must still reach commands beyond the scroll region's visible edge.
     const tools = screen.getByRole('group', { name: studio ? 'Part Studio features' : 'Sketch tools' });
     const lastTool = tools.querySelectorAll('button');

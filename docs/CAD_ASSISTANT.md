@@ -48,8 +48,8 @@ not establish that a piece matches a picture or that its joints are strong.
 
 Only **Apply as one undo step** changes the open document. A hand edit made after
 the request invalidates the proposal, including when that edit has been undone.
-Discarding a preview leaves the document and undo history untouched. **Review
-design file** uses the same guarded path for a candidate with the open design's
+Discarding a preview leaves the document and undo history untouched. **Insert →
+Review design file** uses the same guarded path for a candidate with the open design's
 ID; importing a different design remains the Projects workflow.
 
 The assistant cannot apply, finish a job or make a machine program. Finish and
