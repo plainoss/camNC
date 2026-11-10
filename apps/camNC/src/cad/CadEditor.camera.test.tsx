@@ -32,6 +32,8 @@ it.each([1200, 375, 320])(
       () => {
         state = vi.mocked(ModelViewport).mock.calls.findLast(([props]) => props.cameraState)?.[0].cameraState;
         expect(state?.current?.height).toBeGreaterThan(0);
+        // The camera ref can precede Html's separate DOM-root commit; sample screen positions only once its marker is visible.
+        expect(screen.getByTestId('model-origin')).toBeVisible();
       },
       { timeout: 20000 }
     );
