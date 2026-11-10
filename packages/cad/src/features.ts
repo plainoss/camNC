@@ -1,4 +1,6 @@
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
+import { cadDocumentVersion } from './documentVersion';
+import { featuresForCopy } from './copyFeatures';
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { newCadId, originId } from './document';
 import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './featureModel';
@@ -14,7 +16,6 @@ import type {
   CadDiagnostic,
   CadDocument,
   CadFaceRef,
-  CadFaceSketch,
   CadPart,
   CadPoint,
   CadSketch,
@@ -28,7 +29,7 @@ export const isCadPart = (part: CadPart): boolean => part.extrude !== false && !
 
 /** Features belong to the newer format, so an older build refuses the file instead of silently cutting without them. */
 export function withFeatureVersion(document: CadDocument): CadDocument {
-  return { ...document, version: document.parts.some(part => part.features?.length) ? 2 : 1 };
+  return { ...document, version: cadDocumentVersion(document) };
 }
 function editPart(
   document: CadDocument,
@@ -66,15 +67,18 @@ export function setCutDepth(
   depthExpression?: string
 ): CadDocument {
   const typed = depth !== 'through' && depthExpression ? { depthExpression } : {};
+  const copyId = document.parts
+    .find(part => part.id === partId)
+    ?.features?.find(feature => feature.type === 'sketch' && feature.sketch.id === sketchId)?.copyId;
   return editPart(document, partId, features =>
-    features.some(f => f.type === 'cut' && f.sketchId === sketchId && f.regionId === regionId)
+    features.some(f => f.type === 'cut' && f.sketchId === sketchId && f.regionId === regionId && f.copyId === copyId)
       ? features.map(f => {
-          if (f.type !== 'cut' || f.sketchId !== sketchId || f.regionId !== regionId) return f;
+          if (f.type !== 'cut' || f.sketchId !== sketchId || f.regionId !== regionId || f.copyId !== copyId) return f;
           // Setting a depth means the cut is wanted, so it comes back on.
           const { suppressed: _suppressed, depthExpression: _typed, ...cut } = f;
           return { ...cut, depth, ...typed };
         })
-      : [...features, { type: 'cut', id: newCadId(), sketchId, regionId, depth, ...typed }]
+      : [...features, { type: 'cut', id: newCadId(), sketchId, regionId, depth, ...typed, ...(copyId && { copyId }) }]
   );
 }
 
@@ -220,8 +224,12 @@ const sameIds = (a: string[], b: string[]) => a.length === b.length && [...a].so
  * Applies a part's features to its evaluated profile. An inner loop stays a through-hole unless its cut says otherwise,
  * so parts without features evaluate exactly as they always have.
  */
-export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
-  const cut = cutFeatures(part, profile);
+export function evaluateCadFeatures(
+  part: CadPart,
+  profile: EvaluatedCadPart,
+  copyId?: string
+): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
+  const cut = cutFeatures({ ...part, features: featuresForCopy(part, copyId) }, profile);
   if (!part.cornerRelief) return cut;
   const { part: next, skipped } = relieveCorners(cut.part, part.cornerRelief.diameter);
   const diagnostics = [...cut.diagnostics];
@@ -234,6 +242,34 @@ export function evaluateCadFeatures(part: CadPart, profile: EvaluatedCadPart): {
       points: skipped,
     });
   return { part: next, diagnostics };
+}
+
+/** Evaluate a source and only the copies with their own features; ordinary copies keep sharing its geometry. */
+export function evaluateCadPartFamily(part: CadPart, profile: EvaluatedCadPart): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
+  const evaluated = evaluateCadFeatures(part, profile);
+  for (const copy of part.copies ?? []) {
+    if (!part.features?.some(feature => feature.copyId === copy.id)) continue;
+    const own = evaluateCadFeatures(part, profile, copy.id);
+    evaluated.diagnostics.push(...own.diagnostics);
+    evaluated.part = {
+      ...evaluated.part,
+      copyCuts: { ...evaluated.part.copyCuts, [copy.id]: own.part.cuts ?? [] },
+      copyProfiles: {
+        ...evaluated.part.copyProfiles,
+        [copy.id]: { outline: own.part.outline, holes: own.part.holes, loops: own.part.loops },
+      },
+    };
+  }
+  for (const copyId of new Set(part.features?.flatMap(feature => (feature.copyId ? [feature.copyId] : [])))) {
+    if (part.copies?.some(copy => copy.id === copyId)) continue;
+    evaluated.diagnostics.push({
+      code: 'copy-feature-inactive',
+      severity: 'warning',
+      partId: part.id,
+      message: `Features on copy ${copyId} are inactive while that copy is absent or suppressed.`,
+    });
+  }
+  return evaluated;
 }
 
 function cutFeatures(part: CadPart, profile: EvaluatedCadPart): { part: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
@@ -383,7 +419,7 @@ export function evaluateCadDocument(given: CadDocument): { parts: EvaluatedCadPa
       ...(isCadBody(document, part) ? result.diagnostics : result.diagnostics.map(d => ({ ...d, severity: 'warning' as const })))
     );
     if (!result.part) continue;
-    const evaluated = evaluateCadFeatures(part, result.part);
+    const evaluated = evaluateCadPartFamily(part, result.part);
     diagnostics.push(...evaluated.diagnostics);
     parts.push(evaluated.part);
   }

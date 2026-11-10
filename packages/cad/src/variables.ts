@@ -632,7 +632,7 @@ export function cadVariableUses(document: CadDocument, name: string): number {
  */
 export function setCadVariable(
   document: CadDocument,
-  change: { id?: string; name: string; expression: string }
+  change: { id?: string; name: string; expression: string; folderId?: string | null }
 ): { document: CadDocument; id: string } | { error: string } {
   const name = change.name.trim(),
     expression = change.expression.trim();
@@ -641,16 +641,20 @@ export function setCadVariable(
   if (!expression) return { error: 'Enter a value.' };
   const variables = document.variables ?? [];
   const existing = variables.find(variable => variable.id === change.id);
+  const folderId = change.folderId === null ? undefined : (change.folderId ?? existing?.folderId);
+  if (folderId !== undefined && !document.folders?.some(folder => folder.id === folderId))
+    return { error: 'This folder no longer exists.' };
   if (variables.some(variable => variable.name === name && variable.id !== existing?.id))
     return { error: `There's already a variable called ${name}.` };
-  if (existing && existing.name === name && existing.expression === expression) return { document, id: existing.id };
+  if (existing && existing.name === name && existing.expression === expression && existing.folderId === folderId)
+    return { document, id: existing.id };
   const id = existing?.id ?? change.id ?? newCadId();
   let next: CadDocument = {
     ...document,
     revision: document.revision + 1,
     variables: existing
-      ? variables.map(variable => (variable.id === id ? { id, name, expression } : variable))
-      : [...variables, { id, name, expression }],
+      ? variables.map(variable => (variable.id === id ? { id, name, expression, ...(folderId && { folderId }) } : variable))
+      : [...variables, { id, name, expression, ...(folderId && { folderId }) }],
   };
   if (existing && existing.name !== name) next = mapExpressions(next, text => renameCadExpressionVariable(text, existing.name, name));
   const { errors } = cadVariableValues(next);

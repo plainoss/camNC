@@ -1,9 +1,13 @@
-import { buildConstraintForSelection, type ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands';
+import { prepareEmptyStudio } from './emptyStudio';
+import { checkedDesignApi } from './argumentChecks';
+import { buildConstraintForSelection } from '@wbcnc/cad-editor/constraintCommands';
 import {
   addArc,
   addCircle,
   addConstraint,
   addFaceSketch,
+  addCopyFaceSketch,
+  setCopyCutDepth,
   addLine,
   addPartCopy,
   addPartCut,
@@ -38,180 +42,32 @@ import {
   type NewCadConstraint,
   cadCopyName,
   resolvePartPatterns,
+  initializeCadSolver,
+  solveCadDocumentNow,
 } from '@wbcnc/cad';
 import { combineExpressions, differenceExpression } from './linearExpression';
 import { inspectCadDocument, shortHandles, type CadExpectation, type CadReport } from './inspect';
+import { CadScriptError, fail, resolveHandle, existingDesignEdit } from './editExisting';
+import { runFolderScope } from './folderScope';
 
-export type Xy = readonly [number, number];
-/** mm, or an expression such as `'width - 2*board'` that keeps following the design's variables. */
-export type Len = number | string;
-export type LenXy = readonly [Len, Len];
-/** A direction in the assembly: X runs left to right, Y front to back, Z up. */
-export type CadAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
-/** Anything in a sketch: returned when it's made, or looked up with `find` from a handle in the report. */
-export interface CadRef {
-  id: string;
-}
-export interface CadRegionRef {
-  sketchId: string;
-  regionId: string;
-}
-export interface CadCutRef {
-  id: string;
-}
-export type CadFacePick = 'top' | 'underside' | { floorOf: CadCutRef };
-/** One of the studio's base planes. */
-export type CadPlane = 'top' | 'front' | 'right';
-/** A face of a part that another part can be drawn on, from `part.face(...)`. */
-export interface CadPartFace {
-  readonly partId: string;
-  readonly face: Extract<CadDrawnOn['on'], { partId: string }>['face'];
-}
-
-export interface SketchEdit {
-  readonly id: string;
-  /** Dimensioned and placed, so it's fully constrained. `at` is the lower-left corner; use `center` for the middle. */
-  rect(options: { w: Len; h: Len; at?: LenXy; center?: LenXy }): {
-    edges: { bottom: CadRef; right: CadRef; top: CadRef; left: CadRef };
-    corners: CadRef[];
-  };
-  /** Dimensioned and placed, so it's fully constrained. */
-  circle(options: { at: LenXy; d: Len }): CadRef & { center: CadRef };
-  /** A closed loop through these points, each placed so the loop is fully constrained. Corners can then be filleted. */
-  polygon(points: readonly Xy[]): { edges: CadRef[]; corners: CadRef[] };
-  /**
-   * A closed outline of lines and arcs, drawn from `from` and finished with `close()`. Every vertex is placed and each
-   * arc has its radius or a tangency, so the loop comes out fully constrained.
-   */
-  path(from: LenXy): PathEdit;
-  /** A single segment with no dimensions, which leaves it free to be constrained. */
-  line(from: Xy, to: Xy): CadRef & { start: CadRef; end: CadRef };
-  /** Counterclockwise around `at` from `from` degrees to `to` degrees. */
-  arc(options: { at: Xy; r: number; from: number; to: number }): CadRef & { center: CadRef; start: CadRef; end: CadRef };
-  /** Rounds corners that join two lines, sharing one radius, which can be an expression. */
-  fillet(corners: readonly CadRef[], r: Len): CadRef[];
-  /** A geometric relation between curves or points, under the same rules as the sketch editor's tools. */
-  relate(relation: ConstraintCommandTool, ...items: CadRef[]): void;
-  distance(a: CadRef, b: CadRef, value: Len, axis?: 'x' | 'y'): void;
-  radius(curve: CadRef, value: Len): void;
-  place(point: CadRef, at: LenXy): void;
-  /**
-   * Copies of these curves in a row, and in rows when `rows` is given, linked so they keep the first one's shape. Pick the
-   * copies' regions with `regionAt`. A count can be an expression, rounded down to say how many fit, such as
-   * `'(height - 2*margin)/pitch + 1'`. A step along one axis can be one too, such as `[0, 'pitch']`.
-   */
-  pattern(
-    items: readonly (CadRef | { edges: readonly CadRef[] | Record<string, CadRef> })[],
-    options: { count: Len; step: LenXy; rows?: { count: Len; step: LenXy } }
-  ): void;
-  /** Looks up a handle from the report. */
-  find(handle: string): CadRef;
-  /** The innermost region at a point, as a click picks it. Resolved now to a stable ID, so solving can't move the pick. */
-  regionAt(x: number, y: number): CadRegionRef;
-}
-export interface PathEdit {
-  lineTo(to: LenXy): PathEdit;
-  /**
-   * An arc to `to`. With `r`, it turns counterclockwise unless `clockwise`, the short way round unless `large`. With
-   * `tangent`, it carries on smoothly from the segment before it, and its radius follows from where it ends.
-   */
-  arcTo(to: LenXy, how: { r: Len; clockwise?: boolean; large?: boolean } | { tangent: true }): PathEdit;
-  /** Joins the end back to the start with a line, unless it's already there. */
-  close(options?: { straight?: boolean }): { edges: CadRef[]; corners: CadRef[] };
-}
-export interface PartEdit {
-  readonly id: string;
-  readonly name: string;
-  /** The outline sketch. Its outer loop is the part's shape, and inner loops are through-holes unless given a depth. */
-  readonly profile: SketchEdit;
-  thickness(mm: Len): void;
-  /**
-   * Relieves the part's inside corners with dogbones for a bit of this diameter, so square-cornered joints close. Corners
-   * on the outline of a pocket that runs off the part stay square. `null` takes the relief off.
-   */
-  relief(diameter: Len | null): void;
-  sketchOn(face: CadFacePick): SketchEdit;
-  /** An existing face sketch, by its handle in the report. */
-  sketch(handle: string): SketchEdit;
-  /** `depth` is mm, an expression that follows the variables, or `'through'`. */
-  cut(region: CadRegionRef, options: { depth: Len | 'through' }): CadCutRef;
-  remove(feature: CadCutRef): void;
-  /** What this part should measure when finished. A valid design isn't necessarily the one you meant. */
-  expect(expectation: CadExpectation): void;
-  /**
-   * Where the part sits in the assembly: `at` is where its sketch origin goes, and `x` and `y` say which way its sketch
-   * axes point there. Its thickness points along x × y. A position given as an expression follows the variables.
-   */
-  place(options: CadPlaceOptions): void;
-  /**
-   * Another of this part, placed like `place`. A mirrored copy is the part's mirror image across its sketch's y axis
-   * (x becomes -x), for a left and right pair that aren't alike; CAM cuts it as a part of its own. It can be a
-   * `cutParts` tool by itself.
-   */
-  copy(options: CadPlaceOptions & { mirrored?: boolean; name?: string }): PartCopy;
-  /**
-   * A face of this part to draw another part on: `'top'`, `'underside'`, or the edge face looking a way in the studio,
-   * such as `'+x'`. It's found now, by where the part is, and kept by what it is, so it stays the same face when the part
-   * is resized or moved.
-   */
-  face(which: 'top' | 'underside' | CadAxis): CadPartFace;
-  /**
-   * Draws this part on a base plane or on another part's face, so it sits there and moves with it. Its sketch's x and y
-   * run as the face's do, and its thickness grows out from the face, or into it with `inward`. `offset` moves it along
-   * the face's normal. `check` reports each face's frame in words.
-   */
-  drawOn(on: CadPlane | CadPartFace, options?: { offset?: Len; inward?: boolean }): void;
-  /**
-   * Copies of the part in a row along a studio axis, `spacing` apart. The count and spacing can follow variables. Each
-   * copy can be a `cutParts` tool by itself; one the count later drops cuts nothing, and the check warns.
-   */
-  pattern(options: { axis: 'x' | 'y' | 'z'; count: Len; spacing: Len }): readonly PartCopy[];
-}
-/** One copy of a part, to cut with on its own. As a `cutParts` tool, the part itself cuts with every copy. */
-export interface PartCopy {
-  readonly id: string;
-  readonly name: string;
-}
-export interface CadPlaceOptions {
-  at: readonly [Len, Len, Len];
-  x?: CadAxis;
-  y?: CadAxis;
-}
-export interface DesignEdit {
-  /** Finds a part by name, or adds it. New parts are 18 mm thick unless `thickness` says otherwise. */
-  part(name: string, options?: { thickness?: Len; relief?: Len }): PartEdit;
-  /** Adds a variable, or changes the one with this name, and returns its name. Later values can use it in expressions. */
-  variable(name: string, expression: string): string;
-  /**
-   * Cuts the `with` parts out of the target parts wherever they reach in, with `clearance` mm of room: housings, grooves,
-   * rebates and mortises that follow both parts. The clearance grows every side of an opening inside the target and
-   * deepens a blind one; a side that runs off the target's edge stays open. With `split`, two parts that cross share the
-   * material where they meet instead: `'half'` for a half-lap, `{ fingers: n }` for a finger joint at a corner.
-   */
-  cutParts(
-    targets: PartEdit | readonly PartEdit[],
-    options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len; split?: 'half' | { fingers: Len } }
-  ): void;
-  /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
-  value(expression: Len): number;
-}
-export type CadScript = (design: DesignEdit) => void;
+export type * from './editTypes';
+import type {
+  Xy,
+  Len,
+  LenXy,
+  CadAxis,
+  CadRef,
+  SketchEdit,
+  PathEdit,
+  PartEdit,
+  PartCopy,
+  CadPlaceOptions,
+  DesignEdit,
+  CadScript,
+} from './editTypes';
 
 /** Identity, so a design file gets the API's types without importing them by hand. */
 export const design = (script: CadScript) => script;
-
-class CadScriptError extends Error {}
-const fail = (message: string): never => {
-  throw new CadScriptError(message);
-};
-
-function resolveHandle(ids: readonly string[], handle: string, what: string): string {
-  const matches = ids.filter(id => id === handle || id.startsWith(handle));
-  if (matches.length === 1) return matches[0]!;
-  return fail(
-    matches.length ? `The handle ${handle} matches several ${what}. Use more of it.` : `There is no ${what} with the handle ${handle}.`
-  );
-}
 
 const axes: Record<CadAxis, [number, number, number]> = {
   '+x': [1, 0, 0],
@@ -246,7 +102,20 @@ function rotationTo(ex: readonly number[], ey: readonly number[]): CadPlacement[
 }
 
 function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpectation[]>) {
-  let document = start;
+  const initial = prepareEmptyStudio(start);
+  let document = initial.document;
+  let variablesDirty = false;
+  const solveForQuery = () => {
+    if (!variablesDirty) return;
+    // Variable edits change dimension values before they move vertices. A geometric pick must see the solved shape.
+    const solved = solveCadDocumentNow(document, { sketchOnly: true });
+    if (solved.status !== 'solved')
+      fail(
+        `The design could not be solved before this geometric query: ${solved.diagnostics.find(d => d.severity === 'error')?.message ?? solved.status}`
+      );
+    document = solved.document;
+    variablesDirty = false;
+  };
   const closures: { partId: string; sketchId: string; edgeId: string; from: Xy; to: Xy }[] = [];
   const measure = (value: Len, what: string, unit: 'mm' | 'scalar' = 'mm'): number => {
     if (typeof value === 'number') return value;
@@ -276,6 +145,38 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       const part = partOf(partId);
       return cadCopyName(part, part.copies?.findIndex(copy => copy.id === copyId) ?? -1);
     },
+    sketchOn(face) {
+      const on: CadFaceRef = typeof face === 'object' ? { floorOf: face.floorOf.id } : face;
+      try {
+        const result = addCopyFaceSketch(document, partId, copyId, on);
+        document = result.document;
+        return sketchEdit(partId, result.sketchId);
+      } catch (error) {
+        return fail(error instanceof Error ? error.message : 'This copy cannot be sketched on.');
+      }
+    },
+    cut({ sketchId, regionId }, { depth }) {
+      const mm = depth === 'through' ? depth : measure(depth, 'Depth');
+      if (mm !== 'through' && !(mm > 0)) return fail('A cut needs a positive depth or through.');
+      try {
+        document = setCopyCutDepth(
+          document,
+          partId,
+          copyId,
+          sketchId,
+          regionId,
+          mm,
+          typeof depth === 'string' && depth !== 'through' ? depth : undefined
+        );
+        return {
+          id: partOf(partId).features!.find(
+            feature => feature.type === 'cut' && feature.copyId === copyId && feature.sketchId === sketchId && feature.regionId === regionId
+          )!.id,
+        };
+      } catch (error) {
+        return fail(error instanceof Error ? error.message : 'This copy cannot be cut.');
+      }
+    },
   });
   const sketchOf = (partId: string, sketchId: string): CadSketch => {
     const part = partOf(partId);
@@ -284,7 +185,12 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
   const setSketch = (partId: string, sketchId: string, sketch: CadSketch) =>
     replacePart(partId, part =>
       part.sketch.id === sketchId
-        ? { ...part, sketch }
+        ? (() => {
+            // Drawing into the starter uses its original implicit extrude, just as editing it in the studio does.
+            const next = { ...part, sketch };
+            if (part.id === initial.starterPartId && sketch.entities.some(entity => entity.type !== 'point')) delete next.extrude;
+            return next;
+          })()
         : { ...part, features: part.features?.map(f => (f.type === 'sketch' && f.sketch.id === sketchId ? { ...f, sketch } : f)) }
     );
 
@@ -663,6 +569,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         ),
       }),
       regionAt(x, y) {
+        solveForQuery();
         const regions = cadSketchRegions(partOf(partId), sketchId);
         const hits = regions
           .filter(r => pointInPolygon({ x, y }, r.points) && !r.holes.some(hole => pointInPolygon({ x, y }, hole)))
@@ -685,7 +592,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     thickness(mm) {
       const value = measure(mm, 'Thickness');
       if (!(value > 0)) fail(`A part needs a positive thickness, not ${value}.`);
-      replacePart(partId, ({ thicknessExpression: _, ...part }) => ({
+      replacePart(partId, ({ thicknessExpression: _thicknessExpression, ...part }) => ({
         ...part,
         thickness: value,
         ...(typeof mm === 'string' && { thicknessExpression: mm }),
@@ -693,7 +600,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     },
     relief(diameter) {
       if (diameter === null) {
-        replacePart(partId, ({ cornerRelief: _, ...part }) => part);
+        replacePart(partId, ({ cornerRelief: _cornerRelief, ...part }) => part);
         return;
       }
       const value = measure(diameter, 'Relief');
@@ -731,6 +638,9 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     remove(feature) {
       document = removeCadFeature(document, partId, feature.id);
     },
+    existingCut(handle) {
+      return existing.cut(partId, handle);
+    },
     expect(expectation) {
       expectations.set(partId, [...(expectations.get(partId) ?? []), expectation]);
     },
@@ -751,6 +661,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       return copyHandle(partId, added.id);
     },
     face(which) {
+      solveForQuery();
       if (which === 'top' || which === 'underside') return { partId, face: which };
       const found = cadFaceFacing(document, partId, which);
       return 'error' in found ? fail(found.error) : { partId, face: found.face };
@@ -785,58 +696,101 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     },
   });
 
+  const existing = existingDesignEdit({
+    get: () => document,
+    set: next => {
+      document = next;
+    },
+    part: partEdit,
+    copy: copyHandle,
+    measure,
+  });
+  const optionsOnPart = (partId: string, options?: { thickness?: Len; relief?: Len }) => {
+    const edit = partEdit(partId);
+    if (options?.thickness !== undefined) edit.thickness(options.thickness);
+    if (options?.relief !== undefined) edit.relief(options.relief);
+    return edit;
+  };
+  const { findPart: _findPart, cut: _cut, ...existingApi } = existing;
+  const edit: DesignEdit = {
+    folder(name, script) {
+      return runFolderScope(
+        {
+          get: () => document,
+          set: next => {
+            document = next;
+            variablesDirty = true;
+          },
+        },
+        edit,
+        name,
+        script
+      );
+    },
+    existingFolder(name, script) {
+      return runFolderScope(
+        {
+          get: () => document,
+          set: next => {
+            document = next;
+            variablesDirty = true;
+          },
+        },
+        edit,
+        name,
+        script,
+        true
+      );
+    },
+    ...existingApi,
+    part(name, options) {
+      return optionsOnPart(existing.findPart(name).id, options);
+    },
+    newPart(name, options) {
+      if (!name.trim()) return fail('A new part needs a name.');
+      if (document.parts.some(part => part.name === name)) return fail(`There is already a part named ${name}. Use part() to edit it.`);
+      const part = { ...createCadPart(name, 18), id: newCadId() };
+      document = { ...document, parts: [...document.parts, part] };
+      return optionsOnPart(part.id, options);
+    },
+    variable(name, expression) {
+      const existing = document.variables?.find(variable => variable.name === name);
+      const result = setCadVariable(document, { id: existing?.id, name, expression });
+      if ('error' in result) return fail(`The variable ${name}: ${result.error}`);
+      document = resolvePartPatterns(result.document);
+      variablesDirty = true;
+      return name;
+    },
+    cutParts(targets, { with: tools, clearance = 0, split }) {
+      const ids = (parts: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]) =>
+        'id' in parts ? [parts.id] : parts.map(part => part.id);
+      const value = measure(clearance, 'Clearance');
+      if (value < 0) fail(`A clearance can't be negative: ${value} mm.`);
+      const fingers = typeof split === 'object' ? measure(split.fingers, 'Fingers', 'scalar') : undefined;
+      if (fingers !== undefined && !(Number.isInteger(fingers) && fingers >= 2))
+        fail(`A finger joint needs a whole number of fingers, at least 2, not ${fingers}.`);
+      document = addPartCut(
+        document,
+        ids(tools),
+        ids(targets),
+        { value, ...(typeof clearance === 'string' && { expression: clearance }) },
+        typeof split === 'object'
+          ? { fingers: fingers!, ...(typeof split.fingers === 'string' && { fingersExpression: split.fingers }) }
+          : split
+      ).document;
+    },
+    value(expression) {
+      // A count or ratio, such as `'(height - 2*margin)/pitch'`, has no unit.
+      if (
+        typeof expression === 'string' &&
+        !('error' in parseCadValue(expression, { unit: 'scalar', variables: cadVariableScope(document) }))
+      )
+        return measure(expression, 'Value', 'scalar');
+      return measure(expression, 'Value');
+    },
+  };
   return {
-    edit: {
-      part(name, options) {
-        const existing = document.parts.find(part => part.name === name);
-        if (existing) {
-          const edit = partEdit(existing.id);
-          if (options?.thickness !== undefined) edit.thickness(options.thickness);
-          if (options?.relief !== undefined) edit.relief(options.relief);
-          return edit;
-        }
-        const part = { ...createCadPart(name, 18), id: newCadId() };
-        document = { ...document, parts: [...document.parts, part] };
-        const edit = partEdit(part.id);
-        if (options?.thickness !== undefined) edit.thickness(options.thickness);
-        if (options?.relief !== undefined) edit.relief(options.relief);
-        return edit;
-      },
-      variable(name, expression) {
-        const existing = document.variables?.find(variable => variable.name === name);
-        const result = setCadVariable(document, { id: existing?.id, name, expression });
-        if ('error' in result) return fail(`The variable ${name}: ${result.error}`);
-        document = result.document;
-        return name;
-      },
-      cutParts(targets, { with: tools, clearance = 0, split }) {
-        const ids = (parts: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]) =>
-          'id' in parts ? [parts.id] : parts.map(part => part.id);
-        const value = measure(clearance, 'Clearance');
-        if (value < 0) fail(`A clearance can't be negative: ${value} mm.`);
-        const fingers = typeof split === 'object' ? measure(split.fingers, 'Fingers', 'scalar') : undefined;
-        if (fingers !== undefined && !(Number.isInteger(fingers) && fingers >= 2))
-          fail(`A finger joint needs a whole number of fingers, at least 2, not ${fingers}.`);
-        document = addPartCut(
-          document,
-          ids(tools),
-          ids(targets),
-          { value, ...(typeof clearance === 'string' && { expression: clearance }) },
-          typeof split === 'object'
-            ? { fingers: fingers!, ...(typeof split.fingers === 'string' && { fingersExpression: split.fingers }) }
-            : split
-        ).document;
-      },
-      value(expression) {
-        // A count or ratio, such as `'(height - 2*margin)/pitch'`, has no unit.
-        if (
-          typeof expression === 'string' &&
-          !('error' in parseCadValue(expression, { unit: 'scalar', variables: cadVariableScope(document) }))
-        )
-          return measure(expression, 'Value', 'scalar');
-        return measure(expression, 'Value');
-      },
-    } satisfies DesignEdit,
+    edit,
     document: () => document,
     closures,
   };
@@ -858,11 +812,12 @@ export interface CadEditResult {
  */
 export async function editCad(start: CadDocument | null, script: CadScript, options: { name?: string } = {}): Promise<CadEditResult> {
   const base = start ?? createCadDocument(options.name);
+  await initializeCadSolver();
   const expectations = new Map<string, CadExpectation[]>();
   const session = createDesignEdit(base, expectations);
   let scriptError: string | undefined;
   try {
-    script(session.edit);
+    script(checkedDesignApi(session.edit));
   } catch (error) {
     if (!(error instanceof CadScriptError)) throw error;
     scriptError = error.message;

@@ -1,6 +1,6 @@
 import { reconcileSlot } from './slot';
 import { slotPrimitives, slotArcRuleOverrides } from './slotConstraint';
-import { Algorithm, GcsWrapper, init_planegcs_module, SolveStatus, type ModuleStatic, type SketchPrimitive } from '@salusoft89/planegcs';
+import { Algorithm, GcsWrapper, SolveStatus, type ModuleStatic, type SketchPrimitive } from '@salusoft89/planegcs';
 import { resolveExtrudeSteps } from './extrudeSteps';
 import { withUsedPoints } from './usedEdges';
 import { resolveUpTo } from './upTo';
@@ -28,7 +28,8 @@ import {
   rationalCurveData,
   splineNativePoleIds,
 } from './curves';
-import bundledWasmUrl from './wasmAsset';
+import { cadSolverRuntime, initializeCadSolver, poisonedModules, destroyCadSolverWrapper as destroyWrapper } from './solverRuntime';
+export { initializeCadSolver } from './solverRuntime';
 import { fixedConstraintConflicts } from './fixedConstraints';
 import { pointEquivalence, type CadPointEquivalence } from './pointEquivalence';
 import { classifyNativeEntities } from './entityFreedom';
@@ -46,20 +47,9 @@ import { reconcileLinearPattern, linearPatternReservationIssue } from './pattern
 import { conditionPatternEllipseAxes } from './patternEllipse';
 import { compilePatternTopology } from './patternTopology';
 import { conditionEllipseAxes } from './ellipse';
+import { trimCadFolders } from './folderModel';
+import { supportsFirst } from './solveOrder';
 import { withSplineHandleSegments } from './splineHandles';
-
-let modulePromise: Promise<ModuleStatic> | undefined;
-const poisonedModules = new WeakSet<ModuleStatic>();
-function destroyWrapper(wrapper: GcsWrapper): void {
-  // After a native trap/abort, release the whole module instead of calling back into its heap.
-  if (wrapper.module && poisonedModules.has(wrapper.module)) return;
-  // The upstream wrapper keeps BSpline geometries alive for constraint reuse; release
-  // our cache explicitly after their copied native constraints have been cleared.
-  wrapper.gcs.clear_data();
-  for (const curve of wrapper.bspline_gcs_cache.values()) curve.delete();
-  wrapper.bspline_gcs_cache.clear();
-  wrapper.destroy_gcs_module();
-}
 
 /** PlaneGCS normalizes symmetry's perpendicular equation by the initial point separation.
  * An on-axis mirror has zero separation. Condition registration only, then restore
@@ -101,29 +91,6 @@ function pushConditionedPrimitive(wrapper: GcsWrapper, primitive: SketchPrimitiv
     wrapper.gcs.set_p_param(bi, bx, fixedX);
     wrapper.gcs.set_p_param(bi + 1, by, fixedY);
   }
-}
-
-/** Optional explicit asset URL for hosts without Vite. WASM is bundled and runs locally. */
-export async function initializeCadSolver(wasmUrl?: string): Promise<void> {
-  if (!modulePromise) {
-    const opening = (async () => {
-      const isNode = typeof process !== 'undefined' && !!process.versions?.node;
-      const url = wasmUrl ?? (isNode ? undefined : bundledWasmUrl);
-      const module = await init_planegcs_module(url ? { locateFile: () => url } : undefined);
-      // The pinned Emscripten runtime reads this mutable hook when it aborts, although
-      // its package declaration exposes only the CAD constructors.
-      (module as ModuleStatic & { onAbort?: (reason: unknown) => void }).onAbort = () => {
-        poisonedModules.add(module);
-        if (modulePromise === opening) modulePromise = undefined;
-      };
-      return module;
-    })();
-    modulePromise = opening;
-    opening.catch(() => {
-      if (modulePromise === opening) modulePromise = undefined;
-    });
-  }
-  await modulePromise;
 }
 
 export interface CadSolveOptions {
@@ -471,7 +438,6 @@ function applySolvedGeometry(part: CadPart, wrapper: GcsWrapper): void {
       constraint.parameter = (solved - lo) / (hi - lo);
     }
 }
-
 /** Never publish native success unless its evaluated curve equations match retained source. */
 function solvedCurveEquationsHold(part: CadPart): boolean {
   const entities = new Map(part.sketch.entities.map(e => [e.id, e]));
@@ -493,29 +459,10 @@ function solvedCurveEquationsHold(part: CadPart): boolean {
     if (c.type === 'pointOnCurve' && !matches(entities.get(c.entityId) as CadNurbsEntity, c.pointId, c.parameter)) return false;
   return true;
 }
-
 /** Solve a detached revision. Callers retain their accepted model while an invalid draft is edited. */
 /** Parts in an order where each comes after the part it's drawn on. */
-function supportsFirst(parts: CadPart[]): CadPart[] {
-  const byId = new Map(parts.map(part => [part.id, part]));
-  const depth = new Map<string, number>();
-  const depthOf = (part: CadPart, seen = new Set<string>()): number => {
-    const known = depth.get(part.id);
-    if (known !== undefined) return known;
-    const on = part.drawnOn?.on;
-    const support = on && 'partId' in on ? byId.get(on.partId) : undefined;
-    seen.add(part.id);
-    const value = support && !seen.has(support.id) ? depthOf(support, seen) + 1 : 0;
-    depth.set(part.id, value);
-    return value;
-  };
-  return parts
-    .map((part, index) => ({ part, index, depth: depthOf(part) }))
-    .sort((a, b) => a.depth - b.depth || a.index - b.index)
-    .map(({ part }) => part);
-}
 
-export async function solveCadDocument(document: CadDocument, options: CadSolveOptions = {}): Promise<CadSolveResult> {
+function* solveCadSteps(document: CadDocument, options: CadSolveOptions): Generator<string | undefined, CadSolveResult, ModuleStatic> {
   // Values that use variables follow them before anything is solved.
   let next = structuredClone(resolveUpTo(resolveDatumPlanes(applyCadVariables(resolveExtrudeSteps(document)))));
   for (const part of next.parts) {
@@ -611,9 +558,8 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
   let nativeModule: ModuleStatic | undefined;
   let nativePromise: Promise<ModuleStatic> | undefined;
   try {
-    await initializeCadSolver(options.wasmUrl);
-    nativePromise = modulePromise!;
-    let module = await nativePromise;
+    let module = yield options.wasmUrl;
+    nativePromise = cadSolverRuntime.promise!;
     nativeModule = module;
     // Solving replaces each sketch's contents in place, so the face sketches update through their targets. A part
     // drawn on another is solved after it, with that face's edges where they now are, so what's tied to them follows.
@@ -628,9 +574,8 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
         continue;
       }
       if (poisonedModules.has(module)) {
-        await initializeCadSolver(options.wasmUrl);
-        nativePromise = modulePromise!;
-        module = await nativePromise;
+        module = yield options.wasmUrl;
+        nativePromise = cadSolverRuntime.promise!;
         nativeModule = module;
       }
       let wrapper = new GcsWrapper(new module.GcsSystem(), module);
@@ -933,7 +878,9 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
           // Open profiles are intentionally excluded: they remain normal editable sketch geometry.
           if (
             solvedCurveEquationsHold(solvedPart) &&
-            !validateCadDocument({ ...next, parts: [solvedPart] }).some(diagnostic => diagnostic.severity === 'error')
+            // This is a temporary single-part probe. Full-document validation above retains every membership error;
+            // references to the other valid folder members must not make this individual sketch look unsolved.
+            !validateCadDocument(trimCadFolders({ ...next, parts: [solvedPart] })).some(diagnostic => diagnostic.severity === 'error')
           ) {
             candidate = solvedPart;
             break;
@@ -1015,7 +962,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
               // Geometry and global DOF were already validated before this optional query.
               // Discard only the aborted analysis engine; later parts use a fresh module.
               poisonedModules.add(module);
-              if (modulePromise === nativePromise) modulePromise = undefined;
+              if (cadSolverRuntime.promise === nativePromise) cadSolverRuntime.promise = undefined;
             }
             sketchStatus.entityStatus = Object.fromEntries(part.sketch.entities.map(entity => [entity.id, 'unknown']));
             sketchStatus.entityAnalysis = {
@@ -1042,7 +989,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
       } catch (error) {
         if (isFatalSolverError(error) || poisonedModules.has(module)) {
           poisonedModules.add(module);
-          if (modulePromise === nativePromise) modulePromise = undefined;
+          if (cadSolverRuntime.promise === nativePromise) cadSolverRuntime.promise = undefined;
         }
         throw error;
       } finally {
@@ -1052,7 +999,7 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
   } catch (error) {
     if (isFatalSolverError(error) || (nativeModule && poisonedModules.has(nativeModule))) {
       if (nativeModule) poisonedModules.add(nativeModule);
-      if (modulePromise === nativePromise) modulePromise = undefined;
+      if (cadSolverRuntime.promise === nativePromise) cadSolverRuntime.promise = undefined;
       return {
         document: structuredClone(document),
         status: 'invalid',
@@ -1088,7 +1035,12 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
   diagnostics.push(...resolved.diagnostics);
   const placed = resolvePartPatterns(resolved.document);
   // Cut-parts and Remove volumes intersect copies where patterns and transforms place them now.
-  if (placed !== next && (placed.partCuts?.length || placed.parts.some(part => part.remove))) evaluated = evaluateCadDocument(placed);
+  // Copy-specific features follow the final pattern count too, including dormant features when a copy disappears.
+  if (
+    placed !== next &&
+    (placed.partCuts?.length || placed.parts.some(part => part.remove || part.features?.some(feature => feature.copyId)))
+  )
+    evaluated = evaluateCadDocument(placed);
   diagnostics.push(...evaluated.diagnostics);
   return {
     document: placed,
@@ -1097,4 +1049,33 @@ export async function solveCadDocument(document: CadDocument, options: CadSolveO
     parts: evaluated.parts,
     sketches,
   };
+}
+/** Solve with module loading and recovery available between sketches. */
+export async function solveCadDocument(document: CadDocument, options: CadSolveOptions = {}): Promise<CadSolveResult> {
+  const steps = solveCadSteps(document, options);
+  let result = steps.next();
+  while (!result.done) {
+    try {
+      await initializeCadSolver(result.value);
+      result = steps.next(cadSolverRuntime.module!);
+    } catch (error) {
+      result = steps.throw(error);
+    }
+  }
+  return result.value;
+}
+/**
+ * Resolve a script's geometric query after initializeCadSolver has completed. Uses the same solver as the async
+ * entry, without replaying the script or changing identities. A native abort leaves the input unchanged.
+ */
+export function solveCadDocumentNow(document: CadDocument, options: CadSolveOptions = {}): CadSolveResult {
+  const module = cadSolverRuntime.module;
+  if (!module || poisonedModules.has(module)) throw new Error('Initialize the CAD solver before a synchronous geometric query.');
+  const steps = solveCadSteps(document, options);
+  let result = steps.next();
+  while (!result.done) {
+    if (poisonedModules.has(module)) result = steps.throw(new WebAssembly.RuntimeError('The native sketch solver aborted.'));
+    else result = steps.next(module);
+  }
+  return result.value;
 }

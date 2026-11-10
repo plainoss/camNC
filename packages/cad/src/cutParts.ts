@@ -5,7 +5,7 @@ import { validPartCutSplit } from './partCutSplit';
 import { evaluatedPartCopy, mirrorEvaluatedPart, sameCadCuts } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
-import { evaluateCadFeatures } from './features';
+import { evaluateCadPartFamily } from './features';
 import { evaluateCadPart, polygonArea } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
@@ -572,7 +572,7 @@ export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): Eva
   const tools = toolIds.flatMap(id => {
     const source = document.parts.find(candidate => candidate.id === id);
     const profile = source && evaluateCadPart(source).part;
-    return source && profile ? [evaluateCadFeatures(source, profile).part] : [];
+    return source && profile ? [evaluateCadPartFamily(source, profile).part] : [];
   });
   return applyPartCuts(document, applyExtrudeRemovals(document, [part, ...tools]).parts).parts[0]!;
 }

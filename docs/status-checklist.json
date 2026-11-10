@@ -107,6 +107,18 @@
           "evidence": ["packages/cad/src/assemblyCollisions.test.ts"]
         },
         {
+          "item": "Group neighbouring steps and variables in folders",
+          "status": "done",
+          "evidence": ["packages/cad/src/folders.test.ts", "apps/camNC/src/cad/FeatureList.folders.test.tsx", "apps/camNC/src/cad/reorderSteps.test.ts"],
+          "note": "Folder metadata preserves step IDs and geometry. Suppression masks child settings, rollback uses real steps, and deletion lists outside variable uses. Documents use version 3."
+        },
+        {
+          "item": "Sketch and cut on one physical copy, or detach it",
+          "status": "done",
+          "evidence": ["packages/cad/src/copyFeatures.test.ts", "apps/camNC/src/cad/assemblyModel.copyFeatures.test.ts", "packages/cad-script/src/editCopies.test.ts", "apps/camNC/src/cad/CadEditor.cupboard.test.tsx"],
+          "note": "Copy-specific material and machining groups survive variable edits, absent copies and reload. Detach freezes placement and excludes its pattern slot. Mirrored detach snapshots evaluated contours as polygon source at the evaluator's chord tolerance."
+        },
+        {
           "item": "Suppress a step",
           "status": "done",
           "evidence": ["packages/cad/src/suppression.test.ts"]
@@ -438,6 +450,47 @@
           "item": "3D material removal preview",
           "status": "done",
           "evidence": ["apps/camNC/src/visualize/stockSim/HeightmapStamper.test.ts", "apps/camNC/src/visualize/stockSim/toolShapes.test.ts"]
+        }
+      ]
+    },
+    {
+      "name": "Scripted designs and assistant",
+      "rows": [
+        {
+          "item": "Edit existing parts, steps, cuts, copies and variables from scripts",
+          "status": "done",
+          "evidence": ["packages/cad-script/src/editExisting.test.ts", "packages/cad-script/src/argumentChecks.test.ts"],
+          "note": "Lookup is explicit and missing names fail; newPart creates. Runtime checks name unsupported methods and options. Geometric picks solve variable edits before choosing a region."
+        },
+        {
+          "item": "Preview and apply a candidate as one guarded undo step",
+          "status": "done",
+          "evidence": ["packages/cad-editor/src/proposal.test.ts", "apps/camNC/src/cad/ProposalReview.test.tsx", "apps/camNC/src/cad/CadEditor.assistant.test.tsx"],
+          "note": "Review shows changed steps, lost cuts and joint openings, and new diagnostics. Intervening edits refuse Apply; discarding leaves source and history unchanged."
+        },
+        {
+          "item": "Insert independent cupboards with scoped variables and shelves",
+          "status": "done",
+          "evidence": ["packages/cad-script/src/folderScope.test.ts", "packages/cad-script/src/mcp.test.ts", "packages/cad-script/fixtures/designs/two-cupboards.report.json", "apps/camNC/src/cad/CadEditor.cupboard.test.tsx"],
+          "note": "Insert and the MCP tool use the same builder. Two cupboards retain independent source; one shelf hole survives width, depth, count changes, reopening and undo."
+        },
+        {
+          "item": "Isolated browser script checks with cancellation",
+          "status": "done",
+          "evidence": ["apps/camNC/src/cad/assistant/scriptCheck.browser.test.ts"],
+          "note": "Examples agree with the CLI API. Opaque frame and disposable worker deny network and storage, resist forged replies, and terminate loops or stopped checks. Successful output is inspected again outside the worker."
+        },
+        {
+          "item": "Assistant dock with direct provider tools and image context",
+          "status": "partial",
+          "evidence": ["apps/camNC/src/cad/assistant/provider.test.ts", "apps/camNC/src/cad/assistant/loop.test.ts", "apps/camNC/src/cad/CadEditor.assistant.test.tsx", "apps/camNC/src/cad/CadEditor.cupboard.test.tsx"],
+          "note": "Recorded Anthropic, compatible Chat Completions and Responses cover the bounded loop, prior constraints, preview, Apply, undo and stale proposals. Keys have a separate local store. Live provider access and fresh image-model output require the user's endpoint, model and key."
+        },
+        {
+          "item": "Saved modelling tasks and cut-aware drawings",
+          "status": "done",
+          "evidence": ["packages/cad-script/src/tasks/tasks.test.ts", "packages/cad-script/src/views/views.test.ts"],
+          "note": "Nine trial requests and three whole-piece briefs use independently stated outcomes. Recorded replay keeps failures and human visual review explicit. Top, front, right and named-cut sections use evaluated contours and cuts."
         }
       ]
     },

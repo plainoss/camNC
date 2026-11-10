@@ -1,0 +1,17 @@
+.cad-assistant-dock { position: absolute; right: 0; top: 96px; bottom: 36px; width: min(380px, 100%); z-index: 8; display: flex; flex-direction: column; gap: 8px; border-left: 1px solid #b9c6d6; padding: 12px; background: #f8fafc; overflow: auto; }
+.cad-assistant-dock header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.cad-assistant-dock h2 { margin: 0; font-size: 16px; }
+.cad-assistant-dock label { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.cad-assistant-dock textarea, .cad-assistant-dock select { font: inherit; border: 1px solid #b9c6d6; border-radius: 4px; padding: 6px; max-width: 100%; }
+.cad-assistant-dock .cad-assistant-check { flex-direction: row; align-items: center; }
+.cad-assistant-check input { min-height: 0; }
+.cad-assistant-messages { flex: 1; min-height: 100px; overflow: auto; }
+.cad-assistant-messages article { border-bottom: 1px solid #d7e0ed; margin-bottom: 10px; padding-bottom: 8px; }
+.cad-assistant-messages p { white-space: pre-wrap; }
+.cad-assistant-messages img { max-width: 100%; max-height: 180px; object-fit: contain; }
+.cad-assistant-proposal { border: 1px solid #adc8ec; background: #eef5ff; border-radius: 6px; padding: 10px; }
+.cad-proposal-tools { display: flex; align-items: center; gap: 8px; padding: 3px 12px; border-bottom: 1px solid #d7e0ed; }
+.cad-insert-menu { position: relative; }
+.cad-insert-menu summary { min-height: 32px; padding: 5px 8px; cursor: pointer; }
+.cad-insert-menu > div { position: absolute; top: 100%; left: 0; z-index: 10; min-width: 140px; background: white; border: 1px solid #b9c6d6; border-radius: 4px; padding: 4px; }
+@media (min-width: 850px) { .cad-editor:has(.cad-assistant-dock) > .cad-workspace { margin-right: 380px; } }

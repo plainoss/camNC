@@ -1,4 +1,5 @@
 import { newCadId } from './document';
+import { cadDocumentVersion } from './documentVersion';
 import { cadDatumFrame } from './datumPlanes';
 import { cadDrawnOnSupports, cadFaceFrame, effectivePlacement } from './drawnOn';
 import { mirroredPlacement, turnAbout } from './placement';
@@ -11,7 +12,13 @@ export const CAD_MAX_PART_PATTERN = 200;
 
 /** What a copy is called: its own name, or the part's with a number counting the part as the first. */
 export const cadCopyName = (part: Pick<CadPart, 'name' | 'copies'>, index: number): string =>
-  part.copies?.[index]?.name ?? `${part.name} ${index + 2}`;
+  part.copies?.[index]?.name ??
+  (() => {
+    const copy = part.copies?.[index];
+    const logical = copy?.pattern ? Number(copy.id.slice(copy.pattern.length + 1)) : NaN;
+    const own = part.copies?.filter(copy => !copy.pattern).length ?? 0;
+    return `${part.name} ${Number.isInteger(logical) ? own + logical + 1 : index + 2}`;
+  })();
 
 /**
  * A pattern's copies, laid out from where the part sits, which for an unplaced part others are drawn on is the origin.
@@ -25,18 +32,20 @@ function patternCopies(
 ): CadPartCopy[] {
   const before = new Map((part.copies ?? []).map(copy => [copy.id, copy]));
   const axis = kAxes[pattern.axis];
-  return Array.from({ length: Math.max(0, pattern.count - 1) }, (_, i) => {
-    const id = `${pattern.id}:${i + 1}`;
-    const name = before.get(id)?.name;
-    const copy: CadPartCopy = { id, pattern: pattern.id, ...(name && { name }) };
-    if (at) {
-      const position = [...at.position] as [number, number, number];
-      if (along) for (const k of [0, 1, 2]) position[k]! += (i + 1) * pattern.spacing * along[k]!;
-      else position[axis] += (i + 1) * pattern.spacing;
-      copy.placement = { position, rotation: at.rotation };
-    }
-    return copy;
-  });
+  return Array.from({ length: Math.max(0, pattern.count - 1) }, (_, i) => i)
+    .filter(i => !pattern.excluded?.includes(i + 1))
+    .map(i => {
+      const id = `${pattern.id}:${i + 1}`;
+      const name = before.get(id)?.name;
+      const copy: CadPartCopy = { id, pattern: pattern.id, ...(name && { name }) };
+      if (at) {
+        const position = [...at.position] as [number, number, number];
+        if (along) for (const k of [0, 1, 2]) position[k]! += (i + 1) * pattern.spacing * along[k]!;
+        else position[axis] += (i + 1) * pattern.spacing;
+        copy.placement = { position, rotation: at.rotation };
+      }
+      return copy;
+    });
 }
 
 /**
@@ -87,7 +96,7 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
 
 /** Sets a part's pattern, or removes it with `null`, and lays its copies out. */
 export function setPartPattern(document: CadDocument, partId: string, pattern: Omit<CadPartPattern, 'id'> | null): CadDocument {
-  return resolvePartPatterns({
+  const next = resolvePartPatterns({
     ...document,
     revision: document.revision + 1,
     parts: document.parts.map(part => {
@@ -97,12 +106,17 @@ export function setPartPattern(document: CadDocument, partId: string, pattern: O
         delete next.pattern;
         return next;
       }
-      const next: CadPartPattern = { id: part.pattern?.id ?? newCadId(), ...pattern };
+      const next: CadPartPattern = {
+        id: part.pattern?.id ?? newCadId(),
+        ...(part.pattern?.excluded && { excluded: part.pattern.excluded }),
+        ...pattern,
+      };
       if (!next.countExpression) delete next.countExpression;
       if (!next.spacingExpression) delete next.spacingExpression;
       return { ...part, pattern: next };
     }),
   });
+  return { ...next, version: cadDocumentVersion(next) };
 }
 
 /** Names one copy of a part, or gives it back the part's name with a number when `name` is empty. */

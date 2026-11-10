@@ -8,7 +8,7 @@ tests. A script produces an ordinary CAD document and isn't kept. See
 import { design } from '@wbcnc/cad-script';
 
 export default design(d => {
-  const plate = d.part('Plate', { thickness: 18 });
+  const plate = d.newPart('Plate', { thickness: 18 });
   plate.profile.rect({ at: [0, 0], w: 400, h: 300 });
   plate.profile.circle({ at: [30, 30], d: 8 });
   const top = plate.sketchOn('top');
@@ -65,7 +65,28 @@ are the document's own, so the same design always prints the same text and a dif
 two reports shows what changed. With a script it reports on the design the script made;
 the exit code still follows the check.
 
-### Golden reports
+#### Placed views and sections
+
+```sh
+pnpm --silent --filter @wbcnc/cad-script check --from design.json --views /tmp/design-views
+pnpm --silent --filter @wbcnc/cad-script check --from design.json --views /tmp/design-views --section-part Shelf --section-cut 7b8b --section-axis x
+```
+
+`--views` writes `top.svg`, `front.svg` and `right.svg` from evaluated physical outlines,
+through-holes, pockets and copy-specific cuts, in their placed positions. These are
+transparent line drawings, with hidden contours still visible, rather than a shaded
+occlusion view. A section also needs a physical part/copy name or full ID and an
+unambiguous evaluated cut ID prefix; `--section-at` optionally chooses its coordinate
+across the other local sketch axis. It writes `section.svg` through the cut's centre
+by default, showing material left between its floors and both board surfaces.
+
+The library exports `renderCadViews(document, parts)` and
+`renderCadSection(document, parts, { part, cut, axis?, at? })`.
+`fullCadReport(document, inspected?, { views: true, section? })` includes these drawings
+when requested. MCP `check_design` accepts `views: true` and the same `section` object.
+The assistant converts the SVG views into PNG images for image-capable models.
+
+## Golden reports
 
 `fixtures/designs/` holds saved designs, each with its full report next to it as
 `<name>.report.json`. A test checks every design against its report:
@@ -138,7 +159,7 @@ change a variable or a dimension, or a step's settings. So:
   tenon worked out from `legH` and `legH + board`, and every other corner is measured
   from the one before. Changing one length in the app moves what comes after it.
   `close()` warns with `close-straight` if it adds a line; use `close({ straight: true })` when intended.
-- `d.part(name, { relief: 'bit' })`, or `part.relief(...)`, puts dogbones in the part's
+- `d.newPart(name, { relief: 'bit' })`, or `part.relief(...)`, puts dogbones in the part's
   inside corners for a bit of that diameter, so mortises and finger joints close. Corners
   on the outline of a pocket that runs off the part stay square. The check warns with
   `relief-bit` when the bit it plans with is wider than the relief. The report gives a
@@ -170,6 +191,78 @@ change a variable or a dimension, or a step's settings. So:
   revision of the design. `redundant-constraint` names the involved entity handles.
 - A script that stops with an error leaves the design as it was.
 
+## Changing an open design
+
+Use `d.part('Shelf')` to find an existing part by name or its report handle. A missing
+or ambiguous name is an error; `d.newPart('Divider', { thickness: 'board' })` explicitly
+creates one. Creation refuses a duplicate name. Existing scripts that used `part` to
+create geometry should use `newPart` instead.
+
+The check report's handles refer to the document being checked:
+
+```ts
+export default design(d => {
+  const shelf = d.part('Shelf');
+  const top = shelf.sketch('a13f'); // existing face sketch's report handle
+  const corner = shelf.profile.find('c20e'); // existing corner or curve handle
+  shelf.profile.fillet([corner], 12);
+  shelf.existingCut('b217').depth(6); // also replaces a depth originally typed as a number
+  d.step('91ad').set({ tools: [d.existingCopy('Shelf 2')] });
+});
+```
+
+`d.existingCopy(nameOrHandle)` finds a copy, including a named pattern instance,
+without creating an empty part. `d.step(handleOrExactLabel)` finds a feature-list step;
+`set` accepts thickness on an extrude, depth on a cut, tools/targets/clearance on a
+cut-parts step, count/spacing/axis on a pattern, radius on a fillet, and suppression
+on steps that support it. Unknown settings list the available ones. Removing a shelf
+from a housing step can leave interfering material: read the check and preview's
+cost before applying, and change the shelf's fit as well when necessary.
+
+Use `d.removePart(partOrName)`, `d.removeCopy(copyOrName)`,
+`d.removePattern(partOrName)`, `d.removeStep(stepOrHandle)`, and
+`d.removeVariable(nameOrHandle)` for explicit deletion. A variable still used by an
+expression is refused. Deleting a part keeps dependent sketches as broken references
+so their work can be repaired. A pattern copy cannot be removed independently until
+it is detached; change the count or remove its pattern instead.
+
+`regionAt` and `face` see the solved geometry after variable changes in the same
+script, while keeping existing identities. The model-facing CLI/MCP check report
+lists pattern seed geometry and a cut's `count` with its `lastAt`, instead of repeating
+every copy. `compactCadReport(document, report)` provides the same form for browser
+clients. The full report and evaluated geometry keep every instance for exact checks.
+
+### A feature on one copy
+
+```ts
+const shelf = d.existingCopy('Shelf 2');
+const top = shelf.sketchOn('top');
+top.circle({ at: ['width/2', 80], d: 20 });
+shelf.cut(top.regionAt(d.value('width/2'), 80), { depth: 'through' });
+```
+
+The sketch and cut belong to that copy. Other copies keep their source geometry and
+CAM groups identical siblings together. A feature whose pattern position disappears
+stays saved and reports `copy-feature-inactive`; restoring the count restores its IDs.
+`d.detachCopy('Shelf 2', 'Cable shelf')` makes a separate part with its current sketch,
+features and placement, and permanently skips that place in its pattern. The detached
+part can be reshaped with the normal part API. A mirrored detach snapshots the reflected
+evaluated outline and cuts as fixed polygon geometry at the evaluator’s chord tolerance;
+normal detach keeps the authored symbolic sketches.
+
+### Browser checks
+
+The in-app assistant runs plain JavaScript in an opaque, sandboxed frame's disposable
+worker. The API and solver are bundled locally, including WASM; scripts have no network,
+storage or application access. A private channel carries the result, and the app checks
+a successful candidate independently before offering it. Stop and the time limit
+terminate the worker. Runtime argument checks name an unknown method or option and list
+supported ones, including inside folders and returned pattern copies.
+
+Browser scripts may import `design` and `cupboard` from `@wbcnc/cad-script`. TypeScript
+annotations require the Node CLI's type-checking pass. The browser package entry excludes
+CLI tools and file writers, while the default Node entry keeps the headless tools.
+
 ## Variables
 
 - `d.variable('board', '18mm')` adds a design variable, or changes the one with that
@@ -185,6 +278,35 @@ change a variable or a dimension, or a step's settings. So:
   fingers, `'min(depth; 600mm)'`, `'sqrt(w*w + h*h)'` for a diagonal. Separate `min` and
   `max` arguments with `;` or `, `. A cut whose depth works out to zero or less stops the
   script.
+
+## Folder scopes and cupboards
+
+```ts
+import { cupboard, design } from '@wbcnc/cad-script';
+
+export default design(d => {
+  cupboard({ name: 'Wall cupboard', width: '800mm', shelves: 3 })(d);
+  cupboard({ name: 'Narrow cupboard', width: '450mm', shelves: 4, at: [1000, 0, 0] })(d);
+});
+```
+
+`cupboard({ name?, width?, height?, depth?, board?, shelves?, at? })` returns a script.
+Lengths are expression strings, `shelves` is a number, and `at` is an XYZ offset in mm.
+Defaults make three shelves resting on pin rows. Each call inserts an independent
+folder of ordinary boards, rebate cuts, a shelf pattern and variables; later edits
+change those same steps and never rerun this builder.
+
+For a custom piece, use `d.folder('Stool', scoped => { ... })` to build inside a new
+folder. Repeated folder names get a suffix. `d.existingFolder('Stool', scoped => { ... })`
+edits an existing folder by name or handle. Within the callback, `scoped.part` only
+finds that folder's existing parts, and `scoped.newPart` explicitly adds one. Copies,
+steps and variables are found within the same scope. Folders cannot be nested.
+
+Variable names remain globally unique: another folder's `width` becomes `width_2`.
+Inside a scope, expressions can use their local tokens (`'width - 2*board'`) or the
+actual globally unique name returned by `scoped.variable(...)`. Only expression tokens
+are substituted; entity IDs and names stay unchanged. Removing a folder's source through
+script editing also trims its membership so the document can still be saved and reloaded.
 
 ## Building a piece in the studio
 
@@ -246,3 +368,22 @@ top-level warning. Pass `{ toolpaths: false }` to `inspectCadDocument` to skip i
 
 It never writes or prints G-code, and it doesn't say a program is safe to run. The app
 plans again with your bit, material and board, and that's the program that runs.
+
+## Saved assistant tasks
+
+`pnpm --filter @wbcnc/cad-script tasks --list` lists the nine original trial requests
+verbatim, their starting designs and independent requested outcomes, plus a stool,
+a shelf described in words and a shelf from a reference drawing.
+
+`pnpm --filter @wbcnc/cad-script tasks --replay --out test-results/saved-tasks`
+rechecks the historical attempts with today's API and an eight-check repair limit.
+Select one with `--task A1`. A valid CAD check does not pass a task that removes its
+housings or cuts all shelves when only one was requested. Results keep human visual
+and construction reviews pending instead of counting them as passes.
+
+The exported `runCadTask` accepts model and isolated execution adapters for headless
+comparisons; every repair starts from the same saved design. `tasks --compare
+first/tasks.json second/tasks.json` compares saved runs by model, checks and outcomes.
+See [the task fixture guide](fixtures/tasks/README.md) for the recording format,
+known historical failures and review requirements. Starting designs and golden reports
+live in `fixtures/designs/task-start-*`; no private or `work/` files are needed.

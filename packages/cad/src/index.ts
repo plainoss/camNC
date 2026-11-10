@@ -38,8 +38,11 @@ export * from './cutParts';
 export * from './partPatterns';
 export * from './stepReport';
 export * from './designSteps';
+export * from './folders';
+export * from './documentVersion';
 export * from './assemblyCollisions';
 export * from './copies';
+export * from './copyFeatures';
 export * from './cornerRelief';
 
 export * from './dimensionValues';

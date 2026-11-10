@@ -1,4 +1,5 @@
 import { faceRemovalDepth } from './faceRemovalDepth';
+import { cadDocumentVersion } from './documentVersion';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
 import { faceExtrudeProblem, resolveFaceProfiles } from './faceExtrude';
@@ -236,7 +237,7 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
 
   const changed = parts.some((part, index) => JSON.stringify(part) !== JSON.stringify(document.parts[index]));
   if (!changed) return document;
-  return { ...document, parts, version: parts.some(part => part.features?.length) ? 2 : 1 };
+  return { ...document, parts, version: cadDocumentVersion({ ...document, parts }) };
 }
 
 /** Why an Extrude → Add or Remove step can't do what it says, or null when it can. */

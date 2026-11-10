@@ -72,7 +72,7 @@ it('removes the stale document but keeps a newly rendered SVG when expectations 
     file,
     `import { design } from '@wbcnc/cad-script';
 export default design(d => {
-  const part = d.part('Small');
+  const part = d.newPart('Small');
   part.profile.rect({ at: [0, 0], w: 40, h: 30 });
   part.expect({ size: [100, 80] });
 });
@@ -110,7 +110,7 @@ it('says in the full report why a script editing a saved design stopped', async 
     file,
     `import { design } from '@wbcnc/cad-script';
 export default design(d => {
-  d.part('Bad', { thickness: -1 });
+  d.newPart('Bad', { thickness: -1 });
 });
 `
   );
@@ -133,3 +133,25 @@ export default design(d => {
   // The design is reported as it was before the script.
   expect(report.design.name).toBe('tray');
 }, 60000);
+
+it('keeps a failed script false when the unchanged starting design passes its check', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cad-script-status-'));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'missing-part.cad.ts');
+  await writeFile(file, "import { design } from '@wbcnc/cad-script'; export default design(d=>{d.part('Missing');});");
+  const from = path.join(packageDir, 'fixtures/designs/tray.json');
+  const result = await new Promise<{ code: number; stdout: string }>((resolve, reject) =>
+    execFile(
+      process.execPath,
+      ['node_modules/vite-node/vite-node.mjs', '--config', 'vite.config.ts', 'src/cli.ts', file, '--from', from],
+      { cwd: packageDir },
+      (error, stdout) => {
+        const code = error?.code ?? 0;
+        if (typeof code !== 'number') return reject(error);
+        resolve({ code, stdout });
+      }
+    )
+  );
+  expect(result.code).toBe(1);
+  expect(JSON.parse(result.stdout)).toMatchObject({ ok: false, scriptError: expect.stringMatching(/no part/) });
+}, 60_000);

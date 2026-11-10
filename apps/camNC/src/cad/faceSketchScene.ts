@@ -20,6 +20,7 @@ export interface PartViewSnapshot {
 export interface FaceSketchScene extends PartViewSnapshot {
   document: CadDocument;
   partId: string;
+  copyId?: string;
   frame: Exclude<ReturnType<typeof cadFaceFrame>, { error: string }>;
 }
 
@@ -45,7 +46,8 @@ export function faceSketchScene(
   document: CadDocument,
   partId: string,
   face: CadFaceRef,
-  view: PartViewSnapshot
+  view: PartViewSnapshot,
+  copyId?: string
 ): FaceSketchScene | undefined {
   const part = document.parts.find(part => part.id === partId);
   if (!part) return;
@@ -55,11 +57,11 @@ export function faceSketchScene(
   if ('error' in frame) return;
   if (typeof face === 'object') {
     const profile = evaluateCadPart(part).part;
-    const floor = profile && evaluateCadFeatures(part, profile).part.cuts?.find(cut => cut.id === face.floorOf);
+    const floor = profile && evaluateCadFeatures(part, profile, copyId).part.cuts?.find(cut => cut.id === face.floorOf);
     if (!floor || floor.through) return;
     frame.origin = frame.origin.map((value, axis) => value - frame.normal[axis]! * floor.to) as [number, number, number];
   }
-  return { ...view, document, partId, frame };
+  return { ...view, document, partId, ...(copyId && { copyId }), frame };
 }
 
 export function initialFaceSketchView(scene?: FaceSketchScene) {

@@ -1,3 +1,4 @@
+import { cadSandboxPlugin } from './cadSandboxPlugin';
 import { BalancedBrowserSequencer } from './vitest.browser-sequencer';
 import nodeFiles from './vitest.node-files.json';
 import TimingReporter from '../../scripts/test-timings.mjs';
@@ -10,10 +11,11 @@ import { defineConfig, type ViteUserConfig } from 'vitest/config';
 export default defineConfig({
   // Vitest 3 still types plugins against Vite 7. Drop the cast with Vitest 4.
   // Tailwind: layout tests import the app's CSS (src/style.css).
-  plugins: [react(), tailwindcss(), tsconfigPaths(), nodePolyfills()] as unknown as ViteUserConfig['plugins'],
+  plugins: [cadSandboxPlugin(), react(), tailwindcss(), tsconfigPaths(), nodePolyfills()] as unknown as ViteUserConfig['plugins'],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@wbcnc/cad-script': path.resolve(__dirname, '../../packages/cad-script/src/browser.ts'),
     },
   },
   optimizeDeps: {
@@ -37,6 +39,7 @@ export default defineConfig({
       // Only a dependency of @wbcnc/cam, so not resolvable from here by its bare name: unresolved, Vite discovers it
       // mid-run and reloads the page, failing whichever test file is running.
       '@wbcnc/cam > clipper2-ts',
+      '@wbcnc/cad > @salusoft89/planegcs',
     ],
   },
   test: {

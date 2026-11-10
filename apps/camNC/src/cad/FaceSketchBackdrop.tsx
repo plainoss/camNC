@@ -10,7 +10,10 @@ const identity = new Matrix4();
 
 /** Keep the same machined solid behind a face sketch, in the per-part view's coordinate frame. */
 export default function FaceSketchBackdrop({ scene, view }: { scene: FaceSketchScene; view: SketchView }) {
-  const solid = useMemo(() => partSolid(scene.document.parts.find(part => part.id === scene.partId)!, scene.document), [scene]);
+  const solid = useMemo(
+    () => partSolid(scene.document.parts.find(part => part.id === scene.partId)!, scene.document, scene.copyId),
+    [scene]
+  );
   useEffect(() => () => solid.geometry?.dispose(), [solid]);
   return (
     <div className="cad-sketch-backdrop" aria-hidden="true">
