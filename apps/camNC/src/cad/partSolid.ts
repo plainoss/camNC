@@ -1,4 +1,12 @@
-import { evaluateCadFeatures, evaluateCadPart, withPartCuts, type CadPart, type CadDocument } from '@wbcnc/cad';
+import {
+  evaluateCadFeatures,
+  evaluateCadPart,
+  evaluateCadPartFamily,
+  evaluatedPartCopy,
+  withPartCuts,
+  type CadPart,
+  type CadDocument,
+} from '@wbcnc/cad';
 import type * as THREE from 'three';
 import { modelGeometry } from '@/cam/model/modelGeometry';
 import { nativePart } from '@/cam/nativeCadModel';
@@ -18,7 +26,11 @@ export function partSolid(
   const { part: evaluated, diagnostics } = evaluateCadFeatures(part, profile, copyId),
     problem = diagnostics.find(diagnostic => diagnostic.severity === 'error')?.message;
   try {
-    const { mesh, info } = nativePart(document ? withPartCuts(document, evaluated) : evaluated);
+    const family = document && copyId ? evaluateCadPartFamily(part, profile).part : evaluated;
+    const machined = document ? withPartCuts(document, family) : family;
+    // A face sketch uses the original local frame, including on mirrors. Select the copy's material without reflecting its axes.
+    const shape = copyId ? evaluatedPartCopy(machined, { id: copyId }) : machined;
+    const { mesh, info } = nativePart(shape);
     return { geometry: modelGeometry(mesh), origin: info.sourceOrigin, problem };
   } catch (cause) {
     return { problem: cause instanceof Error ? cause.message : String(cause) };

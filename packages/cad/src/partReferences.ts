@@ -2,7 +2,7 @@ import { isJoinedBody } from './extrudeSteps';
 import { cadCopyName } from './partPatterns';
 import type { CadDocument } from './types';
 
-/** A whole source family, or one physical tool copy. Copy IDs may themselves contain colons. */
+/** A whole source family, or one physical copy. Copy IDs may themselves contain colons. */
 export const cadPartReference = (partId: string, copyId?: string) => (copyId === undefined ? partId : `${partId}:${copyId}`);
 
 /** The source dependency of a family or copy reference, including a copy that has disappeared. */
