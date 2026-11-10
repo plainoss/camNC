@@ -325,6 +325,9 @@ Three things the code already does carry most of this:
 - Insert → Cupboard asks for width, height, depth, board and shelves with a
   preview, then runs the script on the open design as one undo step. The same
   call is offered by the MCP server.
+- Applying a script's result and previewing it are steps 7 and 8 of
+  [the AI plan](CAD_AI_PLAN.md#in-app-chat), which the in-app chat uses too. They
+  are built once, before this PR.
 - **Done when:** an end-to-end spec inserts two cupboards, cuts a cable hole in
   the second shelf of one, changes its width and depth, takes its shelf count
   3 → 2 → 3, then saves, reopens and undoes. The hole stays on the same shelf and
