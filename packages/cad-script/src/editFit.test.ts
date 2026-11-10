@@ -145,3 +145,30 @@ describe('measured bounds fitting', () => {
     expect(sketch.entities.filter((e): e is CadPointEntity => e.type === 'point').every(e => Number.isFinite(e.x))).toBe(true);
   });
 });
+
+it('fits using bare-number variables as millimetres, as the existing length API does', async () => {
+  const first = await editCad(
+    null,
+    d => {
+      d.variable('w', '200');
+      d.variable('h', '120');
+      d.variable('origin', '10');
+      const p = d.newPart('Panel');
+      const r = p.profile.rect({ at: [0, 0], w: 100, h: 60 });
+      p.profile.fitBounds([r], { w: 'w', h: 'h', at: ['origin', 20], preserveAspect: false });
+    },
+    fast
+  );
+  expect(first.ok, JSON.stringify(first.report)).toBe(true);
+  expect(first.report.parts[0]!.outline).toEqual({ at: [10, 20], size: [200, 120] });
+  const next = await editCad(
+    first.document,
+    d => {
+      d.variable('w', '300');
+      d.variable('origin', '30');
+    },
+    fast
+  );
+  expect(next.ok, JSON.stringify(next.report)).toBe(true);
+  expect(next.report.parts[0]!.outline).toEqual({ at: [30, 20], size: [300, 120] });
+});

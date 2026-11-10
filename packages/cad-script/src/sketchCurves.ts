@@ -11,7 +11,7 @@ import {
   type CadValueUnit,
 } from '@wbcnc/cad';
 import { fail } from './editExisting';
-import { lengthExpression, splineHandleCoordinates } from './curveExpressions';
+import { splineHandleCoordinates } from './curveExpressions';
 import type { CadRef, Len, LenXy, SketchEdit } from './editTypes';
 
 export interface SketchCurveContext {
@@ -19,9 +19,10 @@ export interface SketchCurveContext {
   apply(edit: (sketch: CadSketch) => CadSketch): void;
   measure(value: Len, label: string, unit?: CadValueUnit): number;
   place(point: CadRef, at: LenXy): void;
+  lengthTerm(value: Len): string;
 }
 export function createSketchCurves(context: SketchCurveContext) {
-  const { current, apply, measure, place } = context;
+  const { current, apply, measure, place, lengthTerm } = context;
   const constrain = (constraint: Parameters<typeof addConstraint>[1]) => apply(sketch => addConstraint(sketch, constraint));
   const xy = (point: LenXy) => ({ x: measure(point[0], 'X'), y: measure(point[1], 'Y') });
   const positioned = (id: string) =>
@@ -84,7 +85,7 @@ export function createSketchCurves(context: SketchCurveContext) {
         .entities.filter((e): e is CadPointEntity => e.type === 'point')
         .map(p => [p.id, p])
     );
-    const handles = splineHandleCoordinates(added, points, sourceFits);
+    const handles = splineHandleCoordinates(added, points, sourceFits, lengthTerm);
     const owners = [
       added.id,
       ...current()
@@ -137,7 +138,7 @@ export function createSketchCurves(context: SketchCurveContext) {
         pointAId: ids[0]!,
         pointBId: ids[1]!,
         value: 2 * measure(value, 'Ellipse radius'),
-        ...(typeof value === 'string' && { expression: `2*${lengthExpression(value)}` }),
+        ...(typeof value === 'string' && { expression: `2*${lengthTerm(value)}` }),
       });
     // The baseline is ordinary fixed construction geometry. The ellipse's axis line reuses its native points.
     const baseStart = { id: newCadId(), type: 'point' as const, x: 0, y: 0, fixed: true, construction: true };

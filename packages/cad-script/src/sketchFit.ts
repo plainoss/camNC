@@ -9,7 +9,6 @@ import {
   type CadSketch,
 } from '@wbcnc/cad';
 import { fail } from './editExisting';
-import { lengthExpression } from './curveExpressions';
 import { measuredSketchBounds } from './curveBounds';
 import type { CadSketchSelection, Len, SketchEdit } from './editTypes';
 import type { SketchCurveContext } from './sketchCurves';
@@ -19,7 +18,7 @@ export function fitSketchBounds(
   items: CadSketchSelection,
   options: Parameters<SketchEdit['fitBounds']>[1]
 ): ReturnType<SketchEdit['fitBounds']> {
-  const { current, apply, measure } = context,
+  const { current, apply, measure, lengthTerm: lengthExpression } = context,
     before = current();
   const selected = new Set(
     items.flatMap(item =>

@@ -1,14 +1,22 @@
-import { evaluateRationalCurve, rationalCurveData, type CadPoint, type CadSplineEntity } from '@wbcnc/cad';
-import { combineExpressions } from './linearExpression';
+import {
+  evaluateRationalCurve,
+  rationalCurveData,
+  parseCadValue,
+  type CadPoint,
+  type CadSplineEntity,
+  type CadValueScope,
+} from '@wbcnc/cad';
 import type { Len, LenXy } from './editTypes';
 
 /** Explicit mm prevents a numeric source coordinate from becoming a dimensionless term beside a variable. */
-export const lengthExpression = (value: Len) => (typeof value === 'number' ? `${value}mm` : `(${value})`);
-export function weightedLength(values: readonly Len[], weights: readonly number[]): Len {
+export function lengthExpression(value: Len, variables?: CadValueScope): string {
+  if (typeof value === 'number') return `${value}mm`;
+  // A bare-number variable is a valid length in the script API, but needs explicit mm inside a ratio or mixed sum.
+  return variables && !('error' in parseCadValue(value, { unit: 'scalar', variables })) ? `((${value})*1mm)` : `(${value})`;
+}
+export function weightedLength(values: readonly Len[], weights: readonly number[], term: (value: Len) => string = lengthExpression): Len {
   if (values.every(value => typeof value === 'number'))
     return values.reduce<number>((sum, value, i) => sum + (value as number) * weights[i]!, 0);
-  const simple = combineExpressions(values.map((value, i) => [weights[i]!, value] as const));
-  if (simple !== undefined) return simple;
   let constant = 0;
   const terms = new Map<string, number>();
   values.forEach((value, i) => {
@@ -17,14 +25,19 @@ export function weightedLength(values: readonly Len[], weights: readonly number[
   });
   return (
     [...terms]
-      .flatMap(([value, weight]) => (Math.abs(weight) < 1e-14 ? [] : [`${weight}*${lengthExpression(value)}`]))
+      .flatMap(([value, weight]) => (Math.abs(weight) < 1e-14 ? [] : [`${weight}*${term(value)}`]))
       .concat(Math.abs(constant) > 1e-14 ? [`${constant}mm`] : [])
       .join(' + ') || '0mm'
   );
 }
 
 /** Fixed interpolation parameters keep the native fit-point and tangent-handle identities across variable edits. */
-export function splineHandleCoordinates(curve: CadSplineEntity, points: ReadonlyMap<string, CadPoint>, fits: readonly LenXy[]): LenXy[] {
+export function splineHandleCoordinates(
+  curve: CadSplineEntity,
+  points: ReadonlyMap<string, CadPoint>,
+  fits: readonly LenXy[],
+  term: (value: Len) => string = lengthExpression
+): LenXy[] {
   if (curve.closed) return [];
   const data = rationalCurveData(curve, points),
     n = data.poles.length;
@@ -63,11 +76,13 @@ export function splineHandleCoordinates(curve: CadSplineEntity, points: Readonly
   return [1, n - 2].map(index => [
     weightedLength(
       fits.map(p => p[0]),
-      matrix[index]!.slice(n)
+      matrix[index]!.slice(n),
+      term
     ),
     weightedLength(
       fits.map(p => p[1]),
-      matrix[index]!.slice(n)
+      matrix[index]!.slice(n),
+      term
     ),
   ]);
 }

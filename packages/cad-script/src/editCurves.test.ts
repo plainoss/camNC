@@ -160,3 +160,28 @@ describe('native scripted curves', () => {
     expect(full.report.parts[0]!.toolpaths).toBeDefined();
   });
 });
+
+it('keeps spline handle coordinates linked when fit coordinates mix number and length variables', async () => {
+  const first = await editCad(
+    null,
+    d => {
+      d.variable('rise', '45');
+      d.variable('width', '100mm');
+      const p = d.newPart('Rail');
+      p.profile.spline({
+        points: [
+          [0, 0],
+          [23, 'rise'],
+          ['width-24mm', 'rise'],
+          ['width', 0],
+        ],
+      });
+      p.profile.line([100, 0], [0, 0]);
+    },
+    fast
+  );
+  expect(first.ok, JSON.stringify(first.report)).toBe(true);
+  const next = await editCad(first.document, d => d.variable('rise', '60'), fast);
+  expect(next.ok, JSON.stringify(next.report)).toBe(true);
+  expect(next.report.parts[0]!.sketches[0]!.freedom).toBe(0);
+});

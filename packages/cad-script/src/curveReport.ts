@@ -1,4 +1,4 @@
-import { constraintEntityIds, type CadEntity, type CadPointEntity, type CadSketch } from '@wbcnc/cad';
+import { constraintEntityIds, entityPointIds, type CadEntity, type CadPointEntity, type CadSketch } from '@wbcnc/cad';
 import { measuredSketchBounds } from './curveBounds';
 const round = (n: number) => Math.round(n * 1e6) / 1e6;
 /** Full/on-demand reports keep editable parameters. Compact model summaries can omit these controls. */
@@ -64,18 +64,23 @@ export function sketchCurveDetails(sketch: CadSketch, entityRef: (id: string) =>
       ...(c.expression && { expression: c.expression }),
       members: c.members.map(m => ({ type: m.kind, source: entityRef(m.sourceId), target: entityRef(m.targetId), side: m.side })),
     }));
-  const drivers = sketch.constraints
-    .filter(c => c.label?.startsWith('Fit ') && 'value' in c)
-    .map(c => ({
-      ref: constraintRef(c.id),
-      type: c.type,
-      entities: constraintEntityIds(c).map(entityRef),
-      ...('value' in c && { value: c.value, ...(c.expression && { expression: c.expression }) }),
-    }));
+  const fittingConstraints = sketch.constraints.filter(c => c.label?.startsWith('Fit ') && 'value' in c);
+  const fittingReferences = new Set(fittingConstraints.flatMap(constraintEntityIds));
+  const fittedCurves = new Set(
+    sketch.entities
+      .filter(entity => fittingReferences.has(entity.id) || entityPointIds(entity).some(id => fittingReferences.has(id)))
+      .map(entity => entity.id)
+  );
+  const drivers = fittingConstraints.map(c => ({
+    ref: constraintRef(c.id),
+    type: c.type,
+    entities: constraintEntityIds(c).map(entityRef),
+    ...('value' in c && { value: c.value, ...(c.expression && { expression: c.expression }) }),
+  }));
   let fitting: { bounds?: { at: number[]; size: number[] }; drivers: typeof drivers } | undefined;
   if (drivers.length) {
     try {
-      const bounds = measuredSketchBounds(sketch);
+      const bounds = measuredSketchBounds(sketch, fittedCurves);
       fitting = { bounds: { at: bounds.at.map(round), size: bounds.size.map(round) }, drivers };
     } catch {
       fitting = { drivers };

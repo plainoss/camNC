@@ -1,3 +1,4 @@
+import { lengthExpression } from './curveExpressions';
 import { fitSketchBounds } from './sketchFit';
 import { createSketchCurves } from './sketchCurves';
 import { prepareEmptyStudio } from './emptyStudio';
@@ -124,6 +125,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     const result = parseCadValue(value, { unit, variables: cadVariableScope(document) });
     return 'error' in result ? fail(`${what} "${value}": ${result.error}`) : result.value;
   };
+  const lengthTerm = (value: Len) => lengthExpression(value, cadVariableScope(document));
   const expressionOf = (value: Len) => (typeof value === 'string' ? { expression: value } : {});
   const placementOf = ({ at, x = '+x', y = '+y' }: CadPlaceOptions): CadPlacement => {
     const ex = axes[x],
@@ -256,7 +258,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       constrain({ type: 'positionX', pointId: point.id, value: measure(x, 'X'), label: 'X', ...expressionOf(x) });
       constrain({ type: 'positionY', pointId: point.id, value: measure(y, 'Y'), label: 'Y', ...expressionOf(y) });
     };
-    const curves = createSketchCurves({ current, apply, measure, place });
+    const curves = createSketchCurves({ current, apply, measure, place, lengthTerm });
     const self: SketchEdit = {
       bezier: curves.bezier,
       spline: curves.spline,
@@ -264,7 +266,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       offset: curves.offset,
       fitBounds(items, options) {
         solveForQuery();
-        return fitSketchBounds({ current, apply, measure, place }, items, options);
+        return fitSketchBounds({ current, apply, measure, place, lengthTerm }, items, options);
       },
       id: sketchId,
       rect({ w, h, at, center }) {
