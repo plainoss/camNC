@@ -250,9 +250,6 @@ import {
 } from './editorHelpers';
 import { useFeaturePreview } from './useFeaturePreview';
 import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
-import { VariableDialog } from './VariableDialog';
-import { PlaneDialog } from './PlaneDialog';
-import { ShapeStepDialogs } from './ShapeStepDialogs';
 import { HoleDialog } from './HoleDialog';
 import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
@@ -274,7 +271,9 @@ import { faceSketchHost } from './faceSketchHost';
 import { useExtrudeDepth } from './useExtrudeDepth';
 import { bindPartCorners, partCornerInference } from './partCornerInference';
 import { newSketchPart } from './newSketchPart';
-import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
+import { ExtrudeDialog, PartPatternDialog, type CadConnectorPick } from './PartFeatureDialogs';
+import { StudioStepDialogs } from './StudioStepDialogs';
+import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 import './cad.css';
 
@@ -655,8 +654,14 @@ export function CadEditor({
   useProvideCadVariableFields(variableFields);
   const blankDesign = studioSession && doc.parts.length === 1 && isBlank(doc.parts[0]!);
   const extrusionDepth = useExtrudeDepth(doc, featureDialog?.kind === 'extrude' ? featureDialog.partId : undefined, next => commit(next));
+  const studioPreview = useStudioPreview(
+    doc,
+    transformDialog ?? variableDialog ?? planeDialog ?? mirrorDialog ?? filletDialog ?? partCutting
+  );
+  const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
   const { rollbackStep, shownDocument } = useFeaturePreview({
-    document: extrusionDepth.document,
+    document:
+      pointPicker.onPick && transformDialog ? doc : studioPreview.document === doc ? extrusionDepth.document : studioPreview.document,
     enabled: studioSession && showWorkspace,
     blank: blankDesign,
     rolledTo,
@@ -4324,68 +4329,25 @@ export function CadEditor({
               {studioRefusal}
             </p>
           )}
-          {showWorkspace &&
-            transformDialog &&
-            (() => {
-              const target = doc.parts.find(candidate => candidate.id === transformDialog.partId);
-              return target ? (
-                <TransformDialog
-                  key={`${target.id}:${transformDialog.copyId ?? 'new'}`}
-                  document={doc}
-                  part={target}
-                  copyId={transformDialog.copyId}
-                  move={transformDialog.move}
-                  variables={variableScope}
-                  onSave={next => {
-                    commit(next);
-                    setDirectionPicker(null);
-                    setTransformDialog(null);
-                  }}
-                  onCancel={() => {
-                    setDirectionPicker(null);
-                    setTransformDialog(null);
-                  }}
-                  pickDirection={picked => setDirectionPicker(() => picked)}
-                  pickPoint={pointPicker.start}
-                />
-              ) : null;
-            })()}
-          {showWorkspace && variableDialog && (
-            <VariableDialog
-              key={variableDialog.id ?? 'new'}
-              document={doc}
-              variableId={variableDialog.id}
-              onSave={next => {
-                commit(next);
-                setVariableDialog(null);
-              }}
-              onCancel={() => setVariableDialog(null)}
-            />
-          )}
           {showWorkspace && (
-            <ShapeStepDialogs
-              {...{ document: doc, variables: variableScope, mirror: mirrorDialog, fillet: filletDialog, commit }}
-              {...{ setMirror: setMirrorDialog, setFillet: setFilletDialog, pickEdge: pointPicker.start }}
-              setDirectionPicker={picker => setDirectionPicker(() => picker)}
-            />
-          )}
-          {showWorkspace && planeDialog && (
-            <PlaneDialog
-              key={planeDialog.id ?? 'new'}
+            <StudioStepDialogs
               document={doc}
-              planeId={planeDialog.id}
-              preselected={planeDialog.preselected}
               variables={variableScope}
-              pickPlane={picked => setDirectionPicker(() => picked)}
-              onSave={next => {
-                commit(next);
-                setDirectionPicker(null);
-                setPlaneDialog(null);
-              }}
-              onCancel={() => {
-                setDirectionPicker(null);
-                setPlaneDialog(null);
-              }}
+              transform={transformDialog}
+              variable={variableDialog}
+              plane={planeDialog}
+              mirror={mirrorDialog}
+              fillet={filletDialog}
+              commit={next => commit(prepareStudioPreview(next))}
+              onPreview={studioPreview.update}
+              onConnectorsChange={setMateConnectors}
+              setTransform={setTransformDialog}
+              setVariable={setVariableDialog}
+              setPlane={setPlaneDialog}
+              setMirror={setMirrorDialog}
+              setFillet={setFilletDialog}
+              setDirectionPicker={picker => setDirectionPicker(() => picker)}
+              pickPoint={pointPicker.start}
             />
           )}
           {showWorkspace &&
@@ -4586,6 +4548,7 @@ export function CadEditor({
                     : undefined
                 }
                 onPickPoint={pointPicker.onPick}
+                connectors={transformDialog ? mateConnectors : undefined}
                 onSelectFace={on => {
                   if (directionPicker && on) {
                     directionPicker(on);
@@ -4615,6 +4578,7 @@ export function CadEditor({
                   <PartCutDialog
                     key={partCutting.id ?? 'new'}
                     document={doc}
+                    onPreview={studioPreview.update}
                     step={doc.partCuts?.find(step => step.id === partCutting.id)}
                     tool={cutSelection.selectedTool}
                     variables={variableScope}
@@ -4642,7 +4606,7 @@ export function CadEditor({
                           );
                       const document = 'document' in made ? made.document : made;
                       const id = 'document' in made ? made.id : partCutting.id!;
-                      commit(updatePartCut(document, id, { consumeTools }));
+                      commit(prepareStudioPreview(updatePartCut(document, id, { consumeTools })));
                       setPartCutting(null);
                     }}
                   />

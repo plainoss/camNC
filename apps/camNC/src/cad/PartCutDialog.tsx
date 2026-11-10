@@ -1,6 +1,7 @@
-import { cadPartReferenceName, type CadDocument, type CadPartCut, type CadValueScope } from '@wbcnc/cad';
-import { useEffect, useRef, useState } from 'react';
+import { cadPartReferenceName, newCadId, updatePartCut, type CadDocument, type CadPartCut, type CadValueScope } from '@wbcnc/cad';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FeatureDialog } from './FeatureDialog';
+import { useDialogPreview } from './useDialogPreview';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 import './partCutDialog.css';
 import { CadValueInput } from './CadValueInput';
@@ -9,6 +10,15 @@ const kDefaultClearance = '0.2';
 
 type Box = 'tools' | 'targets';
 type Joint = 'none' | 'half' | 'fingers';
+
+interface PartCutChange {
+  tools: string[];
+  targets: string[];
+  clearance: number;
+  clearanceExpression?: string;
+  split?: CadPartCut['split'];
+  consumeTools?: true;
+}
 
 /**
  * One "cut parts" step, as the reference's subtracting boolean: the parts that cut (tools) and the parts they're cut
@@ -23,6 +33,7 @@ export function PartCutDialog({
   pick,
   onPicked,
   onSave,
+  onPreview,
   onRemove,
   onClose,
 }: {
@@ -36,14 +47,8 @@ export function PartCutDialog({
   pick?: { partId: string; seq: number } | null;
   /** The parts in both boxes, for the view to show. */
   onPicked?: (picked: { tools: string[]; targets: string[] }) => void;
-  onSave: (change: {
-    tools: string[];
-    targets: string[];
-    clearance: number;
-    clearanceExpression?: string;
-    split?: CadPartCut['split'];
-    consumeTools?: true;
-  }) => void;
+  onPreview?: (document: CadDocument | null) => void;
+  onSave: (change: PartCutChange) => void;
   onRemove?: () => void;
   onClose: () => void;
 }) {
@@ -59,7 +64,7 @@ export function PartCutDialog({
   const [fingersText, setFingersText] = useState(
     step?.split && typeof step.split === 'object' ? (step.split.fingersExpression ?? String(step.split.fingers)) : '5'
   );
-  const fingers = parseCadValue(fingersText, { unit: 'scalar', variables });
+  const fingers = useMemo(() => parseCadValue(fingersText, { unit: 'scalar', variables }), [fingersText, variables]);
   const fingersError =
     joint !== 'fingers'
       ? null
@@ -84,32 +89,46 @@ export function PartCutDialog({
     setError(null);
   }, [pick, active, document.parts]);
   useEffect(() => onPicked?.({ tools, targets }), [tools, targets, onPicked]);
-  const save = () => {
-    if (!tools.length || !targets.length) return setError('Pick at least one part to cut out, and one to cut it from.');
+  const [featureId] = useState(() => step?.id ?? newCadId());
+  const result = useMemo<{ error: string } | { change: PartCutChange }>(() => {
+    if (!tools.length || !targets.length) return { error: 'Pick at least one part to cut out, and one to cut it from.' };
     if (targets.some(id => !document.parts.some(part => part.id === id)))
-      return setError('Pick the original part as a target; targets include its copies.');
+      return { error: 'Pick the original part as a target; targets include its copies.' };
     if (tools.every(id => targets.every(target => target === id || id.startsWith(`${target}:`))))
-      return setError('A part can’t be cut out of itself.');
+      return { error: 'A part can’t be cut out of itself.' };
     if (joint === 'none' && !keepTools && tools.some(id => !document.parts.some(part => part.id === id)))
-      return setError('Using up a single copy is not supported. Keep tools to cut with a copy.');
+      return { error: 'Using up a single copy is not supported. Keep tools to cut with a copy.' };
     const parsed = parseCadValue(text, { unit: 'mm', variables });
-    if ('error' in parsed) return setError(parsed.error);
-    if (parsed.value < 0) return setError('A clearance can’t be less than nothing.');
-    if (fingersError) return;
+    if ('error' in parsed) return { error: parsed.error };
+    if (parsed.value < 0) return { error: 'A clearance can’t be less than nothing.' };
+    if (fingersError) return { error: fingersError };
     const split: CadPartCut['split'] =
       joint === 'half'
         ? 'half'
         : joint === 'fingers' && !('error' in fingers)
           ? { fingers: fingers.value, ...(fingers.expression && { fingersExpression: fingers.expression }) }
           : undefined;
-    onSave({
-      tools,
-      targets,
-      clearance: parsed.value,
-      clearanceExpression: parsed.expression,
-      split,
-      consumeTools: !split && !keepTools ? true : undefined,
-    });
+    return {
+      change: {
+        tools,
+        targets,
+        clearance: parsed.value,
+        clearanceExpression: parsed.expression,
+        split,
+        consumeTools: !split && !keepTools ? true : undefined,
+      },
+    };
+  }, [document, tools, targets, text, variables, joint, keepTools, fingersError, fingers]);
+
+  const candidate = useMemo(() => {
+    if ('error' in result) return null;
+    if (step) return updatePartCut(document, step.id, result.change);
+    return { ...document, revision: document.revision + 1, partCuts: [...(document.partCuts ?? []), { id: featureId, ...result.change }] };
+  }, [document, result, step, featureId]);
+  useDialogPreview(candidate, onPreview);
+  const save = () => {
+    if ('error' in result) return setError(result.error);
+    onSave(result.change);
   };
   const name = (id: string) => cadPartReferenceName(document, id) ?? 'a removed part';
   const box = (which: Box, label: string, chosen: string[], choose: (ids: string[]) => void) => (
