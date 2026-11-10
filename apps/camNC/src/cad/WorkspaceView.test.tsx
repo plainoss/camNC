@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createCadDocument, createPlateDocument, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import WorkspaceView from './WorkspaceView';
@@ -19,6 +19,22 @@ function setup(document: CadDocument, selectedId: string | null = null) {
 }
 
 describe('the design workspace', () => {
+  it('animates the exploded button and lets the slider place parts manually', async () => {
+    setup({ ...createCadDocument(), parts: [panel('Side'), panel('Shelf')] });
+    expect(screen.queryByRole('slider', { name: 'Explosion amount' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Exploded' }));
+    const slider = screen.getByRole('slider', { name: 'Explosion amount' }) as HTMLInputElement;
+    // Other browser pages may throttle animation frames; wait for the visible playback endpoint.
+    await waitFor(() => expect(slider.value).toBe('100'), { timeout: 10_000 });
+    fireEvent.change(slider, { target: { value: '42' } });
+    expect(slider.getAttribute('aria-valuetext')).toBe('42% exploded');
+    fireEvent.change(slider, { target: { value: '0' } });
+    expect(slider.value).toBe('0');
+    fireEvent.click(screen.getByRole('button', { name: 'Laid flat' }));
+    expect(screen.queryByRole('slider', { name: 'Explosion amount' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Laid flat' }).getAttribute('aria-pressed')).toBe('true');
+  }, 20_000);
+
   it('shows every part, and opens the selected one', () => {
     const side = panel('Side');
     const { open } = setup({ ...createCadDocument(), parts: [side, panel('Shelf')] }, side.id);

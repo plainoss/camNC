@@ -56,7 +56,7 @@ const kExplodeReach = 0.2;
  * The model as designed, centered, with each part pulled out from the middle so the joints between them show. Parts
  * that touch always come apart, however close their centers are.
  */
-export function explodeAssembled(meshes: BodyMesh[]): THREE.Matrix4[] {
+export function explodeAssembled(meshes: BodyMesh[], assembled = centerAssembled(meshes)): THREE.Matrix4[] {
   const boxes = meshes.map(m => {
     const box = new THREE.Box3();
     const v = new THREE.Vector3();
@@ -66,12 +66,21 @@ export function explodeAssembled(meshes: BodyMesh[]): THREE.Matrix4[] {
   const whole = boxes.reduce((all, box) => all.union(box), new THREE.Box3()),
     middle = whole.getCenter(new THREE.Vector3()),
     reach = whole.getSize(new THREE.Vector3()).length() * kExplodeReach;
-  const centered = centerAssembled(meshes);
   return boxes.map((box, i) => {
     const away = box.getCenter(new THREE.Vector3()).sub(middle);
     // A part right in the middle goes up or down, alternating, so a stack still separates.
     const direction = away.lengthSq() > 1e-6 ? away.clone().normalize() : new THREE.Vector3(0, 0, i % 2 ? -1 : 1);
     const offset = away.multiplyScalar(kExplodeScale).addScaledVector(direction, meshes.length > 1 ? reach : 0);
-    return new THREE.Matrix4().makeTranslation(offset.x, offset.y, offset.z).multiply(centered);
+    return new THREE.Matrix4().makeTranslation(offset.x, offset.y, offset.z).multiply(assembled);
+  });
+}
+
+/** Explosion only translates parts, preserving each part's orientation and the studio's origin. */
+export function interpolateExplosion(assembled: THREE.Matrix4, exploded: THREE.Matrix4[], progress: number): THREE.Matrix4[] {
+  const amount = Math.min(1, Math.max(0, progress));
+  const start = new THREE.Vector3().setFromMatrixPosition(assembled);
+  return exploded.map(matrix => {
+    const position = new THREE.Vector3().setFromMatrixPosition(matrix).lerp(start, 1 - amount);
+    return assembled.clone().setPosition(position);
   });
 }
