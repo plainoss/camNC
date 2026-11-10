@@ -26,8 +26,7 @@ export function parseCadDocument(input: unknown): CadDocument {
     d.revision < 0 ||
     !Array.isArray(d.parts) ||
     (d.version === 2 && !d.parts.some(p => p?.features?.length)) ||
-    (d.version !== 3 && d.folders !== undefined) ||
-    (d.version === 3 && cadDocumentVersion(d) !== 3)
+    (d.version !== 3 && d.folders !== undefined)
   )
     throw new Error('Invalid CAD document');
   const ids = new Set<string>([d.id]);
@@ -92,6 +91,11 @@ export function parseCadDocument(input: unknown): CadDocument {
       (flip !== undefined && typeof flip !== 'boolean')
     )
       throw new Error('Invalid CAD direction');
+  };
+  const checkVector = (vector: unknown) => {
+    if (!Array.isArray(vector) || vector.length !== 3) throw new Error('Invalid CAD transform vector');
+    // Iteration visits sparse slots too; a missing component is not a finite coordinate.
+    for (const value of vector) number(value);
   };
   if (d.partCuts !== undefined) {
     if (!Array.isArray(d.partCuts)) throw new Error('Invalid CAD part cuts');
@@ -166,6 +170,44 @@ export function parseCadDocument(input: unknown): CadDocument {
         throw new Error('Invalid CAD part pattern');
     }
     if (p.placement !== undefined) checkPlacement(p.placement);
+    // History details are formatted during folder validation below, before geometry is evaluated.
+    if (p.moved !== undefined) {
+      const moved = p.moved;
+      if (!moved || typeof moved !== 'object' || Array.isArray(moved)) throw new Error('Invalid CAD part transform');
+      if ('by' in moved) {
+        checkVector(moved.by);
+        if (
+          moved.byExpressions !== undefined &&
+          (!Array.isArray(moved.byExpressions) ||
+            moved.byExpressions.length !== 3 ||
+            [...moved.byExpressions].some(expression => expression !== null && typeof expression !== 'string'))
+        )
+          throw new Error('Invalid CAD transform expressions');
+        if (moved.turn !== undefined) {
+          const turn = moved.turn;
+          if (!turn || typeof turn !== 'object' || Array.isArray(turn)) throw new Error('Invalid CAD turn');
+          checkVector(turn.about);
+          checkVector(turn.axis);
+          if (Math.hypot(...turn.axis) === 0) throw new Error('Invalid CAD turn axis');
+          number(turn.degrees);
+          if (turn.degreesExpression !== undefined && typeof turn.degreesExpression !== 'string') throw new Error('Invalid CAD turn');
+        }
+      } else {
+        checkDirection(moved);
+        number(moved.distance);
+      }
+    }
+    if (p.fillets !== undefined) {
+      if (!Array.isArray(p.fillets)) throw new Error('Invalid CAD fillets');
+      for (const fillet of p.fillets) {
+        if (!fillet || typeof fillet !== 'object' || !Array.isArray(fillet.corners)) throw new Error('Invalid CAD fillet');
+        addId(fillet.id);
+        for (const corner of fillet.corners) reference(corner);
+        number(fillet.radius);
+        if (fillet.radiusExpression !== undefined && typeof fillet.radiusExpression !== 'string') throw new Error('Invalid CAD fillet');
+        if (fillet.suppressed !== undefined && typeof fillet.suppressed !== 'boolean') throw new Error('Invalid CAD fillet');
+      }
+    }
     if (p.drawnOn !== undefined) {
       const { on, offset, offsetExpression, inward } = p.drawnOn ?? ({} as NonNullable<CadPart['drawnOn']>);
       const face = on && typeof on === 'object' && 'face' in on ? on.face : undefined;
@@ -470,7 +512,10 @@ export function parseCadDocument(input: unknown): CadDocument {
   }
   const folderIssue = cadFolderIssue(d) || cadFolderStepIssue(d, designSteps(d));
   if (folderIssue) throw new Error(folderIssue);
-  if (d.version < cadDocumentVersion(d)) throw new Error('These CAD source settings require document version 3');
+  // The derived version walks feature arrays, so their shapes must be validated before it runs.
+  const requiredVersion = cadDocumentVersion(d);
+  if (d.version === 3 && requiredVersion !== 3) throw new Error('Invalid CAD document');
+  if (d.version < requiredVersion) throw new Error('These CAD source settings require document version 3');
   for (const folder of d.folders ?? []) addId(folder.id);
   const parsed = structuredClone(d);
   for (const part of parsed.parts) {
