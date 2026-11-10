@@ -101,7 +101,19 @@ it('cancels playback on flat and unmount, and explodes from assembled after flat
   expect(frames.size).toBe(0);
 });
 
-it('respects reduced motion both when selected and when the preference changes during playback', () => {
+it('starts only on an explicit view request when Reduce Motion is already enabled', () => {
+  reduced = true;
+  const { result } = renderHook(useView);
+  expect(result.current.progress).toBe(0);
+  expect(frames.size).toBe(0);
+  act(() => result.current.chooseView('exploded'));
+  advance(400);
+  expect(result.current.progress).toBeCloseTo(0.5);
+  advance(700);
+  expect(result.current.progress).toBe(1);
+});
+
+it('animates explicit view requests with reduced motion enabled, while a preference change stops current playback', () => {
   const { result } = renderHook(useView);
   act(() => result.current.chooseView('exploded'));
   advance(400);
@@ -112,9 +124,16 @@ it('respects reduced motion both when selected and when the preference changes d
   expect(result.current.progress).toBe(1);
   expect(frames.size).toBe(0);
   act(() => result.current.chooseView('assembled'));
+  expect(result.current.progress).toBe(1);
+  advance(400);
+  expect(result.current.progress).toBeCloseTo(0.5);
+  advance(700);
   expect(result.current.progress).toBe(0);
-  expect(frames.size).toBe(0);
   act(() => result.current.chooseView('exploded'));
+  expect(result.current.progress).toBe(0);
+  advance(400);
+  expect(result.current.progress).toBeCloseTo(0.5);
+  advance(700);
   expect(result.current.progress).toBe(1);
   act(() => result.current.scrub(0.42));
   expect(result.current.progress).toBe(0.42);
