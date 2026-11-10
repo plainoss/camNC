@@ -268,6 +268,7 @@ import { useFaceSketchCamera } from './useFaceSketchCamera';
 import { fitSketchView, pointsOf } from './fitSketchView';
 import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions } from './sketchViewport';
 import { addUsedPartEdges } from './partEdgeUse';
+import { PartReferenceGeometry } from './PartReferenceGeometry';
 import { faceSketchHost } from './faceSketchHost';
 import { useExtrudeDepth } from './useExtrudeDepth';
 import { bindPartCorners, partCornerInference } from './partCornerInference';
@@ -2347,7 +2348,7 @@ export function CadEditor({
         setMessage('Choose a drawing tool or select geometry.');
       } else {
         setUsingEdges(true);
-        setMessage('Use: click the edges of the parts to bring them into the sketch. Esc ends.');
+        setMessage('Use: click the edges or vertices of the parts to bring them into the sketch. Esc ends.');
       }
       return;
     }
@@ -4744,22 +4745,7 @@ export function CadEditor({
                 </pattern>
               </defs>
               <rect x={view.x - view.w} y={view.y - view.h} width={view.w * 3} height={view.h * 3} fill={`url(#cad-grid-${doc.id})`} />
-              {shownEdges.length > 0 && (
-                <g className="cad-part-edges" aria-label="Edges of the parts behind the sketch">
-                  {shownEdges.map(edge => (
-                    <line
-                      key={edge.key}
-                      data-part-edge={edge.key}
-                      className={pickedEdges.includes(edge.key) ? 'cad-part-edge is-picked' : 'cad-part-edge'}
-                      x1={edge.x1}
-                      y1={-edge.y1}
-                      x2={edge.x2}
-                      y2={-edge.y2}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ))}
-                </g>
-              )}
+              {shownEdges.length > 0 && <PartReferenceGeometry edges={shownEdges} picked={pickedEdges} pixelScale={markerScale} />}
               <SketchRegion
                 document={doc}
                 partId={part?.id}
@@ -4808,6 +4794,7 @@ export function CadEditor({
                 x2={view.x + view.w * 2}
                 y1="0"
                 y2="0"
+                pointerEvents="none"
                 stroke="#db9d9d"
                 strokeWidth="1"
                 vectorEffect="non-scaling-stroke"
@@ -4817,6 +4804,7 @@ export function CadEditor({
                 x2="0"
                 y1={view.y - view.h}
                 y2={view.y + view.h * 2}
+                pointerEvents="none"
                 stroke="#92bfa2"
                 strokeWidth="1"
                 vectorEffect="non-scaling-stroke"
@@ -5421,7 +5409,7 @@ export function CadEditor({
             </span>
             <span>
               {sketchBackdrop
-                ? 'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it · U uses parts’ edges'
+                ? 'Scroll to zoom · middle-drag to pan · right-drag to turn · N to look straight at it · U uses parts’ edges and vertices'
                 : 'Scroll to zoom · right-drag to pan'}
             </span>
             {sketch && (

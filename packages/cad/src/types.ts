@@ -17,7 +17,7 @@ export interface CadPointEntity extends EntityBase, CadPoint {
    * Used from another part's corner, as the reference's Use: the point stays where that corner is seen on this sketch's
    * plane, on the part's top or its bottom, and follows it when that part changes.
    */
-  used?: { partId: string; pointId: string; side: 'top' | 'bottom' };
+  used?: { partId: string; copyId?: string; pointId: string; side: 'top' | 'bottom' };
   /** Explicit Point-tool geometry survives removal of curves that reuse it. */
   standalone?: boolean;
 }
@@ -370,7 +370,7 @@ export interface CadThinExtrude {
 export interface CadDrawnOn {
   /** The datum plane it's drawn on, if any: `on` and `offset` then follow that plane. */
   datum?: string;
-  on: { plane: 'top' | 'front' | 'right' } | { partId: string; face: 'top' | 'underside' | { edge: string } };
+  on: { plane: 'top' | 'front' | 'right' } | { partId: string; copyId?: string; face: 'top' | 'underside' | { edge: string } };
   /** How far from the plane or face the part starts, in mm along its normal. */
   offset: number;
   offsetExpression?: string;
