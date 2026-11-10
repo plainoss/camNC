@@ -12,6 +12,7 @@
     system-ui,
     sans-serif;
   position: relative;
+  container: cad-editor / inline-size;
 }
 .cad-editor,
 .cad-editor *,
@@ -767,16 +768,6 @@
   }
   .cad-toolbar {
     gap: 3px;
-    /* Keep both modes the same height so entering a sketch does not move the view. */
-    flex-wrap: wrap;
-    height: auto;
-    flex-basis: auto;
-  }
-  .cad-toolbar > .cad-drawing-tools {
-    flex-basis: 100%;
-  }
-  .cad-toolbar > .cad-search-trigger {
-    margin-left: 0;
   }
   .cad-session-actions {
     gap: 0;
@@ -813,6 +804,20 @@
   }
   .cad-number-field {
     flex-wrap: wrap;
+  }
+}
+@container cad-editor (max-width: 600px) {
+  .cad-toolbar {
+    /* Keep both modes the same height so entering a sketch does not move the view. */
+    flex-wrap: wrap;
+    height: auto;
+    flex-basis: auto;
+  }
+  .cad-toolbar > .cad-drawing-tools {
+    flex-basis: 100%;
+  }
+  .cad-toolbar > .cad-search-trigger {
+    margin-left: 0;
   }
 }
 .cad-constraint-list {
