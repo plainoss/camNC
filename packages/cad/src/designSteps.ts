@@ -18,7 +18,7 @@ export interface DesignStep {
   cutId?: string;
   /** The "cut parts" step it stands for. */
   partCutId?: string;
-  /** The copy it made. */
+  /** The copy it made, or the physical copy targeted by a Cut parts step. */
   copyId?: string;
   /** Switched off in the feature list. */
   suppressed?: boolean;
@@ -123,6 +123,8 @@ function listedSteps(document: CadDocument): DesignStep[] {
   const order = new Map(document.parts.map((part, index) => [part.id, index]));
   const after = new Map<number, DesignStep[]>();
   for (const step of document.partCuts ?? []) {
+    const reference = step.targets[0] ?? step.tools[0]!;
+    const owner = cadPartReferenceOwner(document, reference);
     const last = Math.max(0, ...[...step.tools, ...step.targets].map(id => order.get(cadPartReferenceOwner(document, id)?.id ?? id) ?? 0));
     after.set(last, [
       ...(after.get(last) ?? []),
@@ -131,7 +133,8 @@ function listedSteps(document: CadDocument): DesignStep[] {
         kind: 'partCut',
         label: `Cut ${names(document, step.targets)} with ${names(document, step.tools)}`,
         detail: `clearance ${typed(step.clearanceExpression, step.clearance)}`,
-        partId: step.targets[0] ?? step.tools[0]!,
+        partId: owner?.id ?? reference,
+        ...(owner && reference !== owner.id && { copyId: reference.slice(owner.id.length + 1) }),
         partCutId: step.id,
         suppressed: !!step.suppressed,
       },

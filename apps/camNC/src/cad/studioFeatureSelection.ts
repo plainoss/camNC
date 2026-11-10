@@ -6,7 +6,7 @@ export function selectStudioFeature(
   selection: {
     sketch: (partId: string | null) => void;
     face: () => void;
-    part: (partId: string) => void;
+    part: (partId: string, copyId?: string) => void;
     entities: () => void;
   }
 ) {
@@ -16,7 +16,9 @@ export function selectStudioFeature(
     selection.sketch(sketch);
     selection.face();
     if (entry.kind === 'step') {
-      selection.part(entry.step.partId);
+      // A saved exact target must not widen to its source family when its feature row is selected.
+      if (entry.step.kind === 'partCut' && entry.step.copyId !== undefined) selection.part(entry.step.partId, entry.step.copyId);
+      else selection.part(entry.step.partId);
       selection.entities();
     }
   };

@@ -37,6 +37,7 @@ export function studioState(document) {
     } : null])),
     copyIds: Object.fromEntries(document.parts.map(part => [part.name, (part.copies ?? []).map(copy => copy.id)])),
     cutExpressions: (document.partCuts ?? []).map(cut => cut.clearanceExpression ?? null),
+    cutReferences: (document.partCuts ?? []).map(cut => ({ id: cut.id, tools: [...cut.tools], targets: [...cut.targets] })),
     cutSettings: (document.partCuts ?? []).map(cut => ({
       clearance: cut.clearance, suppressed: !!cut.suppressed, keepTools: !cut.consumeTools,
       tools: cut.tools.map(referenceName).sort(),
@@ -89,6 +90,19 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
         equal(`${key}/added`, wanted.count, current.filter(id => !previous.includes(id)).length);
         equal(`${key}/unique`, current.length, new Set(current).size);
       }
+    } else if (key === 'copyMembershipSince') {
+      const before = checkpoints.get(wanted.checkpoint), count = wanted.copies;
+      if (!before) failures.push(`studio/${key}: unknown checkpoint ${wanted.checkpoint}`);
+      else if (!Number.isInteger(count) || count < 0 || count > (before.copyIds[wanted.part]?.length ?? -1)) failures.push(`studio/${key}: invalid retained copy count for ${wanted.part}`);
+      else {
+        equal(`${key}/sources`, before.sourceParts, actual.sourceParts);
+        for (const [index, name] of before.sourceParts.entries()) {
+          // A shrink removes only trailing slots of the selected family. Source
+          // and sibling ownership must remain exact rather than merely present.
+          const identities = name === wanted.part ? before.identities[index].slice(0, count + 1) : before.identities[index];
+          equal(`${key}/${name}`, identities, actual.identities[actual.sourceParts.indexOf(name)]);
+        }
+      }
     } else if (key === 'samePatternIdsSince') {
       const before = checkpoints.get(wanted);
       if (!before) failures.push(`studio/${key}: unknown checkpoint ${wanted}`);
@@ -99,11 +113,11 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
           failures.push(`studio/thicknesses/${name}: wanted ${value}, got ${actual.thicknesses[name]}`);
       }
     } else if (['sourceParts', 'partCuts', 'dialog', 'listedParts', 'partIssues', 'workspacePartCount'].includes(key)) equal(key, wanted, actual[key]);
-    else if (['sameIdsSince', 'sameFeatureIdsSince', 'unchangedSince'].includes(key)) {
+    else if (['sameIdsSince', 'sameFeatureIdsSince', 'sameCutReferencesSince', 'unchangedSince'].includes(key)) {
       const checkpoint = checkpoints.get(wanted);
       if (!checkpoint) failures.push(`studio/${key}: unknown checkpoint ${wanted}`);
       else {
-        const field = key === 'sameIdsSince' ? 'identities' : key === 'sameFeatureIdsSince' ? 'featureIds' : 'content';
+        const field = key === 'sameIdsSince' ? 'identities' : key === 'sameFeatureIdsSince' ? 'featureIds' : key === 'sameCutReferencesSince' ? 'cutReferences' : 'content';
         equal(key, checkpoint[field], actual[field]);
       }
     } else failures.push(`studio/unsupported expectation: ${key}`);

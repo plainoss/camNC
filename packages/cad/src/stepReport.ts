@@ -1,5 +1,8 @@
 import { cadFaceFrame, cadFaceName, type CadFaceFrame } from './drawnOn';
 import { cadCopyName } from './partPatterns';
+import { cadPartReferenceName } from './partReferences';
+import { resolvePartCutTargets } from './partCutTargetSelection';
+import { evaluatedPartCopy } from './copies';
 import type { CadCircularPartPattern, CadDocument, CadPartPattern, CadPlacement, EvaluatedCadPart } from './types';
 
 /** What one step of a design refers to, and what that came to, in words and numbers rather than pictures. */
@@ -135,19 +138,28 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
   };
   for (const step of document.partCuts ?? []) {
     const prefix = `cut-parts:${step.id}:`;
+    const exactTargets = resolvePartCutTargets(document, step.targets).targets.filter(target => target.copyId !== undefined);
+    const reportedParts = parts.flatMap(part => [
+      { name: part.name, shape: part },
+      ...exactTargets.flatMap(target => {
+        if (target.part.id !== part.partId) return [];
+        const index = target.part.copies!.findIndex(copy => copy.id === target.copyId);
+        return [{ name: cadCopyName(target.part, index), shape: evaluatedPartCopy(part, target.part.copies![index]!) }];
+      }),
+    ]);
     report.push({
       kind: 'partCut',
       stepId: step.id,
       tools: step.tools.map(toolName),
-      targets: step.targets.map(id => byId.get(id)?.name ?? 'a part that is gone'),
+      targets: step.targets.map(id => cadPartReferenceName(document, id) ?? 'a part that is gone'),
       clearance: round(step.clearance),
-      cuts: parts.flatMap(part =>
-        (part.cuts ?? []).flatMap(cut => {
+      cuts: reportedParts.flatMap(({ name, shape }) =>
+        (shape.cuts ?? []).flatMap(cut => {
           if (!cut.id.startsWith(prefix) || !cut.opening) return [];
           const { x0, y0, x1, y1 } = cut.opening;
           return [
             {
-              target: part.name,
+              target: name,
               tool: toolName(cut.id.slice(prefix.length)),
               side: cut.side,
               width: round(x1 - x0),

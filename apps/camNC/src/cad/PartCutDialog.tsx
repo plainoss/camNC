@@ -1,5 +1,16 @@
 import { useDesignUnits } from './designUnits';
-import { cadPartReferenceName, newCadId, updatePartCut, type CadDocument, type CadPartCut, type CadValueScope } from '@wbcnc/cad';
+import {
+  activeDesign,
+  cadPartReferenceName,
+  cadPartReferenceOwner,
+  isCadPart,
+  newCadId,
+  resolvePartCutTargets,
+  updatePartCut,
+  type CadDocument,
+  type CadPartCut,
+  type CadValueScope,
+} from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
@@ -82,11 +93,6 @@ export function PartCutDialog({
   useEffect(() => {
     if (!pick || pick.seq === seen.current) return;
     seen.current = pick.seq;
-    // Core targets name a whole source family. A copy-only target would save a
-    // reference the evaluator cannot apply, or unexpectedly cut its siblings.
-    if (active === 'targets' && !document.parts.some(part => part.id === pick.partId)) {
-      return setError('Pick the original part as a target; targets include its copies.');
-    }
     if (active === 'tools') setTools(list => toggle(list, pick.partId));
     else setTargets(list => toggle(list, pick.partId));
     setError(null);
@@ -95,9 +101,12 @@ export function PartCutDialog({
   const [featureId] = useState(() => step?.id ?? newCadId());
   const result = useMemo<{ error: string } | { change: PartCutChange }>(() => {
     if (!tools.length || !targets.length) return { error: 'Pick at least one part to cut out, and one to cut it from.' };
-    if (targets.some(id => !document.parts.some(part => part.id === id)))
-      return { error: 'Pick the original part as a target; targets include its copies.' };
-    if (tools.every(id => targets.every(target => target === id || id.startsWith(`${target}:`))))
+    // A later cut may consume this feature's target. Final visible membership must not invalidate its saved reference.
+    const selection = resolvePartCutTargets({ parts: activeDesign(document).parts.filter(isCadPart) }, targets);
+    if (selection.missing.length) return { error: 'A target copy or part is not present. Restore it or choose another target.' };
+    if (joint !== 'none' && selection.targets.some(target => target.copyId !== undefined))
+      return { error: 'Split joints on a single target copy are not supported. Choose Cut out or target the source family.' };
+    if (tools.every(id => targets.every(target => cadPartReferenceOwner(document, target)?.id === cadPartReferenceOwner(document, id)?.id)))
       return { error: 'A part can’t be cut out of itself.' };
     if (joint === 'none' && !keepTools && tools.some(id => !document.parts.some(part => part.id === id)))
       return { error: 'Using up a single copy is not supported. Keep tools to cut with a copy.' };

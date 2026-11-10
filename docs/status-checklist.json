@@ -93,14 +93,19 @@
           "evidence": ["packages/cad/src/cutParts.test.ts", "apps/camNC/src/cad/PartCutDialog.test.tsx"]
         },
         {
-          "item": "Select one physical copy as a cut tool",
+          "item": "Select one physical copy as a cut tool or target",
           "status": "partial",
           "evidence": [
             "apps/camNC/src/cad/CadEditor.partCutCopies.test.tsx",
+            "apps/camNC/src/cad/CadEditor.partCutTargets.test.tsx",
+            "packages/cad/src/partCutTargets.test.ts",
+            "packages/cad-script/src/iteration/copyTargets.test.ts",
+            "packages/cad-script/src/iteration/cabinetCopyTargetFixture.test.ts",
             "packages/cad/src/partReferences.test.ts",
-            "studio/tray/selected-copy-tool"
+            "studio/tray/selected-copy-tool",
+            "studio/cupboard/selected-copy-target"
           ],
-          "note": "Parts-list and viewport picks retain the exact copy tool, including a copy selected before Cut parts opens. A complete tray checks movement, pattern growth and reload. Copy-only targets and consuming a single copy remain unsupported and are explicitly refused."
+          "note": "Parts-list and viewport picks retain an exact copy tool or ordinary Cut out target. Complete cabinet and tray fixtures check copy-only removal, unchanged source and siblings, count edits, reload and machining groups. The complete cabinet UI scenario creates a last-shelf target through visible controls, cancels then accepts, edits stock and width, removes then restores its pattern slot and reloads while retaining saved references and rendered membership. Missing target slots are reported and retain their saved identities for restoration. Source references still target the whole family. Exact-copy target split joints and consuming a single copy remain unsupported and are explicitly refused."
         },
         {
           "item": "Overlapping parts are reported",
