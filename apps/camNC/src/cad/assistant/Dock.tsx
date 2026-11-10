@@ -9,15 +9,19 @@ import { readAssistantImage, rasterizeAssistantView } from './images';
 import { assistantQuestion, resumeAssistantMessages, runDesignAssistant } from './loop';
 import { ActivityView } from './ActivityView';
 import { checkScriptInBrowser } from './scriptCheck';
-import guide from '../../../../../packages/cad-script/README.md?raw';
+import { assistantGuide, guideSections } from './guide';
+import { summarizeAssistantReport } from './report';
+import { appendConversation, readConversation, recordAssistantEvent, subscribeConversation, writeConversation } from './conversationStore';
+import { RunSettings, type AssistantRunSettings } from './RunSettings';
+import type { AssistantRunUsage } from './runBudget';
 import cupboardExample from '../../../../../packages/cad-script/examples/cupboard.cad.ts?raw';
 import plateExample from '../../../../../packages/cad-script/examples/plate.cad.ts?raw';
 import trayExample from '../../../../../packages/cad-script/examples/tray.cad.ts?raw';
 import shelfExample from '../../../../../packages/cad-script/examples/shelf-side.cad.ts?raw';
+import pebbleExample from '../../../../../packages/cad-script/examples/pebble-tray.cad.ts?raw';
 import './dock.css';
 import type { AssistantSelection } from './selection';
 
-const conversations = new Map<string, AssistantMessage[]>();
 const starters = [
   {
     title: 'Build a cupboard',
@@ -35,7 +39,13 @@ const starters = [
     prompt: 'Review the open design and suggest improvements. Ask before making changes.',
   },
 ];
-const examples = { cupboard: cupboardExample, plate: plateExample, tray: trayExample, 'shelf-side': shelfExample };
+const examples = {
+  cupboard: cupboardExample,
+  plate: plateExample,
+  tray: trayExample,
+  'shelf-side': shelfExample,
+  'pebble-tray': pebbleExample,
+};
 
 export function AssistantDock({
   document,
@@ -52,15 +62,45 @@ export function AssistantDock({
 }) {
   const [credentials, setCredentials] = useState<AssistantCredentials | null>(() => readAssistantCredentials());
   const [settings, setSettings] = useState(!credentials);
-  const [messages, setMessages] = useState<AssistantMessage[]>(() => conversations.get(document.id) ?? []);
+  const [messages, setMessages] = useState<AssistantMessage[]>(() => readConversation(document.id));
+  const [runSettings, setRunSettings] = useState<AssistantRunSettings>({ limits: {} });
+  const [usage, setUsage] = useState<AssistantRunUsage | null>(null);
   const [text, setText] = useState('');
   const [images, setImages] = useState<AssistantImage[]>([]);
+  const [readingImage, setReadingImage] = useState(false);
   const [running, setRunning] = useState(false);
   const [activity, setActivity] = useState('');
   const [error, setError] = useState('');
   const [proposal, setProposal] = useState<CadProposal | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const activeBase = useRef<string | null>(null);
+  const stopReason = useRef('Stopped. The design is unchanged.');
+  const previousDocument = useRef(JSON.stringify(document));
   const mounted = useRef(true);
+  useEffect(
+    () =>
+      subscribeConversation(document.id, () => {
+        const next = readConversation(document.id);
+        setMessages(next);
+        if (next.at(-1)?.proposalOutcome) setProposal(null);
+      }),
+    [document.id]
+  );
+  useEffect(() => {
+    const snapshot = JSON.stringify(document);
+    if (previousDocument.current === snapshot) return;
+    previousDocument.current = snapshot;
+    if (activeBase.current && activeBase.current !== snapshot) {
+      stopReason.current = 'The design changed. Send again to work from the current design.';
+      controller.current?.abort();
+      setActivity(stopReason.current);
+    }
+    if (readConversation(document.id).length)
+      recordAssistantEvent(
+        document.id,
+        'The open design changed. Its current context supersedes earlier candidate geometry. Earlier user constraints still apply.'
+      );
+  }, [document]);
   const composer = useRef<HTMLTextAreaElement>(null);
   const attachment = useRef<HTMLInputElement>(null);
   const transcriptEnd = useRef<HTMLDivElement>(null);
@@ -79,19 +119,21 @@ export function AssistantDock({
     };
   }, []);
   const send = async (reply = text) => {
-    if (running || !credentials || (!reply.trim() && !images.length)) return;
+    if (running || readingImage || !credentials || (!reply.trim() && !images.length)) return;
     const start = structuredClone(document);
     const user: AssistantMessage = { role: 'user', text: reply.trim(), ...(images.length && { images }) };
-    const transcript = [...resumeAssistantMessages(messages), user];
+    const transcript = [...resumeAssistantMessages(readConversation(document.id)), user];
     const abort = new AbortController();
     controller.current = abort;
+    activeBase.current = JSON.stringify(start);
+    stopReason.current = 'Stopped. The design is unchanged.';
     setText('');
     setImages([]);
     setMessages(transcript);
     setRunning(true);
     setError('');
     setProposal(null);
-    conversations.set(start.id, transcript);
+    writeConversation(start.id, transcript);
     try {
       setActivity('Reading the open design…');
       const inspected = await inspectCadDocument(start);
@@ -101,42 +143,58 @@ export function AssistantDock({
         config: credentials.config,
         key: credentials.key,
         messages: transcript,
-        guide,
+        guide: assistantGuide,
+        guideSections,
         examples,
+        limits: runSettings.limits,
+        pricing: runSettings.pricing,
+        onUsage: value => {
+          if (mounted.current) setUsage(value);
+        },
         signal: abort.signal,
-        context: JSON.stringify({ selection, design: compactCadReport(inspected.document, inspected.report) }),
+        report: compactCadReport(inspected.document, inspected.report),
+        context: JSON.stringify({
+          selection,
+          design: summarizeAssistantReport(compactCadReport(inspected.document, inspected.report), {
+            partId: selection?.partId,
+            partName: selection?.name,
+          }),
+        }),
         onMessage: message => {
           if (!mounted.current) return;
           const safe = JSON.parse(redactAssistantText(JSON.stringify(message), credentials.key)) as AssistantMessage;
-          setMessages(previous => {
-            const next = [...previous, safe];
-            conversations.set(start.id, next);
-            return next;
-          });
+          appendConversation(start.id, safe);
         },
         onActivity: message => {
           if (mounted.current) setActivity(message);
         },
-        check: async (source, base, signal) => {
+        check: async (source, base, signal, options) => {
           const checked = await checkScriptInBrowser(base, source, { signal });
+          if (signal.aborted) return checked;
           const views =
-            checked.ok && credentials.config.images
+            checked.ok && credentials.config.images && options?.views
               ? await Promise.all(
                   renderCadViews(checked.document, checked.parts ?? evaluateCadDocument(checked.document).parts).map(view =>
-                    rasterizeAssistantView(view.svg, view.name)
+                    signal.aborted ? Promise.reject(new DOMException('Stopped', 'AbortError')) : rasterizeAssistantView(view.svg, view.name)
                   )
                 )
               : undefined;
-          return { ...checked, report: compactCadReport(checked.document, checked.report), images: views };
+          const detailReport = compactCadReport(checked.document, checked.report);
+          return {
+            ...checked,
+            detailReport,
+            report: summarizeAssistantReport(detailReport, { partId: selection?.partId, partName: selection?.name }),
+            images: views,
+          };
         },
       });
       if (!mounted.current) return;
-      if (result.proposal) setProposal(result.proposal);
+      if (result.proposal && !abort.signal.aborted) setProposal(result.proposal);
       setActivity(
         result.status === 'stopped'
           ? 'Stopped. The design is unchanged.'
           : result.status === 'exhausted'
-            ? `Stopped after ${result.checks} checks. No proposal was offered.`
+            ? (result.stopReason ?? `Stopped after ${result.checks} checks. No proposal was offered.`)
             : result.proposal
               ? 'Checked proposal ready to review.'
               : 'Waiting for your reply.'
@@ -145,9 +203,10 @@ export function AssistantDock({
       if (mounted.current && !abort.signal.aborted)
         setError(redactAssistantText(cause instanceof Error ? cause.message : 'The assistant could not finish.', credentials.key));
     } finally {
+      activeBase.current = null;
       if (mounted.current) {
         setRunning(false);
-        if (abort.signal.aborted) setActivity('Stopped. The design is unchanged.');
+        if (abort.signal.aborted) setActivity(stopReason.current);
       }
     }
   };
@@ -206,7 +265,7 @@ export function AssistantDock({
               .filter(message => message.role !== 'tool' && (message.text || assistantQuestion(message) || message.images?.length))
               .map((message, index) => (
                 <article key={index} className="cad-assistant-message" data-role={message.role}>
-                  <strong>{message.role === 'user' ? 'You' : 'Assistant'}</strong>
+                  <strong>{message.event ? 'Design' : message.role === 'user' ? 'You' : 'Assistant'}</strong>
                   {message.text && <p>{message.text}</p>}
                   {assistantQuestion(message) && assistantQuestion(message)?.question !== message.text && (
                     <p>{assistantQuestion(message)?.question}</p>
@@ -242,7 +301,12 @@ export function AssistantDock({
                 Preview proposal
               </button>
               {disabled && <p>Complete the current edit before reviewing this proposal.</p>}
-              <button type="button" onClick={() => setProposal(null)}>
+              <button
+                type="button"
+                onClick={() => {
+                  recordAssistantEvent(document.id, 'The user discarded the checked proposal. It was not applied.', 'discarded');
+                  setProposal(null);
+                }}>
                 Discard proposal
               </button>
             </div>
@@ -251,6 +315,7 @@ export function AssistantDock({
             {activity}
           </p>
           <ActivityView messages={messages} activity={activity} running={running} />
+          <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />
           {error && <p role="alert">{error}</p>}
           <form
             className="cad-assistant-composer"
@@ -275,7 +340,7 @@ export function AssistantDock({
                 className="cad-assistant-attach"
                 aria-label="Add reference image"
                 title={credentials?.config.images ? 'Add reference image' : 'Enable image support in Connection'}
-                disabled={running || !credentials?.config.images || images.length >= 3}
+                disabled={running || readingImage || !credentials?.config.images || images.length >= 3}
                 onClick={() => attachment.current?.click()}>
                 <span aria-hidden="true">＋</span> Attach
               </button>
@@ -287,14 +352,23 @@ export function AssistantDock({
               hidden
               aria-label="Reference image"
               accept="image/png,image/jpeg,image/webp,image/gif"
-              disabled={running || !credentials?.config.images || images.length >= 3}
+              disabled={running || readingImage || !credentials?.config.images || images.length >= 3}
               onChange={event => {
                 const file = event.target.files?.[0];
                 event.target.value = '';
-                if (file)
+                if (file) {
+                  setReadingImage(true);
                   void readAssistantImage(file)
-                    .then(image => setImages(previous => [...previous, image].slice(0, 3)))
-                    .catch(cause => setError(String(cause.message)));
+                    .then(image => {
+                      if (mounted.current) setImages(previous => [...previous, image].slice(0, 3));
+                    })
+                    .catch(cause => {
+                      if (mounted.current) setError(String(cause.message));
+                    })
+                    .finally(() => {
+                      if (mounted.current) setReadingImage(false);
+                    });
+                }
               }}
             />
             {!credentials?.config.images && <small>Enable image support in Connection to attach a reference.</small>}
@@ -317,7 +391,10 @@ export function AssistantDock({
                 Stop
               </button>
             ) : (
-              <button type="submit" className="cad-assistant-primary" disabled={!credentials || (!text.trim() && !images.length)}>
+              <button
+                type="submit"
+                className="cad-assistant-primary"
+                disabled={readingImage || !credentials || (!text.trim() && !images.length)}>
                 Send
               </button>
             )}
@@ -327,10 +404,10 @@ export function AssistantDock({
             type="button"
             disabled={running}
             onClick={() => {
-              conversations.delete(document.id);
-              setMessages([]);
+              writeConversation(document.id, []);
               setProposal(null);
               setActivity('');
+              setUsage(null);
               setText('');
               setImages([]);
               setError('');

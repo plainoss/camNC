@@ -81,6 +81,16 @@ export function ProviderSettings({
         <input type="checkbox" checked={config.images} onChange={event => setConfig({ ...config, images: event.target.checked })} />
         This model reads images
       </label>
+      {config.kind === 'anthropic' && (
+        <label className="cad-assistant-check">
+          <input
+            type="checkbox"
+            checked={config.promptCaching !== false}
+            onChange={event => setConfig({ ...config, promptCaching: event.target.checked })}
+          />
+          Reuse prompt context with Anthropic caching (cache writes are billed)
+        </label>
+      )}
       <label className="cad-assistant-check">
         <input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)} />
         Remember key on this device
