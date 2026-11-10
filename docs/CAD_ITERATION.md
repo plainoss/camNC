@@ -11,9 +11,13 @@ pnpm --silent cad:iterate
 pnpm --silent cad:iterate --list
 pnpm --silent cad:iterate --through resize-stock-and-width
 pnpm --silent cad:iterate --out /tmp/cabinet-checkpoints
+pnpm --silent cad:iterate --workflow divided-tray
+pnpm --silent cad:iterate --workflow fitted-joints
 ```
 
 The cabinet workflow exercises five source parts, a mirrored side, repeated shelves and dependent rebates. Its checkpoints change shared dimensions, grow a pattern, move the shelf stack, change clearance, suppress and restore the housings, and reload the document. Checks specify expected dimensions, world bounds, physical-piece membership and dependency behavior. The hot loop omits toolpath planning; run the affected mesh/planning tests separately when those paths change.
+
+The other two complete workflows each cover eight cumulative states with independent material volumes, connectivity, phase/clearance probes, collision pairs and exact source/copy identities. Their [contracts](../packages/cad-script/src/iteration/WOODWORKING.md) describe the full studios and the separate incomplete `tray-missing-tool` and `joint-unconstrained` diagnostics. `--list` shows all keys and incomplete checkpoints; an explicit `--workflow <key> --list` filters the catalog. The cabinet remains the default.
 
 The result stops at the first divergent checkpoint and identifies its layer: source, solver, geometry, assembly, cutting handoff or persistence. A requested prefix is explicitly labelled `scope: prefix`; passing it does not establish that the full workflow passes. Unsupported checkpoints exit 2 and remain incomplete.
 
@@ -23,6 +27,8 @@ Artifacts default to `test-results/cad-iteration/core/`:
 - `checkpoints.json`: named checkpoints, exact source hashes and physical-body identities.
 - `*.source.json`: the document after the edit and before solving.
 - `*.candidate.json`: the solver's result, explicitly candidate-derived.
+
+Other workflow keys get their own subdirectories under that default, so they cannot overwrite the cabinet artifacts. `--out` still selects an explicit directory.
 
 Reference tools must independently interpret source expressions and dependencies. Candidate-derived coordinates and placements can test later geometry stages but cannot establish independent solver or placement equivalence.
 
