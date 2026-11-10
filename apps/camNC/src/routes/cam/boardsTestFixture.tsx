@@ -7,10 +7,10 @@ import { camWorkerCache } from '@/test/camWorkerCache';
 import '@/style.css';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import type { ComponentType } from 'react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, expect, vi } from 'vitest';
 import stepUrl from '../../../../../packages/cam/test/fixtures/kinderregal-eiche.step?url';
 import { Route } from './$jobId.boards';
 
@@ -53,6 +53,9 @@ export const drawing = (board: string) => screen.getByRole('region', { name: `Bo
 export const showAll = () => fireEvent.click(screen.getByRole('button', { name: 'All boards' }));
 /** An item of the Suggest holds menu in the tools. */
 export const holdsMenu = async (name: string) => {
+  // The previous menu exits after its selection saves. Let it restore focus before opening another menu,
+  // or that late focus restoration can dismiss the new menu even though the drawing already shows the saved holds.
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull(), { timeout: 10_000 });
   fireEvent.pointerDown(await screen.findByRole('button', { name: 'Suggest holds' }, { timeout: 10_000 }), { button: 0, ctrlKey: false });
   return (await screen.findByRole('menuitem', { name })) as HTMLElement;
 };
