@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { evaluateCadDocument, type CadDocument } from '@wbcnc/cad';
-import { compactCadReport, inspectCadDocument, renderCadViews } from '@wbcnc/cad-script';
+import { compactCadReport, inspectCadDocument } from '@wbcnc/cad-script';
 import type { CadProposal } from '@wbcnc/cad-editor/proposal';
 import { readAssistantCredentials, redactAssistantText, type AssistantCredentials } from './keyStore';
 import type { AssistantImage, AssistantMessage } from './provider';
@@ -21,6 +21,9 @@ import shelfExample from '../../../../../packages/cad-script/examples/shelf-side
 import pebbleExample from '../../../../../packages/cad-script/examples/pebble-tray.cad.ts?raw';
 import './dock.css';
 import type { AssistantSelection } from './selection';
+import { Requirements } from './RequirementSettings';
+import { readRequirements, confirmRequirements, subscribeRequirements, bindProposalRequirements } from './requirementStore';
+import { renderAssistantViews } from './designViews';
 
 const starters = [
   {
@@ -72,6 +75,16 @@ export function AssistantDock({
   const [activity, setActivity] = useState('');
   const [error, setError] = useState('');
   const [proposal, setProposal] = useState<CadProposal | null>(null);
+  const [confirmed, setConfirmed] = useState(() => readRequirements(document.id));
+  useEffect(
+    () =>
+      subscribeRequirements(document.id, () => {
+        setConfirmed(readRequirements(document.id));
+        setProposal(null);
+        controller.current?.abort();
+      }),
+    [document.id]
+  );
   const controller = useRef<AbortController | null>(null);
   const activeBase = useRef<string | null>(null);
   const stopReason = useRef('Stopped. The design is unchanged.');
@@ -146,6 +159,7 @@ export function AssistantDock({
         guide: assistantGuide,
         guideSections,
         examples,
+        requirements: confirmed.requirements,
         limits: runSettings.limits,
         pricing: runSettings.pricing,
         onUsage: value => {
@@ -174,14 +188,18 @@ export function AssistantDock({
           const views =
             checked.ok && credentials.config.images && options?.views
               ? await Promise.all(
-                  renderCadViews(checked.document, checked.parts ?? evaluateCadDocument(checked.document).parts).map(view =>
-                    signal.aborted ? Promise.reject(new DOMException('Stopped', 'AbortError')) : rasterizeAssistantView(view.svg, view.name)
+                  renderAssistantViews(checked.document, checked.parts ?? evaluateCadDocument(checked.document).parts, options?.views).map(
+                    view =>
+                      signal.aborted
+                        ? Promise.reject(new DOMException('Stopped', 'AbortError'))
+                        : rasterizeAssistantView(view.svg, view.name)
                   )
                 )
               : undefined;
           const detailReport = compactCadReport(checked.document, checked.report);
           return {
             ...checked,
+            trustedReport: checked.report,
             detailReport,
             report: summarizeAssistantReport(detailReport, { partId: selection?.partId, partName: selection?.name }),
             images: views,
@@ -189,7 +207,10 @@ export function AssistantDock({
         },
       });
       if (!mounted.current) return;
-      if (result.proposal && !abort.signal.aborted) setProposal(result.proposal);
+      if (result.proposal && !abort.signal.aborted) {
+        bindProposalRequirements(result.proposal, confirmed.revision);
+        setProposal(result.proposal);
+      }
       setActivity(
         result.status === 'stopped'
           ? 'Stopped. The design is unchanged.'
@@ -316,6 +337,17 @@ export function AssistantDock({
           </p>
           <ActivityView messages={messages} activity={activity} running={running} />
           <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />
+          <Requirements
+            value={confirmed.requirements}
+            disabled={running}
+            onConfirm={value => {
+              confirmRequirements(document.id, value);
+              recordAssistantEvent(
+                document.id,
+                `Confirmed application requirements: ${JSON.stringify(value)}. These supersede earlier application requirements.`
+              );
+            }}
+          />
           {error && <p role="alert">{error}</p>}
           <form
             className="cad-assistant-composer"

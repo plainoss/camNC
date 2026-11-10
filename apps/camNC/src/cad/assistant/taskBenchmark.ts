@@ -23,7 +23,7 @@ export async function benchmarkAssistantTask(
       source: string,
       base: CadDocument,
       signal: AbortSignal,
-      options?: { views: boolean }
+      options?: { views: boolean | readonly import('@wbcnc/cad-script').CadViewName[] }
     ): Promise<CadTaskCandidate & { images?: import('./provider').AssistantImage[] }>;
     attachments?: import('./provider').AssistantImage[];
   }
@@ -45,7 +45,7 @@ export async function benchmarkAssistantTask(
     check: async (source, document, signal, viewOptions) => {
       const checked = await options.check(source, document, signal, viewOptions);
       const detailReport = compactCadReport(checked.document, checked.report);
-      return { ...checked, detailReport, report: summarizeAssistantReport(detailReport) };
+      return { ...checked, trustedReport: checked.report, detailReport, report: summarizeAssistantReport(detailReport) };
     },
   });
   const response = result.messages.at(-1)?.text ?? '';
