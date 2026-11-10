@@ -1,0 +1,95 @@
+.cad-assembly-view:has(.cad-section-view-dialog) .cad-assembly-tools {
+  left: calc(17rem + 24px);
+  right: 12px;
+  max-width: calc(100% - 17rem - 36px);
+}
+@media (max-width: 1000px) {
+  /* The inspector and wrapped view controls need distinct spaces on a narrow workspace. */
+  .cad-assembly-view:has(.cad-section-view-dialog) .cad-assembly-tools {
+    left: 12px;
+    top: auto;
+    bottom: 36px;
+    max-width: calc(100% - 24px);
+  }
+}
+.cad-section-view-dialog .cad-section-plane {
+  gap: 6px;
+}
+.cad-section-view-dialog .cad-section-plane > label {
+  color: #50739b;
+  font-size: 11px;
+}
+.cad-section-view-dialog .cad-section-plane > select {
+  width: 100%;
+  min-width: 0;
+  min-height: 26px;
+  padding: 3px 5px;
+  border: 1px solid #9cc0e8;
+  border-radius: 3px;
+  background: #fff;
+  color: #243247;
+  font: inherit;
+}
+.cad-section-view-dialog .cad-section-offset {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 9rem);
+  align-items: center;
+  gap: 8px;
+}
+.cad-section-view-dialog .cad-section-value {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.cad-editor .cad-section-view-dialog .cad-section-value input {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  box-sizing: border-box;
+  padding: 4px 27px 4px 6px;
+  border: 1px solid #9aa8b9;
+  border-radius: 3px;
+  background: #fff;
+  color: #243247;
+  font: inherit;
+}
+.cad-section-view-dialog .cad-section-value > span {
+  position: absolute;
+  right: 6px;
+  color: #62758f;
+  pointer-events: none;
+}
+.cad-editor .cad-section-view-dialog .cad-section-value input[aria-invalid='true'] {
+  border-color: #ba3529;
+}
+.cad-section-view-dialog .cad-section-problem {
+  color: #a32920;
+}
+.cad-section-view-dialog .cad-section-actions {
+  display: flex;
+  gap: 6px;
+}
+.cad-editor .cad-section-view-dialog .cad-section-actions button,
+.cad-editor .cad-section-view-dialog .cad-section-off {
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 1px solid #b9c4cd;
+  border-radius: 3px;
+  background: #fff;
+  color: #243247;
+  font: inherit;
+}
+.cad-editor .cad-section-view-dialog .cad-section-actions button[aria-pressed='true'] {
+  border-color: #2762a8;
+  background: #e9f2ff;
+  color: #174f8f;
+}
+.cad-editor .cad-section-view-dialog .cad-section-actions button:disabled {
+  color: #8290a1;
+  cursor: default;
+}
+.cad-section-view-dialog :is(button, input, select):focus-visible {
+  outline: 2px solid #2762a8;
+  outline-offset: 2px;
+}
