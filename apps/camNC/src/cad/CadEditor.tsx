@@ -29,6 +29,7 @@ import {
   dimensionValueError,
   entityPointIds as curvePointIds,
   filletLineCorners,
+  replaceFilletedSketch,
   chamferLineCorners,
   splitSketchCurve,
   transformSketchEntities,
@@ -915,7 +916,6 @@ export function CadEditor({
       previous.phase === 'idle' ? previous : transitionDimensionWorkflow(sketch, previous, { type: 'refresh' }).state
     );
   }, [sketch]);
-
   const publish = (next: CadDocument) => {
     setCancelledSketch(null);
     setFinishError(null);
@@ -1833,7 +1833,7 @@ export function CadEditor({
             constraints: filletPreview.sketch.constraints.map(c => (c.id === radiusId ? { ...c, expression: parsed.expression } : c)),
           }
         : filletPreview.sketch;
-    changeSketch(next);
+    commit(replaceFilletedSketch(documentRef.current, next, filletPreview.arcIds));
     chooseTool('select');
     setSelected([]);
     setSelectedConstraints([radiusId]);
