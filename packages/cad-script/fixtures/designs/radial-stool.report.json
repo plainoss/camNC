@@ -1,0 +1,1037 @@
+{
+ "design": {
+  "name": "Radial stool",
+  "revision": 1,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "stool:variable:board",
+   "kind": "variable",
+   "label": "#board",
+   "settings": {
+    "expression": "18mm"
+   },
+   "result": {
+    "value": 18,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "stool:variable:radius",
+   "kind": "variable",
+   "label": "#radius",
+   "settings": {
+    "expression": "150mm"
+   },
+   "result": {
+    "value": 150,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "stool:variable:legs",
+   "kind": "variable",
+   "label": "#legs",
+   "settings": {
+    "expression": "4"
+   },
+   "result": {
+    "value": 4,
+    "kind": "number"
+   }
+  },
+  {
+   "id": "stool:variable:height",
+   "kind": "variable",
+   "label": "#height",
+   "settings": {
+    "expression": "400mm"
+   },
+   "result": {
+    "value": 400,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "stool:seat:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Seat",
+   "part": "Seat",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Seat / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "stool:seat:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Seat",
+   "part": "Seat",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 400,
+      "expression": "height"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      -230,
+      -230
+     ],
+     "size": [
+      460,
+      460
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "stool:leg:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Leg",
+   "part": "Leg",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Leg / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "stool:leg:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Leg",
+   "part": "Leg",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      -30,
+      0
+     ],
+     "size": [
+      60,
+      400
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "stool:leg:move",
+   "kind": "move",
+   "label": "Transform · Leg",
+   "part": "Leg",
+   "settings": {
+    "by": [
+     150,
+     9,
+     0
+    ],
+    "byExpressions": [
+     "radius",
+     "board/2",
+     null
+    ]
+   },
+   "result": {
+    "placement": {
+     "position": [
+      150,
+      9,
+      0
+     ],
+     "rotation": [
+      0.707,
+      0,
+      0,
+      0.707
+     ]
+    }
+   }
+  },
+  {
+   "id": "stool:leg:pattern",
+   "kind": "pattern",
+   "label": "Circular pattern · Leg × 4",
+   "part": "Leg",
+   "settings": {
+    "count": {
+     "value": 4,
+     "expression": "legs"
+    },
+    "circular": {
+     "origin": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      0,
+      1
+     ],
+     "angle": {
+      "value": 360
+     },
+     "equalSpacing": true,
+     "opposite": false
+    }
+   },
+   "result": {
+    "copies": [
+     {
+      "name": "Leg 2",
+      "position": [
+       -9,
+       150,
+       0
+      ]
+     },
+     {
+      "name": "Leg 3",
+      "position": [
+       -150,
+       -9,
+       0
+      ]
+     },
+     {
+      "name": "Leg 4",
+      "position": [
+       9,
+       -150,
+       0
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Seat",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {},
+   "entities": [
+    {
+     "ref": "stool:seat:l0",
+     "type": "line",
+     "a": [
+      230,
+      0
+     ],
+     "b": [
+      199.186,
+      115
+     ],
+     "ends": [
+      "stool:seat:p0",
+      "stool:seat:p1"
+     ]
+    },
+    {
+     "ref": "stool:seat:l1",
+     "type": "line",
+     "a": [
+      199.186,
+      115
+     ],
+     "b": [
+      115,
+      199.186
+     ],
+     "ends": [
+      "stool:seat:p1",
+      "stool:seat:p2"
+     ]
+    },
+    {
+     "ref": "stool:seat:l2",
+     "type": "line",
+     "a": [
+      115,
+      199.186
+     ],
+     "b": [
+      0,
+      230
+     ],
+     "ends": [
+      "stool:seat:p2",
+      "stool:seat:p3"
+     ]
+    },
+    {
+     "ref": "stool:seat:l3",
+     "type": "line",
+     "a": [
+      0,
+      230
+     ],
+     "b": [
+      -115,
+      199.186
+     ],
+     "ends": [
+      "stool:seat:p3",
+      "stool:seat:p4"
+     ]
+    },
+    {
+     "ref": "stool:seat:l4",
+     "type": "line",
+     "a": [
+      -115,
+      199.186
+     ],
+     "b": [
+      -199.186,
+      115
+     ],
+     "ends": [
+      "stool:seat:p4",
+      "stool:seat:p5"
+     ]
+    },
+    {
+     "ref": "stool:seat:l5",
+     "type": "line",
+     "a": [
+      -199.186,
+      115
+     ],
+     "b": [
+      -230,
+      0
+     ],
+     "ends": [
+      "stool:seat:p5",
+      "stool:seat:p6"
+     ]
+    },
+    {
+     "ref": "stool:seat:l6",
+     "type": "line",
+     "a": [
+      -230,
+      0
+     ],
+     "b": [
+      -199.186,
+      -115
+     ],
+     "ends": [
+      "stool:seat:p6",
+      "stool:seat:p7"
+     ]
+    },
+    {
+     "ref": "stool:seat:l7",
+     "type": "line",
+     "a": [
+      -199.186,
+      -115
+     ],
+     "b": [
+      -115,
+      -199.186
+     ],
+     "ends": [
+      "stool:seat:p7",
+      "stool:seat:p8"
+     ]
+    },
+    {
+     "ref": "stool:seat:l8",
+     "type": "line",
+     "a": [
+      -115,
+      -199.186
+     ],
+     "b": [
+      0,
+      -230
+     ],
+     "ends": [
+      "stool:seat:p8",
+      "stool:seat:p9"
+     ]
+    },
+    {
+     "ref": "stool:seat:l9",
+     "type": "line",
+     "a": [
+      0,
+      -230
+     ],
+     "b": [
+      115,
+      -199.186
+     ],
+     "ends": [
+      "stool:seat:p9",
+      "stool:seat:p10"
+     ]
+    },
+    {
+     "ref": "stool:seat:l10",
+     "type": "line",
+     "a": [
+      115,
+      -199.186
+     ],
+     "b": [
+      199.186,
+      -115
+     ],
+     "ends": [
+      "stool:seat:p10",
+      "stool:seat:p11"
+     ]
+    },
+    {
+     "ref": "stool:seat:l11",
+     "type": "line",
+     "a": [
+      199.186,
+      -115
+     ],
+     "b": [
+      230,
+      0
+     ],
+     "ends": [
+      "stool:seat:p11",
+      "stool:seat:p0"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -230,
+      -230
+     ],
+     "size": [
+      460,
+      460
+     ],
+     "area": 158700,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Leg",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "positionX": 4,
+    "positionY": 4
+   },
+   "entities": [
+    {
+     "ref": "stool:leg:l0",
+     "type": "line",
+     "a": [
+      -30,
+      0
+     ],
+     "b": [
+      30,
+      0
+     ],
+     "ends": [
+      "stool:leg:p0",
+      "stool:leg:p1"
+     ]
+    },
+    {
+     "ref": "stool:leg:l1",
+     "type": "line",
+     "a": [
+      30,
+      0
+     ],
+     "b": [
+      30,
+      400
+     ],
+     "ends": [
+      "stool:leg:p1",
+      "stool:leg:p2"
+     ]
+    },
+    {
+     "ref": "stool:leg:l2",
+     "type": "line",
+     "a": [
+      30,
+      400
+     ],
+     "b": [
+      -30,
+      400
+     ],
+     "ends": [
+      "stool:leg:p2",
+      "stool:leg:p3"
+     ]
+    },
+    {
+     "ref": "stool:leg:l3",
+     "type": "line",
+     "a": [
+      -30,
+      400
+     ],
+     "b": [
+      -30,
+      0
+     ],
+     "ends": [
+      "stool:leg:p3",
+      "stool:leg:p0"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -30,
+      0
+     ],
+     "size": [
+      60,
+      400
+     ],
+     "area": 24000,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Seat",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     -230,
+     -230
+    ],
+    "size": [
+     460,
+     460
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 11.4,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      418
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l0",
+     "looks": "(0.966, 0.259, 0)",
+     "origin": [
+      230,
+      0,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l1",
+     "looks": "(0.707, 0.707, 0)",
+     "origin": [
+      199.186,
+      115,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l2",
+     "looks": "(0.259, 0.966, 0)",
+     "origin": [
+      115,
+      199.186,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l3",
+     "looks": "(-0.259, 0.966, 0)",
+     "origin": [
+      0,
+      230,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l4",
+     "looks": "(-0.707, 0.707, 0)",
+     "origin": [
+      -115,
+      199.186,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l5",
+     "looks": "(-0.966, 0.259, 0)",
+     "origin": [
+      -199.186,
+      115,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l6",
+     "looks": "(-0.966, -0.259, 0)",
+     "origin": [
+      -230,
+      0,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l7",
+     "looks": "(-0.707, -0.707, 0)",
+     "origin": [
+      -199.186,
+      -115,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l8",
+     "looks": "(-0.259, -0.966, 0)",
+     "origin": [
+      -115,
+      -199.186,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l9",
+     "looks": "(0.259, -0.966, 0)",
+     "origin": [
+      0,
+      -230,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l10",
+     "looks": "(0.707, -0.707, 0)",
+     "origin": [
+      115,
+      -199.186,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:seat:l11",
+     "looks": "(0.966, -0.259, 0)",
+     "origin": [
+      199.186,
+      -115,
+      400
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Leg",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     -30,
+     0
+    ],
+    "size": [
+     60,
+     400
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "pieces": {
+    "names": [
+     "Leg",
+     "Leg 2",
+     "Leg 3",
+     "Leg 4"
+    ],
+    "mirrored": []
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 7.7,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      150,
+      -9,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      150,
+      9,
+      0
+     ]
+    },
+    {
+     "face": "edge stool:leg:l0",
+     "looks": "-z",
+     "origin": [
+      120,
+      9,
+      0
+     ]
+    },
+    {
+     "face": "edge stool:leg:l1",
+     "looks": "+x",
+     "origin": [
+      180,
+      9,
+      0
+     ]
+    },
+    {
+     "face": "edge stool:leg:l2",
+     "looks": "+z",
+     "origin": [
+      180,
+      9,
+      400
+     ]
+    },
+    {
+     "face": "edge stool:leg:l3",
+     "looks": "-x",
+     "origin": [
+      120,
+      9,
+      400
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Seat",
+    "at": [
+     -230,
+     -230,
+     400
+    ],
+    "size": [
+     460,
+     460,
+     18
+    ]
+   },
+   {
+    "name": "Leg",
+    "at": [
+     120,
+     -9,
+     0
+    ],
+    "size": [
+     60,
+     18,
+     400
+    ]
+   },
+   {
+    "name": "Leg 2",
+    "at": [
+     -9,
+     120,
+     0
+    ],
+    "size": [
+     18,
+     60,
+     400
+    ]
+   },
+   {
+    "name": "Leg 3",
+    "at": [
+     -180,
+     -9,
+     0
+    ],
+    "size": [
+     60,
+     18,
+     400
+    ]
+   },
+   {
+    "name": "Leg 4",
+    "at": [
+     -9,
+     -180,
+     0
+    ],
+    "size": [
+     18,
+     60,
+     400
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    753.4,
+    473.4
+   ],
+   "yield": 0.862,
+   "parts": [
+    {
+     "name": "Seat",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      460,
+      460
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Leg",
+     "at": [
+      476.7,
+      6.7
+     ],
+     "size": [
+      60,
+      400
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Leg 2",
+     "at": [
+      546.7,
+      6.7
+     ],
+     "size": [
+      60,
+      400
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Leg 3",
+     "at": [
+      616.7,
+      6.7
+     ],
+     "size": [
+      60,
+      400
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Leg 4",
+     "at": [
+      686.7,
+      6.7
+     ],
+     "size": [
+      60,
+      400
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Seat",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Leg",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Leg 2",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Leg 3",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Leg 4",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 42.2,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}

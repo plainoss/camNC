@@ -1,0 +1,32 @@
+.cad-editor .cad-circular-part-pattern > .cad-feature-selection {
+  display: grid;
+  gap: 2px;
+  min-height: 24px;
+  padding: 5px 7px;
+  border: 1px solid #9cc0e8;
+  border-radius: 3px;
+  background: #eef5fd;
+  text-align: left;
+}
+
+.cad-editor .cad-circular-part-pattern > .cad-feature-selection[data-active] {
+  border-color: #2f80ed;
+}
+
+.cad-circular-part-pattern .cad-circular-pattern-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.cad-editor .cad-circular-part-pattern .cad-circular-pattern-option input {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  min-height: 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: #2762a8;
+}

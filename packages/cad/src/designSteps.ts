@@ -219,8 +219,12 @@ function listedSteps(document: CadDocument): DesignStep[] {
       steps.push({
         id: part.pattern.id,
         kind: 'pattern',
-        label: `Pattern · ${part.name} × ${part.pattern.count} along ${part.pattern.axis}`,
-        detail: `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing)}`,
+        label: part.pattern.circular
+          ? `Circular pattern · ${part.name} × ${part.pattern.count}`
+          : `Pattern · ${part.name} × ${part.pattern.count} along ${part.pattern.axis}`,
+        detail: part.pattern.circular
+          ? `angle ${part.pattern.circular.angleExpression ? `${part.pattern.circular.angleExpression} = ` : ''}${+part.pattern.circular.angle.toFixed(3)}°`
+          : `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing)}`,
         partId: part.id,
         suppressed: !!part.pattern.suppressed,
       });
