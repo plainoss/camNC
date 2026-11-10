@@ -1,3 +1,4 @@
+import { setImmediate } from 'node:timers/promises';
 import { expect, it } from 'vitest';
 import { machiningPart, rectangle } from '../test/machining-fixtures';
 import { geometryTolerances, planAccuracy } from './accuracy';
@@ -63,48 +64,65 @@ it('proves the existing tight-tolerance small-island layout without inventing bo
   expect({ region, rings }).toEqual(before);
 });
 
-it.each([0.007, 0.01, 0.05])('keeps actual posted coverage and retained islands within a %s mm total budget', geometryTolerance => {
+const coverageCases = [0.007, 0.01, 0.05].flatMap(geometryTolerance => {
   const budget = planAccuracy(geometryTolerance).budget;
   // Leave only 0.0014 mm for offset/smoothing/fitting in the declared-source variants: a valid near-minimum allocation.
   const declared = geometryTolerance - budget.outputRounding - budget.controllerRounding - budget.polygonRounding - 0.0014;
-  for (const diameter of [3.175, 6])
-    for (const sourceTolerance of [0, declared]) {
-      const features = machiningPart([[rectangle(20, 20, 70, 50), rectangle(44.7, 34.7, 45.3, 35.3).reverse()]], 10.5);
-      const before = structuredClone(features);
-      const plan = camPart(features, {
-        cutThrough: false,
-        geometryTolerance,
-        sourceTolerance,
-        maxStepdown: 1.5,
-        tools: [{ number: 1, diameter }],
-      });
-      expect(features).toEqual(before);
-      const radius = diameter / 2;
-      for (const arcs of [false, true]) {
-        const distance = postedFloorDistance(toGcode(plan, { arcs }), 10.5);
-        for (const [x, y] of [
-          [25, 25],
-          [65, 25],
-          [25, 45],
-          [65, 45],
-          [45 - radius - 1, 35],
-          [45 + radius + 1, 35],
-          [45, 35 - radius - 1],
-          [45, 35 + radius + 1],
-        ])
-          expect(distance(x!, y!), `floor at ${x},${y}; D${diameter}; source ${sourceTolerance}; arcs ${arcs}`).toBeLessThanOrEqual(
-            radius + geometryTolerance
-          );
-        expect(distance(45, 35)).toBeGreaterThanOrEqual(radius + 0.2);
-      }
-      const settings = { ...DEFAULT_SETTINGS, geometryTolerance, sourceTolerance };
-      const region = openPocketRegion(
-        features.outlines,
-        features.pockets[0]!,
-        radius + 1,
-        geometryTolerances(geometryTolerance, sourceTolerance)
-      );
-      const wallOnly = createPocketRings(region, radius, 0, settings, 100);
-      expect(pocketRingsCoverFloor(region, wallOnly.slice(0, 1), diameter, settings, features.outlines)).toBe(false);
-    }
+  return [3.175, 6].flatMap(diameter =>
+    [0, declared].map(sourceTolerance => ({
+      geometryTolerance,
+      diameter,
+      sourceTolerance,
+      source: sourceTolerance === 0 ? 'zero' : 'near-minimum',
+    }))
+  );
 });
+
+// Keep each geometry/source variant a separate test so the per-test event-loop
+// yield can drain Vitest's worker RPC before another expensive synchronous case.
+it.each(coverageCases)(
+  'keeps actual posted coverage and retained islands within $geometryTolerance mm (D$diameter, $source source uncertainty)',
+  async ({ geometryTolerance, diameter, sourceTolerance }) => {
+    const features = machiningPart([[rectangle(20, 20, 70, 50), rectangle(44.7, 34.7, 45.3, 35.3).reverse()]], 10.5);
+    const before = structuredClone(features);
+    const plan = camPart(features, {
+      cutThrough: false,
+      geometryTolerance,
+      sourceTolerance,
+      maxStepdown: 1.5,
+      tools: [{ number: 1, diameter }],
+    });
+    expect(features).toEqual(before);
+    const radius = diameter / 2;
+    for (const arcs of [false, true]) {
+      const distance = postedFloorDistance(toGcode(plan, { arcs }), 10.5);
+      for (const [x, y] of [
+        [25, 25],
+        [65, 25],
+        [25, 45],
+        [65, 45],
+        [45 - radius - 1, 35],
+        [45 + radius + 1, 35],
+        [45, 35 - radius - 1],
+        [45, 35 + radius + 1],
+      ])
+        expect(distance(x!, y!), `floor at ${x},${y}; D${diameter}; source ${sourceTolerance}; arcs ${arcs}`).toBeLessThanOrEqual(
+          radius + geometryTolerance
+        );
+      expect(distance(45, 35)).toBeGreaterThanOrEqual(radius + 0.2);
+    }
+    // Planning/posting and the independent missing-ring proof can each take
+    // tens of seconds. Let pending worker-report acknowledgements run between
+    // those blocks instead of starving Vitest's separate 60 s RPC deadline.
+    await setImmediate();
+    const settings = { ...DEFAULT_SETTINGS, geometryTolerance, sourceTolerance };
+    const region = openPocketRegion(
+      features.outlines,
+      features.pockets[0]!,
+      radius + 1,
+      geometryTolerances(geometryTolerance, sourceTolerance)
+    );
+    const wallOnly = createPocketRings(region, radius, 0, settings, 100);
+    expect(pocketRingsCoverFloor(region, wallOnly.slice(0, 1), diameter, settings, features.outlines)).toBe(false);
+  }
+);
