@@ -55,7 +55,17 @@ export function evaluateCopyOperations(source: CadDocument, initial: EvaluatedCa
       diagnostics: [{ code: 'copy-operation-prefix-missing', severity: 'error', message: 'This operation is not in the source order.' }],
     };
   const consume = (ids: string[]) => {
-    for (const id of ids.filter(id => !id.includes(':')))
+    const families = new Set(ids.filter(id => !id.includes(':')));
+    // Add generators remain editable source rows, but their material cannot survive its consumed host.
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const part of source.parts)
+        if (part.addTo && families.has(part.addTo) && !families.has(part.id)) {
+          families.add(part.id);
+          changed = true;
+        }
+    }
+    for (const id of families)
       for (const reference of available) if (reference === id || reference.startsWith(`${id}:`)) available.delete(reference);
   };
   const legacy = (source.legacyPartCutIds ?? []).slice(0, end);
