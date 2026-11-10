@@ -16,45 +16,48 @@ afterEach(() => {
   sessions.splice(0).forEach(endCadSession);
 });
 
-it('keeps the same screen positions through opening, drawing in and closing an oblique front-plane sketch', async () => {
-  const source = createPlateDocument({ width: 57, height: 78, thickness: 25 });
-  source.parts[0]!.drawnOn = { on: { plane: 'front' }, offset: 0 };
-  sessions.push(source.id);
-  render(
-    <div style={{ height: 700, display: 'flex' }}>
-      <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={() => {}} onCancel={() => {}} />
-    </div>
-  );
-  let state: StudioCameraRef | undefined;
-  await waitFor(
-    () => {
-      state = vi.mocked(ModelViewport).mock.calls.findLast(([props]) => props.cameraState)?.[0].cameraState;
-      expect(state?.current?.height).toBeGreaterThan(0);
-    },
-    { timeout: 20000 }
-  );
-  const marker = () => {
-    const box = screen.getByTestId('model-origin').getBoundingClientRect();
-    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-  };
-  const before = marker();
-  const saved = structuredClone(state!.current!);
-  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Sketch ·/ }));
-  const drawing = await screen.findByTestId('cad-drawing');
-  await waitFor(() => {
-    const point = new DOMPoint(0, 0).matrixTransform((drawing as unknown as SVGGraphicsElement).getScreenCTM()!);
-    expect(point.x).toBeCloseTo(before.x, 0);
-    expect(point.y).toBeCloseTo(before.y, 0);
-  });
-  expect(screen.getByTestId('cad-canvas').hasAttribute('data-sketch-turned')).toBe(true);
-  await userEvent.click(screen.getByRole('button', { name: '✓ Finish sketch' }));
-  await waitFor(() => {
-    expect(marker().x).toBeCloseTo(before.x, 0);
-    expect(marker().y).toBeCloseTo(before.y, 0);
-    expect(state!.current!.height).toBeCloseTo(saved.height, 6);
-    state!.current!.back.forEach((value, axis) => expect(value).toBeCloseTo(saved.back[axis]!, 10));
-  });
-});
+it.each([1200, 375, 320])(
+  'keeps the same screen positions through opening, drawing in and closing an oblique front-plane sketch at %dpx',
+  async width => {
+    const source = createPlateDocument({ width: 57, height: 78, thickness: 25 });
+    source.parts[0]!.drawnOn = { on: { plane: 'front' }, offset: 0 };
+    sessions.push(source.id);
+    render(
+      <div style={{ width, height: 700, display: 'flex' }}>
+        <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={() => {}} onCancel={() => {}} />
+      </div>
+    );
+    let state: StudioCameraRef | undefined;
+    await waitFor(
+      () => {
+        state = vi.mocked(ModelViewport).mock.calls.findLast(([props]) => props.cameraState)?.[0].cameraState;
+        expect(state?.current?.height).toBeGreaterThan(0);
+      },
+      { timeout: 20000 }
+    );
+    const marker = () => {
+      const box = screen.getByTestId('model-origin').getBoundingClientRect();
+      return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    };
+    const before = marker();
+    const saved = structuredClone(state!.current!);
+    await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Sketch ·/ }));
+    const drawing = await screen.findByTestId('cad-drawing');
+    await waitFor(() => {
+      const point = new DOMPoint(0, 0).matrixTransform((drawing as unknown as SVGGraphicsElement).getScreenCTM()!);
+      expect(point.x).toBeCloseTo(before.x, 0);
+      expect(point.y).toBeCloseTo(before.y, 0);
+    });
+    expect(screen.getByTestId('cad-canvas').hasAttribute('data-sketch-turned')).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: '✓ Finish sketch' }));
+    await waitFor(() => {
+      expect(marker().x).toBeCloseTo(before.x, 0);
+      expect(marker().y).toBeCloseTo(before.y, 0);
+      expect(state!.current!.height).toBeCloseTo(saved.height, 6);
+      state!.current!.back.forEach((value, axis) => expect(value).toBeCloseTo(saved.back[axis]!, 10));
+    });
+  }
+);
 
 it('shows the parts built before a sketch behind it, without changing view, looking normal only when asked and turning by a right drag, and none of its own', async () => {
   const side = { ...createPlateDocument({ width: 130, height: 500, thickness: 20 }).parts[0]!, name: 'Side' };

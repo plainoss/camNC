@@ -3,6 +3,7 @@ import {
   evaluateCadPart,
   evaluateCadFeatures,
   faceIsUnderside,
+  featuresForCopy,
   resolveDrawnPlacements,
   effectivePlacement,
   cadDrawnOnSupports,
@@ -20,6 +21,7 @@ export interface PartViewSnapshot {
 export interface FaceSketchScene extends PartViewSnapshot {
   document: CadDocument;
   partId: string;
+  copyId?: string;
   frame: Exclude<ReturnType<typeof cadFaceFrame>, { error: string }>;
 }
 
@@ -45,7 +47,8 @@ export function faceSketchScene(
   document: CadDocument,
   partId: string,
   face: CadFaceRef,
-  view: PartViewSnapshot
+  view: PartViewSnapshot,
+  copyId?: string
 ): FaceSketchScene | undefined {
   const part = document.parts.find(part => part.id === partId);
   if (!part) return;
@@ -55,11 +58,19 @@ export function faceSketchScene(
   if ('error' in frame) return;
   if (typeof face === 'object') {
     const profile = evaluateCadPart(part).part;
-    const floor = profile && evaluateCadFeatures(part, profile).part.cuts?.find(cut => cut.id === face.floorOf);
+    const source = part.features?.find(feature => feature.type === 'cut' && feature.id === face.floorOf);
+    // A copy can override the family's parent cut while a child sketch keeps its saved family floor reference.
+    const projected =
+      source?.type === 'cut' &&
+      featuresForCopy(part, copyId).find(
+        feature => feature.type === 'cut' && feature.sketchId === source.sketchId && feature.regionId === source.regionId
+      );
+    const floorId = projected ? projected.id : face.floorOf;
+    const floor = profile && evaluateCadFeatures(part, profile, copyId).part.cuts?.find(cut => cut.id === floorId);
     if (!floor || floor.through) return;
     frame.origin = frame.origin.map((value, axis) => value - frame.normal[axis]! * floor.to) as [number, number, number];
   }
-  return { ...view, document, partId, frame };
+  return { ...view, document, partId, ...(copyId && { copyId }), frame };
 }
 
 export function initialFaceSketchView(scene?: FaceSketchScene) {

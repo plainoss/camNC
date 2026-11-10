@@ -3,6 +3,7 @@ import { cadFaceSketches, faceIsUnderside } from './featureModel';
 import { cadCopyName } from './partPatterns';
 import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import type { CadDocument, CadPart } from './types';
+import { trimCadFolders } from './folderModel';
 
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
@@ -51,13 +52,14 @@ function extrudeDetail(document: CadDocument, part: CadPart) {
 export function designSteps(document: CadDocument): DesignStep[] {
   const broken = brokenParts(document);
   const byId = new Map(document.parts.map(part => [part.id, part]));
+  const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
   return listedSteps(document).map(step => {
     const own = broken.get(step.partId);
     const part = byId.get(step.partId);
     // A sketch or cut on a part's own face needs that part to be there.
     const onFace =
       (step.kind === 'faceSketch' || step.kind === 'cut') && part
-        ? part.suppressed
+        ? part.suppressed || masked.has(part.id)
           ? `It’s on ${part.name}, which is suppressed.`
           : own && `It’s on ${part.name}, which can’t be built.`
         : null;
@@ -72,11 +74,12 @@ export function designSteps(document: CadDocument): DesignStep[] {
  */
 export function brokenParts(document: CadDocument): Map<string, string> {
   const byId = new Map(document.parts.map(part => [part.id, part]));
+  const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
   const broken = new Map<string, string>();
   const missing = (id: string): string | null => {
     const host = byId.get(id);
     if (!host) return 'a deleted part';
-    if (host.suppressed) return `${host.name}, which is suppressed`;
+    if (host.suppressed || masked.has(host.id)) return `${host.name}, which is suppressed`;
     if (host.extrude === false) return `${host.name}, which isn’t extruded`;
     if (broken.has(id)) return `${host.name}, which can’t be built`;
     return null;
@@ -170,6 +173,15 @@ function listedSteps(document: CadDocument): DesignStep[] {
         : []),
     ];
     let cut = 0;
+    const featureName = (copyId?: string) => {
+      if (!copyId) return part.name;
+      const index = part.copies?.findIndex(copy => copy.id === copyId) ?? -1;
+      return index >= 0 ? cadCopyName(part, index) : `${part.name} · absent copy`;
+    };
+    const absent = (copyId?: string) =>
+      copyId && !part.copies?.some(copy => copy.id === copyId)
+        ? 'This copy is absent. Restore its pattern count to build these features.'
+        : undefined;
     for (const feature of part.features ?? []) {
       // What an Extrude → Remove cuts is that step's, listed where it is.
       if (feature.removedBy) continue;
@@ -177,21 +189,25 @@ function listedSteps(document: CadDocument): DesignStep[] {
         steps.push({
           id: feature.id,
           kind: 'faceSketch',
-          label: `Sketch on ${faceName(part, feature.on)} · ${part.name}`,
+          label: `Sketch on ${faceName(part, feature.on)} · ${featureName(feature.copyId)}`,
           partId: part.id,
           sketchId: feature.sketch.id,
+          ...(feature.copyId && { copyId: feature.copyId }),
+          broken: absent(feature.copyId),
         });
       else {
         cut++;
         steps.push({
           id: feature.id,
           kind: 'cut',
-          label: `Cut ${cut} · ${part.name}`,
+          label: `Cut ${cut} · ${featureName(feature.copyId)}`,
           detail: feature.suppressed ? 'off' : feature.depth === 'through' ? 'through' : typed(feature.depthExpression, feature.depth),
           partId: part.id,
           suppressed: !!feature.suppressed,
           cutId: feature.id,
           sketchId: feature.sketchId,
+          ...(feature.copyId && { copyId: feature.copyId }),
+          broken: absent(feature.copyId),
         });
       }
     }
@@ -265,5 +281,5 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
   if (partCuts.length) next.partCuts = partCuts;
   else delete next.partCuts;
   // Add and Remove steps kept still add and cut; shared sketches go to the first part left that uses them.
-  return resolveExtrudeSteps(next);
+  return resolveExtrudeSteps(trimCadFolders(next));
 }

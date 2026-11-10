@@ -34,7 +34,7 @@ export function sketchTargets(part: CadPart): CadPart[] {
 export function validateCadFeatures(part: CadPart): CadDiagnostic[] {
   const diagnostics: CadDiagnostic[] = [];
   const error = (code: string, message: string) => diagnostics.push({ code, message, severity: 'error', partId: part.id });
-  const sketchIds = new Set([part.sketch.id]),
+  const sketchIds = new Map<string, string | undefined>([[part.sketch.id, undefined]]),
     seenCuts = new Set<string>(),
     regions = new Set<string>();
   for (const feature of part.features ?? []) {
@@ -46,13 +46,17 @@ export function validateCadFeatures(part: CadPart): CadDiagnostic[] {
         part.features!.some(f => f.id === (feature.on as { floorOf: string }).floorOf)
       )
         error('invalid-face', 'A sketch can only sit on the floor of an earlier cut.');
-      sketchIds.add(feature.sketch.id);
+      sketchIds.set(feature.sketch.id, feature.copyId);
       continue;
     }
-    if (!sketchIds.has(feature.sketchId)) error('invalid-cut', 'A cut needs an earlier sketch on the same part.');
+    if (
+      !sketchIds.has(feature.sketchId) ||
+      (sketchIds.get(feature.sketchId) !== undefined && sketchIds.get(feature.sketchId) !== feature.copyId)
+    )
+      error('invalid-cut', 'A cut needs an earlier sketch on the same part or copy.');
     if (feature.depth !== 'through' && (!Number.isFinite(feature.depth) || feature.depth < 0))
       error('invalid-depth', 'A cut depth must be zero or more, or through.');
-    const region = `${feature.sketchId}\n${feature.regionId}`;
+    const region = `${feature.copyId ?? ''}\n${feature.sketchId}\n${feature.regionId}`;
     if (regions.has(region)) error('duplicate-cut', 'A sketch region can only have one cut.');
     regions.add(region);
     seenCuts.add(feature.id);

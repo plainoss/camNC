@@ -1,4 +1,4 @@
-import type { CadDocument, CadPart } from '@wbcnc/cad';
+import { cadFolderForPart, cadFolderIssue, type CadDocument, type CadPart } from '@wbcnc/cad';
 import type { DesignStep } from '@wbcnc/cad';
 
 /** The parts a part is built on: drawn on, sketched from, added to or cut into. They come before it. */
@@ -23,6 +23,11 @@ export function reorderedSteps(
   const name = (id: string) => document.parts.find(part => part.id === id)?.name ?? 'a part';
   if (partLevel(dragged) && partLevel(target)) {
     if (dragged.partId === target.partId) return { document };
+    const sourceFolder = cadFolderForPart(document, dragged.partId);
+    const targetFolder = cadFolderForPart(document, target.partId);
+    // Moving one member out, or inserting into the middle, would split a saved contiguous group.
+    if (sourceFolder?.id !== targetFolder?.id && (sourceFolder || (targetFolder?.partIds[0] !== target.partId && targetFolder)))
+      return { error: 'Move the folder as a group, or unpack it before moving its parts.' };
     const moving = document.parts.find(part => part.id === dragged.partId)!;
     const rest = document.parts.filter(part => part.id !== moving.id);
     const at = rest.findIndex(part => part.id === target.partId);
@@ -32,7 +37,19 @@ export function reorderedSteps(
       for (const base of builtOn(part))
         if ((index.get(base) ?? -1) > index.get(part.id)!)
           return { error: `${part.name} is built on ${name(base)}, so it comes after it.` };
-    return { document: { ...document, revision: document.revision + 1, parts } };
+    const next = {
+      ...document,
+      revision: document.revision + 1,
+      parts,
+      ...(document.folders && {
+        folders: document.folders.map(folder => ({
+          ...folder,
+          partIds: parts.filter(part => folder.partIds.includes(part.id)).map(part => part.id),
+        })),
+      }),
+    };
+    const issue = cadFolderIssue(next);
+    return issue ? { error: issue } : { document: next };
   }
   const featureLevel = (step: DesignStep) => step.kind === 'faceSketch' || step.kind === 'cut';
   if (featureLevel(dragged) && featureLevel(target) && dragged.partId === target.partId) {

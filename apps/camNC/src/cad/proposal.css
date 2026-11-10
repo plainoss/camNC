@@ -1,0 +1,32 @@
+.cad-proposal-review {
+  width: min(1200px, 96vw);
+  height: min(850px, 92dvh);
+  max-height: 92dvh;
+  padding: 0;
+  border: 1px solid #b9c6d6;
+  border-radius: 8px;
+  color: #243247;
+  background: #f8fafc;
+  overscroll-behavior: contain;
+}
+.cad-proposal-review[open] { display: flex; flex-direction: column; }
+.cad-proposal-review::backdrop { background: #18223577; overflow: hidden; overscroll-behavior: contain; }
+.cad-proposal-review > header, .cad-proposal-review > footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px;
+}
+.cad-proposal-review h2, .cad-proposal-review h3 { margin: 0 0 8px; }
+.cad-proposal-review button { border: 1px solid #b9c6d6; background: white; color: inherit; border-radius: 4px; padding: 8px 12px; min-height: 32px; cursor: pointer; }
+.cad-proposal-review button:disabled { opacity: .5; cursor: default; }
+.cad-proposal-body { display: flex; flex: 1; min-height: 0; }
+.cad-proposal-view { display: flex; flex-direction: column; flex: 1; min-width: 0; position: relative; }
+.cad-proposal-view > button { align-self: start; margin: 8px; }
+.cad-proposal-view > .cad-part-view { flex: 1; min-height: 200px; }
+.cad-proposal-body > aside { width: 300px; overflow: auto; padding: 12px; border-left: 1px solid #d7e0ed; }
+.cad-cupboard-insert { border: 1px solid #b9c6d6; border-radius: 8px; color: #243247; background: #f8fafc; overscroll-behavior: contain; }
+.cad-cupboard-insert::backdrop { background: #18223577; overflow: hidden; overscroll-behavior: contain; }
+.cad-cupboard-insert label { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin: 10px 0; }
+@media (max-width: 700px) {
+  .cad-proposal-body { flex-direction: column; overflow: auto; }
+  .cad-proposal-view { min-height: 300px; }
+  .cad-proposal-body > aside { width: auto; min-height: 150px; border-left: 0; }
+}

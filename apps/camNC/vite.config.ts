@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+import { cadSandboxPlugin } from './cadSandboxPlugin';
 import tailwindcss from '@tailwindcss/vite';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
@@ -12,13 +14,17 @@ const ReactCompilerConfig = {
   target: '19',
 };
 
+// Colocated browser tests and their fixture are not routes; otherwise the router dumps their source as warnings.
+export const routeFileIgnorePattern = '(?:\\.(?:test|spec)|TestFixture)\\.[cm]?[jt]sx?$';
+
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
   const plugins: PluginOption[] = [
     devtoolsJson(),
+    cadSandboxPlugin(),
 
     tsconfigPaths(),
-    TanStackRouterVite({ target: 'react', autoCodeSplitting: true }),
+    TanStackRouterVite({ target: 'react', autoCodeSplitting: true, routeFileIgnorePattern }),
     react({
       babel: {
         plugins: [['babel-plugin-react-compiler', ReactCompilerConfig], ['module:@preact/signals-react-transform']],
@@ -54,10 +60,16 @@ export default defineConfig(({ command }) => {
       commonjsOptions: { transformMixedEsModules: true },
     },
     plugins,
+    resolve: { alias: { '@wbcnc/cad-script': fileURLToPath(new URL('../../packages/cad-script/src/browser.ts', import.meta.url)) } },
     optimizeDeps: {
       // These plugin-injected/lazy imports escape the initial crawl. Discovering
       // them during a sketch forces a reload and invalidates in-flight previews.
-      include: ['vite-plugin-node-polyfills/shims/global', '@preact/signals-react/runtime', 'occt-import-js'],
+      include: [
+        'vite-plugin-node-polyfills/shims/global',
+        '@preact/signals-react/runtime',
+        'occt-import-js',
+        '@wbcnc/cad > @salusoft89/planegcs',
+      ],
       // Without it, framer-motion's circular imports (via HeroUI) run out of order in dev
       // ("Class extends value undefined").
       rolldownOptions: { output: { strictExecutionOrder: true } },
