@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
 import { kStudioCommands, type StudioCommand } from './studioCommands';
 
@@ -20,6 +21,7 @@ export function StudioToolbar({
   onFinish,
   canFinish,
   onSearch,
+  children,
 }: {
   busy: boolean;
   /** Commands that need something first, such as a selected part, with why. */
@@ -35,6 +37,7 @@ export function StudioToolbar({
   onFinish: () => void;
   /** Opens the search of these commands, as Alt+C does. */
   onSearch?: () => void;
+  children?: ReactNode;
 }) {
   return (
     <header
@@ -66,6 +69,7 @@ export function StudioToolbar({
         </button>
       )}
       <div className="cad-tool-group cad-session-actions" aria-label="Design actions" role="group">
+        {children}
         <ToolHint label="Undo (Ctrl or Command Z)">
           <button
             type="button"

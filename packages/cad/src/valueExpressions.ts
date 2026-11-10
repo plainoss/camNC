@@ -138,7 +138,16 @@ export function cadExpressionNames(text: string): string[] {
 
 /** The expression with one variable renamed, leaving everything else as typed. */
 export function renameCadExpressionVariable(text: string, from: string, to: string): string {
-  return text.replace(new RegExp(`(?<![A-Za-z0-9_#])(#?)${from}(?![A-Za-z0-9_])(?!\\s*\\()`, 'g'), `$1${to}`);
+  return renameCadExpressionVariables(text, new Map([[from, to]]));
+}
+
+/** Rename original variable references once; replacements cannot become another alias in the same pass. */
+export function renameCadExpressionVariables(text: string, names: ReadonlyMap<string, string>): string {
+  // Match the same references as a single rename: function calls and exponent suffixes are not variable tokens.
+  return text.replace(
+    /(?<![A-Za-z0-9_#])(#?)([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_])(?!\s*\()/g,
+    (_token, hash: string, name: string) => `${hash}${names.get(name) ?? name}`
+  );
 }
 
 /** A bounded arithmetic parser, with fixed functions, no eval and no application-state access. Variables come only from the scope given. */

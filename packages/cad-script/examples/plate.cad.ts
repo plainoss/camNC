@@ -1,7 +1,7 @@
 import { design } from '@wbcnc/cad-script';
 
 export default design(d => {
-  const plate = d.part('Plate', { thickness: 18 });
+  const plate = d.newPart('Plate', { thickness: 18 });
   plate.profile.rect({ at: [0, 0], w: 400, h: 300 });
   for (const at of [
     [30, 30],
