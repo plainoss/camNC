@@ -1,6 +1,7 @@
 import type { ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands';
 import type { CadDrawnOn } from '@wbcnc/cad';
 import type { CadExpectation } from './inspect';
+import type { ScriptConstruction } from './constructionApi';
 export type Xy = readonly [number, number];
 /** mm, or an expression such as `'width - 2*board'` that keeps following the design's variables. */
 export type Len = number | string;
@@ -143,6 +144,8 @@ export interface CadPlaceOptions {
   y?: CadAxis;
 }
 export interface DesignEdit {
+  /** Durable construction facts, exact physical members and purchased hardware; never a strength certificate. */
+  construction(options: ScriptConstruction): { id: string };
   /** Builds ordinary steps and globally unique variables in a new named folder. */
   folder(name: string, script: CadScript): { id: string; name: string };
   /** Edits an existing folder by name or handle, with part lookup restricted to its members. */

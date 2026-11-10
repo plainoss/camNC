@@ -1,3 +1,5 @@
+import type { CadConstruction } from './constructionTypes';
+
 /** CAD source is independent of the solver and the CAM tessellation. All lengths are mm. */
 export interface CadPoint {
   x: number;
@@ -495,8 +497,8 @@ export type CadLengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
-  /** 2 for face features, 3 for folders, so older builds refuse instead of losing source settings. */
-  version: 1 | 2 | 3;
+  /** 2 for face features, 3 for folders, 4 for durable construction intent. Older readers must refuse. */
+  version: 1 | 2 | 3 | 4;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */
@@ -509,6 +511,8 @@ export interface CadDocument {
   planes?: CadDatumPlane[];
   /** Named groups over neighbouring source steps. They never replace or regenerate their contents. */
   folders?: CadFolder[];
+  /** Authored facts/assumptions, never stored geometry acceptance or strength claims. */
+  constructions?: CadConstruction[];
   parts: CadPart[];
 }
 export interface CadFolder {

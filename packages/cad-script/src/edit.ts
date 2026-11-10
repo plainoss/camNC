@@ -49,6 +49,7 @@ import { combineExpressions, differenceExpression } from './linearExpression';
 import { inspectCadDocument, shortHandles, type CadExpectation, type CadReport } from './inspect';
 import { CadScriptError, fail, resolveHandle, existingDesignEdit } from './editExisting';
 import { runFolderScope } from './folderScope';
+import { declareScriptConstruction } from './constructionApi';
 
 export type * from './editTypes';
 import type {
@@ -747,6 +748,11 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       );
     },
     ...existingApi,
+    construction(options) {
+      const result = declareScriptConstruction(document, options);
+      document = result.document;
+      return { id: result.id };
+    },
     part(name, options) {
       return optionsOnPart(existing.findPart(name).id, options);
     },

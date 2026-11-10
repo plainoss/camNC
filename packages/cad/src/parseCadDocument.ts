@@ -11,6 +11,7 @@ import { cadFolderIssue, cadFolderStepIssue } from './folderModel';
 import { designSteps } from './designSteps';
 import { cadDocumentVersion } from './documentVersion';
 import { validCircularPartPattern } from './circularPartPattern';
+import { constructionShapeIssue } from './constructionShape';
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
 export function parseCadDocument(input: unknown): CadDocument {
@@ -18,7 +19,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
   if (
-    (d.version !== 1 && d.version !== 2 && d.version !== 3) ||
+    (d.version !== 1 && d.version !== 2 && d.version !== 3 && d.version !== 4) ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
@@ -26,9 +27,11 @@ export function parseCadDocument(input: unknown): CadDocument {
     d.revision < 0 ||
     !Array.isArray(d.parts) ||
     (d.version === 2 && !d.parts.some(p => p?.features?.length)) ||
-    (d.version !== 3 && d.folders !== undefined)
+    (d.version < 3 && d.folders !== undefined)
   )
     throw new Error('Invalid CAD document');
+  const constructionIssue = constructionShapeIssue(d.constructions);
+  if (constructionIssue) throw new Error(constructionIssue);
   const ids = new Set<string>([d.id]);
   const addId = (id: unknown, into = ids) => {
     if (typeof id !== 'string' || !id || into.has(id)) throw new Error('CAD IDs must be unique nonempty strings');
@@ -236,7 +239,7 @@ export function parseCadDocument(input: unknown): CadDocument {
       addId(f.id);
       if (f.copyId !== undefined) {
         reference(f.copyId);
-        if (d.version !== 3) throw new Error('Copy features require CAD document version 3');
+        if (d.version < 3) throw new Error('Copy features require CAD document version 3');
       }
       if (f.type === 'sketch') {
         if (!f.sketch || typeof f.sketch !== 'object' || !Array.isArray(f.sketch.entities) || !Array.isArray(f.sketch.constraints))
@@ -514,9 +517,14 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (folderIssue) throw new Error(folderIssue);
   // The derived version walks feature arrays, so their shapes must be validated before it runs.
   const requiredVersion = cadDocumentVersion(d);
-  if (d.version === 3 && requiredVersion !== 3) throw new Error('Invalid CAD document');
-  if (d.version < requiredVersion) throw new Error('These CAD source settings require document version 3');
+  if (d.version >= 3 && requiredVersion !== d.version) throw new Error('Invalid CAD document');
+  if (d.version < requiredVersion) throw new Error(`These CAD source settings require document version ${requiredVersion}`);
   for (const folder of d.folders ?? []) addId(folder.id);
+  for (const plan of d.constructions ?? []) {
+    addId(plan.id);
+    for (const connection of plan.connections) addId(connection.id);
+    for (const hardware of plan.hardware) addId(hardware.id);
+  }
   const parsed = structuredClone(d);
   for (const part of parsed.parts) {
     part.sketch = withSplineHandleSegments(part.sketch);
