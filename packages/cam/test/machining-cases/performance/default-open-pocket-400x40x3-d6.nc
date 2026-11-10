@@ -1,6 +1,6 @@
 (camNC CAM)
 (default-open-pocket-400x40x3-d6)
-(Plan: cam-plan-v1-f650f29f9c43ac4b)
+(Plan: cam-plan-v1-11c45c26cd57ea2a)
 (Post: fluidnc. Safe Z23. Retract Z20)
 (Planned bounds: X52.825..447.175 Y-1.01..37 Z15..18)
 (Stock: 500 x 100 x 18 mm)
@@ -132,10 +132,7 @@ X444.462
 Y0
 G3 X444.555 Y-1.01 I5.476 J-0.003
 (PASS 17/18 Z15)
-G0 Z20
-X446.923
-Z19
-G1 Z15 F480
+G1 X446.923 F711.358
 G2 X446.76 Y0 I3.047 J1.007 F1800
 G1 Y36.76
 X53.24
