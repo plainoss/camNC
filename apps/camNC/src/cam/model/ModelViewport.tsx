@@ -470,7 +470,7 @@ export function ModelViewport({
   if (!extrusionDepth) referencePlaneSize.current = modelPlaneSize;
   const planeSize = extrusionDepth ? referencePlaneSize.current : modelPlaneSize;
   const shownPlanes = view === 'assembled' ? planes : [];
-  const box = useMemo(() => {
+  const geometryBox = useMemo(() => {
     const fit = boundsOf(meshes, matrices);
     // Finished sketches are in view too, as a first one is before it has any part.
     for (const line of view === 'assembled' ? sketchLines : [])
@@ -484,6 +484,10 @@ export function ModelViewport({
             .addScaledVector(new THREE.Vector3(...region.frame.y), point.y)
             .applyMatrix4(assembled)
         );
+    return fit;
+  }, [meshes, matrices, assembled, sketchLines, regions, view]);
+  const box = useMemo(() => {
+    const fit = geometryBox.clone();
     if (!shownPlanes.length) return fit;
     // The planes are in view too, so a design with no parts yet still shows them.
     const corner = new THREE.Vector3();
@@ -502,12 +506,16 @@ export function ModelViewport({
     return fit;
     // The planes' identity changes with their highlight, which shouldn't move the camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meshes, matrices, shownPlanes.length, planeSize, assembled, sketchLines, regions, view]);
+  }, [geometryBox, shownPlanes.length, planeSize, assembled]);
   const orbitBox = useMemo(() => {
-    const bounds = box.clone();
+    // Plane squares grow to make them easy to see. Their display extents must not move the model's rotation center.
+    const bounds = geometryBox.clone();
     if (showOrigin && view === 'assembled') bounds.expandByPoint(new THREE.Vector3().applyMatrix4(assembled));
+    // Before any geometry exists, the visible planes still provide their actual origins as rotation anchors.
+    if (bounds.isEmpty() && view === 'assembled')
+      for (const plane of planes) bounds.expandByPoint(new THREE.Vector3(...plane.origin).applyMatrix4(assembled));
     return bounds;
-  }, [box, showOrigin, view, assembled]);
+  }, [geometryBox, showOrigin, view, assembled, planes]);
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
     // A captured depth drag must not also select the face beneath its release point.
     if (extrusionDepth?.dragging) return;

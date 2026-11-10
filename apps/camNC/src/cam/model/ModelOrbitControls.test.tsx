@@ -50,7 +50,8 @@ function View({
 
 async function ready(orthographic = true) {
   render(<View orthographic={orthographic} />);
-  await waitFor(() => expect(controls?.target.toArray()).toEqual([0, 0, 0]));
+  // Canvas and controls initialize asynchronously; cold WebGL contexts can take more than the default second.
+  await waitFor(() => expect(controls?.target.toArray()).toEqual([0, 0, 0]), { timeout: 20000 });
   await waitFor(() => expect(camera.getWorldDirection(new THREE.Vector3()).z).toBeCloseTo(-1));
 }
 
@@ -123,7 +124,7 @@ it('uses the current model center for a background drag after panning, without r
 
 it('allows a named view to replace an orbit that is still damping', async () => {
   const view = render(<View />);
-  await waitFor(() => expect(controls?.target.toArray()).toEqual([0, 0, 0]));
+  await waitFor(() => expect(controls?.target.toArray()).toEqual([0, 0, 0]), { timeout: 20000 });
   drag(screen(new THREE.Vector3(65, 30, 20)));
   view.rerender(<View request={{ name: 'front', seq: 1 }} />);
   await waitFor(() => expect(camera.getWorldDirection(new THREE.Vector3()).y).toBeGreaterThan(0.99));
@@ -134,7 +135,7 @@ it('allows a named view to replace an orbit that is still damping', async () => 
 
 it('leaves depth dragging alone while the camera controls are disabled', async () => {
   render(<View enabled={false} />);
-  await waitFor(() => expect(controls?.target.toArray()).toEqual([0, 0, 0]));
+  await waitFor(() => expect(controls?.target.toArray()).toEqual([0, 0, 0]), { timeout: 20000 });
   controls.update();
   const position = camera.position.clone();
   const orientation = camera.quaternion.clone();
@@ -146,7 +147,7 @@ it('leaves depth dragging alone while the camera controls are disabled', async (
 
 it('keeps the active hit when a hover rerender replaces the bounds object', async () => {
   const view = render(<View />);
-  await waitFor(() => expect(controls?.target.toArray()).toEqual([0, 0, 0]));
+  await waitFor(() => expect(controls?.target.toArray()).toEqual([0, 0, 0]), { timeout: 20000 });
   const pivot = new THREE.Vector3(65, 30, 20);
   const before = projected(pivot);
   const from = screen(pivot);
