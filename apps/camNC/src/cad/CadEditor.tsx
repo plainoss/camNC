@@ -254,7 +254,6 @@ import { StudioProposals } from './StudioProposals';
 import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
 import { trimCadFolders } from '@wbcnc/cad';
-import { HoleDialog } from './HoleDialog';
 import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
@@ -274,7 +273,9 @@ import { faceSketchHost } from './faceSketchHost';
 import { useExtrudeDepth } from './useExtrudeDepth';
 import { bindPartCorners, partCornerInference } from './partCornerInference';
 import { newSketchPart } from './newSketchPart';
-import { ExtrudeDialog, PartPatternDialog, type CadConnectorPick } from './PartFeatureDialogs';
+import type { CadConnectorPick } from './PartFeatureDialogs';
+import { StudioFeatureDialog, type StudioFeatureDialogState } from './StudioFeatureDialog';
+import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
 import { useEditorVariableFields } from './useEditorVariableFields';
@@ -436,11 +437,7 @@ export function CadEditor({
   const [partCutting, setPartCutting] = useState<{ id?: string } | null>(null);
   const cutSelection = usePartCutSelection(doc, part, setPartId);
   // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
-  const [featureDialog, setFeatureDialog] = useState<{
-    kind: 'extrude' | 'pattern' | 'hole';
-    partId: string;
-    before: CadDocument;
-  } | null>(null);
+  const [featureDialog, setFeatureDialog] = useState<StudioFeatureDialogState | null>(null);
   // Picking the plane or face a new part is sketched on.
   // A new design opens with nothing picked or asked for: the first sketch starts from the toolbar, as in the reference.
   const [choosingFace, setChoosingFace] = useState(false);
@@ -606,12 +603,23 @@ export function CadEditor({
   const solveSequence = useRef(0);
   const lastCheckedRevision = useRef('');
   const documentRef = useRef(doc);
-  const variableScope = useEditorVariableFields(doc, documentRef, next => commit(next));
+  const { commit: variableCommit, normalized: normalizePatternVariableSource } = usePatternVariableCommit(
+    featureDialog,
+    documentRef,
+    next => commit(next)
+  );
+  const variableScope = useEditorVariableFields(doc, documentRef, variableCommit);
   const blankDesign = studioSession && doc.parts.length === 1 && isBlank(doc.parts[0]!);
   const extrusionDepth = useExtrudeDepth(doc, featureDialog?.kind === 'extrude' ? featureDialog.partId : undefined, next => commit(next));
   const studioPreview = useStudioPreview(
     doc,
-    transformDialog ?? variableDialog ?? planeDialog ?? mirrorDialog ?? filletDialog ?? partCutting
+    transformDialog ??
+      variableDialog ??
+      planeDialog ??
+      mirrorDialog ??
+      filletDialog ??
+      partCutting ??
+      (featureDialog?.kind === 'pattern' ? featureDialog : null)
   );
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
   const { rollbackStep, shownDocument } = useFeaturePreview({
@@ -1022,6 +1030,7 @@ export function CadEditor({
         setStatus(feedback.status);
         // Solver normalization belongs to the same user command, never another undo entry.
         if (result.sketches.some(s => s.status === 'solved') && JSON.stringify(result.document) !== JSON.stringify(documentRef.current)) {
+          normalizePatternVariableSource(doc, result.document);
           session.document = result.document;
           documentRef.current = result.document;
           setDocument(result.document);
@@ -1039,7 +1048,7 @@ export function CadEditor({
     return () => {
       cancelled = true;
     };
-  }, [doc, session, checkEpoch, sketchOnly]);
+  }, [doc, session, checkEpoch, sketchOnly, normalizePatternVariableSource]);
 
   useEffect(() => {
     if (!dimension) return;
@@ -3446,7 +3455,8 @@ export function CadEditor({
   };
   const closeFeature = (keep: boolean) => {
     setDirectionPicker(null);
-    if (!keep && featureDialog) commit(featureDialog.before);
+    // Pattern candidates use the viewport preview transaction, so cancel has no source or history edit to undo.
+    if (!keep && featureDialog && featureDialog.kind !== 'pattern') commit(featureDialog.before);
     // Regions picked apart are a part each.
     if (keep && featureDialog?.kind === 'extrude') {
       const split = splitApartRegions(documentRef.current, featureDialog.partId);
@@ -4307,39 +4317,23 @@ export function CadEditor({
               pickPoint={pointPicker.start}
             />
           )}
-          {showWorkspace &&
-            featureDialog &&
-            (() => {
-              const target = extrusionDepth.document.parts.find(candidate => candidate.id === featureDialog.partId);
-              if (!target) return null;
-              const props = {
-                document: extrusionDepth.document,
-                part: target,
-                variables: variableScope,
-                onChange: (change: (document: CadDocument) => CadDocument) => commit(change(documentRef.current)),
-                onOk: () => closeFeature(true),
-                onCancel: () => closeFeature(false),
-              };
-              if (featureDialog.kind === 'hole') return <HoleDialog key={target.id} {...props} />;
-              return featureDialog.kind === 'extrude' ? (
-                <ExtrudeDialog
-                  key={target.id}
-                  {...props}
-                  depthDragging={extrusionDepth.control(shownDocument)?.dragging}
-                  profilePicking={profiles.enabled}
-                  onPickProfile={() => profiles.setEnabled(!profiles.enabled)}
-                  onEditSketch={() => openSketch(target.id)}
-                  pickFace={picked => setDirectionPicker(() => picked)}
-                />
-              ) : (
-                <PartPatternDialog
-                  key={target.id}
-                  {...props}
-                  pickDirection={picked => setDirectionPicker(() => picked)}
-                  pickPoint={pointPicker.start}
-                />
-              );
-            })()}
+          {showWorkspace && featureDialog && (
+            <StudioFeatureDialog
+              state={featureDialog}
+              document={extrusionDepth.document}
+              variables={variableScope}
+              onChange={change => commit(change(documentRef.current))}
+              onOk={() => closeFeature(true)}
+              onCancel={() => closeFeature(false)}
+              onPreview={studioPreview.update}
+              depthDragging={extrusionDepth.control(shownDocument)?.dragging}
+              profilePicking={profiles.enabled}
+              onPickProfile={() => profiles.setEnabled(!profiles.enabled)}
+              onEditSketch={openSketch}
+              pickDirection={picked => setDirectionPicker(() => picked)}
+              pickPoint={pointPicker.start}
+            />
+          )}
           {studioSession && !showWorkspace && part && (
             // The open sketch, closed from here as the reference's sketch dialog is: away from the studio's Done.
             <StudioSketchDialog

@@ -945,6 +945,11 @@ it('patterns a part along an edge picked in the view', async () => {
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() => expect(props().instanceIds?.length).toBeGreaterThan(0), { timeout: 10_000 });
   const part = latest().parts[0]!;
+  const copyY = () => {
+    const index = props().instanceIds!.findIndex(id => id !== part.id);
+    const ys = props().meshes[index]!.positions.filter((_, coordinate) => coordinate % 3 === 1);
+    return [Math.min(...ys), Math.max(...ys)];
+  };
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
   const dialog = await screen.findByRole('dialog', { name: /^Linear pattern/ });
@@ -960,11 +965,13 @@ it('patterns a part along an edge picked in the view', async () => {
   // The plate's left edge, picked from its far end, runs along -y.
   await userEvent.click(within(dialog).getByRole('button', { name: 'Direction edge' }));
   click({ a: [0, 100, 18], b: [0, 0, 18] });
-  await waitFor(() => expect(latest().parts[0]!.pattern?.vector).toEqual([0, -1, 0]));
+  await waitFor(() => expect(copyY()).toEqual([-100, 0]));
+  expect(latest().parts[0]!.pattern).toBeUndefined();
   expect(within(dialog).getByRole('button', { name: 'Direction' }).textContent).toMatch(/Along an edge/);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Flip direction' }));
-  await waitFor(() => expect(latest().parts[0]!.pattern?.vector).toEqual([0, 1, 0]));
+  await waitFor(() => expect(copyY()).toEqual([100, 200]));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  expect(latest().parts[0]!.pattern?.vector).toEqual([0, 1, 0]);
   expect(latest().parts[0]!.copies?.map(copy => copy.placement?.position)).toEqual([[0, 100, 0]]);
 });
 
