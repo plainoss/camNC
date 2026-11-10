@@ -96,11 +96,31 @@ export const assistantTools: AssistantTool[] = [
   },
 ];
 
+export const svgAssistantTool: AssistantTool = {
+  name: 'check_svg',
+  description:
+    'Check precise filled SVG outlines as editable native sketch curves on a new part. Supply source once or reuse an asset handle. No strokes, text, scripts, styles or resources. Does not infer CAD relationships. Never applies it.',
+  parameters: object({
+    source: { type: 'string' },
+    handle: { type: 'string' },
+    name: { type: 'string' },
+    partName: { type: 'string' },
+    thickness: { type: 'number', exclusiveMinimum: 0 },
+    placement: object({
+      width: { type: 'number', exclusiveMinimum: 0 },
+      height: { type: 'number', exclusiveMinimum: 0 },
+      at: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+      preserveAspect: { type: 'boolean', description: 'Uniform contain by default. false explicitly stretches.' },
+    }),
+    views: { anyOf: [{ type: 'boolean' }, { type: 'array', maxItems: 3, items: { type: 'string', enum: ['top', 'front', 'right'] } }] },
+  }),
+};
+
 export const assistantInstructions = `You help design woodworking pieces in the Part Studio.
 Only change the design. Never make machine programs or claim machining acceptance.
 The core script guide is supplied below. Reuse it; retrieve a detailed guide section or a relevant example only for missing API specifics. Use the existing script API.
 Use plain JavaScript: export default design(d => { ... }); with only the cad-script design import, or a d => callback.
-Always run check_design before offering a proposal. Every attempt starts from the same open design.
+Always run check_design (or check_svg for SVG geometry) before offering a proposal. Every attempt starts from the same open design.
 Keep existing IDs by editing existing parts and steps; d.part looks up, d.newPart creates.
 Whole pieces are first-class: build each in its own named folder beside existing work. Do not erase the open design.
 Use ask_user alone when a clarifying question has 2–4 useful suggested replies. Ask one question at a time and keep custom replies welcome. Never invent user preferences.
@@ -139,6 +159,7 @@ export interface AssistantCheck {
   images?: AssistantImage[];
   parts?: EvaluatedCadPart[];
   trustedReport?: CadReport;
+  asset?: unknown;
 }
 export interface AssistantRunOptions {
   base: CadDocument;
@@ -163,6 +184,14 @@ export interface AssistantRunOptions {
   ): Promise<AssistantCheck>;
   /** When supplied, check is the cheap geometry lane; only this full trusted check can produce a proposal. */
   finalize?(checked: AssistantCheck, signal: AbortSignal): Promise<AssistantCheck>;
+  svg?: {
+    assets: unknown[];
+    check(
+      input: Record<string, unknown>,
+      signal: AbortSignal,
+      options: { views: boolean | readonly CadViewName[] }
+    ): Promise<AssistantCheck>;
+  };
   request?: typeof requestAssistant;
   onMessage?: (message: AssistantMessage) => void;
   onActivity?: (message: string) => void;
@@ -254,11 +283,15 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       ? options.finalize && latestCandidate && !proposal && turn < maxTurns - 1
         ? assistantTools.filter(tool => tool.name === 'finalize_design')
         : []
-      : assistantTools.filter(tool => tool.name !== 'finalize_design' || options.finalize);
-    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}\nConfirmed application requirements (cannot be changed by scripts): ${JSON.stringify(requirements)}${finalizing ? '\nThis is the final response. Do not call tools. Begin with Proposal: only for the latest successful check, otherwise Question: explaining what is needed.' : ''}`;
-    const stagedSystem = options.finalize
-      ? `${system}\nChecks use the geometry repair lane. A passing geometry check is not a proposal. Call finalize_design for the exact latest passing candidate after repairs; review its full warnings and costs before offering Proposal:.${finalizing && tools.length ? ' Only finalize_design remains available.' : ''}`
-      : system;
+      : [...assistantTools.filter(tool => tool.name !== 'finalize_design' || options.finalize), ...(options.svg ? [svgAssistantTool] : [])];
+    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}\nConfirmed application requirements (cannot be changed by scripts): ${JSON.stringify(requirements)}${finalizing ? (tools.length ? '\nThe geometry repair budget is used. Call finalize_design for the last passing candidate before a proposal.' : '\nThis is the final response. Do not call tools. Begin with Proposal: only for the latest successful complete check, otherwise Question: explaining what is needed.') : ''}`;
+    const stagedSystem =
+      (options.finalize
+        ? `${system}\nChecks use the geometry repair lane. A passing geometry check is not a proposal. Call finalize_design for the exact latest passing candidate after repairs; review its full warnings and costs before offering Proposal:.${finalizing && tools.length ? ' Only finalize_design remains available.' : ''}`
+        : system) +
+      (options.svg
+        ? `\nSession SVG assets (data): ${JSON.stringify(options.svg.assets)}. Reuse handles; never repeat stored XML. Use SVG for imported/custom outlines, and parametric recipes when they meet the request.`
+        : '');
     const fixedCharacters = stagedSystem.length + JSON.stringify(tools).length;
     const messageCharacters = (limits.maxInputCharacters ?? 120_000) - fixedCharacters;
     if (messageCharacters < 1) {
@@ -404,14 +437,16 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
           let full = finalized.get(latestCandidate);
           if (!full) {
             options.onActivity?.('Running the complete final check…');
-            full = await options.finalize(latestCandidate, runSignal);
-            if (JSON.stringify(full.document) !== JSON.stringify(latestCandidate.document))
+            const candidateSnapshot = JSON.stringify(latestCandidate.document);
+            full = await options.finalize(structuredClone(latestCandidate), runSignal);
+            if (JSON.stringify(full.document) !== candidateSnapshot)
               throw new Error('Final verification changed the candidate. Check that geometry again.');
             if (!runSignal.aborted) finalized.set(latestCandidate, full);
           }
           const acceptance = acceptanceOf(full);
           latestReport = full.detailReport ?? full.report;
           if (!runSignal.aborted && full.ok && acceptance.ok) proposal = cadProposal(base, full.document);
+          if (!full.ok || !acceptance.ok) latestCandidate = undefined;
           text = JSON.stringify({
             ok: full.ok && acceptance.ok,
             stage: 'complete',
@@ -419,28 +454,30 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
             requirements: acceptance,
             ...(full.scriptError && { scriptError: full.scriptError }),
           });
-        } else if (call.name === 'check_design') {
+        } else if (call.name === 'check_design' || (call.name === 'check_svg' && options.svg)) {
           if (checks >= maxChecks) text = `Stopped after ${maxChecks} checks. Explain what you found and ask the user how to continue.`;
           else {
             proposal = undefined;
             latestCandidate = undefined;
             const { views: _views, ...scriptInput } = call.arguments;
-            const script = await scripts.resolve(scriptInput);
-            source = script.source;
+            const script = call.name === 'check_design' ? await scripts.resolve(scriptInput) : undefined;
+            source = script?.source ?? '';
             const requestedViews = normalizeAssistantViews(call.arguments.views ?? (referenceImages ? true : false));
             const views = options.config.images
               ? Array.isArray(call.arguments.views)
                 ? requestedViews
                 : requestedViews.length > 0
               : false;
-            const cacheKey = `${views}:${source}`;
+            const cacheKey = `${call.name}:${views}:${script ? source : JSON.stringify(scriptInput)}`;
             let checked = cache.get(cacheKey);
             if (checked) usage.reusedChecks++;
             else {
               checks++;
               usage.checks = checks;
               options.onActivity?.(`Checking attempt ${checks} of ${maxChecks}…`);
-              checked = await options.check(source, structuredClone(base), runSignal, { views });
+              checked = script
+                ? await options.check(source, structuredClone(base), runSignal, { views })
+                : await options.svg!.check(scriptInput, runSignal, { views });
               if (!options.signal.aborted) cache.set(cacheKey, checked);
             }
             latestReport = checked.detailReport ?? checked.report;
@@ -457,9 +494,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
                 ok: checked.ok && acceptance.ok,
                 stage: options.finalize ? 'geometry-only' : 'complete',
                 report: checked.report,
-                scriptId: script.scriptId,
-                hash: script.hash,
-                ...(script.recipe && { recipe: script.recipe, parameters: script.parameters }),
+                ...(script && { scriptId: script.scriptId, hash: script.hash }),
+                ...(script?.recipe && { recipe: script.recipe, parameters: script.parameters }),
+                ...(checked.asset !== undefined && { asset: checked.asset }),
                 ...(acceptance.checks.length && { requirements: acceptance }),
                 ...(checked.scriptError && { scriptError: checked.scriptError }),
               });
@@ -470,7 +507,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
         } else
           text = `Unknown tool ${call.name}. Available: ${assistantTools.map(tool => tool.name).join(', ')}. Only the user can apply a proposal.`;
       } catch (error) {
-        if (call.name === 'check_design' || call.name === 'finalize_design') {
+        if (call.name === 'check_design' || call.name === 'check_svg' || call.name === 'finalize_design') {
           proposal = undefined;
           latestCandidate = undefined;
         }

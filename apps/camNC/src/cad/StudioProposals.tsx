@@ -8,6 +8,7 @@ import { ProposalReview } from './ProposalReview';
 import { assistantSelection } from './assistant/selection';
 import { recordAssistantEvent } from './assistant/conversationStore';
 import './assistant/dock.css';
+import { SvgInsert } from './svg/SvgInsert';
 
 const AssistantDock = lazy(() => import('./assistant/Dock').then(module => ({ default: module.AssistantDock })));
 
@@ -106,6 +107,7 @@ export function StudioProposals({
         <details className="cad-insert-menu">
           <summary>Insert</summary>
           <div>
+            <SvgInsert document={document} disabled={disabled || building} onProposal={setProposal} />
             <button
               type="button"
               disabled={disabled || building}

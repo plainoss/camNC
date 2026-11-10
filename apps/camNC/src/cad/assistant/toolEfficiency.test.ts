@@ -95,3 +95,21 @@ it('never treats a geometry-only success as a proposal', async () => {
   expect(result.proposal).toBeUndefined();
   expect(options.finalize).not.toHaveBeenCalled();
 });
+
+it('protects the cached candidate against in-place mutation by a finalizer', async () => {
+  const options = setup();
+  options.finalize = async checked => {
+    checked.document.name = 'Mutated';
+    return checked;
+  };
+  const replies = [
+    call({ source: 'd => {}' }),
+    call({}, 'finalize_design'),
+    { role: 'assistant', text: 'Proposal: mutated.' } as AssistantMessage,
+  ];
+  options.request = async () => replies.shift()!;
+  const result = await runDesignAssistant(options);
+  expect(result.proposal).toBeUndefined();
+  expect(options.base.name).not.toBe('Mutated');
+  expect(result.messages.some(message => message.role === 'tool' && message.text.includes('changed the candidate'))).toBe(true);
+});

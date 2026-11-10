@@ -15,9 +15,9 @@ it('resolves report handles by persistent identity when folders reuse source nam
   expect(
     checkAssistantRequirements({ part: handle, width: 200, thickness: 24 }, base, checked.document, checked.report, checked.parts).ok
   ).toBe(true);
-  expect(checkAssistantRequirements({ part: handle, width: 100, thickness: 18 }, base, checked.document, compact, checked.parts).ok).toBe(
-    false
-  );
+  expect(
+    checkAssistantRequirements({ part: handle, width: 100, thickness: 18 }, base, checked.document, checked.report, checked.parts).ok
+  ).toBe(false);
 });
 
 it('refuses globally ambiguous copy names and accepts exact copy IDs', async () => {

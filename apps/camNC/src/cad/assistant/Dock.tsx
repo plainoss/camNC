@@ -24,6 +24,9 @@ import type { AssistantSelection } from './selection';
 import { Requirements } from './RequirementSettings';
 import { readRequirements, confirmRequirements, subscribeRequirements, bindProposalRequirements } from './requirementStore';
 import { renderAssistantViews } from './designViews';
+import { finalizeBrowserCandidate } from './finalizeCandidate';
+import { checkAssistantSvg } from './svgCheck';
+import { svgAssetsForDocument } from '../svg/svgAssets';
 
 const starters = [
   {
@@ -160,6 +163,10 @@ export function AssistantDock({
         guideSections,
         examples,
         requirements: confirmed.requirements,
+        svg: {
+          assets: svgAssetsForDocument(start.id).list(),
+          check: (input, signal, options) => checkAssistantSvg(start, input, signal, options.views),
+        },
         limits: runSettings.limits,
         pricing: runSettings.pricing,
         onUsage: value => {
@@ -183,7 +190,7 @@ export function AssistantDock({
           if (mounted.current) setActivity(message);
         },
         check: async (source, base, signal, options) => {
-          const checked = await checkScriptInBrowser(base, source, { signal });
+          const checked = await checkScriptInBrowser(base, source, { signal, toolpaths: false });
           if (signal.aborted) return checked;
           const views =
             checked.ok && credentials.config.images && options?.views
@@ -203,6 +210,20 @@ export function AssistantDock({
             detailReport,
             report: summarizeAssistantReport(detailReport, { partId: selection?.partId, partName: selection?.name }),
             images: views,
+          };
+        },
+        finalize: async (candidate, signal) => {
+          if (!candidate.trustedReport) throw new Error('Missing trusted geometry check.');
+          const checked = await finalizeBrowserCandidate(
+            { ...candidate, report: candidate.trustedReport, parts: candidate.parts ?? [] },
+            signal
+          );
+          const detailReport = compactCadReport(checked.document, checked.report);
+          return {
+            ...checked,
+            trustedReport: checked.report,
+            detailReport,
+            report: summarizeAssistantReport(detailReport, { partId: selection?.partId, partName: selection?.name }),
           };
         },
       });
