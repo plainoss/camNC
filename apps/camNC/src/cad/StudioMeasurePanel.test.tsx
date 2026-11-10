@@ -79,6 +79,35 @@ describe('assembled measurement inspector', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    { unit: 'cm', length: '2.54 cm', area: '6.452 cm²' },
+    { unit: 'in', length: '1 in', area: '1 in²' },
+  ] as const)('defaults quick and expanded readouts to $unit while retaining an explicit conversion', ({ unit, length, area }) => {
+    const measured: MeasureResult = {
+      rows: [
+        { id: 'length', label: 'Length', value: 25.4, kind: 'length' },
+        { id: 'area', label: 'Surface area', value: 645.16, kind: 'area' },
+      ],
+    };
+    const original = JSON.stringify({ selection, measured });
+    const { rerenderPanel } = setup({ defaultLengthUnit: unit, result: measured });
+    expect(screen.getByRole('button', { name: `Length: ${length}` })).toBeVisible();
+    expect(screen.getByRole('button', { name: `Surface area: ${area}` })).toBeVisible();
+    rerenderPanel({ expanded: true });
+    expect(screen.getByLabelText('Length unit')).toHaveValue(unit);
+    expect(screen.getByRole('button', { name: `Length: ${length}` })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Length unit'), { target: { value: 'mm' } });
+    expect(screen.getByRole('button', { name: 'Length: 25.4 mm' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Surface area: 645.16 mm²' })).toBeVisible();
+    rerenderPanel({ expanded: false, selection: [], result: { rows: [] } });
+    expect(screen.queryByRole('region', { name: 'Selection measurements' })).toBeNull();
+    rerenderPanel({ selection, result: measured });
+    expect(screen.getByRole('button', { name: 'Length: 25.4 mm' })).toBeVisible();
+    rerenderPanel({ expanded: true });
+    expect(screen.getByLabelText('Length unit')).toHaveValue('mm');
+    expect(JSON.stringify({ selection, measured })).toBe(original);
+  });
+
   it('converts lengths, areas and angles with independent dimensions and filters result types', () => {
     setup({
       expanded: true,

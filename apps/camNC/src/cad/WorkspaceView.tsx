@@ -440,19 +440,19 @@ export default function WorkspaceView({
         }}
       />
       <p role="status">{status}</p>
-      {(measure.expanded || measure.selection.length > 0) && (
-        <StudioMeasurePanel
-          selection={measure.selection}
-          result={measure.result}
-          expanded={measure.expanded}
-          selectedRowId={measure.selectedRowId}
-          onExpand={measure.open}
-          onClose={measure.close}
-          onClear={measure.clear}
-          onRemove={measure.remove}
-          onSelectRow={measure.selectRow}
-        />
-      )}
+      {/* The hidden inspector keeps explicit unit conversions until this workspace session ends. */}
+      <StudioMeasurePanel
+        defaultLengthUnit={document.lengthUnit ?? 'mm'}
+        selection={measure.selection}
+        result={measure.result}
+        expanded={measure.expanded}
+        selectedRowId={measure.selectedRowId}
+        onExpand={measure.open}
+        onClose={measure.close}
+        onClear={measure.clear}
+        onRemove={measure.remove}
+        onSelectRow={measure.selectRow}
+      />
       {children}
     </div>
   );

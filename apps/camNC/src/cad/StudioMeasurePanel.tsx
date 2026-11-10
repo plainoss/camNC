@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import type { CadLengthUnit } from '@wbcnc/cad';
 import type { MeasureEntity, MeasureResult, MeasureRow } from './measureGeometry';
 import { formatCadValue } from './valueExpressions';
 import './studioMeasurePanel.css';
@@ -13,6 +14,8 @@ export interface StudioMeasurePanelProps {
   selection: readonly StudioMeasureSelection[];
   result: MeasureResult;
   expanded: boolean;
+  /** The design preference initializes readouts; explicit conversions stay local to this inspector session. */
+  defaultLengthUnit?: CadLengthUnit;
   selectedRowId?: string | null;
   onExpand: () => void;
   /** Collapse the inspector while keeping the selected geometry and quick readout. */
@@ -24,7 +27,7 @@ export interface StudioMeasurePanelProps {
   copyText?: (text: string) => Promise<void>;
 }
 
-type LengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft' | 'yd';
+type LengthUnit = CadLengthUnit | 'yd';
 type AngleUnit = 'deg' | 'rad';
 type MeasureType = 'all' | 'distance' | 'length' | 'position' | 'angle' | 'area';
 const lengthScales: Record<LengthUnit, number> = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8, yd: 914.4 };
@@ -46,6 +49,7 @@ export function StudioMeasurePanel({
   selection,
   result,
   expanded,
+  defaultLengthUnit = 'mm',
   selectedRowId,
   onExpand,
   onClose,
@@ -56,7 +60,7 @@ export function StudioMeasurePanel({
 }: StudioMeasurePanelProps) {
   const id = useId();
   const dialog = useRef<HTMLDialogElement>(null);
-  const [lengthUnit, setLengthUnit] = useState<LengthUnit>('mm');
+  const [lengthUnit, setLengthUnit] = useState<LengthUnit>(defaultLengthUnit);
   const [angleUnit, setAngleUnit] = useState<AngleUnit>('deg');
   const [filter, setFilter] = useState<MeasureType>('all');
   const [copyStatus, setCopyStatus] = useState('');

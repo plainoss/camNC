@@ -1,5 +1,5 @@
-import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { createPlateDocument, type CadDocument, type CadLengthUnit } from '@wbcnc/cad';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { endCadSession } from '@wbcnc/cad-editor/session';
@@ -16,9 +16,11 @@ afterEach(async () => {
   await page.viewport(1280, 800);
 });
 
-async function setup() {
+async function setup(lengthUnit?: CadLengthUnit) {
   await page.viewport(1776, 1115);
   const source = createPlateDocument({ width: 100, height: 60, thickness: 18 });
+  if (lengthUnit) source.lengthUnit = lengthUnit;
+  const original = JSON.stringify(source);
   sessionId = source.id;
   const change = vi.fn<(document: CadDocument) => void>();
   render(
@@ -29,7 +31,11 @@ async function setup() {
   await waitFor(() => expect(document.querySelector('.cad-editor')).toHaveAttribute('aria-busy', 'false'), { timeout: 20000 });
   // Wait for the lazy workspace itself before the separate camera readiness check.
   const frame = await screen.findByTestId('workspace-3d', {}, { timeout: 20000 });
-  const props = () => vi.mocked(ModelViewport).mock.calls.findLast(([props]) => props.cameraState)![0];
+  // Spy history can outlive the previous fixture; its camera must belong to this design's body.
+  const props = () =>
+    vi
+      .mocked(ModelViewport)
+      .mock.calls.findLast(([props]) => props.cameraState && props.meshes.some(mesh => mesh.partId === source.parts[0]!.id))![0];
   // The lazy Canvas publishes its first camera frame after shader/context startup, which can outlast a second under suite load.
   await waitFor(() => expect(props().cameraState!.current).not.toBeNull(), { timeout: 20000 });
   const view = async (digit: number, z: number) => {
@@ -49,8 +55,37 @@ async function setup() {
       position: { x: box.width / 2 + (dot(right) * box.height) / height, y: box.height / 2 - (dot(up) * box.height) / height },
     });
   };
-  return { source, change, frame, view, click };
+  return { source, original, change, frame, view, click };
 }
+
+it.each([
+  { unit: 'cm', length: '10 cm' },
+  { unit: 'in', length: '3.937 in' },
+] as const)(
+  'uses the design $unit default and retains a manual conversion after clearing and repicking without editing the design',
+  async ({ unit, length }) => {
+    const { source, original, change, view, click, frame } = await setup(unit);
+    await view(5, 1);
+    await click([50, 0, 18]);
+    const quick = await screen.findByRole('region', { name: 'Selection measurements' });
+    expect(within(quick).getByRole('button', { name: `Length: ${length}` })).toBeVisible();
+    await userEvent.click(within(quick).getByRole('button', { name: 'Measure [' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Measure' });
+    expect(within(dialog).getByLabelText('Length unit')).toHaveValue(unit);
+    expect(within(dialog).getByRole('button', { name: `Length: ${length}` })).toBeVisible();
+    fireEvent.change(within(dialog).getByLabelText('Length unit'), { target: { value: 'mm' } });
+    expect(within(dialog).getByRole('button', { name: 'Length: 100 mm' })).toBeVisible();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close Measure' }));
+    await userEvent.click(frame.querySelector('canvas')!, { position: { x: 10, y: 80 } });
+    expect(screen.queryByRole('region', { name: 'Selection measurements' })).toBeNull();
+    await click([50, 0, 18]);
+    expect(screen.getByRole('button', { name: 'Length: 100 mm' })).toBeVisible();
+    expect(change.mock.calls.at(-1)?.[0] ?? source).toEqual(source);
+    expect(JSON.stringify(source)).toBe(original);
+    expect(screen.getByRole('button', { name: 'Undo (Ctrl or Command Z)' })).toBeDisabled();
+  },
+  kViewportWorkflowTimeout
+);
 
 it(
   'measures actual opposite stock faces with native viewport picks and keeps document/history unchanged',
