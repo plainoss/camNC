@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
 import { kStudioCommands, type StudioCommand } from './studioCommands';
 
@@ -12,6 +12,7 @@ export function StudioToolbar({
   busy,
   disabled,
   active,
+  searchHighlight,
   canUndo,
   canRedo,
   onCommand,
@@ -27,6 +28,8 @@ export function StudioToolbar({
   /** Commands that need something first, such as a selected part, with why. */
   disabled: Partial<Record<StudioCommand, string>>;
   active: StudioCommand | null;
+  /** Search previews a command without selecting or activating it. */
+  searchHighlight?: string | null;
   canUndo: boolean;
   canRedo: boolean;
   canFinish: boolean;
@@ -39,6 +42,13 @@ export function StudioToolbar({
   onSearch?: () => void;
   children?: ReactNode;
 }) {
+  const features = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Reveal overflowed commands on narrow screens while keyboard focus stays in search.
+    features.current
+      ?.querySelector<HTMLElement>('[data-command-highlight="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [searchHighlight]);
   return (
     <header
       className="cad-toolbar cad-studio-toolbar"
@@ -46,12 +56,13 @@ export function StudioToolbar({
       aria-label="Part Studio toolbar"
       title="Views: Shift+1 Front, Shift+2 Back, Shift+3 Left, Shift+4 Right, Shift+5 Top, Shift+6 Bottom, Shift+7 Isometric. F fits the model. P toggles base planes. Y hides the part under the pointer, Shift+T toggles transparency, Shift+Y shows all, Shift+I isolates the selected part.">
       {/* Scroll the feature commands so they cannot widen the mobile viewport or push Done off screen. */}
-      <div className="cad-tool-group cad-drawing-tools" role="group" aria-label="Part Studio features" inert={busy}>
+      <div ref={features} className="cad-tool-group cad-drawing-tools" role="group" aria-label="Part Studio features" inert={busy}>
         {kStudioCommands.map(command => (
           <ToolHint key={command.id} label={disabled[command.id] ?? command.hint}>
             <button
               type="button"
               className="cad-studio-command"
+              data-command-highlight={(searchHighlight === command.id && !disabled[command.id]) || undefined}
               aria-pressed={active === command.id}
               aria-disabled={disabled[command.id] ? true : undefined}
               onClick={() => !disabled[command.id] && onCommand(command.id)}>
