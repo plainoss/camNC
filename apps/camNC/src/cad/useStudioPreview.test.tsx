@@ -28,6 +28,8 @@ it('scopes an unsaved candidate to its opening document and dialog, including la
   expect(result.current.document).toBe(source);
   act(() => result.current.update(candidate));
   expect(result.current.document.parts[0]!.thickness).toBe(29);
+  act(() => oldUpdate({ ...candidate, parts: candidate.parts.map(part => ({ ...part, thickness: 31 })) }));
+  expect(result.current.document.parts[0]!.thickness).toBe(29);
   const changed = { ...source, revision: source.revision + 1 };
   rerender({ document: changed, owner: nextOwner });
   expect(result.current.document).toBe(changed);

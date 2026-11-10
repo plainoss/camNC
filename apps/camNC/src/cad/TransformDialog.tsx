@@ -279,10 +279,10 @@ export function TransformDialog({
     };
     if (!copy) return addCopy({ offset, mirrored, turn }).document;
     // By X, Y and Z, a copy no longer follows the direction it was picked along.
-    const moved = setPartCopyOffset(document, part.id, copy.id, { offset, mirrored, turn });
-    return {
-      ...moved,
-      parts: moved.parts.map(candidate =>
+    // Clear the old direction before resolving the new offset, or it replaces the freshly typed XYZ values.
+    const independent = {
+      ...document,
+      parts: document.parts.map(candidate =>
         candidate.id !== part.id
           ? candidate
           : {
@@ -296,6 +296,7 @@ export function TransformDialog({
             }
       ),
     };
+    return setPartCopyOffset(independent, part.id, copy.id, { offset, mirrored, turn });
   }, [
     document,
     part,

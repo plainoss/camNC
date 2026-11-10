@@ -159,3 +159,33 @@ it.each([false, true])('copies from the original connector to a connector in the
   await waitFor(() => expect(latest()?.parts[0]?.copies?.find(copy => !copy.pattern)?.offset?.position).toEqual([0, 0, copy ? 282 : -18]));
   expect(screen.queryByRole('alert')).toBeNull();
 });
+
+it('releases an existing distance copy before previewing typed XYZ and saves that preview', async () => {
+  const document = createPlateDocument({ width: 200, height: 100 });
+  const part = document.parts[0]!;
+  part.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  part.copies = [
+    {
+      id: 'along-copy',
+      along: { along: { plane: 'front' }, distance: 30 },
+      offset: { position: [0, -30, 0], rotation: [0, 0, 0, 1] },
+    },
+  ];
+  const preview = vi.fn<(document: CadDocument | null) => void>();
+  const save = vi.fn();
+  render(<TransformDialog document={document} part={part} copyId="along-copy" onSave={save} onCancel={() => {}} onPreview={preview} />);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Transform type' }), { target: { value: 'xyz' } });
+  fireEvent.change(screen.getByRole('textbox', { name: 'X' }), { target: { value: '80' } });
+  await waitFor(() =>
+    expect(preview.mock.calls.at(-1)?.[0]?.parts[0]?.copies?.[0]).toMatchObject({
+      id: 'along-copy',
+      offset: { position: [80, -30, 0] },
+      placement: { position: [80, -30, 0] },
+    })
+  );
+  const candidate = preview.mock.calls.at(-1)![0]!;
+  expect(candidate.parts[0]!.copies![0]!.along).toBeUndefined();
+  expect(part.copies[0]!.along).toEqual({ along: { plane: 'front' }, distance: 30 });
+  fireEvent.click(screen.getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(candidate));
+});

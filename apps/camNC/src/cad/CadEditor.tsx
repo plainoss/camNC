@@ -272,7 +272,7 @@ import { bindPartCorners, partCornerInference } from './partCornerInference';
 import { newSketchPart } from './newSketchPart';
 import { ExtrudeDialog, PartPatternDialog, type CadConnectorPick } from './PartFeatureDialogs';
 import { StudioStepDialogs } from './StudioStepDialogs';
-import { useStudioPreview } from './useStudioPreview';
+import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 import './cad.css';
 
@@ -4338,7 +4338,7 @@ export function CadEditor({
               plane={planeDialog}
               mirror={mirrorDialog}
               fillet={filletDialog}
-              commit={commit}
+              commit={next => commit(prepareStudioPreview(next))}
               onPreview={studioPreview.update}
               onConnectorsChange={setMateConnectors}
               setTransform={setTransformDialog}
@@ -4606,7 +4606,7 @@ export function CadEditor({
                           );
                       const document = 'document' in made ? made.document : made;
                       const id = 'document' in made ? made.id : partCutting.id!;
-                      commit(updatePartCut(document, id, { consumeTools }));
+                      commit(prepareStudioPreview(updatePartCut(document, id, { consumeTools })));
                       setPartCutting(null);
                     }}
                   />
