@@ -1193,7 +1193,7 @@
    },
    "toolpaths": {
     "bit": 3.175,
-    "minutes": 112.1,
+    "minutes": 103.5,
     "operations": [
      {
       "label": "Edge groove 6 deep",
@@ -1971,7 +1971,7 @@
      "ok": true
     }
    ],
-   "minutes": 313.7,
+   "minutes": 297.5,
    "operations": [
     {
      "label": "Edge groove 6 deep",
