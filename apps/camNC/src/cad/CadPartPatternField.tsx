@@ -1,6 +1,6 @@
+import { useDesignUnits } from './designUnits';
 import { CAD_MAX_PART_PATTERN, type CadDocument, type CadDrawnOn, type CadPartPattern, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 import './cadThicknessField.css';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
@@ -48,6 +48,7 @@ function LinearPartPatternField({
   /** Patterning from the start, as the reference's Linear pattern dialog opens: no checkbox to switch it on first. */
   ready?: boolean;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const id = useId();
   // Opened ready, a part without a pattern gets one straight away; the dialog's cancel takes it back off.
   useEffect(() => {
@@ -72,7 +73,7 @@ function LinearPartPatternField({
   };
   const current = pattern ?? kStart;
   const typedCount = current.countExpression ?? String(current.count),
-    typedSpacing = current.spacingExpression ?? formatCadValue(current.spacing);
+    typedSpacing = current.spacingExpression ?? lengthText(current.spacing);
   const [count, setCount] = useState(typedCount);
   const [spacing, setSpacing] = useState(typedSpacing);
   const [error, setError] = useState<string | null>(null);
@@ -305,7 +306,7 @@ function LinearPartPatternField({
                 onKeyDown={keys}
               />
             </span>
-            mm
+            {lengthUnit}
           </label>
         </>
       )}

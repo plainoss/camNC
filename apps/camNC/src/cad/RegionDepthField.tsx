@@ -1,6 +1,6 @@
+import { useDesignUnits } from './designUnits';
 import type { CadCutDepth, CadValueScope } from '@wbcnc/cad';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { parseCadValue } from './valueExpressions';
 
 /** Sets how deep one region is cut. Every choice applies at once, and Escape leaves it as it was. */
 export function RegionDepthField({
@@ -23,7 +23,8 @@ export function RegionDepthField({
   onChoose: (depth: CadCutDepth, expression?: string) => void;
   onClose: () => void;
 }) {
-  const [text, setText] = useState(expression ?? String(depth === 'through' ? thickness : depth));
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
+  const [text, setText] = useState(expression ?? lengthText(depth === 'through' ? thickness : depth));
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     input.current?.focus();
@@ -36,7 +37,7 @@ export function RegionDepthField({
     <div className="cad-region-depth" style={style} role="group" aria-label="Cut depth">
       <input
         ref={input}
-        aria-label="Depth in mm"
+        aria-label={`Depth in ${lengthUnit}`}
         aria-invalid={!valid}
         title={'error' in parsed ? parsed.error : undefined}
         spellCheck={false}
@@ -49,7 +50,7 @@ export function RegionDepthField({
             onChoose(value >= thickness ? 'through' : value, 'value' in parsed ? parsed.expression : undefined);
         }}
       />
-      <span className="cad-muted">mm</span>
+      <span className="cad-muted">{lengthUnit}</span>
       <button type="button" onClick={() => onChoose('through')}>
         Through
       </button>

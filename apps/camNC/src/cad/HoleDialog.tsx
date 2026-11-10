@@ -1,8 +1,8 @@
+import { useDesignUnits } from './designUnits';
 import { extrudeStepProblem, type CadDocument, type CadPart, type CadValueScope } from '@wbcnc/cad';
 import { useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 
 /**
  * A Hole step: a round hole at each point of a sketch drawn on a part's face, as wide as the diameter, through the part
@@ -23,9 +23,10 @@ export function HoleDialog({
   onOk: () => void;
   onCancel: () => void;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const depth = part.remove?.depth ?? 'through';
-  const [diameterText, setDiameterText] = useState(part.hole?.diameterExpression ?? formatCadValue(part.hole?.diameter ?? 5));
-  const [depthText, setDepthText] = useState(depth === 'through' ? '10' : (part.remove?.depthExpression ?? formatCadValue(depth)));
+  const [diameterText, setDiameterText] = useState(part.hole?.diameterExpression ?? lengthText(part.hole?.diameter ?? 5));
+  const [depthText, setDepthText] = useState(depth === 'through' ? lengthText(10) : (part.remove?.depthExpression ?? lengthText(depth)));
   const [error, setError] = useState<string | null>(null);
   const change = (next: (p: CadPart) => CadPart) =>
     onChange(current => ({ ...current, parts: current.parts.map(p => (p.id === part.id ? next(p) : p)) }));
@@ -72,7 +73,7 @@ export function HoleDialog({
             onKeyDown={event => event.key === 'Enter' && apply()}
           />
         </span>
-        mm
+        {lengthUnit}
       </label>
       <label className="cad-number-field">
         Termination
@@ -100,7 +101,7 @@ export function HoleDialog({
               onKeyDown={event => event.key === 'Enter' && apply(undefined, false)}
             />
           </span>
-          mm
+          {lengthUnit}
         </label>
       )}
       {(error || problem) && (

@@ -1,3 +1,4 @@
+import { withCadLengthUnit } from './lengthUnits';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { newCadId, originId } from './document';
@@ -98,6 +99,8 @@ export function faceSketchDocument(document: CadDocument, partId: string, sketch
     version: 1,
     id: `${document.id}:face:${sketchId}`,
     name: document.name,
+    lengthUnit: document.lengthUnit,
+    variables: document.variables,
     revision: document.revision,
     parts: [{ id: part.id, name: part.name, thickness: part.thickness, sketch: face.sketch }],
   };
@@ -105,8 +108,13 @@ export function faceSketchDocument(document: CadDocument, partId: string, sketch
 
 /** Puts an edited face sketch back into its document. */
 export function withFaceSketchDocument(document: CadDocument, partId: string, sketchId: string, edited: CadDocument): CadDocument {
+  // A face editor changes the preference for the whole design, including expressions outside its one sketch.
+  document = withCadLengthUnit(document, edited.lengthUnit ?? 'mm');
   return {
     ...document,
+    name: edited.name,
+    variables: edited.variables ?? document.variables,
+    lengthUnit: edited.lengthUnit,
     revision: Math.max(document.revision, edited.revision),
     parts: document.parts.map(part =>
       part.id !== partId

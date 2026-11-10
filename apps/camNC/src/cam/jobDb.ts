@@ -193,7 +193,7 @@ export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV
     name,
     (await listJobsIn(context)).map(j => j.name)
   );
-  const draft = createCadDocument(title);
+  const draft = { ...createCadDocument(title), lengthUnit: 'cm' as const };
   draft.parts.push(createCadPart('Part 1'));
   return saveJobIn(context, {
     v: 1,
