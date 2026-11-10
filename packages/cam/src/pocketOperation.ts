@@ -3,6 +3,7 @@ import { CamInputError, validateCamSettings, validateDepthRange, validatePaths, 
 import { clipLines, difference, intersect, offset, pathLength, PRECISION, type Vec3 } from './geom';
 import type { MotionRole } from './motion';
 import { geometryTolerances, planAccuracy } from './accuracy';
+import { pocketEndpointDeviation, pocketRingSpacing } from './pocketSpacing';
 import type { CamSettings, Operation, Pass, Tool } from './toolpathTypes';
 import {
   type Loop,
@@ -328,7 +329,7 @@ function openPocketPasses(comp: PathsD, walls: PathsD, solid: PathsD, topZ: numb
     const pass: Pass =
       rampFrom !== undefined
         ? rampAlong(line, rampFrom, z, s)
-        : hop + 2 * pocketTransitionDeviation(s) <= s.stepoverFactor * tool.diameter && last && last[2] === z
+        : hop + 2 * pocketEndpointDeviation(s) <= s.stepoverFactor * tool.diameter && last && last[2] === z
           ? { pts: line.map(q => [q.x, q.y, z]), feeds: line.map(() => feed), link: 'direct' }
           : { pts: line.map(q => [q.x, q.y, z]), feeds: line.map((_, k) => (k === 0 ? s.plungeFeed : feed)), link: 'retract' };
     passes.push(pass);
@@ -354,12 +355,6 @@ function openPocketPasses(comp: PathsD, walls: PathsD, solid: PathsD, topZ: numb
 function pocketTransitionDeviation(settings: CamSettings): number {
   const budget = planAccuracy(settings.geometryTolerance, settings.sourceTolerance).budget;
   return budget.fitting + budget.outputRounding + budget.controllerRounding;
-}
-
-function pocketRingSpacing(settings: CamSettings, diameter: number): number {
-  const selected = settings.stepoverFactor * diameter;
-  const reserve = 2 * pocketTransitionDeviation(settings) + 0.001;
-  return selected > 2 * reserve ? selected - reserve : selected;
 }
 
 function withPocketTransitions(

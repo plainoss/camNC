@@ -18,7 +18,7 @@ All use `DEFAULT_SETTINGS`. The panel overrides only the tool diameter/name; poc
 
 `round-open.cases.json` holds the six additional inputs. Their circle primitives explicitly produce regular source polygons: the accuracy scope starts at those supplied polygon features, with no declared uncertainty for an original CAD circle. Containment assertions use every polygon half-plane. They do not silently grant an ideal circle's larger interior to a coarse polygon. All four tessellations and both open-pocket cases retain their generated `.nc` files, hashes, metrics and geometry/cost checks. The nine default-policy cases have nine programs; the combined corpus has 17 inputs and 18 programs.
 
-The retained programs total 148,779 bytes across the combined corpus, including 117,936 bytes for the nine default-policy programs. All six new programs together occupy 23,782 bytes. Individual byte counts and SHA-256 values are recorded in the manifests; historical dense programs remain outside the retained set.
+The retained programs total 134,731 bytes across the combined corpus, including 110,359 bytes for the nine default-policy programs. The six added open/round programs together occupy 21,064 bytes. Individual byte counts and SHA-256 values are recorded in the manifests; historical dense programs remain outside the retained set.
 
 `baseline-before.json` records the original three inputs run against an isolated archive of source commit `f5c76b20287b84f736d3e5bb19e01029281796d5`. The input SHA-256, expanded settings, generated-program SHA-256 and measurements are retained. Baseline source was isolated before edits to the motion planner. The ordinary regeneration command never overwrites this historical record.
 
@@ -30,20 +30,20 @@ For these defined fixtures, the before/after measurements are:
 | ----------------------------- | ----------------: | --------------------: | -------------------------: | ------------------------: |
 | Panel 600×400×18, D6          |          205 → 90 |                 0 → 0 |                     14 → 3 |        1473.588 → 594.026 |
 | Outline 120×80×12, D3.175     |         235 → 100 |                 0 → 0 |                     16 → 3 |         408.926 → 161.597 |
-| Pocket 150×120×6 deep, D3.175 |      12910 → 3555 |              9024 → 0 |                    185 → 9 |       2209.624 → 2104.250 |
+| Pocket 150×120×6 deep, D3.175 |      12910 → 3355 |              9024 → 0 |                    185 → 9 |       2209.624 → 1992.029 |
 
 For the added fixtures, the earlier source is the separately captured `850731a` baseline:
 
 | Case                                  | Executable blocks | G1 blocks | Retract/clearance commands | Modeled automatic seconds |
 | ------------------------------------- | ----------------: | --------: | -------------------------: | ------------------------: |
 | Open 400×12×9 deep, D6                |         196 → 148 |  108 → 72 |                     19 → 7 |         324.015 → 305.947 |
-| Open 400×40×3 deep, D6                |         185 → 127 |   99 → 70 |                     19 → 4 |         284.900 → 269.474 |
-| Round D60×6 deep, 64 source segments  |        1146 → 138 | 1090 → 38 |                      3 → 3 |          99.433 → 100.060 |
-| Round D60×6 deep, 128 source segments |        1541 → 119 | 1462 → 32 |                      6 → 5 |         103.259 → 102.472 |
-| Round D60×6 deep, 256 source segments |         874 → 111 |  786 → 27 |                      6 → 5 |         103.974 → 103.014 |
-| Round D60×6 deep, 512 source segments |         116 → 112 |   28 → 28 |                      5 → 5 |         102.404 → 103.072 |
+| Open 400×40×3 deep, D6                |         185 → 124 |   99 → 70 |                     19 → 3 |         284.900 → 268.365 |
+| Round D60×6 deep, 64 source segments  |        1146 → 120 | 1090 → 40 |                      3 → 3 |           99.433 → 84.963 |
+| Round D60×6 deep, 128 source segments |        1541 → 104 | 1462 → 34 |                      6 → 5 |          103.259 → 87.679 |
+| Round D60×6 deep, 256 source segments |          874 → 94 |  786 → 26 |                      6 → 5 |          103.974 → 87.686 |
+| Round D60×6 deep, 512 source segments |          116 → 94 |   28 → 26 |                      5 → 5 |          102.404 → 87.754 |
 
-The round-case improvement concerns arc recovery and program size; modeled time is broadly unchanged. All new cases keep the same 0.05 mm total budget and feature scope. The current manifest and six-case historical record retain the configured stage allocations, including the separately reserved output/controller precision. Open cases retain step-limited cutting transitions and conservative fallbacks rather than requiring every hop to stay down.
+Current ring spacing distinguishes pinned pass endpoints from fitted ring interiors. Output/controller uncertainty bounds the straight cutting hop, while a separate full-path overlap bound protects floor coverage near a full-diameter stepover. The 150×120 mm default pocket now has 184 passes instead of 196, retaining nine retract/clearance commands. All cases keep the same 0.05 mm total budget and feature scope. The current manifest and six-case historical record retain the configured stage allocations, including the separately reserved output/controller precision. Open cases retain step-limited cutting transitions and conservative fallbacks rather than requiring every hop to stay down. These modeled improvements do not qualify physical cutting feeds or predict measured cycle times.
 
 `limits.json` supplies independent ceilings with headroom above the improved output. All three original pre-change cases exceed their block, retract and modeled-time ceilings; the rectangular pocket also exceeds its tiny-line ceiling. Round cases additionally cap G1 blocks and require circular blocks. Updating the generated files cannot bypass these limits. Tests also require final-depth profile-wall midpoints, clearance from retained rectangles beside open edges, source-polygon containment for circular pockets, wall coverage, and floor coverage spanning every cavity.
 
