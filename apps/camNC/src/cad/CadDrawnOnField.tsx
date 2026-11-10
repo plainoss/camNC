@@ -13,9 +13,11 @@ export function CadDrawnOnField({
   onChange,
   onDone,
   inwardToggle = true,
+  livePreview = false,
 }: {
   /** Whether it offers growing into the face, which the Extrude dialog's flip does instead. */
   inwardToggle?: boolean;
+  livePreview?: boolean;
   document: CadDocument;
   part: CadPart & { drawnOn: CadDrawnOn };
   variables?: CadValueScope;
@@ -33,10 +35,13 @@ export function CadDrawnOnField({
       setError(null);
     }
   }, [typed]);
-  const apply = () => {
-    const parsed = parseCadValue(text, { unit: 'mm', variables });
-    if ('error' in parsed) return setError(parsed.error);
-    dirty.current = false;
+  const apply = (value = text, preview = false) => {
+    const parsed = parseCadValue(value, { unit: 'mm', variables });
+    if ('error' in parsed) {
+      if (!preview) setError(parsed.error);
+      return;
+    }
+    if (!preview) dirty.current = false;
     setError(null);
     if (parsed.value !== part.drawnOn.offset || parsed.expression !== part.drawnOn.offsetExpression) {
       const next: CadDrawnOn = { ...part.drawnOn, offset: parsed.value, offsetExpression: parsed.expression };
@@ -60,6 +65,7 @@ export function CadDrawnOnField({
             onChange={event => {
               dirty.current = true;
               setText(event.target.value);
+              if (livePreview) apply(event.target.value, true);
             }}
             onBlur={() => {
               if (dirty.current) apply();

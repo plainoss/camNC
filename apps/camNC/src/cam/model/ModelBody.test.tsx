@@ -1,8 +1,8 @@
 import { Canvas, useThree } from '@react-three/fiber';
 import { cleanup, render, waitFor } from '@testing-library/react';
-import { parseCadDocument } from '@wbcnc/cad';
+import { createPlateDocument, parseCadDocument } from '@wbcnc/cad';
 import { memo } from 'react';
-import { BufferGeometry, EdgesGeometry, Mesh, type Scene } from 'three';
+import { BufferGeometry, EdgesGeometry, Mesh, OrthographicCamera, Raycaster, Vector2, type Scene } from 'three';
 import { afterEach, expect, it, vi } from 'vitest';
 import designText from '../../../../../packages/cad-script/fixtures/designs/finger-joint-face-sketch.json?raw';
 import { assemblyModel } from '../../cad/assemblyModel';
@@ -48,6 +48,27 @@ function endpoints(geometry: BufferGeometry, names: string[]) {
     })
     .sort();
 }
+
+it('lets a corner pick reach the solid face through its decorative edge overlay', async () => {
+  const document = createPlateDocument({ width: 120, height: 80, thickness: 18 });
+  document.parts[0]!.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  const mesh = assemblyModel(document).meshes[0]!;
+  render(<View mesh={mesh} />);
+  await waitFor(() => expect(scene?.children.find(child => child instanceof Mesh)?.children.length).toBeGreaterThan(0));
+  const body = scene!.children.find(child => child instanceof Mesh)!;
+  const camera = new OrthographicCamera(-100, 100, 100, -100, 0.1, 500);
+  camera.position.set(0, 0, 200);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  scene!.updateMatrixWorld(true);
+  const ray = new Raycaster();
+  ray.setFromCamera(new Vector2(0, 0), camera);
+  const hits = ray.intersectObject(body, true);
+  expect(hits.length).toBeGreaterThan(0);
+  // A line hit has no face and would prevent selecting a mate connector at this corner.
+  expect(hits.every(hit => hit.face != null)).toBe(true);
+  expect(hits[0]!.point.toArray()).toEqual([0, 0, 18]);
+});
 
 it('updates the visible edges with the solid when a joint changes from five to three to eight fingers', async () => {
   const document = parseCadDocument(JSON.parse(designText));

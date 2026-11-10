@@ -10,6 +10,7 @@ export function ShapeStepDialogs({
   mirror,
   fillet,
   commit,
+  onPreview,
   setMirror,
   setFillet,
   setDirectionPicker,
@@ -20,6 +21,7 @@ export function ShapeStepDialogs({
   mirror: { partId: string; copyId?: string } | null;
   fillet: { partId?: string; filletId?: string } | null;
   commit: (document: CadDocument) => void;
+  onPreview?: (document: CadDocument | null) => void;
   setMirror: (open: null) => void;
   setFillet: (open: null) => void;
   /** Hands the view's next plane or face pick to a dialog, or stops it with null. */
@@ -31,7 +33,7 @@ export function ShapeStepDialogs({
       {fillet && (
         <FilletDialog
           key={fillet.filletId ?? 'new'}
-          {...{ document, variables, ...fillet, pickEdge }}
+          {...{ document, variables, ...fillet, pickEdge, onPreview }}
           onSave={next => (commit(next), setFillet(null))}
           onCancel={() => setFillet(null)}
         />
@@ -40,6 +42,7 @@ export function ShapeStepDialogs({
         <MirrorDialog
           key={mirror.copyId ?? mirror.partId}
           document={document}
+          onPreview={onPreview}
           {...mirror}
           pickPlane={picked => setDirectionPicker(picked)}
           onSave={next => (commit(next), setDirectionPicker(null), setMirror(null))}
