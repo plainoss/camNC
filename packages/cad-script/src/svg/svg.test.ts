@@ -139,12 +139,26 @@ it('imports native constrained curves, solves holes and round-trips while preser
 it('imports native conics/Beziers that remain valid after solving', async () => {
   const asset = parseSvgSketch(svg('<path d="M0 40 C20 0 80 0 100 40 L100 80 A50 20 0 0 1 0 80 Z"/>'));
   const part = createCadPart();
-  part.sketch = appendSvgToSketch(part.sketch, asset);
+  part.sketch = appendSvgToSketch(part.sketch, asset, { width: 280, height: 190, preserveAspect: false });
   expect(part.sketch.entities.some(e => e.type === 'bezier')).toBe(true);
   expect(part.sketch.entities.some(e => e.type === 'conic')).toBe(true);
-  const solved = await solveCadDocument({ ...createCadDocument(), parts: [part] });
+  const input = parseCadDocument(JSON.parse(JSON.stringify({ ...createCadDocument(), parts: [part] })));
+  const solved = await solveCadDocument(input);
   expect(solved.status, JSON.stringify(solved.diagnostics)).toBe('solved');
   expect(solved.parts[0].outline.length).toBeGreaterThan(5);
+  const changed = structuredClone(solved.document),
+    sketch = changed.parts[0].sketch;
+  const curve = sketch.entities.find(e => e.type === 'bezier')!;
+  if (curve.type !== 'bezier') throw new Error('Expected native Bezier.');
+  const controlId = curve.controlPointIds[1],
+    dimension = sketch.constraints.find(c => c.type === 'positionY' && c.pointId === controlId)!;
+  if (dimension.type !== 'positionY') throw new Error('Expected editable position dimension.');
+  const y = dimension.value + 1;
+  dimension.value = y;
+  const resized = await solveCadDocument(parseCadDocument(JSON.parse(JSON.stringify(changed))));
+  expect(resized.status, JSON.stringify(resized.diagnostics)).toBe('solved');
+  expect(resized.document.parts[0].sketch.entities.find(e => e.id === controlId)).toMatchObject({ y: expect.closeTo(y, 7) });
+  expect(resized.document.parts[0].sketch.entities.map(e => e.id)).toEqual(sketch.entities.map(e => e.id));
 });
 it('deduplicates session handles and returns isolated geometry copies', () => {
   const store = createSvgAssetStore(),
@@ -180,4 +194,9 @@ it('ignores legal zero-length commands without importing hidden descriptive geom
   const asset = parseSvgSketch(svg('<path d="M0 0L0 0 A10 10 0 0 1 0 0 H100V100H0Z"/>'));
   expect(asset.contours[0].segments).toHaveLength(4);
   expect(() => parseSvgSketch(svg('<title><rect width="10" height="10"/></title>'))).toThrow(/descriptive/);
+});
+
+it('rejects long malformed tag input with a bounded linear preflight', () => {
+  expect(() => parseSvgSketch('<svg ' + 'a'.repeat(900000))).toThrow(/incomplete tag/);
+  expect(() => parseSvgSketch('<g'.repeat(100000))).toThrow(/Invalid SVG XML tag/);
 });

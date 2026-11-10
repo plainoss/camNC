@@ -11,3 +11,6 @@ export {
   type SvgSegment,
   type SvgSketchAsset,
 } from './types';
+
+export { checkSvgCandidate, type CheckSvgOptions } from './check';
+export { createDocumentSvgAssetRegistry } from './registry';

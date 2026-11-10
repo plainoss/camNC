@@ -2,6 +2,7 @@ import { DOMParser, type Element } from '@xmldom/xmldom';
 import { geometryBounds } from './bounds';
 import { identity, lengthMm, multiply, numbers, parseTransform, transformPoint, viewportMatrix, type Matrix } from './matrix';
 import { parsePath } from './path';
+import { preflightSvg } from './preflight';
 import { filledContours } from './topology';
 import { finite, SVG_LIMITS, type SvgContour, type SvgSketchAsset } from './types';
 const svgNamespace = 'http://www.w3.org/2000/svg';
@@ -89,20 +90,7 @@ export function parseSvgSketch(source: string): SvgSketchAsset {
   // Reject declarations and resources before XML parsing, including entity expansion and CSS references.
   if (/<!\s*(?:DOCTYPE|ENTITY)|<\s*\?|\b(?:href|style|class)\s*=|\burl\s*\(/i.test(source.replace(/^\s*<\?xml\s+[^?]*\?>/, '')))
     throw new Error('SVG declarations, styles and external resources are unsupported.');
-  // Bound allocation and nesting before building an XML tree. Quoted '>' characters
-  // and comments cannot hide opening tags from this preflight.
-  let preflightDepth = 0,
-    preflightElements = 0;
-  for (const match of source.matchAll(/<!--[\s\S]*?-->|<(?:"[^"]*"|'[^']*'|[^'">])*>/g)) {
-    const tag = match[0];
-    if (tag.startsWith('<!--') || tag.startsWith('<?')) continue;
-    if (/^<\s*\//.test(tag)) preflightDepth--;
-    else {
-      if (++preflightElements > SVG_LIMITS.elements) throw new Error('SVG element limit exceeded.');
-      if (++preflightDepth > SVG_LIMITS.depth + 1) throw new Error('SVG nesting limit exceeded.');
-      if (/\/\s*>$/.test(tag)) preflightDepth--;
-    }
-  }
+  preflightSvg(source);
   const document = new DOMParser({
     onError: (_level, message) => {
       throw new Error(`Invalid SVG XML: ${message}`);

@@ -1,5 +1,6 @@
 import { addBezier, addConic, addConstraint, addLine, type CadSketch } from '@wbcnc/cad';
 import { geometryBounds } from './bounds';
+import { filledContours } from './topology';
 import { finite, SVG_LIMITS, type SvgPlacement, type SvgPoint, type SvgSegment, type SvgSketchAsset } from './types';
 /** Placement uses actual curve extrema. Uniform contain preserves the source's proportions. */
 export function placedSvgSegments(asset: SvgSketchAsset, placement: SvgPlacement = {}): SvgSegment[] {
@@ -40,7 +41,18 @@ export function placedSvgSegments(asset: SvgSketchAsset, placement: SvgPlacement
  */
 export function appendSvgToSketch(sketch: CadSketch, asset: SvgSketchAsset, placement: SvgPlacement = {}): CadSketch {
   let imported: CadSketch = { ...sketch, entities: [], constraints: [] };
-  for (const segment of placedSvgSegments(asset, placement)) {
+  const segments = placedSvgSegments(asset, placement);
+  let offset = 0;
+  // Fitting can shrink a formerly safe gap below CAD's point-sharing tolerance.
+  // Validate in final millimetres before adding any native geometry.
+  filledContours(
+    asset.contours.map(contour => {
+      const own = segments.slice(offset, offset + contour.segments.length);
+      offset += own.length;
+      return { ...contour, segments: own };
+    })
+  );
+  for (const segment of segments) {
     const p = segment.points.map(([x, y]) => ({ x, y }));
     if (segment.kind === 'line') imported = addLine(imported, { x1: p[0].x, y1: p[0].y, x2: p[1].x, y2: p[1].y });
     else if (segment.kind === 'bezier') imported = addBezier(imported, { points: p });

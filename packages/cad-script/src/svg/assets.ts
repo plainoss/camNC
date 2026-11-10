@@ -13,6 +13,7 @@ export interface SvgAssetSummary {
  * needs to echo the original XML or repeat large control polygons on repair turns.
  */
 export function createSvgAssetStore() {
+  const namespace = crypto.randomUUID();
   let next = 1;
   const entries = new Map<string, { source: string; name: string; asset: SvgSketchAsset }>();
   const getEntry = (handle: string) => {
@@ -37,7 +38,7 @@ export function createSvgAssetStore() {
       for (const [handle, entry] of entries) if (entry.source === source) return summary(handle);
       if (entries.size >= SVG_LIMITS.assets) throw new Error('SVG asset limit reached. Remove an asset or start a new conversation.');
       const asset = parseSvgSketch(source),
-        handle = `svg-${next++}`;
+        handle = `svg-${namespace}-${next++}`;
       entries.set(handle, { source, name: name.slice(0, 200), asset });
       return summary(handle);
     },
