@@ -1,3 +1,4 @@
+import { cadSketchFrame, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { CadViewport } from '@wbcnc/cad-editor/viewState';
 import type { SketchTurn } from './sketchOrbit';
@@ -75,4 +76,43 @@ export function cameraFromSketch(
     key: previous?.key,
     seq: previous?.seq,
   };
+}
+
+/** Read the camera from either 3D viewport before its canvas is unmounted. */
+export function carriedSketchCamera(
+  document: CadDocument,
+  part: CadPart | undefined,
+  camera: StudioCameraState | null,
+  root: HTMLElement | null
+) {
+  const frame = part && cadSketchFrame(document, part);
+  const bounds = root?.querySelector('[data-testid="workspace-3d"] canvas, [data-testid="part-3d"] canvas')?.getBoundingClientRect();
+  return camera && frame && bounds?.height ? sketchFromCamera(camera, frame, bounds.width / bounds.height) : null;
+}
+
+/** Save the drawing's actual letterboxed viewport before returning to the 3D canvas. */
+export function captureSketchCamera(
+  document: CadDocument,
+  part: CadPart | undefined,
+  camera: StudioCameraRef,
+  view: CadViewport,
+  turn: SketchTurn,
+  shift: [number, number],
+  box: { width: number; height: number } | null
+) {
+  const frame = part && cadSketchFrame(document, part);
+  if (!frame || !box?.height) return;
+  const scale = Math.min(box.width / view.w, box.height / view.h);
+  camera.current = cameraFromSketch(
+    frame,
+    {
+      x: view.x + view.w / 2 - box.width / scale / 2,
+      y: view.y + view.h / 2 - box.height / scale / 2,
+      w: box.width / scale,
+      h: box.height / scale,
+    },
+    turn,
+    camera.current,
+    shift
+  );
 }

@@ -27,6 +27,8 @@ import {
   pendingDesignDraft,
 } from '@/cam/designDraftRecovery';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
+import type { FaceSketchScene } from '@/cad/faceSketchScene';
+import type { StudioCameraRef } from '@/cad/studioCamera';
 import { CadEditor, type CadEditorController } from '@/cad/CadEditor';
 import { acknowledgeCadSession, cadSession, endCadSession, replaceCadSession, syncCadSession } from '@wbcnc/cad-editor/session';
 import { openAtMachine } from '@/cam/machine/openAtMachine';
@@ -91,7 +93,8 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   const [editorEpoch, setEditorEpoch] = useState(0);
   // Back from a face sketch, the editor opens on that part, where its new regions are cut.
   const [returnToPart, setReturnToPart] = useState<string | null>(null);
-  const [faceEdit, setFaceEdit] = useState<{ base: CadDocument; partId: string; sketchId: string } | null>(null);
+  const [faceEdit, setFaceEdit] = useState<{ base: CadDocument; partId: string; sketchId: string; scene?: FaceSketchScene } | null>(null);
+  const partCameraState = useRef<StudioCameraRef['current']>(null);
   const [conflicted, setConflicted] = useState(!!session.conflict);
   const [recovering, setRecovering] = useState(false);
   const activeSession = useRef(session);
@@ -334,6 +337,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
               floor: faceBelow && faceFloor ? flipUnderside(faceFloor) : faceFloor,
               label: `${faceFloor ? 'Pocket floor' : faceBelow ? 'Underside' : 'Top face'}${faceBelow ? ', seen from below' : ''}`,
               below: faceBelow,
+              scene: faceEdit.scene,
             }}
             onDraftChange={edited => {
               const merged = withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited);
@@ -355,10 +359,11 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
           <CadEditor
             key={editorEpoch}
             document={editorDocument}
+            partCameraState={partCameraState}
             startIn3D={returnToPart ? 'part' : true}
-            onEditFaceSketch={(base, partId, sketchId) => {
+            onEditFaceSketch={(base, partId, sketchId, scene) => {
               draft(base);
-              setFaceEdit({ base, partId, sketchId });
+              setFaceEdit({ base, partId, sketchId, scene });
             }}
             preferredPartId={returnToPart ?? context.part}
             onDraftChange={draft}

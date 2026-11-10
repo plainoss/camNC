@@ -7,6 +7,10 @@ import { kPlaneMarker, planeGivesWay } from './planePicking';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { ViewCube } from './ViewCube';
 import { ModelBody } from './ModelBody';
+import { ModelFaceHighlight } from './ModelFaceHighlight';
+import { ExtrudeDepthArrow } from './ExtrudeDepthArrow';
+import type { ExtrudeDepthControl } from '@/cad/extrudeDepth';
+import { sameFacePlane } from './faceHighlight';
 import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
@@ -192,11 +196,13 @@ export function FitCamera({
   fitKey,
   viewRequest,
   cameraState,
+  initialDirection,
 }: {
   box: THREE.Box3;
   fitKey?: string;
   viewRequest?: ViewRequest;
   cameraState?: StudioCameraRef;
+  initialDirection?: [number, number, number];
 }) {
   const camera = useThree(s => s.camera) as THREE.PerspectiveCamera | THREE.OrthographicCamera;
   const controls = useThree(s => s.controls) as OrbitControlsImpl | null;
@@ -255,7 +261,7 @@ export function FitCamera({
         ? camera.getWorldDirection(new THREE.Vector3()).negate()
         : name === 'normal' || viewRequest?.direction
           ? new THREE.Vector3(...(viewRequest?.direction ?? [0, 0, 1])).normalize()
-          : new THREE.Vector3(...(ortho && !viewRequest ? [0.77, -1, 0.17] : kViewDirections[name])).normalize();
+          : new THREE.Vector3(...(ortho && !viewRequest ? (initialDirection ?? [0.77, -1, 0.17]) : kViewDirections[name])).normalize();
     if (name === 'normal') camera.up.set(...(viewRequest?.up ?? [0, 1, 0]));
     else if (name !== 'fit') {
       const vertical = Math.abs(direction.z) > 1 - 1e-10;
@@ -290,7 +296,7 @@ export function FitCamera({
     }
     // The view draws only when something changes, and moving the camera is a change.
     invalidate();
-  }, [box, camera, controls, aspect, fitKey, viewRequest, invalidate, cameraState]);
+  }, [box, camera, controls, aspect, fitKey, viewRequest, invalidate, cameraState, initialDirection]);
   return null;
 }
 
@@ -311,7 +317,7 @@ export interface SketchView {
   turned?: { right: [number, number, number]; up: [number, number, number]; back: [number, number, number] };
 }
 
-function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 }) {
+export function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 }) {
   const set = useThree(s => s.set);
   const size = useThree(s => s.size);
   const invalidate = useThree(s => s.invalidate);
@@ -369,6 +375,7 @@ export function ModelViewport({
   milled,
   highlightIds = [],
   selectedIndexes,
+  selectedFace,
   warnIds = [],
   onSelect,
   onPickFace,
@@ -388,6 +395,8 @@ export function ModelViewport({
   regions = [],
   onPickRegion,
   cameraState,
+  extrusionDepth,
+  onPickSketch,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -429,7 +438,11 @@ export function ModelViewport({
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
   cameraState?: StudioCameraRef;
+  extrusionDepth?: ExtrudeDepthControl | null;
+  onPickSketch?: (id: string) => void;
+  selectedFace?: ModelFacePick | null;
 }) {
+  const [hoveredFace, setHoveredFace] = useState<ModelFacePick | null>(null);
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
   // The studio shows a design where it is, about its origin, so hiding a part doesn't shift the rest.
   const assembled = useMemo(() => (palette === 'studio' ? new THREE.Matrix4() : centerAssembled(meshes)), [meshes, palette]);
@@ -485,6 +498,8 @@ export function ModelViewport({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meshes, matrices, shownPlanes.length, planeSize, assembled, sketchLines, regions, view]);
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
+    // A captured depth drag must not also select the face beneath its release point.
+    if (extrusionDepth?.dragging) return;
     if (!e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.
     const point = e.point.clone().applyMatrix4(matrix.clone().invert()),
@@ -511,7 +526,10 @@ export function ModelViewport({
       orthographic={palette === 'studio'}
       camera={{ fov: 30 }}
       dpr={[1, 2]}
-      onPointerLeave={() => onHover?.(null)}
+      onPointerLeave={() => {
+        onHover?.(null);
+        setHoveredFace(null);
+      }}
       onPointerMissed={() => {
         onHover?.(null);
         onMissed?.();
@@ -546,10 +564,27 @@ export function ModelViewport({
             opacity={display === 'translucent' || transparentIds?.has(instanceIds?.[i] ?? m.partId) ? 0.3 : milled(m.partId) ? 1 : 0.35}
             edges={display === 'edges'}
             onSelect={e => pick(m, i, matrices[i]!, e)}
-            onHover={hovered => onHover?.(hovered ? m.partId : null, hovered ? i : undefined)}
+            onHover={(hovered, event) => {
+              onHover?.(hovered ? m.partId : null, hovered ? i : undefined);
+              if (palette !== 'studio') return;
+              if (!hovered || !event?.face) return setHoveredFace(current => (current?.index === i ? null : current));
+              const point = event.point.clone().applyMatrix4(matrices[i]!.clone().invert()).toArray();
+              const face: ModelFacePick = { partId: m.partId, index: i, point, normal: event.face.normal.toArray() };
+              setHoveredFace(current => (current?.index === i && sameFacePlane(current, face) ? current : face));
+            }}
           />
         ))}
       </group>
+      {[
+        selectedFace,
+        hoveredFace && !(selectedFace?.index === hoveredFace.index && sameFacePlane(selectedFace, hoveredFace)) ? hoveredFace : null,
+      ].map(
+        (face, index) =>
+          face &&
+          meshes[face.index] && (
+            <ModelFaceHighlight key={index} mesh={meshes[face.index]!} matrix={matrices[face.index]!} face={face} selected={index === 0} />
+          )
+      )}
       {view === 'assembled' && sketchLines.length > 0 && (
         <group matrixAutoUpdate={false} matrix={assembled}>
           {sketchLines.map((line, i) => (
@@ -558,6 +593,14 @@ export function ModelViewport({
               points={line.points}
               color={highlightIds.includes(line.partId) || line.partId === selectedId ? kStudioPicked : '#1f6fc5'}
               lineWidth={highlightIds.includes(line.partId) || line.partId === selectedId ? 2.5 : 1.5}
+              onClick={
+                onPickSketch
+                  ? event => {
+                      event.stopPropagation();
+                      if (event.delta <= 4) onPickSketch(line.partId);
+                    }
+                  : undefined
+              }
             />
           ))}
         </group>
@@ -579,8 +622,11 @@ export function ModelViewport({
       {shownPlanes.map(plane => (
         <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
       ))}
+      {extrusionDepth && view === 'assembled' && <ExtrudeDepthArrow key={extrusionDepth.partId} control={extrusionDepth} />}
       {!sketchView && onViewRequest && <ViewCube onViewRequest={onViewRequest} />}
-      {!sketchView && <OrbitControls makeDefault dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />}
+      {!sketchView && (
+        <OrbitControls makeDefault enabled={!extrusionDepth?.dragging} dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />
+      )}
     </Canvas>
   );
 }
