@@ -38,7 +38,8 @@ export function assemblyDisplayPlacements(document: CadDocument, source: CadDocu
       if (parentAt && partAt && host && copy) placement = joinedCopyPlacement(parentAt, partAt, place(host), !!copy.mirrored);
     }
     if (!placement) {
-      placement = { position: [cursor - (piece.origin?.[0] ?? 0), -(piece.origin?.[1] ?? 0), 0], rotation: [0, 0, 0, 1] };
+      // Keep legacy +0 at the origin; unary negation would expose -0 in the placement map.
+      placement = { position: [cursor - (piece.origin?.[0] ?? 0), 0 - (piece.origin?.[1] ?? 0), 0], rotation: [0, 0, 0, 1] };
       cursor += piece.width + gap;
     }
     placements.set(key, placement);
