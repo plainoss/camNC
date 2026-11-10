@@ -9,12 +9,13 @@ import { nativePart } from '@/cam/nativeCadModel';
  */
 export function partSolid(
   part: CadPart,
-  document?: CadDocument
+  document?: CadDocument,
+  copyId?: string
 ): { geometry?: THREE.BufferGeometry; origin?: [number, number]; problem?: string } {
   const { part: profile } = evaluateCadPart(part);
   if (!profile) return { problem: 'This part can’t be shown until its sketch is fixed.' };
   // A cut with an error is left out and explained, so the part stays on screen while it's put right.
-  const { part: evaluated, diagnostics } = evaluateCadFeatures(part, profile),
+  const { part: evaluated, diagnostics } = evaluateCadFeatures(part, profile, copyId),
     problem = diagnostics.find(diagnostic => diagnostic.severity === 'error')?.message;
   try {
     const { mesh, info } = nativePart(document ? withPartCuts(document, evaluated) : evaluated);

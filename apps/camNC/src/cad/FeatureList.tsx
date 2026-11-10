@@ -1,9 +1,12 @@
-import { cadVariableValues, type CadDocument } from '@wbcnc/cad';
+import { cadFolderSteps, cadVariableValues, moveCadFolder, type CadDocument } from '@wbcnc/cad';
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { kBasePlanes } from './basePlanes';
-import { designSteps, type DesignStep } from '@wbcnc/cad';
+import type { DesignStep } from '@wbcnc/cad';
 import { PartRowMenu } from './PartRowMenu';
 import { formatCadValue } from './valueExpressions';
+import { useFolderControls } from './FolderControls';
+import { RollbackBar } from './RollbackBar';
+import { folderFeatureEntries, folderOfFeature, type ListedFeatureEntry } from './folderFeatureEntries';
 import './featureList.css';
 
 const kIcons: Record<DesignStep['kind'] | 'variable' | 'plane', string> = {
@@ -89,6 +92,7 @@ export function FeatureList({
   shown,
   onToggleShown,
   onNewSketch,
+  onChange,
 }: {
   document: CadDocument;
   selectedPartId: string | null;
@@ -118,21 +122,16 @@ export function FeatureList({
   onToggleShown?: (id: string) => void;
   /** New sketch, from a base plane's right-click menu, as the reference's. */
   onNewSketch?: (plane: string) => void;
+  onChange?: (document: CadDocument) => void;
 }) {
   const { scope } = cadVariableValues(document);
-  const blank = new Set(
-    document.parts
-      .filter(part => !part.drawnOn && part.sketch.entities.every(entity => entity.type === 'point' && entity.fixed))
-      .map(part => part.id)
-  );
-  const entries: FeatureEntry[] = [
-    ...(document.variables ?? []).map(variable => ({ kind: 'variable' as const, id: variable.id })),
-    ...(document.planes ?? []).map(plane => ({ kind: 'plane' as const, id: plane.id })),
-    // A part with nothing drawn yet, such as a new design's, isn't a feature until it's sketched.
-    ...designSteps(document)
-      .filter(step => !blank.has(step.partId))
-      .map(step => ({ kind: 'step' as const, step })),
-  ];
+  const entries = folderFeatureEntries(document);
+  const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
+  const folders = useFolderControls({ document, onChange, onRollTo, selectedPartId });
+  const select = (entry: FeatureEntry) => {
+    setSelectedEntry(entry.kind === 'step' ? entry.step.id : entry.id);
+    onSelect(entry);
+  };
   const [menu, setMenu] = useState<{ entry: FeatureEntry; x: number; y: number } | null>(null);
   const [planeMenu, setPlaneMenu] = useState<{ plane: string; name: string; x: number; y: number } | null>(null);
   const closePlaneMenu = useCallback(() => setPlaneMenu(null), []);
@@ -147,7 +146,8 @@ export function FeatureList({
     window.addEventListener('pointerdown', close, true);
     return () => window.removeEventListener('pointerdown', close, true);
   }, [menu]);
-  const label = (entry: FeatureEntry) => {
+  const label = (entry: ListedFeatureEntry) => {
+    if (entry.kind === 'folder') return document.folders!.find(folder => folder.id === entry.id)!.name;
     if (entry.kind === 'step') return entry.step.label;
     if (entry.kind === 'plane') return document.planes!.find(candidate => candidate.id === entry.id)!.name;
     const variable = document.variables!.find(candidate => candidate.id === entry.id)!;
@@ -158,10 +158,10 @@ export function FeatureList({
   /** What a row's eye shows or hides: a sketch, by its step's id, or a plane. */
   const visibilityId = (entry: FeatureEntry) =>
     entry.kind === 'plane' ? entry.id : entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.id : null;
-  const key = (entry: FeatureEntry) => (entry.kind === 'step' ? entry.step.id : entry.id);
+  const key = (entry: ListedFeatureEntry) => (entry.kind === 'step' ? entry.step.id : entry.id);
   const rollbackAt = rollback ? entries.findIndex(entry => key(entry) === rollback) : -1;
   // With the bar movable it's always there: after the step it's rolled to, or at the end.
-  const barAt = rollbackAt >= 0 ? rollbackAt : onRollTo ? entries.length - 1 : -1;
+  const barAt = rollbackAt;
   const [barMenu, setBarMenu] = useState<{ x: number; y: number } | null>(null);
   const stepIds = entries.flatMap(entry => (entry.kind === 'step' ? [entry.step.id] : []));
   /** Rolls to just after the entry at an index; past the last step is the end. */
@@ -172,7 +172,7 @@ export function FeatureList({
   };
   const open = (entry: FeatureEntry, event: MouseEvent) => {
     event.preventDefault();
-    onSelect(entry);
+    select(entry);
     setMenu({ entry, x: event.clientX, y: event.clientY });
   };
   const brokenCount = entries.filter(entry => entry.kind === 'step' && entry.step.broken).length;
@@ -180,7 +180,7 @@ export function FeatureList({
     <section className="cad-studio-features" aria-label="Features" tabIndex={-1}>
       <div className="cad-panel-heading">
         <h2>
-          Features ({entries.length})
+          Features ({entries.filter(entry => entry.kind !== 'folder').length})
           {brokenCount > 0 && (
             <span
               className="cad-feature-error-badge"
@@ -191,6 +191,11 @@ export function FeatureList({
             </span>
           )}
         </h2>
+        {onChange && (
+          <button type="button" aria-label="New folder" title="Group neighbouring parts and planes in a folder" onClick={folders.newFolder}>
+            ＋
+          </button>
+        )}
       </div>
       {/* Listed in a sketch too, as in the reference, to show or hide; a plane is picked to sketch on from the studio. */}
       {(onPickPlane || onToggleShown) && (
@@ -226,7 +231,73 @@ export function FeatureList({
       )}
       <ol>
         {entries.map((entry, index) => {
+          if (entry.kind === 'folder') {
+            const folder = document.folders!.find(folder => folder.id === entry.id)!;
+            const contained = cadFolderSteps(document, folder.id);
+            const rollbackInside = !!rollback && contained.some(step => step.id === rollback);
+            return (
+              <li
+                key={folder.id}
+                className={folder.suppressed ? 'cad-feature-suppressed cad-folder-row' : 'cad-folder-row'}
+                onDragOver={event => {
+                  if (event.dataTransfer.types.includes('text/x-cad-folder')) event.preventDefault();
+                }}
+                onDrop={event => {
+                  const id = event.dataTransfer.getData('text/x-cad-folder');
+                  if (!id || !onChange) return;
+                  event.preventDefault();
+                  const result = moveCadFolder(document, id, folder.partIds[0]);
+                  if ('document' in result) onChange(result.document);
+                }}>
+                <button
+                  type="button"
+                  className="cad-folder-disclosure"
+                  aria-label={`${folder.collapsed ? 'Expand' : 'Collapse'} ${folder.name}`}
+                  aria-expanded={!folder.collapsed}
+                  onClick={() => folders.toggle(folder)}>
+                  <span aria-hidden="true">{folder.collapsed ? '▸' : '▾'}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-current={selectedEntry === folder.id ? 'true' : undefined}
+                  aria-haspopup="menu"
+                  draggable={!!onChange}
+                  onDragStart={event => {
+                    event.dataTransfer.setData('text/x-cad-folder', folder.id);
+                    event.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onClick={() => setSelectedEntry(folder.id)}
+                  onDoubleClick={() => folders.settings(folder.id)}
+                  onContextMenu={event => {
+                    event.preventDefault();
+                    setSelectedEntry(folder.id);
+                    folders.openMenu(folder.id, event.clientX, event.clientY);
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                      event.preventDefault();
+                      const box = event.currentTarget.getBoundingClientRect();
+                      folders.openMenu(folder.id, box.left, box.bottom);
+                    }
+                  }}>
+                  <span aria-hidden="true">▰</span>
+                  <span>{folder.name}</span>
+                </button>
+                {folder.collapsed && rollbackInside && (
+                  <RollbackBar
+                    stepId={rollback ?? null}
+                    stepIds={stepIds}
+                    onRollTo={onRollTo}
+                    onMenu={(x, y) => setBarMenu({ x, y })}
+                    label={`Shown through ${contained.find(step => step.id === rollback)?.label}`}
+                  />
+                )}
+              </li>
+            );
+          }
           const step = entry.kind === 'step' ? entry.step : null;
+          const folderId = folderOfFeature(document, entry);
+          const folder = document.folders?.find(folder => folder.id === folderId);
           if (step && renaming === step.id) {
             return (
               <li key={key(entry)}>
@@ -256,13 +327,22 @@ export function FeatureList({
           return (
             <li
               key={key(entry)}
+              hidden={!!folder?.collapsed}
               onDragOver={event => {
                 if (entry.kind !== 'step') return;
                 if (onRollTo && event.dataTransfer.types.includes('text/x-cad-rollback')) event.preventDefault();
                 if (onReorder && event.dataTransfer.types.includes('text/x-cad-step')) event.preventDefault();
+                if (onChange && event.dataTransfer.types.includes('text/x-cad-folder')) event.preventDefault();
               }}
               onDrop={event => {
                 if (entry.kind !== 'step') return;
+                const folderId = event.dataTransfer.getData('text/x-cad-folder');
+                if (folderId && onChange) {
+                  event.preventDefault();
+                  const result = moveCadFolder(document, folderId, entry.step.partId);
+                  if ('document' in result) onChange(result.document);
+                  return;
+                }
                 if (event.dataTransfer.types.includes('text/x-cad-step')) {
                   // A step dropped on another goes just before it.
                   event.preventDefault();
@@ -277,6 +357,8 @@ export function FeatureList({
               className={
                 [
                   rollbackAt >= 0 && index > rollbackAt && 'cad-feature-rolled-back',
+                  folderId && 'cad-folder-child',
+                  folder?.suppressed && 'cad-feature-suppressed',
                   step?.suppressed && 'cad-feature-suppressed',
                   step?.broken && 'cad-feature-broken',
                   visibilityId(entry) && shown?.(visibilityId(entry)!) === false && 'cad-feature-hidden',
@@ -286,14 +368,14 @@ export function FeatureList({
               }>
               <button
                 type="button"
-                aria-current={step && step.partId === selectedPartId ? 'true' : undefined}
+                aria-current={key(entry) === selectedEntry ? 'true' : undefined}
                 aria-pressed={entry.kind === 'plane' ? selectedPlane === entry.id : undefined}
                 aria-haspopup="menu"
                 aria-description={step?.broken}
                 onClick={() => {
                   // A plane is picked to sketch on, as a base plane is.
                   if (entry.kind === 'plane') onPickPlane?.(entry.id);
-                  onSelect(entry);
+                  select(entry);
                 }}
                 onDoubleClick={() => onAction(entry, 'edit')}
                 draggable={!!onReorder && entry.kind === 'step' && entry.step.kind !== 'partCut'}
@@ -320,7 +402,7 @@ export function FeatureList({
                   } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
                     const box = event.currentTarget.getBoundingClientRect();
                     event.preventDefault();
-                    onSelect(entry);
+                    select(entry);
                     setMenu({ entry, x: box.left + 24, y: box.bottom });
                   }
                 }}>
@@ -341,38 +423,16 @@ export function FeatureList({
                 />
               )}
               {index === barAt && (index < entries.length - 1 || onRollTo) && (
-                <div
-                  className="cad-rollback-bar"
-                  role="separator"
-                  aria-label="Shown up to here"
-                  aria-orientation="horizontal"
-                  tabIndex={onRollTo ? 0 : undefined}
-                  draggable={!!onRollTo}
-                  title={
-                    onRollTo ? 'Drag, or use the arrow keys, to show the design up to a step. Right-click to roll to the end.' : undefined
-                  }
-                  onDragStart={event => {
-                    event.dataTransfer.setData('text/x-cad-rollback', '');
-                    event.dataTransfer.effectAllowed = 'move';
-                  }}
-                  onKeyDown={event => {
-                    if (!onRollTo || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const to = event.key === 'ArrowUp' ? index - 1 : index + 1;
-                    if (to >= 0 && to < entries.length) rollToIndex(to);
-                  }}
-                  onContextMenu={event => {
-                    if (!onRollTo) return;
-                    event.preventDefault();
-                    setBarMenu({ x: event.clientX, y: event.clientY });
-                  }}
-                />
+                <RollbackBar stepId={step?.id ?? null} stepIds={stepIds} onRollTo={onRollTo} onMenu={(x, y) => setBarMenu({ x, y })} />
               )}
             </li>
           );
         })}
       </ol>
+      {onRollTo && rollbackAt < 0 && (
+        <RollbackBar stepId={null} stepIds={stepIds} onRollTo={onRollTo} onMenu={(x, y) => setBarMenu({ x, y })} />
+      )}
+      {folders.controls}
       {barMenu && onRollTo && (
         <div className="cad-feature-menu" role="menu" aria-label="Rollback bar actions" style={{ left: barMenu.x, top: barMenu.y }}>
           <button

@@ -1,5 +1,5 @@
 import {
-  evaluateCadFeatures,
+  evaluateCadPartFamily,
   evaluateCadPart,
   evaluatedPartCopy,
   CAD_IDENTITY_PLACEMENT,
@@ -65,12 +65,12 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
       const { part: profile } = evaluateCadPart(part);
       if (!profile) return { part, problem: 'Its sketch needs fixing first.' };
       try {
-        const evaluated: EvaluatedCadPart = withPartCuts(document, evaluateCadFeatures(part, profile).part);
+        const evaluated: EvaluatedCadPart = withPartCuts(document, evaluateCadPartFamily(part, profile).part);
         const shape = nativePart(evaluated);
         // A copy is meshed on its own only when it's mirrored or cut differently; the rest share the part's mesh.
         let mirrored: Shape | undefined;
         const copies = (part.copies ?? []).map(copy => {
-          if (evaluated.copyCuts?.[copy.id]) return nativePart(evaluatedPartCopy(evaluated, copy));
+          if (evaluated.copyCuts?.[copy.id] || evaluated.copyProfiles?.[copy.id]) return nativePart(evaluatedPartCopy(evaluated, copy));
           if (copy.mirrored) return (mirrored ??= nativePart(evaluatedPartCopy(evaluated, copy)));
           return shape;
         });

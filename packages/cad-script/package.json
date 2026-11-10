@@ -4,12 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "browser": "./src/browser.ts",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
     "check": "vite-node --config vite.config.ts src/cli.ts",
     "mcp": "vite-node --config vite.config.ts src/mcpMain.ts",
     "iterate": "vite-node --config vite.config.ts src/iteration/cli.ts",
+    "tasks": "vite-node --config vite.config.ts src/tasks/cli.ts",
     "test": "vitest",
     "check-types": "tsc --noEmit"
   },

@@ -6,6 +6,7 @@ import {
   formatCadValue,
   parseCadValue,
   renameCadExpressionVariable,
+  renameCadExpressionVariables,
 } from './valueExpressions';
 
 function value(text: string, unit: 'mm' | 'deg' = 'mm') {
@@ -15,6 +16,19 @@ function value(text: string, unit: 'mm' | 'deg' = 'mm') {
 }
 
 describe('CAD value expressions', () => {
+  it('renames aliases once while preserving function calls and scientific literals', () => {
+    const names = new Map([
+      ['floor', 'floor_2'],
+      ['e3', 'e3_2'],
+      ['e', 'e_2'],
+      ['width', 'width_2'],
+      ['width_2', 'width_2_2'],
+    ]);
+    expect(
+      renameCadExpressionVariables('floor(100.8) + floor + #floor + 1e3 + 2E3 + 1e-3 + 1e+3 + e3 + #e3 + e + width + width_2', names)
+    ).toBe('floor(100.8) + floor_2 + #floor_2 + 1e3 + 2E3 + 1e-3 + 1e+3 + e3_2 + #e3_2 + e_2 + width_2 + width_2_2');
+    expect(renameCadExpressionVariables('floor (100.8) + floor_2 + 3mm', names)).toBe('floor (100.8) + floor_2 + 3mm');
+  });
   it.each(['2mm', '2 IN', '1/2in', '(20+30)mm', '45deg', '45°', '2mm+', '2in+(', '1e308mm', '3 1/0in', '@2mm'])(
     'detects an explicit unit while typing %s without evaluating its expression',
     text => {

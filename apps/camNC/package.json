@@ -60,9 +60,11 @@
     "@testing-library/jest-dom": "catalog:",
     "@use-gesture/react": "catalog:",
     "@vitest/browser": "catalog:",
-    "@wbcnc/cam": "workspace:*",
     "@wbcnc/cad": "workspace:*",
-    "occt-import-js": "0.0.23",
+    "@wbcnc/cad-editor": "workspace:*",
+    "@wbcnc/cad-script": "workspace:*",
+    "@wbcnc/cam": "workspace:*",
+    "@wbcnc/cam-settings": "workspace:*",
     "@wbcnc/camera-calibration": "workspace:*",
     "@wbcnc/fluidnc": "workspace:*",
     "@wbcnc/go2webrtc": "workspace:*",
@@ -83,6 +85,7 @@
     "lucide-react": "catalog:",
     "mathjs": "catalog:",
     "next-qrcode": "catalog:",
+    "occt-import-js": "0.0.23",
     "playwright": "catalog:",
     "radashi": "^12.6.0",
     "react": "catalog:",
@@ -106,9 +109,7 @@
     "webgpu-utils": "^1.11.0",
     "yaml": "catalog:",
     "zod": "catalog:",
-    "zustand": "catalog:",
-    "@wbcnc/cam-settings": "workspace:*",
-    "@wbcnc/cad-editor": "workspace:*"
+    "zustand": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.12.21",

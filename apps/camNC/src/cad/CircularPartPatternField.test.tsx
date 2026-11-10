@@ -1,4 +1,12 @@
-import { createPlateDocument, setPartPattern, type CadDocument, type CadDrawnOn, type CadPartPattern } from '@wbcnc/cad';
+import {
+  createPlateDocument,
+  detachPartCopy,
+  parseCadDocument,
+  setPartPattern,
+  type CadDocument,
+  type CadDrawnOn,
+  type CadPartPattern,
+} from '@wbcnc/cad';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -70,6 +78,38 @@ function setup(pattern?: CadPartPattern) {
 }
 
 describe('circular part pattern controls', () => {
+  it('keeps a detached logical slot excluded when the circular count is edited through the inline control', () => {
+    let source = createPlateDocument({ width: 40, height: 20, thickness: 18 });
+    source.parts[0]!.placement = { position: [100, 0, 0], rotation: [0, 0, 0, 1] };
+    source = setPartPattern(source, source.parts[0]!.id, circular);
+    const partId = source.parts[0]!.id;
+    const copyId = source.parts[0]!.copies![0]!.id;
+    const detached = detachPartCopy(source, partId, copyId, 'Cable leg');
+    if ('error' in detached) throw new Error(detached.error);
+    const initial = detached.document;
+    const frozen = structuredClone(initial.parts.find(part => part.id === detached.partId)!.placement);
+    let latest = initial;
+    function Harness() {
+      const [document, setDocument] = useState(initial);
+      latest = document;
+      return (
+        <CadPartPatternField
+          pattern={document.parts[0]!.pattern}
+          onChange={pattern => setDocument(setPartPattern(document, partId, pattern))}
+        />
+      );
+    }
+    render(<Harness />);
+    for (const count of [6, 2, 6]) {
+      fireEvent.change(screen.getByLabelText('Instance count'), { target: { value: String(count) } });
+      fireEvent.keyDown(screen.getByLabelText('Instance count'), { key: 'Enter' });
+      expect(latest.parts[0]!.pattern).toMatchObject({ count, excluded: [1], circular: { angle: 360 } });
+      expect(latest.parts[0]!.copies?.some(copy => copy.id === copyId) ?? false).toBe(false);
+      expect(latest.parts.find(part => part.id === detached.partId)!.placement).toEqual(frozen);
+      expect(parseCadDocument(JSON.parse(JSON.stringify(latest)))).toEqual(latest);
+    }
+  });
+
   it('starts a fresh circular pattern with four instances and restores the design on cancel', () => {
     const { latest, onCancel, source } = setup();
     fireEvent.change(screen.getByLabelText('Pattern type'), { target: { value: 'circular' } });

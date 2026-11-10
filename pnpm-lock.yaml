@@ -458,6 +458,9 @@ importers:
       '@wbcnc/cad-editor':
         specifier: workspace:*
         version: link:../../packages/cad-editor
+      '@wbcnc/cad-script':
+        specifier: workspace:*
+        version: link:../../packages/cad-script
       '@wbcnc/cam':
         specifier: workspace:*
         version: link:../../packages/cam

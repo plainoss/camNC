@@ -14,7 +14,7 @@ type Frame = { origin: Vec3; x: Vec3; y: Vec3; normal: Vec3 };
  * to both its ends can't be solved.
  */
 function cornerAt(document: CadDocument, part: CadPart, pointId: string, side: 'top' | 'bottom', copyId?: string): Vec3 | null {
-  if (part.thin || !part.drawnOn) return null;
+  if (part.thin || (!part.drawnOn && !part.placement)) return null;
   const point = part.sketch.entities.find((entity): entity is CadPointEntity => entity.type === 'point' && entity.id === pointId);
   const frame = cadSketchFrame(document, part);
   if (!point || !frame) return null;
@@ -24,8 +24,10 @@ function cornerAt(document: CadDocument, part: CadPart, pointId: string, side: '
       ? placePoint(copy.placement, [copy.mirrored ? -point.x : point.x, point.y, side === 'top' ? part.thickness : 0])
       : null;
   }
+  // Detach freezes a part at an explicit placement instead of a live support plane; its used corners still follow it.
+  if (!part.drawnOn && part.placement) return placePoint(part.placement, [point.x, point.y, side === 'top' ? part.thickness : 0]);
   // Where the sketch's origin is, as the part is placed, which takes in a move by a transform. Its underside sits there.
-  const inward = part.drawnOn.inward ? -part.thickness : 0;
+  const inward = part.drawnOn?.inward ? -part.thickness : 0;
   const origin = part.placement?.position ?? frame.origin.map((value, axis) => value + frame.normal[axis]! * inward);
   const up = side === 'top' ? part.thickness : 0;
   return [0, 1, 2].map(axis => origin[axis]! + frame.x[axis]! * point.x + frame.y[axis]! * point.y + frame.normal[axis]! * up) as Vec3;
@@ -60,7 +62,14 @@ export function cadCornerSources(
 ): Map<string, NonNullable<CadPointEntity['used']>> {
   const sources = new Map<string, NonNullable<CadPointEntity['used']>>();
   for (const part of document.parts) {
-    if (part.id === except || (sourcePartId && part.id !== sourcePartId) || !isCadPart(part) || part.thin || !part.drawnOn) continue;
+    if (
+      part.id === except ||
+      (sourcePartId && part.id !== sourcePartId) ||
+      !isCadPart(part) ||
+      part.thin ||
+      (!part.drawnOn && !part.placement)
+    )
+      continue;
     for (const entity of part.sketch.entities) {
       if (entity.type !== 'point' || entity.construction) continue;
       for (const copyId of [undefined, ...(part.copies ?? []).map(copy => copy.id)])
