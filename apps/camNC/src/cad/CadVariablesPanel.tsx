@@ -8,7 +8,7 @@ import {
   type CadVariable,
   type CadVariableValue,
 } from '@wbcnc/cad';
-import { useId, useState, type FocusEvent } from 'react';
+import { useId, useRef, useState, type FocusEvent } from 'react';
 import { formatCadValue } from './valueExpressions';
 import './cadVariablesPanel.css';
 
@@ -38,6 +38,7 @@ function VariableRow({
   const [name, setName] = useState(variable?.name ?? '');
   const [expression, setExpression] = useState(variable?.expression ?? '');
   const [error, setError] = useState<string | null>(null);
+  const discarding = useRef(false);
   const reset = () => {
     setName(variable?.name ?? '');
     setExpression(variable?.expression ?? '');
@@ -60,7 +61,7 @@ function VariableRow({
     <li
       className="cad-variable"
       onBlur={(event: FocusEvent) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) save();
+        if (!discarding.current && !event.currentTarget.contains(event.relatedTarget as Node | null)) save();
       }}
       onKeyDown={event => {
         // The sketch's own keys stay out of these fields.
@@ -72,9 +73,12 @@ function VariableRow({
           onDone();
         } else if (event.key === 'Escape') {
           event.preventDefault();
+          // blur runs before React renders reset values; it must not save the discarded state snapshot.
+          discarding.current = true;
           reset();
-          if (!variable) onDone();
           (event.target as HTMLElement).blur();
+          discarding.current = false;
+          if (!variable) onDone();
         }
       }}>
       <input

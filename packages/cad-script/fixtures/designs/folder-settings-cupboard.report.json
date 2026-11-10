@@ -1,0 +1,4671 @@
+{
+ "design": {
+  "name": "Untitled design (2)",
+  "revision": 8,
+  "version": 3
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [
+  {
+   "code": "empty-sketch",
+   "message": "Draw a closed profile to create this flat part.",
+   "part": "Part 1"
+  }
+ ],
+ "features": [
+  {
+   "id": "dccd5ba4-8183-4cf7-97f6-282726c3514b",
+   "kind": "variable",
+   "label": "#width",
+   "settings": {
+    "expression": "900mm"
+   },
+   "result": {
+    "value": 900,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "c6644f2b-e3a0-4233-99d3-a48db614331d",
+   "kind": "variable",
+   "label": "#height",
+   "settings": {
+    "expression": "1000mm"
+   },
+   "result": {
+    "value": 1000,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "d809d40b-af2a-4047-a202-2e75ed66b47c",
+   "kind": "variable",
+   "label": "#depth",
+   "settings": {
+    "expression": "350mm"
+   },
+   "result": {
+    "value": 350,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "4e45d263-d759-4f44-af77-0e9e908a4954",
+   "kind": "variable",
+   "label": "#board",
+   "settings": {
+    "expression": "24mm"
+   },
+   "result": {
+    "value": 24,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "93d613aa-0bba-4b62-84b3-52ed4a41061c",
+   "kind": "variable",
+   "label": "#shelves",
+   "settings": {
+    "expression": "4"
+   },
+   "result": {
+    "value": 4,
+    "kind": "number"
+   }
+  },
+  {
+   "id": "ad6a3d1d-d177-40d9-9bce-91c50a449b19",
+   "kind": "variable",
+   "label": "#originX",
+   "settings": {
+    "expression": "100mm"
+   },
+   "result": {
+    "value": 100,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "c3ddf58b-8be7-4da9-ba35-fa57d5b7793f",
+   "kind": "variable",
+   "label": "#originY",
+   "settings": {
+    "expression": "0mm"
+   },
+   "result": {
+    "value": 0,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "b11ea5c4-7729-47fb-a936-8b1df42c5b06",
+   "kind": "variable",
+   "label": "#originZ",
+   "settings": {
+    "expression": "0mm"
+   },
+   "result": {
+    "value": 0,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "0917f798-3930-4937-8295-b4b5ebed8840",
+   "kind": "variable",
+   "label": "#back",
+   "settings": {
+    "expression": "6mm"
+   },
+   "result": {
+    "value": 6,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "cae0c52d-8c9a-49a4-8106-8d1ea58117fd",
+   "kind": "variable",
+   "label": "#housing",
+   "settings": {
+    "expression": "8mm"
+   },
+   "result": {
+    "value": 8,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "537ebeee-ac33-4a29-a9f9-29fb42a693b5",
+   "kind": "variable",
+   "label": "#pin",
+   "settings": {
+    "expression": "5mm"
+   },
+   "result": {
+    "value": 5,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "c82c60f7-8147-45bc-ab2a-0673e53ebde2",
+   "kind": "variable",
+   "label": "#pitch",
+   "settings": {
+    "expression": "32mm"
+   },
+   "result": {
+    "value": 32,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "2114bef1-93f3-40d7-b8e9-8f252680a00c",
+   "kind": "variable",
+   "label": "#margin",
+   "settings": {
+    "expression": "80mm"
+   },
+   "result": {
+    "value": 80,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "64c04b2f-27c6-4b7f-9cc2-6553fd3db2cd",
+   "kind": "variable",
+   "label": "#shelfSpacing",
+   "settings": {
+    "expression": "max(pitch; floor((height - 2*board - 2*margin)/(max(1; shelves - 1)*pitch))*pitch)"
+   },
+   "result": {
+    "value": 256,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "d8ae0a69-4a5c-4acf-8649-b7e912157571:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "on": "not placed",
+    "extruded": false
+   },
+   "result": {
+    "sketch": "Part 1 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 0
+   }
+  },
+  {
+   "id": "0e246156-cd26-4783-8a96-f104130dfb3b:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Side",
+   "part": "Side",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Side / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "0e246156-cd26-4783-8a96-f104130dfb3b:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Side",
+   "part": "Side",
+   "settings": {
+    "thickness": {
+     "value": 24,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 100,
+      "expression": "originX"
+     }
+    }
+   },
+   "result": {
+    "thickness": 24,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      350,
+      1000
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "701c586f-f4e3-42d3-9352-993e70b010e8",
+   "kind": "faceSketch",
+   "label": "Sketch on the top · Side",
+   "part": "Side",
+   "settings": {
+    "on": "top"
+   },
+   "result": {
+    "sketch": "Side / 2dd4",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 51
+   }
+  },
+  {
+   "id": "0744b899-5015-4fc3-95f1-49ec00df1501",
+   "kind": "cut",
+   "label": "Cut 1 · Side",
+   "part": "Side",
+   "settings": {
+    "sketch": "Side / 2dd4",
+    "region": "r2",
+    "depth": {
+     "value": 12
+    }
+   },
+   "result": {
+    "cuts": [
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       101.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       133.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       165.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       197.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       229.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       261.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       293.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       325.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       357.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       389.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       421.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       453.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       485.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       517.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       549.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       581.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       613.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       645.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       677.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       709.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       741.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       773.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       805.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       837.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       869.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       101.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       133.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       165.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       197.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       229.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       261.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       293.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       325.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       357.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       389.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       421.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       453.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       485.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       517.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       549.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       581.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       613.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       645.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       677.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       709.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       741.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       773.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       805.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       837.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       304.5,
+       869.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "630fcfac-961d-4808-834e-27649b7d45d3",
+   "kind": "copy",
+   "label": "Mirrored copy · Right side",
+   "part": "Side",
+   "settings": {
+    "name": "Right side",
+    "mirrored": true,
+    "placement": {
+     "position": [
+      1000,
+      0,
+      0
+     ],
+     "rotation": [
+      -0.5,
+      0.5,
+      0.5,
+      -0.5
+     ],
+     "positionExpressions": [
+      "originX + width",
+      null,
+      null
+     ]
+    }
+   },
+   "result": {
+    "placement": {
+     "position": [
+      1000,
+      0,
+      0
+     ],
+     "rotation": [
+      -0.5,
+      0.5,
+      0.5,
+      -0.5
+     ],
+     "positionExpressions": [
+      "originX + width",
+      null,
+      null
+     ]
+    }
+   }
+  },
+  {
+   "id": "d2621869-a024-4208-9efa-cba059a039e6:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Bottom",
+   "part": "Bottom",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Bottom / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "d2621869-a024-4208-9efa-cba059a039e6:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Bottom",
+   "part": "Bottom",
+   "settings": {
+    "thickness": {
+     "value": 24,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 0,
+      "expression": "originZ + 0mm"
+     }
+    }
+   },
+   "result": {
+    "thickness": 24,
+    "outline": {
+     "at": [
+      116,
+      0
+     ],
+     "size": [
+      868,
+      344
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "8fb41b1c-a3a7-4a2a-a700-d7430dcd8893:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Top",
+   "part": "Top",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Top / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "8fb41b1c-a3a7-4a2a-a700-d7430dcd8893:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Top",
+   "part": "Top",
+   "settings": {
+    "thickness": {
+     "value": 24,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 976,
+      "expression": "originZ + height - board"
+     }
+    }
+   },
+   "result": {
+    "thickness": 24,
+    "outline": {
+     "at": [
+      116,
+      0
+     ],
+     "size": [
+      868,
+      344
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "5760245a-649e-4bb0-a094-71039778b351:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Back",
+   "part": "Back",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Back / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "5760245a-649e-4bb0-a094-71039778b351:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Back",
+   "part": "Back",
+   "settings": {
+    "thickness": {
+     "value": 6,
+     "expression": "back"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -344,
+      "expression": "-(originY + depth - back)"
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 6,
+    "outline": {
+     "at": [
+      116,
+      0
+     ],
+     "size": [
+      868,
+      1000
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "43e9ed08-6247-40e5-8de8-5f9902167b60",
+   "kind": "partCut",
+   "label": "Cut Side with Top, Bottom, Back",
+   "part": "Side",
+   "settings": {
+    "tools": [
+     "Top",
+     "Bottom",
+     "Back"
+    ],
+    "targets": [
+     "Side"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Side",
+      "tool": "Top",
+      "side": "top",
+      "width": 344,
+      "length": 24,
+      "depth": 8,
+      "through": false,
+      "at": {
+       "x": 0,
+       "y": 976
+      }
+     },
+     {
+      "target": "Side",
+      "tool": "Bottom",
+      "side": "top",
+      "width": 344,
+      "length": 24,
+      "depth": 8,
+      "through": false,
+      "at": {
+       "x": 0,
+       "y": 0
+      }
+     },
+     {
+      "target": "Side",
+      "tool": "Back",
+      "side": "top",
+      "width": 6,
+      "length": 1000,
+      "depth": 8,
+      "through": false,
+      "at": {
+       "x": 344,
+       "y": 0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "7e0a9706-64bc-4ede-9ccb-c56b0b009be1:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Shelf",
+   "part": "Shelf",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Shelf / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "7e0a9706-64bc-4ede-9ccb-c56b0b009be1:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Shelf",
+   "part": "Shelf",
+   "settings": {
+    "thickness": {
+     "value": 24,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 106.5,
+      "expression": "originZ + board + margin + pin/2"
+     }
+    }
+   },
+   "result": {
+    "thickness": 24,
+    "outline": {
+     "at": [
+      125,
+      0
+     ],
+     "size": [
+      850,
+      334
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "891a88da-9832-4e88-8a7b-5acb4ba0552f",
+   "kind": "pattern",
+   "label": "Pattern · Shelf × 4 along z",
+   "part": "Shelf",
+   "settings": {
+    "axis": "z",
+    "count": {
+     "value": 4,
+     "expression": "shelves"
+    },
+    "spacing": {
+     "value": 256,
+     "expression": "shelfSpacing"
+    }
+   },
+   "result": {
+    "copies": [
+     {
+      "name": "Shelf 2",
+      "position": [
+       0,
+       0,
+       362.5
+      ]
+     },
+     {
+      "name": "Shelf 3",
+      "position": [
+       0,
+       0,
+       618.5
+      ]
+     },
+     {
+      "name": "Shelf 4",
+      "position": [
+       0,
+       0,
+       874.5
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Part 1",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {},
+   "entities": [],
+   "regions": []
+  },
+  {
+   "part": "Side",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "96f8",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      350,
+      0
+     ],
+     "ends": [
+      "dbfa",
+      "ce7c"
+     ]
+    },
+    {
+     "ref": "fb9a",
+     "type": "line",
+     "a": [
+      350,
+      0
+     ],
+     "b": [
+      350,
+      1000
+     ],
+     "ends": [
+      "097e",
+      "8348"
+     ]
+    },
+    {
+     "ref": "c306",
+     "type": "line",
+     "a": [
+      350,
+      1000
+     ],
+     "b": [
+      0,
+      1000
+     ],
+     "ends": [
+      "0e86",
+      "4e16"
+     ]
+    },
+    {
+     "ref": "6e4c",
+     "type": "line",
+     "a": [
+      0,
+      1000
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "44c8",
+      "a61f"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      350,
+      1000
+     ],
+     "area": 350000,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Side",
+   "ref": "2dd4",
+   "on": "top",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "diameter": 1,
+    "linearPattern": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "949b",
+     "type": "circle",
+     "at": [
+      37,
+      104
+     ],
+     "d": 5
+    },
+    {
+     "ref": "2039",
+     "type": "circle",
+     "at": [
+      37,
+      136
+     ],
+     "d": 5
+    },
+    {
+     "ref": "b88e",
+     "type": "circle",
+     "at": [
+      37,
+      168
+     ],
+     "d": 5
+    },
+    {
+     "ref": "7652",
+     "type": "circle",
+     "at": [
+      37,
+      200
+     ],
+     "d": 5
+    },
+    {
+     "ref": "a157",
+     "type": "circle",
+     "at": [
+      37,
+      232
+     ],
+     "d": 5
+    },
+    {
+     "ref": "8433",
+     "type": "circle",
+     "at": [
+      37,
+      264
+     ],
+     "d": 5
+    },
+    {
+     "ref": "43eb",
+     "type": "circle",
+     "at": [
+      37,
+      296
+     ],
+     "d": 5
+    },
+    {
+     "ref": "6555",
+     "type": "circle",
+     "at": [
+      37,
+      328
+     ],
+     "d": 5
+    },
+    {
+     "ref": "7db7",
+     "type": "circle",
+     "at": [
+      37,
+      360
+     ],
+     "d": 5
+    },
+    {
+     "ref": "80a6",
+     "type": "circle",
+     "at": [
+      37,
+      392
+     ],
+     "d": 5
+    },
+    {
+     "ref": "7950",
+     "type": "circle",
+     "at": [
+      37,
+      424
+     ],
+     "d": 5
+    },
+    {
+     "ref": "b601",
+     "type": "circle",
+     "at": [
+      37,
+      456
+     ],
+     "d": 5
+    },
+    {
+     "ref": "7f5b",
+     "type": "circle",
+     "at": [
+      37,
+      488
+     ],
+     "d": 5
+    },
+    {
+     "ref": "f1b6",
+     "type": "circle",
+     "at": [
+      37,
+      520
+     ],
+     "d": 5
+    },
+    {
+     "ref": "eec8",
+     "type": "circle",
+     "at": [
+      37,
+      552
+     ],
+     "d": 5
+    },
+    {
+     "ref": "b341",
+     "type": "circle",
+     "at": [
+      37,
+      584
+     ],
+     "d": 5
+    },
+    {
+     "ref": "9f50",
+     "type": "circle",
+     "at": [
+      37,
+      616
+     ],
+     "d": 5
+    },
+    {
+     "ref": "78b2",
+     "type": "circle",
+     "at": [
+      37,
+      648
+     ],
+     "d": 5
+    },
+    {
+     "ref": "80b0",
+     "type": "circle",
+     "at": [
+      37,
+      680
+     ],
+     "d": 5
+    },
+    {
+     "ref": "0088",
+     "type": "circle",
+     "at": [
+      37,
+      712
+     ],
+     "d": 5
+    },
+    {
+     "ref": "2889",
+     "type": "circle",
+     "at": [
+      37,
+      744
+     ],
+     "d": 5
+    },
+    {
+     "ref": "23a1",
+     "type": "circle",
+     "at": [
+      37,
+      776
+     ],
+     "d": 5
+    },
+    {
+     "ref": "d794",
+     "type": "circle",
+     "at": [
+      37,
+      808
+     ],
+     "d": 5
+    },
+    {
+     "ref": "29a6",
+     "type": "circle",
+     "at": [
+      37,
+      840
+     ],
+     "d": 5
+    },
+    {
+     "ref": "d946",
+     "type": "circle",
+     "at": [
+      37,
+      872
+     ],
+     "d": 5
+    },
+    {
+     "ref": "fc13",
+     "type": "circle",
+     "at": [
+      307,
+      104
+     ],
+     "d": 5
+    },
+    {
+     "ref": "80fd",
+     "type": "circle",
+     "at": [
+      307,
+      136
+     ],
+     "d": 5
+    },
+    {
+     "ref": "a6f2",
+     "type": "circle",
+     "at": [
+      307,
+      168
+     ],
+     "d": 5
+    },
+    {
+     "ref": "d9ba",
+     "type": "circle",
+     "at": [
+      307,
+      200
+     ],
+     "d": 5
+    },
+    {
+     "ref": "3299",
+     "type": "circle",
+     "at": [
+      307,
+      232
+     ],
+     "d": 5
+    },
+    {
+     "ref": "a431",
+     "type": "circle",
+     "at": [
+      307,
+      264
+     ],
+     "d": 5
+    },
+    {
+     "ref": "fce9",
+     "type": "circle",
+     "at": [
+      307,
+      296
+     ],
+     "d": 5
+    },
+    {
+     "ref": "009a",
+     "type": "circle",
+     "at": [
+      307,
+      328
+     ],
+     "d": 5
+    },
+    {
+     "ref": "4576",
+     "type": "circle",
+     "at": [
+      307,
+      360
+     ],
+     "d": 5
+    },
+    {
+     "ref": "3fe6",
+     "type": "circle",
+     "at": [
+      307,
+      392
+     ],
+     "d": 5
+    },
+    {
+     "ref": "be52",
+     "type": "circle",
+     "at": [
+      307,
+      424
+     ],
+     "d": 5
+    },
+    {
+     "ref": "d629",
+     "type": "circle",
+     "at": [
+      307,
+      456
+     ],
+     "d": 5
+    },
+    {
+     "ref": "38d3",
+     "type": "circle",
+     "at": [
+      307,
+      488
+     ],
+     "d": 5
+    },
+    {
+     "ref": "26d8",
+     "type": "circle",
+     "at": [
+      307,
+      520
+     ],
+     "d": 5
+    },
+    {
+     "ref": "fb3c",
+     "type": "circle",
+     "at": [
+      307,
+      552
+     ],
+     "d": 5
+    },
+    {
+     "ref": "e914",
+     "type": "circle",
+     "at": [
+      307,
+      584
+     ],
+     "d": 5
+    },
+    {
+     "ref": "1c1b",
+     "type": "circle",
+     "at": [
+      307,
+      616
+     ],
+     "d": 5
+    },
+    {
+     "ref": "6b70",
+     "type": "circle",
+     "at": [
+      307,
+      648
+     ],
+     "d": 5
+    },
+    {
+     "ref": "480a",
+     "type": "circle",
+     "at": [
+      307,
+      680
+     ],
+     "d": 5
+    },
+    {
+     "ref": "4604",
+     "type": "circle",
+     "at": [
+      307,
+      712
+     ],
+     "d": 5
+    },
+    {
+     "ref": "1089",
+     "type": "circle",
+     "at": [
+      307,
+      744
+     ],
+     "d": 5
+    },
+    {
+     "ref": "fb64",
+     "type": "circle",
+     "at": [
+      307,
+      776
+     ],
+     "d": 5
+    },
+    {
+     "ref": "1c4f",
+     "type": "circle",
+     "at": [
+      307,
+      808
+     ],
+     "d": 5
+    },
+    {
+     "ref": "d0cd",
+     "type": "circle",
+     "at": [
+      307,
+      840
+     ],
+     "d": 5
+    },
+    {
+     "ref": "ff6c",
+     "type": "circle",
+     "at": [
+      307,
+      872
+     ],
+     "d": 5
+    }
+   ],
+   "patterns": [
+    {
+     "ref": "e7eb",
+     "copies": 49
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      350,
+      1000
+     ],
+     "area": 349023.229,
+     "islands": 50
+    },
+    {
+     "ref": "r2",
+     "at": [
+      34.5,
+      101.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r3",
+     "at": [
+      304.5,
+      101.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r4",
+     "at": [
+      34.5,
+      133.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r5",
+     "at": [
+      304.5,
+      133.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r6",
+     "at": [
+      34.5,
+      165.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r7",
+     "at": [
+      304.5,
+      165.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r8",
+     "at": [
+      34.5,
+      197.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r9",
+     "at": [
+      304.5,
+      197.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r10",
+     "at": [
+      34.5,
+      229.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r11",
+     "at": [
+      304.5,
+      229.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r12",
+     "at": [
+      34.5,
+      261.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r13",
+     "at": [
+      304.5,
+      261.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r14",
+     "at": [
+      34.5,
+      293.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r15",
+     "at": [
+      304.5,
+      293.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r16",
+     "at": [
+      34.5,
+      325.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r17",
+     "at": [
+      304.5,
+      325.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r18",
+     "at": [
+      34.5,
+      357.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r19",
+     "at": [
+      304.5,
+      357.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r20",
+     "at": [
+      34.5,
+      389.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r21",
+     "at": [
+      304.5,
+      389.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r22",
+     "at": [
+      34.5,
+      421.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r23",
+     "at": [
+      304.5,
+      421.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r24",
+     "at": [
+      34.5,
+      453.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r25",
+     "at": [
+      304.5,
+      453.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r26",
+     "at": [
+      34.5,
+      485.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r27",
+     "at": [
+      304.5,
+      485.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r28",
+     "at": [
+      34.5,
+      517.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r29",
+     "at": [
+      304.5,
+      517.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r30",
+     "at": [
+      34.5,
+      549.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r31",
+     "at": [
+      304.5,
+      549.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r32",
+     "at": [
+      34.5,
+      581.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r33",
+     "at": [
+      304.5,
+      581.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r34",
+     "at": [
+      34.5,
+      613.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r35",
+     "at": [
+      304.5,
+      613.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r36",
+     "at": [
+      34.5,
+      645.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r37",
+     "at": [
+      304.5,
+      645.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r38",
+     "at": [
+      34.5,
+      677.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r39",
+     "at": [
+      304.5,
+      677.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r40",
+     "at": [
+      34.5,
+      709.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r41",
+     "at": [
+      304.5,
+      709.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r42",
+     "at": [
+      34.5,
+      741.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r43",
+     "at": [
+      304.5,
+      741.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r44",
+     "at": [
+      34.5,
+      773.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r45",
+     "at": [
+      304.5,
+      773.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r46",
+     "at": [
+      34.5,
+      805.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r47",
+     "at": [
+      304.5,
+      805.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r48",
+     "at": [
+      34.5,
+      837.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r49",
+     "at": [
+      304.5,
+      837.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r50",
+     "at": [
+      34.5,
+      869.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r51",
+     "at": [
+      304.5,
+      869.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Bottom",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "ac93",
+     "type": "line",
+     "a": [
+      116,
+      0
+     ],
+     "b": [
+      984,
+      0
+     ],
+     "ends": [
+      "2e6e",
+      "5e4f"
+     ]
+    },
+    {
+     "ref": "9c22",
+     "type": "line",
+     "a": [
+      984,
+      0
+     ],
+     "b": [
+      984,
+      344
+     ],
+     "ends": [
+      "e254",
+      "7465"
+     ]
+    },
+    {
+     "ref": "4611",
+     "type": "line",
+     "a": [
+      984,
+      344
+     ],
+     "b": [
+      116,
+      344
+     ],
+     "ends": [
+      "84d0",
+      "4951"
+     ]
+    },
+    {
+     "ref": "06f1",
+     "type": "line",
+     "a": [
+      116,
+      344
+     ],
+     "b": [
+      116,
+      0
+     ],
+     "ends": [
+      "e2b3",
+      "e573"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      116,
+      0
+     ],
+     "size": [
+      868,
+      344
+     ],
+     "area": 298592,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Top",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "ba59",
+     "type": "line",
+     "a": [
+      116,
+      0
+     ],
+     "b": [
+      984,
+      0
+     ],
+     "ends": [
+      "9da8",
+      "18a4"
+     ]
+    },
+    {
+     "ref": "8e11",
+     "type": "line",
+     "a": [
+      984,
+      0
+     ],
+     "b": [
+      984,
+      344
+     ],
+     "ends": [
+      "caa5",
+      "8a27"
+     ]
+    },
+    {
+     "ref": "58e9",
+     "type": "line",
+     "a": [
+      984,
+      344
+     ],
+     "b": [
+      116,
+      344
+     ],
+     "ends": [
+      "b066",
+      "5ded"
+     ]
+    },
+    {
+     "ref": "f49a",
+     "type": "line",
+     "a": [
+      116,
+      344
+     ],
+     "b": [
+      116,
+      0
+     ],
+     "ends": [
+      "fe9a",
+      "7be8"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      116,
+      0
+     ],
+     "size": [
+      868,
+      344
+     ],
+     "area": 298592,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Back",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "e0f0",
+     "type": "line",
+     "a": [
+      116,
+      0
+     ],
+     "b": [
+      984,
+      0
+     ],
+     "ends": [
+      "584f",
+      "59dc"
+     ]
+    },
+    {
+     "ref": "6cef",
+     "type": "line",
+     "a": [
+      984,
+      0
+     ],
+     "b": [
+      984,
+      1000
+     ],
+     "ends": [
+      "ac50",
+      "7cbf"
+     ]
+    },
+    {
+     "ref": "f193",
+     "type": "line",
+     "a": [
+      984,
+      1000
+     ],
+     "b": [
+      116,
+      1000
+     ],
+     "ends": [
+      "ef42",
+      "13ec"
+     ]
+    },
+    {
+     "ref": "e99a",
+     "type": "line",
+     "a": [
+      116,
+      1000
+     ],
+     "b": [
+      116,
+      0
+     ],
+     "ends": [
+      "a66b",
+      "a850"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      116,
+      0
+     ],
+     "size": [
+      868,
+      1000
+     ],
+     "area": 868000,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Shelf",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "3ff4",
+     "type": "line",
+     "a": [
+      125,
+      0
+     ],
+     "b": [
+      975,
+      0
+     ],
+     "ends": [
+      "49ab",
+      "b3a2"
+     ]
+    },
+    {
+     "ref": "c3e4",
+     "type": "line",
+     "a": [
+      975,
+      0
+     ],
+     "b": [
+      975,
+      334
+     ],
+     "ends": [
+      "f5bf",
+      "2bcf"
+     ]
+    },
+    {
+     "ref": "2d92",
+     "type": "line",
+     "a": [
+      975,
+      334
+     ],
+     "b": [
+      125,
+      334
+     ],
+     "ends": [
+      "9852",
+      "29c8"
+     ]
+    },
+    {
+     "ref": "7519",
+     "type": "line",
+     "a": [
+      125,
+      334
+     ],
+     "b": [
+      125,
+      0
+     ],
+     "ends": [
+      "b79c",
+      "4304"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      125,
+      0
+     ],
+     "size": [
+      850,
+      334
+     ],
+     "area": 283900,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "sketch",
+   "name": "Part 1",
+   "thickness": 18,
+   "cuts": []
+  },
+  {
+   "kind": "part",
+   "name": "Side",
+   "thickness": 24,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     350,
+     1000
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "0744",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      101.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~1,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      133.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~2,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      165.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~3,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      197.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~4,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      229.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~5,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      261.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~6,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      293.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~7,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      325.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~8,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      357.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~9,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      389.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~10,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      421.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~11,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      453.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~12,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      485.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~13,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      517.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~14,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      549.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~15,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      581.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~16,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      613.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~17,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      645.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~18,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      677.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~19,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      709.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~20,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      741.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~21,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      773.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~22,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      805.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~23,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      837.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~24,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      869.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~0,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      101.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~1,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      133.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~2,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      165.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~3,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      197.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~4,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      229.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~5,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      261.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~6,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      293.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~7,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      325.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~8,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      357.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~9,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      389.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~10,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      421.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~11,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      453.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~12,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      485.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~13,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      517.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~14,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      549.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~15,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      581.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~16,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      613.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~17,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      645.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~18,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      677.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~19,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      709.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~20,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      741.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~21,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      773.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~22,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      805.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~23,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      837.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "0744~24,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      304.5,
+      869.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "Top",
+     "side": "top",
+     "from": 0,
+     "to": 8,
+     "through": false,
+     "at": [
+      0,
+      976
+     ],
+     "size": [
+      344,
+      24
+     ]
+    },
+    {
+     "ref": "Bottom",
+     "side": "top",
+     "from": 0,
+     "to": 8,
+     "through": false,
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      344,
+      24
+     ]
+    },
+    {
+     "ref": "Back",
+     "side": "top",
+     "from": 0,
+     "to": 8,
+     "through": false,
+     "at": [
+      344,
+      0
+     ],
+     "size": [
+      6,
+      1000
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 2,
+    "throughHoles": 0
+   },
+   "pieces": {
+    "names": [
+     "Side"
+    ],
+    "mirrored": [
+     "Right side"
+    ]
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 172.7,
+    "operations": [
+     {
+      "label": "Edge groove 8 deep + 50 pockets to 8",
+      "depth": 8,
+      "steps": 6
+     },
+     {
+      "label": "50 pockets 12 deep, from 8",
+      "depth": 4,
+      "steps": 3
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 24.3,
+      "steps": 16
+     }
+    ],
+    "warnings": [
+     "Side: pocket z=16: 1.2mm² left in corners/narrow spots with D=3.175",
+     "Side: pocket z=12: 1.2mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      124,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      100,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 96f8",
+     "looks": "-z",
+     "origin": [
+      100,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge fb9a",
+     "looks": "+y",
+     "origin": [
+      100,
+      350,
+      0
+     ]
+    },
+    {
+     "face": "edge c306",
+     "looks": "+z",
+     "origin": [
+      100,
+      350,
+      1000
+     ]
+    },
+    {
+     "face": "edge 6e4c",
+     "looks": "-y",
+     "origin": [
+      100,
+      0,
+      1000
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Bottom",
+   "thickness": 24,
+   "outline": {
+    "at": [
+     116,
+     0
+    ],
+    "size": [
+     868,
+     344
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 24.3,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 24.3,
+      "steps": 16
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      24
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge ac93",
+     "looks": "-y",
+     "origin": [
+      116,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 9c22",
+     "looks": "+x",
+     "origin": [
+      984,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 4611",
+     "looks": "+y",
+     "origin": [
+      984,
+      344,
+      0
+     ]
+    },
+    {
+     "face": "edge 06f1",
+     "looks": "-x",
+     "origin": [
+      116,
+      344,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Top",
+   "thickness": 24,
+   "outline": {
+    "at": [
+     116,
+     0
+    ],
+    "size": [
+     868,
+     344
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 24.3,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 24.3,
+      "steps": 16
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      1000
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      976
+     ]
+    },
+    {
+     "face": "edge ba59",
+     "looks": "-y",
+     "origin": [
+      116,
+      0,
+      976
+     ]
+    },
+    {
+     "face": "edge 8e11",
+     "looks": "+x",
+     "origin": [
+      984,
+      0,
+      976
+     ]
+    },
+    {
+     "face": "edge 58e9",
+     "looks": "+y",
+     "origin": [
+      984,
+      344,
+      976
+     ]
+    },
+    {
+     "face": "edge f49a",
+     "looks": "-x",
+     "origin": [
+      116,
+      344,
+      976
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Back",
+   "thickness": 6,
+   "outline": {
+    "at": [
+     116,
+     0
+    ],
+    "size": [
+     868,
+     1000
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 13,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 6.3,
+      "steps": 5
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      344,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      350,
+      0
+     ]
+    },
+    {
+     "face": "edge e0f0",
+     "looks": "-z",
+     "origin": [
+      116,
+      350,
+      0
+     ]
+    },
+    {
+     "face": "edge 6cef",
+     "looks": "+x",
+     "origin": [
+      984,
+      350,
+      0
+     ]
+    },
+    {
+     "face": "edge f193",
+     "looks": "+z",
+     "origin": [
+      984,
+      350,
+      1000
+     ]
+    },
+    {
+     "face": "edge e99a",
+     "looks": "-x",
+     "origin": [
+      116,
+      350,
+      1000
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Shelf",
+   "thickness": 24,
+   "outline": {
+    "at": [
+     125,
+     0
+    ],
+    "size": [
+     850,
+     334
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "pieces": {
+    "names": [
+     "Shelf",
+     "Shelf 2",
+     "Shelf 3",
+     "Shelf 4"
+    ],
+    "mirrored": []
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 23.8,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 24.3,
+      "steps": 16
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      130.5
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      106.5
+     ]
+    },
+    {
+     "face": "edge 3ff4",
+     "looks": "-y",
+     "origin": [
+      125,
+      0,
+      106.5
+     ]
+    },
+    {
+     "face": "edge c3e4",
+     "looks": "+x",
+     "origin": [
+      975,
+      0,
+      106.5
+     ]
+    },
+    {
+     "face": "edge 2d92",
+     "looks": "+y",
+     "origin": [
+      975,
+      334,
+      106.5
+     ]
+    },
+    {
+     "face": "edge 7519",
+     "looks": "-x",
+     "origin": [
+      125,
+      334,
+      106.5
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Side",
+    "at": [
+     100,
+     0,
+     0
+    ],
+    "size": [
+     24,
+     350,
+     1000
+    ]
+   },
+   {
+    "name": "Right side",
+    "at": [
+     976,
+     0,
+     0
+    ],
+    "size": [
+     24,
+     350,
+     1000
+    ]
+   },
+   {
+    "name": "Bottom",
+    "at": [
+     116,
+     0,
+     0
+    ],
+    "size": [
+     868,
+     344,
+     24
+    ]
+   },
+   {
+    "name": "Top",
+    "at": [
+     116,
+     0,
+     976
+    ],
+    "size": [
+     868,
+     344,
+     24
+    ]
+   },
+   {
+    "name": "Back",
+    "at": [
+     116,
+     344,
+     0
+    ],
+    "size": [
+     868,
+     6,
+     1000
+    ]
+   },
+   {
+    "name": "Shelf",
+    "at": [
+     125,
+     0,
+     106.5
+    ],
+    "size": [
+     850,
+     334,
+     24
+    ]
+   },
+   {
+    "name": "Shelf 2",
+    "at": [
+     125,
+     0,
+     362.5
+    ],
+    "size": [
+     850,
+     334,
+     24
+    ]
+   },
+   {
+    "name": "Shelf 3",
+    "at": [
+     125,
+     0,
+     618.5
+    ],
+    "size": [
+     850,
+     334,
+     24
+    ]
+   },
+   {
+    "name": "Shelf 4",
+    "at": [
+     125,
+     0,
+     874.5
+    ],
+    "size": [
+     850,
+     334,
+     24
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 6,
+   "sides": 1,
+   "size": [
+    881.4,
+    1013.4
+   ],
+   "yield": 0.972,
+   "parts": [
+    {
+     "name": "Back",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      868,
+      1000
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Back",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 13,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 6.3,
+     "steps": 5
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  },
+  {
+   "name": "Board B",
+   "thickness": 24,
+   "sides": 1,
+   "size": [
+    1241.4,
+    2087.4
+   ],
+   "yield": 0.939,
+   "parts": [
+    {
+     "name": "Side",
+     "at": [
+      884.7,
+      6.7
+     ],
+     "size": [
+      350,
+      1000
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Right side",
+     "at": [
+      866.7,
+      1016.7
+     ],
+     "size": [
+      350,
+      1000
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Bottom",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      868,
+      344
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Top",
+     "at": [
+      6.7,
+      360.7
+     ],
+     "size": [
+      868,
+      344
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Shelf",
+     "at": [
+      6.7,
+      714.7
+     ],
+     "size": [
+      850,
+      334
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Shelf 2",
+     "at": [
+      6.7,
+      1058.7
+     ],
+     "size": [
+      850,
+      334
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Shelf 3",
+     "at": [
+      6.7,
+      1402.7
+     ],
+     "size": [
+      850,
+      334
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Shelf 4",
+     "at": [
+      6.7,
+      1746.7
+     ],
+     "size": [
+      850,
+      334
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Side",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Right side",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Bottom",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Top",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Shelf",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Shelf 2",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Shelf 3",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Shelf 4",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 270.4,
+   "operations": [
+    {
+     "label": "Edge groove 8 deep + 50 pockets to 8",
+     "depth": 8,
+     "steps": 6
+    },
+    {
+     "label": "50 pockets 12 deep, from 8",
+     "depth": 4,
+     "steps": 3
+    },
+    {
+     "label": "Edge groove 8 deep + 50 pockets to 8",
+     "depth": 8,
+     "steps": 6
+    },
+    {
+     "label": "50 pockets 12 deep, from 8",
+     "depth": 4,
+     "steps": 3
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 24.3,
+     "steps": 16
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 24.3,
+     "steps": 16
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 24.3,
+     "steps": 16
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 24.3,
+     "steps": 16
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 24.3,
+     "steps": 16
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 24.3,
+     "steps": 16
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 24.3,
+     "steps": 16
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 24.3,
+     "steps": 16
+    }
+   ],
+   "warnings": [
+    "Side: pocket z=16: 1.2mm² left in corners/narrow spots with D=3.175",
+    "Side: pocket z=12: 1.2mm² left in corners/narrow spots with D=3.175",
+    "Right side: pocket z=16: 1.2mm² left in corners/narrow spots with D=3.175",
+    "Right side: pocket z=12: 1.2mm² left in corners/narrow spots with D=3.175"
+   ],
+   "blocked": []
+  }
+ ]
+}
