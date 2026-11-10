@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { nearestEdge, nearestEdgeBy, screenDistance } from './edgePick';
+import { joinStraightEdges, nearestEdge, nearestEdgeBy, screenDistance } from './edgePick';
 
 // A 100 × 60 × 40 box, its top split into four triangles meeting in the middle of its long edges.
 const positions = new Float32Array([
@@ -53,6 +53,20 @@ const indices = [
 ];
 
 describe('picking an edge', () => {
+  it('joins an unordered straight boundary while retaining a sharp branch and a separate collinear island', () => {
+    const joined = joinStraightEdges([
+      { a: [20, 0, 0], b: [10, 0, 0] },
+      { a: [10, 0, 0], b: [10, 10, 0] },
+      { a: [0, 0, 0], b: [10, 0, 0] },
+      { a: [20, 0, 0], b: [30, 0, 0] },
+      { a: [100, 0, 0], b: [110, 0, 0] },
+    ]);
+    expect(joined).toHaveLength(3);
+    expect(joined).toContainEqual({ a: [0, 0, 0], b: [30, 0, 0] });
+    expect(joined).toContainEqual({ a: [10, 0, 0], b: [10, 10, 0] });
+    expect(joined).toContainEqual({ a: [100, 0, 0], b: [110, 0, 0] });
+  });
+
   it('gives the whole edge near a click, joined across the pieces the mesh splits it into', () => {
     const edge = nearestEdge(positions, indices, [30, 1, 40], 2)!;
     const ends = [edge.a, edge.b].map(p => p.join(',')).sort();
