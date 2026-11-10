@@ -227,6 +227,7 @@ import { kStudioCommands } from './studioCommands';
 import { selectStudioFeature } from './studioFeatureSelection';
 import { builtStudioParts, disabledStudioCommands } from './studioParts';
 import { usePartCutSelection } from './usePartCutSelection';
+import { usePartIsolation } from './usePartIsolation';
 import { FeatureDialog } from './FeatureDialog';
 import { StudioSketchDialog } from './StudioSketchDialog';
 import { sketchPendingFinishReason } from './sketchPendingFinishReason';
@@ -491,7 +492,6 @@ export function CadEditor({
   const onHoverPart = useCallback((id: string | null) => {
     hoveredPart.current = id;
   }, []);
-  const isolation = useRef<{ before: ReadonlySet<string>; hidden: ReadonlySet<string> } | null>(null);
   useEffect(() => {
     hoveredPart.current = null;
   }, [hiddenParts, showWorkspace]);
@@ -2171,17 +2171,7 @@ export function CadEditor({
       if (event.shiftKey && event.code === 'KeyI') {
         event.preventDefault();
         if (event.repeat || !part || !isCadPart(part)) return;
-        if (isolation.current?.hidden === hiddenParts) {
-          setHiddenParts(isolation.current.before);
-          isolation.current = null;
-        } else {
-          // Keys as assemblyModel's instanceKey makes them, without importing the 3D model code here.
-          const hidden = new Set(
-            builtParts.flatMap(p => [p.id, ...(p.copies ?? []).map(copy => `${p.id}/${copy.id}`)]).filter(key => key !== part.id)
-          );
-          isolation.current = { before: hiddenParts, hidden };
-          setHiddenParts(hidden);
-        }
+        isolatePart();
         return;
       }
       const name = studioViewShortcut(event);
@@ -3894,6 +3884,7 @@ export function CadEditor({
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
   const builtParts = blankDesign ? [] : builtStudioParts(doc);
+  const isolatePart = usePartIsolation(builtParts, cutSelection.selectedKey, hiddenParts, setHiddenParts);
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
   // An open sketch turned with its parts behind it, about the middle of the view.
   const turned = !!sketchBackdrop && sketchTurn !== straightOn;
