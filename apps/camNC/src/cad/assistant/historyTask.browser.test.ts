@@ -34,6 +34,7 @@ it('retains prior back thickness and reports pin-hole floor after a stock change
     key: 'no-provider',
     signal: controller.signal,
     examples: {},
+    reuseTrustedCheckResults: true,
     check: (source, base, signal) => checkScriptInBrowser(base, source, { signal }),
     request: async request => {
       // The latest stock request must not replace the earlier dimensions, back or pins.
