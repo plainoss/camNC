@@ -46,17 +46,21 @@ of this adds a second source of truth.
 ## In-app chat
 
 An assistant in a dock on the right of the Part Studio. The model reads the open
-design, writes a script, checks it on a copy, looks at drawings of the result and
-repairs it, then offers it. The user sees a preview and applies it as one undo step.
+design, writes a script, checks it on a copy and repairs it, then offers it or asks
+a question. The user sees a preview and applies it as one undo step.
 
 The model uses the tools the MCP server already has: the guide, the examples and the
 check. `editCad` already runs a script against a copy and leaves the design as it was
 when the script fails, so the model sends its whole script again on each try and
 nothing has to track a half-built candidate.
 
+A [simulated chat](CAD_AI_FURNITURE.md#the-fifth-run-a-simulated-chat) on these tools
+got six of nine requests right, most on the first check, and shaped the steps below:
+step 9 and the comparison in step 8 come from it, and the views moved to the end.
+
 ```
 Shared:  7 → 8
-Chat:    9 → 10 → 11 → 12 (needs 7 and 8) → 13
+Chat:    9 → 10 → 11 → 12 (needs 7 and 8) → 13 → 14
 ```
 
 7. **Apply an outside document.** The open design takes a whole new document as one
@@ -65,35 +69,53 @@ Chat:    9 → 10 → 11 → 12 (needs 7 and 8) → 13
    keeps the ID and geometry key of every part the script didn't change, and a hand
    edit made in between refuses the apply.
 8. **Preview a candidate.** The studio shows a candidate over the open design, with
-   the steps it adds, changes and removes, before anything is applied. **Done
-   when:** a candidate can be looked at from any side, then applied or dropped,
-   and dropping it leaves no trace.
-9. **Check a script in the browser.** The MCP server's `check_design`, run in an
-   isolated frame that has no network and no storage: a design and a script go in, a
-   design and a report come out. Scripts are plain JavaScript here, because the type
-   check only runs under Node. **Done when:** every example checks to the same report
-   as on the command line, and a script that tries to fetch or read storage fails.
-10. **Views in the report.** Top, front and right drawings of the boards as placed,
-    and a section through a named cut, as SVG from the evaluated geometry. They are
-    made in `cad-script`, so the command line and the MCP server get them too, and
-    the browser turns them into images for models that read images. **Done when:**
-    the cupboard's front view shows its shelves at their heights, and a section
-    through a pocket shows its depth.
+   the steps it adds, changes and removes, before anything is applied. It also says
+   what the change costs: a cut-parts step that cut before and cuts nothing now, a
+   joint that is gone, a warning that is new. A check can pass on a design that got
+   worse. **Done when:** a candidate can be looked at from any side, then applied or
+   dropped, and dropping it leaves no trace; and a candidate that sets a housing's
+   depth to zero is shown as losing its housings.
+9. **Change a design from a script.** Today a script adds to a design and can remove
+   only a part's own cut. It needs to find a part, copy, cut, corner or step that is
+   already there without making one, change a step's settings, and remove a part, a
+   copy, a pattern, a cut-parts step or a variable. Asking for a part that isn't
+   there is an error unless the script says the part is new. The guide gains a
+   section on changing a design, and the report lists a pattern as one line with
+   its count, not every copy. **Done when:** a script turns three of four housed
+   shelves into loose ones by taking them out of the cut-parts step, and changes
+   the depth of a cut that was typed as a number.
+10. **Check a script in the browser.** The MCP server's `check_design`, run in an
+    isolated frame that has no network and no storage: a design and a script go in, a
+    design and a report come out. Scripts are plain JavaScript here, because the type
+    check only runs under Node, so the API checks its own arguments: an option or a
+    method it doesn't know is refused with the names it does. **Done when:** every
+    example checks to the same report as on the command line, a script that tries to
+    fetch or read storage fails, and a mistyped option name is reported with the
+    right one.
 11. **Connect a provider.** A key store of its own, which is never synced and never
     part of a settings backup. Two adapters: Anthropic, and OpenAI-compatible with an
     address that can be changed, which covers OpenAI, OpenRouter and most others. Each
-    model says whether it can call tools, which the chat needs, and read images, which
-    the views need. **Done when:** the key appears in no synced setting, backup or log.
+    model says whether it can call tools, which the chat needs. **Done when:** the key
+    appears in no synced setting, backup or log.
 12. **The assistant dock.** Messages, the selection as context, Stop, and a short log
-    of what the model did ("floor 10 mm, wanted 12; made the pocket shallower"). A
-    proposal card lists what passed and which views were looked at, opens the preview
-    of step 8 and applies through step 7. A run stops after a set number of tries and
-    says what it found. **Done when:** an end-to-end spec with a recorded model asks
-    for a change, previews it, applies it and undoes it, and a hand edit made while
-    the model works turns Apply off.
+    of what the model did ("floor 10 mm, wanted 12; made the pocket shallower"). The
+    model ends a turn with a proposal or with a question, when the request and the
+    design don't fit or the request can be read two ways. A proposal card lists what
+    passed and what the change costs, opens the preview of step 8 and applies through
+    step 7. What the user asked for earlier, such as "no visible screws", stays with
+    the conversation and is sent with each request. A run stops after a set number
+    of tries and says what it found. **Done when:** an end-to-end spec with a
+    recorded model asks for a change, previews it, applies it and undoes it, and a
+    hand edit made while the model works turns Apply off.
 13. **Saved tasks.** Modelling tasks with their outcomes stated independently, run
     through the same loop without a browser, to compare models and to measure again
-    after each API change.
+    after each API change. The nine requests of the simulated chat are the first.
+14. **Views in the report.** Top, front and right drawings of the boards as placed,
+    with their cuts, and a section through a named cut, as SVG from the evaluated
+    geometry. They are made in `cad-script`, so the command line and the MCP server
+    get them too, and the browser turns them into images for models that read
+    images. In the simulated chat, views of the boards as boxes caught no mistake the
+    numbers hadn't, so this waits for a saved task that needs it.
 
 ### With cupboards as folders
 
@@ -109,9 +131,12 @@ chat share work, and each makes the other more useful:
   variables rather than the whole design.
 - The scripts behind the Insert menu are the model's vocabulary. It calls
   `cupboard({ shelves: 4 })` rather than drawing eight boards. A script the model
-  writes can be saved to the Insert menu, which the isolation of step 9 makes safe.
+  writes can be saved to the Insert menu, which the isolation of step 10 makes safe.
+  Without a folder scope, the simulated chat copied the cupboard script by hand into
+  41 lines, with every name given a suffix.
 - "A hole in the second shelf" needs a feature on one copy (roadmap PR 22), and a way
-  to name that copy in a script.
+  to name that copy in a script. The simulated chat could only offer the hole in
+  every shelf.
 - Roadmap PRs 22 and 24 change the script API, so the saved tasks run again after each.
 
 [Designing furniture with scripts](CAD_AI_FURNITURE.md) lists what a furniture test run
@@ -138,11 +163,16 @@ any surface for an untrusted client should take data rather than code.
 
 For the in-app chat:
 
-- The chat takes code and relies on step 9's isolation instead. Whether that frame
+- The chat takes code and relies on step 10's isolation instead. Whether that frame
   works under the app's cross-origin isolation headers is untested; the batched JSON
   form is the way out if it doesn't.
-- How well models write these scripts as plain JavaScript, without the type check.
+- How well models write these scripts as plain JavaScript. None of the simulated
+  chat's 24 checks failed the type check, but a mistyped option without it gives
+  "Cannot read properties of undefined", which step 10's argument checks replace.
 - Whether each provider accepts calls straight from a browser. The desktop build can
   make the call natively where one doesn't.
-- Whether looking at drawings catches mistakes the numeric checks miss. A shaded
-  picture or a second model as reviewer waits for a saved task that shows the need.
+- Whether looking at drawings catches mistakes the numeric checks miss. It didn't in
+  the simulated chat, with boxes only. A shaded picture or a second model as reviewer
+  waits for a saved task that shows the need.
+- A real conversation. The simulated chat gave each request to a model that saw only
+  the design, ran each request once, and mostly used one model.

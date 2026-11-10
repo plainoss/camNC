@@ -168,6 +168,58 @@ What still took hand work, or went wrong:
 - **Docs.** The README still said finger joints aren't covered. Argument types for
   `relief`, `clearance` and `copy`'s axes had to be guessed from the examples.
 
+## The fifth run, a simulated chat
+
+On 2026-11-10, fresh agents stood in for the [in-app chat](CAD_AI_PLAN.md#in-app-chat).
+Each had the README, the examples and two tools: read the open design as a report, and
+check a script against a copy of it. Every request after a design's first went to a new
+agent that had the design but not the script that made it, as after a hand edit. A
+wrapper logged every check.
+
+| Request                                                    | Checks | Result                                                                  |
+| ---------------------------------------------------------- | -----: | ----------------------------------------------------------------------- |
+| Cupboard to 800 × 900 with three even shelves              |      1 | Right, in 8 lines. All 143 IDs kept                                     |
+| The same, with a smaller model                             |      2 | Right. The first pattern count was one short                            |
+| A shoe bench, from nothing                                 |      1 | Right                                                                   |
+| A bookshelf with four housed shelves and a back            |      1 | Right                                                                   |
+| A 60 mm hole in the middle shelf only                      |      5 | Can't be said. Offered the hole in all three shelves, and said so       |
+| Bench 1100 wide, a divider, the seat's front corners round |     10 | Passed, but set the housing depth to zero to do it. Over its limit of 8 |
+| Shelves on pins, the second one stays housed               |      1 | Pins added. The housings can't be removed, and it said so               |
+| A second cupboard, 400 wide, beside the first              |      1 | Right, and the first unchanged byte for byte. 41 lines copied by hand   |
+| Switch to 15 mm board: does it fit, is anything weak?      |      1 | Right, in one line. Found the 3 mm floor left under the 12 mm pin holes |
+
+Of 24 checks, 13 passed, 7 stopped in the script and 4 failed the check. None failed
+the type check. A check took 3 s at the median, and a request 32 to 134 s.
+
+### What it found
+
+- **Changing an open design with a short script works** and keeps every ID. Changing a
+  variable is the cheap, safe case.
+- **A script can add but hardly remove.** Only a part's own cut can go: not a cut-parts
+  step, a pattern, a copy, a part or a variable. A cut's depth typed as a number can't
+  be changed either.
+- **`d.part(name)` makes a part when the name isn't there.** Asked for the copy
+  "Shelf 2", it made an empty part without a word.
+- **The README covers building, not changing.** One agent threw errors on purpose to
+  list a sketch's methods and to probe its regions.
+- **A passing check hid a worse design.** With the housing depth at zero the cut-parts
+  step cuts nothing, which is only a warning.
+- **A request can conflict with the design.** The seat's front corners sit inside the
+  sides' housings, so rounding them has no clean answer. The agents weren't allowed to
+  ask.
+- **The design doesn't carry what was asked for.** "No visible screws" from the first
+  request wasn't known to the agent that got the second.
+- **Reports list every pattern copy.** 56 pin holes make the report of one bookshelf
+  31 KB.
+- **Front, right and top views of the boards as boxes** confirmed layouts at a glance and
+  caught no mistake.
+- **Likely a bug:** after `d.variable('width', …)`, `regionAt` in the same script still
+  finds regions where the old width put them. Seen in the bench's failed checks, not
+  reproduced on its own.
+
+Not covered: a conversation with its history, more than one run of a request, and the
+browser.
+
 ## What works now
 
 - **Parts and cuts.** Profiles with holes, pockets on the top, the underside or a
@@ -227,6 +279,9 @@ pockets out of the edge. The warning now counts only the part.
 ### cad-script
 
 1. **The drawing is for reading only.** Labels can still crowd on dense parts.
+2. **Changing a design.** What the fifth run found: little can be removed or changed,
+   a part asked for by a wrong name is made, and the README doesn't say how to reach
+   what is already there. Step 9 of [the plan](CAD_AI_PLAN.md#in-app-chat).
 
 ## Next, in order
 
@@ -235,4 +290,4 @@ pockets out of the edge. The warning now counts only the part.
 2. **Report:** say where relief and constraint warnings are, warn when pattern copies
    vanish, count edge notches apart from holes, and let `expect` follow variables.
 3. **Drilling operations** for holes up to the bit's size and for hinge cups.
-4. **A fifth furniture run** once the joints exist, measured against these four.
+4. **Another furniture run** once the joints exist, measured against the first four.
