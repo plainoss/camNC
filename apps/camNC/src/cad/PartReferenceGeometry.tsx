@@ -9,6 +9,9 @@ export function PartReferenceGeometry({ edges, picked, pixelScale }: { edges: Pa
         <line
           key={edge.key}
           data-part-edge={edge.key}
+          data-part-source={edge.partId}
+          data-part-copy={edge.copyId}
+          data-part-ambiguous={edge.ambiguous ? '' : undefined}
           className={picked.includes(edge.key) ? 'cad-part-edge is-picked' : 'cad-part-edge'}
           x1={edge.x1}
           y1={-edge.y1}
@@ -22,6 +25,9 @@ export function PartReferenceGeometry({ edges, picked, pixelScale }: { edges: Pa
           key={vertex.key}
           data-part-edge={vertex.key}
           data-part-vertex={vertex.key}
+          data-part-source={vertex.partId}
+          data-part-copy={vertex.copyId}
+          data-part-ambiguous={vertex.ambiguous ? '' : undefined}
           className={picked.includes(vertex.key) ? 'cad-part-vertex is-picked' : 'cad-part-vertex'}
           cx={vertex.x}
           cy={-vertex.y}

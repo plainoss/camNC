@@ -365,8 +365,14 @@
         {
           "item": "Use points from another part's corners",
           "status": "partial",
-          "evidence": ["packages/cad/src/usedEdges.test.ts"],
-          "note": "Corner points only; projecting whole edges is not there yet."
+          "evidence": [
+            "packages/cad/src/usedEdges.test.ts",
+            "apps/camNC/src/cad/partEdgeUse.test.ts",
+            "apps/camNC/src/cad/partEdges.test.ts",
+            "apps/camNC/src/cad/studioUsedEdgeOwners.test.ts",
+            "apps/camNC/src/cad/CadEditor.useOwners.test.tsx"
+          ],
+          "note": "Use matches only the chosen part or exact copy's authored corner points. Imported line endpoints carry those point links. Unique in-plane sources retain priority; equally eligible overlaps or missing corner matches produce a visible refusal without edits. Cabinet/tray checks retain links, IDs and CAM membership through stock, size, pattern edits and reload. Whole-edge, curved-geometry and cut-generated-edge associations remain incomplete even when projected endpoints coincide with raw corners; missing sources keep their last fixed points."
         },
         {
           "item": "Driving dimensions: length, distance, angle, diameter, radius, arc gaps",

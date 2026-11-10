@@ -470,9 +470,12 @@ export function CadEditor({
   // The edges of the parts behind a studio sketch, laid on its plane, and those picked to use in it with `u`.
   const [partEdges, setPartEdges] = useState<PartEdge[]>([]);
   const [pickedEdges, setPickedEdges] = useState<string[]>([]);
+  const [useNotice, setUseNotice] = useState<string | null>(null);
   // Use, started with `u` and nothing picked: each part edge clicked goes into the sketch, until Escape or another tool.
   const [usingEdges, setUsingEdges] = useState(false);
   useEffect(() => setUsingEdges(false), [part?.id, showWorkspace]);
+  // A Use refusal belongs only to the current sketch and command.
+  useEffect(() => setUseNotice(null), [part?.id, showWorkspace, tool, usingEdges]);
   const [transparentParts, setTransparentParts] = useState<ReadonlySet<string>>(() => new Set());
   // Parts hidden from the studio's view by their eye in the parts list.
   // Both are kept for the design in this browser, so a reload shows it as it was left.
@@ -3843,7 +3846,7 @@ export function CadEditor({
   const grid = Math.max(1, 10 ** Math.floor(Math.log10(view.w / 20)));
   const chainPreview = sketch && chainGeometry(sketch, chain);
   const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
-  const acceptanceNotice = notice ?? finishError;
+  const acceptanceNotice = notice ?? useNotice ?? finishError;
   const profiles = useProfileSelection(doc, featureDialog, commit, setStudioRefusal);
   const faceBackdrop = useFaceSketchCamera(faceSketch?.scene, view, sketchTurn, sketchCameraShift, canvasBox);
   const studioBackdrop = useMemo(() => {
@@ -3861,14 +3864,11 @@ export function CadEditor({
   /** `u`: the picked edges become the sketch's own, fixed where they are, to draw and constrain against. */
   const takeEdges = (keys = pickedEdges) => {
     if (!sketch) return;
-    const used = addUsedPartEdges(
-      sketch,
-      partEdges,
-      keys,
-      sketchBackdrop?.document ?? documentRef.current,
-      part && cadSketchFrame(documentRef.current, part),
-      part?.id
-    );
+    const source = sketchBackdrop?.document ?? documentRef.current,
+      frame = part && cadSketchFrame(documentRef.current, part);
+    const used = addUsedPartEdges(sketch, partEdges, keys, source, frame, part?.id);
+    if (used.problem) return setUseNotice(used.problem);
+    setUseNotice(null);
     changeSketch(used.sketch);
     setPickedEdges([]);
     setSelected(used.selected);
