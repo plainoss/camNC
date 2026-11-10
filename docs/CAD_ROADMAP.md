@@ -45,6 +45,7 @@ Pockets:   1 → 2 → 3 → 4 → first test cut
 One view:  4 → 5 → 6 → 7
 Variables: 7 → 8 → 9
 Workspace: 9 → 14 → 15 → 16 → 17 → 18 → 19
+Cupboards: 17 → 20 → 21 → 22 → 23 → 24 → 25
 ```
 
 ## Milestone 1: real pockets
@@ -226,6 +227,116 @@ Workspace:  14 → 15 → 16 → 17 → 18 → 19
 
 - Draw on the face in the 3D view itself, with the other parts' edges to snap to.
 
+## Milestone 5: cupboards as folders
+
+A cupboard is inserted in one step and is then a folder of ordinary steps: parts,
+cut-parts steps and a shelf pattern, driven by the folder's variables. Nothing
+remembers that it is a cupboard. Width, depth and shelf count are variable edits,
+and every part inside is changed with the normal tools. Each PR below is useful
+without the ones after it.
+
+```
+Cupboards:  20 → 21 → 22 → 23 → 24 → 25
+```
+
+Three things the code already does carry most of this:
+
+- A dimension typed as `width - 2*board` follows the cupboard, and retyping it is
+  the override. No separate record says which values a cupboard controls.
+- A pattern's copies are numbered by their place in it (`<pattern>:<index>`), so
+  taking the shelf count from 3 to 2 and back gives the same third shelf.
+- A script can run on a document that already has parts.
+
+### PR 20: Group steps in folders
+
+`feat(camNC) Group feature list steps in folders`
+
+- A folder is a named run of neighbouring parts, cut-parts steps and planes. It
+  collapses, and it is rolled to, suppressed, dragged and deleted as one. The parts
+  list groups the same parts under the same name.
+- A folder only changes how the list is shown. The steps keep their order and IDs,
+  and rollback counts steps, whether or not their folder is open.
+- Suppressing a folder leaves each step's own setting alone, so switching the
+  folder back on keeps a shelf that was switched off by hand.
+- The feature list selects a step or a folder, not a part: today every step of the
+  selected part shows as current.
+- Documents with a folder get a new `version`, so an older build refuses the file.
+- **Done when:** the scripted cupboard's steps sit in one folder that moves and
+  suppresses as a block, and adding, renaming or removing a folder leaves every
+  part's geometry key unchanged.
+
+### PR 21: Give a folder its own variables
+
+`feat(cad) Keep a folder's variables with it`
+
+- A variable can belong to a folder. Opening the folder shows its variables as
+  its settings, and they are listed with it rather than with the document's.
+- Names stay unique across the document, so nothing changes in how expressions
+  are worked out. A clash on insert gets a suffix, such as `width_2`.
+- Deleting a folder removes its variables, and is refused with the uses listed
+  while a step outside the folder still uses one.
+- **Done when:** two folders each have a width, and changing one leaves the other
+  folder's parts alone.
+
+### PR 22: Cut one copy of a part
+
+`feat(cad) Sketch and cut on one copy of a part`
+
+- A face sketch or a cut can apply to one copy only. That copy is then a board of
+  its own for machining, as a mirrored copy already is, and the rest stay one
+  board with a quantity.
+- When a pattern's count drops below that copy, its features are kept, switched
+  off, and listed with the reason. They come back when the count does.
+- Starts with a short spike: features are saved on the part and shared by all its
+  copies, and what one copy's own feature costs in evaluation and CAM is not yet
+  known.
+- **Done when:** a cable hole in the second of three shelves survives a change of
+  width and a count of 3 → 2 → 3, and the other two shelves still nest as one
+  board cut twice.
+
+### PR 23: Detach a copy
+
+`feat(cad) Detach a copy into a part of its own`
+
+- Detach turns a copy into a part with its own sketch, where it now sits, keeping
+  the features it had. A pattern skips that place from then on, so no second part
+  appears there.
+- This is the way to a shelf with a different outline.
+- **Done when:** a detached shelf can be reshaped while its siblings follow the
+  pattern, and changing the count neither moves it nor fills its place.
+
+### PR 24: Scope a script to a folder
+
+`feat(cad-script) Build into a folder`
+
+- A script can open a folder and build inside it. Parts are found by name within
+  that folder and its variables belong to it, so running the cupboard script twice
+  makes two cupboards. Today the second run finds the first's parts and variables
+  by name and changes them.
+- The cupboard example gains a `shelves` variable, with the shelf as one part and
+  a pattern counted by it.
+- **Done when:** a golden report covers two cupboards of different sizes in one
+  document.
+
+### PR 25: Insert a cupboard
+
+`feat(camNC) Insert a cupboard`
+
+- Insert → Cupboard asks for width, height, depth, board and shelves with a
+  preview, then runs the script on the open design as one undo step. The same
+  call is offered by the MCP server.
+- Applying a script's result and previewing it are steps 7 and 8 of
+  [the AI plan](CAD_AI_PLAN.md#in-app-chat), which the in-app chat uses too. They
+  are built once, before this PR.
+- **Done when:** an end-to-end spec inserts two cupboards, cuts a cable hole in
+  the second shelf of one, changes its width and depth, takes its shelf count
+  3 → 2 → 3, then saves, reopens and undoes. The hole stays on the same shelf and
+  the other cupboard is unchanged.
+
+A change that is not a variable, a pattern count or switching a step off is made
+by hand or by a script inside the folder: adding a divider, or another kind of
+door. There is no step that rebuilds the cupboard from its settings.
+
 ## Known workflow gaps in the Part Studio
 
 The studio follows a parametric part studio's workflow. Where it still differs, to be closed later:
@@ -254,3 +365,6 @@ The studio follows a parametric part studio's workflow. Where it still differs, 
   it is affected, so its tests should be the strictest.
 - **PR 6:** see the fallback above.
 - **PRs 2, 6 and 11** look like the largest, judged from reading the code.
+- **PR 22:** the only step of milestone 5 that changes what a part is to CAM. If
+  the spike shows one copy's own features don't fit, PR 23's detach covers the
+  case alone, at the cost of a part that no longer follows the pattern.
