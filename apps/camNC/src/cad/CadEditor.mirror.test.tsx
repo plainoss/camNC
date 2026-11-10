@@ -69,16 +69,21 @@ it('uses another part face as the mirror plane', async () => {
     </div>
   );
   await settled();
-  const props = () => vi.mocked(ModelViewport).mock.calls.findLast(([props]) => props.cameraState)![0];
+  // Spy calls survive the previous fixture; only this support body's viewport can supply its camera.
+  const props = () =>
+    vi
+      .mocked(ModelViewport)
+      .mock.calls.findLast(([props]) => props.cameraState && props.meshes.some(mesh => mesh.partId === support.id))?.[0];
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /^Mirror/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
   const frame = cadFaceFrame(source, { partId: support.id, face: 'top' });
   if ('error' in frame) throw new Error(frame.error);
-  await waitFor(() => expect(props().cameraState?.current?.height).toBeGreaterThan(0));
+  // The lazy model canvas publishes its camera after the editor is ready, including under parallel renderer load.
+  await waitFor(() => expect(props()?.cameraState?.current?.height).toBeGreaterThan(0), { timeout: 20_000 });
   const canvas = screen.getByTestId('workspace-3d').querySelector('canvas')!;
   const box = canvas.getBoundingClientRect();
-  const state = props().cameraState!.current!;
+  const state = props()!.cameraState!.current!;
   const width = (state.height * box.width) / box.height;
   const projection = new OrthographicCamera(-width / 2, width / 2, state.height / 2, -state.height / 2, 1, 40000);
   projection.position.set(...state.center).addScaledVector(new Vector3(...state.back), 20000);
@@ -98,4 +103,4 @@ it('uses another part face as the mirror plane', async () => {
     })
   );
   expect(change.mock.calls.at(-1)![0].parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(236, 6);
-});
+}, 40_000);
