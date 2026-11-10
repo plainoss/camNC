@@ -1,4 +1,5 @@
 import { finite, type SvgPoint } from './types';
+import { boundSvgNumericText, readSvgNumber, svgLetter, svgWhitespace } from './numeric';
 export type Matrix = [number, number, number, number, number, number];
 export const identity: Matrix = [1, 0, 0, 1, 0, 0];
 export function multiply(a: Matrix, b: Matrix): Matrix {
@@ -15,17 +16,47 @@ export function transformPoint(m: Matrix, p: SvgPoint): SvgPoint {
   return [finite(m[0] * p[0] + m[2] * p[1] + m[4]), finite(m[1] * p[0] + m[3] * p[1] + m[5])];
 }
 export function numbers(source: string): number[] {
-  const pattern = /[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/gi;
-  if (source.replace(pattern, '').replace(/[\s,]/g, '')) throw new Error('Invalid SVG number list.');
-  return (source.match(pattern) ?? []).map(n => finite(Number(n)));
+  boundSvgNumericText(source);
+  const values: number[] = [];
+  let cursor = 0;
+  while (cursor < source.length) {
+    if (svgWhitespace(source[cursor]) || source[cursor] === ',') {
+      cursor++;
+      continue;
+    }
+    const token = readSvgNumber(source, cursor);
+    values.push(finite(token.value));
+    cursor = token.end;
+  }
+  return values;
 }
+const transformNames = new Set(['matrix', 'translate', 'scale', 'rotate', 'skewX', 'skewY']);
 export function parseTransform(source: string): Matrix {
-  const pattern = /([A-Za-z]+)\s*\(([^()]*)\)/g;
-  if (source.replace(pattern, '').trim()) throw new Error('Invalid SVG transform.');
-  let result = identity;
-  for (const match of source.matchAll(pattern)) {
-    const v = numbers(match[2]);
-    const kind = match[1];
+  boundSvgNumericText(source);
+  let cursor = 0,
+    result = identity;
+  const skipWhitespace = () => {
+    while (svgWhitespace(source[cursor])) cursor++;
+  };
+  skipWhitespace();
+  while (cursor < source.length) {
+    const nameStart = cursor;
+    while (svgLetter(source[cursor])) {
+      cursor++;
+      // All supported names fit in nine characters. Do not copy or echo a hostile long name.
+      if (cursor - nameStart > 9) throw new Error('Unsupported SVG transform.');
+    }
+    const kind = source.slice(nameStart, cursor);
+    if (!transformNames.has(kind)) throw new Error('Unsupported SVG transform.');
+    skipWhitespace();
+    if (source[cursor++] !== '(') throw new Error('Invalid SVG transform.');
+    const valuesStart = cursor;
+    while (cursor < source.length && source[cursor] !== ')') {
+      if (source[cursor] === '(') throw new Error('Nested SVG transform parentheses are unsupported.');
+      cursor++;
+    }
+    if (cursor === source.length) throw new Error('Incomplete SVG transform.');
+    const v = numbers(source.slice(valuesStart, cursor++));
     let m: Matrix;
     if (kind === 'matrix' && v.length === 6) m = v as Matrix;
     else if (kind === 'translate' && (v.length === 1 || v.length === 2)) m = [1, 0, 0, 1, v[0], v[1] ?? 0];
@@ -40,17 +71,32 @@ export function parseTransform(source: string): Matrix {
     } else if ((kind === 'skewX' || kind === 'skewY') && v.length === 1) {
       const t = Math.tan((v[0] * Math.PI) / 180);
       m = kind === 'skewX' ? [1, 0, t, 1, 0, 0] : [1, t, 0, 1, 0, 0];
-    } else throw new Error(`Unsupported SVG transform ${kind}.`);
+    } else throw new Error('Invalid SVG transform parameters.');
     result = multiply(result, m);
+    skipWhitespace();
+    if (source[cursor] === ',') {
+      cursor++;
+      skipWhitespace();
+      if (cursor === source.length) throw new Error('Incomplete SVG transform list.');
+    }
   }
   if (Math.abs(result[0] * result[3] - result[1] * result[2]) < 1e-12) throw new Error('SVG transform collapses geometry.');
   return result;
 }
 const mmPerUnit: Record<string, number> = { '': 25.4 / 96, px: 25.4 / 96, mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, q: 0.25 };
 export function lengthMm(source: string): number {
-  const match = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)\s*(px|mm|cm|in|pt|pc|q)?\s*$/i.exec(source);
-  if (!match) throw new Error('SVG dimensions require absolute units; percentages and relative units are unsupported.');
-  return finite(Number(match[1]) * mmPerUnit[(match[2] ?? '').toLowerCase()]);
+  boundSvgNumericText(source);
+  const text = source.trim();
+  let token: ReturnType<typeof readSvgNumber>;
+  try {
+    token = readSvgNumber(text);
+  } catch {
+    throw new Error('SVG dimensions require absolute units; percentages and relative units are unsupported.');
+  }
+  const unit = text.slice(token.end).trim().toLowerCase();
+  if (!Object.hasOwn(mmPerUnit, unit))
+    throw new Error('SVG dimensions require absolute units; percentages and relative units are unsupported.');
+  return finite(token.value * mmPerUnit[unit]);
 }
 /** Root viewport mapping follows SVG meet/slice alignment, then flips Y for CAD. */
 export function viewportMatrix(attrs: Record<string, string>): Matrix {

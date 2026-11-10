@@ -1,3 +1,4 @@
+import { readSvgNumber } from './numeric';
 // CSS named colors are fixed data; alpha-bearing and context-dependent paints are
 // excluded because invisible geometry must never become imported material.
 const namedColors = new Set(
@@ -13,7 +14,14 @@ export function isOpaqueSvgPaint(source: string): boolean {
     parts = comma ? rgb[1].split(',').map(s => s.trim()) : rgb[1].trim().split(/\s+/);
   if (
     parts.length !== 3 ||
-    !parts.every(p => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?%?$/.test(p) && Number.isFinite(Number.parseFloat(p)))
+    !parts.every(p => {
+      try {
+        const token = readSvgNumber(p);
+        return Number.isFinite(token.value) && (token.end === p.length || (token.end === p.length - 1 && p[token.end] === '%'));
+      } catch {
+        return false;
+      }
+    })
   )
     return false;
   return !comma || parts.every(p => p.endsWith('%') === parts[0].endsWith('%'));
