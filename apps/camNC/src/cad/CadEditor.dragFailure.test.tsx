@@ -3,7 +3,7 @@ import { addRectangle, addPoint, createCadDocument, createCadPart, type CadDocum
 import { cdp, userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { cadSession, commitCadSession, endCadSession } from './session';
+import { cadSession, commitCadSession, endCadSession } from '@wbcnc/cad-editor/session';
 
 const solver = vi.hoisted(() => ({ solve: vi.fn<typeof import('./solveCad').solveCadDocument>() }));
 vi.mock('./solveCad', async importOriginal => ({

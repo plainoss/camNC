@@ -1,6 +1,6 @@
 import { createCadDocument, createPlateDocument, type CadDocument } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
-import { designSteps } from './designSteps';
+import { designSteps } from '@wbcnc/cad';
 import { reorderedSteps } from './reorderSteps';
 
 const plate = (name: string) => ({ ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name });

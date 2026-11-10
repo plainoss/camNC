@@ -2,7 +2,7 @@ import { addConstraint, addLine, addPoint, createCadDocument, createCadPart, typ
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const documentIds: string[] = [];
 afterEach(() => {

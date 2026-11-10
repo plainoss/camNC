@@ -7,7 +7,7 @@ import {
   alignedRectangleFromPoints,
   type CadPoint,
 } from '@wbcnc/cad';
-import { buildArcPreview } from './arcPreviewGeometry';
+import { buildArcPreview } from '@wbcnc/cad-editor/arcPreviewGeometry';
 import type { SketchTool } from './sketchTools';
 import { formatCadValue } from './valueExpressions';
 

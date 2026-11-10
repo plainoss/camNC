@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import saved from '../../../../packages/cad-script/fixtures/designs/extrude-operation-history.json';
 import { CadEditor } from './CadEditor';
 import { assemblyModel } from './assemblyModel';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const sessions: string[] = [];
 afterEach(() => {

@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { SketchToolGlyph } from './SketchToolbar';
 import type { SketchToolDefinition } from './sketchTools';
-import type { ConstraintCommandTool } from './constraintCommands';
+import type { ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands';
 import type { StudioCommand } from './studioCommands';
 
 export type SearchCommand = Omit<SketchToolDefinition, 'id'> & {

@@ -5,7 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DimensionGraphics } from './DimensionGraphics';
 import { SketchContextMenu } from './SketchContextMenu';
-import { createSketchContext, pickSketchContextTarget, type SketchContext, type SketchContextSelection } from './sketchContext';
+import {
+  createSketchContext,
+  pickSketchContextTarget,
+  type SketchContext,
+  type SketchContextSelection,
+} from '@wbcnc/cad-editor/sketchContext';
 
 afterEach(cleanup);
 function fixture(driven = false) {

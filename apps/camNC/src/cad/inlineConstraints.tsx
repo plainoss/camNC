@@ -1,6 +1,6 @@
 import type { CadSketch } from '@wbcnc/cad';
 import { useState } from 'react';
-import { INLINE_CONSTRAINT_SIZE, layoutInlineConstraints, type InlineConstraintKind } from './inlineConstraintLayout';
+import { INLINE_CONSTRAINT_SIZE, layoutInlineConstraints, type InlineConstraintKind } from '@wbcnc/cad-editor/inlineConstraintLayout';
 
 export interface InlineConstraintsProps {
   sketch: CadSketch;

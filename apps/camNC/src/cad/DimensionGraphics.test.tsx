@@ -13,7 +13,7 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { useRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DimensionGraphics } from './DimensionGraphics';
-import { dimensionAnchor } from './dimensionGeometry';
+import { dimensionAnchor } from '@wbcnc/cad-editor/dimensionGeometry';
 import { SKETCH_APPEARANCE, useSvgPixelScale } from './sketchAppearance';
 
 afterEach(cleanup);

@@ -1,5 +1,5 @@
 import type { CadDocument, CadPart } from '@wbcnc/cad';
-import type { DesignStep } from './designSteps';
+import type { DesignStep } from '@wbcnc/cad';
 
 const flip = <T extends { suppressed?: true }>(item: T): T => {
   const next = { ...item };

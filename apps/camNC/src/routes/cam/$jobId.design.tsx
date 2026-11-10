@@ -28,7 +28,7 @@ import {
 } from '@/cam/designDraftRecovery';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { CadEditor, type CadEditorController } from '@/cad/CadEditor';
-import { acknowledgeCadSession, cadSession, endCadSession, replaceCadSession, syncCadSession } from '@/cad/session';
+import { acknowledgeCadSession, cadSession, endCadSession, replaceCadSession, syncCadSession } from '@wbcnc/cad-editor/session';
 import { openAtMachine } from '@/cam/machine/openAtMachine';
 import { downloadDesignFile } from '@/cam/designFile';
 import { Download } from 'lucide-react';

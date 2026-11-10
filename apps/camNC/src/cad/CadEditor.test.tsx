@@ -17,8 +17,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from '@vitest/browser/context';
 import { CadEditor } from './CadEditor';
-import { isCadEditorActive } from './keyboardOwnership';
-import { endCadSession } from './session';
+import { isCadEditorActive } from '@wbcnc/cad-editor/keyboardOwnership';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 import { setDemoModeForTest } from '@/lib/demo/demo-mode';
 
 const ids: string[] = [];

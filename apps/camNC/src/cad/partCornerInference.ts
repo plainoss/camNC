@@ -8,7 +8,7 @@ import {
   type CadPointEntity,
   type CadSketch,
 } from '@wbcnc/cad';
-import type { CadDrawingInference } from './drawingInference';
+import type { CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 import type { PartEdge } from './partEdges';
 
 interface CornerInference extends CadDrawingInference {

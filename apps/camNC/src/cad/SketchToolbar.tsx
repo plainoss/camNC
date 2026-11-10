@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@wbcnc/ui/components/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@wbcnc/ui/components/tooltip';
-import type { ConstraintCommandTool } from './constraintCommands';
+import type { ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands';
 import {
   sketchToolFamilies,
   sketchToolGroups,

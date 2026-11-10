@@ -4,7 +4,7 @@ import { userEvent } from '@vitest/browser/context';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const documentIds: string[] = [];
 afterEach(() => {

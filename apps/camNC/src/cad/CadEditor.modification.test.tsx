@@ -12,8 +12,8 @@ import {
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
-import { saveCadViewState } from './viewState';
+import { endCadSession } from '@wbcnc/cad-editor/session';
+import { saveCadViewState } from '@wbcnc/cad-editor/viewState';
 
 const ids: string[] = [];
 afterEach(() => {
