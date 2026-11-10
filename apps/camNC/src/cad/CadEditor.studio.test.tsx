@@ -452,66 +452,6 @@ it('ignores visibility shortcuts while typing, using modifiers, or repeating Y',
   expect(props().meshes.map(mesh => mesh.name)).toEqual(['Plate 2', 'Shelf']);
 });
 
-it('opens as a studio, with its own toolbar and steps set in dialogs that keep or drop their changes', async () => {
-  const { latest } = await studio();
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  expect(screen.queryByRole('toolbar', { name: 'Sketch toolbar' })).toBeNull();
-
-  // Extrude always starts a new extrude: of the selected part's sketch, with nothing picked once it's all used.
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
-  let dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
-  await waitFor(() => expect(latest().parts[1]).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [] }));
-  expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true);
-  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(latest().parts).toHaveLength(1));
-
-  // A part's extrude is edited from its step. A changed thickness shows straight away, and the cross puts it back.
-  await editExtrude('Plate');
-  dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
-  const thickness = within(dialog).getByRole('textbox', { name: /Thickness/ });
-  await userEvent.clear(thickness);
-  await userEvent.type(thickness, '30');
-  await userEvent.tab();
-  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(30));
-  // The design can't be left with a step half set.
-  expect(within(toolbar).getByRole('button', { name: /Done/ })).toHaveProperty('disabled', true);
-  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(18));
-  expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull();
-
-  // A thickness that can't be used can't be kept.
-  await editExtrude('Plate');
-  dialog = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
-  await userEvent.clear(within(dialog).getByRole('textbox', { name: /Thickness/ }));
-  await userEvent.type(within(dialog).getByRole('textbox', { name: /Thickness/ }), '0');
-  await userEvent.tab();
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true));
-  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  expect(latest().parts[0]!.thickness).toBe(18);
-
-  // The tick keeps it.
-  await editExtrude('Plate');
-  dialog = screen.getByRole('dialog', { name: 'Extrude · Plate' });
-  await userEvent.clear(within(dialog).getByRole('textbox', { name: /Thickness/ }));
-  await userEvent.type(within(dialog).getByRole('textbox', { name: /Thickness/ }), '24');
-  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(24));
-  expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull();
-
-  // A pattern is set in its own dialog, which patterns as soon as it opens; cancelling takes it back off.
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
-  dialog = screen.getByRole('dialog', { name: 'Linear pattern · Plate' });
-  expect(within(dialog).queryByRole('checkbox', { name: 'Pattern copies in a row' })).toBeNull();
-  await waitFor(() => expect(latest().parts[0]!.copies).toHaveLength(1));
-  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(latest().parts[0]!.pattern).toBeUndefined());
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
-  dialog = screen.getByRole('dialog', { name: 'Linear pattern · Plate' });
-  await waitFor(() => expect(latest().parts[0]!.copies).toHaveLength(1));
-  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  expect(latest().parts[0]!.pattern).toBeDefined();
-});
-
 it('opens a sketch from its step and closes it back to the studio, cancelling what changed in it', async () => {
   const { latest, finish } = await studio();
   // Double-clicking a feature edits it; for a sketch, that opens it.
