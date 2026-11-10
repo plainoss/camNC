@@ -18,6 +18,7 @@ export const studioShortcuts: ShortcutSection[] = [
     items: [
       { label: 'New sketch', key: 'Shift+S' },
       { label: 'Extrude', key: 'Shift+E' },
+      { label: 'Measure', key: '[' },
       { label: 'Search tools', key: 'Alt+C' },
       ...undoRedo,
     ],
@@ -28,6 +29,7 @@ export const studioShortcuts: ShortcutSection[] = [
       { label: 'Zoom to fit', key: 'F' },
       { label: 'Front, back, left, right, top, bottom, isometric', key: 'Shift+1 … Shift+7' },
       { label: 'View normal to the picked plane or face', key: 'N' },
+      { label: 'Turn section view on or off', key: 'Shift+X' },
       { label: 'Show or hide planes', key: 'P' },
       { label: 'Hide the part under the pointer', key: 'Y' },
       { label: 'Show all parts', key: 'Shift+Y' },

@@ -9,6 +9,9 @@ import { ViewCube } from './ViewCube';
 import { ModelBody } from './ModelBody';
 import { ModelOrbitControls } from './ModelOrbitControls';
 import { kOrbitSurface } from './orbitPicking';
+import { ModelSectionCap } from './ModelSectionCap';
+import { SectionOffsetHandle, type SectionOffsetControl } from './SectionOffsetHandle';
+import type { SectionCapRange } from '@/cad/sectionModel';
 import { ModelFaceHighlight } from './ModelFaceHighlight';
 import { ExtrudeDepthArrow } from './ExtrudeDepthArrow';
 import type { ExtrudeDepthControl } from '@/cad/extrudeDepth';
@@ -177,9 +180,13 @@ export interface ModelFacePick {
   /** Which of the meshes was clicked, for a part shown more than once. */
   index: number;
   point: [number, number, number];
+  /** The exact ray hit remains on the clicked plane even when a mate-style snap chooses a bounding-box midpoint. */
+  surfacePoint?: [number, number, number];
   normal: [number, number, number];
   /** The part's straight edge, when the click was this close to one, end to end. */
   edge?: ModelEdge;
+  /** Temporary cut surfaces can be measured but do not define a new feature's source face. */
+  sectionCap?: boolean;
 }
 
 /** How close to an edge, in screen pixels, a click picks it. */
@@ -410,6 +417,9 @@ export function ModelViewport({
   measuring = false,
   measureSelection = [],
   measureWitness,
+  sectionCaps = [],
+  sectionControl,
+  sourceMeshes,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -464,6 +474,10 @@ export function ModelViewport({
   measuring?: boolean;
   measureSelection?: readonly MeasureEntity[];
   measureWitness?: ModelMeasureWitness;
+  sectionCaps?: readonly (SectionCapRange | null)[];
+  sectionControl?: SectionOffsetControl | null;
+  /** Persistent feature inputs snap to the original body, while inspection measures the visible clipped body. */
+  sourceMeshes?: readonly BodyMesh[];
 }) {
   const [hoveredConnector, setHoveredConnector] = useState<ModelFacePick | null>(null);
   // A new pick must not briefly reuse a marker from an earlier dialog or different geometry.
@@ -558,9 +572,23 @@ export function ModelViewport({
       for (const plane of planes) bounds.expandByPoint(new THREE.Vector3(...plane.origin).applyMatrix4(assembled));
     return bounds;
   }, [geometryBox, showOrigin, view, assembled, planes]);
+  const colorOf = (mesh: BodyMesh, index: number) =>
+    (selectedIndexes ? selectedIndexes.includes(index) : mesh.partId === selectedId) || highlightIds.includes(mesh.partId)
+      ? palette === 'studio'
+        ? kStudioPicked
+        : kSelected
+      : warnIds.includes(mesh.partId)
+        ? kClash
+        : !milled(mesh.partId)
+          ? kOff
+          : palette === 'studio'
+            ? kStudioPart
+            : kWood;
+  const opacityOf = (mesh: BodyMesh, index: number) =>
+    display === 'translucent' || transparentIds?.has(instanceIds?.[index] ?? mesh.partId) ? 0.3 : milled(mesh.partId) ? 1 : 0.35;
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
     // A captured depth drag must not also select the face beneath its release point.
-    if (extrusionDepth?.dragging) return;
+    if (extrusionDepth?.dragging || sectionControl?.dragging) return;
     if (!e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.
     const point = e.point.clone().applyMatrix4(matrix.clone().invert()),
@@ -574,13 +602,16 @@ export function ModelViewport({
       // Shift explicitly adds measurement geometry; a second quick pick must not reach the part double-click editor.
       if (measuring || (entity && e.shiftKey)) return;
     }
-    const edge = canvas.clientWidth ? nearestEdgeBy(mesh.positions, mesh.indices, screen.segment, kEdgePixels) : null;
+    const source = sourceMeshes?.[index] ?? mesh;
+    const edge = canvas.clientWidth ? nearestEdgeBy(source.positions, source.indices, screen.segment, kEdgePixels) : null;
     const near = edge && Math.min(screen.point(edge.a), screen.point(edge.b)) > kEdgePixels ? edge : null;
     const face: ModelFacePick = {
       partId: mesh.partId,
       index,
-      point: snapToFace(mesh.positions, point.toArray(), normal),
+      point: snapToFace(source.positions, point.toArray(), normal),
+      surfacePoint: point.toArray(),
       normal,
+      ...(e.faceIndex != null && sectionCaps[index] && e.faceIndex * 3 >= sectionCaps[index]!.start && { sectionCap: true }),
       ...(near && { edge: near }),
     };
     if (onPickFace) onPickFace(face);
@@ -612,29 +643,20 @@ export function ModelViewport({
         <FitCamera box={view === 'exploded' ? explosionBox : box} fitKey={view} viewRequest={viewRequest} cameraState={cameraState} />
       )}
       <group>
-        {meshes.map((m, i) => (
-          <ModelBody
-            key={i}
-            mesh={m}
-            matrix={matrices[i]!}
-            color={
-              (selectedIndexes ? selectedIndexes.includes(i) : m.partId === selectedId) || highlightIds.includes(m.partId)
-                ? palette === 'studio'
-                  ? kStudioPicked
-                  : kSelected
-                : warnIds.includes(m.partId)
-                  ? kClash
-                  : !milled(m.partId)
-                    ? kOff
-                    : palette === 'studio'
-                      ? kStudioPart
-                      : kWood
-            }
-            opacity={display === 'translucent' || transparentIds?.has(instanceIds?.[i] ?? m.partId) ? 0.3 : milled(m.partId) ? 1 : 0.35}
-            edges={display === 'edges'}
-            onSelect={e => pick(m, i, matrices[i]!, e)}
-            onHover={(hovered, event) => {
-              onHover?.(hovered ? m.partId : null, hovered ? i : undefined);
+        {meshes.map(
+          (m, i) =>
+            m.indices.length > 0 && (
+              <ModelBody
+                key={i}
+                mesh={m}
+                sectionCap={sectionCaps[i] ?? undefined}
+                matrix={matrices[i]!}
+                color={colorOf(m, i)}
+                opacity={opacityOf(m, i)}
+                edges={display === 'edges'}
+                onSelect={e => pick(m, i, matrices[i]!, e)}
+                onHover={(hovered, event) => {
+                  onHover?.(hovered ? m.partId : null, hovered ? i : undefined);
               if (pickingConnector) {
                 if (hovered && event?.face) {
                   const point = event.point.clone().applyMatrix4(matrices[i]!.clone().invert()).toArray();
@@ -642,15 +664,29 @@ export function ModelViewport({
                   setHoveredConnector({ partId: m.partId, index: i, point: snapToFace(m.positions, point, normal), normal });
                 } else setHoveredConnector(current => (current?.index === i ? null : current));
               }
-              if (palette !== 'studio') return;
-              if (!hovered || !event?.face) return setHoveredFace(current => (current?.index === i ? null : current));
-              const point = event.point.clone().applyMatrix4(matrices[i]!.clone().invert()).toArray();
-              const face: ModelFacePick = { partId: m.partId, index: i, point, normal: event.face.normal.toArray() };
-              setHoveredFace(current => (current?.index === i && sameFacePlane(current, face) ? current : face));
-            }}
-          />
-        ))}
+                  if (palette !== 'studio') return;
+                  if (!hovered || !event?.face) return setHoveredFace(current => (current?.index === i ? null : current));
+                  const point = event.point.clone().applyMatrix4(matrices[i]!.clone().invert()).toArray();
+                  const face: ModelFacePick = { partId: m.partId, index: i, point, normal: event.face.normal.toArray() };
+                  setHoveredFace(current => (current?.index === i && sameFacePlane(current, face) ? current : face));
+                }}
+              />
+            )
+        )}
       </group>
+      {meshes.map(
+        (mesh, index) =>
+          sectionCaps[index] && (
+            <ModelSectionCap
+              key={index}
+              mesh={mesh}
+              range={sectionCaps[index]!}
+              matrix={matrices[index]!}
+              color={colorOf(mesh, index)}
+              opacity={opacityOf(mesh, index)}
+            />
+          )
+      )}
       {[
         selectedFace,
         hoveredFace && !(selectedFace?.index === hoveredFace.index && sameFacePlane(selectedFace, hoveredFace)) ? hoveredFace : null,
@@ -715,8 +751,13 @@ export function ModelViewport({
         <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
       ))}
       {extrusionDepth && view === 'assembled' && <ExtrudeDepthArrow key={extrusionDepth.partId} control={extrusionDepth} />}
+      {sectionControl && view === 'assembled' && (
+        <SectionOffsetHandle
+          control={{ ...sectionControl, origin: new THREE.Vector3(...sectionControl.origin).applyMatrix4(assembled).toArray() }}
+        />
+      )}
       {!sketchView && onViewRequest && <ViewCube onViewRequest={onViewRequest} />}
-      {!sketchView && <ModelOrbitControls box={orbitBox} enabled={!extrusionDepth?.dragging} />}
+      {!sketchView && <ModelOrbitControls box={orbitBox} enabled={!extrusionDepth?.dragging && !sectionControl?.dragging} />}
     </Canvas>
   );
 }
