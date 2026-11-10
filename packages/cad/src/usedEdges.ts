@@ -6,6 +6,7 @@ import type { CadDocument, CadPart, CadPointEntity, CadSketch } from './types';
 
 type Vec3 = [number, number, number];
 type Frame = { origin: Vec3; x: Vec3; y: Vec3; normal: Vec3 };
+type CornerInstance = Pick<NonNullable<CadPointEntity['used']>, 'partId' | 'copyId'>;
 
 /**
  * Where a corner of a part is in the studio: a point of its sketch, on its top or its bottom. Its sketch's axes come
@@ -58,9 +59,10 @@ export function cadCornerSources(
   document: CadDocument,
   frame: Frame,
   except?: string,
-  sourcePartId?: string
+  sourcePart?: string | CornerInstance
 ): Map<string, NonNullable<CadPointEntity['used']>> {
   const sources = new Map<string, NonNullable<CadPointEntity['used']>>();
+  const sourcePartId = typeof sourcePart === 'string' ? sourcePart : sourcePart?.partId;
   for (const part of document.parts) {
     if (
       part.id === except ||
@@ -72,7 +74,8 @@ export function cadCornerSources(
       continue;
     for (const entity of part.sketch.entities) {
       if (entity.type !== 'point' || entity.construction) continue;
-      for (const copyId of [undefined, ...(part.copies ?? []).map(copy => copy.id)])
+      // A picked physical source must not fall back to the seed or another coincident copy.
+      for (const copyId of typeof sourcePart === 'object' ? [sourcePart.copyId] : [undefined, ...(part.copies ?? []).map(copy => copy.id)])
         for (const side of ['top', 'bottom'] as const) {
           const at = cornerAt(document, part, entity.id, side, copyId);
           if (!at) continue;

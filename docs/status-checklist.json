@@ -79,8 +79,8 @@
         {
           "item": "Linear pattern of parts along a picked edge",
           "status": "done",
-          "evidence": ["packages/cad/src/partPatterns.test.ts", "apps/camNC/src/cad/CadPartPatternField.test.tsx", "apps/camNC/src/cad/CadEditor.patternHistory.test.tsx"],
-          "note": "Dialog previews leave source and undo/redo history unchanged until confirmation. Cancel discards the pattern candidate; accepted inline variables remain separate operations."
+          "evidence": ["packages/cad/src/partPatterns.test.ts", "apps/camNC/src/cad/CadPartPatternField.test.tsx", "apps/camNC/src/cad/CadEditor.patternHistory.test.tsx", "apps/camNC/src/cad/CadEditor.patternScope.test.tsx", "apps/camNC/src/cad/CadEditor.patternConsumedSource.test.tsx", "apps/camNC/src/cad/CadEditor.patternSearch.test.tsx"],
+          "note": "Tool search opens distinct Linear pattern and Circular pattern controls using the existing type conversions. Dialog previews leave source and undo/redo history unchanged until confirmation. Cancel discards the pattern candidate; accepted inline variables remain separate operations. The Pattern command refuses a selected physical copy, including a slot removed by a count edit, rather than widening it to the source family. Source families remain editable after a later cut consumes their bodies."
         },
         {
           "item": "Mirror a part across a plane",
@@ -172,6 +172,7 @@
             "packages/cad-script/src/iteration/radialStool.test.ts",
             "apps/camNC/src/cad/CircularPartPatternField.test.tsx",
             "apps/camNC/src/cad/CadEditor.patternHistory.test.tsx",
+            "apps/camNC/src/cad/CadEditor.patternSearch.test.tsx",
             "studio/stool/circular-pattern-edit-reload"
           ],
           "note": "Makes separate copies of one part around a world axis or a picked straight edge or face normal. Count includes the seed; full rings, partial sweeps, step angles, opposite direction and variables are supported. Surviving slots retain names and identities. Picked axes stay as picked; cut tools retain the existing square-to-target limits. Centered patterns, skipped instances, multiple seeds, feature/face patterns and Boolean result modes are not available."
@@ -365,8 +366,14 @@
         {
           "item": "Use points from another part's corners",
           "status": "partial",
-          "evidence": ["packages/cad/src/usedEdges.test.ts"],
-          "note": "Corner points only; projecting whole edges is not there yet."
+          "evidence": [
+            "packages/cad/src/usedEdges.test.ts",
+            "apps/camNC/src/cad/partEdgeUse.test.ts",
+            "apps/camNC/src/cad/partEdges.test.ts",
+            "apps/camNC/src/cad/studioUsedEdgeOwners.test.ts",
+            "apps/camNC/src/cad/CadEditor.useOwners.test.tsx"
+          ],
+          "note": "Use matches only the chosen part or exact copy's authored corner points. Imported line endpoints carry those point links. Unique in-plane sources retain priority; equally eligible overlaps or missing corner matches produce a visible refusal without edits. Cabinet/tray checks retain links, IDs and CAM membership through stock, size, pattern edits and reload. Whole-edge, curved-geometry and cut-generated-edge associations remain incomplete even when projected endpoints coincide with raw corners; missing sources keep their last fixed points."
         },
         {
           "item": "Driving dimensions: length, distance, angle, diameter, radius, arc gaps",

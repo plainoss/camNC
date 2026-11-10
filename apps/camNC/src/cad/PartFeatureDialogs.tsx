@@ -4,7 +4,7 @@ import { CadCopyNames } from './CadCopyNames';
 import { CadPartPatternField } from './CadPartPatternField';
 import { FeatureDialog } from './FeatureDialog';
 import { CircularPartPatternField } from './CircularPartPatternField';
-import { circularPartPatternStart } from './circularPartPatternStart';
+import { partPatternForKind } from './partPatternKind';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -33,15 +33,18 @@ export function PartPatternDialog({
   pickDirection,
   pickPoint,
   blockedReason,
+  initiallyPatterned,
 }: PartDialogProps & {
   pickDirection?: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
   /** Starts picking in the view, for an edge to pattern along. Null stops it. */
   pickPoint?: (picked: ((pick: CadConnectorPick) => void) | null) => void;
   /** A stale studio transaction cannot replace a newer source, even if its local fields are valid. */
   blockedReason?: string | null;
+  /** The opening source can have no pattern even when a studio draft starts in the requested kind. */
+  initiallyPatterned?: boolean;
 }) {
   const id = useId();
-  const initialPattern = useRef(part.pattern);
+  const hadPattern = useRef(initiallyPatterned ?? !!part.pattern);
   const [problem, setProblem] = useState<string | null>(null);
   const circular = part.pattern?.circular;
   const latestPickDirection = useRef(pickDirection);
@@ -72,26 +75,8 @@ export function PartPatternDialog({
               pickPoint?.(null);
               pickDirection?.(null);
               setProblem(null);
-              const current = part.pattern;
-              const fresh =
-                !initialPattern.current &&
-                current?.count === 2 &&
-                current.spacing === 100 &&
-                current.axis === 'x' &&
-                !current.countExpression &&
-                !current.spacingExpression &&
-                !current.direction &&
-                !current.vector;
-              const pattern =
-                event.currentTarget.value === 'circular'
-                  ? circularPartPatternStart(fresh ? undefined : current)
-                  : {
-                      axis: current?.axis ?? 'x',
-                      count: current?.count ?? 2,
-                      spacing: current?.spacing ?? 100,
-                      ...(current?.suppressed && { suppressed: current.suppressed }),
-                      ...(current?.countExpression && { countExpression: current.countExpression }),
-                    };
+              const kind = event.currentTarget.value === 'circular' ? 'circular' : 'linear';
+              const pattern = partPatternForKind(kind, part.pattern, hadPattern.current);
               onChange(document => setPartPattern(document, part.id, pattern));
             }}>
             <option value="linear">Linear</option>
