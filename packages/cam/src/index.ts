@@ -4,7 +4,7 @@ export { maxOf, minOf } from './geom';
 export { extractFeatures } from './features';
 export type { PartFeatures, PocketFeature, Level } from './features';
 export { cutsMeet, featuresFromCuts, flippedProfile, profileFeatures } from './cutFeatures';
-export { union as unionPaths } from './geom';
+export { union as unionPaths, intersect as intersectPaths } from './geom';
 export type { FlatCut, FlatProfile, HoleSource, SidedCut } from './cutFeatures';
 export {
   camPart,
