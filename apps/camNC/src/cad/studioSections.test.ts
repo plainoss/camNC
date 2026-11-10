@@ -88,12 +88,13 @@ const distance = (first: MeasureEntity, second: MeasureEntity) => {
   return result.rows.find(row => row.id === 'min-distance')!.value;
 };
 function retained(section: SectionModel, height: number, sign: 1 | -1, axis = 2) {
-  for (const mesh of section.meshes)
-    for (const index of mesh.indices) expect(sign * (mesh.positions[index * 3 + axis]! - height)).toBeLessThanOrEqual(0.001);
   const axes = [(axis + 1) % 3, (axis + 2) % 3];
   for (let i = 0; i < section.meshes.length; i++) {
     const mesh = section.meshes[i]!,
       range = section.sectionCaps[i];
+    let greatestViolation = -Infinity;
+    for (const index of mesh.indices) greatestViolation = Math.max(greatestViolation, sign * (mesh.positions[index * 3 + axis]! - height));
+    expect(greatestViolation, `${mesh.name} remains in the retained halfspace`).toBeLessThanOrEqual(0.001);
     let smallestArea = Infinity;
     for (let j = 0; j < mesh.indices.length; j += 3) {
       const [a, b, c] = [0, 1, 2].map(k => mesh.indices[j + k]! * 3);
@@ -107,17 +108,21 @@ function retained(section: SectionModel, height: number, sign: 1 | -1, axis = 2)
     }
     expect(smallestArea, `${mesh.name} has no degenerate retained or cap triangles`).toBeGreaterThan(0);
     if (!range) continue;
+    let greatestPlaneError = 0,
+      smallestWinding = Infinity;
     for (let j = range.start; j < range.start + range.count; j += 3) {
       const p = [0, 1, 2].map(k => {
         const at = mesh.indices[j + k]! * 3;
-        expect(mesh.positions[at + axis]).toBeCloseTo(height, 4);
+        greatestPlaneError = Math.max(greatestPlaneError, Math.abs(mesh.positions[at + axis]! - height));
         return [mesh.positions[at + axes[0]!]!, mesh.positions[at + axes[1]!]!] as const;
       });
       const a = p[0]!,
         b = p[1]!,
         c = p[2]!;
-      expect(sign * ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]))).toBeGreaterThan(0);
+      smallestWinding = Math.min(smallestWinding, sign * ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])));
     }
+    expect(greatestPlaneError, `${mesh.name} cap vertices lie on the section plane`).toBeCloseTo(0, 4);
+    expect(smallestWinding, `${mesh.name} cap triangles face the retained-side boundary normal`).toBeGreaterThan(0);
   }
 }
 

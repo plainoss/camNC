@@ -10,7 +10,7 @@ import {
 } from './sectionTopology';
 
 export type { SectionVec3 } from './sectionTopology';
-/** The retained halfspace is dot(point-origin, normal) <= 0; the new cap faces along normal. */
+/** Points with dot(point-origin, normal) > 0 are removed; the new cap faces along normal. */
 export interface SectionPlane {
   origin: SectionVec3;
   normal: SectionVec3;
