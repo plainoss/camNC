@@ -65,7 +65,7 @@ describe('recorded assistant repair loop', () => {
     const options = setup();
     options.request = vi.fn<NonNullable<AssistantRunOptions['request']>>(async () => ({
       role: 'assistant',
-      text: 'What height and joints should the stool have?',
+      text: 'Question: What height and joints should the stool have?',
     }));
     const result = await runDesignAssistant(options);
     expect(result.status).toBe('question');
@@ -79,13 +79,13 @@ describe('recorded assistant repair loop', () => {
     options.maxTurns = 4;
     options.request = vi.fn<NonNullable<AssistantRunOptions['request']>>(async request => {
       expect(request.tools.map(tool => tool.name)).not.toContain('apply');
-      return answer('check_design', 'same script');
+      return answer('check_design', `script ${crypto.randomUUID()}`);
     });
     const result = await runDesignAssistant(options);
     expect(result.status).toBe('exhausted');
     expect(result.proposal).toBeUndefined();
     expect(options.check).toHaveBeenCalledTimes(2);
-    expect(options.request).toHaveBeenCalledTimes(4);
+    expect(options.request).toHaveBeenCalledTimes(3);
   });
 
   it('does not offer a previously passing candidate after the last check fails', async () => {
@@ -113,4 +113,153 @@ describe('recorded assistant repair loop', () => {
     expect(result.status).toBe('stopped');
     expect(result.proposal).toBeUndefined();
   });
+});
+
+it('uses one final response without execution tools after the last permitted check', async () => {
+  const options = setup();
+  options.maxChecks = 1;
+  options.request = vi.fn(async request =>
+    request.tools.length ? answer('check_design', 'good') : { role: 'assistant' as const, text: 'Proposal: checked.' }
+  );
+  const result = await runDesignAssistant(options);
+  expect(result.status).toBe('proposal');
+  expect(result.usage.calls).toBe(2);
+  expect(options.check).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(options.request).mock.calls[1][0].tools).toEqual([]);
+});
+
+it('reuses an identical script on the same snapshot without spending another check', async () => {
+  const options = setup();
+  const replies = [
+    answer('check_design', 'same'),
+    answer('check_design', 'same'),
+    { role: 'assistant' as const, text: 'Proposal: checked.' },
+  ];
+  options.request = vi.fn(async () => replies.shift()!);
+  const result = await runDesignAssistant(options);
+  expect(options.check).toHaveBeenCalledTimes(1);
+  expect(result.checks).toBe(1);
+  expect(result.usage.reusedChecks).toBe(1);
+});
+
+it.each(['incomplete', 'refused'] as const)('does not publish a candidate for a %s final response', async completion => {
+  const options = setup();
+  const replies = [answer('check_design', 'good'), { role: 'assistant' as const, text: 'Proposal: checked.', completion }];
+  options.request = vi.fn(async () => replies.shift()!);
+  const result = await runDesignAssistant(options);
+  expect(result.status).toBe('exhausted');
+  expect(result.proposal).toBeUndefined();
+});
+
+it.each(['', 'Ready', 'Proposal:', 'Question:'])('rejects an ambiguous final response %j', async text => {
+  const options = setup();
+  const replies = [answer('check_design', 'good'), { role: 'assistant' as const, text }];
+  options.request = vi.fn(async () => replies.shift()!);
+  expect((await runDesignAssistant(options)).proposal).toBeUndefined();
+});
+
+it('does not lose a checked proposal when a later unrelated tool fails', async () => {
+  const options = setup();
+  options.guideSections = Object.defineProperty({}, 'broken', {
+    get() {
+      throw new Error('bad section');
+    },
+  });
+  const broken = answer('cad_script_guide');
+  broken.calls![0].arguments = { section: 'broken' };
+  const replies = [answer('check_design', 'good'), broken, { role: 'assistant' as const, text: 'Proposal: checked.' }];
+  options.request = vi.fn(async () => replies.shift()!);
+  expect((await runDesignAssistant(options)).status).toBe('proposal');
+});
+
+it('requests views only on demand and automatically for the latest reference image', async () => {
+  const options = setup();
+  options.config.images = true;
+  options.messages.push({ role: 'user', text: 'Match this', images: [{ name: 'ref', mediaType: 'image/png', data: 'AA==' }] });
+  const replies = [answer('check_design', 'good'), { role: 'assistant' as const, text: 'Proposal: checked.' }];
+  options.request = vi.fn(async () => replies.shift()!);
+  await runDesignAssistant(options);
+  expect(vi.mocked(options.check).mock.calls[0][3]).toEqual({ views: true });
+});
+
+it('stops before requesting overlarge input and stops when capped provider usage is unknown', async () => {
+  const options = setup();
+  options.limits = { maxInputCharacters: 1 };
+  options.request = vi.fn(async () => answer('cad_script_guide'));
+  expect((await runDesignAssistant(options)).status).toBe('exhausted');
+  expect(options.request).not.toHaveBeenCalled();
+  options.limits = { maxTotalTokens: 1000 };
+  const result = await runDesignAssistant(options);
+  expect(result.status).toBe('exhausted');
+  expect(result.usage.calls).toBe(1);
+  expect(result.usage.inputTokens).toBeNull();
+  expect(result.stopReason).toContain('unknown');
+});
+
+it('passes output and request limits and keeps actual usage on an explicit question', async () => {
+  const options = setup();
+  options.limits = { maxOutputTokens: 123, maxRequestMs: 456 };
+  options.request = vi.fn(async () => ({
+    role: 'assistant' as const,
+    text: 'Question: Which joint?',
+    usage: { inputTokens: 10, outputTokens: 5 },
+  }));
+  const result = await runDesignAssistant(options);
+  expect(vi.mocked(options.request).mock.calls[0][0]).toMatchObject({ maxOutputTokens: 123, timeoutMs: 456 });
+  expect(result.usage).toMatchObject({ calls: 1, inputTokens: 10, outputTokens: 5, costUsd: null });
+});
+
+it('enforces the image byte budget independently of text length', async () => {
+  const options = setup();
+  options.config.images = true;
+  options.limits = { maxImageBytes: 1 };
+  options.messages.push({ role: 'user', text: 'Match', images: [{ name: 'ref', mediaType: 'image/png', data: 'AAAA' }] });
+  options.request = vi.fn(async () => ({ role: 'assistant' as const, text: 'Question: How wide?' }));
+  const result = await runDesignAssistant(options);
+  expect(result.stopReason).toContain('Image');
+  expect(options.request).not.toHaveBeenCalled();
+});
+
+it('offers detailed report data only when requested', async () => {
+  const options = setup();
+  options.report = { errors: [], warnings: [], parts: [{ id: 'p', name: 'Plate', features: [{ name: 'Detailed hole' }] }] };
+  const read = answer('read_design_report');
+  read.calls![0].arguments = { section: 'parts' };
+  const replies = [read, { role: 'assistant' as const, text: 'Question: Which hole?' }];
+  options.request = vi.fn(async () => replies.shift()!);
+  const result = await runDesignAssistant(options);
+  expect(result.messages.find(message => message.role === 'tool')?.text).toContain('Detailed hole');
+});
+
+it.each(['constructor', '__proto__', 'toString'])('treats inherited guide name %s as unknown', async section => {
+  const options = setup();
+  options.guideSections = { editing: 'Edit guide' };
+  const read = answer('cad_script_guide');
+  read.calls![0].arguments = { section };
+  const replies = [read, { role: 'assistant' as const, text: 'Question: Which section?' }];
+  options.request = vi.fn(async () => replies.shift()!);
+  const result = await runDesignAssistant(options);
+  expect(result.messages.find(message => message.role === 'tool')?.text).toBe('Unknown guide section. Available: editing');
+});
+
+it('counts a failed paid request as unknown usage before surfacing its error', async () => {
+  const options = setup();
+  options.onUsage = vi.fn();
+  options.request = vi.fn(async () => {
+    throw new Error('Provider request failed');
+  });
+  await expect(runDesignAssistant(options)).rejects.toThrow('Provider request failed');
+  expect(options.onUsage).toHaveBeenCalledWith(expect.objectContaining({ calls: 1, inputTokens: null, costUsd: null }));
+});
+
+it('continues a dollar-capped compatible run without write counts when input pricing explicitly includes writes', async () => {
+  const options = setup();
+  options.limits = { maxCostUsd: 1 };
+  options.pricing = { inputUsdPerMillion: 3, outputUsdPerMillion: 15, cacheWritesAtInputPrice: true };
+  const replies = [answer('cad_script_guide'), { role: 'assistant' as const, text: 'Question: Which size?' }];
+  options.request = vi.fn(async () => ({ ...replies.shift()!, usage: { inputTokens: 100, outputTokens: 10, cacheReadTokens: 0 } }));
+  const result = await runDesignAssistant(options);
+  expect(result.status).toBe('question');
+  expect(result.usage.calls).toBe(2);
+  expect(result.usage.costUsd).toBeCloseTo(0.0009);
 });

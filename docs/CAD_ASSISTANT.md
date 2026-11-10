@@ -38,7 +38,8 @@ or key through a server. Live provider access still depends on the endpoint's
 CORS policy and the user's account and model permissions.
 
 Describe a change or a whole piece, such as a shelf or stool. For a look, attach a
-PNG, JPEG, WebP or GIF. When dimensions or joints are unspecified, the assistant
+PNG, JPEG, WebP or GIF. References are limited to 1600 pixels on their longest
+side; GIF references use the first frame. When dimensions or joints are unspecified, the assistant
 asks for them or proposes choices before building. Earlier conversation
 constraints remain in subsequent requests. Conversations are retained in memory
 for the current app session; they are not saved into a design or account settings.
@@ -46,7 +47,42 @@ for the current app session; they are not saved into a design or account setting
 The assistant reads the guide and examples, checks a script on a copy and repairs
 it. Each attempt starts from the original snapshot. Stop cancels provider access
 and terminates a running script. A turn is limited to five checks and twelve model
-responses. Its output is a checked proposal or a question.
+responses, including one final response without tools once the check budget is
+exhausted. Identical scripts on the same snapshot reuse their check result.
+Changing the open design during a run stops further provider calls. Its output
+is a checked proposal or a question; incomplete and refused responses never
+publish a candidate.
+
+## Usage and limits
+
+**Usage and limits** shows the last turn's request/check counts and provider-reported
+input, output and cached tokens. Enter the selected model's prices to calculate
+USD cost. Missing usage or cache prices remain **unknown**, rather than appearing
+as zero. Prices and limits last until the dock closes; verify them after changing
+the provider or model.
+If a provider omits cache-write counts and bills writes at its normal input rate,
+select **Cache writes are billed at the input price**. This explicit pricing
+choice permits cost calculation while the unreported write count stays unknown.
+
+The default limits are 120,000 input characters per request, 8192 output tokens
+per response, six images totalling 20 MiB per request, 90 seconds per provider
+request and three minutes per run. Character and image limits are separate;
+base64 size is not a token estimate. Optional total-token and USD limits stop
+between requests. A request already in flight can exceed the remaining aggregate
+allowance. A capped run stops if the provider omits the usage needed to account
+for it. Failed requests may still have been billed; their usage is unknown and
+they are not automatically retried.
+
+The displayed session transcript remains intact. Provider requests preserve
+earlier user constraints, final decisions and apply/discard events, while removing
+superseded repair scripts, reports and candidate images. A short guide provides
+the core API; detailed guide sections, examples and report data are available on
+demand. Diagnostics, cuts and joints remain in the summary. Visual checks are
+requested explicitly, and are automatic when the latest user message attaches a
+reference image. Only the latest candidate's views are retained for inspection.
+Switching to a text-only provider preserves the conversation with explicit image
+availability notices. Oversized context stops before sending rather than silently
+discarding user constraints.
 
 ## Review and acceptance
 
@@ -88,6 +124,14 @@ from the recordings. Recorded runs measure the loop and check the historical
 attempts; they are not a fresh model comparison. Visual and construction review
 remain explicit human-review outcomes. See the package README for the task and
 comparison commands.
+
+`apps/camNC/src/cad/assistant/taskBenchmark.ts` connects these saved-task outcomes
+to the same `runDesignAssistant` loop used by the dock. It accepts either a fresh
+provider adapter or recorded tool messages and keeps provider usage and human
+review separate from automatic geometric outcomes. The browser tests include
+independently authored cable-hole and shoe-bench smoke trials with real sandbox
+checks. These trials exercise guide usability and production-loop behavior; they
+are not live-provider comparisons or evidence of billed savings.
 
 ## Provider protocol references
 

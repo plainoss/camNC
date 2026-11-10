@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { defaultProvider, rememberAssistantCredentials } from './assistant/keyStore';
 import { requestAssistant, type AssistantMessage } from './assistant/provider';
+import { readConversation } from './assistant/conversationStore';
 
 vi.mock('./assistant/provider', { spy: true });
 vi.mock('./WorkspaceView', () => ({
@@ -85,20 +86,24 @@ it('checks a recorded model proposal, previews it, applies it once and undoes th
   expect(within(review).getByText(/Extrude · Plate/)).toBeDefined();
   await userEvent.click(within(review).getByRole('button', { name: 'Apply as one undo step' }));
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(24));
+  expect(readConversation(source.id).some(message => message.proposalOutcome === 'applied')).toBe(true);
+  expect(within(dock).queryByRole('button', { name: 'Preview proposal' })).toBeNull();
   expect(latest().parts[0]!.id).toBe(source.parts[0]!.id);
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Undo/ }));
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(18));
+  expect(readConversation(source.id).some(message => message.event && message.text.includes('was undone'))).toBe(true);
 }, 60_000);
 
-it('makes a model result stale when the user edits while the provider works', async () => {
+it('stops further model calls when the user edits while the provider works', async () => {
   recorded();
   let release: ((message: AssistantMessage) => void) | undefined;
-  vi.mocked(requestAssistant).mockImplementationOnce(
-    () =>
-      new Promise(resolve => {
-        release = resolve;
-      })
-  );
+  let requestSignal: AbortSignal | undefined;
+  vi.mocked(requestAssistant).mockImplementationOnce(request => {
+    requestSignal = request.signal;
+    return new Promise(resolve => {
+      release = resolve;
+    });
+  });
   const { latest } = await studio();
   await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
   const dock = await screen.findByRole('complementary', { name: 'Design assistant' }, { timeout: 20_000 });
@@ -112,10 +117,11 @@ it('makes a model result stale when the user edits while the provider works', as
   await userEvent.type(thickness, '30');
   await userEvent.click(within(extrude).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(30));
+  expect(requestSignal?.aborted).toBe(true);
   release!({ role: 'assistant', text: '', calls: [{ id: 'read-1', name: 'cad_script_guide', arguments: {} }] });
-  const preview = await within(dock).findByRole('button', { name: 'Preview proposal' }, { timeout: 45_000 });
-  expect(preview).toHaveProperty('disabled', true);
-  expect(within(dock).getByText(/The design has changed/)).toBeDefined();
+  await waitFor(() => expect(within(dock).getByRole('status').textContent).toContain('The design changed'));
+  expect(within(dock).queryByRole('button', { name: 'Preview proposal' })).toBeNull();
+  expect(requestAssistant).toHaveBeenCalledTimes(1);
   expect(latest().parts[0]!.thickness).toBe(30);
 }, 60_000);
 

@@ -1,3 +1,5 @@
+import { providerMetadata } from './providerMetadata';
+
 export type ProviderKind = 'anthropic' | 'compatible';
 export interface ProviderConfig {
   kind: ProviderKind;
@@ -17,8 +19,22 @@ export interface AssistantToolCall {
   name: string;
   arguments: Record<string, unknown>;
 }
+/** Totals include cached input and reasoning output; breakdowns are subsets, never additional tokens. */
+export interface AssistantUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  reasoningTokens?: number;
+}
 export interface AssistantMessage {
   role: 'user' | 'assistant' | 'tool';
+  /** Application-authored design lifecycle event rather than a user request. */
+  event?: boolean;
+  proposalOutcome?: 'applied' | 'discarded';
+  usage?: AssistantUsage;
+  completion?: 'complete' | 'incomplete' | 'refused';
+  latencyMs?: number;
   text: string;
   images?: AssistantImage[];
   calls?: AssistantToolCall[];
@@ -38,6 +54,8 @@ export interface ProviderRequest {
   messages: AssistantMessage[];
   tools: AssistantTool[];
   signal: AbortSignal;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
 }
 
 export function providerUrl(config: ProviderConfig): string {
@@ -74,7 +92,14 @@ function compatibleMessages(messages: AssistantMessage[]): AssistantMessage[] {
   return result;
 }
 
-export function providerPayload({ config, system, messages, tools }: Omit<ProviderRequest, 'key' | 'signal'>): Record<string, unknown> {
+export function providerPayload({
+  config,
+  system,
+  messages,
+  tools,
+  maxOutputTokens = 8192,
+}: Omit<ProviderRequest, 'key' | 'signal'>): Record<string, unknown> {
+  if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1) throw new Error('Choose a positive output token limit.');
   if (!config.tools) throw new Error('Select a model that supports tools.');
   if (!config.model.trim()) throw new Error('Enter the model ID from your provider.');
   if (!config.images && messages.some(message => message.images?.length))
@@ -104,7 +129,7 @@ export function providerPayload({ config, system, messages, tools }: Omit<Provid
     return {
       model: config.model,
       system,
-      max_tokens: 8192,
+      max_tokens: maxOutputTokens,
       messages: turns,
       tools: tools.map(tool => ({ name: tool.name, description: tool.description, input_schema: tool.parameters })),
     };
@@ -146,6 +171,7 @@ export function providerPayload({ config, system, messages, tools }: Omit<Provid
     return {
       model: config.model,
       instructions: system,
+      max_output_tokens: maxOutputTokens,
       input,
       store: false,
       tools: tools.map(tool => ({
@@ -192,6 +218,7 @@ export function providerPayload({ config, system, messages, tools }: Omit<Provid
   return {
     model: config.model,
     messages: [{ role: 'system', content: system }, ...turns],
+    max_completion_tokens: maxOutputTokens,
     tools: tools.map(tool => ({
       type: 'function',
       function: { name: tool.name, description: tool.description, parameters: tool.parameters },
@@ -206,6 +233,8 @@ function argumentsObject(input: unknown): Record<string, unknown> {
 }
 
 export function parseProviderMessage(config: ProviderConfig, input: unknown): AssistantMessage {
+  const metadata = providerMetadata(config, input);
+  const interrupted = metadata.completion === 'incomplete' || metadata.completion === 'refused';
   const data = input as {
     content?: { type: string; text?: string; id?: string; name?: string; input?: unknown }[];
     choices?: { message?: { content?: string; tool_calls?: { id: string; function: { name: string; arguments: string } }[] } }[];
@@ -215,27 +244,33 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
     if (!Array.isArray(data.content)) throw new Error('The provider returned no message.');
     return {
       role: 'assistant',
+      ...metadata,
       text: data.content
         .filter(block => block.type === 'text')
         .map(block => block.text ?? '')
         .join('\n'),
-      calls: data.content
-        .filter(block => block.type === 'tool_use')
-        .map(block => ({ id: block.id!, name: block.name!, arguments: argumentsObject(block.input) })),
+      calls: interrupted
+        ? []
+        : data.content
+            .filter(block => block.type === 'tool_use')
+            .map(block => ({ id: block.id!, name: block.name!, arguments: argumentsObject(block.input) })),
     };
   }
   if (config.protocol === 'responses') {
     if (!Array.isArray(data.output)) throw new Error('The provider returned no message.');
     return {
       role: 'assistant',
+      ...metadata,
       text: data.output
         .filter(item => item.type === 'message')
         .flatMap(item => item.content ?? [])
         .map(item => item.text ?? '')
         .join('\n'),
-      calls: data.output
-        .filter(item => item.type === 'function_call')
-        .map(item => ({ id: item.call_id!, name: item.name!, arguments: argumentsObject(item.arguments) })),
+      calls: interrupted
+        ? []
+        : data.output
+            .filter(item => item.type === 'function_call')
+            .map(item => ({ id: item.call_id!, name: item.name!, arguments: argumentsObject(item.arguments) })),
       responseItems: data.output,
     };
   }
@@ -243,42 +278,97 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
   if (!message) throw new Error('The provider returned no message.');
   return {
     role: 'assistant',
+    ...metadata,
     text: message.content ?? '',
-    calls: message.tool_calls?.map(call => ({
-      id: call.id,
-      name: call.function.name,
-      arguments: argumentsObject(call.function.arguments),
-    })),
+    calls: interrupted
+      ? []
+      : message.tool_calls?.map(call => ({
+          id: call.id,
+          name: call.function.name,
+          arguments: argumentsObject(call.function.arguments),
+        })),
   };
+}
+
+export class AssistantProviderError extends Error {
+  constructor(
+    readonly code: 'timeout' | 'network' | 'http' | 'protocol',
+    message: string,
+    readonly status?: number
+  ) {
+    super(message);
+    this.name = 'AssistantProviderError';
+  }
 }
 
 /** Browser → chosen provider only. Error bodies can echo credentials, so they never enter chat or logs. */
 export async function requestAssistant(request: ProviderRequest, fetcher: typeof fetch = fetch): Promise<AssistantMessage> {
   const url = providerUrl(request.config);
   const payload = providerPayload(request);
-  let response: Response;
+  const timeoutMs = request.timeoutMs ?? 90_000;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new Error('Choose a positive provider timeout.');
+  if (request.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+  const controller = new AbortController();
+  const started = performance.now();
+  let abort: () => void = () => {};
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const interrupted = new Promise<never>((_, reject) => {
+    abort = () => {
+      controller.abort();
+      reject(new DOMException('Stopped', 'AbortError'));
+    };
+    request.signal.addEventListener('abort', abort, { once: true });
+    // Race the complete operation: a provider can return headers and then stall its JSON body.
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new AssistantProviderError('timeout', 'The provider took too long. Try again or choose a faster model.'));
+    }, timeoutMs);
+  });
+  const operation = async (): Promise<AssistantMessage> => {
+    let response: Response;
+    try {
+      response = await fetcher(url, {
+        method: 'POST',
+        credentials: 'omit',
+        redirect: 'error',
+        signal: controller.signal,
+        headers: {
+          'content-type': 'application/json',
+          ...(request.config.kind === 'anthropic'
+            ? { 'x-api-key': request.key, 'anthropic-version': '2026-10-21', 'anthropic-dangerous-direct-browser-access': 'true' }
+            : { authorization: `Bearer ${request.key}` }),
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      throw new AssistantProviderError(
+        'network',
+        'Could not reach this provider from the browser. Check its address and browser access (CORS).'
+      );
+    }
+    if (!response.ok) {
+      const action =
+        response.status === 429
+          ? 'Wait before trying again, or check your provider quota.'
+          : response.status === 401 || response.status === 403
+            ? 'Check your key and model permissions.'
+            : 'Check your model and API protocol, or try again later.';
+      throw new AssistantProviderError('http', `Provider request failed (HTTP ${response.status}). ${action}`, response.status);
+    }
+    try {
+      const message = parseProviderMessage(request.config, await response.json());
+      return { ...message, latencyMs: performance.now() - started };
+    } catch {
+      throw new AssistantProviderError(
+        'protocol',
+        'The provider returned an unsupported response. Check its API protocol and tool support.'
+      );
+    }
+  };
   try {
-    response = await fetcher(url, {
-      method: 'POST',
-      credentials: 'omit',
-      redirect: 'error',
-      signal: request.signal,
-      headers: {
-        'content-type': 'application/json',
-        ...(request.config.kind === 'anthropic'
-          ? { 'x-api-key': request.key, 'anthropic-version': '2026-10-21', 'anthropic-dangerous-direct-browser-access': 'true' }
-          : { authorization: `Bearer ${request.key}` }),
-      },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    if (request.signal.aborted) throw new DOMException('Stopped', 'AbortError');
-    throw new Error('Could not reach this provider from the browser. Check its address and browser access (CORS).');
-  }
-  if (!response.ok) throw new Error(`Provider request failed (HTTP ${response.status}). Check your key, model, quota and API protocol.`);
-  try {
-    return parseProviderMessage(request.config, await response.json());
-  } catch {
-    throw new Error('The provider returned an unsupported response. Check its API protocol and tool support.');
+    return await Promise.race([interrupted, operation()]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    request.signal.removeEventListener('abort', abort);
   }
 }

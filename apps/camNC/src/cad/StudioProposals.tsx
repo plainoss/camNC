@@ -6,6 +6,7 @@ import { cadProposal, type CadProposal } from '@wbcnc/cad-editor/proposal';
 import type { CadSession } from '@wbcnc/cad-editor/session';
 import { ProposalReview } from './ProposalReview';
 import { assistantSelection } from './assistant/selection';
+import { recordAssistantEvent } from './assistant/conversationStore';
 import './assistant/dock.css';
 
 const AssistantDock = lazy(() => import('./assistant/Dock').then(module => ({ default: module.AssistantDock })));
@@ -26,6 +27,22 @@ export function StudioProposals({
 }) {
   const [assistant, setAssistant] = useState(false);
   const [proposal, setProposal] = useState<CadProposal | null>(null);
+  const assistantProposal = useRef<CadProposal | null>(null);
+  const appliedProposal = useRef<CadProposal | null>(null);
+  useEffect(() => {
+    const applied = appliedProposal.current;
+    if (!applied || applied.base.id !== document.id) return;
+    // Undo changes the session revision, so compare document content without its history counter.
+    const { revision: _beforeRevision, ...before } = applied.base;
+    const { revision: _currentRevision, ...current } = document;
+    if (JSON.stringify(before) === JSON.stringify(current)) {
+      recordAssistantEvent(
+        document.id,
+        'The applied proposal was undone: the open design matches its pre-proposal content. Earlier user constraints still apply.'
+      );
+      appliedProposal.current = null;
+    }
+  }, [document]);
   const [error, setError] = useState('');
   const [building, setBuilding] = useState(false);
   const tools = useRef<HTMLDivElement>(null);
@@ -185,7 +202,10 @@ export function StudioProposals({
                   document={document}
                   disabled={disabled}
                   selection={assistantSelection(document, selection)}
-                  onProposal={setProposal}
+                  onProposal={value => {
+                    assistantProposal.current = value;
+                    setProposal(value);
+                  }}
                   onClose={() => setAssistant(false)}
                 />
               </Suspense>
@@ -196,8 +216,23 @@ export function StudioProposals({
                 session={session}
                 currentDocument={document}
                 disabled={disabled}
-                onApply={onApply}
-                onClose={() => setProposal(null)}
+                onApply={value => {
+                  onApply(value);
+                  if (assistantProposal.current === proposal) {
+                    appliedProposal.current = proposal;
+                    recordAssistantEvent(
+                      document.id,
+                      'The user applied the checked proposal as one undo step. The next open-design context is authoritative.',
+                      'applied'
+                    );
+                  }
+                }}
+                onClose={() => {
+                  if (assistantProposal.current === proposal && appliedProposal.current !== proposal)
+                    recordAssistantEvent(document.id, 'The user discarded the proposal review. No candidate was applied.', 'discarded');
+                  assistantProposal.current = null;
+                  setProposal(null);
+                }}
               />
             )}
           </>,
