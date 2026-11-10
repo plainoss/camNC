@@ -81,12 +81,59 @@ it('gives mirror inputs priority on the first render while a section face pick i
   const first = vi.mocked(ModelViewport).mock.calls[nextCall]![0];
   expect(first.onMeasurePick).toBeUndefined();
   expect(screen.getByRole('button', { name: 'Measure' })).toBeDisabled();
-  expect(viewport().sectionControl).toBeNull();
+  expect(first.sectionControl).toBeNull();
   expect(viewport().sectionCaps![0]!.count).toBeGreaterThan(0);
   act(() => first.onPickFace!({ partId, index: 0, point: [50, 30, 9], normal: [0, 0, 1], sectionCap: true }));
   expect(onSelectFace).not.toHaveBeenCalled();
   act(() => first.onPickFace!({ partId, index: 0, point: [50, 30, 0], normal: [0, 0, -1] }));
   expect(onSelectFace).toHaveBeenCalledExactlyOnceWith({ partId, face: 'underside' });
   expect(onNewPart).not.toHaveBeenCalled();
+  expect(JSON.stringify(document)).toBe(before);
+});
+
+it.each(['face', 'plane'] as const)('gives new-sketch %s picks priority on the first render after a section picker', kind => {
+  const { document, partId, props, view, onNewPart } = setup();
+  const before = JSON.stringify(document);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit section view' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pick planar face' }));
+  const nextCall = vi.mocked(ModelViewport).mock.calls.length;
+  view.rerender(<WorkspaceView {...props} choosing measurementEnabled={false} />);
+  const first = vi.mocked(ModelViewport).mock.calls[nextCall]![0];
+  expect(first.onMeasurePick).toBeUndefined();
+  if (kind === 'face') {
+    act(() => first.onPickFace!({ partId, index: 0, point: [50, 30, 9], normal: [0, 0, 1], sectionCap: true }));
+    expect(onNewPart).not.toHaveBeenCalled();
+    act(() => first.onPickFace!({ partId, index: 0, point: [50, 30, 0], normal: [0, 0, -1] }));
+    expect(onNewPart).toHaveBeenCalledExactlyOnceWith({ partId, face: 'underside' });
+  } else {
+    act(() => first.onPickPlane!('front'));
+    expect(onNewPart).toHaveBeenCalledExactlyOnceWith({ plane: 'front' }, undefined);
+  }
+  expect(first.sectionControl).toBeNull();
+  expect(first.sectionCaps![0]!.count).toBeGreaterThan(0);
+  expect(JSON.stringify(document)).toBe(before);
+});
+
+it('gives mate inputs priority on the first render after a section face picker', () => {
+  const { document, partId, props, view, onPickPoint, onSelect, onOpen } = setup();
+  const before = JSON.stringify(document);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit section view' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pick planar face' }));
+  const nextCall = vi.mocked(ModelViewport).mock.calls.length;
+  view.rerender(<WorkspaceView {...props} onPickPoint={onPickPoint} />);
+  const first = vi.mocked(ModelViewport).mock.calls[nextCall]![0];
+  expect(first.pickingConnector).toBe(true);
+  expect(first.onPickFace).toBeUndefined();
+  expect(first.onMeasurePick).toBeUndefined();
+  expect(first.sectionControl).toBeNull();
+  expect(first.sectionCaps![0]!.count).toBeGreaterThan(0);
+  expect(screen.getByRole('button', { name: 'Measure' })).toBeDisabled();
+  act(() => first.onSelect(partId, 0, { partId, index: 0, point: [50, 30, 9], normal: [0, 0, 1], sectionCap: true }));
+  expect(onPickPoint).not.toHaveBeenCalled();
+  const edge = { a: [0, 0, 0] as [number, number, number], b: [0, 0, 18] as [number, number, number] };
+  act(() => first.onSelect(partId, 0, { partId, index: 0, point: [0, 0, 0], normal: [0, -1, 0], edge }));
+  expect(onPickPoint).toHaveBeenCalledExactlyOnceWith({ partId, point: [0, 0, 0], normal: [0, -1, 0], copy: false, edge });
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(onOpen).not.toHaveBeenCalled();
   expect(JSON.stringify(document)).toBe(before);
 });

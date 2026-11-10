@@ -199,6 +199,8 @@ export default function WorkspaceView({
   // Feature pickers must own the first render, before an effect has closed the section's old picker state.
   const sectionEnabled = measurementEnabled && !choosing && !pickingMirrorPlane && !onPickPoint && !(onPickRegion && regions?.length);
   const section = useStudioSection(document, assembly, frame, sectionEnabled, onViewRequest, selectedPlane, selectedFace);
+  const sectionEditing = sectionEnabled && section.editing;
+  const sectionPicking = sectionEnabled && section.picking;
   const model = useMemo(() => sectionModel(assembly, section.plane), [assembly, section.plane]);
   const sectionProblem = model.sectionProblems.length
     ? `Section unavailable: ${model.sectionProblems.map(item => `${item.name}: ${item.message}`).join('; ')} Showing the full model.`
@@ -213,7 +215,7 @@ export default function WorkspaceView({
     if (section.active) setView('assembled');
   }, [section.active]);
   // The Assembled button changes first; parts can still be animating back in the rendered exploded layout.
-  const measureEnabled = sectionEnabled && view === 'assembled' && explosion.modelView === 'assembled' && !section.editing;
+  const measureEnabled = sectionEnabled && view === 'assembled' && explosion.modelView === 'assembled' && !sectionEditing;
   const measure = useStudioMeasure(document, model, frame, measureEnabled, inspectionTopology);
   const [notice, setNotice] = useState<string | null>(null);
   // Escape stops picking, so the view takes the keyboard while it picks.
@@ -270,8 +272,8 @@ export default function WorkspaceView({
     : -1;
   const status =
     sectionProblem ??
-    (section.active && section.reason ? `Section view: ${section.reason}` : null) ??
-    (section.picking ? 'Pick a planar model face, or choose a section plane.' : null) ??
+    (sectionEnabled && section.active && section.reason ? `Section view: ${section.reason}` : null) ??
+    (sectionPicking ? 'Pick a planar model face, or choose a section plane.' : null) ??
     (notice
       ? notice
       : measure.expanded
@@ -333,9 +335,7 @@ export default function WorkspaceView({
           aria-label="Measure"
           aria-keyshortcuts="["
           aria-pressed={measure.expanded}
-          disabled={
-            !measurementEnabled || choosing || pickingMirrorPlane || section.editing || !model.meshes.some(mesh => mesh.indices.length > 0)
-          }
+          disabled={!sectionEnabled || sectionEditing || !model.meshes.some(mesh => mesh.indices.length > 0)}
           onClick={() => {
             // Inspection uses assembled coordinates immediately; an old playback frame must not move them again.
             explosion.scrub(0);
@@ -378,7 +378,7 @@ export default function WorkspaceView({
         meshes={model.meshes}
         sourceMeshes={assembly.meshes}
         sectionCaps={model.sectionCaps}
-        sectionControl={sectionProblem ? null : section.control}
+        sectionControl={sectionEnabled && !sectionProblem ? section.control : null}
         parts={model.parts}
         view={explosion.modelView}
         explosionProgress={explosion.progress}
@@ -403,7 +403,7 @@ export default function WorkspaceView({
         palette={controlled ? 'studio' : undefined}
         highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
-        onPickFace={pickingMirrorPlane ? pickMirrorFace : section.picking ? section.pickFace : choosing ? pickFace : undefined}
+        onPickFace={pickingMirrorPlane ? pickMirrorFace : sectionPicking ? section.pickFace : choosing ? pickFace : undefined}
         onMeasurePick={
           measureEnabled
             ? pick => {
@@ -420,7 +420,7 @@ export default function WorkspaceView({
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
         onPickSketch={
-          !section.editing && !measure.expanded && onPickSketch
+          !sectionEditing && !measure.expanded && onPickSketch
             ? id => {
                 measure.clear();
                 lastClick.current = null;
@@ -430,7 +430,7 @@ export default function WorkspaceView({
         }
         display={controlled ? display : 'shaded'}
         showOrigin={!!onNewPart && showPlanes && (featureShown?.('origin') ?? true)}
-        regions={[...(regions ?? []), ...(measure.expanded || section.editing ? [] : sketchRegions)]}
+        regions={[...(regions ?? []), ...(measure.expanded || sectionEditing ? [] : sketchRegions)]}
         onPickRegion={id => {
           if (sketchRegions.some(region => region.id === id)) {
             measure.clear();
@@ -440,7 +440,7 @@ export default function WorkspaceView({
           } else onPickRegion?.(id);
         }}
         onPickPlane={id => {
-          if (section.pickPlane(id)) return;
+          if (sectionEnabled && section.pickPlane(id)) return;
           measure.clear();
           if (measure.expanded) return;
           // Picked while choosing, the new part is drawn on it; otherwise it's picked for the next sketch, as a face is.
@@ -501,7 +501,7 @@ export default function WorkspaceView({
         onRemove={measure.remove}
         onSelectRow={measure.selectRow}
       />
-      <StudioSectionInspector section={section} problem={sectionProblem} />
+      {sectionEnabled && <StudioSectionInspector section={section} problem={sectionProblem} />}
       {children}
     </div>
   );
