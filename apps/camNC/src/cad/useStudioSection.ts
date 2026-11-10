@@ -145,9 +145,14 @@ export function useStudioSection(
             parts: document.parts.map(part => {
               if (part.id !== selectedFace.partId) return part;
               // Preview/layout placements belong to the exact physical instance, including a mirrored copy.
-              return selectedFace.copyId
-                ? { ...part, copies: part.copies?.map(copy => (copy.id === selectedFace.copyId ? { ...copy, placement } : copy)) }
-                : { ...part, placement };
+              if (!selectedFace.copyId) return { ...part, placement };
+              const copyId = selectedFace.copyId;
+              // An Add body inherits its parent's copies without owning their entries. The displayed instance
+              // already supplies its rigid placement; use a temporary copy so the same face resolver can read it.
+              const copies = part.copies?.some(copy => copy.id === copyId)
+                ? part.copies.map(copy => (copy.id === copyId ? { ...copy, placement } : copy))
+                : [...(part.copies ?? []), { id: copyId, placement }];
+              return { ...part, copies };
             }),
           }
         : document;
