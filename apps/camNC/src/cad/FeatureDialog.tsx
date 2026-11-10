@@ -12,6 +12,7 @@ export function FeatureDialog({
   okLabel = 'OK',
   okDisabled,
   okReason,
+  okShortcut,
   onOk,
   onCancel,
   autoFocus = true,
@@ -23,6 +24,8 @@ export function FeatureDialog({
   okDisabled?: boolean;
   /** Why OK can't be used yet, shown on it while it's disabled. */
   okReason?: string | null;
+  /** An explicit confirmation shortcut, also shown on the green check. */
+  okShortcut?: { keys: string; label: string };
   onOk: () => void;
   onCancel: () => void;
   /** Puts the keyboard in its first field on opening. A sketch's dialog leaves it on the drawing. */
@@ -89,7 +92,8 @@ export function FeatureDialog({
           type="button"
           className="cad-feature-ok"
           aria-label={okLabel}
-          title={(okDisabled && okReason) || okLabel}
+          title={(okDisabled && okReason) || (okShortcut ? `${okLabel} (${okShortcut.label})` : okLabel)}
+          aria-keyshortcuts={okShortcut?.keys}
           aria-description={(okDisabled && okReason) || undefined}
           disabled={okDisabled}
           onClick={ok}>
