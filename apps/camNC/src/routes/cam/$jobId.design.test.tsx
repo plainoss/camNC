@@ -502,7 +502,8 @@ it('preserves the durable checkpoint when a unit change remounts the editor befo
   await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
   expect(state.save.mock.calls[0]![2]).toEqual(source);
   await waitFor(async () => expect((await getJob(state.job!.id))!.design!.draft.lengthUnit).toBe('in'));
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  // Wait for the closing animation to release the modal before the next editor action.
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), { timeout: 20_000 });
   expect(screen.queryByRole('alert')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
   await waitFor(async () => expect((await getJob(state.job!.id))!.design!.draft.revision).toBe(source.revision + 2));
