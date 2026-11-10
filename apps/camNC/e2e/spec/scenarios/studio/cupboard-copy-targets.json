@@ -1,0 +1,612 @@
+[
+  {
+    "id": "studio/cupboard/selected-copy-target",
+    "title": "A complete cabinet retains its last shelf cut target through Cancel, stock and width edits, count shrink, restoration and reload",
+    "evidence": "complete public cabinet with an all-shelf crossing tool; visible controls, saved exact references and rendered membership; independent material proof in cabinetCopyTargetFixture.test.ts and copyTargets.test.ts",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/cabinet-copy-target-start.json",
+      "closesketch",
+      "checkpoint initial",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Side",
+              "Bottom",
+              "Top",
+              "Back",
+              "Shelf",
+              "Cable chase"
+            ],
+            "variables": {
+              "board": "18mm",
+              "width": "800mm",
+              "shelves": "3"
+            },
+            "copies": {
+              "Side": 1,
+              "Shelf": 2
+            },
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Right side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 18
+              },
+              {
+                "name": "Cable chase",
+                "thickness": 20
+              }
+            ],
+            "workspacePartCount": 9,
+            "partCuts": 1,
+            "dialog": null,
+            "partIssues": []
+          }
+        }
+      },
+      "selectpart Cable chase",
+      "studiotool Cut parts",
+      "dialogfill Clearance = 0",
+      "dialogcheck Keep tools = false",
+      "selectpart Shelf 3",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": [
+                "Cable chase"
+              ],
+              "Targets": [
+                "Shelf 3"
+              ]
+            },
+            "partCuts": 1
+          }
+        }
+      },
+      "dialogcancel",
+      {
+        "expect": {
+          "studio": {
+            "unchangedSince": "initial",
+            "sameIdsSince": "initial",
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Right side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 18
+              },
+              {
+                "name": "Cable chase",
+                "thickness": 20
+              }
+            ],
+            "workspacePartCount": 9,
+            "dialog": null
+          }
+        }
+      },
+      "selectpart Cable chase",
+      "studiotool Cut parts",
+      "dialogfill Clearance = 0",
+      "dialogcheck Keep tools = false",
+      "selectpart Shelf 3",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": [
+                "Cable chase"
+              ],
+              "Targets": [
+                "Shelf 3"
+              ]
+            },
+            "partCuts": 1
+          }
+        }
+      },
+      "dialogconfirm",
+      "checkpoint accepted",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Side",
+              "Bottom",
+              "Top",
+              "Back",
+              "Shelf",
+              "Cable chase"
+            ],
+            "retainedIdsSince": "initial",
+            "samePatternIdsSince": "initial",
+            "copies": {
+              "Side": 1,
+              "Shelf": 2
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": false,
+                "tools": [
+                  "Cable chase"
+                ],
+                "targets": [
+                  "Shelf 3"
+                ]
+              }
+            ],
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 18
+              },
+              {
+                "name": "Right side",
+                "thickness": 18
+              },
+              {
+                "name": "Bottom",
+                "thickness": 18
+              },
+              {
+                "name": "Top",
+                "thickness": 18
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 18
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 18
+              }
+            ],
+            "workspacePartCount": 8,
+            "partCuts": 2,
+            "partIssues": [],
+            "dialog": null
+          }
+        }
+      },
+      "feature Cut Shelf 3 with Cable chase",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": [
+                "Cable chase"
+              ],
+              "Targets": [
+                "Shelf 3"
+              ]
+            }
+          }
+        }
+      },
+      "dialogcancel",
+      "feature #board",
+      "dialogfill Value = 21mm",
+      "dialogconfirm",
+      "feature #width",
+      "dialogfill Value = 900mm",
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "variables": {
+              "board": "21mm",
+              "width": "900mm",
+              "shelves": "3"
+            },
+            "sameIdsSince": "accepted",
+            "sameFeatureIdsSince": "accepted",
+            "sameCutReferencesSince": "accepted",
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": false,
+                "tools": [
+                  "Cable chase"
+                ],
+                "targets": [
+                  "Shelf 3"
+                ]
+              }
+            ],
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 21
+              }
+            ],
+            "workspacePartCount": 8,
+            "partIssues": []
+          }
+        }
+      },
+      "feature #shelves",
+      "dialogfill Value = 2",
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "variables": {
+              "shelves": "2"
+            },
+            "copyMembershipSince": {
+              "checkpoint": "accepted",
+              "part": "Shelf",
+              "copies": 1
+            },
+            "sameFeatureIdsSince": "accepted",
+            "sameCutReferencesSince": "accepted",
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": false,
+                "tools": [
+                  "Cable chase"
+                ],
+                "targets": [
+                  null
+                ]
+              }
+            ],
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              }
+            ],
+            "workspacePartCount": 7,
+            "copies": {
+              "Side": 1,
+              "Shelf": 1
+            }
+          }
+        }
+      },
+      "feature #shelves",
+      "dialogfill Value = 3",
+      "dialogconfirm",
+      {
+        "expect": {
+          "studio": {
+            "variables": {
+              "board": "21mm",
+              "width": "900mm",
+              "shelves": "3"
+            },
+            "sameIdsSince": "accepted",
+            "sameFeatureIdsSince": "accepted",
+            "sameCutReferencesSince": "accepted",
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": false,
+                "tools": [
+                  "Cable chase"
+                ],
+                "targets": [
+                  "Shelf 3"
+                ]
+              }
+            ],
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 21
+              }
+            ],
+            "workspacePartCount": 8,
+            "partIssues": []
+          }
+        }
+      },
+      "checkpoint restored",
+      "reload",
+      {
+        "expect": {
+          "studio": {
+            "unchangedSince": "restored",
+            "sameIdsSince": "accepted",
+            "sameFeatureIdsSince": "accepted",
+            "sameCutReferencesSince": "accepted",
+            "listedParts": [
+              {
+                "name": "Side",
+                "thickness": 21
+              },
+              {
+                "name": "Right side",
+                "thickness": 21
+              },
+              {
+                "name": "Bottom",
+                "thickness": 21
+              },
+              {
+                "name": "Top",
+                "thickness": 21
+              },
+              {
+                "name": "Back",
+                "thickness": 6
+              },
+              {
+                "name": "Shelf",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 2",
+                "thickness": 21
+              },
+              {
+                "name": "Shelf 3",
+                "thickness": 21
+              }
+            ],
+            "workspacePartCount": 8,
+            "copies": {
+              "Side": 1,
+              "Shelf": 2
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Back",
+                  "Bottom",
+                  "Top"
+                ],
+                "targets": [
+                  "Side"
+                ]
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": false,
+                "tools": [
+                  "Cable chase"
+                ],
+                "targets": [
+                  "Shelf 3"
+                ]
+              }
+            ],
+            "partIssues": []
+          }
+        }
+      },
+      "feature Cut Shelf 3 with Cable chase",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": [
+                "Cable chase"
+              ],
+              "Targets": [
+                "Shelf 3"
+              ]
+            }
+          }
+        }
+      },
+      "dialogcancel",
+      {
+        "expect": {
+          "studio": {
+            "unchangedSince": "restored",
+            "sameCutReferencesSince": "accepted",
+            "dialog": null
+          }
+        }
+      }
+    ]
+  }
+]

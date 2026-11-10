@@ -112,7 +112,7 @@ export async function createAdapter(page, url) {
       await field.fill(rest.slice(at + 3));
     } else if (verb === 'dialogconfirm' || verb === 'dialogcancel') {
       const dialog = page.getByRole('dialog');
-      await dialog.getByRole('button', { name: verb === 'dialogconfirm' ? /^(OK|Save)$/ : 'Cancel', exact: true }).click();
+      await dialog.getByRole('button', { name: verb === 'dialogconfirm' ? /^(OK|Save|Cut)$/ : 'Cancel', exact: true }).click();
       await dialog.waitFor({ state: 'hidden' });
     } else {
       if (!rest || checkpoints.has(rest)) throw new Error(`Checkpoint must have a unique name: ${rest}`);
