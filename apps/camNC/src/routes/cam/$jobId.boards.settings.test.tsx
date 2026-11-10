@@ -194,4 +194,22 @@ describe('CAM boards.settings step', () => {
     expect(screen.getByRole('button', { name: 'Next: Plan' }).hasAttribute('disabled')).toBe(true);
     expect(screen.queryByRole('region', { name: 'Board A drawing' })).toBeNull();
   }, 90_000);
+
+  it('applies a board’s spacing globally and re-lays out all boards with Undo', async () => {
+    const job = await openKinderregal();
+    openBoard('A');
+    const margin = (await screen.findByLabelText('Edge margin')) as HTMLInputElement;
+    fireEvent.change(margin, { target: { value: '1' } });
+    fireEvent.blur(margin);
+    const offer = await screen.findByRole('toolbar', { name: 'Apply spacing to all boards' });
+    expect(offer).toBeTruthy();
+    fireEvent.click(within(offer).getByRole('button', { name: 'Apply to all boards & re-layout' }));
+    await screen.findByText(/Applied Board A’s setup and laid out all boards again\./);
+    const boardsAfter = (await getJob(job.id))!.boards!;
+    expect(boardsAfter.every(b => b.margin === 1)).toBe(true);
+
+    showAll();
+    const allPanel = await screen.findByRole('region', { name: 'Spacing and holds across boards' });
+    expect(within(allPanel).getByRole('button', { name: /Use A’s setup & re-layout all/ })).toBeTruthy();
+  }, 90_000);
 });
