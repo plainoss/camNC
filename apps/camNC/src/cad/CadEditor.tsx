@@ -139,7 +139,14 @@ import {
 import { idleDrawingGesture, transitionDrawingGesture, type DrawingGesture } from './drawingGesture';
 import { advanceCreationValue, beginCreationValues, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
-import { CadValueInput } from './CadValueInput';
+import {
+  SketchChamferForm,
+  SketchConicRhoForm,
+  SketchDimensionEditor,
+  SketchFilletForm,
+  SketchPolygonForm,
+  SketchShapeSizeForm,
+} from './SketchValueForms';
 import { SketchLinearPatternControls, SketchLinearPatternManipulator } from './SketchLinearPatternControls';
 import {
   initialLinearPatternParameters,
@@ -5321,42 +5328,23 @@ export function CadEditor({
             />
           )}
           {polygonTool && (
-            <form
-              className="cad-create-size"
-              onSubmit={event => {
-                event.preventDefault();
+            <SketchPolygonForm
+              inputRef={polygonInput}
+              sides={polygonSides}
+              canCreate={!!pending[1]}
+              onSides={value => {
+                setPolygonSides(value);
+                if (pending[0])
+                  polygonCountGesture.current = {
+                    sides: Number(value),
+                    radius: Math.hypot(cursor.x - pending[0].x, cursor.y - pending[0].y),
+                  };
+              }}
+              onCreate={() => {
                 if (pending[1]) addShape(pending[1]);
-              }}>
-              <label>
-                Polygon sides{' '}
-                <input
-                  ref={polygonInput}
-                  aria-label="Polygon sides"
-                  type="number"
-                  min={3}
-                  max={50}
-                  step={1}
-                  value={polygonSides}
-                  onChange={event => {
-                    setPolygonSides(event.target.value);
-                    if (pending[0])
-                      polygonCountGesture.current = {
-                        sides: Number(event.target.value),
-                        radius: Math.hypot(cursor.x - pending[0].x, cursor.y - pending[0].y),
-                      };
-                  }}
-                  onKeyDown={event => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      chooseTool('select');
-                    }
-                  }}
-                />
-              </label>
-              <button type="submit" disabled={!pending[1]}>
-                Create polygon
-              </button>
-            </form>
+              }}
+              onEscape={() => chooseTool('select')}
+            />
           )}
           {tool === 'slot' && selected.length > 0 && (
             <SketchSlotControls
@@ -5443,205 +5431,56 @@ export function CadEditor({
             </div>
           )}
           {tool === 'chamfer' && selected.length > 0 && (
-            <form
-              className="cad-create-size cad-chamfer-editor"
-              onSubmit={event => {
-                event.preventDefault();
-                acceptChamfer();
-              }}>
-              {chamferDistances.map((value, index) => (
-                <label key={index}>
-                  Distance {index + 1}{' '}
-                  <CadValueInput
-                    aria-label={`Chamfer distance ${index + 1}`}
-                    inputMode="decimal"
-                    value={value}
-                    onChange={event =>
-                      setChamferDistances(previous => previous.map((text, i) => (i === index ? event.target.value : text)))
-                    }
-                    onKeyDown={event => {
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        chooseTool('select');
-                        setSelected([]);
-                      }
-                    }}
-                  />
-                </label>
-              ))}
-              <button type="submit" disabled={!chamferPreview?.ok}>
-                Apply chamfers
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  chooseTool('select');
-                  setSelected([]);
-                }}>
-                Cancel chamfers
-              </button>
-              {((chamferPreview && !chamferPreview.ok) || (chamferSelection && !chamferSelection.ok)) && (
-                <span role="alert" className="cad-error">
-                  {(chamferPreview && !chamferPreview.ok ? chamferPreview.message : undefined) ??
-                    (chamferSelection && !chamferSelection.ok ? chamferSelection.message : '')}
-                </span>
-              )}
-            </form>
+            <SketchChamferForm
+              distances={chamferDistances}
+              preview={chamferPreview}
+              selection={chamferSelection}
+              onDistances={setChamferDistances}
+              onApply={acceptChamfer}
+              onCancel={() => {
+                chooseTool('select');
+                setSelected([]);
+              }}
+            />
           )}
           {tool === 'fillet' && selected.length > 0 && (
-            <form
-              className="cad-create-size cad-fillet-editor"
-              onSubmit={event => {
-                event.preventDefault();
-                acceptFillet();
-              }}>
-              <label>
-                Fillet radius{' '}
-                <CadValueInput
-                  inputRef={filletInput}
-                  aria-label="Fillet radius"
-                  inputMode="decimal"
-                  value={filletRadius}
-                  onFocus={() => setFilletEditing(true)}
-                  onChange={event => setFilletRadius(event.target.value)}
-                  onKeyDown={event => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      chooseTool('select');
-                      setSelected([]);
-                    }
-                  }}
-                />
-              </label>
-              <button type="submit" disabled={!filletPreview?.ok}>
-                Apply fillets
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  chooseTool('select');
-                  setSelected([]);
-                }}>
-                Cancel fillets
-              </button>
-              {filletPreview && !filletPreview.ok && (
-                <span role="alert" className="cad-error">
-                  {filletPreview.message}
-                </span>
-              )}
-            </form>
+            <SketchFilletForm
+              inputRef={filletInput}
+              radius={filletRadius}
+              preview={filletPreview}
+              onRadius={setFilletRadius}
+              onFocus={() => setFilletEditing(true)}
+              onApply={acceptFillet}
+              onCancel={() => {
+                chooseTool('select');
+                setSelected([]);
+              }}
+            />
           )}
           {conicEditing && (
-            <form
-              className="cad-create-size cad-conic-editor"
-              onSubmit={event => {
-                event.preventDefault();
-                applyConicRho();
-              }}>
-              <label>
-                Rho{' '}
-                <input
-                  ref={rhoInput}
-                  aria-label="Conic rho"
-                  inputMode="decimal"
-                  value={rho}
-                  onChange={event => setRho(event.target.value)}
-                  onKeyDown={event => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      chooseTool('select');
-                    }
-                  }}
-                />
-              </label>
-              <span>0 &lt; ρ &lt; 1</span>
-              <button type="submit">Apply rho</button>
-              <button type="button" onClick={() => chooseTool('select')}>
-                Close rho
-              </button>
-            </form>
+            <SketchConicRhoForm inputRef={rhoInput} rho={rho} onRho={setRho} onApply={applyConicRho} onClose={() => chooseTool('select')} />
           )}
           {currentDimension && numeric(currentDimension) && (
-            <form
-              className="cad-dimension-editor"
+            <SketchDimensionEditor
+              dimension={currentDimension}
+              inputRef={dimensionInput}
               style={dimensionEditorPosition}
-              onSubmit={event => {
-                event.preventDefault();
-                applyDimensionValue();
-              }}>
-              <label htmlFor="cad-edit-dimension" className="sr-only">
-                {currentDimension.label ?? currentDimension.type} <span>{currentDimension.type === 'angle' ? 'degrees' : 'mm'}</span>
-              </label>
-              <div>
-                <CadValueInput
-                  id="cad-edit-dimension"
-                  inputRef={dimensionInput}
-                  key={currentDimension.id}
-                  defaultValue={currentDimension.expression ?? String(currentDimension.value)}
-                  inputMode="decimal"
-                  unit={currentDimension.type === 'angle' ? 'deg' : 'mm'}
-                  unitClassName="cad-dimension-unit"
-                  onKeyDown={event => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      cancelDimensionEdit();
-                    } else if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229))
-                      event.preventDefault();
-                  }}
-                />
-                <button type="submit" aria-label="Apply dimension">
-                  ✓
-                </button>
-                <button type="button" aria-label="Cancel dimension edit" onClick={cancelDimensionEdit}>
-                  ×
-                </button>
-              </div>
-            </form>
+              onApply={applyDimensionValue}
+              onCancel={cancelDimensionEdit}
+            />
           )}
           {pending[0] && (tool === 'rectangle' || tool === 'centerRectangle' || tool === 'circle') && (
-            <form
-              className="cad-create-size"
-              onSubmit={event => {
-                event.preventDefault();
-                addShape();
-              }}>
-              <span>
-                From {rounded(pending[0].x)}, {rounded(pending[0].y)}
-              </span>
-              {tool === 'rectangle' || tool === 'centerRectangle' ? (
-                <>
-                  <label>
-                    Width{' '}
-                    <CadValueInput
-                      aria-label="Rectangle width"
-                      value={width}
-                      onChange={event => setWidth(event.target.value)}
-                      inputMode="decimal"
-                    />
-                  </label>
-                  <label>
-                    Height{' '}
-                    <CadValueInput
-                      aria-label="Rectangle height"
-                      value={height}
-                      onChange={event => setHeight(event.target.value)}
-                      inputMode="decimal"
-                    />
-                  </label>
-                </>
-              ) : (
-                <label>
-                  Radius{' '}
-                  <CadValueInput
-                    aria-label="Circle radius"
-                    value={radius}
-                    onChange={event => setRadius(event.target.value)}
-                    inputMode="decimal"
-                  />
-                </label>
-              )}
-              <button type="submit">Create</button>
-            </form>
+            <SketchShapeSizeForm
+              from={pending[0]}
+              rectangle={tool === 'rectangle' || tool === 'centerRectangle'}
+              width={width}
+              height={height}
+              radius={radius}
+              onWidth={setWidth}
+              onHeight={setHeight}
+              onRadius={setRadius}
+              onCreate={() => addShape()}
+            />
           )}
           <div className="cad-canvas-footer">
             <span>
