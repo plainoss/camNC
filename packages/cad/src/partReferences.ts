@@ -1,3 +1,4 @@
+import { isJoinedBody } from './extrudeSteps';
 import { cadCopyName } from './partPatterns';
 import type { CadDocument } from './types';
 
@@ -15,7 +16,10 @@ export function cadPartReferenceName(document: Pick<CadDocument, 'parts'>, refer
   if (!source) return null;
   if (source.id === reference) return source.name;
   const index = source.copies?.findIndex(copy => cadPartReference(source.id, copy.id) === reference) ?? -1;
-  return index >= 0 ? cadCopyName(source, index) : null;
+  if (index >= 0) return cadCopyName(source, index);
+  const parent = isJoinedBody(document, source) && document.parts.find(part => part.id === source.addTo);
+  const inherited = parent ? (parent.copies?.findIndex(copy => cadPartReference(source.id, copy.id) === reference) ?? -1) : -1;
+  return parent && inherited >= 0 ? `${source.name} · ${cadCopyName(parent, inherited)}` : null;
 }
 
 /** Picking a family highlights its copies too; picking one copy never highlights its siblings. */

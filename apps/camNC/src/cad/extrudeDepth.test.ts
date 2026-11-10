@@ -25,3 +25,10 @@ it('measures oblique and reversed axes and refuses unstable head-on ray division
   expect(distanceAlongAxis([0, -20, 10], [0, 1, 0], [0, 0, 0], [0, 0, -1])).toBe(-10);
   expect(distanceAlongAxis([0, 0, 20], [0, 0, -1], [0, 0, 0], [0, 0, 1])).toBeNull();
 });
+
+it('allows dragging depth beyond 300 mm while retaining the minimum and rounding', () => {
+  const source = createPlateDocument({ width: 60, height: 80, thickness: 25 });
+  const partId = source.parts[0]!.id;
+  expect(withExtrudeDepth(source, partId, 2000.34).parts[0]!.thickness).toBe(2000.3);
+  expect(withExtrudeDepth(source, partId, -10).parts[0]!.thickness).toBe(0.1);
+});

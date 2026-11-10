@@ -1,4 +1,11 @@
-import { addPartMirror, type CadDocument, type CadDrawnOn, type CadPartCopy } from '@wbcnc/cad';
+import {
+  addPartMirror,
+  cadMirrorPlaneFrame,
+  cadMirrorPlaneWouldCycle,
+  type CadDocument,
+  type CadDrawnOn,
+  type CadPartCopy,
+} from '@wbcnc/cad';
 import { useEffect, useState } from 'react';
 import { drawnOnName } from './drawnOnName';
 import { FeatureDialog } from './FeatureDialog';
@@ -30,10 +37,22 @@ export function MirrorDialog({
   const copy = part?.copies?.find(candidate => candidate.id === copyId);
   const [across, setAcross] = useState<Across | null>(copy?.mirror ?? null);
   const [picking, setPicking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Automatic display positions are not persisted; an unresolved face must never create a stale or unplaced mirror.
+  const frame = across && cadMirrorPlaneFrame(document, across);
+  const planeError = across && (!frame ? 'That plane cannot be resolved.' : 'error' in frame ? frame.error : null);
+  const issue = error ?? planeError;
   const pick = () => {
     if (!pickPlane) return;
     setPicking(true);
     pickPlane((on, datum) => {
+      // A copy cannot define its own mirror plane: regeneration would keep reflecting it about its previous position.
+      if (copyId && cadMirrorPlaneWouldCycle(document, partId, copyId, on)) {
+        setError('Choose a face that does not depend on this mirror.');
+        setPicking(false);
+        return;
+      }
+      setError(null);
       setAcross(datum ? { across: on, datum } : { across: on });
       setPicking(false);
     });
@@ -46,7 +65,7 @@ export function MirrorDialog({
   }, []);
   const name = across && (document.planes?.find(plane => plane.id === across.datum)?.name ?? drawnOnName(document, across.across));
   const save = () => {
-    if (!part || !across) return;
+    if (!part || !across || issue) return;
     if (!copy) return onSave(addPartMirror(document, part.id, across).document);
     onSave({
       ...document,
@@ -59,7 +78,7 @@ export function MirrorDialog({
     });
   };
   return (
-    <FeatureDialog title="Mirror" okDisabled={!across || !part} onOk={save} onCancel={onCancel}>
+    <FeatureDialog title="Mirror" okDisabled={!across || !part || !!issue} onOk={save} onCancel={onCancel}>
       <div className="cad-feature-selection">
         <small>Entities to mirror</small>
         <span>{part?.name ?? 'Select a part'}</span>
@@ -73,6 +92,7 @@ export function MirrorDialog({
         <small>Mirror plane</small>
         <span>{name ?? 'Pick a plane or a face'}</span>
       </button>
+      {issue && <p role="alert">{issue}</p>}
     </FeatureDialog>
   );
 }

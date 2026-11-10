@@ -63,6 +63,7 @@ export default function WorkspaceView({
   selectedPlane,
   onSelectPlane,
   onSelectFace,
+  pickingMirrorPlane = false,
   onPickPoint,
   picked,
   hoverIds,
@@ -112,6 +113,8 @@ export default function WorkspaceView({
   onSelectPlane?: (plane: string) => void;
   /** The face of the part last clicked, for a sketch started next to be drawn on, as the reference sketches on a selection. */
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
+  /** Mirror accepts a planar face of a physical copy without selecting or opening that part. */
+  pickingMirrorPlane?: boolean;
   /** While set, a click picks the corner or face middle it snaps to, as a mate connector, instead of selecting. */
   onPickPoint?: (pick: {
     partId: string;
@@ -210,6 +213,13 @@ export default function WorkspaceView({
     setChoosing(false);
     setNotice(null);
     onNewPart?.({ partId: part.id, face, ...(copyId && { copyId }) });
+  };
+  const pickMirrorFace = (pick: ModelFacePick) => {
+    const found = faceAt(pick);
+    if (!found) return setNotice('Pick a flat face: a part’s top, its underside, or one of its straight edges.');
+    setNotice(null);
+    lastClick.current = null;
+    onSelectFace?.({ partId: found.part.id, face: found.face, ...(found.copyId && { copyId: found.copyId }) });
   };
   const selectedIndexes = model.instances.flatMap((instance, index) =>
     (
@@ -321,7 +331,7 @@ export default function WorkspaceView({
         palette={controlled ? 'studio' : undefined}
         highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
-        onPickFace={choosing ? pickFace : undefined}
+        onPickFace={pickingMirrorPlane ? pickMirrorFace : choosing ? pickFace : undefined}
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
