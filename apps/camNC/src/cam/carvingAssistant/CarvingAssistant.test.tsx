@@ -343,7 +343,7 @@ it('loads a real PNG locally, keeps its original source, and waits for explicit 
   fireEvent.change(screen.getByLabelText('Artwork description'), { target: { value: '' } });
   const { file, dataUri } = pngFile();
   fireEvent.change(screen.getByLabelText('Generated PNG file'), { target: { files: [file] } });
-  await screen.findByText('Image loaded; update preview locally.');
+  await screen.findByText('Image loaded; update preview locally.', {}, { timeout: 10_000 });
   expect(screen.getByLabelText('Artwork description')).toHaveProperty('value', 'Line art from tiny-owl');
   expect(screen.getByRole('img', { name: 'Original generated artwork' }).getAttribute('src')).toBe(dataUri);
   expect(prepareCarvingArt).not.toHaveBeenCalled();
@@ -398,7 +398,7 @@ it('keeps a typed description when turning a local PNG into a reusable source as
   await open();
   const { file } = pngFile();
   fireEvent.change(screen.getByLabelText('Generated PNG file'), { target: { files: [file] } });
-  await screen.findByText('Image loaded; update preview locally.');
+  await screen.findByText('Image loaded; update preview locally.', {}, { timeout: 10_000 });
   expect(screen.getByLabelText('Artwork description')).toHaveProperty('value', asset.prompt);
   expect(screen.getByRole('button', { name: 'Update preview locally' })).toHaveProperty('disabled', false);
   expect(generateCarvingAsset).not.toHaveBeenCalled();

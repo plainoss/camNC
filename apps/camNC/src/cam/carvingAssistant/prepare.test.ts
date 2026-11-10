@@ -178,6 +178,15 @@ describe('generated carving preparation', () => {
 });
 
 describe('restrictive generated SVG vocabulary', () => {
+  it('bounds malformed transform parsing while retaining ordinary transform lists', () => {
+    const sanitizeTransform = (transform: string) => sanitizeCarvingSvg(`<svg viewBox="0 0 10 10"><g transform="${transform}"/></svg>`);
+    expect(sanitizeTransform(' translate(1, 2) scale(2) rotate(45 1 1) ')).toContain('rotate(45 1 1)');
+    expect(() => sanitizeTransform(`${'scale(&#9;) '.repeat(5000)}!`)).toThrow('Invalid artwork transform');
+    for (const transform of ['', 'scale(1', 'scale((1))', 'scale(1) garbage', 'scale(1))']) {
+      expect(() => sanitizeTransform(transform)).toThrow('Invalid artwork transform');
+    }
+  });
+
   it.each([
     '<image href="https://example.com/x.png"/>',
     '<script>alert(1)</script>',

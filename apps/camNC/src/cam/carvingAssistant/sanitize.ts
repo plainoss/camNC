@@ -64,7 +64,15 @@ export function sanitizeCarvingSvg(source: string): string {
       } else if (name === 'stroke-linejoin') {
         if (!['round', 'bevel', 'miter'].includes(value)) throw new Error('Invalid line join.');
       } else if (name === 'transform') {
-        if (!/^(?:\s*(?:translate|scale|rotate|matrix|skewX|skewY)\([\s,0-9eE+.-]+\)\s*)+$/.test(value) || !finiteCoordinates(value))
+        // Split at closing parentheses so adjacent whitespace cannot cause exponential regex backtracking.
+        const transforms = value.split(')');
+        const trailing = transforms.pop();
+        if (
+          trailing?.trim() !== '' ||
+          transforms.length === 0 ||
+          !transforms.every(part => /^\s*(?:translate|scale|rotate|matrix|skewX|skewY)\([\s,0-9eE+.-]+$/.test(part)) ||
+          !finiteCoordinates(value)
+        )
           throw new Error('Invalid artwork transform.');
       } else throw new Error(`Unsupported artwork attribute: ${name}.`);
       target.setAttribute(name, value);

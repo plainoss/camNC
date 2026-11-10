@@ -16,13 +16,16 @@ export function CarvingArtFields({
   /** Set while typed text waits for its debounce: commits it at once. */
   flush: RefObject<(() => void) | null>;
 }) {
-  const [text, setText] = useState(art.kind === 'text' ? art.text : '');
-  // Typing outlines again once it pauses.
+  const [draft, setDraft] = useState<string | null>(null);
+  const text = draft ?? (art.kind === 'text' ? art.text : '');
+  // Only typed drafts debounce. Undo can remount against the old SVG before the restored text arrives;
+  // treating the old SVG's empty text as a draft would overwrite restored lettering and clear Redo.
   useEffect(() => {
-    if (art.kind !== 'text' || text === art.text) return;
+    if (art.kind !== 'text' || draft === null || text === art.text) return;
     const commit = () => {
       clearTimeout(t);
       flush.current = null;
+      setDraft(null);
       onArt({ ...art, text });
     };
     const t = setTimeout(commit, 300);
@@ -31,7 +34,7 @@ export function CarvingArtFields({
       clearTimeout(t);
       if (flush.current === commit) flush.current = null;
     };
-  }, [text, art, onArt, flush]);
+  }, [text, draft, art, onArt, flush]);
   return art.kind === 'text' ? (
     <>
       <Input
@@ -40,7 +43,7 @@ export function CarvingArtFields({
         value={text}
         maxLength={60}
         className="h-7 w-36 px-2 text-xs"
-        onChange={e => setText(e.target.value)}
+        onChange={e => setDraft(e.target.value)}
       />
       <div className="w-40">
         <LetteringFontPicker font={art.font} className="h-7 px-2 text-xs" onChange={font => onArt({ ...art, text, font })} />

@@ -7,6 +7,7 @@ import { defaultProvider, rememberAssistantCredentials } from '@/cad/assistant/k
 import { loadFontCatalog } from '@/cam/webFonts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { userEvent } from '@vitest/browser/context';
 import type { ComponentProps, ComponentType, ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { Route } from './$jobId.carve';
@@ -168,10 +169,9 @@ it('invalidates accepted suitability and a pending proposal after tool and board
   expect(screen.getByRole('link', { name: /Next: Plan/ }).hasAttribute('disabled')).toBe(true);
   expect(screen.getByText(/Generated artwork changed size, placement or cutting settings/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Update preview locally' }));
-  await waitFor(() =>
-    expect(screen.getByRole('checkbox', { name: 'I have reviewed these detail warnings.' })).toHaveProperty('checked', false)
-  );
+  // Preparation clears old results and runs CAM in a worker before the review controls exist again.
   await waitFor(() => expect(screen.getByText(/Preview ready/)).toBeTruthy(), { timeout: 20_000 });
+  expect(screen.getByRole('checkbox', { name: 'I have reviewed these detail warnings.' })).toHaveProperty('checked', false);
   acknowledge();
   fireEvent.click(screen.getByRole('button', { name: 'Apply artwork' }));
   await waitFor(() => expect(screen.getByRole('link', { name: /Next: Plan/ }).hasAttribute('disabled')).toBe(false));
@@ -194,4 +194,30 @@ it('refuses Apply against a same-tick newer cache entry without saving or record
   expect((await getJob(job.id))!.carving).toEqual(changed.carving);
   expect(client.getQueryData<CamJobV1>(camKeys.job(job.id))!.carving).toEqual(changed.carving);
   expect(screen.getByRole('button', { name: 'Undo' })).toHaveProperty('disabled', true);
+}, 30_000);
+
+it('restores the text field and redoes a same-item artwork replacement without inventing an empty text edit', async () => {
+  const { job } = await open();
+  const before = structuredClone(job.carving!);
+  await generate();
+  await userEvent.selectOptions(screen.getByLabelText('Placement'), 'replace');
+  await userEvent.click(screen.getByRole('button', { name: 'Update preview locally' }));
+  await waitFor(() => expect(screen.getByText(/Preview ready/)).toBeTruthy(), { timeout: 20_000 });
+  await userEvent.click(screen.getByRole('checkbox', { name: 'I have reviewed these detail warnings.' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Apply artwork' }));
+  await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].art.kind).toBe('svg'));
+  const applied = (await getJob(job.id))!.carving!;
+  expect(applied.items).toHaveLength(1);
+  expect(applied.items[0].id).toBe(before.items[0].id);
+  await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+  await waitFor(async () => expect((await getJob(job.id))!.carving).toEqual(before));
+  // The restored field must follow the restored artwork, rather than autosaving a stale SVG's empty text state.
+  expect(screen.getByLabelText('Text')).toHaveProperty('value', 'Welcome');
+  await userEvent.click(screen.getByLabelText('Text'));
+  await userEvent.click(screen.getByRole('button', { name: 'Redo' }));
+  await waitFor(async () => expect((await getJob(job.id))!.carving).toEqual(applied));
+  expect(screen.queryByLabelText('Text')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Replace SVG' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Redo' })).toHaveProperty('disabled', true);
+  expect(screen.getByRole('link', { name: 'Next: Plan' }).getAttribute('aria-disabled')).not.toBe('true');
 }, 30_000);
