@@ -3,10 +3,10 @@ import '@/style.css';
 import { page } from '@vitest/browser/context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { addFaceSketch, addLine, cadFaceSketches, createPlateDocument, updateDimension, type CadDocument } from '@wbcnc/cad';
-import { useImperativeHandle, useRef, type ComponentType, type Ref } from 'react';
+import { useImperativeHandle, useRef, useState, type ComponentType, type Ref, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
-import { acknowledgeCadSession, cadSession, commitCadSession, endCadSession } from '@wbcnc/cad-editor/session';
+import { acknowledgeCadSession, cadSession, commitCadSession, endCadSession, type CadSession } from '@wbcnc/cad-editor/session';
 import { keepPendingDesignDraft, pendingDesignDraft } from '@/cam/designDraftRecovery';
 import type { CadEditorController } from '@/cad/CadEditor';
 import type { CamStageDestination } from '@/cam/CamJobBar';
@@ -44,11 +44,17 @@ vi.mock('@/cam/CamJobBar', () => ({
   CamJobBar: ({
     onStageNavigate,
     navigationPending,
+    title,
+    tools,
   }: {
     onStageNavigate: (destination: CamStageDestination) => void;
     navigationPending: boolean;
+    title?: ReactNode;
+    tools?: ReactNode;
   }) => (
     <nav>
+      {title}
+      {tools}
       {(['boards', 'plan', 'machine'] as const).map(stage => (
         <button key={stage} disabled={navigationPending} onClick={() => onStageNavigate({ stage, board: 'board-c' })}>
           Go {stage}
@@ -62,6 +68,7 @@ vi.mock('@/components/page-header', () => ({ PageHeader: () => null }));
 vi.mock('@/cad/CadEditor', () => ({
   CadEditor: (props: {
     document: CadDocument;
+    editSession?: CadSession;
     preferredPartId?: string;
     onDraftChange: (d: CadDocument) => void;
     onFinish: (d: CadDocument) => Promise<void>;
@@ -71,9 +78,14 @@ vi.mock('@/cad/CadEditor', () => ({
     controller?: Ref<CadEditorController>;
     notice?: string | null;
   }) => {
-    const current = useRef(cadSession(props.document).document);
+    const [session] = useState(() => props.editSession ?? cadSession(props.document));
+    const current = useRef(session.document);
     useImperativeHandle(props.controller, () => ({
-      updateSettings: () => false,
+      updateSettings: settings => {
+        current.current = commitCadSession(session, { ...current.current, ...settings });
+        props.onDraftChange(current.current);
+        return true;
+      },
       prepareDocument: () => (state.prepared === undefined ? current.current : state.prepared),
       finish: async () => {
         state.finishRequests();
@@ -476,4 +488,23 @@ describe('recovering a conflicting editor source', () => {
     expect((await getJob(f.savedB.id))!.design!.draft).toEqual(saved.design!.draft);
     expect(f.session.document).toEqual(f.local);
   });
+});
+
+it('preserves the durable checkpoint when a unit change remounts the editor before autosave', async () => {
+  const actual = await vi.importActual<typeof import('@/cam/cadDesign')>('@/cam/cadDesign');
+  state.job = await createDesignJob('Unit checkpoint');
+  const source = state.job.design!.draft;
+  state.save.mockImplementation(actual.saveDesignDraft);
+  open();
+  fireEvent.click(screen.getByRole('button', { name: 'Design settings' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Length unit' }), { target: { value: 'in' } });
+  fireEvent.submit(screen.getByRole('button', { name: 'Save settings' }).closest('form')!);
+  await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+  expect(state.save.mock.calls[0]![2]).toEqual(source);
+  await waitFor(async () => expect((await getJob(state.job!.id))!.design!.draft.lengthUnit).toBe('in'));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(screen.queryByRole('alert')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
+  await waitFor(async () => expect((await getJob(state.job!.id))!.design!.draft.revision).toBe(source.revision + 2));
+  expect(screen.queryByRole('alert')).toBeNull();
 });

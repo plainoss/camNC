@@ -1,3 +1,4 @@
+import type { CadEditorController } from './editorController';
 import { DesignUnitContext, useDesignUnits } from './designUnits';
 import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
 import { previewSlot } from './slotPreview';
@@ -124,6 +125,7 @@ import {
   redoCadSession,
   undoCadSession,
   type CadCommandCheckpoint,
+  type CadSession,
 } from '@wbcnc/cad-editor/session';
 import { DimensionGraphics } from './DimensionGraphics';
 import {
@@ -291,16 +293,12 @@ const PartView3D = lazy(() => import('./PartView3D'));
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
 const SketchBackdrop = lazy(() => import('./SketchBackdrop'));
 
-export interface CadEditorController {
-  /** Commit valid open value fields to the draft without accepting it or navigating. */
-  prepareDocument: () => CadDocument | null;
-  updateSettings: (settings: Pick<CadDocument, 'name' | 'lengthUnit'>) => boolean;
-  /** Use the same validation and accepted-session boundary as the Finish button. */
-  finish: () => Promise<boolean>;
-}
+export type { CadEditorController } from './editorController';
 
 export interface CadEditorProps {
   document: CadDocument;
+  /** Join the route session without acknowledging a remount as a durable save. */
+  editSession?: CadSession;
   onDraftChange: (document: CadDocument) => void;
   onFinish: (document: CadDocument) => void | Promise<void>;
   onCancel: () => void | Promise<void>;
@@ -321,6 +319,7 @@ export interface CadEditorProps {
 /** Native editable source stays in one document while CAM remains a derived consumer of accepted revisions. */
 export function CadEditor({
   document: initialDocument,
+  editSession,
   onDraftChange,
   onFinish,
   onCancel,
@@ -334,7 +333,7 @@ export function CadEditor({
   faceSketch,
   startIn3D,
 }: CadEditorProps) {
-  const [session] = useState(() => cadSession(initialDocument));
+  const [session] = useState(() => editSession ?? cadSession(initialDocument));
   const [doc, setDocument] = useState(session.document);
   const { parseCadValue, lengthText, formatLength, lengthUnit } = useDesignUnits(doc.lengthUnit ?? 'mm');
   const [faceOpening] = useState(() => initialFaceSketchView(faceSketch?.scene));

@@ -376,6 +376,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
           <CadEditor
             key={editorEpoch}
             document={editorDocument}
+            editSession={session}
             partCameraState={partCameraState}
             startIn3D={returnToPart ? 'part' : true}
             onEditFaceSketch={(base, partId, sketchId, scene) => {
