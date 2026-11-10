@@ -1,0 +1,34 @@
+[
+  {
+    "id": "studio/section/cabinet-linked-offset",
+    "title": "A cabinet section retains physical parts and its linked offset through stock edits and cancellation",
+    "evidence": "design complete cabinet with a mirrored side and dependent housings; occupied cap geometry and 34 pin openings checked independently",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/cupboard.json",
+      "closesketch",
+      "hideplanes",
+      "checkpoint assembled",
+      "key Shift+X",
+      "dialogselect Section plane = right",
+      "dialogfill Offset = #board-4mm",
+      "button ^Confirm section view$",
+      { "expect": { "studio": { "section": { "active": true, "editing": false }, "unchangedSince": "assembled", "sameIdsSince": "assembled", "sameFeatureIdsSince": "assembled", "workspacePartCount": 6, "partIssues": [] } } },
+      "feature #board",
+      "dialogfill Value = 21mm",
+      "dialogconfirm",
+      "checkpoint resized",
+      { "expect": { "studio": { "section": { "active": true, "editing": false }, "variables": { "board": "21mm" }, "thicknesses": { "Side": 21, "Bottom": 21, "Top": 21, "Back": 6, "Shelf": 21 }, "sameIdsSince": "assembled", "sameFeatureIdsSince": "assembled", "workspacePartCount": 6, "partIssues": [] } } },
+      "button ^Edit section view$",
+      { "expect": { "studio": { "dialog": "Section view", "section": { "plane": "right", "offset": "#board-4mm", "flipped": false }, "unchangedSince": "resized" } } },
+      "dialogcancel",
+      { "expect": { "studio": { "dialog": null, "section": { "active": false }, "unchangedSince": "resized", "workspacePartCount": 6 } } },
+      "key Shift+X",
+      "dialogselect Section plane = front",
+      "dialogfill Offset = 150",
+      "key Escape",
+      { "expect": { "studio": { "dialog": null, "section": { "active": false }, "unchangedSince": "resized" } } },
+      "reload",
+      { "expect": { "studio": { "section": { "active": false }, "sameIdsSince": "assembled", "sameFeatureIdsSince": "assembled", "unchangedSince": "resized", "workspacePartCount": 6, "partIssues": [] } } }
+    ]
+  }
+]

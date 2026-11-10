@@ -37,7 +37,18 @@ export async function createAdapter(page, url) {
       return [text.slice(0, at), text.slice(at + 2)];
     })));
     const dialogName = await dialog.count() ? await dialog.evaluate(element => element.getAttribute('aria-label') ?? document.getElementById(element.getAttribute('aria-labelledby'))?.textContent ?? null) : null;
-    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, dialog: dialogName };
+    const sectionDialog = page.getByRole('dialog', { name: 'Section view', exact: true });
+    const editingSection = await sectionDialog.count() > 0;
+    const section = {
+      active: await page.getByRole('button', { name: 'Edit section view', exact: true }).count() > 0,
+      editing: editingSection,
+      ...(editingSection ? {
+        plane: await sectionDialog.getByRole('combobox', { name: 'Section plane', exact: true }).inputValue(),
+        offset: await sectionDialog.getByRole('textbox', { name: 'Offset', exact: true }).inputValue(),
+        flipped: await sectionDialog.getByRole('button', { name: 'Flip plane', exact: true }).getAttribute('aria-pressed') === 'true',
+      } : {}),
+    };
+    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, section, dialog: dialogName };
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
