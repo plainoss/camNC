@@ -13,12 +13,13 @@ import {
   isCadBody,
   isJoinedBody,
   consumedTools,
+  physicalJoinedCopies,
   type CadDocument,
   type CadPart,
   type CadPlacement,
   type EvaluatedCadPart,
 } from '@wbcnc/cad';
-import { Matrix4, Quaternion, Vector3 } from 'three';
+import { Matrix4, Vector3 } from 'three';
 import type { BodyMesh, CamPartInfo } from '@/cam/camTypes';
 import { nativePart } from '@/cam/nativeCadModel';
 
@@ -53,7 +54,8 @@ export interface AssemblyModel {
 export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = new Set()): AssemblyModel {
   // Where each part drawn on a plane or face is, from that face as it is now: a step changed without solving, such as a
   // thickness in the Extrude dialog, would otherwise leave the parts on it where it used to be.
-  const document = resolveDrawnPlacements(resolveDatumPlanes(activeDesign(given))).document;
+  // Inherited material uses the ordinary copy path so its reflected contours and instance-specific cuts stay visible.
+  const document = physicalJoinedCopies(resolveDrawnPlacements(resolveDatumPlanes(activeDesign(given))).document);
   type Shape = ReturnType<typeof nativePart>;
   type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; copies: Shape[] };
   // A sketch not yet extruded has nothing to show in 3D.
@@ -80,29 +82,6 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
       }
     });
   const byId = new Map(document.parts.map(part => [part.id, part]));
-  /** A body joined to a part goes with each copy of it, where the copy is as the body is to the part. */
-  const withParentCopies = (part: CadPart, shape: Shape) => {
-    const parent = isJoinedBody(document, part) ? byId.get(part.addTo!) : undefined;
-    if (!parent?.placement || !part.placement) return [];
-    const relative = new Matrix4()
-      .fromArray(placementMatrix(parent.placement))
-      .invert()
-      .multiply(new Matrix4().fromArray(placementMatrix(part.placement)));
-    return (parent.copies ?? []).flatMap((copy, index) => {
-      if (!copy.placement) return [];
-      const matrix = new Matrix4().fromArray(placementMatrix(copy.placement)).multiply(relative);
-      const position = new Vector3(),
-        rotation = new Quaternion();
-      matrix.decompose(position, rotation, new Vector3());
-      return [
-        {
-          instance: { partId: part.id, copyId: copy.id, name: `${part.name} · ${cadCopyName(parent, index)}` },
-          placement: { position: position.toArray(), rotation: rotation.toArray() } as CadPlacement,
-          shape,
-        },
-      ];
-    });
-  };
   const pieces = built.flatMap(entry =>
     'shape' in entry
       ? [
@@ -112,7 +91,6 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
             placement: copy.placement,
             shape: entry.copies[index]!,
           })),
-          ...withParentCopies(entry.part, entry.shape),
         ]
       : []
   );
