@@ -69,3 +69,11 @@ it('invalidates an already reviewed proposal when confirmed requirements change'
   expect(requirementProposalRefusal(proposal)).toMatch(/requirements changed/);
   expect(requirementProposalRefusal(cadProposal(base, base))).toBeUndefined();
 });
+
+it('canonicalizes cleared optional fields without retaining an active empty contract', () => {
+  const base = createPlateDocument();
+  confirmRequirements(base.id, { width: 280 });
+  const cleared = confirmRequirements(base.id, { width: undefined, preserveExistingIds: undefined });
+  expect(cleared.requirements).toEqual({});
+  expect(confirmRequirements(base.id, {}).revision).toBe(cleared.revision);
+});

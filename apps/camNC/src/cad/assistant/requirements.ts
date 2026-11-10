@@ -53,7 +53,8 @@ export function validateAssistantRequirements(input: AssistantRequirements): Ass
       throw new Error(`${key} must be a positive finite length in mm.`);
     }
   }
-  return structuredClone(input);
+  // Clearing an optional field must remove it from confirmed state, including its active badge and revision comparison.
+  return structuredClone(Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)));
 }
 
 function ids(value: unknown): string[] {
