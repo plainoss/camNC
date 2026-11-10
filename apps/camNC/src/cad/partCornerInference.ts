@@ -10,6 +10,8 @@ import {
 } from '@wbcnc/cad';
 import type { CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 import type { PartEdge } from './partEdges';
+import { partVertices } from './partVertices';
+import { partEdgeSourceKey } from './partWorldEdges';
 
 interface CornerInference extends CadDrawingInference {
   sourceCorner?: NonNullable<CadPointEntity['used']>;
@@ -30,12 +32,18 @@ export function partCornerInference(
   if (!frame) return inference;
   const sourceParts = new Map<string, ReturnType<typeof cadCornerSources>>(),
     screen = project(raw);
+  const ambiguous = new Set(
+    partVertices(edges.filter(edge => edge.onPlane))
+      .filter(vertex => vertex.ambiguous)
+      .map(vertex => cornerKey(vertex.x, vertex.y))
+  );
   let nearest: { point: CadPoint; sourceCorner: NonNullable<CadPointEntity['used']>; distance: number } | undefined;
   for (const edge of edges) {
     // Off-plane edges project elsewhere once the camera is turned; they cannot be snapped as plane geometry.
-    if (!edge.onPlane) continue;
-    if (!sourceParts.has(edge.partId)) sourceParts.set(edge.partId, cadCornerSources(document, frame, part.id, edge.partId));
-    const sources = sourceParts.get(edge.partId)!;
+    if (!edge.onPlane || edge.ambiguous) continue;
+    const sourceKey = partEdgeSourceKey(edge);
+    if (!sourceParts.has(sourceKey)) sourceParts.set(sourceKey, cadCornerSources(document, frame, part.id, edge));
+    const sources = sourceParts.get(sourceKey)!;
     for (const point of [
       { x: edge.x1, y: edge.y1 },
       { x: edge.x2, y: edge.y2 },
@@ -46,7 +54,9 @@ export function partCornerInference(
         (lockedAxes.y !== undefined && Math.abs(point.y - lockedAxes.y) > 1e-6)
       )
         continue;
-      const sourceCorner = sources.get(cornerKey(point.x, point.y));
+      const key = cornerKey(point.x, point.y);
+      if (ambiguous.has(key)) continue;
+      const sourceCorner = sources.get(key);
       if (!sourceCorner) continue;
       const at = project(point),
         distance = Math.hypot(at.x - screen.x, at.y - screen.y);

@@ -38,3 +38,24 @@ it('snaps to an on-plane part corner before the grid and keeps the drawn corner 
   const after = withUsedPoints({ ...document, parts: [resized, { ...part, sketch: drawn }] }, { ...part, sketch: drawn });
   expect(after.entities.find(e => e.type === 'point' && e.used)).toMatchObject({ x: 12.2, y: 20.3 });
 });
+
+it('keeps a copy endpoint owned by that exact copy when its projection meets the seed', () => {
+  const source = createPlateDocument({ width: 100, height: 20, thickness: 18 }).parts[0]!,
+    target = createCadPart('Target');
+  source.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  source.copies = [{ id: 'copy', placement: { position: [-100, 0, 0], rotation: [0, 0, 0, 1] } }];
+  target.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  const document = { ...createCadDocument(), parts: [source, target] },
+    edge = { key: 'copy', partId: source.id, copyId: 'copy', x1: -100, y1: 0, x2: 0, y2: 0, onPlane: true },
+    inference = { point: { x: 0, y: 0 }, snap: null, alignments: [], guides: [] },
+    project = (p: { x: number; y: number }) => ({ x: p.x * 5, y: p.y * 5 });
+  const hint = partCornerInference(document, target, [edge], { x: 0, y: 0 }, inference, project);
+  const drawn = bindPartCorners(target.sketch, addRectangle(target.sketch, { x: 0, y: 0, width: 10, height: 10 }), [hint]);
+  expect(drawn.entities.flatMap(entity => (entity.type === 'point' && entity.used ? [entity.used] : []))).toEqual([
+    expect.objectContaining({ partId: source.id, copyId: 'copy' }),
+    expect.objectContaining({ partId: source.id, copyId: 'copy' }),
+  ]);
+  // At a genuinely ambiguous vertex the inference remains unchanged, rather than choosing the first owner.
+  const seed = { ...edge, key: 'seed', copyId: undefined, x1: 0, x2: 100 };
+  expect(partCornerInference(document, target, [edge, seed], { x: 0, y: 0 }, inference, project)).toBe(inference);
+});
