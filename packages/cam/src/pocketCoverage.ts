@@ -24,10 +24,13 @@ function coverageScope(region: PathsD, diameter: number, settings: CamSettings, 
   // At most six target/band offset or capsule chord approximations affect comparison.
   // This third-sized query tolerance therefore fits within the unchanged two-source-offset reserve above.
   const tolerance = geometryTolerances(settings.geometryTolerance, settings.sourceTolerance).offset / 3;
-  const radius = pocketCoverageRadius(diameter, settings);
+  const guaranteedRadius = pocketCoverageRadius(diameter, settings);
+  // Every nominal reachable point must be within the unchanged total tolerance of
+  // the conservative physical sweep. Dilating that sweep by total is a distance
+  // bound; eroding the target is not equivalent at cusps between retained islands.
+  const radius = guaranteedRadius > 0 ? guaranteedRadius + budget.total : guaranteedRadius;
   const reachable = offset(offset(region, -diameter / 2, tolerance), diameter / 2, tolerance);
-  // Boundary error remains bounded by the unchanged job tolerance; inaccessible sharp corners are not invented stock coverage.
-  const target = offset(material ? intersect(reachable, material) : reachable, -budget.total, tolerance);
+  const target = material ? intersect(reachable, material) : reachable;
   return { radius, target, tolerance };
 }
 
@@ -41,13 +44,13 @@ export function pocketRingsCoverFloor(
 ): boolean {
   const { radius, target, tolerance } = coverageScope(region, diameter, settings, material);
   if (radius <= 0) return false;
-  const bands = rings.flatMap(ring => difference(offset(ring, radius, tolerance), offset(ring, -radius, tolerance)));
+  const bands = rings.map(ring => difference(offset(ring, radius, tolerance), offset(ring, -radius, tolerance)));
   return difference(target, unionMany(bands)).length === 0;
 }
 
 export function pocketRowsCoverFloor(region: PathsD, lines: PathsD, diameter: number, settings: CamSettings, material: PathsD): boolean {
   const { radius, target, tolerance } = coverageScope(region, diameter, settings, material);
   if (radius <= 0) return false;
-  const capsules = lines.flatMap(line => line.slice(1).flatMap((point, index) => coverageCapsule(line[index]!, point, radius, tolerance)));
+  const capsules = lines.flatMap(line => line.slice(1).map((point, index) => coverageCapsule(line[index]!, point, radius, tolerance)));
   return difference(target, unionMany(capsules)).length === 0;
 }

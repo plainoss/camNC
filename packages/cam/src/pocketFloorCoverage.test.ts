@@ -4,6 +4,7 @@ import { finalizePlan } from './finalizePlan';
 import { toGcode } from './gcode';
 import { distPointSeg, type PathD, type PathsD } from './geom';
 import { DEFAULT_SETTINGS, pocketOperation } from './toolpaths';
+import cuspRegion from '../test/pocketFloorCusp.json';
 
 const polygon = (points: number[][]): PathD => points.map(([x, y]) => ({ x: x!, y: y! }));
 const rect = (x0: number, y0: number, x1: number, y1: number) =>
@@ -46,6 +47,26 @@ it('clears the four reachable diagonal floor points from issue #516 with a D6 fu
       [53.5, 33.5],
     ])
       expect(distance(x!, y!)).toBeLessThanOrEqual(3);
+  }
+});
+
+it('posts the complete report-holes retained-cusp floor within the unchanged distance tolerance', () => {
+  const settings = { ...DEFAULT_SETTINGS, maxStepdown: 5, geometryTolerance: 0.05 };
+  const operation = pocketOperation('Retained cusp source', cuspRegion, 18, 13, { number: 1, diameter: 3.175 }, settings);
+  const plan = finalizePlan({ stockTop: 18, operations: [operation], warnings: [] }, settings);
+  for (const arcs of [false, true]) {
+    const distance = postedFloorDistance(toGcode(plan, { arcs }), 13);
+    for (const [x, y] of [
+      [37.90335668965518, 104.54158651724137],
+      [36.9087298064516, 103.91921116129032],
+      [35.03861638461538, 100.57572776923077],
+      [35.037438599999994, 99.40179626666665],
+      [44.830363125, 98.71354543749999],
+      [44.39872233333333, 97.63267026666664],
+      [43.10392285714285, 96.08470403571425],
+      [39.9972753877551, 95.00888785714285],
+    ])
+      expect(distance(x!, y!), `cusp ${x},${y}, arcs=${arcs}`).toBeLessThanOrEqual(3.175 / 2 + settings.geometryTolerance);
   }
 });
 

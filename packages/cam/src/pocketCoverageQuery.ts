@@ -15,10 +15,13 @@ export const coverageOffset = (paths: PathsD, delta: number, tolerance: number):
 export const coverageDifference = (a: PathsD, b: PathsD): PathsD => differenceD(a, b, FillRule.NonZero, kQueryPrecision);
 export const coverageIntersection = (a: PathsD, b: PathsD): PathsD => intersectD(a, b, FillRule.NonZero, kQueryPrecision);
 
-export function coverageUnionMany(paths: PathsD): PathsD {
-  if (paths.length <= 256) return unionD(paths, [], FillRule.NonZero, kQueryPrecision);
-  const middle = paths.length >> 1;
-  return unionD(coverageUnionMany(paths.slice(0, middle)), coverageUnionMany(paths.slice(middle)), FillRule.NonZero, kQueryPrecision);
+/** Each group is a complete filled polygon set, including its negatively oriented holes. */
+export function coverageUnionMany(groups: PathsD[]): PathsD {
+  // Splitting raw contours could separate an outer loop from its hole: NonZero would
+  // fill the isolated negative loop and invent coverage. Only split between complete sets.
+  if (groups.length <= 256) return unionD(groups.flat(), [], FillRule.NonZero, kQueryPrecision);
+  const middle = groups.length >> 1;
+  return unionD(coverageUnionMany(groups.slice(0, middle)), coverageUnionMany(groups.slice(middle)), FillRule.NonZero, kQueryPrecision);
 }
 
 /** Round-ended inner capsule on the proof grid; stock's coarser fixed grid guard must not be charged again. */

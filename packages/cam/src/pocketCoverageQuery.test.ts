@@ -8,6 +8,43 @@ import { pocketRingSpacing } from './pocketSpacing';
 import { camPart, DEFAULT_SETTINGS } from './toolpaths';
 import { toGcode } from './gcode';
 import { postedFloorDistance } from '../test/postedFloorDistance';
+import { coverageDifference, coverageUnionMany } from './pocketCoverageQuery';
+import cuspRegion from '../test/pocketFloorCusp.json';
+
+it('bounds distance to the complete reachable floor at retained-sliver cusps without endless refinement', () => {
+  // Exact supplied region captured from cad-script's report-holes fixture; tiny retained
+  // source contours remain intact. Target erosion incorrectly left fixed cusp residuals.
+  const settings = { ...DEFAULT_SETTINGS };
+  const diameter = 3.175;
+  const rings = createPocketRings(cuspRegion, diameter / 2, 0, settings, pocketRingSpacing(settings, diameter));
+  const before = structuredClone({ cuspRegion, rings });
+  expect(rings).toHaveLength(7);
+  expect(pocketRingsCoverFloor(cuspRegion, rings, diameter, settings)).toBe(true);
+  expect({ cuspRegion, rings }).toEqual(before);
+  // A genuine missing interior sweep still exceeds the same total distance budget.
+  expect(pocketRingsCoverFloor(cuspRegion, rings.slice(0, 1), diameter, settings)).toBe(false);
+});
+
+it('preserves a ring hole when its signed contours straddle a union chunk boundary', () => {
+  const fillers = Array.from({ length: 255 }, (_, i) => rectangle(100 + i * 3, 0, 101 + i * 3, 1));
+  const outer = rectangle(0, 0, 20, 20);
+  const hole = rectangle(5, 5, 15, 15).reverse();
+  const groups = [...fillers.slice(0, 127).map(path => [path]), [outer, hole], ...fillers.slice(127).map(path => [path])];
+  const union = coverageUnionMany(groups);
+  expect(coverageDifference([rectangle(7, 7, 13, 13)], union)).toHaveLength(1);
+  expect(coverageDifference([rectangle(1, 1, 4, 4)], union)).toHaveLength(0);
+});
+
+it('unions overlapping complete ring groups without filling their remaining holes', () => {
+  const fillers = Array.from({ length: 511 }, (_, i) => [rectangle(100 + i * 3, 0, 101 + i * 3, 1)]);
+  const ring = [rectangle(0, 0, 20, 20), rectangle(5, 5, 15, 15).reverse()];
+  const overlap = [rectangle(10, 10, 25, 25), rectangle(17, 17, 23, 23).reverse()];
+  const union = coverageUnionMany([...fillers.slice(0, 255), ring, overlap, ...fillers.slice(255)]);
+  expect(coverageDifference([rectangle(6, 6, 9, 9)], union)).toHaveLength(1);
+  expect(coverageDifference([rectangle(11, 11, 14, 14)], union)).toHaveLength(0);
+  expect(coverageDifference([rectangle(18, 18, 19, 19)], union)).toHaveLength(0);
+  expect(coverageDifference([rectangle(21, 21, 22, 22)], union)).toHaveLength(1);
+});
 
 it('proves the existing tight-tolerance small-island layout without inventing boundary residuals', () => {
   const settings = { ...DEFAULT_SETTINGS, geometryTolerance: 0.01 };
