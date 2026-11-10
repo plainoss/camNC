@@ -173,8 +173,8 @@
       "programs": [
         {
           "file": "concave-pocket.nc",
-          "sha256": "c6053e189b115e356322cda0512b3e0f4d60aa28d377e0603372bcb230f47ef0",
-          "bytes": 4515,
+          "sha256": "f3d285c524a73c6f0816ab9bf40cb74284274f3eabc4b1a2e7b0fab24ca1a856",
+          "bytes": 4695,
           "operations": 1,
           "passes": 8,
           "toolNumbers": [
@@ -182,7 +182,7 @@
           ],
           "setup": {
             "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-2cb240550f985aa9",
+            "planFingerprint": "cam-plan-v1-06b035fdabf9c891",
             "programName": "concave-pocket",
             "units": "mm",
             "origin": {
@@ -262,9 +262,9 @@
                 },
                 "roles": {
                   "approach": 4,
-                  "ramp": 147,
-                  "corner": 387,
-                  "cut": 233,
+                  "ramp": 179,
+                  "cut": 226,
+                  "corner": 386,
                   "link": 8,
                   "lead-in": 34,
                   "lead-out": 34
@@ -287,17 +287,17 @@
               "pocket z=3: 2.7mm² left in corners/narrow spots with D=3.175"
             ],
             "statistics": {
-              "bytes": 4515,
-              "executableBlocks": 204,
-              "motionBlocks": 196,
-              "arcBlocks": 62,
-              "cuttingLineBlocks": 120,
-              "feedChanges": 83,
-              "tinyCuttingLines": 1,
+              "bytes": 4695,
+              "executableBlocks": 206,
+              "motionBlocks": 198,
+              "arcBlocks": 68,
+              "cuttingLineBlocks": 116,
+              "feedChanges": 82,
+              "tinyCuttingLines": 2,
               "tinySegmentThresholdMm": 0.1,
               "unresolvedCuttingLines": 0,
-              "minimumCuttingLineMm": 0.08417244204607593,
-              "averageCuttingLineMm": 3.9794511053937756,
+              "minimumCuttingLineMm": 0.015132745950421975,
+              "averageCuttingLineMm": 3.9472609443800355,
               "maximumLineBytes": 73
             }
           }
@@ -314,8 +314,8 @@
       "programs": [
         {
           "file": "pocket-island.nc",
-          "sha256": "8e6681f34724acd03986227df3001908cd8274d9f1b4f78588252b20d7b8e22e",
-          "bytes": 9573,
+          "sha256": "a3cc23f44847a165096d60165bbb225c5dc904dca02d9be6cae8135347e632b3",
+          "bytes": 9687,
           "operations": 1,
           "passes": 16,
           "toolNumbers": [
@@ -323,7 +323,7 @@
           ],
           "setup": {
             "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-979441379f4b5ff3",
+            "planFingerprint": "cam-plan-v1-363331f10f1e666d",
             "programName": "pocket-island",
             "units": "mm",
             "origin": {
@@ -402,9 +402,9 @@
                 },
                 "roles": {
                   "approach": 16,
-                  "ramp": 909,
-                  "corner": 730,
-                  "cut": 848,
+                  "ramp": 965,
+                  "cut": 810,
+                  "corner": 728,
                   "lead-in": 68,
                   "lead-out": 68
                 }
@@ -426,17 +426,17 @@
               "pocket z=3: 2.2mm² left in corners/narrow spots with D=3.175"
             ],
             "statistics": {
-              "bytes": 9573,
-              "executableBlocks": 421,
-              "motionBlocks": 413,
-              "arcBlocks": 171,
-              "cuttingLineBlocks": 192,
+              "bytes": 9687,
+              "executableBlocks": 419,
+              "motionBlocks": 411,
+              "arcBlocks": 170,
+              "cuttingLineBlocks": 191,
               "feedChanges": 130,
               "tinyCuttingLines": 0,
               "tinySegmentThresholdMm": 0.1,
               "unresolvedCuttingLines": 0,
-              "minimumCuttingLineMm": 0.11920151005754885,
-              "averageCuttingLineMm": 5.041566083093162,
+              "minimumCuttingLineMm": 0.9430000000000014,
+              "averageCuttingLineMm": 4.967792871154341,
               "maximumLineBytes": 73
             }
           }

@@ -41,12 +41,13 @@ describe('open-edge pocket cutting transitions', () => {
     expect(job.stockSummary!.cuttingTransitions).toBeGreaterThan(5);
     const budget = job.accuracy!.budget;
     const deviation = budget.fitting + budget.outputRounding + budget.controllerRounding;
+    const endpointDeviation = budget.outputRounding + budget.controllerRounding;
     for (const pass of job.operations[0].passes) {
       const transition = pass.cuttingTransition;
       if (!transition || pass.link !== 'direct') continue;
-      expect(Math.hypot(transition.to[0] - transition.from[0], transition.to[1] - transition.from[1]) + 2 * deviation).toBeLessThanOrEqual(
-        2.4
-      );
+      expect(
+        Math.hypot(transition.to[0] - transition.from[0], transition.to[1] - transition.from[1]) + 2 * endpointDeviation
+      ).toBeLessThanOrEqual(2.4);
       expect(transition.to[2]).toBe(transition.from[2]);
       expect(pass.feeds[1] * (6 + 2 * deviation)).toBeLessThanOrEqual(DEFAULT_SETTINGS.feed * 2.4);
     }

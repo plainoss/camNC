@@ -19,6 +19,25 @@ const batch = (id: string, source: string, images?: AssistantImage[]): Assistant
 ];
 
 describe('bounded assistant provider context', () => {
+  it('retains earlier suggested questions so short user replies keep their meaning', () => {
+    const question: AssistantMessage = {
+      role: 'assistant',
+      text: '',
+      calls: [{ id: 'ask', name: 'ask_user', arguments: { question: 'Keep the back 6 mm?', choices: ['Yes', 'No'] } }],
+    };
+    const messages: AssistantMessage[] = [
+      question,
+      { role: 'tool', callId: 'ask', text: 'Waiting for the user.' },
+      { role: 'user', text: 'Yes' },
+      ...batch('old', 'superseded'),
+      ...batch('new', 'latest'),
+    ];
+    const result = buildAssistantContext(messages, { images: false });
+    expect(result[0]).toEqual(question);
+    expect(result[1]).toEqual(messages[1]);
+    expect(result[2]).toEqual({ role: 'user', text: 'Yes' });
+    expect(JSON.stringify(result)).not.toContain('superseded"');
+  });
   it('preserves earlier constraints, decisions and application events while removing superseded scripts and raw reasoning', () => {
     const original: AssistantMessage[] = [
       { role: 'user', text: 'No visible screws. Board is 18 mm; back is 6 mm.' },

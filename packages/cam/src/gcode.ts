@@ -188,14 +188,14 @@ export function postProgram(cam: PartCam, opts: GcodeOptions = {}): PostedProgra
     throw new Error('Arc tolerance exceeds the machining plan fitting budget');
   // Recheck the exact program order, including custom plans and programs split
   // by tool. Header stock dimensions alone do not establish a known raw blank.
+  const endpointTolerance =
+    (cam.accuracy?.budget.outputRounding ?? Math.sqrt(3) * 0.0005) + (cam.accuracy?.budget.controllerRounding ?? Math.sqrt(3) * 2 ** -10);
   cam = certifyStockLinks(cam, {
     plungeFeed: opts.plungeFeed ?? DEFAULT_SETTINGS.plungeFeed,
     footprint: cam.stockFootprint,
     tolerance: cam.accuracy?.budget.offset ?? 0.005,
-    pathTolerance:
-      (useArcs ? tol : 0) +
-      (cam.accuracy?.budget.outputRounding ?? Math.sqrt(3) * 0.0005) +
-      (cam.accuracy?.budget.controllerRounding ?? Math.sqrt(3) * 2 ** -10),
+    pathTolerance: (useArcs ? tol : 0) + endpointTolerance,
+    endpointTolerance,
   }).cam;
   const setup = summarizeSetup(cam, {
     programName: opts.partName,
@@ -329,12 +329,18 @@ export function postProgram(cam: PartCam, opts: GcodeOptions = {}): PostedProgra
       // everything else is G1.
       const xy = (k: number) => Math.hypot(pass.pts[k][0] - pass.pts[k - 1][0], pass.pts[k][1] - pass.pts[k - 1][1]);
       const slope = (k: number) => (pass.pts[k][2] - pass.pts[k - 1][2]) / (xy(k) || NaN);
+      // Caller-authored roles may also be `link` after the bridge. Pin its destination
+      // explicitly so fitting cannot replace the certified straight hop with a surrounding arc.
+      const bridgeEnd = pass.cuttingTransition
+        ? pass.pts.findIndex(point => point.every((value, axis) => value === pass.cuttingTransition!.to[axis]))
+        : -1;
+      const fitLimit = (from: number) => (bridgeEnd >= from ? bridgeEnd + 1 : pass.pts.length);
       let i = 1;
       while (i < pass.pts.length) {
         let verticalEnd = 0;
         if (useArcs)
           for (const plane of [18, 19] as const) {
-            const end = verticalRunEnd(pass.pts, pass.feeds, pass.roles, i, plane);
+            const end = Math.min(verticalRunEnd(pass.pts, pass.feeds, pass.roles, i, plane), fitLimit(i));
             if (end - i < 3) continue;
             const primitives = fitVerticalRun(pass.pts.slice(i - 1, end), plane, tol, (points, tolerance) =>
               fitArcs(points, tolerance, tolerance)
@@ -358,7 +364,7 @@ export function postProgram(cam: PartCam, opts: GcodeOptions = {}): PostedProgra
         const s0 = slope(i);
         while (
           useArcs &&
-          j < pass.pts.length &&
+          j < fitLimit(i) &&
           pass.feeds[j] === pass.feeds[i] &&
           pass.roles?.[j] === pass.roles?.[i] &&
           xy(j) > 1e-9 &&

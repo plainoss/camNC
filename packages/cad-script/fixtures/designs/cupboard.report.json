@@ -2849,7 +2849,7 @@
    },
    "toolpaths": {
     "bit": 3.175,
-    "minutes": 114.8,
+    "minutes": 111.2,
     "operations": [
      {
       "label": "Edge groove 8 deep + 34 pockets to 8",
@@ -3527,7 +3527,7 @@
      "ok": true
     }
    ],
-   "minutes": 268.8,
+   "minutes": 261.6,
    "operations": [
     {
      "label": "Edge groove 8 deep + 34 pockets to 8",
