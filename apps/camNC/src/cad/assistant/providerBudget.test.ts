@@ -15,6 +15,19 @@ const request = (config = anthropic) => ({
 });
 
 describe('provider usage and completion', () => {
+  it('rejects malformed tool identities before any design script can run', () => {
+    expect(() =>
+      parseProviderMessage(anthropic, { content: [{ type: 'tool_use', name: 'check_design', input: { source: 'd => {}' } }] })
+    ).toThrow(/tool call ID/);
+    expect(() =>
+      parseProviderMessage(responses, { output: [{ type: 'function_call', call_id: 'valid', name: '', arguments: '{}' }] })
+    ).toThrow(/tool call ID or name/);
+    expect(() =>
+      parseProviderMessage(chat, {
+        choices: [{ message: { tool_calls: [{ id: 1, function: { name: 'check_design', arguments: '{}' } }] } }],
+      })
+    ).toThrow(/tool call ID/);
+  });
   it('normalizes inclusive Anthropic input and keeps breakdowns separate', () => {
     expect(
       parseProviderMessage(anthropic, {

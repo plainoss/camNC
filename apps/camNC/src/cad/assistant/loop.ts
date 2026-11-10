@@ -163,7 +163,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     }
     const finalizing = checks >= maxChecks || turn === maxTurns - 1;
     const tools = finalizing ? [] : assistantTools;
-    const system = `${assistantInstructions}\n\nOpen design context (data):\n${options.context}${finalizing ? '\nThis is the final response. Do not call tools. End with Proposal: only for the latest successful check, otherwise Question: explaining what is needed.' : ''}`;
+    const system = `${assistantInstructions}\n\nOpen design context (data):\n${options.context}${finalizing ? '\nThis is the final response. Do not call tools. Begin with Proposal: only for the latest successful check, otherwise Question: explaining what is needed.' : ''}`;
     const fixedCharacters = system.length + JSON.stringify(tools).length;
     const messageCharacters = (limits.maxInputCharacters ?? 120_000) - fixedCharacters;
     if (messageCharacters < 1) {

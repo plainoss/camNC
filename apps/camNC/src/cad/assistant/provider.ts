@@ -232,6 +232,12 @@ function argumentsObject(input: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function toolCall(id: unknown, name: unknown, input: unknown): AssistantToolCall {
+  if (typeof id !== 'string' || !id.trim() || typeof name !== 'string' || !name.trim())
+    throw new Error('The provider returned an invalid tool call ID or name.');
+  return { id, name, arguments: argumentsObject(input) };
+}
+
 export function parseProviderMessage(config: ProviderConfig, input: unknown): AssistantMessage {
   const metadata = providerMetadata(config, input);
   const interrupted = metadata.completion === 'incomplete' || metadata.completion === 'refused';
@@ -251,9 +257,7 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
         .join('\n'),
       calls: interrupted
         ? []
-        : data.content
-            .filter(block => block.type === 'tool_use')
-            .map(block => ({ id: block.id!, name: block.name!, arguments: argumentsObject(block.input) })),
+        : data.content.filter(block => block.type === 'tool_use').map(block => toolCall(block.id, block.name, block.input)),
     };
   }
   if (config.protocol === 'responses') {
@@ -268,9 +272,7 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
         .join('\n'),
       calls: interrupted
         ? []
-        : data.output
-            .filter(item => item.type === 'function_call')
-            .map(item => ({ id: item.call_id!, name: item.name!, arguments: argumentsObject(item.arguments) })),
+        : data.output.filter(item => item.type === 'function_call').map(item => toolCall(item.call_id, item.name, item.arguments)),
       responseItems: data.output,
     };
   }
@@ -280,13 +282,7 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
     role: 'assistant',
     ...metadata,
     text: message.content ?? '',
-    calls: interrupted
-      ? []
-      : message.tool_calls?.map(call => ({
-          id: call.id,
-          name: call.function.name,
-          arguments: argumentsObject(call.function.arguments),
-        })),
+    calls: interrupted ? [] : message.tool_calls?.map(call => toolCall(call.id, call.function.name, call.function.arguments)),
   };
 }
 

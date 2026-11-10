@@ -133,6 +133,12 @@ independently authored cable-hole and shoe-bench smoke trials with real sandbox
 checks. These trials exercise guide usability and production-loop behavior; they
 are not live-provider comparisons or evidence of billed savings.
 
+A separate history smoke trial checks the 15 mm stock change, retained 6 mm back
+and 3 mm pin-hole floor. It also exposes a limitation in the saved starting
+fixture: all four shelf housings remain despite an earlier request to keep only
+the second fixed. The trial reports that discrepancy explicitly; its automatic
+C3 assessment does not establish that the earlier housing request was satisfied.
+
 ## Provider protocol references
 
 Protocol schemas were checked on 2026-11-10 with Context7 against the
