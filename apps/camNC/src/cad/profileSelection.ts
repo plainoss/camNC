@@ -64,8 +64,13 @@ export function replaceExtrudeProfile(
   const reference = owner ? owner.id : 'face' in selection ? selection.face.partId : null;
   if (!reference || (reference !== targetId && dependsOn(document, reference, targetId)))
     throw new Error('Choose a profile that does not depend on this extrusion.');
-  if (reference === targetId && 'sketch' in selection)
-    return selection.region ? withRegionToggled(document, targetId, selection.region) : document;
+  if (reference === targetId && 'sketch' in selection) {
+    if (selection.region) return withRegionToggled(document, targetId, selection.region);
+    if (!target.regions) return document;
+    const entireSketch = { ...target };
+    delete entireSketch.regions;
+    return { ...document, revision: document.revision + 1, parts: document.parts.map(p => (p.id === targetId ? entireSketch : p)) };
+  }
   if (reference === targetId) throw new Error('Choose a face of another part.');
   let parts = document.parts;
   if (!target.sketchOf && !target.faceProfile) {

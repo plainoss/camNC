@@ -101,7 +101,14 @@ export function FeatureDialog({
             <path d="M3 8.5 6.5 12 13 4.5" />
           </svg>
         </button>
-        <button type="button" className="cad-feature-cancel" aria-label="Cancel" title="Cancel" onClick={onCancel}>
+        <button
+          type="button"
+          className="cad-feature-cancel"
+          aria-label="Cancel"
+          title="Cancel"
+          // Moving focus here would let a blur-accepting field save before Cancel gets its click.
+          onMouseDown={event => event.preventDefault()}
+          onClick={onCancel}>
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M4 4l8 8M12 4l-8 8" />
           </svg>
