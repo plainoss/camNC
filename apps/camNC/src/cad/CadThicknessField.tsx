@@ -11,6 +11,8 @@ export interface CadThicknessFieldProps {
   expression?: string;
   variables?: CadValueScope;
   onCommit: (value: number, expression?: string) => void;
+  /** Preview valid text immediately, keeping unfinished expressions in the field. */
+  livePreview?: boolean;
   onDone?: () => void;
   onValidityChange?: (valid: boolean) => void;
 }
@@ -23,7 +25,15 @@ function thicknessValue(text: string, variables?: CadValueScope): { value: numbe
 }
 
 /** Invalid drafts stay visible until corrected or explicitly canceled; blur never moves focus. */
-export function CadThicknessField({ value, expression, variables, onCommit, onDone, onValidityChange }: CadThicknessFieldProps) {
+export function CadThicknessField({
+  value,
+  expression,
+  variables,
+  onCommit,
+  onDone,
+  onValidityChange,
+  livePreview = false,
+}: CadThicknessFieldProps) {
   const id = useId();
   const typed = expression ?? String(value);
   const [text, setText] = useState(typed);
@@ -86,10 +96,11 @@ export function CadThicknessField({ value, expression, variables, onCommit, onDo
               const next = event.target.value;
               dirty.current = true;
               setText(next);
-              if (error) {
-                const parsed = thicknessValue(next, variables);
-                setError('error' in parsed ? parsed.error : null);
-              }
+              const parsed = thicknessValue(next, variables);
+              if (error) setError('error' in parsed ? parsed.error : null);
+              // Keep the literal draft while previewing; normalizing it here would interrupt units and expressions.
+              if (livePreview && !('error' in parsed) && (parsed.value !== value || parsed.expression !== expression))
+                onCommit(parsed.value, parsed.expression);
             }}
             onBlur={() => {
               if (dirty.current) commit();

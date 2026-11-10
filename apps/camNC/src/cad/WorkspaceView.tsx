@@ -23,6 +23,7 @@ import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
 import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
+import type { CadConnectorPick } from './TransformDialog';
 import type { ExtrudeDepthControl } from './extrudeDepth';
 
 const kViews: { view: ModelView; label: string }[] = [
@@ -65,6 +66,7 @@ export default function WorkspaceView({
   onSelectFace,
   pickingMirrorPlane = false,
   onPickPoint,
+  connectors,
   picked,
   hoverIds,
   regions,
@@ -123,6 +125,7 @@ export default function WorkspaceView({
     copy: boolean;
     edge?: { a: [number, number, number]; b: [number, number, number] };
   }) => void;
+  connectors?: { from?: CadConnectorPick; to?: CadConnectorPick };
   /** The name of the plane or face picked for the next sketch, said in the status line so the pick isn't hidden. */
   picked?: string | null;
   /** Parts shown highlighted, as when their row in the feature list is hovered. */
@@ -307,6 +310,11 @@ export default function WorkspaceView({
       <ModelViewport
         cameraState={cameraState}
         extrusionDepth={extrusionDepth}
+        pickingConnector={!!onPickPoint}
+        connectors={Object.entries(connectors ?? {}).map(([end, pick]) => ({
+          ...pick,
+          label: end === 'from' ? 'Source mate connector' : 'Destination mate connector',
+        }))}
         meshes={model.meshes}
         parts={model.parts}
         view={view}
