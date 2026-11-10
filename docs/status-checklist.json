@@ -68,8 +68,9 @@
         },
         {
           "item": "Transform a part: translate, translate by line, rotate, mate connectors",
-          "status": "done",
-          "evidence": ["packages/cad/src/mateMove.test.ts", "apps/camNC/src/cad/CadEditor.studio.test.tsx"]
+          "status": "partial",
+          "evidence": ["packages/cad/src/mateMove.test.ts", "apps/camNC/src/cad/CadEditor.studio.test.tsx", "apps/camNC/src/cad/CadEditor.transformScope.test.tsx"],
+          "note": "Source-part transforms move the whole family and remain editable after downstream consumption. Transform refuses a selected physical copy, including an absent pattern slot. Independent copy transforms need persistent operation history distinct from creation offsets."
         },
         {
           "item": "Copies of a part",
@@ -78,14 +79,21 @@
         },
         {
           "item": "Linear pattern of parts along a picked edge",
-          "status": "done",
+          "status": "partial",
           "evidence": ["packages/cad/src/partPatterns.test.ts", "apps/camNC/src/cad/CadPartPatternField.test.tsx", "apps/camNC/src/cad/CadEditor.patternHistory.test.tsx", "apps/camNC/src/cad/CadEditor.patternScope.test.tsx", "apps/camNC/src/cad/CadEditor.patternConsumedSource.test.tsx", "apps/camNC/src/cad/CadEditor.patternSearch.test.tsx", "apps/camNC/src/cad/CadEditor.searchHighlight.test.tsx"],
           "note": "Tool search opens distinct Linear pattern and Circular pattern controls using the existing type conversions. Its optional toolbar highlight reveals the matching command without activating it. Dialog previews leave source and undo/redo history unchanged until confirmation. Cancel discards the pattern candidate; accepted inline variables remain separate operations. The Pattern command refuses a selected physical copy, including a slot removed by a count edit, rather than widening it to the source family. Source families remain editable after a later cut consumes their bodies."
         },
         {
           "item": "Mirror a part across a plane",
-          "status": "done",
-          "evidence": ["packages/cad/src/mirror.test.ts", "apps/camNC/src/cad/CadEditor.mirror.test.tsx"]
+          "status": "partial",
+          "evidence": ["packages/cad/src/mirror.test.ts", "apps/camNC/src/cad/CadEditor.mirror.test.tsx"],
+          "note": "A source part can produce a linked mirror across a base plane, datum or part face, including a physical-copy face used as the mirror plane. A selected physical copy is not retained as an independent mirror seed, including its placement and copy-specific material."
+        },
+        {
+          "item": "Independent transforms, patterns and mirrors of physical copies",
+          "status": "gap",
+          "evidence": ["apps/camNC/src/cad/CadEditor.transformScope.test.tsx", "apps/camNC/src/cad/CadEditor.patternScope.test.tsx"],
+          "note": "Transform and Pattern refuse a selected physical copy. Mirror starts from the source part. Persistent operations must retain the exact target or seed, evaluate cuts at each operation's pose, and survive pattern slot removal and restoration, history edits, reload and machining handoff."
         },
         {
           "item": "Part cut: house one part in another with clearance",
