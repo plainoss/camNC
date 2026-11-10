@@ -1,8 +1,11 @@
-import { pointInPolygonD, PointInPolygonResult, simplifyPathsD, type PathD, type PathsD } from 'clipper2-ts';
+import { pointInPolygonD, PointInPolygonResult, type PathD, type PathsD } from 'clipper2-ts';
 import { CamInputError, validateCamSettings, validateDepthRange, validatePaths, validateTool } from './validation';
 import { clipLines, difference, intersect, offset, pathLength, PRECISION, type Vec3 } from './geom';
 import type { MotionRole } from './motion';
 import { geometryTolerances, planAccuracy } from './accuracy';
+import { conservativePocketRingSpacing, pocketEndpointDeviation, pocketRingSpacing } from './pocketSpacing';
+import { createPocketRings } from './pocketRings';
+import { pocketRingsCoverFloor, pocketRowsCoverFloor } from './pocketCoverage';
 import type { CamSettings, Operation, Pass, Tool } from './toolpathTypes';
 import {
   type Loop,
@@ -237,12 +240,20 @@ function rampAlong(line: PathD, zFrom: number, zTo: number, s: CamSettings): Pas
  * finishes the walls. Every pass starts and ends where the region meets the waste and runs along the end walls and
  * around their corners: no move straight into a wall, no sharp turn onto it.
  */
-function openPocketPasses(comp: PathsD, walls: PathsD, solid: PathsD, topZ: number, floorZ: number, tool: Tool, s: CamSettings): Pass[] {
+function openPocketPasses(
+  comp: PathsD,
+  walls: PathsD,
+  solid: PathsD,
+  topZ: number,
+  floorZ: number,
+  tool: Tool,
+  s: CamSettings,
+  stepover = pocketRingSpacing(s, tool.diameter)
+): Pass[] {
   const r = tool.diameter / 2;
   const offsetPaths = (paths: PathsD, delta: number) => offset(paths, delta, offsetToleranceFor(s));
   const stepdown = stepdownFor(tool, s);
   const levels = depthLevels(topZ, floorZ, stepdown);
-  const stepover = pocketRingSpacing(s, tool.diameter);
   // A shallow pocket (the last few tenths of a rabbet) cuts its walls lightly anyway: no separate finishing pass.
   const allowance = s.pocketWallAllowance || (topZ - floorZ > 1 ? (s.openWallAllowance ?? kOpenWallAllowance) : 0);
   const free = offsetPaths(comp, -r);
@@ -316,6 +327,11 @@ function openPocketPasses(comp: PathsD, walls: PathsD, solid: PathsD, topZ: numb
   const span = lo - near;
   const n = Math.max(0, Math.ceil(span / stepover - 1e-9));
   const rows = Array.from({ length: n + 1 }, (_, k) => along(n ? lo - (k * (lo - near)) / n : near));
+  const conservative = conservativePocketRingSpacing(s, tool.diameter);
+  const floorLines = [...rows.flat(), ...(allowance > 0 ? along(r) : [])];
+  // Parallel spacing alone misses diagonal gaps at smoothed corners. Preserve the established rows if the tighter set is unproved.
+  if (stepover !== conservative && !pocketRowsCoverFloor(comp, floorLines, tool.diameter, s, solid))
+    return openPocketPasses(comp, walls, solid, topZ, floorZ, tool, s, conservative);
   // The row next to the walls is climb; each row before it runs the way that ends where the next one starts.
   for (let k = n - 1; k >= 0; k--) {
     const next = rows[k + 1][0]?.[0];
@@ -328,7 +344,7 @@ function openPocketPasses(comp: PathsD, walls: PathsD, solid: PathsD, topZ: numb
     const pass: Pass =
       rampFrom !== undefined
         ? rampAlong(line, rampFrom, z, s)
-        : hop + 2 * pocketTransitionDeviation(s) <= s.stepoverFactor * tool.diameter && last && last[2] === z
+        : hop + 2 * pocketEndpointDeviation(s) <= s.stepoverFactor * tool.diameter && last && last[2] === z
           ? { pts: line.map(q => [q.x, q.y, z]), feeds: line.map(() => feed), link: 'direct' }
           : { pts: line.map(q => [q.x, q.y, z]), feeds: line.map((_, k) => (k === 0 ? s.plungeFeed : feed)), link: 'retract' };
     passes.push(pass);
@@ -354,12 +370,6 @@ function openPocketPasses(comp: PathsD, walls: PathsD, solid: PathsD, topZ: numb
 function pocketTransitionDeviation(settings: CamSettings): number {
   const budget = planAccuracy(settings.geometryTolerance, settings.sourceTolerance).budget;
   return budget.fitting + budget.outputRounding + budget.controllerRounding;
-}
-
-function pocketRingSpacing(settings: CamSettings, diameter: number): number {
-  const selected = settings.stepoverFactor * diameter;
-  const reserve = 2 * pocketTransitionDeviation(settings) + 0.001;
-  return selected > 2 * reserve ? selected - reserve : selected;
 }
 
 function withPocketTransitions(
@@ -460,26 +470,14 @@ export function pocketOperation(
     const free = offsetPaths(comps[ci], -r);
     // A pocket hardly wider than the bit has no room for the allowance: rough on the wall ring, or nothing would be cut.
     const allowance = offsetPaths(comps[ci], -r - s.pocketWallAllowance).length ? s.pocketWallAllowance : 0;
-    const rings: PathsD[] = [];
-    const c = s.innerCornerRadius;
-    let inset = r + allowance;
-    for (let cur = allowance > 0 ? offsetPaths(comps[ci], -inset) : free; cur.length; ) {
-      if (rings.length >= 10_000)
-        throw new CamInputError([{ field: 'stepoverFactor', message: 'would require more than 10000 pocket rings' }]);
-      // Inner rings get rounded corners (an opening keeps them inside the ring); the wall ring keeps its shape.
-      // (Simplified: the double offset leaves near-collinear micro-segments that arc fitting can't merge.)
-      const smoothingTolerance = geometryTolerances(s.geometryTolerance, s.sourceTolerance).opening;
-      const rounded =
-        rings.length && c > 0
-          ? simplifyPathsD(offset(offset(cur, -c, smoothingTolerance), c, smoothingTolerance), smoothingTolerance, true)
-          : cur;
-      rings.push(rounded.length ? rounded : cur);
-      // The bit running along this ring clears r inwards; stop once nothing is left inside that.
-      if (!offsetPaths(cur, -r).length) break;
-      const next = offsetPaths(comps[ci], -inset - stepover);
-      // A strip narrower than 2 stepovers but wider than D stays in the middle: one more ring closer in.
-      inset += next.length ? stepover : stepover / 2;
-      cur = next.length ? next : offsetPaths(comps[ci], -inset);
+    let ringSpacing = stepover;
+    let rings = createPocketRings(comps[ci], r, allowance, s, ringSpacing);
+    const conservative = conservativePocketRingSpacing(s, tool.diameter);
+    const floorRings = allowance > 0 ? [...rings, free] : rings;
+    // Prove the rounded paths cover the reachable floor within the unchanged job tolerance before spending fitting slack.
+    if (ringSpacing !== conservative && !pocketRingsCoverFloor(comps[ci], floorRings, tool.diameter, s, solid)) {
+      ringSpacing = conservative;
+      rings = createPocketRings(comps[ci], r, allowance, s, ringSpacing);
     }
     let prevZ = topZ;
     for (const z of depthLevels(topZ, floorZ, stepdown)) {
@@ -503,7 +501,7 @@ export function pocketOperation(
             }
           }
           const nearest = rotateToNearest(oriented, last ? { x: last[0], y: last[1] } : pos);
-          const near = last && Math.sqrt(dist2({ x: last[0], y: last[1] }, nearest[0])) <= stepover * 1.5;
+          const near = last && Math.sqrt(dist2({ x: last[0], y: last[1] }, nearest[0])) <= ringSpacing * 1.5;
           const pass: Pass = near
             ? { pts: closeLoop(nearest, z), feeds: closeLoop(nearest, z).map(() => s.feed), link: 'direct' }
             : entry(oriented, nearest, prevZ, z);

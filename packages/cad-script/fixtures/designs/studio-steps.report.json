@@ -1217,7 +1217,7 @@
    },
    "toolpaths": {
     "bit": 3.175,
-    "minutes": 20.7,
+    "minutes": 20.4,
     "operations": [
      {
       "label": "1 pocket 5 deep + 1 pocket to 5",
@@ -1226,7 +1226,7 @@
      },
      {
       "label": "1 pocket 6 deep, from 5",
-      "depth": 0,
+      "depth": 1,
       "steps": 1
      },
      {
@@ -1564,7 +1564,7 @@
      "ok": true
     }
    ],
-   "minutes": 20.7,
+   "minutes": 20.4,
    "operations": [
     {
      "label": "1 pocket 5 deep + 1 pocket to 5",
@@ -1573,7 +1573,7 @@
     },
     {
      "label": "1 pocket 6 deep, from 5",
-     "depth": 0,
+     "depth": 1,
      "steps": 1
     },
     {

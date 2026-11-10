@@ -37,7 +37,15 @@ const cuttingTransitions = (passes: Pass[]) =>
 export function finalizePlan(cam: PartCam, settings: FinalizeSettings, blank?: PathsD): FinalizedCam {
   const accuracy = planAccuracy(settings.geometryTolerance, settings.sourceTolerance);
   const pathTolerance = accuracy.budget.fitting + accuracy.budget.outputRounding + accuracy.budget.controllerRounding;
-  const stock = new StockModel({ stockTop: cam.stockTop, footprint: blank, tolerance: accuracy.budget.offset, pathTolerance });
+  // The post preserves pass-final XYZ and isolates generated cutting bridges from fitted runs.
+  const endpointTolerance = accuracy.budget.outputRounding + accuracy.budget.controllerRounding;
+  const stock = new StockModel({
+    stockTop: cam.stockTop,
+    footprint: blank,
+    tolerance: accuracy.budget.offset,
+    pathTolerance,
+    endpointTolerance,
+  });
   const summary: StockSummary = {
     certifiedLinks: 0,
     cuttingTransitions: 0,
