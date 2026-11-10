@@ -22,6 +22,8 @@
     "@wbcnc/cad": "workspace:*",
     "@wbcnc/cad-editor": "workspace:*",
     "@wbcnc/cam": "workspace:*",
+    "@xmldom/xmldom": "^0.9.12",
+    "svg-pathdata": "^9.0.0",
     "typescript": "catalog:",
     "vite-node": "3.2.4",
     "zod": "catalog:"
