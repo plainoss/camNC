@@ -26,6 +26,11 @@ export function studioState(document) {
       id: part.pattern.id, axis: part.pattern.axis, count: part.pattern.count,
       countExpression: part.pattern.countExpression ?? null, spacing: part.pattern.spacing,
       spacingExpression: part.pattern.spacingExpression ?? null,
+      circular: part.pattern.circular ? {
+        origin: [...part.pattern.circular.origin], axis: [...part.pattern.circular.axis],
+        angle: part.pattern.circular.angle, angleExpression: part.pattern.circular.angleExpression ?? null,
+        equalSpacing: part.pattern.circular.equalSpacing !== false, opposite: !!part.pattern.circular.opposite,
+      } : null,
     } : null])),
     offsets: Object.fromEntries(document.parts.map(part => [part.name, part.drawnOn ? {
       value: part.drawnOn.offset, expression: part.drawnOn.offsetExpression ?? null,

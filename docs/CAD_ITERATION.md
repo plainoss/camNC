@@ -19,6 +19,8 @@ The cabinet workflow exercises five source parts, a mirrored side, repeated shel
 
 The other two complete workflows each cover eight cumulative states with independent material volumes, connectivity, phase/clearance probes, collision pairs and exact source/copy identities. Their [contracts](../packages/cad-script/src/iteration/WOODWORKING.md) describe the full studios and the separate incomplete `tray-missing-tool` and `joint-unconstrained` diagnostics. `--list` shows all keys and incomplete checkpoints; an explicit `--workflow <key> --list` filters the catalog. The cabinet remains the default.
 
+The radial stool workflow (`--workflow radial-stool`) keeps a seat and repeated upright legs together through stock, radius, count, direction, suppression and reload edits. Its independent geometry checks cover rotated leg placement, occupied volume and cutting-piece membership. The `studio/stool/circular-pattern-edit-reload` interface scenario checks cancel, sweep versus step controls, growth, suppression and reload through visible dialogs. Picked pattern axes are fixed world lines; they do not follow a later edit to the picked edge or face.
+
 The result stops at the first divergent checkpoint and identifies its layer: source, solver, geometry, assembly, cutting handoff or persistence. A requested prefix is explicitly labelled `scope: prefix`; passing it does not establish that the full workflow passes. Unsupported checkpoints exit 2 and remain incomplete.
 
 Artifacts default to `test-results/cad-iteration/core/`:

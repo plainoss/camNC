@@ -357,7 +357,10 @@ export async function fullCadReport(
     return reportOf
       .get(part.id)!
       .cuts.filter(candidate => candidate.ref === handle || candidate.ref.startsWith(`${handle}~`))
-      .map(({ ref: _, ...cut }) => cut);
+      .map(candidate => {
+        const { ref: _, ...cut } = candidate;
+        return cut;
+      });
   };
   const partErrors = (partId: string) => report.errors.filter(error => error.part === partName(partId)).map(error => error.message);
 
@@ -532,12 +535,23 @@ export async function fullCadReport(
         const made = stepFor('pattern', entry => entry.partId === part.id);
         return {
           ...base,
-          settings: {
-            axis: pattern.axis,
-            ...(pattern.direction && { direction: direction(pattern.direction) }),
-            count: typed(pattern.count, pattern.countExpression),
-            spacing: typed(pattern.spacing, pattern.spacingExpression),
-          },
+          settings: pattern.circular
+            ? {
+                count: typed(pattern.count, pattern.countExpression),
+                circular: {
+                  origin: vector(pattern.circular.origin),
+                  axis: vector(pattern.circular.axis),
+                  angle: typed(pattern.circular.angle, pattern.circular.angleExpression),
+                  equalSpacing: pattern.circular.equalSpacing !== false,
+                  opposite: !!pattern.circular.opposite,
+                },
+              }
+            : {
+                axis: pattern.axis,
+                ...(pattern.direction && { direction: direction(pattern.direction) }),
+                count: typed(pattern.count, pattern.countExpression),
+                spacing: typed(pattern.spacing, pattern.spacingExpression),
+              },
           result: made ? { copies: made.copies } : { error: 'The pattern made no copies.' },
         };
       }
