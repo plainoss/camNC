@@ -451,9 +451,8 @@ export function ModelViewport({
     () => (view === 'flat' ? flat : view === 'exploded' ? exploded : meshes.map(() => assembled)),
     [view, flat, exploded, assembled, meshes]
   );
-  // Base planes centred on the origin and big enough to take in the whole model, as the reference sizes them, so a
-  // part drawn away from the origin still sits on its plane. A sensible size before there's anything.
-  const planeSize = useMemo(() => {
+  // Size the normal display planes around the origin and model, with a useful extent before any geometry exists.
+  const modelPlaneSize = useMemo(() => {
     const reach = boundsOf(
       meshes,
       meshes.map(() => new THREE.Matrix4())
@@ -463,6 +462,11 @@ export function ModelViewport({
     const half = Math.max(...reach.min.toArray().map(Math.abs), ...reach.max.toArray().map(Math.abs));
     return Math.max(palette === 'studio' ? 150 : 100, half * 2.2);
   }, [meshes, sketchLines, palette]);
+  // While the depth arrow is present, changing model bounds must not resize its reference planes.
+  // Retain the previous extent, including after pointer release and subsequent depth changes.
+  const referencePlaneSize = useRef(modelPlaneSize);
+  if (!extrusionDepth) referencePlaneSize.current = modelPlaneSize;
+  const planeSize = extrusionDepth ? referencePlaneSize.current : modelPlaneSize;
   const shownPlanes = view === 'assembled' ? planes : [];
   const box = useMemo(() => {
     const fit = boundsOf(meshes, matrices);

@@ -1,5 +1,5 @@
 import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { OrthographicCamera, Vector3 } from 'three';
@@ -51,6 +51,11 @@ it.each(['normal', 'symmetric', 'flipped', 'add'])(
       const field = screen.getByRole('textbox', { name: 'Thickness' });
       await userEvent.clear(field);
       await userEvent.type(field, 'invalid');
+      const planePositions = () =>
+        ['Top', 'Front', 'Right'].map(name =>
+          within(screen.getByTestId('workspace-3d')).getByText(name, { exact: true }).getBoundingClientRect().toJSON()
+        );
+      const beforePlanes = planePositions();
       const before = structuredClone(props().cameraState!.current!);
       const control = props().extrusionDepth!;
       const canvas = screen.getByTestId('workspace-3d').querySelector('canvas')!;
@@ -62,14 +67,20 @@ it.each(['normal', 'symmetric', 'flipped', 'add'])(
       camera.lookAt(...before.center);
       camera.updateMatrixWorld();
       const target = new Vector3(...control.origin)
-        .addScaledVector(new Vector3(...control.direction), 52.4 / control.factor + 8)
+        .addScaledVector(new Vector3(...control.direction), 282.4 / control.factor + 8)
         .project(camera);
       await userEvent.dragAndDrop(arrow, canvas, {
         targetPosition: { x: ((target.x + 1) * box.width) / 2, y: ((1 - target.y) * box.height) / 2 },
       });
-      await waitFor(() => expect(selected().thickness).toBeCloseTo(52.4, 0));
+      await waitFor(() => expect(selected().thickness).toBeCloseTo(282.4, 0));
       expect(selected().thicknessExpression).toBeUndefined();
-      expect(Number((screen.getByRole('textbox', { name: 'Thickness' }) as HTMLInputElement).value)).toBeCloseTo(52.4, 0);
+      expect(Number((screen.getByRole('textbox', { name: 'Thickness' }) as HTMLInputElement).value)).toBeCloseTo(282.4, 0);
+      // The HTML plane labels follow the rendered scene in useFrame, after the document commit.
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      planePositions().forEach((rect, index) => {
+        expect(rect.left).toBeCloseTo(beforePlanes[index]!.left, 2);
+        expect(rect.top).toBeCloseTo(beforePlanes[index]!.top, 2);
+      });
       const after = props().cameraState!.current!;
       for (const key of ['center', 'back', 'up'] as const) after[key].forEach((v, i) => expect(v).toBeCloseTo(before[key][i]!, 6));
       expect(after.height).toBeCloseTo(before.height, 6);
