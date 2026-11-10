@@ -6,8 +6,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { defaultProvider, rememberAssistantCredentials } from './assistant/keyStore';
 import { requestAssistant, type AssistantMessage } from './assistant/provider';
+import { readConversation } from './assistant/conversationStore';
+import { checkScriptInBrowser } from './assistant/scriptCheck';
 
 vi.mock('./assistant/provider', { spy: true });
+vi.mock('./assistant/scriptCheck', { spy: true });
 vi.mock('./WorkspaceView', () => ({
   default: ({ document }: { document: CadDocument }) => (
     <div data-testid="workspace-3d" tabIndex={0}>
@@ -85,20 +88,24 @@ it('checks a recorded model proposal, previews it, applies it once and undoes th
   expect(within(review).getByText(/Extrude · Plate/)).toBeDefined();
   await userEvent.click(within(review).getByRole('button', { name: 'Apply as one undo step' }));
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(24));
+  expect(readConversation(source.id).some(message => message.proposalOutcome === 'applied')).toBe(true);
+  expect(within(dock).queryByRole('button', { name: 'Preview proposal' })).toBeNull();
   expect(latest().parts[0]!.id).toBe(source.parts[0]!.id);
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Undo/ }));
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(18));
+  expect(readConversation(source.id).some(message => message.event && message.text.includes('was undone'))).toBe(true);
 }, 60_000);
 
-it('makes a model result stale when the user edits while the provider works', async () => {
+it('stops further model calls when the user edits while the provider works', async () => {
   recorded();
   let release: ((message: AssistantMessage) => void) | undefined;
-  vi.mocked(requestAssistant).mockImplementationOnce(
-    () =>
-      new Promise(resolve => {
-        release = resolve;
-      })
-  );
+  let requestSignal: AbortSignal | undefined;
+  vi.mocked(requestAssistant).mockImplementationOnce(request => {
+    requestSignal = request.signal;
+    return new Promise(resolve => {
+      release = resolve;
+    });
+  });
   const { latest } = await studio();
   await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
   const dock = await screen.findByRole('complementary', { name: 'Design assistant' }, { timeout: 20_000 });
@@ -112,12 +119,60 @@ it('makes a model result stale when the user edits while the provider works', as
   await userEvent.type(thickness, '30');
   await userEvent.click(within(extrude).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(30));
+  expect(requestSignal?.aborted).toBe(true);
   release!({ role: 'assistant', text: '', calls: [{ id: 'read-1', name: 'cad_script_guide', arguments: {} }] });
-  const preview = await within(dock).findByRole('button', { name: 'Preview proposal' }, { timeout: 45_000 });
-  expect(preview).toHaveProperty('disabled', true);
-  expect(within(dock).getByText(/The design has changed/)).toBeDefined();
+  await waitFor(() => expect(within(dock).getByRole('status').textContent).toContain('The design changed'));
+  expect(within(dock).queryByRole('button', { name: 'Preview proposal' })).toBeNull();
+  expect(requestAssistant).toHaveBeenCalledTimes(1);
   expect(latest().parts[0]!.thickness).toBe(30);
 }, 60_000);
+
+it('resumes the same conversation after a hand edit cancels an in-flight script check', async () => {
+  recorded();
+  let release: (() => void) | undefined;
+  vi.mocked(checkScriptInBrowser).mockImplementationOnce(async base => {
+    await new Promise<void>(resolve => {
+      release = resolve;
+    });
+    return {
+      ok: false,
+      document: base,
+      parts: [],
+      scriptError: 'Stopped.',
+      report: { ok: false, status: 'invalid', errors: [], warnings: [], parts: [] },
+    };
+  });
+  vi.mocked(requestAssistant)
+    .mockImplementationOnce(async () => ({
+      role: 'assistant',
+      text: '',
+      calls: [{ id: 'pending-check', name: 'check_design', arguments: { source: 'd => {}' } }],
+    }))
+    .mockResolvedValue({ role: 'assistant', text: 'Question: What should change next?' });
+  const { source, latest } = await studio();
+  await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
+  const dock = await screen.findByRole('complementary', { name: 'Design assistant' });
+  await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Make it thicker.');
+  await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
+  await waitFor(() => expect(release).toBeDefined());
+  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Extrude · Plate/ }));
+  const extrude = await screen.findByRole('dialog', { name: 'Extrude · Plate' });
+  const thickness = within(extrude).getByRole('textbox', { name: /Thickness/ });
+  await userEvent.clear(thickness);
+  await userEvent.type(thickness, '30');
+  await userEvent.click(within(extrude).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(30));
+  release!();
+  await waitFor(() => expect(within(dock).getByRole('status').textContent).toContain('The design changed'));
+  const history = readConversation(source.id);
+  const callIndex = history.findIndex(message => message.calls?.some(call => call.id === 'pending-check'));
+  expect(history[callIndex + 1]).toMatchObject({ role: 'tool', callId: 'pending-check' });
+  await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Continue from this design.');
+  await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
+  await within(dock).findByText('Question: What should change next?');
+  expect(requestAssistant).toHaveBeenCalledTimes(2);
+  expect(within(dock).queryByRole('alert')).toBeNull();
+}, 30_000);
 
 it('keeps an assistant proposal pending until a feature preview is cancelled', async () => {
   recorded();
