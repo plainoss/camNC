@@ -111,3 +111,40 @@ describe('linked scripted offsets', () => {
     expect(collapsed.scriptError).toMatch(/collapse/);
   });
 });
+
+it('keeps a line/arc offset linked through radius and clearance expression edits', async () => {
+  const first = await editCad(
+    null,
+    d => {
+      d.variable('height', '40mm');
+      d.variable('rim', '5mm');
+      const p = d.newPart('Curved frame');
+      const outline = p.profile
+        .path([0, 0])
+        .lineTo([100, 0])
+        .arcTo([100, 'height'], { r: 'height/2' })
+        .lineTo([0, 'height'])
+        .arcTo([0, 0], { r: 'height/2' })
+        .close();
+      p.profile.offset([outline], { distance: 'rim' });
+    },
+    fast
+  );
+  expect(first.ok, JSON.stringify(first.report)).toBe(true);
+  const ids = first.document.parts[0]!.sketch.entities.map(e => e.id);
+  const next = await editCad(
+    first.document,
+    d => {
+      d.variable('height', '60mm');
+      d.variable('rim', '8mm');
+    },
+    fast
+  );
+  expect(next.ok, JSON.stringify(next.report)).toBe(true);
+  expect(next.document.parts[0]!.sketch.entities.map(e => e.id)).toEqual(ids);
+  expect(next.report.parts[0]!.outline?.size).toEqual([160, 60]);
+  expect(next.report.parts[0]!.holes).toBe(1);
+  const radii = next.document.parts[0]!.sketch.entities.filter(e => e.type === 'arc').map(e => e.radius);
+  expect(radii.filter(r => Math.abs(r - 30) < 1e-6)).toHaveLength(4);
+  expect(radii.filter(r => Math.abs(r - 22) < 1e-6)).toHaveLength(4);
+});
