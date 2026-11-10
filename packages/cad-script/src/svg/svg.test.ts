@@ -200,3 +200,10 @@ it('rejects long malformed tag input with a bounded linear preflight', () => {
   expect(() => parseSvgSketch('<svg ' + 'a'.repeat(900000))).toThrow(/incomplete tag/);
   expect(() => parseSvgSketch('<g'.repeat(100000))).toThrow(/Invalid SVG XML tag/);
 });
+
+it('rejects invalid or transparent paints instead of changing inherited fill semantics', () => {
+  for (const fill of ['banana', 'rgb(,,)', 'rgb(1,2%,3)', 'rgba(0,0,0,0)', 'NONE'])
+    expect(() => parseSvgSketch(svg(`<g fill="none"><rect width="20" height="20" fill="${fill}"/></g>`))).toThrow(/paint|Unfilled/);
+  for (const fill of ['rebeccapurple', 'rgb(20 30% 40)', 'rgb(0, 20, 255)', '#123abc'])
+    expect(parseSvgSketch(svg(`<rect width="20" height="20" fill="${fill}"/>`)).contours).toHaveLength(1);
+});

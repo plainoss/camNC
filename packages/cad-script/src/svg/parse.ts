@@ -3,6 +3,7 @@ import { geometryBounds } from './bounds';
 import { identity, lengthMm, multiply, numbers, parseTransform, transformPoint, viewportMatrix, type Matrix } from './matrix';
 import { parsePath } from './path';
 import { preflightSvg } from './preflight';
+import { isOpaqueSvgPaint } from './paint';
 import { filledContours } from './topology';
 import { finite, SVG_LIMITS, type SvgContour, type SvgSketchAsset } from './types';
 const svgNamespace = 'http://www.w3.org/2000/svg';
@@ -120,12 +121,12 @@ export function parseSvgSketch(source: string): SvgSketchAsset {
     if (a.xmlns && a.xmlns !== svgNamespace) throw new Error('Unsupported SVG namespace.');
     const rule = a['fill-rule'] ?? paint.rule;
     if (rule !== 'nonzero' && rule !== 'evenodd') throw new Error('Unsupported SVG fill rule.');
-    const next: Paint = { fill: a.fill ?? paint.fill, rule, stroke: a.stroke ?? paint.stroke };
-    if (
-      !/^(?:none|#[0-9a-f]{3}|#[0-9a-f]{6}|[a-z]+|rgb\([\d\s.,%]+\))$/i.test(next.fill) ||
-      /^(?:transparent|currentcolor|inherit|initial|unset|revert)$/i.test(next.fill)
-    )
-      throw new Error('Unsupported SVG paint.');
+    const next: Paint = {
+      fill: (a.fill ?? paint.fill).trim().toLowerCase(),
+      rule,
+      stroke: (a.stroke ?? paint.stroke).trim().toLowerCase(),
+    };
+    if (!isOpaqueSvgPaint(next.fill)) throw new Error('Unsupported SVG paint.');
     if (next.stroke !== 'none') throw new Error('SVG strokes are unsupported. Convert strokes to closed filled outlines first.');
     const matrix = multiply(parent, a.transform ? parseTransform(a.transform) : identity);
     if (tag !== 'svg' && tag !== 'g' && tag !== 'title' && tag !== 'desc') {
