@@ -38,7 +38,9 @@ export function useExplodedView(view: ModelView, onViewChange: (view: ModelView)
     onViewChange(next);
     const end = next === 'exploded' ? 1 : 0;
     target.current = end;
-    if (next === 'flat' || matchMedia('(prefers-reduced-motion: reduce)').matches || current.current === end) {
+    // Choosing a view explicitly requests this spatial transition, including with Reduce Motion enabled.
+    // Initial loading stays still; a later system-preference change can still stop playback above.
+    if (next === 'flat' || current.current === end) {
       update(end);
       return;
     }
