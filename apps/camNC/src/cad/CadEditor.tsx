@@ -228,10 +228,12 @@ import { kStudioCommands } from './studioCommands';
 import { builtStudioParts } from './studioParts';
 import { usePartCutSelection } from './usePartCutSelection';
 import { FeatureDialog } from './FeatureDialog';
+import { StudioSketchDialog } from './StudioSketchDialog';
+import { sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
 import { usePointPicker } from './pointPicker';
 import { ShortcutList } from './ShortcutList';
-import { sketchShortcuts, studioShortcuts } from './shortcuts';
+import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
 import {
@@ -2290,6 +2292,8 @@ export function CadEditor({
       setSnapCue(null);
       return;
     }
+    // A modifier press must not release a held selection before its shortcut's actual key arrives.
+    if (key === 'control' || key === 'meta' || key === 'alt') return;
     if (
       drag.current ||
       annotationDrag.current ||
@@ -3372,6 +3376,13 @@ export function CadEditor({
       restoreCanvasKeyboard();
     }
   };
+  const pendingFinishReason = sketchPendingFinishReason({
+    tool,
+    selected: selected.length,
+    splitting: !!splitFirst,
+    modification,
+    drawing: !!pending.length && !lineContinuation,
+  });
   const prepareDocument = (): CadDocument | null => {
     const blocked = (reason: string) => {
       setFinishError(reason);
@@ -3380,25 +3391,7 @@ export function CadEditor({
       return null;
     };
     if (busy || solving || finishing.current || preparingDimension.current) return blocked('Wait for the current sketch check to finish.');
-    const reason = !thicknessValid
-      ? 'Enter a valid part thickness before finishing the sketch.'
-      : tool === 'slot' && selected.length
-        ? 'Create the slot or press Escape before finishing the sketch.'
-        : (tool === 'linearPattern' || tool === 'circularPattern') && selected.length
-          ? 'Apply the pattern or press Escape before finishing the sketch.'
-          : tool === 'transform' && selected.length
-            ? 'Apply the transform or press Escape before finishing the sketch.'
-            : splitFirst
-              ? 'Choose the second split point or press Escape before finishing the sketch.'
-              : (tool === 'fillet' || tool === 'chamfer') && selected.length
-                ? 'Apply the corner preview or press Escape before finishing the sketch.'
-                : modification.phase === 'mirror' && modification.entityIds.length
-                  ? 'Choose the mirror line or press Escape before finishing the sketch.'
-                  : modification.phase === 'extend' && modification.entityId
-                    ? 'Place the extended endpoint or press Escape before finishing the sketch.'
-                    : pending.length && !lineContinuation
-                      ? 'Complete the current shape or press Escape before finishing the sketch.'
-                      : null;
+    const reason = !thicknessValid ? 'Enter a valid part thickness before finishing the sketch.' : pendingFinishReason;
     if (reason) {
       return blocked(reason);
     }
@@ -3539,17 +3532,10 @@ export function CadEditor({
     chooseTool('select');
     setSelected([]);
     setShow3D(false);
+    // A lazy or inert view takes focus through onReady/solve completion, even when loading takes more than a second.
+    if (svg.current === root.current?.ownerDocument.activeElement) svg.current?.blur();
+    viewWantsKeyboard.current = true;
     setShowWorkspace(true);
-    // Finishing a sketch opens nothing: Extrude is started from the toolbar or with Shift+E, as in the reference. The
-    // studio takes the keyboard, so that works straight away.
-    const focusStudio = (frames: number) =>
-      requestAnimationFrame(() => {
-        const view = root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]');
-        // The studio's view may still be loading.
-        if (view) view.focus();
-        else if (frames > 0) focusStudio(frames - 1);
-      });
-    focusStudio(60);
   };
   /** Opens what a step of the design made: its sketch, its dialog, or its part in 3D. */
   const openStep = (step: DesignStep) => {
@@ -3906,23 +3892,19 @@ export function CadEditor({
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
   // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
-  const sketchFinishReason = solving
-    ? 'Wait for the current sketch check to finish.'
-    : edgeOnBoard
-      ? null
-      : !faceSketch && !thicknessValid
-        ? 'Enter a valid part thickness before finishing the sketch.'
-        : problems.length
-          ? problems.join(' ')
-          : !faceSketch && numberOfShapes === 0
-            ? 'Draw an outline before finishing the sketch.'
-            : splitFirst
-              ? 'Choose the second split point or press Escape before finishing the sketch.'
-              : (tool === 'slot' || tool === 'transform' || tool === 'linearPattern' || tool === 'circularPattern') && selected.length
-                ? 'Apply the preview or press Escape before finishing the sketch.'
-                : !faceSketch && (tool === 'fillet' || tool === 'chamfer') && selected.length
-                  ? 'Apply the corner preview or press Escape before finishing the sketch.'
-                  : null;
+  const sketchFinishReason =
+    busy || solving
+      ? 'Wait for the current sketch check to finish.'
+      : (pendingFinishReason ??
+        (edgeOnBoard
+          ? null
+          : !faceSketch && !thicknessValid
+            ? 'Enter a valid part thickness before finishing the sketch.'
+            : problems.length
+              ? problems.join(' ')
+              : !faceSketch && numberOfShapes === 0
+                ? 'Draw an outline before finishing the sketch.'
+                : null));
   const sketchCanFinish = sketchFinishReason === null;
   // The studio's Parts list shows each physical instance, with an eye to show or hide it in the view.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
@@ -4440,31 +4422,26 @@ export function CadEditor({
             })()}
           {studioSession && !showWorkspace && part && (
             // The open sketch, closed from here as the reference's sketch dialog is: away from the studio's Done.
-            <FeatureDialog
+            <StudioSketchDialog
+              key={`${doc.id}:${part.sketch.id}`}
+              editor={root}
               title={part.sketchName ?? `Sketch · ${part.name}`}
-              okLabel="✓ Finish sketch"
-              okDisabled={!sketchCanFinish}
-              okReason={sketchFinishReason}
-              onOk={() => closeSketch(true)}
+              plane={part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'Top plane'}
+              disabled={!sketchCanFinish}
+              checking={busy || solving}
+              reason={sketchFinishReason}
+              canConfirm={() => {
+                // A held pointer still owns its gesture; closing here could publish its solve into the next view.
+                return !drag.current && !annotationDrag.current && !boxGesture.current && drawingGesture.current.phase !== 'pressed';
+              }}
+              onConfirm={() => closeSketch(true)}
               onCancel={() => closeSketch(false)}
-              autoFocus={false}
-              className="cad-sketch-dialog">
-              <div className="cad-feature-selection">
-                <small>Sketch plane</small>
-                <span>{part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'Top plane'}</span>
-              </div>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={showConstraints}
-                  onChange={event => {
-                    setShowConstraints(event.target.checked);
-                    setHoveredConstraintEntities([]);
-                  }}
-                />
-                Show constraints
-              </label>
-            </FeatureDialog>
+              showConstraints={showConstraints}
+              onShowConstraints={show => {
+                setShowConstraints(show);
+                setHoveredConstraintEntities([]);
+              }}
+            />
           )}
           <div className="cad-canvas-bar">
             {showWorkspace ? (
@@ -5230,7 +5207,7 @@ export function CadEditor({
             />
           )}
           <ShortcutList
-            sections={studioSession && showWorkspace ? studioShortcuts : sketchShortcuts}
+            sections={studioSession ? (showWorkspace ? studioShortcuts : studioSketchShortcuts) : sketchShortcuts}
             open={shortcutsOpen}
             onOpenChange={setShortcutsOpen}
           />
