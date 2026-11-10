@@ -1,4 +1,4 @@
-import { cadPartReference, createPlateDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { createPlateDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { MirrorDialog } from './MirrorDialog';
@@ -10,7 +10,7 @@ it.each(['self', 'dependent'])('rejects a %s mirror plane dependency and allows 
   const part = document.parts[0]!;
   part.copies = [
     { id: 'first', mirrored: true, mirror: { across: { plane: 'top' } } },
-    { id: 'second', mirrored: true, mirror: { across: { partId: cadPartReference(part.id, 'first'), face: 'top' } } },
+    { id: 'second', mirrored: true, mirror: { across: { partId: part.id, copyId: 'first', face: 'top' } } },
   ];
   let picked: (on: CadDrawnOn['on']) => void = () => {};
   render(
@@ -26,7 +26,7 @@ it.each(['self', 'dependent'])('rejects a %s mirror plane dependency and allows 
     />
   );
   fireEvent.click(screen.getByRole('button', { name: 'Mirror plane' }));
-  act(() => picked({ partId: cadPartReference(part.id, kind === 'self' ? 'first' : 'second'), face: 'top' }));
+  act(() => picked({ partId: part.id, copyId: kind === 'self' ? 'first' : 'second', face: 'top' }));
   expect(screen.getByRole('alert').textContent).toContain('does not depend on this mirror');
   expect(screen.getByRole('button', { name: 'OK' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Mirror plane' }));

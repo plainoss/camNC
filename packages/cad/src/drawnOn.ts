@@ -1,3 +1,5 @@
+import { resolvePartPatterns, cadCopyName } from './partPatterns';
+import { faceSupportPart, faceSupportShape } from './faceSupport';
 import { cadThinLine, evaluateCadPart, pointInPolygon } from './geometry';
 import { CAD_IDENTITY_PLACEMENT, placePoint, rotateVector, turnAbout, type Vec3 } from './placement';
 import type { CadDiagnostic, CadDocument, CadDrawnOn, CadPart, CadPlacement, CadPoint, EvaluatedCadPart } from './types';
@@ -130,11 +132,29 @@ export function resolveDrawnPlacements(
     else {
       const support = byId.get(on.partId);
       if (!support) return problem('The part it was drawn on is gone.');
-      const supportPlacement = place(support) ?? CAD_IDENTITY_PLACEMENT;
+      const originalPlacement = place(support) ?? CAD_IDENTITY_PLACEMENT;
+      // Resolve the copy after its source is placed, so a moved source or changed pattern never leaves a stale attachment.
+      const copy = on.copyId
+        ? resolvePartPatterns({
+            ...document,
+            parts: document.parts.map(candidate =>
+              candidate.id === support.id
+                ? { ...support, placement: originalPlacement }
+                : placed.has(candidate.id)
+                  ? { ...candidate, placement: placed.get(candidate.id) }
+                  : candidate
+            ),
+          })
+            .parts.find(candidate => candidate.id === support.id)!
+            .copies?.find(copy => copy.id === on.copyId)
+        : undefined;
+      if (on.copyId && (!copy || !copy.placement)) return problem('The copy it was drawn on is gone or unplaced.');
+      const supportPlacement = copy?.placement ?? originalPlacement;
+      const facePart = faceSupportPart(support, copy);
       if (failed.has(support.id)) return problem(`${support.name} can’t be placed, so neither can this.`);
-      const shape = shapes.get(support.id) ?? evaluateCadPart(support).part;
+      const shape = copy?.mirrored ? faceSupportShape(support, copy) : (shapes.get(support.id) ?? evaluateCadPart(support).part);
       if (!shape) return problem(`${support.name} can’t be worked out, so neither can where this goes.`);
-      const face = partFace(support, shape, on.face);
+      const face = partFace(facePart, shape, on.face);
       if (typeof face === 'string') return problem(face);
       frame = carried(supportPlacement, face);
     }
@@ -166,11 +186,21 @@ export function resolveDrawnPlacements(
       if ('plane' in direction.along) normal = kPlanes[direction.along.plane].z;
       else {
         const source = byId.get(direction.along.partId);
-        const shape = source && (shapes.get(source.id) ?? evaluateCadPart(source).part);
-        if (!source || !shape) return null;
-        const face = partFace(source, shape, direction.along.face);
-        if (typeof face === 'string') return null;
-        normal = carried(place(source) ?? CAD_IDENTITY_PLACEMENT, face).z;
+        if (!source) return null;
+        const placement = place(source);
+        const current = resolvePartPatterns({
+          ...document,
+          parts: document.parts.map(candidate =>
+            candidate.id === source.id
+              ? { ...source, placement }
+              : placed.has(candidate.id)
+                ? { ...candidate, placement: placed.get(candidate.id) }
+                : candidate
+          ),
+        });
+        const face = cadFaceFrame(current, direction.along);
+        if ('error' in face) return null;
+        normal = face.normal;
       }
       return scale(normal, direction.flip ? -1 : 1);
     };
@@ -196,11 +226,12 @@ export function drawnOnOutline(document: CadDocument, part: CadPart): CadPoint[]
   const on = part.drawnOn?.on;
   if (!on || 'plane' in on) return null;
   const support = document.parts.find(candidate => candidate.id === on.partId);
-  const shape = support && evaluateCadPart(support).part;
+  const facePart = support && faceSupportPart(support, on.copyId ? support.copies?.find(copy => copy.id === on.copyId) : undefined);
+  const shape = support && faceSupportShape(support, on.copyId ? support.copies?.find(copy => copy.id === on.copyId) : undefined);
   if (!support || !shape) return null;
   if (on.face === 'top') return shape.outline;
   if (on.face === 'underside') return shape.outline.map(p => ({ x: -p.x, y: p.y })).reverse();
-  const face = partFace(support, shape, on.face);
+  const face = partFace(facePart!, shape, on.face);
   if (typeof face === 'string') return null;
   return [
     { x: 0, y: 0 },
@@ -218,16 +249,11 @@ export function partFaceAt(
   part: CadPart,
   placement: CadPlacement,
   point: Vec3,
-  normal: Vec3,
-  mirrored = false
+  normal: Vec3
 ): Extract<CadDrawnOn['on'], { partId: string }>['face'] | null {
   const back = [-placement.rotation[0], -placement.rotation[1], -placement.rotation[2], placement.rotation[3]];
   const local = rotateVector(back, [point[0] - placement.position[0], point[1] - placement.position[1], point[2] - placement.position[2]]);
   const facing = rotateVector(back, normal);
-  if (mirrored) {
-    local[0] *= -1;
-    facing[0] *= -1;
-  }
   // A pocket's floor looks the same way as the top, but isn't the face a part would sit on.
   if (facing[2] > 0.99) return Math.abs(local[2] - part.thickness) < 0.5 ? 'top' : null;
   if (facing[2] < -0.99) return Math.abs(local[2]) < 0.5 ? 'underside' : null;
@@ -312,11 +338,17 @@ export function cadFaceFrame(document: CadDocument, on: CadDrawnOn['on']): CadFa
   if ('plane' in on) return frame(kPlanes[on.plane]);
   const part = document.parts.find(candidate => candidate.id === on.partId);
   if (!part) return { error: 'That part is gone.' };
-  const shape = evaluateCadPart(part).part;
+  const copy = on.copyId ? part.copies?.find(copy => copy.id === on.copyId) : undefined;
+  if (on.copyId && (!copy || !copy.placement)) return { error: 'That copy is gone or unplaced.' };
+  const facePart = faceSupportPart(part, copy);
+  const shape = faceSupportShape(part, copy);
   if (!shape) return { error: `${part.name} can’t be worked out until its sketch is fixed.` };
-  const face = partFace(part, shape, on.face);
+  const face = partFace(facePart, shape, on.face);
   if (typeof face === 'string') return { error: `${part.name}: ${face}` };
-  return frame({ ...carried(readingPlacement(document, part), face), ...(face.length !== undefined && { length: face.length }) });
+  return frame({
+    ...carried(copy?.placement ?? readingPlacement(document, part), face),
+    ...(face.length !== undefined && { length: face.length }),
+  });
 }
 
 /** Every flat face of a part a new part can be drawn on, with where it is in the studio. */
@@ -375,12 +407,14 @@ export function cadFaceName(document: CadDocument, on: CadDrawnOn['on']): string
   if ('plane' in on) return `the ${on.plane} plane`;
   const part = document.parts.find(candidate => candidate.id === on.partId);
   if (!part) return 'a part that is gone';
+  const index = on.copyId ? part.copies?.findIndex(copy => copy.id === on.copyId) : undefined;
+  const name = index !== undefined && index >= 0 ? cadCopyName(part, index) : part.name;
   const frame = cadFaceFrame(document, on);
-  if ('error' in frame) return `${part.name}'s missing edge`;
+  if ('error' in frame) return `${name}'s missing edge`;
   if (on.face === 'top' || on.face === 'underside') {
     const looks = directionOf(frame.normal);
-    return looks ? `${part.name}'s ${on.face} (${looks})` : `${part.name}'s ${on.face}`;
+    return looks ? `${name}'s ${on.face} (${looks})` : `${name}'s ${on.face}`;
   }
   const way = directionOf(frame.normal);
-  return way ? `${part.name}'s ${way} face` : `${part.name}'s slanted edge face`;
+  return way ? `${name}'s ${way} face` : `${name}'s slanted edge face`;
 }

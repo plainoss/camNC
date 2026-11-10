@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { createPlateDocument } from './document';
 import { partFaceAt } from './drawnOn';
+import { faceSupportPart } from './faceSupport';
 import { cadMirrorPlaneFrame } from './mirrorPlane';
 
 it('reads the x-normal face of a rotated mirrored copy and never falls back when that copy is missing', () => {
@@ -13,10 +14,12 @@ it('reads the x-normal face of a rotated mirrored copy and never falls back when
       entity.type === 'line' &&
       part.sketch.entities.some(point => point.type === 'point' && point.id === entity.startId && point.x === 100 && point.y === 0)
   )!;
-  const mirror = { across: { partId: `${part.id}:copy`, face: { edge: right.id } } };
+  const mirror = { across: { partId: part.id, copyId: 'copy', face: { edge: right.id } } };
   const frame = cadMirrorPlaneFrame(document, mirror);
   if (!frame || 'error' in frame) throw new Error('Missing copy face');
-  expect(partFaceAt(part, part.copies![0]!.placement!, [500, -80, 39], [0, -1, 0], true)).toEqual({ edge: right.id });
+  expect(partFaceAt(faceSupportPart(part, part.copies![0]), part.copies![0]!.placement!, [500, -80, 39], [0, -1, 0])).toEqual({
+    edge: right.id,
+  });
   expect(frame.origin[0]).toBeCloseTo(500, 6);
   expect(frame.origin[1]).toBeCloseTo(-80, 6);
   expect(frame.origin[2]).toBeCloseTo(30, 6);
@@ -35,7 +38,7 @@ it('resolves an Add body face on an inherited parent copy', () => {
   boss.addTo = block.id;
   boss.placement = { position: [40, 40, 18], rotation: [0, 0, 0, 1] };
   document.parts.push(boss);
-  const frame = cadMirrorPlaneFrame(document, { across: { partId: `${boss.id}:along`, face: 'top' } });
+  const frame = cadMirrorPlaneFrame(document, { across: { partId: boss.id, copyId: 'along', face: 'top' } });
   if (!frame || 'error' in frame) throw new Error('Missing inherited face');
   expect(frame.origin).toEqual([240, 40, 28]);
   expect(frame.normal).toEqual([0, 0, 1]);

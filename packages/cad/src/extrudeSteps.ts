@@ -19,7 +19,7 @@ export const sharesSketch = (a: CadPart, b: CadPart): boolean => sketchOwnerId(a
  * made like a part, but listed as part of that one. How it's machined, as one piece or several, is decided later.
  */
 export function isJoinedBody(document: Pick<CadDocument, 'parts'>, part: CadPart): boolean {
-  if (!part.addTo || part.extrude === false || part.suppressed || part.remove) return false;
+  if (!part.addTo || part.extrude === false || part.suppressed || part.remove || copyFaceOperationProblem(part)) return false;
   const target = document.parts.find(candidate => candidate.id === part.addTo);
   return !!target && isCadPart(target) && !sharesSketch(target, part);
 }
@@ -31,9 +31,19 @@ export const isCadBody = (document: CadDocument, part: CadPart): boolean => isCa
 export const sketchUsers = (document: CadDocument, part: CadPart): CadPart[] =>
   document.parts.filter(candidate => sharesSketch(candidate, part));
 
+/** Instance-specific Add/Remove is not represented yet; never redirect a copy-face edit to its source family. */
+export function copyFaceOperationProblem(part: CadPart): string | null {
+  const on = part.drawnOn?.on;
+  return on && 'partId' in on && on.copyId
+    ? 'A sketch on a copy can make a new part. Add, Remove and Hole on a copy are not supported yet.'
+    : null;
+}
+
 /** The board an Extrude → Remove cuts into: the one its sketch is drawn on, by the top or the underside. */
 export function removeSupport(document: CadDocument, part: CadPart): { board: CadPart; face: 'top' | 'underside' } | { error: string } {
   const on = part.drawnOn?.on;
+  const copyProblem = copyFaceOperationProblem(part);
+  if (copyProblem) return { error: copyProblem };
   if (!on || 'plane' in on || (on.face !== 'top' && on.face !== 'underside'))
     return { error: 'Remove cuts into the top or underside of a board: sketch on one of those faces.' };
   const board = document.parts.find(candidate => candidate.id === on.partId);
@@ -241,6 +251,10 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
 
 /** Why an Extrude → Add or Remove step can't do what it says, or null when it can. */
 export function extrudeStepProblem(document: CadDocument, part: CadPart): string | null {
+  if (part.addTo !== undefined || part.remove || part.hole) {
+    const problem = copyFaceOperationProblem(part);
+    if (problem) return problem;
+  }
   if (part.faceProfile && part.drawnOn && 'partId' in part.drawnOn.on) {
     const problem = faceExtrudeProblem(document, part.drawnOn.on, part.id);
     if (problem) return problem;

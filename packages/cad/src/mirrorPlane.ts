@@ -22,11 +22,12 @@ export function cadMirrorPlaneFrame(document: CadDocument, mirror: NonNullable<C
   if (mirror.datum) return cadDatumFrame(document, mirror.datum);
   const on = mirror.across;
   if ('plane' in on) return cadFaceFrame(document, on);
-  const part = cadPartReferenceOwner(document, on.partId);
+  const reference = cadPartReference(on.partId, on.copyId);
+  const part = cadPartReferenceOwner(document, reference);
   if (!part) return { error: 'That part is gone.' };
-  const frame = cadFaceFrame(document, { ...on, partId: part.id });
-  if ('error' in frame || part.id === on.partId) return frame;
-  const instance = cadMirrorFaceCopy(document, on.partId);
+  const frame = cadFaceFrame(document, { partId: part.id, face: on.face });
+  if ('error' in frame || part.id === reference) return frame;
+  const instance = cadMirrorFaceCopy(document, reference);
   const copy = instance?.copy;
   // A removed copy must never silently resolve to its source or a different pattern instance.
   if (!copy?.placement) return { error: 'That copy is gone or cannot be placed.' };
@@ -59,9 +60,10 @@ export function cadMirrorPlaneWouldCycle(
   const visited = new Set<string>();
   let next = on;
   while ('partId' in next) {
-    if (next.partId === target || visited.has(next.partId)) return true;
-    visited.add(next.partId);
-    const instance = cadMirrorFaceCopy(document, next.partId);
+    const reference = cadPartReference(next.partId, next.copyId);
+    if (reference === target || visited.has(reference)) return true;
+    visited.add(reference);
+    const instance = cadMirrorFaceCopy(document, reference);
     if (instance && cadPartReference(instance.part.id, instance.copy.id) === target) return true;
     const dependency = instance?.copy.mirror;
     if (!dependency || dependency.datum) return false;

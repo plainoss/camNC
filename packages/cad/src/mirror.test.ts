@@ -55,7 +55,7 @@ it.each([false, true])('mirrors across a physical copy face and follows its plac
   shelf.copies = [{ id: 'shelf-copy', mirrored, placement: { position: [0, 0, 300], rotation: [0, 0, 0, 1] } }];
   source.parts.push(shelf);
   const edge = shelf.sketch.entities.find(entity => entity.type === 'line')!.id;
-  const made = addPartMirror(source, part.id, { across: { partId: `${shelf.id}:shelf-copy`, face: { edge } } });
+  const made = addPartMirror(source, part.id, { across: { partId: shelf.id, copyId: 'shelf-copy', face: { edge } } });
   // The first edge is y=0: reflecting the source's -19 origin puts it at +19, independent of shelf height.
   expect(made.document.parts[0]!.copies![0]!.placement!.position[1]).toBeCloseTo(19, 6);
   const moved = resolvePartPatterns({
@@ -84,7 +84,7 @@ it('follows a picked pattern copy in the same edit, even when the mirrored part 
   shelf.pattern = { id: 'shelves', axis: 'z', count: 3, spacing: 300 };
   source.parts.push(shelf);
   const laid = resolvePartPatterns(source);
-  const made = addPartMirror(laid, part.id, { across: { partId: `${shelf.id}:shelves:2`, face: 'top' } });
+  const made = addPartMirror(laid, part.id, { across: { partId: shelf.id, copyId: 'shelves:2', face: 'top' } });
   expect(made.document.parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(1238, 6);
   const moved = resolvePartPatterns({
     ...made.document,
@@ -100,14 +100,14 @@ it('resolves mirror-face dependencies within one family in the same regeneration
   const part = source.parts[0]!;
   part.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
   const first = addPartMirror(source, part.id, { across: { plane: 'top' } });
-  const second = addPartMirror(first.document, part.id, { across: { partId: `${part.id}:${first.id}`, face: 'top' } });
+  const second = addPartMirror(first.document, part.id, { across: { partId: part.id, copyId: first.id, face: 'top' } });
   expect(second.document.parts[0]!.copies![1]!.placement!.position[2]).toBeCloseTo(-36, 6);
   const changed = structuredClone(second.document);
   changed.parts[0]!.copies![0]!.mirror = { across: { partId: part.id, face: 'top' } };
   const next = resolvePartPatterns(changed);
   expect(next.parts[0]!.copies![1]!.placement!.position[2]).toBeCloseTo(36, 6);
   const cyclic = structuredClone(next);
-  cyclic.parts[0]!.copies![0]!.mirror = { across: { partId: `${part.id}:${second.id}`, face: 'top' } };
+  cyclic.parts[0]!.copies![0]!.mirror = { across: { partId: part.id, copyId: second.id, face: 'top' } };
   const stable = resolvePartPatterns(cyclic);
   expect(resolvePartPatterns(stable)).toEqual(stable);
   expect(stable.parts[0]!.copies!.map(copy => copy.placement)).toEqual(cyclic.parts[0]!.copies!.map(copy => copy.placement));
@@ -124,7 +124,7 @@ it('follows a joined body face inherited by a pattern copy in the same edit', ()
   boss.addTo = block.id;
   boss.placement = { position: [40, 40, 18], rotation: [0, 0, 0, 1] };
   source.parts.push(block, boss);
-  const made = addPartMirror(resolvePartPatterns(source), target.id, { across: { partId: `${boss.id}:blocks:2`, face: 'top' } });
+  const made = addPartMirror(resolvePartPatterns(source), target.id, { across: { partId: boss.id, copyId: 'blocks:2', face: 'top' } });
   expect(made.document.parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(1256, 6);
   const next = resolvePartPatterns({
     ...made.document,

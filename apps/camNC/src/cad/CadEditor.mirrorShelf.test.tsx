@@ -1,4 +1,4 @@
-import { cadPartReference, parseCadDocument, type CadDocument } from '@wbcnc/cad';
+import { parseCadDocument, type CadDocument } from '@wbcnc/cad';
 import { OrthographicCamera, Vector3 } from 'three';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
@@ -45,7 +45,6 @@ it.each([0, 1, 2])('mirrors the cabinet side using shelf %s’s narrow end face 
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /^Mirror/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
   const copyId = shelfIndex ? shelf.copies![shelfIndex - 1]!.id : undefined;
-  const reference = cadPartReference(shelf.id, copyId);
   const instance = copyId ? `${shelf.id}/${copyId}` : shelf.id;
   const index = props().instanceIds!.indexOf(instance);
   expect(index).toBeGreaterThanOrEqual(0);
@@ -73,7 +72,9 @@ it.each([0, 1, 2])('mirrors the cabinet side using shelf %s’s narrow end face 
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest.parts[1]!.copies).toHaveLength(1));
   const mirror = latest.parts[1]!.copies![0]!;
-  expect(mirror.mirror).toEqual({ across: { partId: reference, face: { edge: '1ae808ee-7445-47ed-a11f-8a0b26cca6ff' } } });
+  expect(mirror.mirror).toEqual({
+    across: { partId: shelf.id, ...(copyId && { copyId }), face: { edge: '1ae808ee-7445-47ed-a11f-8a0b26cca6ff' } },
+  });
   expect(mirror.placement!.position[1]).toBeCloseTo(1200, 6);
   expect(latest.parts[0]!.copies).toHaveLength(2);
   const restored = parseCadDocument(JSON.parse(JSON.stringify(latest)));

@@ -91,7 +91,7 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
     visiting.add(key);
     const on = copy.mirror.across;
     if ('partId' in on) {
-      const support = cadMirrorFaceCopy({ ...document, parts }, on.partId);
+      const support = cadMirrorFaceCopy({ ...document, parts }, cadPartReference(on.partId, on.copyId));
       if (support && !resolve(support.part, support.copy)) {
         failed.add(key);
         visiting.delete(key);
