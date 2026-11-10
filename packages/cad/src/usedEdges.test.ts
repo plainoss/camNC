@@ -108,3 +108,35 @@ describe('points used from a part standing on the Front plane', () => {
     }
   });
 });
+
+it('keeps a used vertex bound to its exact pattern copy after a spacing edit and reload', () => {
+  const document = design();
+  const base = document.parts[0]!;
+  base.copies = [{ id: 'copy', placement: { position: [200, 0, 0], rotation: [0, 0, 0, 1] } }];
+  const target = document.parts[1]!;
+  const frame = cadSketchFrame(document, target)!;
+  const used = cadCornerSources(document, frame, target.id).get(cornerKey(300, 18));
+  expect(used).toMatchObject({ partId: base.id, copyId: 'copy', side: 'top' });
+  target.sketch.entities.push({ id: 'used-copy', type: 'point', x: 300, y: 18, fixed: true, used });
+  const loaded = JSON.parse(JSON.stringify(document)) as CadDocument;
+  loaded.parts[0]!.copies![0]!.placement!.position[0] = 250;
+  expect(withUsedPoints(loaded, loaded.parts[1]!).entities.find(entity => entity.id === 'used-copy')).toMatchObject({
+    x: 350,
+    y: 18,
+    used: { copyId: 'copy' },
+  });
+});
+
+it('updates a copy-bound vertex from its source’s move before saved copy placements catch up', () => {
+  const document = design();
+  const base = document.parts[0]!;
+  base.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  base.pattern = { id: 'row', axis: 'x', count: 2, spacing: 200 };
+  base.copies = [{ id: 'row:1', pattern: 'row', placement: { position: [200, 0, 0], rotation: [0, 0, 0, 1] } }];
+  const target = document.parts[1]!;
+  const used = cadCornerSources(document, cadSketchFrame(document, target)!, target.id).get(cornerKey(300, 18));
+  target.sketch.entities.push({ id: 'used-copy', type: 'point', x: 300, y: 18, fixed: true, used });
+  base.moved = { by: [40, 0, 0] };
+  base.pattern.spacing = 250;
+  expect(withUsedPoints(document, target).entities.find(entity => entity.id === 'used-copy')).toMatchObject({ x: 390, y: 18 });
+});

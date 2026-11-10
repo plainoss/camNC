@@ -10,7 +10,7 @@ import type { CadDiagnostic, CadDocument, CadPart, EvaluatedCadPart } from './ty
 /** Plane and edge Removes cut by their extrusion volume; face Removes keep named cuts and pocket floors. */
 export function isSpatialRemoval(part: CadPart): boolean {
   const on = part.drawnOn?.on;
-  return !!part.remove && !part.hole && !!on && ('plane' in on || typeof on.face === 'object');
+  return !!part.remove && !part.hole && !!on && ('plane' in on || (!on.copyId && typeof on.face === 'object'));
 }
 
 /** A face Remove grows into its support by default; one on a plane follows the plane's normal. */

@@ -1,6 +1,6 @@
 import { createCadPart } from './document';
 import { drawnOnOutline } from './drawnOn';
-import { evaluateCadPart } from './geometry';
+import { faceSupportShape } from './faceSupport';
 import type { CadDocument, CadDrawnOn, CadEntity, CadPart } from './types';
 
 /** Modified face boundaries need a topology-aware profile; do not silently replace them with the original outline. */
@@ -42,7 +42,9 @@ export function refreshFaceProfile(document: CadDocument, part: CadPart): CadPar
   const outline = problem ? null : drawnOnOutline(document, part);
   const support = on && 'partId' in on ? document.parts.find(candidate => candidate.id === on.partId) : undefined;
   const holes =
-    support && on && 'partId' in on && (on.face === 'top' || on.face === 'underside') ? (evaluateCadPart(support).part?.holes ?? []) : [];
+    support && on && 'partId' in on && (on.face === 'top' || on.face === 'underside')
+      ? (faceSupportShape(support, on.copyId ? support.copies?.find(copy => copy.id === on.copyId) : undefined)?.holes ?? [])
+      : [];
   const loops = outline
     ? [
         outline,
