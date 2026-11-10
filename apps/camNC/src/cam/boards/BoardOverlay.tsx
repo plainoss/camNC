@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { placedRect, type BoardNest, type PartInstance } from '../boards';
 import { Hint } from '../Hint';
@@ -63,7 +63,7 @@ function Chip({
   onCommit: (v: number) => void;
 }) {
   return (
-    <div className="absolute z-10 -translate-x-1/2 -translate-y-1/2" style={{ left, top }}>
+    <div data-spacing-chip className="absolute z-10 -translate-x-1/2 -translate-y-1/2" style={{ left, top }}>
       <Hint text={hint} id={`${id}-hint`}>
         <label className="flex h-5 items-center gap-1 rounded border border-primary/70 bg-background px-1 font-mono text-[11px] whitespace-nowrap shadow-sm">
           {label}
@@ -103,6 +103,7 @@ export function BoardOverlay({
   onDraft,
   onMargin,
   onGap,
+  onApplyAll,
 }: {
   nest: BoardNest;
   instances: PartInstance[];
@@ -120,13 +121,38 @@ export function BoardOverlay({
   onDraft: (size: { w: number; h: number } | null) => void;
   onMargin: (margin: number) => void;
   onGap: (gap: number) => void;
+  /** Apply this board's setup (margin, gap, holding) to all uncut boards, optionally re-laying out from scratch. */
+  onApplyAll?: (relayout: boolean) => void;
 }) {
   const { w, h } = nest.board;
   const [draft, setDraft] = useState<{ w: number; h: number } | null>(null);
+  const [offer, setOffer] = useState(false);
+  const offerRef = useRef<HTMLDivElement>(null);
   const start = useRef<{ grip: Grip; x: number; y: number; w: number; h: number; tight: TightSizes } | null>(null);
   const px = (mm: number) => mm * pxPerMm;
   const right = padPx + px(w);
   const bottom = padPx + px(h);
+
+  useEffect(() => {
+    if (!offer) return;
+    const down = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      const active = document.activeElement;
+      // Commit a chip value being typed before the apply button runs or the offer closes.
+      if (active instanceof HTMLElement && active.closest('[data-spacing-chip]') && !active.contains(target)) active.blur();
+      if (offerRef.current?.contains(target) || target?.closest?.('[data-spacing-chip]')) return;
+      setOffer(false);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOffer(false);
+    };
+    document.addEventListener('pointerdown', down, true);
+    window.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('keydown', key);
+    };
+  }, [offer]);
   /** On the machine, either way round, as a board may lie on it. */
   const fits = (s: { w: number; h: number }) =>
     !machine || (s.w <= machine.w && s.h <= machine.h) || (s.w <= machine.h && s.h <= machine.w);
@@ -221,7 +247,10 @@ export function BoardOverlay({
             value={nest.margin}
             left={padPx + 44}
             top={padPx + px(nest.margin)}
-            onCommit={onMargin}
+            onCommit={v => {
+              onMargin(v);
+              setOffer(true);
+            }}
           />
           {gap && (
             <Chip
@@ -233,8 +262,42 @@ export function BoardOverlay({
               min={bit}
               left={padPx + px(gap.x)}
               top={padPx + px(h - gap.y)}
-              onCommit={onGap}
+              onCommit={v => {
+                onGap(v);
+                setOffer(true);
+              }}
             />
+          )}
+          {offer && onApplyAll && (
+            <div
+              ref={offerRef}
+              role="toolbar"
+              aria-label="Apply spacing to all boards"
+              data-spacing-offer
+              style={{ left: padPx, top: Math.max(2, padPx - 36) }}
+              className="absolute z-20 flex w-max max-w-full flex-wrap items-center gap-1.5 rounded-lg border bg-background px-2 py-1 text-xs shadow-lg">
+              <span className="font-mono text-[11px] whitespace-nowrap text-muted-foreground">
+                margin {nest.margin} · gap {nest.gap} mm:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setOffer(false);
+                  onApplyAll(true);
+                }}
+                className="rounded border border-primary/50 bg-primary/10 px-1.5 py-0.5 font-medium whitespace-nowrap text-primary hover:border-primary hover:bg-primary/20">
+                Apply to all boards & re-layout
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOffer(false);
+                  onApplyAll(false);
+                }}
+                className="rounded border bg-muted/40 px-1.5 py-0.5 whitespace-nowrap text-primary hover:border-primary">
+                Apply to all boards
+              </button>
+            </div>
           )}
         </>
       )}
