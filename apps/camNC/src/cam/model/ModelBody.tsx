@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { BodyMesh } from '../camTypes';
 import { modelGeometry } from './modelGeometry';
+import { kOrbitSurface } from './orbitPicking';
 
 export function ModelBody({
   mesh,
@@ -28,6 +29,7 @@ export function ModelBody({
   return (
     <mesh
       geometry={geometry}
+      userData={kOrbitSurface}
       matrixAutoUpdate={false}
       matrix={matrix ?? new THREE.Matrix4()}
       onPointerOver={event => {

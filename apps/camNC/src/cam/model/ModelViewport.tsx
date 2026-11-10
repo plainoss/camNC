@@ -1,4 +1,4 @@
-import { Edges, Html, Line, OrbitControls } from '@react-three/drei';
+import { Edges, Html, Line } from '@react-three/drei';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -7,6 +7,8 @@ import { kPlaneMarker, planeGivesWay } from './planePicking';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { ViewCube } from './ViewCube';
 import { ModelBody } from './ModelBody';
+import { ModelOrbitControls } from './ModelOrbitControls';
+import { kOrbitSurface } from './orbitPicking';
 import { ModelFaceHighlight } from './ModelFaceHighlight';
 import { ExtrudeDepthArrow } from './ExtrudeDepthArrow';
 import type { ExtrudeDepthControl } from '@/cad/extrudeDepth';
@@ -14,7 +16,6 @@ import { sameFacePlane } from './faceHighlight';
 import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
-import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
 import type { StudioCameraRef } from '@/cad/studioCamera';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
@@ -74,6 +75,7 @@ function Region({ region, model, onPick }: { region: ViewRegion; model: THREE.Ma
   return (
     <mesh
       geometry={geometry}
+      userData={kOrbitSurface}
       matrixAutoUpdate={false}
       matrix={matrix}
       renderOrder={2}
@@ -124,7 +126,7 @@ function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number;
       matrixAutoUpdate={false}
       matrix={matrix}
       renderOrder={1}
-      userData={kPlaneMarker}
+      userData={{ ...kPlaneMarker, ...kOrbitSurface }}
       onPointerOver={event => {
         if (planeGivesWay(event.intersections)) return;
         event.stopPropagation();
@@ -501,6 +503,11 @@ export function ModelViewport({
     // The planes' identity changes with their highlight, which shouldn't move the camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meshes, matrices, shownPlanes.length, planeSize, assembled, sketchLines, regions, view]);
+  const orbitBox = useMemo(() => {
+    const bounds = box.clone();
+    if (showOrigin && view === 'assembled') bounds.expandByPoint(new THREE.Vector3().applyMatrix4(assembled));
+    return bounds;
+  }, [box, showOrigin, view, assembled]);
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
     // A captured depth drag must not also select the face beneath its release point.
     if (extrusionDepth?.dragging) return;
@@ -594,6 +601,7 @@ export function ModelViewport({
           {sketchLines.map((line, i) => (
             <Line
               key={i}
+              userData={kOrbitSurface}
               points={line.points}
               color={highlightIds.includes(line.partId) || line.partId === selectedId ? kStudioPicked : '#1f6fc5'}
               lineWidth={highlightIds.includes(line.partId) || line.partId === selectedId ? 2.5 : 1.5}
@@ -628,9 +636,7 @@ export function ModelViewport({
       ))}
       {extrusionDepth && view === 'assembled' && <ExtrudeDepthArrow key={extrusionDepth.partId} control={extrusionDepth} />}
       {!sketchView && onViewRequest && <ViewCube onViewRequest={onViewRequest} />}
-      {!sketchView && (
-        <OrbitControls makeDefault enabled={!extrusionDepth?.dragging} dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />
-      )}
+      {!sketchView && <ModelOrbitControls box={orbitBox} enabled={!extrusionDepth?.dragging} />}
     </Canvas>
   );
 }

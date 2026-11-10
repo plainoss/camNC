@@ -1,4 +1,4 @@
-import { Edges, Line, OrbitControls } from '@react-three/drei';
+import { Edges, Line } from '@react-three/drei';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import {
   evaluateCadPart,
@@ -15,7 +15,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { FitCamera } from '@/cam/model/ModelViewport';
-import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
+import { ModelOrbitControls } from '@/cam/model/ModelOrbitControls';
+import { kOrbitSurface } from '@/cam/model/orbitPicking';
 import { partSolid } from './partSolid';
 import type { StudioCameraRef } from './studioCamera';
 import type { PartViewSnapshot } from './faceSketchScene';
@@ -268,6 +269,7 @@ export default function PartView3D({
         {solid.geometry && (
           <mesh
             geometry={solid.geometry}
+            userData={kOrbitSurface}
             position={[solid.origin![0], solid.origin![1], 0]}
             onPointerMove={event => {
               event.stopPropagation();
@@ -338,7 +340,7 @@ export default function PartView3D({
             }}
           />
         )}
-        <OrbitControls makeDefault enabled={dragging === null} dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />
+        <ModelOrbitControls box={box} enabled={dragging === null} />
       </Canvas>
       {entry && picked && dragging === null && (
         <RegionDepthField
