@@ -9,6 +9,7 @@ import {
   createPlateDocument,
   originId,
   resolveDimensionPlacement,
+  withDimensionPlacement,
   type CadDimension,
   type CadDocument,
 } from '@wbcnc/cad';
@@ -125,7 +126,6 @@ describe('integrated sketch editor', () => {
     const dimension = moved.constraints.find((c): c is CadDimension => 'value' in c && c.label === 'Width')!;
     expect(dimension).toMatchObject({ value: 120 });
     expect(dimension.labelPlacement).toBeDefined();
-    expect(dimension.labelPosition).toBeUndefined();
     expect(resolveDimensionPlacement(moved, dimension)).toEqual({ x: expect.any(Number), y: expect.any(Number) });
     expect(moved.constraints.filter(c => c.id !== dimension.id)).toEqual(
       document.parts[0]!.sketch.constraints.filter(c => c.id !== dimension.id)
@@ -706,7 +706,6 @@ describe('integrated sketch editor', () => {
       value: 50,
     });
     expect(dimension.labelPlacement).toBeDefined();
-    expect(dimension.labelPosition).toBeUndefined();
     expect(resolveDimensionPlacement(placedSketch, dimension)).toEqual({ x: expect.closeTo(80), y: expect.closeTo(80) });
   });
 
@@ -994,7 +993,6 @@ describe('integrated sketch editor', () => {
     const dimension = placedSketch.constraints[0]! as CadDimension;
     expect(dimension).toMatchObject({ type: 'distance', value: 80 });
     expect(dimension.labelPlacement).toBeDefined();
-    expect(dimension.labelPosition).toBeUndefined();
     expect(resolveDimensionPlacement(part.sketch, dimension)).toEqual({ x: expect.closeTo(35), y: expect.closeTo(55) });
     fireEvent.keyDown(canvas, { key: 'z', ctrlKey: true });
     expect(change.mock.calls.at(-1)![0].parts[0]!.sketch.constraints).toHaveLength(0);
@@ -1025,7 +1023,6 @@ describe('integrated sketch editor', () => {
     const dimension = placedSketch.constraints[0]! as CadDimension;
     expect(dimension).toMatchObject({ type: 'distance', value: expect.closeTo(Math.hypot(40, 20)) });
     expect(dimension.labelPlacement).toBeDefined();
-    expect(dimension.labelPosition).toBeUndefined();
     expect(resolveDimensionPlacement(placedSketch, dimension)).toEqual({ x: expect.closeTo(40), y: expect.closeTo(55) });
     expect(window.document.activeElement).toBe(canvas);
     fireEvent.keyDown(canvas, { key: 'z', ctrlKey: true });
@@ -1078,8 +1075,9 @@ describe('integrated sketch editor', () => {
 
   it('keeps the dimension value editor inside the drawing area for an annotation at its edge', () => {
     const document = createPlateDocument();
-    document.parts[0]!.sketch.constraints = document.parts[0]!.sketch.constraints.map(c =>
-      c.label === 'Width' ? { ...c, labelPosition: { x: 100_000, y: -100_000 } } : c
+    const sketch = document.parts[0]!.sketch;
+    sketch.constraints = sketch.constraints.map(c =>
+      c.label === 'Width' && 'value' in c ? withDimensionPlacement(sketch, c, { x: 100_000, y: -100_000 }) : c
     );
     setup(document);
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Edit Width: 120 mm' }));

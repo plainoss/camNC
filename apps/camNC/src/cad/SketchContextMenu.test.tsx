@@ -1,4 +1,4 @@
-import { addCircle, addConstraint, addLine, createCadPart, type CadSketch } from '@wbcnc/cad';
+import { addCircle, addConstraint, addLine, createCadPart, withDimensionPlacement, type CadSketch } from '@wbcnc/cad';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { cdp, userEvent } from '@vitest/browser/context';
 import { useEffect, useRef, useState } from 'react';
@@ -13,7 +13,10 @@ function fixture(driven = false) {
   const line = sketch.entities.at(-1)!;
   sketch = addCircle(sketch, { x: 140, y: 80, radius: 15 });
   const circle = sketch.entities.at(-1)!;
-  sketch = addConstraint(sketch, { type: 'diameter', entityId: circle.id, value: 30, labelPosition: { x: 170, y: 120 }, driven });
+  sketch = addConstraint(
+    sketch,
+    withDimensionPlacement(sketch, { type: 'diameter', entityId: circle.id, value: 30, driven }, { x: 170, y: 120 })
+  );
   return { sketch, line, circle, dimension: sketch.constraints.at(-1)! };
 }
 

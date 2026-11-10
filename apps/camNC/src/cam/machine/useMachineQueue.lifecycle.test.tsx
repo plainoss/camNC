@@ -1,4 +1,4 @@
-import { addRectangle, createCadPart, createPlateDocument, migrateDimensionPlacements, updateDimension } from '@wbcnc/cad';
+import { addRectangle, createCadPart, createPlateDocument, updateDimension } from '@wbcnc/cad';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@wbcnc/ui/components/tooltip';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -99,34 +99,6 @@ async function fixture(singleBoard = false) {
   );
   return { job, document, boards, instances, client, model, view };
 }
-
-it('keeps a protected program current when accepted annotations only receive a storage representation upgrade', async () => {
-  const f = await fixture();
-  const legacy = structuredClone(f.job.design!.accepted!);
-  const width = legacy.parts[0]!.sketch.constraints.find(constraint => constraint.label === 'Width')!;
-  if (!('value' in width)) throw new Error('Expected the plate width dimension.');
-  delete width.labelPlacement;
-  width.labelPosition = { x: 25, y: -20 };
-  const stored = await saveJob({ ...f.job, design: { ...f.job.design!, draft: legacy, accepted: structuredClone(legacy) } });
-  f.client.setQueryData(camKeys.job(stored.id), stored);
-  const { rerender } = render(f.view());
-  fireEvent.click(await screen.findByRole('button', { name: 'Load program' }));
-  const original = useStore.getState().toolpath!.gcode;
-  const snapshot = pinManufacturingRun(original)!;
-  useCamMachine.setState({ preparingRun: false, runReview: 'finished' });
-  const canonical = migrateDimensionPlacements(legacy);
-  const accepted = await acceptDesign(await saveDesignDraft(stored, canonical), canonical);
-  f.client.setQueryData(camKeys.job(stored.id), accepted);
-  rerender(f.view());
-  await waitFor(() => {
-    expect(latest.snapshot?.runId).toBe(snapshot.runId);
-    expect(latest.designChanged).toBe(false);
-    expect(useStore.getState().toolpath?.gcode).toBe(original);
-    expect(screen.getByRole('status').textContent).toContain('Run review: finished');
-    expect(screen.queryByText(/Current design is revision/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Use current design with a new setup' })).toBeNull();
-  });
-}, 30_000);
 
 it('M1 records a completed native run after CAD acceptance without erasing boards while its model reloads', async () => {
   const f = await fixture();

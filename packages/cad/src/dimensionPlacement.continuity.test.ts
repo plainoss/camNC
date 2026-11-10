@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addCircle, addConstraint, addLine, createCadDocument, createCadPart } from './document';
-import {
-  dimensionAnnotationAngleWitness,
-  migrateDimensionPlacements,
-  resolveDimensionPlacement,
-  withDimensionPlacement,
-} from './dimensionPlacement';
+import { dimensionAnnotationAngleWitness, resolveDimensionPlacement, withDimensionPlacement } from './dimensionPlacement';
 import type { CadDimension, CadPoint, CadSketch } from './types';
 
 const distance = (a: CadPoint, b: CadPoint) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -44,26 +39,6 @@ function radialFixture(radius: number) {
 }
 
 describe('continuous dimension placement through geometric degeneracies', () => {
-  it('interprets an unflagged legacy small-radius angle in its previous bounded display frame before upgrading it', () => {
-    const { dimension, at } = angleFixture();
-    const sketch = at(0.001),
-      source = createCadDocument();
-    source.parts.push({
-      ...createCadPart(),
-      sketch: addConstraint(sketch, {
-        ...dimension,
-        value: (Math.atan2(0.001, 100) * 180) / Math.PI,
-        labelPlacement: { kind: 'angle', radius: 70, angleOffset: 0 },
-      }),
-    });
-    const stored = source.parts[0]!.sketch.constraints[0] as CadDimension;
-    expect(distance(finitePoint(resolveDimensionPlacement(sketch, stored)), { x: 120, y: 5.00025 })).toBeLessThan(1e-7);
-    const migrated = migrateDimensionPlacements(source).parts[0]!.sketch,
-      upgraded = migrated.constraints[0] as CadDimension;
-    expect(upgraded.labelPlacement).toMatchObject({ kind: 'angle', frame: 'local' });
-    expect(distance(finitePoint(resolveDimensionPlacement(migrated, upgraded)), { x: 120, y: 5.00025 })).toBeLessThan(1e-7);
-  });
-
   it('sweeps a stored angle through the former parallel boundary without label or arc-centre jumps', () => {
     const { sketch, dimension, at } = angleFixture();
     const placed = withDimensionPlacement(sketch, dimension, { x: 50, y: 20 });
@@ -215,29 +190,18 @@ describe('continuous dimension placement through geometric degeneracies', () => 
   });
 
   it('does not freeze a valid stored radial ratio while the supporting radius is temporarily tiny', () => {
-    const { sketch, dimension, at } = radialFixture(0.005);
-    const source = createCadDocument();
-    source.parts.push({
-      ...createCadPart(),
-      sketch: addConstraint(sketch, { ...dimension, labelPlacement: { kind: 'radial', angle: 0, radiusRatio: 3 } }),
-    });
-    const migrated = migrateDimensionPlacements(source).parts[0]!.sketch;
-    const stored = migrated.constraints[0] as CadDimension;
+    const { dimension, at } = radialFixture(0.005);
+    const stored: CadDimension = { ...dimension, labelPlacement: { kind: 'radial', angle: 0, radiusRatio: 3 } };
+    expect(finitePoint(resolveDimensionPlacement(at(0.005), stored)).x).toBeCloseTo(0.015, 8);
     expect(finitePoint(resolveDimensionPlacement(at(5), stored)).x).toBeCloseTo(15, 8);
   });
 
-  it('retains a stored gain while its radius goes to zero and back without mutation during normalization', () => {
+  it('retains a stored gain while its radius goes to zero and back', () => {
     const { sketch, dimension, at } = radialFixture(5),
       placed = withDimensionPlacement(sketch, dimension, { x: 15, y: 0 });
-    for (const radius of [5, 0.0101, 0.01, 0.0099, 0.005, 0.000001, 0, 0.000001, 5]) {
-      const source = createCadDocument();
-      source.parts.push({ ...createCadPart(), sketch: addConstraint(at(radius), placed) });
-      const migrated = migrateDimensionPlacements(source).parts[0]!.sketch,
-        current = migrated.constraints[0] as CadDimension;
-      expect(current.labelPlacement).toEqual(placed.labelPlacement);
-      expect(finitePoint(resolveDimensionPlacement(migrated, current)).x).toBeCloseTo(radius * 3, 8);
-      expect(finitePoint(resolveDimensionPlacement(at(5), current)).x).toBeCloseTo(15, 8);
-    }
+    for (const radius of [5, 0.0101, 0.01, 0.0099, 0.005, 0.000001, 0, 0.000001, 5])
+      expect(finitePoint(resolveDimensionPlacement(at(radius), placed)).x).toBeCloseTo(radius * 3, 8);
+    expect(finitePoint(resolveDimensionPlacement(at(5), placed)).x).toBeCloseTo(15, 8);
   });
 
   it('has the same capture limit at zero radius as at tiny positive radii', () => {

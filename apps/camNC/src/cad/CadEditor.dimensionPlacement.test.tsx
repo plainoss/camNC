@@ -276,30 +276,4 @@ describe('dimension placement follows geometry independently of stored annotatio
     const reloaded = await setup(portable);
     closePoint(labelAt(reloaded.canvas, dimension.id), editedLabel);
   });
-
-  it('keeps the exact initial location of a portable legacy absolute label through mount and solver normalization', async () => {
-    const source = createCadDocument(),
-      part = createCadPart();
-    part.sketch = addLine(part.sketch, { x1: 20, y1: 40, x2: 120, y2: 40 });
-    const line = part.sketch.entities.find(entity => entity.type === 'line')!;
-    part.sketch = addConstraint(part.sketch, {
-      type: 'distance',
-      pointAId: line.startId,
-      pointBId: line.endId,
-      value: 100,
-      labelPosition: { x: 85, y: 75 },
-    });
-    source.parts.push(part);
-    const before = structuredClone(source);
-    const editor = await setup(JSON.parse(JSON.stringify(source)), canvas => closePoint(labelAt(canvas), { x: 85, y: 75 }));
-    closePoint(labelAt(editor.canvas), { x: 85, y: 75 });
-    closePoint(visibleLine(editor.canvas, line.id).a, { x: 20, y: 40 });
-    closePoint(visibleLine(editor.canvas, line.id).b, { x: 120, y: 40 });
-    const normalized = editor.latest().parts[0]!.sketch.constraints.find(constraint => 'value' in constraint)!;
-    expect(normalized.value).toBe(100);
-    expect(normalized.labelPlacement).toBeDefined();
-    expect(normalized.labelPosition).toBeUndefined();
-    expect(editor.latest().revision).toBe(source.revision);
-    expect(source).toEqual(before);
-  });
 });

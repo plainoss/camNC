@@ -246,7 +246,6 @@ describe('real pointer dimension gestures', () => {
       const dimension = latest().constraints.find(c => c.type === kind)! as CadDimension;
       expect(dimension.value).toBeCloseTo(value, 5);
       expect(dimension.labelPlacement).toBeDefined();
-      expect(dimension.labelPosition).toBeUndefined();
       const position = resolveDimensionPlacement(latest(), dimension)!;
       expect(position.x).toBeCloseTo(x!, 1);
       expect(position.y).toBeCloseTo(y!, 1);
@@ -319,7 +318,6 @@ describe('real pointer dimension gestures', () => {
       const dimension = latest().constraints.find(constraint => constraint.type === 'pointLineDistance')!;
       expect(dimension).toMatchObject({ pointId: point.id, entityId: line.id, value: 30 });
       expect(dimension.labelPlacement).toBeDefined();
-      expect(dimension.labelPosition).toBeUndefined();
       const placedPosition = resolveDimensionPlacement(sketch, dimension)!;
       expect(placedPosition.x).toBeCloseTo(145, 1);
       expect(placedPosition.y).toBeCloseTo(65, 1);
@@ -354,7 +352,6 @@ describe('real pointer dimension gestures', () => {
     const angle = latest().constraints.find(constraint => constraint.type === 'angle')!;
     expect(angle).toMatchObject({ entityAId: first.id, entityBId: second.id, value: 45 });
     expect(angle.labelPlacement).toBeDefined();
-    expect(angle.labelPosition).toBeUndefined();
     const placedPosition = resolveDimensionPlacement(sketch, angle)!;
     expect(placedPosition.x).toBeCloseTo(130, 1);
     expect(placedPosition.y).toBeCloseTo(25, 1);

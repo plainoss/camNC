@@ -5094,7 +5094,7 @@ export function CadEditor({
                   constraint={dimensionDraft}
                   sketch={sketch}
                   pixelScale={markerScale}
-                  position={dimensionDraft.labelPosition ?? cursor}
+                  position={cursor}
                   selected
                   interactive={false}
                 />

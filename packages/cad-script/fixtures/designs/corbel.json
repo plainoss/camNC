@@ -261,9 +261,10 @@
             "value": 66,
             "label": "Length",
             "id": "constraint-14",
-            "labelPosition": {
-              "x": 59.9999899115445,
-              "y": -15.00001008845561
+            "labelPlacement": {
+              "kind": "linear",
+              "fraction": 0.5757574229021895,
+              "normalOffset": -15.00001008845561
             }
           },
           {
@@ -271,9 +272,10 @@
             "entityId": "arc-1",
             "value": 22.000000000000004,
             "id": "constraint-15",
-            "labelPosition": {
-              "x": 145.00000000000006,
-              "y": 69.99999999999997
+            "labelPlacement": {
+              "kind": "radial",
+              "angle": 0.6998928697192428,
+              "radiusRatio": 3.387202458647516
             }
           }
         ]

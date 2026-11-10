@@ -97,8 +97,6 @@ export type CadEntity = CadPointEntity | CadLineEntity | CadCircleEntity | CadAr
 interface ConstraintBase {
   id: string;
   label?: string;
-  /** Legacy absolute annotation input; numeric dimensions migrate to labelPlacement. */
-  labelPosition?: CadPoint;
 }
 /** User placement in a dimension's geometric frame; independent of camera scale. */
 export type CadDimensionPlacement =
@@ -114,10 +112,12 @@ export type CadDimensionPlacement =
       angle: number;
       radiusRatio: number;
       /** Fixed radial residual in millimetres, added after bounded radius scaling. */ radiusOffset?: number;
-      /** Legacy absolute distance input retains its original authority. */ distance?: number;
     }
-  | { kind: 'angle'; radius: number; angleOffset: number; frame?: 'local' }
-  | { kind: 'fallback'; offset: CadPoint };
+  | { kind: 'angle'; radius: number; angleOffset: number }
+  /** Offset from the frame's origin, for a frame without a usable span. */
+  | { kind: 'fallback'; offset: CadPoint }
+  /** Sketch coordinates, for a dimension whose geometry gives no frame (a missing reference). */
+  | { kind: 'absolute'; position: CadPoint };
 interface DimensionBase extends ConstraintBase {
   labelPlacement?: CadDimensionPlacement;
   /** A reference measurement does not add solver equations or remove freedom. */

@@ -1,4 +1,4 @@
-import { cadPartsToCut, migrateDimensionPlacements, type CadDocument } from '@wbcnc/cad';
+import { cadPartsToCut, type CadDocument } from '@wbcnc/cad';
 import { solveCadDocument } from '../cad/solveCad';
 import { updateJobForModel, type CamJobV1 } from './jobDb';
 import { carryDesignTabs } from './designTabAnchors';
@@ -7,9 +7,9 @@ import { asMilled } from './millSide';
 import { missingNativeHoleChoices } from './holeChoices';
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-// Representation upgrades are not edits; durable optimistic guards still compare exact snapshots below.
+// The revision counts edits, not content; durable optimistic guards still compare exact snapshots below.
 const sameDesignContent = (a: CadDocument | null | undefined, b: CadDocument | null | undefined) =>
-  same(a && { ...migrateDimensionPlacements(a), revision: 0 }, b && { ...migrateDimensionPlacements(b), revision: 0 });
+  same(a && { ...a, revision: 0 }, b && { ...b, revision: 0 });
 
 /** A draft is recoverable after reload; it never changes the geometry CAM has accepted. */
 export async function saveDesignDraft(

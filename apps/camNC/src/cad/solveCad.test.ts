@@ -1,4 +1,4 @@
-import { addCircle, createPlateDocument, dimensionForSelection, updateDimension } from '@wbcnc/cad';
+import { addCircle, createPlateDocument, dimensionForSelection, updateDimension, withDimensionPlacement } from '@wbcnc/cad';
 import { afterEach, describe, expect, it } from 'vitest';
 import { disposeCadSolver, prepareDimensionCreation, solveCadDocument } from './solveCad';
 
@@ -42,15 +42,12 @@ describe('dedicated CAD solver worker', () => {
     const proposal = dimensionForSelection(part.sketch, [top.id]);
     if ('message' in proposal) throw new Error(proposal.message);
     const source = structuredClone(part);
-    const result = await prepareDimensionCreation(part, {
-      ...proposal.constraint,
-      id: 'new-top-reference',
-      labelPosition: { x: 50, y: 80 },
-    });
+    const placed = withDimensionPlacement(part.sketch, { ...proposal.constraint, id: 'new-top-reference' }, { x: 50, y: 80 });
+    const result = await prepareDimensionCreation(part, placed);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.driven).toBe(true);
-    expect(result.dimension).toMatchObject({ id: 'new-top-reference', driven: true, value: 100, labelPosition: { x: 50, y: 80 } });
+    expect(result.dimension).toMatchObject({ id: 'new-top-reference', driven: true, value: 100, labelPlacement: placed.labelPlacement });
     expect(part).toEqual(source);
     expect(result.part.sketch.constraints.filter(c => c.id !== 'new-top-reference')).toEqual(part.sketch.constraints);
   });

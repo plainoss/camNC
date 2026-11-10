@@ -179,11 +179,14 @@ describe('inline dimension graphics', () => {
   it('uses stored world label positions while keeping default offsets20pixels from geometry', () => {
     expect(dimensionAnchor(width, sketch, 2)).toEqual({ x: 60, y: -10 });
     expect(dimensionAnchor(height, sketch, 4)).toEqual({ x: 125, y: 40 });
-    expect(dimensionAnchor({ ...width, labelPosition: { x: -7, y: 14 } }, sketch, 100)).toEqual({ x: -7, y: 14 });
+    expect(dimensionAnchor({ ...width, labelPlacement: { kind: 'absolute', position: { x: -7, y: 14 } } }, sketch, 100)).toEqual({
+      x: -7,
+      y: 14,
+    });
     const { container } = render(
       <svg>
         <DimensionGraphics
-          constraint={{ ...width, labelPosition: { x: -7, y: 14 } }}
+          constraint={{ ...width, labelPlacement: { kind: 'absolute', position: { x: -7, y: 14 } } }}
           sketch={sketch}
           pixelScale={1}
           position={{ x: 50, y: -25 }}
@@ -384,20 +387,23 @@ describe('inline dimension graphics', () => {
     let almostParallel = addLine(createCadPart().sketch, { x1: 0, y1: 0, x2: 100, y2: 0 });
     const first = almostParallel.entities.at(-1)!;
     almostParallel = addLine(almostParallel, { x1: 0, y1: 10, x2: 100, y2: 10.001 });
-    const dimension: CadDimension = {
-      id: 'conditioned-angle',
-      type: 'angle',
-      entityAId: first.id,
-      entityBId: almostParallel.entities.at(-1)!.id,
-      value: (Math.atan2(0.001, 100) * 180) / Math.PI,
-      labelPosition: { x: 50, y: 20 },
-    };
+    const dimension = withDimensionPlacement<CadDimension>(
+      almostParallel,
+      {
+        id: 'conditioned-angle',
+        type: 'angle',
+        entityAId: first.id,
+        entityBId: almostParallel.entities.at(-1)!.id,
+        value: (Math.atan2(0.001, 100) * 180) / Math.PI,
+      },
+      { x: 50, y: 20 }
+    );
     const { container } = render(
       <svg>
         <DimensionGraphics constraint={dimension} sketch={almostParallel} pixelScale={1} />
       </svg>
     );
-    expect(dimensionAnchor(dimension, almostParallel)).toEqual({ x: 50, y: 20 });
+    expect(dimensionAnchor(dimension, almostParallel)).toEqual({ x: expect.closeTo(50, 7), y: expect.closeTo(20, 7) });
     const path = container.querySelector('[data-dimension-line="angle-arc"]')!;
     expect(path).not.toBeNull();
     const coordinates = path
