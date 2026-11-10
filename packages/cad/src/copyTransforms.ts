@@ -2,6 +2,7 @@ import { newCadId } from './document';
 import { copyOperationSourceIssue } from './copyOperationSource';
 import { evaluateCadDocument } from './features';
 import { cadPartReference } from './partReferences';
+import { trimCadFolders } from './folderModel';
 import type { CadCopyTransform, CadDocument } from './types';
 
 /** Fresh ordered documents use current tool material. This explicit conversion opts into ordered cut semantics. */
@@ -87,11 +88,14 @@ export function copyOperationPrefix(document: CadDocument, through?: string): Ca
   if (through !== undefined && at < 0) throw Error('This operation is not in the source order.');
   const operationOrder = order.slice(0, at + 1),
     kept = new Set(operationOrder);
-  return checked({
-    ...document,
-    operationOrder,
-    partCuts: document.partCuts?.filter(cut => kept.has(cut.id)),
-    copyTransforms: document.copyTransforms?.filter(move => kept.has(move.id)),
-    ...(document.legacyPartCutIds && { legacyPartCutIds: document.legacyPartCutIds.filter(id => kept.has(id)) }),
-  });
+  // A finite prefix removes later cut records; its folder memberships must remain valid source too.
+  return checked(
+    trimCadFolders({
+      ...document,
+      operationOrder,
+      partCuts: document.partCuts?.filter(cut => kept.has(cut.id)),
+      copyTransforms: document.copyTransforms?.filter(move => kept.has(move.id)),
+      ...(document.legacyPartCutIds && { legacyPartCutIds: document.legacyPartCutIds.filter(id => kept.has(id)) }),
+    })
+  );
 }
