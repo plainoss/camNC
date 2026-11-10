@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Box3, Vector3 } from 'three';
 import type { SectionOffsetControl } from '@/cam/model/SectionOffsetHandle';
 import type { ModelFacePick, ViewRequest } from '@/cam/model/ModelViewport';
-import type { AssemblyModel } from './assemblyModel';
+import { instanceKey, type AssemblyModel } from './assemblyModel';
 import { basePlaneViews, pickedPlaneFrame } from './basePlanes';
 import { parseCadValue } from './valueExpressions';
 import type { SectionPlane } from './sectionGeometry';
@@ -134,16 +134,25 @@ export function useStudioSection(
     }
     let source: Source | null = selectedPlane && pickedPlaneFrame(document, selectedPlane) ? { kind: 'plane', id: selectedPlane } : null;
     if (!source && selectedFace) {
-      const placement = model.placements.get(selectedFace.partId);
+      const placement = model.placements.get(instanceKey(selectedFace));
       const placed = placement
-        ? { ...document, parts: document.parts.map(part => (part.id === selectedFace.partId ? { ...part, placement } : part)) }
+        ? {
+            ...document,
+            parts: document.parts.map(part => {
+              if (part.id !== selectedFace.partId) return part;
+              // Preview/layout placements belong to the exact physical instance, including a mirrored copy.
+              return selectedFace.copyId
+                ? { ...part, copies: part.copies?.map(copy => (copy.id === selectedFace.copyId ? { ...copy, placement } : copy)) }
+                : { ...part, placement };
+            }),
+          }
         : document;
       const picked = cadFaceFrame(placed, selectedFace);
       if (!('error' in picked))
         source = {
           kind: 'face',
           frame: picked,
-          label: `${model.instances.find(item => item.partId === selectedFace.partId)?.name ?? 'Selected'} face`,
+          label: `${model.instances.find(item => item.partId === selectedFace.partId && item.copyId === selectedFace.copyId)?.name ?? 'Selected'} face`,
           document,
         };
     }
