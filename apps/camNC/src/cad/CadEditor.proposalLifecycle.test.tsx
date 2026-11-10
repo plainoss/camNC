@@ -52,7 +52,8 @@ async function checkedProposal() {
   await ready();
   await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
   await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
-  await screen.findByRole('complementary', { name: 'Design assistant' });
+  // The toolbar toggles before the lazy Dock chunk mounts; wait for its actual accessible panel.
+  await screen.findByRole('complementary', { name: 'Design assistant' }, { timeout: 20_000 });
   await userEvent.type(within(dock()).getByRole('textbox', { name: 'Message' }), 'Make the plate 24 mm thick.');
   await userEvent.click(within(dock()).getByRole('button', { name: 'Send' }));
   // Publishing the checked candidate rerenders the portal's parent; wait for the review action itself.
