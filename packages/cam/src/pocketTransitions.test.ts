@@ -6,6 +6,7 @@ import { camPart, DEFAULT_SETTINGS, pocketOperation, type PartCam } from './tool
 import type { PathD, Vec3 } from './geom';
 import { StockModel } from './stock';
 import { machiningPart } from '../test/machining-fixtures';
+import { planAccuracy } from './accuracy';
 
 const rect = (x0: number, y0: number, x1: number, y1: number): PathD => [
   { x: x0, y: y0 },
@@ -217,7 +218,12 @@ describe('posted pocket cutting transitions', () => {
     };
     const posted = toGcode(source);
     expect(retracts(posted)).toBeLessThan(retracts(toGcode(baseline)) / 2);
-    const resolved = resolve(source);
+    const budget = planAccuracy().budget;
+    const resolved = certifyStockLinks(source, {
+      plungeFeed: 480,
+      pathTolerance: 0.01,
+      endpointTolerance: budget.outputRounding + budget.controllerRounding,
+    });
     expect(resolved.cuttingCertificates.filter(proof => proof.certificate.allowed).length).toBeGreaterThan(5);
     expect(resolved.cam.operations[0].passes[0].link).toBe('retract');
     expect(retracts(posted)).toBeGreaterThan(0);
