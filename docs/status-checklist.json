@@ -171,6 +171,12 @@
           "note": "Variables are inferred from expressions and apply globally; explicit types, measured values and positional scope are not implemented."
         },
         {
+          "item": "Confirm an open Part Studio sketch with Ctrl or Command Enter",
+          "status": "done",
+          "evidence": ["studio/sketch/confirm-shortcut-keeps-cabinet", "apps/camNC/src/cad/CadEditor.confirmShortcut.test.tsx"],
+          "note": "Keeps typed valid dimensions and returns the keyboard to the assembled view. Empty or invalid sketches and unfinished drawings stay open; Enter retains its drawing-tool behavior."
+        },
+        {
           "item": "Accepted geometry and draft edits persist with the project",
           "status": "done",
           "evidence": ["sketch/persist/reload-keeps-design", "sketch/persist/reload-keeps-accepted", "sketch/persist/last-edit-saved-immediately"]
