@@ -2,3 +2,8 @@ export * from './edit';
 export * from './inspect';
 export * from './render';
 export * from './fullReport';
+export * from './iteration/workflow';
+export * from './iteration/artifacts';
+export * from './iteration/dividedTray';
+export * from './iteration/fittedJoints';
+export * from './iteration/woodworkingDiagnostics';
