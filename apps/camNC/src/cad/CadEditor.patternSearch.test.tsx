@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
-import { createPlateDocument, parseCadDocument, setPartPattern, type CadDocument } from '@wbcnc/cad';
+import { addPartCut, createPlateDocument, parseCadDocument, setPartPattern, updatePartCut, type CadDocument } from '@wbcnc/cad';
 import { cadSession, endCadSession } from '@wbcnc/cad-editor/session';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ModelViewport } from '@/cam/model/ModelViewport';
@@ -241,3 +241,66 @@ it.each(['linear', 'circular'] as const)('keeps the selected-copy refusal before
   expect(session.future).toHaveLength(0);
   expect(viewport().instanceIds).toEqual(identities);
 });
+
+it.each(['linear', 'circular'] as const)(
+  'opens a searched %s source-family pattern when a later cut consumes its visible tool body',
+  async kind => {
+    let source = createPlateDocument({ width: 200, height: 120, thickness: 18 });
+    const target = source.parts[0]!;
+    target.name = 'Target';
+    target.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    const tool = createPlateDocument({ width: 20, height: 20, thickness: 18 }).parts[0]!;
+    tool.name = 'Plate';
+    tool.placement = { position: [20, 20, 0], rotation: [0, 0, 0, 1] };
+    source.parts.push(tool);
+    const cut = addPartCut(source, [tool.id], [target.id], { value: 0 });
+    source = updatePartCut(cut.document, cut.id, { consumeTools: true });
+    const { session, latest, settled } = await studio(source);
+    const parts = () => within(screen.getByRole('list', { name: 'Parts' }));
+    expect(parts().queryByRole('button', { name: 'Plate' })).toBeNull();
+    expect(viewport().instanceIds).not.toContain(tool.id);
+    await userEvent.click(
+      within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Extrude · Plate(?:\s|$)/ })
+    );
+    const before = structuredClone(latest());
+    let dialog = await choose(kind);
+    defaults(dialog, kind);
+    expect(content(latest())).toEqual(content(before));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(content(latest())).toEqual(content(before));
+    expect(session.past).toHaveLength(0);
+    dialog = await choose(kind);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+    await settled();
+    const accepted = latest().parts.find(part => part.id === tool.id)!.pattern!;
+    expect(accepted.count).toBe(kind === 'linear' ? 2 : 4);
+    expect(!!accepted.circular).toBe(kind === 'circular');
+    expect(latest().partCuts).toEqual(before.partCuts);
+    expect(parts().queryByRole('button', { name: 'Plate' })).toBeNull();
+    expect(session.past).toHaveLength(1);
+    const saved = structuredClone(latest());
+    const copyIds = saved.parts.find(part => part.id === tool.id)!.copies!.map(copy => copy.id);
+    dialog = await choose(kind);
+    defaults(dialog, kind);
+    await userEvent.fill(count(dialog, kind), kind === 'linear' ? '3' : '2');
+    await userEvent.tab();
+    expect(content(latest())).toEqual(content(saved));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(content(latest())).toEqual(content(saved));
+    expect(session.past).toHaveLength(1);
+    dialog = await choose(kind);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+    expect(latest().parts.find(part => part.id === tool.id)!.pattern!.id).toBe(accepted.id);
+    expect(
+      latest()
+        .parts.find(part => part.id === tool.id)!
+        .copies!.map(copy => copy.id)
+    ).toEqual(copyIds);
+    expect(content(latest())).toEqual(content(saved));
+    expect(session.past).toHaveLength(1);
+    await userEvent.click(toolbar().getByRole('button', { name: 'Undo (Ctrl or Command Z)' }));
+    await settled();
+    expect(content(latest())).toEqual(content(before));
+  },
+  30_000
+);
