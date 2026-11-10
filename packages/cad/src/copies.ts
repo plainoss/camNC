@@ -144,16 +144,26 @@ export function evaluatedPartCopy(part: EvaluatedCadPart, copy: CadPartCopy): Ev
 /**
  * What gets cut: pieces grouped by their cuts and whether they are mirrored, named as the assembly names them.
  */
-export function cadPartsToCut(given: CadDocument, parts: readonly EvaluatedCadPart[]): CadPartToCut[] {
+export function cadPartsToCut(
+  given: CadDocument,
+  parts: readonly EvaluatedCadPart[],
+  stage?: { available?: readonly string[] }
+): CadPartToCut[] {
   // Copies switched off in the feature list aren't cut.
   const document = activeDesign(given);
-  const consumed = consumedTools(document);
+  const consumed = stage?.available ? new Set<string>() : consumedTools(document);
   return parts.flatMap(part => {
     const source = document.parts.find(candidate => candidate.id === part.partId);
     // A sketch not yet extruded, a step cutting others, or a tool used up by its cut, isn't a part to cut.
-    if ((source && !isCadBody(document, source)) || consumed.has(part.partId)) return [];
+    if (
+      (source && !isCadBody(document, source)) ||
+      consumed.has(part.partId) ||
+      (stage?.available && !stage.available.includes(part.partId))
+    )
+      return [];
     const groups: (CadPartToCut & { mirrored?: boolean })[] = [{ part, names: [part.name] }];
     for (const [index, copy] of (source?.copies ?? []).entries()) {
+      if (stage?.available && !stage.available.includes(`${part.partId}:${copy.id}`)) continue;
       const shape = evaluatedPartCopy(part, copy);
       const group = groups.find(
         entry => !!entry.mirrored === !!copy.mirrored && sameCadProfile(entry.part, shape) && sameCadCuts(entry.part.cuts, shape.cuts)

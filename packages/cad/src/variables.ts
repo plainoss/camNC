@@ -1,6 +1,7 @@
 import { resolveDatumPlanes } from './datumPlanes';
 import { dimensionValueError } from './dimensionValues';
 import { newCadId } from './document';
+import { copyTransformValue, editCopyTransformExpressions } from './copyTransformValues';
 import type {
   CadConstraint,
   CadCut,
@@ -411,14 +412,25 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     return next;
   });
   const cutsChanged = partCuts?.some((step, index) => step !== document.partCuts![index]);
+  const copyTransforms = document.copyTransforms?.map(move => {
+    const value = copyTransformValue(move, scope);
+    return 'move' in value ? value.move : move;
+  });
+  const transformsChanged = copyTransforms?.some((move, index) => move !== document.copyTransforms![index]);
   const planes = document.planes?.map(plane => {
     if (!usesVariables(plane.offsetExpression)) return plane;
     const parsed = parseCadValue(plane.offsetExpression, { unit: 'mm', variables: scope });
     return 'error' in parsed || parsed.value === plane.offset ? plane : { ...plane, offset: parsed.value };
   });
   const planesChanged = planes?.some((plane, index) => plane !== document.planes![index]);
-  if (parts.every((part, index) => part === document.parts[index]) && !cutsChanged && !planesChanged) return document;
-  const next = { ...document, parts, ...(cutsChanged && { partCuts }), ...(planesChanged && { planes }) };
+  if (parts.every((part, index) => part === document.parts[index]) && !cutsChanged && !planesChanged && !transformsChanged) return document;
+  const next = {
+    ...document,
+    parts,
+    ...(cutsChanged && { partCuts }),
+    ...(planesChanged && { planes }),
+    ...(transformsChanged && { copyTransforms }),
+  };
   // What's drawn on a plane that moved goes with it.
   return planesChanged ? resolveDatumPlanes(next) : next;
 }
@@ -538,6 +550,11 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
         message: `Cut parts fingers ${step.split.fingersExpression}: ${fingers.error}`,
       });
   }
+  for (const move of document.copyTransforms ?? []) {
+    if (move.suppressed) continue;
+    const value = copyTransformValue(move, scope);
+    if ('error' in value) problems.push({ code: 'variable-value', severity: 'error', partId: move.partId, message: value.error });
+  }
   return problems;
 }
 
@@ -560,6 +577,7 @@ function withPlacementExpressions(part: CadPart, edit: (expression: string) => s
 function mapExpressions(document: CadDocument, edit: (expression: string) => string): CadDocument {
   return {
     ...document,
+    ...(document.copyTransforms && { copyTransforms: document.copyTransforms.map(move => editCopyTransformExpressions(move, edit)) }),
     variables: document.variables?.map(variable => ({ ...variable, expression: edit(variable.expression) })),
     planes: document.planes?.map(plane => (plane.offsetExpression ? { ...plane, offsetExpression: edit(plane.offsetExpression) } : plane)),
     partCuts: document.partCuts?.map(step => ({

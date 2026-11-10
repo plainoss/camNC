@@ -8,7 +8,7 @@
     "apps/camNC/src/cam/boards.ts": 1437,
     "apps/camNC/src/cam/boards/BoardDrawings.tsx": 1467,
     "apps/camNC/src/routes/cam/$jobId.carve.tsx": 1073,
-    "packages/cad/src/solver.ts": 1080,
+    "packages/cad/src/solver.ts": 1077,
     "packages/cam/src/settle.ts": 1099
   }
 }

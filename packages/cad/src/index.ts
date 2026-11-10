@@ -76,3 +76,7 @@ export * from './extrudeRemoval';
 
 export * from './lengthUnits';
 export * from './replaceFilletedSketch';
+
+export * from './copyTransforms';
+export * from './physicalCadView';
+export * from './copyOperationHistory';
