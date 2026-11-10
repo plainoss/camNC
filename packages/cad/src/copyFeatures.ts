@@ -4,6 +4,8 @@ import { resolveDrawnPlacements } from './drawnOn';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
 import { detachedMirroredPart } from './detachedMirror';
 import { rebindDetachedCopyReferences } from './detachedCopyReferences';
+import { isJoinedBody } from './extrudeSteps';
+import { activeDesign } from './suppression';
 import type { CadCut, CadCutDepth, CadDocument, CadFaceRef, CadFeature, CadPart } from './types';
 
 /** A copy keeps the family's features and adds only those explicitly addressed to it. */
@@ -148,6 +150,21 @@ export function detachPartCopy(
   const source = document.parts.find(part => part.id === partId);
   const index = source?.copies?.findIndex(copy => copy.id === copyId) ?? -1;
   if (!source || index < 0) return { error: 'This copy is not present. Restore its pattern count before detaching it.' };
+  const active = activeDesign(document);
+  const byId = new Map(active.parts.map(part => [part.id, part]));
+  for (const body of active.parts) {
+    if (!isJoinedBody(active, body)) continue;
+    let target = body.addTo;
+    const seen = new Set<string>();
+    // Joined bodies inherit the source's copies but aren't in its sketch. Cloning that sketch would drop material.
+    // Follow Add parents too, without looping on a malformed chain, if a joined body is itself used as an Add target.
+    while (target && !seen.has(target)) {
+      if (target === partId)
+        return { error: 'This part has active joined bodies. Suppress or remove those Add steps before detaching a copy.' };
+      seen.add(target);
+      target = byId.get(target)?.addTo;
+    }
+  }
   const copy = source.copies![index]!;
   const detached: CadPart = structuredClone(source);
   detached.name = name?.trim() || cadCopyName(source, index);

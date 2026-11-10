@@ -186,7 +186,7 @@ describe('detaching copy reference integration', () => {
     document = addPartMirror(document, target.id, { across: { partId: boss.id, copyId, face: 'top' } }).document;
     const snapshot = JSON.stringify(document);
     expect(detachPartCopy(document, source.id, copyId)).toEqual({
-      error: 'This copy has a reference to a joined body on it. Remove that reference before detaching the copy.',
+      error: 'This part has active joined bodies. Suppress or remove those Add steps before detaching a copy.',
     });
     expect(JSON.stringify(document)).toBe(snapshot);
   });

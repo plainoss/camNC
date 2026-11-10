@@ -17,7 +17,9 @@ corners, directions and mirror planes to the new part. A mirrored detach snapsho
 its evaluated contours and cuts as editable polygon sketches at the evaluator's
 curve tolerance. It refuses a mirrored copy with external face or corner references,
 or any copy referenced through an inherited joined body; remove those references
-before detaching.
+before detaching. Detach also refuses a source with active joined Add bodies, which
+are outside its own sketch. Suppress or remove those Add steps first; inactive Add
+steps stay with the source family and are not copied into the detached part.
 
 ## Connection and conversation
 
