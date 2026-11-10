@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import { useState } from 'react';
 import {
   type CadDrawnOn,
@@ -28,7 +29,6 @@ import { CadDrawnOnField } from './CadDrawnOnField';
 import { CadReliefField } from './CadReliefField';
 import { CadThicknessField } from './CadThicknessField';
 import { FeatureDialog } from './FeatureDialog';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 
@@ -75,6 +75,7 @@ export function ExtrudeDialog({
   /** Starts picking a plane or a face, for Up to face; the pick comes back once. Null stops a pick under way. */
   pickFace?: (picked: ((on: CadDrawnOn['on'], datum?: string) => void) | null) => void;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const [pickingFace, setPickingFace] = useState(false);
   /** Blind to a thickness, or up to a plane or face: its thickness then follows that face. */
   const setUpTo = (upTo: CadDrawnOn['on'] | null, datum?: string) =>
@@ -131,10 +132,10 @@ export function ExtrudeDialog({
   const [operationError, setOperationError] = useState<string | null>(null);
   const [removeDepthText, setRemoveDepthText] = useState(() =>
     part.remove && part.remove.depth !== 'through'
-      ? (part.remove.depthExpression ?? formatCadValue(part.remove.depth))
+      ? (part.remove.depthExpression ?? lengthText(part.remove.depth))
       : part.drawnOn && 'plane' in part.drawnOn.on
-        ? (part.thicknessExpression ?? formatCadValue(part.thickness))
-        : '6'
+        ? (part.thicknessExpression ?? lengthText(part.thickness))
+        : lengthText(6)
   );
   const [removeError, setRemoveError] = useState<string | null>(null);
   /** Regions kept that the extrude can still take, given which of them it picks from. */
@@ -235,7 +236,7 @@ export function ExtrudeDialog({
     operation === 'remove' || !ownExtrusion || part.thin || apart
       ? undefined
       : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
-  const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? formatCadValue(part.thin.depth)) : '100');
+  const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? lengthText(part.thin.depth)) : lengthText(100));
   const setThin = (thin: CadPart['thin'] | null) => {
     // A thin extrude has a depth of its own, so it no longer goes up to a face.
     if (thin) stopPickingFace();
@@ -394,7 +395,7 @@ export function ExtrudeDialog({
                   }}
                 />
               </span>
-              mm
+              {lengthUnit}
             </label>
           )}
           {(removeError || stepProblem) && (
@@ -473,7 +474,7 @@ export function ExtrudeDialog({
               <small>Up to</small>
               <span>
                 {part.upTo
-                  ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${formatCadValue(part.thickness)} mm away`
+                  ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${lengthText(part.thickness)} ${lengthUnit} away`
                   : 'Pick a plane or a face'}
               </span>
             </button>
@@ -565,7 +566,7 @@ export function ExtrudeDialog({
                     }}
                   />
                 </span>
-                mm
+                {lengthUnit}
               </label>
               {depthError && (
                 <p role="alert" className="cad-thickness-error">

@@ -2,16 +2,14 @@ import type { CadDocument, CadPoint } from '@wbcnc/cad';
 import type { Ref } from 'react';
 import type { FaceSketchScene } from './faceSketchScene';
 import type { StudioCameraRef } from './studioCamera';
-
-export interface CadEditorController {
-  /** Commit valid open value fields to the draft without accepting it or navigating. */
-  prepareDocument: () => CadDocument | null;
-  /** Use the same validation and accepted-session boundary as the Finish button. */
-  finish: () => Promise<boolean>;
-}
+import type { CadSession } from '@wbcnc/cad-editor/session';
+import type { CadEditorController } from './editorController';
+export type { CadEditorController } from './editorController';
 
 export interface CadEditorProps {
   document: CadDocument;
+  /** Join the route session without acknowledging a remount as a durable save. */
+  editSession?: CadSession;
   onDraftChange: (document: CadDocument) => void;
   onFinish: (document: CadDocument) => void | Promise<void>;
   onCancel: () => void | Promise<void>;

@@ -1,3 +1,4 @@
+import type { CadLengthUnit } from './types';
 import { isBareBaseUnitLiteral } from './dimensionExpressions';
 
 export type CadValueUnit = 'mm' | 'deg' | 'scalar';
@@ -153,7 +154,7 @@ export function renameCadExpressionVariables(text: string, names: ReadonlyMap<st
 /** A bounded arithmetic parser, with fixed functions, no eval and no application-state access. Variables come only from the scope given. */
 export function parseCadValue(
   text: string,
-  { unit = 'mm', variables = {} }: { unit?: CadValueUnit; variables?: CadValueScope } = {}
+  { unit = 'mm', variables = {}, lengthUnit = 'mm' }: { unit?: CadValueUnit; variables?: CadValueScope; lengthUnit?: CadLengthUnit } = {}
 ): CadValueResult {
   const original = text.trim();
   if (!original) return { error: 'Enter a value.' };
@@ -343,12 +344,16 @@ export function parseCadValue(
           ? 'The expression must produce a length, not a unitless ratio.'
           : 'The expression must produce an angle, not a unitless ratio.'
       );
+    // Unitless user input uses the design unit; named lengths and explicit units already resolve to mm.
+    const implicitLength = unit === 'mm' && !result.dimension && !result.explicitUnits && lengthUnit !== 'mm';
+    if (implicitLength) result.value = checked(result.value * unitFactors[lengthUnit]!.factor);
+    const expression = implicitLength ? `(${original.replace(/^=/, '')}) ${lengthUnit}` : original;
     if (Math.abs(result.value) > CAD_MAX_INPUT_MAGNITUDE)
       throw new Error(
         `Use an absolute value of at most ${CAD_MAX_INPUT_MAGNITUDE}${unit === 'mm' ? ' mm' : unit === 'deg' ? ' degrees' : ''}.`
       );
     const baseUnitLiteral = unit !== 'scalar' && isBareBaseUnitLiteral(original, unit, result.value);
-    return { value: checked(result.value), ...(!plainNumber.test(original) && !baseUnitLiteral && { expression: original }) };
+    return { value: checked(result.value), ...((implicitLength || (!plainNumber.test(original) && !baseUnitLiteral)) && { expression }) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Enter a valid arithmetic expression.' };
   }

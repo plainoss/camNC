@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import {
   cadExpressionNames,
   cadVariableValues,
@@ -13,8 +14,6 @@ import './cadVariablesPanel.css';
 
 /** Only an expression that names a variable or does arithmetic needs its result shown. */
 const worksOut = (expression: string) => cadExpressionNames(expression).length > 0 || /[-+*/()]/.test(expression.replace(/^[+-]/, ''));
-const shown = (result: CadVariableValue) =>
-  `${formatCadValue(result.value)}${result.kind === 'length' ? ' mm' : result.kind === 'angle' ? '°' : ''}`;
 
 function VariableRow({
   variable,
@@ -32,6 +31,9 @@ function VariableRow({
   onDelete?: () => string | null;
   onDone: () => void;
 }) {
+  const { formatLength, lengthUnit } = useDesignUnits();
+  const shown = (result: CadVariableValue) =>
+    `${result.kind === 'length' ? formatLength(result.value) : formatCadValue(result.value)}${result.kind === 'length' ? ` ${lengthUnit}` : result.kind === 'angle' ? '°' : ''}`;
   const id = useId();
   const [name, setName] = useState(variable?.name ?? '');
   const [expression, setExpression] = useState(variable?.expression ?? '');

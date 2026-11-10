@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import { type CadDimension, type CadPoint, type CadSketch } from '@wbcnc/cad';
 import type { PointerEvent, ReactNode } from 'react';
 import { angleDimensionGeometry, dimensionAnchor, dimensionPoints, linearDimensionGeometry } from '@wbcnc/cad-editor/dimensionGeometry';
@@ -156,10 +157,11 @@ export function DimensionGraphics({
   onEdit,
   onLabelPointerDown,
 }: DimensionGraphicsProps) {
+  const { formatLength, lengthUnit } = useDesignUnits();
   const scale = Number.isFinite(pixelScale) && pixelScale > 0 ? pixelScale : 1;
   const at = position ?? dimensionAnchor(constraint, sketch, scale);
   if (!at) return null;
-  const formatted = formatCadValue(constraint.value),
+  const formatted = constraint.type === 'angle' ? formatCadValue(constraint.value) : formatLength(constraint.value),
     expression = constraint.expression?.trim();
   const text = `${expression ? 'ƒ ' : ''}${constraint.type === 'diameter' ? '⌀' : constraint.type === 'radius' ? 'R' : ''}${formatted}${constraint.type === 'angle' ? '°' : ''}`;
   const color = selected
@@ -183,7 +185,7 @@ export function DimensionGraphics({
           role="button"
           aria-disabled={!interactive}
           tabIndex={interactive ? 0 : -1}
-          aria-label={`${constraint.driven ? 'Reference' : 'Edit'} ${constraint.label ?? constraint.type}: ${formatted} ${constraint.type === 'angle' ? 'degrees' : 'mm'}`}
+          aria-label={`${constraint.driven ? 'Reference' : 'Edit'} ${constraint.label ?? constraint.type}: ${formatted} ${constraint.type === 'angle' ? 'degrees' : lengthUnit}`}
           aria-description={
             [constraint.driven ? 'Read-only measurement that follows the geometry.' : '', expression ? `Expression: ${expression}` : '']
               .filter(Boolean)

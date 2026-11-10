@@ -21,6 +21,7 @@ export function parseCadDocument(input: unknown): CadDocument {
     (d.version !== 1 && d.version !== 2 && d.version !== 3) ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
+    (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
     !Number.isSafeInteger(d.revision) ||
     d.revision < 0 ||
     !Array.isArray(d.parts) ||

@@ -143,9 +143,18 @@ export async function createAdapter(page, url) {
   await page.getByRole('region', { name: 'Demo mode', exact: true }).waitFor();
   await page.goto(new URL('/cam', url).href, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /^New design/ }).click();
+  await page.getByTestId('model-origin').waitFor();
+  await waitSettled(page);
+  // This coordinate corpus is authored in mm, matching the headless adapter. Keep its fixture unit explicit when
+  // the app's new-design default changes, so the existing geometry and label assertions retain their meaning.
+  await page.getByRole('button', { name: 'Design settings', exact: true }).click();
+  const settings = page.getByRole('dialog', { name: 'Design settings', exact: true });
+  await settings.getByRole('combobox', { name: 'Length unit' }).selectOption('mm');
+  await settings.getByRole('button', { name: 'Save settings', exact: true }).click();
+  await settings.waitFor({ state: 'hidden' });
+  await waitSettled(page);
   const canvas = page.getByTestId('cad-canvas');
   const studioToolbar = page.getByRole('toolbar', { name: 'Part Studio toolbar' });
-  await page.getByTestId('model-origin').waitFor();
   // A new design opens in the Part Studio with no parts: scenarios start a sketch on the top plane.
   await studioToolbar.getByRole('button', { name: /Sketch/ }).click();
   await page.getByRole('list', { name: 'Default geometry' }).getByRole('button', { name: 'Top', exact: true }).click();

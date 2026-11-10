@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeatureList } from './FeatureList';
 import { PartsList } from './PartsList';
+import { DesignUnitContext } from './designUnits';
 
 afterEach(cleanup);
 const plate = (name: string) => ({ ...createPlateDocument({ width: 120, height: 80 }).parts[0]!, name });
@@ -223,4 +224,36 @@ describe('folder plane membership', () => {
     expect(ui.document().folders![0]!.partIds).toEqual([ui.source.parts[0]!.id]);
     expect(parseCadDocument(JSON.parse(JSON.stringify(ui.document())))).toEqual(ui.document());
   });
+});
+
+it('shows grouped part thicknesses and folder variables in the design unit', () => {
+  const document = cupboard();
+  render(
+    <DesignUnitContext.Provider value="cm">
+      <FeatureList
+        document={document}
+        selectedPartId={null}
+        onSelect={() => undefined}
+        onAction={() => undefined}
+        onRename={() => undefined}
+      />
+      <PartsList
+        rows={document.parts.map(part => ({ key: part.id, part, name: part.name }))}
+        folders={document.folders}
+        hidden={false}
+        studio
+        selectedKey={undefined}
+        hiddenParts={new Set()}
+        onToggleHidden={() => undefined}
+        trouble={() => null}
+        onPick={() => undefined}
+        onRename={() => undefined}
+      />
+    </DesignUnitContext.Provider>
+  );
+  expect(screen.getByRole('button', { name: '#width = 60 cm' })).toBeTruthy();
+  const group = screen.getByRole('list', { name: 'Cupboard parts' });
+  const side = within(group).getByRole('button', { name: /^Side/ });
+  expect(side.querySelector('small')!.textContent).toBe(`${document.parts[0]!.thickness / 10} cm`);
+  expect(document.parts[0]!.thickness).toBe(18);
 });

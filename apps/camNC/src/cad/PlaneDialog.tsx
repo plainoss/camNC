@@ -1,10 +1,10 @@
+import { useDesignUnits } from './designUnits';
 import { newCadId, nextDatumName, resolveDatumPlanes, type CadDocument, type CadDrawnOn, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useMemo, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 
 /**
  * A plane to sketch on, as a step of its own: a base plane or a part's face, moved out along its normal by an offset.
@@ -32,9 +32,10 @@ export function PlaneDialog({
   onPreview?: (document: CadDocument | null) => void;
   onCancel: () => void;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const plane = document.planes?.find(candidate => candidate.id === planeId);
   const [on, setOn] = useState<CadDrawnOn['on'] | null>(plane?.on ?? preselected ?? null);
-  const [offsetText, setOffsetText] = useState(plane ? (plane.offsetExpression ?? formatCadValue(plane.offset)) : '100');
+  const [offsetText, setOffsetText] = useState(plane ? (plane.offsetExpression ?? lengthText(plane.offset)) : lengthText(100));
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pick = () => {
@@ -67,7 +68,7 @@ export function PlaneDialog({
       ? (document.planes ?? []).map(candidate => (candidate.id === plane.id ? next : candidate))
       : [...(document.planes ?? []), next];
     return resolveDatumPlanes({ ...document, revision: document.revision + 1, planes });
-  }, [document, plane, featureId, on, offsetText, variables]);
+  }, [document, plane, featureId, on, offsetText, variables, parseCadValue]);
   useDialogPreview(candidate, onPreview);
   const save = () => {
     if (!on) return setError('Pick a plane or a face to offset from.');
@@ -97,7 +98,7 @@ export function PlaneDialog({
             onChange={event => setOffsetText(event.target.value)}
           />
         </span>
-        mm
+        {lengthUnit}
       </label>
       {error && (
         <p role="alert" className="cad-thickness-error">
