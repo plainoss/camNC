@@ -18,7 +18,7 @@ export const sharesSketch = (a: CadPart, b: CadPart): boolean => sketchOwnerId(a
  * Whether a part is an Extrude → Add of another sketch: a body of its own, joined to the part it adds to. It's built and
  * made like a part, but listed as part of that one. How it's machined, as one piece or several, is decided later.
  */
-export function isJoinedBody(document: CadDocument, part: CadPart): boolean {
+export function isJoinedBody(document: Pick<CadDocument, 'parts'>, part: CadPart): boolean {
   if (!part.addTo || part.extrude === false || part.suppressed || part.remove) return false;
   const target = document.parts.find(candidate => candidate.id === part.addTo);
   return !!target && isCadPart(target) && !sharesSketch(target, part);

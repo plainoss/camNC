@@ -112,3 +112,30 @@ it('resolves mirror-face dependencies within one family in the same regeneration
   expect(resolvePartPatterns(stable)).toEqual(stable);
   expect(stable.parts[0]!.copies!.map(copy => copy.placement)).toEqual(cyclic.parts[0]!.copies!.map(copy => copy.placement));
 });
+
+it('follows a joined body face inherited by a pattern copy in the same edit', () => {
+  const source = createPlateDocument({ width: 100, height: 60, thickness: 18 });
+  const target = source.parts[0]!;
+  target.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  const block = createPlateDocument({ width: 100, height: 100, thickness: 18 }).parts[0]!;
+  block.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  block.pattern = { id: 'blocks', axis: 'z', count: 3, spacing: 300 };
+  const boss = createPlateDocument({ width: 20, height: 20, thickness: 10 }).parts[0]!;
+  boss.addTo = block.id;
+  boss.placement = { position: [40, 40, 18], rotation: [0, 0, 0, 1] };
+  source.parts.push(block, boss);
+  const made = addPartMirror(resolvePartPatterns(source), target.id, { across: { partId: `${boss.id}:blocks:2`, face: 'top' } });
+  expect(made.document.parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(1256, 6);
+  const next = resolvePartPatterns({
+    ...made.document,
+    parts: made.document.parts.map(part =>
+      part.id === block.id
+        ? {
+            ...part,
+            pattern: { ...part.pattern!, spacing: 400 },
+          }
+        : part
+    ),
+  });
+  expect(next.parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(1656, 6);
+});

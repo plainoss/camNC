@@ -1,6 +1,6 @@
 import { newCadId } from './document';
-import { cadMirrorPlaneFrame } from './mirrorPlane';
-import { cadPartReference, cadPartReferenceOwner } from './partReferences';
+import { cadMirrorFaceCopy, cadMirrorPlaneFrame } from './mirrorPlane';
+import { cadPartReference } from './partReferences';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { mirroredPlacement, turnAbout } from './placement';
 import { cadDirectionVector } from './directions';
@@ -91,9 +91,8 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
     visiting.add(key);
     const on = copy.mirror.across;
     if ('partId' in on) {
-      const support = cadPartReferenceOwner({ parts }, on.partId);
-      const supportCopy = support?.copies?.find(candidate => cadPartReference(support.id, candidate.id) === on.partId);
-      if (support && supportCopy && !resolve(support, supportCopy)) {
+      const support = cadMirrorFaceCopy({ ...document, parts }, on.partId);
+      if (support && !resolve(support.part, support.copy)) {
         failed.add(key);
         visiting.delete(key);
         return null;

@@ -1,8 +1,21 @@
+import { isJoinedBody } from './extrudeSteps';
 import { cadDatumFrame } from './datumPlanes';
 import { cadDrawnOnSupports, cadFaceFrame, effectivePlacement } from './drawnOn';
 import { cadPartReference, cadPartReferenceOwner } from './partReferences';
 import { CAD_IDENTITY_PLACEMENT, placePoint, rotateVector, type Vec3 } from './placement';
 import type { CadDocument, CadPartCopy } from './types';
+
+/** A joined body inherits its parent's copy ID and transform, as the assembled viewport does. */
+export function cadMirrorFaceCopy(document: CadDocument, reference: string) {
+  const source = cadPartReferenceOwner(document, reference);
+  if (!source || source.id === reference) return null;
+  const own = source.copies?.find(copy => cadPartReference(source.id, copy.id) === reference && !copy.suppressed);
+  if (own) return { part: source, copy: own, mirrored: !!own.mirrored };
+  const parent = isJoinedBody(document, source) && document.parts.find(part => part.id === source.addTo);
+  const inherited = parent && parent.copies?.find(copy => cadPartReference(source.id, copy.id) === reference && !copy.suppressed);
+  // Inherited bodies are rendered with the parent's rigid transform; their mesh is not reflected in local x.
+  return parent && inherited ? { part: parent, copy: inherited, mirrored: false } : null;
+}
 
 /** A mirror plane may belong to one physical copy, independently of its source family's other faces. */
 export function cadMirrorPlaneFrame(document: CadDocument, mirror: NonNullable<CadPartCopy['mirror']>) {
@@ -13,18 +26,19 @@ export function cadMirrorPlaneFrame(document: CadDocument, mirror: NonNullable<C
   if (!part) return { error: 'That part is gone.' };
   const frame = cadFaceFrame(document, { ...on, partId: part.id });
   if ('error' in frame || part.id === on.partId) return frame;
-  const copy = part.copies?.find(copy => cadPartReference(part.id, copy.id) === on.partId && !copy.suppressed);
+  const instance = cadMirrorFaceCopy(document, on.partId);
+  const copy = instance?.copy;
   // A removed copy must never silently resolve to its source or a different pattern instance.
   if (!copy?.placement) return { error: 'That copy is gone or cannot be placed.' };
-  const at = effectivePlacement(part, cadDrawnOnSupports(document)) ?? CAD_IDENTITY_PLACEMENT;
+  const at = effectivePlacement(instance!.part, cadDrawnOnSupports(document)) ?? CAD_IDENTITY_PLACEMENT;
   const back = [-at.rotation[0], -at.rotation[1], -at.rotation[2], at.rotation[3]];
   const vector = (v: Vec3): Vec3 => {
     const local = rotateVector(back, v);
-    if (copy.mirrored) local[0] *= -1;
+    if (instance!.mirrored) local[0] *= -1;
     return rotateVector(copy.placement!.rotation, local);
   };
   const local = rotateVector(back, frame.origin.map((value, axis) => value - at.position[axis]!) as Vec3);
-  if (copy.mirrored) local[0] *= -1;
+  if (instance!.mirrored) local[0] *= -1;
   return {
     ...frame,
     origin: placePoint(copy.placement, local),
@@ -47,9 +61,9 @@ export function cadMirrorPlaneWouldCycle(
   while ('partId' in next) {
     if (next.partId === target || visited.has(next.partId)) return true;
     visited.add(next.partId);
-    const owner = cadPartReferenceOwner(document, next.partId);
-    const reference = next.partId;
-    const dependency = owner?.copies?.find(copy => cadPartReference(owner.id, copy.id) === reference)?.mirror;
+    const instance = cadMirrorFaceCopy(document, next.partId);
+    if (instance && cadPartReference(instance.part.id, instance.copy.id) === target) return true;
+    const dependency = instance?.copy.mirror;
     if (!dependency || dependency.datum) return false;
     next = dependency.across;
   }
