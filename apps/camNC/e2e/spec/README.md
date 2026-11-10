@@ -214,15 +214,16 @@ The comparison reports themselves are kept outside this repository.
 
 Part Studio scenarios also use these steps, all through visible controls:
 
-| Step                                                                                                      | Meaning                                                                             |
-| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `studiotool <name>` / `selectpart <name>`                                                                 | Click a Part Studio toolbar command or one uniquely named rendered part.            |
-| `feature <name>`                                                                                          | Double-click one named feature to open its dialog.                                  |
-| `featureaction <name> = <action>`                                                                         | Open the feature's context menu and choose its named action.                        |
-| `dialogfill <label> = <value>` / `dialogselect <label> = <value>` / `dialogcheck <label> = <true\|false>` | Edit a dialog textbox, select or checkbox. Textbox names may include a unit suffix. |
-| `dialogfocus <box>` / `dialogremove <box> = <part name>`                                                  | Activate a selection box or remove its named selection through the visible control. |
-| `dialogconfirm` / `dialogcancel`                                                                          | Confirm with OK or Save, or cancel the dialog.                                      |
-| `checkpoint <name>`                                                                                       | Remember the settled saved source and visible parts for later checks.               |
+| Step                                                                                                      | Meaning                                                                                              |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `studiotool <name>` / `selectpart <name>`                                                                 | Click a Part Studio toolbar command or one uniquely named rendered part.                             |
+| `feature <name>`                                                                                          | Double-click one named feature to open its dialog.                                                   |
+| `featureaction <name> = <action>`                                                                         | Open the feature's context menu and choose its named action.                                         |
+| `dialogfill <label> = <value>` / `dialogselect <label> = <value>` / `dialogcheck <label> = <true\|false>` | Edit a dialog textbox, select or checkbox. Textbox names may include a unit suffix.                  |
+| `dialogfocus <box>` / `dialogremove <box> = <part name>`                                                  | Activate a selection box or remove its named selection through the visible control.                  |
+| `dialogconfirm` / `dialogcancel`                                                                          | Confirm with OK or Save, or cancel the dialog.                                                       |
+| `checkpoint <name>`                                                                                       | Remember the settled saved source and visible parts for later checks.                                |
+| `pickviewcenter`                                                                                          | Click the center of the model canvas after a named view; intended for a single centered stock board. |
 
 ### Expectations
 
@@ -233,6 +234,8 @@ Dimensions and relations: `dimensions`, `dimensionsInclude`, `constraintsAtLeast
 `annotation`. See `adapters/sketch.mjs` for exact meanings and default tolerances.
 
 The `studio` expectations check source variables, thicknesses, patterns, offsets and cut settings separately from the rendered `listedParts` and `workspacePartCount`. `cutExpressions` checks linked clearance expressions; split settings include the finger count and its expression. `dialogSelections` checks the names actually displayed in a dialog's Tools and Targets boxes. Copy tool names resolve the exact persisted source/copy reference. `sameIdsSince` checks unchanged identities; `addedCopyIdsSince` requires prior copy IDs to retain their instance slots and allows the stated number of new IDs. `samePatternIdsSince` checks the pattern feature's identity. `sameFeatureIdsSince` also retains named variables, source sketches, patterns and ordered cut features. These are interface/source checks; source coordinates and part lists do not establish geometry correctness.
+
+`measurements` checks the visible measurement rows by label and displayed value, including units. The stock measurement scenario uses real top/bottom viewport clicks; its unchanged-content assertion keeps inspection separate from feature edits.
 
 ## Goldens
 

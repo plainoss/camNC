@@ -264,6 +264,7 @@ import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnedBy, type SketchTurn } from './sketchOrbit';
 import { captureSketchCamera, carriedSketchCamera, type StudioCameraState } from './studioCamera';
+import { studioViewShortcut } from './studioViewShortcut';
 import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
@@ -2171,14 +2172,7 @@ export function CadEditor({
         }
         return;
       }
-      const namedViews = ['front', 'back', 'left', 'right', 'top', 'bottom', 'iso'] as const;
-      const name = event.shiftKey
-        ? /^Digit[1-7]$/.test(event.code)
-          ? namedViews[Number(event.code.slice(-1)) - 1]
-          : undefined
-        : event.key.toLowerCase() === 'f'
-          ? 'fit'
-          : undefined;
+      const name = studioViewShortcut(event);
       if (name) {
         event.preventDefault();
         if (!event.repeat) setViewRequest(previous => ({ name, seq: (previous?.seq ?? 0) + 1 }));
@@ -4455,6 +4449,7 @@ export function CadEditor({
               <WorkspaceView
                 cameraState={studioCamera}
                 extrusionDepth={extrusionDepth.control(shownDocument)}
+                measurementEnabled={!busy && !stepDialogOpen && !filletDialog && !choosingFace && !directionPicker && !pointPicker.onPick}
                 onReady={focusViewIfIdle}
                 document={shownDocument}
                 profileDocument={doc}

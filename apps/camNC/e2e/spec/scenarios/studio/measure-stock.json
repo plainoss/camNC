@@ -1,0 +1,26 @@
+[
+  {
+    "id": "studio/measure/stock-faces-readonly",
+    "title": "Measure reads opposite stock faces through real viewport picks without changing the saved design",
+    "evidence": "design read-only inspection of a 100 by 60 by 18 stock board; exact geometry math and complete woodworking meshes checked separately",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/measurement-stock.json",
+      "closesketch",
+      "hideplanes",
+      "checkpoint initial",
+      "view top",
+      "pickviewcenter",
+      { "expect": { "studio": { "measurements": { "Area": "6000 mm²" }, "unchangedSince": "initial" } } },
+      "button ^Measure$",
+      { "expect": { "studio": { "dialog": "Measure" } } },
+      "view bottom",
+      "pickviewcenter",
+      { "expect": { "studio": { "measurements": { "Min distance": "18 mm", "Angle": "180°" }, "unchangedSince": "initial" } } },
+      "dialogselect Length unit = in",
+      { "expect": { "studio": { "measurements": { "Min distance": "0.709 in" }, "unchangedSince": "initial" } } },
+      "button Close Measure",
+      "reload",
+      { "expect": { "studio": { "dialog": null, "workspacePartCount": 1, "unchangedSince": "initial", "sameIdsSince": "initial" } } }
+    ]
+  }
+]
