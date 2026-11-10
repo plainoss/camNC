@@ -4,6 +4,8 @@ Run `pnpm run test:fast` for local feedback, plus any slow browser files changed
 
 During an edit, run focused test files directly. Both root broad commands (`test` and `test:fast`) acquire the same local worktree lock; CI skips that lock because each suite has its own runner. Waiting for a broad suite does not prevent focused checks. This avoids concurrent agents repeatedly timing out otherwise passing browser tests.
 
+The local headless phase runs one package at a time, matching CI. Each geometry package has its own worker pool, so starting several packages together can oversubscribe the host and exhaust existing test deadlines on cold runs. CAM and cad-script also yield to the event loop between tests so long chains of synchronous geometry and microtask-only awaits cannot starve worker-report acknowledgements. This preserves the existing test deadlines and coverage.
+
 | Boundary                                         | Owner                          | Runtime                 | Coverage                                                                               |
 | ------------------------------------------------ | ------------------------------ | ----------------------- | -------------------------------------------------------------------------------------- |
 | Cutting recipes and hardware defaults            | `packages/cam-settings`        | Node                    | Pure resolution and identity rules; browser persistence remains tested in the app      |
