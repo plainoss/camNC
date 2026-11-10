@@ -87,3 +87,24 @@ it('checks linked clearance and independent split snapshots without changing hou
   expect(before.cutSettings[1].split.fingers).toBe(5);
   expect(studioState(cupboard).cutSettings[0]).not.toHaveProperty('split');
 });
+it('distinguishes circular sweep, spacing mode and axis from equal copy counts', () => {
+  const design = structuredClone(cupboard), shelf = design.parts.find(part => part.name === 'Shelf');
+  shelf.pattern = {
+    id: 'radial', axis: 'z', count: 4, spacing: 0,
+    circular: { origin: [20, 30, 0], axis: [0, 0, 1], angle: 180, angleExpression: 'sweep' },
+  };
+  const initial = studioState(design), wanted = { patterns: { Shelf: { circular: initial.patterns.Shelf.circular } } };
+  expect(checkStudio(wanted, initial)).toEqual([]);
+  for (const change of [
+    circular => { circular.equalSpacing = false; },
+    circular => { circular.opposite = true; },
+    circular => { circular.axis = [1, 0, 0]; },
+    circular => { circular.origin[0] = 0; },
+    circular => { circular.angleExpression = '180deg'; },
+  ]) {
+    const altered = structuredClone(design);
+    change(altered.parts.find(part => part.name === 'Shelf').pattern.circular);
+    expect(checkStudio(wanted, studioState(altered))).toHaveLength(1);
+  }
+  expect(initial.patterns.Shelf.circular.origin).toEqual([20, 30, 0]);
+});

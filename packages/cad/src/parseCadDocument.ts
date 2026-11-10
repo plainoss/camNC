@@ -7,6 +7,7 @@ import { validPartCutSplit } from './partCutSplit';
 import type { CadDirection, CadDocument, CadPart, CadPlacement, CadSketch } from './types';
 import { splineHandleIssue, withSplineHandleSegments } from './splineHandles';
 import { constraintEntityIds, entityPointIds } from './entityReferences';
+import { validCircularPartPattern } from './circularPartPattern';
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
 export function parseCadDocument(input: unknown): CadDocument {
@@ -130,6 +131,8 @@ export function parseCadDocument(input: unknown): CadDocument {
       }
     }
     if (p.pattern !== undefined) {
+      if (p.pattern?.circular !== undefined && !validCircularPartPattern(p.pattern.circular))
+        throw new Error('Invalid CAD circular part pattern');
       if (p.pattern?.direction !== undefined) checkDirection(p.pattern.direction);
       const vector = p.pattern?.vector;
       if (

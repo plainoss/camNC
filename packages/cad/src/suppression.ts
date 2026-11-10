@@ -1,4 +1,5 @@
 import { cadCopyName } from './partPatterns';
+import { CAD_IDENTITY_PLACEMENT } from './placement';
 import type { CadDocument, CadPart } from './types';
 
 /**
@@ -14,7 +15,12 @@ export function activeDesign(document: CadDocument): CadDocument {
   if (!suppressedSomething) return document;
   const parts = document.parts.map((part): CadPart => {
     const next: CadPart = part.suppressed ? { ...part, extrude: false } : { ...part };
-    if (part.pattern?.suppressed) delete next.pattern;
+    if (part.pattern?.suppressed) {
+      // Circular patterns anchor an otherwise unplaced seed at the origin. Keep that frame in the built view when
+      // removing the pattern and its copies, including portable files that never had an explicit seed placement.
+      if (part.pattern.circular && !part.placement) next.placement = CAD_IDENTITY_PLACEMENT;
+      delete next.pattern;
+    }
     // The copies left keep the names they had, rather than moving up into a suppressed one's.
     const copies = (part.copies ?? [])
       .map((copy, index) => ({ ...copy, name: cadCopyName(part, index) }))

@@ -1,6 +1,6 @@
 import { cadFaceFrame, cadFaceName, type CadFaceFrame } from './drawnOn';
 import { cadCopyName } from './partPatterns';
-import type { CadDocument, CadPartPattern, CadPlacement, EvaluatedCadPart } from './types';
+import type { CadCircularPartPattern, CadDocument, CadPartPattern, CadPlacement, EvaluatedCadPart } from './types';
 
 /** What one step of a design refers to, and what that came to, in words and numbers rather than pictures. */
 export type CadStepReportEntry =
@@ -16,15 +16,24 @@ export type CadStepReportEntry =
       frame: CadFaceFrame | { error: string };
       placement?: CadPlacement;
     }
-  | {
+  | ({
       kind: 'pattern';
       partId: string;
       part: string;
-      axis: CadPartPattern['axis'];
       count: number;
-      spacing: number;
       copies: { name: string; position?: [number, number, number] }[];
-    }
+    } & (
+      | { axis: CadPartPattern['axis']; spacing: number; circular?: never }
+      | {
+          axis?: never;
+          spacing?: never;
+          countExpression?: string;
+          circular: Pick<CadCircularPartPattern, 'origin' | 'axis' | 'angle' | 'angleExpression'> & {
+            equalSpacing: boolean;
+            opposite: boolean;
+          };
+        }
+    ))
   | {
       kind: 'partCut';
       stepId: string;
@@ -92,9 +101,20 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
         kind: 'pattern',
         partId: part.id,
         part: part.name,
-        axis: part.pattern.axis,
         count: round(part.pattern.count),
-        spacing: round(part.pattern.spacing),
+        ...(part.pattern.circular
+          ? {
+              ...(part.pattern.countExpression && { countExpression: part.pattern.countExpression }),
+              circular: {
+                origin: roundVector(part.pattern.circular.origin),
+                axis: roundVector(part.pattern.circular.axis),
+                angle: round(part.pattern.circular.angle),
+                ...(part.pattern.circular.angleExpression && { angleExpression: part.pattern.circular.angleExpression }),
+                equalSpacing: part.pattern.circular.equalSpacing !== false,
+                opposite: !!part.pattern.circular.opposite,
+              },
+            }
+          : { axis: part.pattern.axis, spacing: round(part.pattern.spacing) }),
         copies: (part.copies ?? []).flatMap((copy, index) =>
           copy.pattern === part.pattern!.id
             ? [{ name: cadCopyName(part, index), ...(copy.placement && { position: roundVector(copy.placement.position) }) }]

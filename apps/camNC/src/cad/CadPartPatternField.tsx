@@ -4,13 +4,29 @@ import { useEffect, useId, useRef, useState } from 'react';
 import './cadThicknessField.css';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
+import { CircularPartPatternField } from './CircularPartPatternField';
 
 type Pattern = Omit<CadPartPattern, 'id'>;
 type Vec3 = [number, number, number];
 const kStart: Pattern = { axis: 'x', count: 2, spacing: 100 };
 
+/** The inline part controls also edit circular patterns without converting them into a row. */
+export function CadPartPatternField(props: Parameters<typeof LinearPartPatternField>[0]) {
+  const circular = props.pattern?.circular;
+  return circular && props.pattern ? (
+    <CircularPartPatternField
+      pattern={{ ...props.pattern, circular }}
+      variables={props.variables}
+      onChange={props.onChange}
+      onDone={props.onDone}
+    />
+  ) : (
+    <LinearPartPatternField {...props} />
+  );
+}
+
 /** Copies of a part in a row along an axis. The count and the spacing can use variables, such as a number of shelves. */
-export function CadPartPatternField({
+function LinearPartPatternField({
   pattern,
   document,
   pickDirection,
@@ -42,6 +58,19 @@ export function CadPartPatternField({
   }, []);
   const [picking, setPicking] = useState(false);
   const [pickingEdge, setPickingEdge] = useState(false);
+  const pickGeneration = useRef(0);
+  // A callback from an earlier picker or an unmounted linear field must not replace a newer pattern.
+  useEffect(
+    () => () => {
+      pickGeneration.current++;
+    },
+    []
+  );
+  const cancelPick = () => {
+    pickGeneration.current++;
+    setPicking(false);
+    setPickingEdge(false);
+  };
   const current = pattern ?? kStart;
   const typedCount = current.countExpression ?? String(current.count),
     typedSpacing = current.spacingExpression ?? lengthText(current.spacing);
@@ -109,6 +138,7 @@ export function CadPartPatternField({
       apply();
       onDone?.();
     } else if (event.key === 'Escape') {
+      cancelPick();
       dirty.current = false;
       setCount(typedCount);
       setSpacing(typedSpacing);
@@ -140,8 +170,12 @@ export function CadPartPatternField({
               data-active={picking || !pattern.direction ? '' : undefined}
               aria-label="Direction"
               onClick={() => {
+                const generation = ++pickGeneration.current;
                 setPicking(true);
+                setPickingEdge(false);
                 pickDirection(along => {
+                  if (generation !== pickGeneration.current) return;
+                  pickGeneration.current++;
                   latestApply.current(undefined, { along });
                   setPicking(false);
                 });
@@ -163,9 +197,13 @@ export function CadPartPatternField({
               data-active={pickingEdge ? '' : undefined}
               aria-label="Direction edge"
               onClick={() => {
+                const generation = ++pickGeneration.current;
                 setPickingEdge(true);
+                setPicking(false);
                 setError(null);
                 pickEdge(edge => {
+                  if (generation !== pickGeneration.current) return;
+                  pickGeneration.current++;
                   setPickingEdge(false);
                   if (!edge) return setError('Click close to an edge of a part.');
                   const along = edge.b.map((value, axis) => value - edge.a[axis]!) as Vec3;
@@ -179,18 +217,33 @@ export function CadPartPatternField({
           )}
           {pattern.vector && !pattern.direction ? (
             <div className="cad-feature-selection">
-              <button type="button" onClick={() => apply(current.axis, null, null)}>
+              <button
+                type="button"
+                onClick={() => {
+                  cancelPick();
+                  apply(current.axis, null, null);
+                }}>
                 Clear
               </button>
               {/* The edge's direction turned the other way. */}
-              <button type="button" onClick={() => apply(current.axis, null, pattern.vector!.map(value => -value || 0) as Vec3)}>
+              <button
+                type="button"
+                onClick={() => {
+                  cancelPick();
+                  apply(current.axis, null, pattern.vector!.map(value => -value || 0) as Vec3);
+                }}>
                 Flip direction
               </button>
             </div>
           ) : pattern.direction ? (
             <>
               <div className="cad-feature-selection">
-                <button type="button" onClick={() => apply(current.axis, null)}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelPick();
+                    apply(current.axis, null);
+                  }}>
                   Clear
                 </button>
               </div>
@@ -198,7 +251,10 @@ export function CadPartPatternField({
                 <input
                   type="checkbox"
                   checked={!!pattern.direction.flip}
-                  onChange={event => apply(current.axis, { ...pattern.direction!, flip: event.target.checked })}
+                  onChange={event => {
+                    cancelPick();
+                    apply(current.axis, { ...pattern.direction!, flip: event.target.checked });
+                  }}
                 />
                 Flip direction
               </label>
@@ -207,7 +263,13 @@ export function CadPartPatternField({
             <label htmlFor={`${id}-axis`} className="cad-number-field">
               Along
               <span>
-                <select id={`${id}-axis`} value={pattern.axis} onChange={event => apply(event.target.value as Pattern['axis'])}>
+                <select
+                  id={`${id}-axis`}
+                  value={pattern.axis}
+                  onChange={event => {
+                    cancelPick();
+                    apply(event.target.value as Pattern['axis']);
+                  }}>
                   <option value="x">x</option>
                   <option value="y">y</option>
                   <option value="z">z</option>

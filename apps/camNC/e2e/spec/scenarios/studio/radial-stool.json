@@ -1,0 +1,94 @@
+[
+  {
+    "id": "studio/stool/circular-pattern-edit-reload",
+    "title": "A radial stool keeps named legs through pattern edits, cancellation, growth, suppression and reload",
+    "evidence": "design complete radial woodworking workflow; visible controls and saved source identities, with geometry checked separately in the core lane",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/radial-stool.json",
+      "closesketch",
+      "checkpoint assembled",
+      { "expect": { "studio": {
+        "workspacePartCount": 5,
+        "partIssues": [],
+        "copies": { "Leg": 3 },
+        "patterns": { "Leg": { "count": 4, "countExpression": "legs", "circular": {
+          "origin": [0, 0, 0], "axis": [0, 0, 1], "angle": 360,
+          "angleExpression": null, "equalSpacing": true, "opposite": false
+        } } }
+      } } },
+      "feature Circular pattern · Leg",
+      { "expect": { "studio": { "dialog": "Circular pattern · Leg" } } },
+      "dialogfill Angle = 90deg",
+      "dialogcheck Equal spacing = false",
+      "dialogfill Instance count = 5",
+      "dialogcancel",
+      { "expect": { "studio": { "unchangedSince": "assembled", "dialog": null, "workspacePartCount": 5 } } },
+      "feature #board",
+      "dialogfill Value = 21mm",
+      "dialogconfirm",
+      "feature #radius",
+      "dialogfill Value = 170mm",
+      "dialogconfirm",
+      "feature #legs",
+      "dialogfill Value = 6",
+      "dialogconfirm",
+      "checkpoint grown",
+      { "expect": { "studio": {
+        "workspacePartCount": 7,
+        "partIssues": [],
+        "variables": { "board": "21mm", "radius": "170mm", "legs": "6" },
+        "thicknesses": { "Seat": 21, "Leg": 21 },
+        "retainedIdsSince": "assembled",
+        "sameFeatureIdsSince": "assembled",
+        "addedCopyIdsSince": { "checkpoint": "assembled", "part": "Leg", "count": 2 }
+      } } },
+      "feature Circular pattern · Leg",
+      "dialogfill Angle = 180deg",
+      "dialogcheck Opposite direction = true",
+      "dialogconfirm",
+      { "expect": { "studio": {
+        "workspacePartCount": 7,
+        "sameIdsSince": "grown",
+        "patterns": { "Leg": { "count": 6, "countExpression": "legs", "circular": {
+          "origin": [0, 0, 0], "axis": [0, 0, 1], "angle": 180,
+          "angleExpression": null, "equalSpacing": true, "opposite": true
+        } } }
+      } } },
+      "reload",
+      "feature Circular pattern · Leg",
+      "dialogfill Angle = 30deg",
+      "dialogcheck Equal spacing = false",
+      "dialogconfirm",
+      { "expect": { "studio": {
+        "workspacePartCount": 7,
+        "sameIdsSince": "grown",
+        "patterns": { "Leg": { "circular": {
+          "origin": [0, 0, 0], "axis": [0, 0, 1], "angle": 30,
+          "angleExpression": null, "equalSpacing": false, "opposite": true
+        } } }
+      } } },
+      "featureaction Circular pattern · Leg = Suppress",
+      { "expect": { "studio": { "workspacePartCount": 2, "sameIdsSince": "grown" } } },
+      "featureaction Circular pattern · Leg = Unsuppress",
+      "reload",
+      { "expect": { "studio": {
+        "workspacePartCount": 7,
+        "sameIdsSince": "grown",
+        "sameFeatureIdsSince": "assembled",
+        "listedParts": [
+          { "name": "Seat", "thickness": 21 },
+          { "name": "Leg", "thickness": 21 },
+          { "name": "Leg 2", "thickness": 21 },
+          { "name": "Leg 3", "thickness": 21 },
+          { "name": "Leg 4", "thickness": 21 },
+          { "name": "Leg 5", "thickness": 21 },
+          { "name": "Leg 6", "thickness": 21 }
+        ],
+        "patterns": { "Leg": { "circular": {
+          "origin": [0, 0, 0], "axis": [0, 0, 1], "angle": 30,
+          "angleExpression": null, "equalSpacing": false, "opposite": true
+        } } }
+      } } }
+    ]
+  }
+]

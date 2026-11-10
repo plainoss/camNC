@@ -81,13 +81,15 @@ function partFace(part: CadPart, evaluated: EvaluatedCadPart, face: Extract<CadD
 }
 
 /**
- * Parts that others are placed against: drawn on, or copied by a transform. One with no placement of its own stays at
- * the origin, where they were placed against it.
+ * Parts that others are placed against: drawn on, copied by a transform, or circularly patterned. One with no
+ * placement of its own stays at the origin, where they were placed against it.
  */
 export const cadDrawnOnSupports = (document: CadDocument): Set<string> =>
   new Set([
     ...document.parts.flatMap(part => (part.drawnOn && 'partId' in part.drawnOn.on ? [part.drawnOn.on.partId] : [])),
     ...document.parts.flatMap(part => (part.copies?.some(copy => copy.offset) ? [part.id] : [])),
+    // A circular pattern needs a fixed seed frame even when the seed was previously in the unplaced-parts layout.
+    ...document.parts.flatMap(part => (part.pattern?.circular ? [part.id] : [])),
   ]);
 
 /** Where a part sits: its placement, or the origin for an unplaced part others are drawn on. */
