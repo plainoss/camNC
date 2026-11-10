@@ -12,17 +12,16 @@ function design(): CadDocument {
 }
 
 describe('the cut parts dialog', () => {
-  it('refuses an imported copy-only target at save time too', async () => {
+  it('saves an existing exact-copy target without replacing it with its family', async () => {
     const document = design(),
       side = document.parts[0]!;
     side.copies = [{ id: 'pattern:1' }];
     const onSave = vi.fn(),
-      step: CadPartCut = { id: 'unsupported-target', tools: ['back'], targets: [`${side.id}:pattern:1`], clearance: 0 };
+      step: CadPartCut = { id: 'copy-target', tools: ['back'], targets: [`${side.id}:pattern:1`], clearance: 0 };
     render(<PartCutDialog document={document} step={step} onSave={onSave} onClose={() => {}} />);
     expect(within(screen.getByRole('group', { name: 'Targets' })).getByText('Side 2')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/original part as a target/));
-    expect(onSave).not.toHaveBeenCalled();
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ targets: step.targets })));
   });
 
   it('does not promise to consume a single copy while the core only consumes source families', async () => {
@@ -41,7 +40,7 @@ describe('the cut parts dialog', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ tools: step.tools, consumeTools: undefined })));
   });
 
-  it('refuses a copy-only target rather than saving an unsupported target reference', async () => {
+  it('picks a copy-only target and saves exactly the picked reference', async () => {
     const document = design(),
       side = document.parts[0]!;
     side.copies = [{ id: 'pattern:1', name: 'Other side' }];
@@ -51,13 +50,29 @@ describe('the cut parts dialog', () => {
     );
     const view = render(dialog(null));
     view.rerender(dialog({ partId: `${side.id}:pattern:1`, seq: 1 }));
-    expect(screen.getByRole('alert').textContent).toMatch(/original part as a target/);
-    expect(within(screen.getByRole('group', { name: 'Targets' })).queryByRole('listitem')).toBeNull();
-    expect(onSave).not.toHaveBeenCalled();
-    view.rerender(dialog({ partId: side.id, seq: 2 }));
+    expect(within(screen.getByRole('group', { name: 'Targets' })).getByText('Other side')).toBeDefined();
     expect(screen.queryByRole('alert')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Cut' }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ targets: [side.id] })));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ targets: [`${side.id}:pattern:1`] })));
+  });
+
+  it('refuses an absent copy target while preserving the saved identity for restoration', async () => {
+    const document = design(),
+      side = document.parts[0]!,
+      onSave = vi.fn();
+    const targets = [`${side.id}:pattern:2`];
+    render(
+      <PartCutDialog
+        document={document}
+        step={{ id: 'absent', tools: ['back'], targets, clearance: 0 }}
+        onSave={onSave}
+        onClose={() => {}}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/target copy.*not present/i));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(targets).toEqual([`${side.id}:pattern:2`]);
   });
 
   it('recognizes a selected copy and its source target as the same source family', async () => {
@@ -72,6 +87,43 @@ describe('the cut parts dialog', () => {
     const view = render(dialog(null));
     view.rerender(dialog({ partId: side.id, seq: 1 }));
     fireEvent.click(screen.getByRole('button', { name: 'Cut' }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/itself/));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it.each(['half', 'fingers'])('refuses %s joints on an exact-copy target', async joint => {
+    const document = design(),
+      side = document.parts[0]!,
+      onSave = vi.fn();
+    side.copies = [{ id: 'pattern:1' }];
+    render(
+      <PartCutDialog
+        document={document}
+        step={{ id: 'copy-target', tools: ['back'], targets: [`${side.id}:pattern:1`], clearance: 0 }}
+        onSave={onSave}
+        onClose={() => {}}
+      />
+    );
+    fireEvent.change(screen.getByLabelText('Joint'), { target: { value: joint } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/single target copy are not supported/));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('refuses an exact target from the tool family rather than bypassing the self-cut guard', async () => {
+    const document = design(),
+      side = document.parts[0]!,
+      onSave = vi.fn();
+    side.copies = [{ id: 'pattern:1' }];
+    render(
+      <PartCutDialog
+        document={document}
+        step={{ id: 'self', tools: [side.id], targets: [`${side.id}:pattern:1`], clearance: 0 }}
+        onSave={onSave}
+        onClose={() => {}}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/itself/));
     expect(onSave).not.toHaveBeenCalled();
   });

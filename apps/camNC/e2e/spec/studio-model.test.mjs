@@ -118,3 +118,33 @@ it('distinguishes circular sweep, spacing mode and axis from equal copy counts',
   }
   expect(initial.patterns.Shelf.circular.origin).toEqual([20, 30, 0]);
 });
+
+it('preserves a raw exact target while its trailing physical slot is absent', () => {
+  const design = structuredClone(cupboard), shelf = design.parts.find(part => part.name === 'Shelf');
+  shelf.copies = [{ id: 'pattern:1' }, { id: 'pattern:2' }];
+  design.partCuts[0].targets = [`${shelf.id}:pattern:2`];
+  const checkpoints = new Map([['selected', studioState(design)]]), expected = { sameCutReferencesSince: 'selected' };
+  shelf.copies.pop();
+  expect(studioState(design).cutSettings[0].targets).toEqual([null]);
+  expect(checkStudio(expected, studioState(design), checkpoints)).toEqual([]);
+  for (const reference of [shelf.id, `${shelf.id}:pattern:1`]) {
+    const changed = structuredClone(design); changed.partCuts[0].targets = [reference];
+    expect(checkStudio(expected, studioState(changed), checkpoints)).toHaveLength(1);
+  }
+});
+
+it('allows only trailing-slot removal while preserving named source and sibling identities', () => {
+  const design = structuredClone(cupboard), shelf = design.parts.find(part => part.name === 'Shelf');
+  shelf.copies = [{ id: 'pattern:1' }, { id: 'pattern:2' }];
+  const checkpoints = new Map([['selected', studioState(design)]]);
+  const expected = { copyMembershipSince: { checkpoint: 'selected', part: 'Shelf', copies: 1 } };
+  shelf.copies.pop();
+  expect(checkStudio(expected, studioState(design), checkpoints)).toEqual([]);
+  const replacement = structuredClone(design); replacement.parts.find(part => part.name === 'Shelf').copies[0].id = 'pattern:2';
+  expect(checkStudio(expected, studioState(replacement), checkpoints)).toHaveLength(1);
+  const swapped = structuredClone(design), bottom = swapped.parts.find(part => part.name === 'Bottom'), top = swapped.parts.find(part => part.name === 'Top');
+  [bottom.id, top.id] = [top.id, bottom.id];
+  expect(checkStudio(expected, studioState(swapped), checkpoints)).toHaveLength(2);
+  expect(checkStudio({ copyMembershipSince: { ...expected.copyMembershipSince, copies: 3 } }, studioState(design), checkpoints)).toHaveLength(1);
+  expect(checkStudio({ copyMembershipSince: { ...expected.copyMembershipSince, part: 'Missing' } }, studioState(design), checkpoints)).toHaveLength(1);
+});
