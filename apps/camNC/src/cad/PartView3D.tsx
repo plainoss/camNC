@@ -1,10 +1,11 @@
 import { Edges, Line, OrbitControls } from '@react-three/drei';
-import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import {
-  evaluateCadFeatures,
   evaluateCadPart,
+  partFaceAt,
+  CAD_IDENTITY_PLACEMENT,
+  type CadDrawnOn,
   pointInPolygon,
-  withPartCuts,
   type CadCutDepth,
   type CadDocument,
   type CadFaceRef,
@@ -14,10 +15,12 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { FitCamera } from '@/cam/model/ModelViewport';
-import { modelGeometry } from '@/cam/model/modelGeometry';
-import { nativePart } from '@/cam/nativeCadModel';
 import { kCadMouseButtons, kOrbitDamping } from '@/lib/orbitDamping';
-import { holdPending } from '@/lib/settled';
+import { partSolid } from './partSolid';
+import type { StudioCameraRef } from './studioCamera';
+import type { PartViewSnapshot } from './faceSketchScene';
+import type { FacePlane } from '@/cam/model/faceHighlight';
+import { PartFaceHighlight } from './PartFaceHighlight';
 import {
   cutRegions,
   depthLabel,
@@ -36,30 +39,9 @@ const kPick = '#8b5cf6';
 const kSketch = '#3f5f8a';
 /** A region's pick surface sits just over the face it stands for, so it wins against that face. */
 const kLift = 0.01;
-const kTurnSeconds = 0.35;
-const faceLabel = (face: CadFaceRef) => (face === 'top' ? 'top' : face === 'underside' ? 'underside' : 'pocket floor');
+const faceLabel = (face: CadFaceRef | { edge: string }) =>
+  face === 'top' ? 'top' : face === 'underside' ? 'underside' : 'edge' in face ? 'side face' : 'pocket floor';
 const alone = (part: CadPart): CadDocument => ({ version: 2, id: 'part-view', name: part.name, revision: 0, parts: [part] });
-
-/**
- * The part as it'll be cut, or why it can't be shown. Uses the same mesh CAM reads back. Other parts of `document` cut
- * out of it are cut here too.
- */
-function partSolid(
-  part: CadPart,
-  document?: CadDocument
-): { geometry?: THREE.BufferGeometry; origin?: [number, number]; problem?: string } {
-  const { part: profile } = evaluateCadPart(part);
-  if (!profile) return { problem: 'This part can’t be shown until its sketch is fixed.' };
-  // A cut with an error is left out and explained, so the part stays on screen while it's put right.
-  const { part: evaluated, diagnostics } = evaluateCadFeatures(part, profile),
-    problem = diagnostics.find(diagnostic => diagnostic.severity === 'error')?.message;
-  try {
-    const { mesh, info } = nativePart(document ? withPartCuts(document, evaluated) : evaluated);
-    return { geometry: modelGeometry(mesh), origin: info.sourceOrigin, problem };
-  } catch (cause) {
-    return { problem: cause instanceof Error ? cause.message : String(cause) };
-  }
-}
 
 const outlineOf = (part: CadPart) => evaluateCadPart(part).part?.outline ?? [];
 
@@ -121,41 +103,6 @@ function RegionSurface({
       />
     </mesh>
   );
-}
-
-/** Turns the camera to look straight at a face, then hands over to the sketch editor. */
-function FaceCamera({ box, below, onDone }: { box: THREE.Box3; below: boolean; onDone: () => void }) {
-  const start = useRef<{ from: THREE.Vector3; up: THREE.Vector3; at: number } | null>(null);
-  const done = useRef(false);
-  // The turn ends by opening the face's sketch: until then the app hasn't settled (src/lib/settled.ts).
-  const turning = useRef<() => void>(null);
-  useEffect(() => {
-    const release = holdPending('animation');
-    turning.current = release;
-    return release;
-  }, []);
-  useFrame(({ camera, clock }) => {
-    if (done.current) return;
-    start.current ??= { from: camera.position.clone(), up: camera.up.clone(), at: clock.elapsedTime };
-    const center = box.getCenter(new THREE.Vector3()),
-      distance = start.current.from.distanceTo(center),
-      reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-      t = reduced ? 1 : Math.min(1, (clock.elapsedTime - start.current.at) / kTurnSeconds),
-      eased = t * t * (3 - 2 * t);
-    camera.position.lerpVectors(
-      start.current.from,
-      new THREE.Vector3(center.x, center.y, center.z + (below ? -distance : distance)),
-      eased
-    );
-    camera.up.lerpVectors(start.current.up, new THREE.Vector3(0, 1, 0), eased).normalize();
-    camera.lookAt(center);
-    if (t === 1) {
-      done.current = true;
-      onDone();
-      turning.current?.();
-    }
-  });
-  return null;
 }
 
 /** Drags a region's depth, from a grip that stays above the part so no wall ever hides it. */
@@ -243,6 +190,8 @@ export default function PartView3D({
   variables,
   onChoose,
   onSketchFace,
+  onSketchSide,
+  cameraState: givenCamera,
 }: {
   part: CadPart;
   /** The design the part is in, whose other parts may cut it. */
@@ -250,14 +199,18 @@ export default function PartView3D({
   /** Design variables a typed depth may use. */
   variables?: CadValueScope;
   onChoose: (entry: CutRegion, depth: CadCutDepth, expression?: string) => void;
-  onSketchFace?: (face: CadFaceRef) => void;
+  onSketchFace?: (face: CadFaceRef, view?: PartViewSnapshot) => void;
+  cameraState?: StudioCameraRef;
+  onSketchSide?: (face: Extract<CadDrawnOn['on'], { partId: string }>['face'], view: PartViewSnapshot) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [picked, setPicked] = useState<{ id: string; at: { x: number; y: number }; screen: { x: number; y: number } } | null>(null);
   const [dragging, setDragging] = useState<CadCutDepth | null>(null);
-  const [facePicked, setFacePicked] = useState<'top' | 'underside' | null>(null);
-  const [turningTo, setTurningTo] = useState<CadFaceRef | null>(null);
+  const [facePicked, setFacePicked] = useState<Extract<CadDrawnOn['on'], { partId: string }>['face'] | null>(null);
+  const [pickedPlane, setPickedPlane] = useState<FacePlane | null>(null);
+  const ownCamera = useRef<StudioCameraRef['current']>(null);
+  const cameraState = givenCamera ?? ownCamera;
   const regions = useMemo(() => cutRegions(part), [part]);
   const entry = regions.find(candidate => candidate.region.id === picked?.id) ?? null;
   // A drag shows the real solid at each half millimetre, without committing anything until it's let go.
@@ -274,10 +227,11 @@ export default function PartView3D({
   const depth = dragging ?? entry?.depth ?? 0;
   const face = entry ? regionFace(entry) : facePicked;
   // The editor's keys work from here as soon as the view opens.
-  useEffect(() => frame.current?.focus(), []);
+  useEffect(() => frame.current?.focus({ preventScroll: true }), []);
   const pick = (candidate: CutRegion, event: ThreeEvent<MouseEvent>) => {
     const rect = frame.current!.getBoundingClientRect();
     setFacePicked(null);
+    setPickedPlane(null);
     setPicked({
       id: candidate.region.id,
       at: regionCenter(candidate, event.point),
@@ -294,24 +248,22 @@ export default function PartView3D({
       className="cad-part-view"
       data-testid="part-3d"
       tabIndex={-1}
-      onPointerDown={() => frame.current?.focus()}
-      onKeyDown={event => {
-        // Keys pressed while the camera turns are meant for the sketch that is opening, not this view.
-        if (turningTo) event.stopPropagation();
-      }}>
+      onPointerDown={() => frame.current?.focus({ preventScroll: true })}>
       <Canvas
+        orthographic
         camera={{ fov: 30 }}
         dpr={[1, 2]}
         onPointerMissed={() => {
           setPicked(null);
           setFacePicked(null);
+          setPickedPlane(null);
         }}>
         <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
         <directionalLight position={[300, -500, 800]} intensity={1.8} />
         <directionalLight position={[-400, 300, 200]} intensity={0.4} />
         {/* Enough light underneath to work on the underside. */}
         <directionalLight position={[200, -300, -800]} intensity={1.1} />
-        <FitCamera box={box} />
+        <FitCamera box={box} fitKey={part.id} cameraState={cameraState} />
         {solid.geometry && (
           <mesh
             geometry={solid.geometry}
@@ -324,14 +276,24 @@ export default function PartView3D({
               event.stopPropagation();
               if (event.delta > 4) return;
               setPicked(null);
-              // Clicking the top or underside selects it, ready to sketch on. The sides aren't faces to sketch on yet.
-              setFacePicked(event.point.z > part.thickness - kLift ? 'top' : event.point.z < kLift ? 'underside' : null);
+              setPickedPlane(event.face ? { point: event.point.toArray(), normal: event.face.normal.toArray() } : null);
+              // Side profiles are separate studio features; the local depth editor still handles top and underside cuts.
+              setFacePicked(
+                event.point.z > part.thickness - kLift
+                  ? 'top'
+                  : event.point.z < kLift
+                    ? 'underside'
+                    : onSketchSide && event.face
+                      ? partFaceAt(part, CAD_IDENTITY_PLACEMENT, event.point.toArray(), event.face.normal.toArray())
+                      : null
+              );
             }}>
             <meshStandardMaterial vertexColors color={kWood} roughness={0.8} />
             <Edges geometry={solid.geometry} threshold={30} color="#5b4a36" />
           </mesh>
         )}
-        {facePicked && (
+        {pickedPlane && solid.geometry && <PartFaceHighlight geometry={solid.geometry} origin={solid.origin!} face={pickedPlane} />}
+        {facePicked && typeof facePicked === 'string' && (
           <Line
             points={[...outlineOf(part), outlineOf(part)[0]!].map(
               p => [p.x, p.y, facePicked === 'top' ? part.thickness + kLift : -kLift] as const
@@ -375,19 +337,7 @@ export default function PartView3D({
             }}
           />
         )}
-        {turningTo && (
-          <FaceCamera
-            box={box}
-            below={turningTo === 'underside' || (entry?.side === 'underside' && turningTo !== 'top')}
-            onDone={() => onSketchFace?.(turningTo)}
-          />
-        )}
-        <OrbitControls
-          makeDefault
-          enabled={dragging === null && !turningTo}
-          dampingFactor={kOrbitDamping}
-          mouseButtons={kCadMouseButtons}
-        />
+        <OrbitControls makeDefault enabled={dragging === null} dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />
       </Canvas>
       {entry && picked && dragging === null && (
         <RegionDepthField
@@ -399,18 +349,29 @@ export default function PartView3D({
           variables={variables}
           onClose={() => {
             setPicked(null);
-            frame.current?.focus();
+            frame.current?.focus({ preventScroll: true });
           }}
           onChoose={(next, expression) => {
             if (next !== entry.depth || expression !== entry.cut?.depthExpression) onChoose(entry, next, expression);
             setPicked(null);
-            frame.current?.focus();
+            frame.current?.focus({ preventScroll: true });
           }}
         />
       )}
       {onSketchFace && (
         <div className="cad-part-view-tools">
-          <button type="button" disabled={!face || !!turningTo} onClick={() => setTurningTo(face)}>
+          <button
+            type="button"
+            disabled={!face}
+            onClick={() => {
+              if (!face) return;
+              const canvas = frame.current?.querySelector('canvas');
+              const bounds = canvas?.getBoundingClientRect();
+              const snapshot = cameraState.current && bounds?.height ? { cameraState, aspect: bounds.width / bounds.height } : undefined;
+              if (typeof face === 'object' && 'edge' in face) {
+                if (snapshot) onSketchSide?.(face, snapshot);
+              } else onSketchFace(face, snapshot);
+            }}>
             Sketch{face ? ` on ${faceLabel(face)}` : ''}
           </button>
         </div>

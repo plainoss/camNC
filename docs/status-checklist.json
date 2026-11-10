@@ -32,14 +32,14 @@
         {
           "item": "Sketch on the top face, the underside and pocket floors",
           "status": "done",
-          "evidence": ["sketch/finish/pocket-inside-a-pocket", "packages/cad/src/drawnOn.test.ts"],
-          "note": "Part Studio sketches keep the current camera, pan and zoom; N looks straight at the sketch plane. An underside sketch is drawn as seen from below, so its X runs the other way."
+          "evidence": ["sketch/finish/pocket-inside-a-pocket", "packages/cad/src/drawnOn.test.ts", "apps/camNC/src/cad/CadEditor.partCamera.test.tsx"],
+          "note": "Part Studio and per-part face sketches keep the current camera, pan and zoom; N looks straight at the sketch plane. An underside sketch is drawn as seen from below, so its X runs the other way."
         },
         {
           "item": "Sketch on faces in the current view and extrude a solid face up to another face",
           "status": "done",
-          "evidence": ["apps/camNC/src/cad/CadEditor.faceWorkflow.test.tsx", "packages/cad/src/faceExtrude.test.ts", "packages/cad-script/fixtures/designs/face-extrusion-bracket.report.json"],
-          "note": "Manual camera changes persist through sketches and feature dialogs. Drawing snaps to existing part corners; a solid-face Add requires an explicit merge scope. Direct face extrusion requires an unmodified body face."
+          "evidence": ["apps/camNC/src/cad/CadEditor.faceWorkflow.test.tsx", "apps/camNC/src/cad/WorkspaceView.faceSelection.test.tsx", "packages/cad/src/faceExtrude.test.ts", "packages/cad-script/fixtures/designs/face-extrusion-bracket.report.json"],
+          "note": "Selected faces are highlighted individually; rapid picks on different faces do not open a base sketch. Per-part side-face selection starts a studio profile. Manual camera changes persist through sketches and feature dialogs. Drawing snaps to existing part corners; a solid-face Add requires an explicit merge scope. Direct face extrusion requires an unmodified body face."
         },
         {
           "item": "Datum planes",
