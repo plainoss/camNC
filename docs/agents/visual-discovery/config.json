@@ -1,0 +1,20 @@
+{
+  "trackingRepository": "plainoss/camNC",
+  "budget": {
+    "minutes": 45,
+    "explorers": 2,
+    "newIssuesMaximum": 3,
+    "triageReserveMinutes": 15
+  },
+  "persistent": {
+    "changeCheckIntervalMinutes": 60,
+    "exploreAtLeastDaily": true
+  },
+  "rotation": [
+    "Cupboard: build panels and a shelf family; change stock, width and count; inspect joints; save/reopen.",
+    "Rounded panel or sign: outer corners and opening; sketch and solid fillets; inspect shaded edges; undo/cancel/reopen.",
+    "Divided tray: select a physical copy, change count and clearance, suppress/restore and continue editing.",
+    "Fitted joints: change stock, height and finger count; swap targets/tools; inspect fit and downstream effects.",
+    "Recovery and viewport: wrong face, Escape, undo/redo, live dialog preview, camera changes and smaller viewport; finish a useful object."
+  ]
+}
