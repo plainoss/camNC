@@ -5,7 +5,7 @@ import type { SectionOffsetControl } from '@/cam/model/SectionOffsetHandle';
 import type { ModelFacePick, ViewRequest } from '@/cam/model/ModelViewport';
 import { instanceKey, type AssemblyModel } from './assemblyModel';
 import { basePlaneViews, pickedPlaneFrame } from './basePlanes';
-import { parseCadValue } from './valueExpressions';
+import { useDesignUnits } from './designUnits';
 import type { SectionPlane } from './sectionGeometry';
 
 type Vec3 = [number, number, number];
@@ -54,6 +54,7 @@ export function useStudioSection(
   selectedPlane?: string | null,
   selectedFace?: Extract<CadDrawnOn['on'], { partId: string }> | null
 ) {
+  const { parseCadValue, lengthText } = useDesignUnits(document.lengthUnit ?? 'mm');
   const [state, setState] = useState<State | null>(null);
   const [pickProblem, setPickProblem] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -74,7 +75,10 @@ export function useStudioSection(
     // A picked tessellated face has no persistent topology ID. Require a new pick after the design changes.
     return source.document === document ? source.frame : null;
   }, [source, document]);
-  const offset = useMemo(() => parseCadValue(state?.offset ?? '0', { unit: 'mm', variables: scope }), [state?.offset, scope]);
+  const offset = useMemo(
+    () => parseCadValue(state?.offset ?? '0', { unit: 'mm', variables: scope }),
+    [state?.offset, scope, parseCadValue]
+  );
   const offsetProblem = 'error' in offset ? offset.error : null;
   const reason =
     pickProblem ??
@@ -102,7 +106,7 @@ export function useStudioSection(
   }, [model.meshes]);
   const setOffset = (offset: string) => setState(previous => (previous ? { ...previous, offset } : previous));
   const moveOffset = (offset: number) => {
-    if (Number.isFinite(offset)) setOffset(String(offset));
+    if (Number.isFinite(offset)) setOffset(lengthText(offset));
   };
   const cancelDrag = () => {
     const initial = dragInitial.current;
@@ -272,7 +276,7 @@ export function useStudioSection(
         setState(previous => {
           if (!previous) return previous;
           const current = parseCadValue(previous.offset, { unit: 'mm', variables: scope });
-          return 'error' in current ? previous : { ...previous, offset: String(current.value + delta) };
+          return 'error' in current ? previous : { ...previous, offset: lengthText(current.value + delta) };
         }),
       onFinish: () => {
         dragInitial.current = null;

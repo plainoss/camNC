@@ -487,3 +487,76 @@ it('handles Shift+X and N from the model while leaving typing, IME and modified 
   press('X', { code: 'KeyX', shiftKey: true });
   expect(result.current.active).toBe(false);
 });
+
+it.each([
+  ['in', '1/4', 6.35],
+  ['cm', '0.9', 9],
+] as const)('reads %s offsets without rewriting expressions or changing accepted settings and the design', (lengthUnit, input, value) => {
+  const document = source();
+  document.lengthUnit = lengthUnit;
+  const before = JSON.stringify(document);
+  const { result } = setup(document, { selectedPlane: 'top' });
+  act(() => result.current.start());
+  for (const [text, millimeters] of [
+    [input, value],
+    ['9mm', 9],
+    ['#stock ÷ 2', 9],
+  ] as const) {
+    act(() => result.current.setOffset(text));
+    expect(result.current.offset).toBe(text);
+    expect(result.current.offsetProblem).toBeNull();
+    expect(result.current.plane!.origin[2]).toBeCloseTo(millimeters, 12);
+    expect(result.current.control!.offset).toBeCloseTo(millimeters, 12);
+    act(() => result.current.confirm());
+    expect(result.current.active).toBe(true);
+    expect(result.current.editing).toBe(false);
+    act(() => result.current.turnOff());
+    expect(result.current.active).toBe(false);
+    act(() => result.current.start());
+    expect(result.current.offset).toBe(text);
+    expect(result.current.plane!.origin[2]).toBeCloseTo(millimeters, 12);
+  }
+  expect(JSON.stringify(document)).toBe(before);
+});
+
+it('converts physical handle moves and millimeter steps to full-precision inch input and restores canceled expressions', () => {
+  const document = source();
+  document.lengthUnit = 'in';
+  const before = JSON.stringify(document);
+  const { result } = setup(document, { selectedPlane: 'top' });
+  act(() => result.current.start());
+  act(() => result.current.setOffset('#stock / 2'));
+  act(() => result.current.control!.onStart());
+  act(() => result.current.control!.onPreview(12.7));
+  expect(result.current.offset).toBe('0.5');
+  expect(result.current.plane!.origin[2]).toBeCloseTo(12.7, 12);
+  act(() => result.current.control!.onCancel());
+  expect(result.current.offset).toBe('#stock / 2');
+  expect(result.current.plane!.origin[2]).toBe(9);
+
+  act(() => result.current.control!.onStart());
+  act(() => result.current.control!.onPreview(12.7));
+  act(() => result.current.control!.onFinish());
+  expect(result.current.offset).toBe('0.5');
+  act(() => result.current.control!.onStep!(1));
+  expect(result.current.control!.offset).toBeCloseTo(13.7, 12);
+  expect(result.current.offset).toBe(String(13.7 / 25.4));
+  // Batched key repeats must each add physical millimeters without display rounding or a stale offset.
+  act(() => {
+    result.current.control!.onStep!(10);
+    result.current.control!.onStep!(-1);
+  });
+  expect(result.current.control!.offset).toBeCloseTo(22.7, 12);
+  expect(Number(result.current.offset) * 25.4).toBeCloseTo(22.7, 12);
+  const precise = 12.3456789012345;
+  act(() => result.current.moveOffset(precise));
+  expect(result.current.offset).toBe(String(precise / 25.4));
+  expect(result.current.control!.offset).toBeCloseTo(precise, 12);
+  const accepted = result.current.offset;
+  act(() => result.current.confirm());
+  act(() => result.current.turnOff());
+  act(() => result.current.start());
+  expect(result.current.offset).toBe(accepted);
+  expect(result.current.plane!.origin[2]).toBeCloseTo(precise, 12);
+  expect(JSON.stringify(document)).toBe(before);
+});
