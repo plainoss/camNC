@@ -129,6 +129,16 @@
           "note": "Core checks cover dimensions, placement, housings and cutting-piece membership. Browser controls exercise all eight edits, cancel, visible physical-part counts, ordered copy identities and reload. Complete interface details, divided-tray workflows and toolpath equivalence remain outside this sequence."
         },
         {
+          "item": "Complete divided-tray and fitted-joint source edit sequences",
+          "status": "partial",
+          "evidence": [
+            "packages/cad-script/src/iteration/woodworkingWorkflows.test.ts",
+            "packages/cad-script/src/iteration/axisMaterial.test.ts",
+            "packages/cad-script/src/iteration/woodworkingExpected.test.ts"
+          ],
+          "note": "Eight cumulative core states per design check authored dependencies, source/copy IDs, occupied material, phase, clearance, collisions and reload. Missing-tool and unconstrained diagnostics stay incomplete. Full UI, boundary meshes and external equivalence remain separate gates."
+        },
+        {
           "item": "Split a part by a plane",
           "status": "gap",
           "evidence": [],
