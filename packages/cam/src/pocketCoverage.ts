@@ -3,12 +3,19 @@ import { difference, intersect, offset, unionMany, type PathsD } from './geom';
 import { sweptCapsule } from './stock';
 import type { CamSettings } from './toolpathTypes';
 
-function coverageScope(region: PathsD, diameter: number, settings: CamSettings, material?: PathsD) {
+/** Cutter radius remaining after the same full-path uncertainty used to certify the floor sweep. */
+export function pocketCoverageRadius(diameter: number, settings: CamSettings): number {
   const budget = planAccuracy(settings.geometryTolerance, settings.sourceTolerance).budget;
   const tolerance = geometryTolerances(settings.geometryTolerance, settings.sourceTolerance).offset;
   const deviation = budget.fitting + budget.outputRounding + budget.controllerRounding;
   // Shrink the proved sweep for fitting, polygon/offset quantization and the capsule approximation.
-  const radius = diameter / 2 - deviation - budget.polygonRounding - 2 * tolerance - 0.001;
+  return diameter / 2 - deviation - budget.polygonRounding - 2 * tolerance - 0.001;
+}
+
+function coverageScope(region: PathsD, diameter: number, settings: CamSettings, material?: PathsD) {
+  const budget = planAccuracy(settings.geometryTolerance, settings.sourceTolerance).budget;
+  const tolerance = geometryTolerances(settings.geometryTolerance, settings.sourceTolerance).offset;
+  const radius = pocketCoverageRadius(diameter, settings);
   const reachable = offset(offset(region, -diameter / 2, tolerance), diameter / 2, tolerance);
   // Boundary error remains bounded by the unchanged job tolerance; inaccessible sharp corners are not invented stock coverage.
   const target = offset(material ? intersect(reachable, material) : reachable, -budget.total, tolerance);

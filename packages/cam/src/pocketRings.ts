@@ -6,7 +6,14 @@ import type { CamSettings } from './toolpathTypes';
 import { CamInputError } from './validation';
 
 /** Outside-in roughing rings, retaining the established smoothing and central-remainder policy. */
-export function createPocketRings(region: PathsD, radius: number, allowance: number, settings: CamSettings, spacing: number): PathsD[] {
+export function createPocketRings(
+  region: PathsD,
+  radius: number,
+  allowance: number,
+  settings: CamSettings,
+  spacing: number,
+  stopRadius = radius
+): PathsD[] {
   const offsetPaths = (paths: PathsD, delta: number) => offset(paths, delta, offsetToleranceFor(settings));
   const rings: PathsD[] = [];
   const corner = settings.innerCornerRadius;
@@ -19,7 +26,8 @@ export function createPocketRings(region: PathsD, radius: number, allowance: num
     const rounded =
       rings.length && corner > 0 ? simplifyPathsD(offset(offset(cur, -corner, smoothing), corner, smoothing), smoothing, true) : cur;
     rings.push(rounded.length ? rounded : cur);
-    if (!offsetPaths(cur, -radius).length) break;
+    // A nominal-radius stop can leave a central strip when the boundary sweeps need uncertainty reserved.
+    if (!offsetPaths(cur, -stopRadius).length) break;
     const next = offsetPaths(region, -inset - spacing);
     // Retain the closer ring when a central strip is wider than the cutter but narrower than two stepovers.
     inset += next.length ? spacing : spacing / 2;

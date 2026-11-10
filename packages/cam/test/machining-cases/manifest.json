@@ -21,16 +21,16 @@
       "programs": [
         {
           "file": "board-neighbor-open-pocket.nc",
-          "sha256": "f87d7a96596d145cf67353f134c44cfb691dcafd6b7d0de173fc90e431e91881",
-          "bytes": 1294,
+          "sha256": "83fc2b09abb5339b540b3f8b880e98f360fadff9d6ab7e5fae39719017e65d06",
+          "bytes": 2194,
           "operations": 1,
-          "passes": 2,
+          "passes": 4,
           "toolNumbers": [
             1
           ],
           "setup": {
             "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-844fa02e6559c31a",
+            "planFingerprint": "cam-plan-v1-cbdd00ae4216bf3a",
             "programName": "board-neighbor-open-pocket",
             "units": "mm",
             "origin": {
@@ -107,7 +107,7 @@
                   900,
                   1800
                 ],
-                "passes": 2,
+                "passes": 4,
                 "bounds": {
                   "min": [
                     38,
@@ -121,10 +121,12 @@
                   ]
                 },
                 "roles": {
-                  "approach": 2,
-                  "ramp": 4,
-                  "cut": 10,
-                  "corner": 16
+                  "approach": 4,
+                  "ramp": 32,
+                  "cut": 16,
+                  "corner": 108,
+                  "lead-in": 48,
+                  "lead-out": 48
                 }
               }
             ],
@@ -146,17 +148,17 @@
               "Main: pocket z=6: 3.9mm² left in corners/narrow spots with D=6"
             ],
             "statistics": {
-              "bytes": 1294,
-              "executableBlocks": 47,
-              "motionBlocks": 39,
-              "arcBlocks": 0,
-              "cuttingLineBlocks": 32,
-              "feedChanges": 20,
+              "bytes": 2194,
+              "executableBlocks": 89,
+              "motionBlocks": 81,
+              "arcBlocks": 20,
+              "cuttingLineBlocks": 47,
+              "feedChanges": 32,
               "tinyCuttingLines": 0,
               "tinySegmentThresholdMm": 0.1,
               "unresolvedCuttingLines": 0,
-              "minimumCuttingLineMm": 1,
-              "averageCuttingLineMm": 12.488878603493331,
+              "minimumCuttingLineMm": 0.29399999999999693,
+              "averageCuttingLineMm": 13.68669215192118,
               "maximumLineBytes": 127
             }
           }
