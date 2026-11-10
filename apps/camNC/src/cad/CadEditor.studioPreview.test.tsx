@@ -33,6 +33,8 @@ async function studio(document = plate()) {
   );
   await waitFor(() => expect(documentElement().getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
   await waitFor(() => expect(viewport().instanceIds).toContain(document.parts[0]!.id), { timeout: 10_000 });
+  // The viewport can render before the opening solver publishes normalized placements; aria-busy only tracks editor actions.
+  await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
   const latest = () => change.mock.calls.at(-1)?.[0] ?? document;
   return { document, change, latest };
 }
