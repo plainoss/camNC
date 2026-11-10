@@ -1,0 +1,639 @@
+[
+  {
+    "id": "studio/joints/eight-checkpoint-regeneration",
+    "title": "Two half-lap and finger-joint pairs retain feature owners through count, phase, clearance and reload edits",
+    "evidence": "design eight-checkpoint fitted-joint workflow; real user controls and saved-source persistence; material phase checked separately by core recipe",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/fitted-joints.json",
+      "closesketch",
+      "checkpoint assembled",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Leg A",
+              "Leg B",
+              "Front",
+              "Side"
+            ],
+            "workspacePartCount": 4,
+            "listedParts": [
+              {
+                "name": "Leg A",
+                "thickness": 18
+              },
+              {
+                "name": "Leg B",
+                "thickness": 18
+              },
+              {
+                "name": "Front",
+                "thickness": 18
+              },
+              {
+                "name": "Side",
+                "thickness": 18
+              }
+            ],
+            "partIssues": [],
+            "partCuts": 2,
+            "variables": {
+              "board": "18mm",
+              "legHeight": "400mm",
+              "frameHeight": "100mm",
+              "fingers": "5",
+              "fit": "0mm"
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Leg B"
+                ],
+                "targets": [
+                  "Leg A"
+                ],
+                "split": "half"
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Front"
+                ],
+                "targets": [
+                  "Side"
+                ],
+                "split": {
+                  "fingers": 5,
+                  "fingersExpression": "fingers"
+                }
+              }
+            ],
+            "cutExpressions": [
+              "fit",
+              "fit"
+            ],
+            "dialog": null
+          }
+        }
+      },
+      "feature #board",
+      "dialogfill Value = 21mm",
+      "dialogconfirm",
+      "checkpoint resize-stock",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Leg A",
+              "Leg B",
+              "Front",
+              "Side"
+            ],
+            "workspacePartCount": 4,
+            "listedParts": [
+              {
+                "name": "Leg A",
+                "thickness": 21
+              },
+              {
+                "name": "Leg B",
+                "thickness": 21
+              },
+              {
+                "name": "Front",
+                "thickness": 21
+              },
+              {
+                "name": "Side",
+                "thickness": 21
+              }
+            ],
+            "partIssues": [],
+            "sameIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit",
+              "fit"
+            ],
+            "dialog": null,
+            "variables": {
+              "board": "21mm"
+            },
+            "thicknesses": {
+              "Leg A": 21,
+              "Leg B": 21,
+              "Front": 21,
+              "Side": 21
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Leg B"
+                ],
+                "targets": [
+                  "Leg A"
+                ],
+                "split": "half"
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Front"
+                ],
+                "targets": [
+                  "Side"
+                ],
+                "split": {
+                  "fingers": 5,
+                  "fingersExpression": "fingers"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "feature #legHeight",
+      "dialogfill Value = 480mm",
+      "dialogconfirm",
+      "feature #frameHeight",
+      "dialogfill Value = 120mm",
+      "dialogconfirm",
+      "checkpoint resize-joint-heights",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Leg A",
+              "Leg B",
+              "Front",
+              "Side"
+            ],
+            "workspacePartCount": 4,
+            "listedParts": [
+              {
+                "name": "Leg A",
+                "thickness": 21
+              },
+              {
+                "name": "Leg B",
+                "thickness": 21
+              },
+              {
+                "name": "Front",
+                "thickness": 21
+              },
+              {
+                "name": "Side",
+                "thickness": 21
+              }
+            ],
+            "partIssues": [],
+            "sameIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit",
+              "fit"
+            ],
+            "dialog": null,
+            "variables": {
+              "legHeight": "480mm",
+              "frameHeight": "120mm"
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Leg B"
+                ],
+                "targets": [
+                  "Leg A"
+                ],
+                "split": "half"
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Front"
+                ],
+                "targets": [
+                  "Side"
+                ],
+                "split": {
+                  "fingers": 5,
+                  "fingersExpression": "fingers"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "feature #fingers",
+      "dialogfill Value = 8",
+      "dialogconfirm",
+      "checkpoint grow-finger-count",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Leg A",
+              "Leg B",
+              "Front",
+              "Side"
+            ],
+            "workspacePartCount": 4,
+            "listedParts": [
+              {
+                "name": "Leg A",
+                "thickness": 21
+              },
+              {
+                "name": "Leg B",
+                "thickness": 21
+              },
+              {
+                "name": "Front",
+                "thickness": 21
+              },
+              {
+                "name": "Side",
+                "thickness": 21
+              }
+            ],
+            "partIssues": [],
+            "sameIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit",
+              "fit"
+            ],
+            "dialog": null,
+            "variables": {
+              "fingers": "8"
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Leg B"
+                ],
+                "targets": [
+                  "Leg A"
+                ],
+                "split": "half"
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Front"
+                ],
+                "targets": [
+                  "Side"
+                ],
+                "split": {
+                  "fingers": 8,
+                  "fingersExpression": "fingers"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "feature Cut Side with Front",
+      "dialogremove Tools = Front",
+      "dialogfocus Tools",
+      "selectpart Side",
+      "dialogremove Targets = Side",
+      "dialogfocus Targets",
+      "selectpart Front",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": [
+                "Side"
+              ],
+              "Targets": [
+                "Front"
+              ]
+            }
+          }
+        }
+      },
+      "dialogconfirm",
+      "checkpoint swap-finger-phase",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Leg A",
+              "Leg B",
+              "Front",
+              "Side"
+            ],
+            "workspacePartCount": 4,
+            "listedParts": [
+              {
+                "name": "Leg A",
+                "thickness": 21
+              },
+              {
+                "name": "Leg B",
+                "thickness": 21
+              },
+              {
+                "name": "Front",
+                "thickness": 21
+              },
+              {
+                "name": "Side",
+                "thickness": 21
+              }
+            ],
+            "partIssues": [],
+            "sameIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit",
+              "fit"
+            ],
+            "dialog": null,
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Leg B"
+                ],
+                "targets": [
+                  "Leg A"
+                ],
+                "split": "half"
+              },
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Side"
+                ],
+                "targets": [
+                  "Front"
+                ],
+                "split": {
+                  "fingers": 8,
+                  "fingersExpression": "fingers"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "feature #fit",
+      "dialogfill Value = 0.2mm",
+      "dialogconfirm",
+      "checkpoint clearance",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Leg A",
+              "Leg B",
+              "Front",
+              "Side"
+            ],
+            "workspacePartCount": 4,
+            "listedParts": [
+              {
+                "name": "Leg A",
+                "thickness": 21
+              },
+              {
+                "name": "Leg B",
+                "thickness": 21
+              },
+              {
+                "name": "Front",
+                "thickness": 21
+              },
+              {
+                "name": "Side",
+                "thickness": 21
+              }
+            ],
+            "partIssues": [],
+            "sameIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit",
+              "fit"
+            ],
+            "dialog": null,
+            "variables": {
+              "fit": "0.2mm"
+            },
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Leg B"
+                ],
+                "targets": [
+                  "Leg A"
+                ],
+                "split": "half"
+              },
+              {
+                "clearance": 0.2,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Side"
+                ],
+                "targets": [
+                  "Front"
+                ],
+                "split": {
+                  "fingers": 8,
+                  "fingersExpression": "fingers"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "featureaction Cut Leg A with Leg B = Suppress",
+      "featureaction Cut Front with Side = Suppress",
+      "checkpoint suppress-joints",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Leg A",
+              "Leg B",
+              "Front",
+              "Side"
+            ],
+            "workspacePartCount": 4,
+            "listedParts": [
+              {
+                "name": "Leg A",
+                "thickness": 21
+              },
+              {
+                "name": "Leg B",
+                "thickness": 21
+              },
+              {
+                "name": "Front",
+                "thickness": 21
+              },
+              {
+                "name": "Side",
+                "thickness": 21
+              }
+            ],
+            "partIssues": [],
+            "sameIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit",
+              "fit"
+            ],
+            "dialog": null,
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": true,
+                "keepTools": true,
+                "tools": [
+                  "Leg B"
+                ],
+                "targets": [
+                  "Leg A"
+                ],
+                "split": "half"
+              },
+              {
+                "clearance": 0.2,
+                "suppressed": true,
+                "keepTools": true,
+                "tools": [
+                  "Side"
+                ],
+                "targets": [
+                  "Front"
+                ],
+                "split": {
+                  "fingers": 8,
+                  "fingersExpression": "fingers"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "featureaction Cut Leg A with Leg B = Unsuppress",
+      "featureaction Cut Front with Side = Unsuppress",
+      "checkpoint before-reload",
+      "reload",
+      "checkpoint restore-and-reload",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Leg A",
+              "Leg B",
+              "Front",
+              "Side"
+            ],
+            "workspacePartCount": 4,
+            "listedParts": [
+              {
+                "name": "Leg A",
+                "thickness": 21
+              },
+              {
+                "name": "Leg B",
+                "thickness": 21
+              },
+              {
+                "name": "Front",
+                "thickness": 21
+              },
+              {
+                "name": "Side",
+                "thickness": 21
+              }
+            ],
+            "partIssues": [],
+            "sameIdsSince": "before-reload",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit",
+              "fit"
+            ],
+            "dialog": null,
+            "unchangedSince": "before-reload",
+            "variables": {
+              "board": "21mm",
+              "legHeight": "480mm",
+              "frameHeight": "120mm",
+              "fingers": "8",
+              "fit": "0.2mm"
+            },
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Leg B"
+                ],
+                "targets": [
+                  "Leg A"
+                ],
+                "split": "half"
+              },
+              {
+                "clearance": 0.2,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Side"
+                ],
+                "targets": [
+                  "Front"
+                ],
+                "split": {
+                  "fingers": 8,
+                  "fingersExpression": "fingers"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+]
