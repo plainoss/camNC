@@ -123,6 +123,8 @@ it.each([
   ['host', true],
   ['host-copy', false],
   ['host-copy', true],
+  ['boss', false],
+  ['boss', true],
   ['copy', false],
   ['copy', true],
 ] as const)('cuts a joined component through its %s target reference (mirrored: %s)', (scope, mirrored) => {
@@ -130,7 +132,8 @@ it.each([
   const tool = createPlateDocument({ width: 5, height: 4, thickness: 6 }).parts[0]!;
   tool.name = 'Tool';
   tool.placement = { position: [mirrored ? 171 : 225, 16, 18], rotation: [0, 0, 0, 1] };
-  const reference = scope === 'host' ? parentId : cadPartReference(scope === 'host-copy' ? parentId : bossId, copyId);
+  const reference =
+    scope === 'host' ? parentId : scope === 'boss' ? bossId : cadPartReference(scope === 'host-copy' ? parentId : bossId, copyId);
   const source = addPartCut({ ...document, parts: [...document.parts, tool] }, [tool.id], [reference], { value: 0 }).document;
   const before = JSON.stringify(source);
   const result = evaluateCadDocument(source);
@@ -142,12 +145,10 @@ it.each([
   expect(throughMaterial(evaluatedPartCopy(boss, { id: copyId, mirrored }), { x: mirrored ? -27 : 27, y: 18 })).toBe(false);
   expect(result.parts.find(part => part.partId === parentId)!.cuts ?? []).toEqual([]);
   expect(withPartCuts(source, evaluateCadPart(source.parts.find(part => part.id === bossId)!).part!)).toEqual(boss);
-  if (scope === 'copy') {
-    const report = cadStepReport(source, result.parts).find(step => step.kind === 'partCut')!;
-    expect(report.kind).toBe('partCut');
-    if (report.kind === 'partCut')
-      expect(report.cuts).toMatchObject([{ target: 'Boss · Parent 2', tool: 'Tool', width: 5, length: 4, depth: 6, through: true }]);
-  }
+  const report = cadStepReport(source, result.parts).find(step => step.kind === 'partCut')!;
+  expect(report.kind).toBe('partCut');
+  if (report.kind === 'partCut')
+    expect(report.cuts).toMatchObject([{ target: 'Boss · Parent 2', tool: 'Tool', width: 5, length: 4, depth: 6, through: true }]);
   expect(JSON.stringify(source)).toBe(before);
 });
 

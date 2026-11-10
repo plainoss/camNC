@@ -155,3 +155,48 @@ it.each([false, true])(
     expect(JSON.stringify(source)).toBe(before);
   }
 );
+
+it.each([
+  ['body', false, false],
+  ['body', true, false],
+  ['Add', false, false],
+  ['Add', true, false],
+  ['body', false, true],
+  ['body', true, true],
+  ['Add', false, true],
+  ['Add', true, true],
+] as const)('retains a suppressed %s authoring row without physical pieces (copies: %s, folder mask: %s)', async (kind, copies, folder) => {
+  const f = fixture(false);
+  const maskedId = kind === 'body' ? f.parentId : f.bossId;
+  const root = createPlateDocument({ width: 40, height: 30, thickness: 18 }).parts[0]!;
+  root.name = 'Root';
+  root.placement = { position: [500, 0, 0], rotation: [0, 0, 0, 1] };
+  const parts = f.document.parts.map(part => {
+    const { copies: _copies, ...withoutCopies } = part;
+    const source = copies ? part : withoutCopies;
+    return part.id === maskedId && !folder ? { ...source, suppressed: true as const } : source;
+  });
+  const source: CadDocument = {
+    ...f.document,
+    parts: [...parts, root],
+    ...(folder && {
+      version: 3,
+      folders: [{ id: 'masked-folder', name: 'Masked', partIds: [maskedId], suppressed: true }],
+    }),
+  };
+  const before = JSON.stringify(source);
+  // Suppression must preserve the raw report row even when that row has no physical copies.
+  const result = await inspect(source);
+  expect(result.report.parts.map(part => part.name)).toEqual(['Parent', 'Boss', 'Root']);
+  expect(result.document.parts.map(part => part.id)).toEqual(source.parts.map(part => part.id));
+  const retained = result.report.parts.find(part => part.name === (kind === 'body' ? 'Parent' : 'Boss'))!;
+  expect(retained.thickness).toBe(kind === 'body' ? 18 : 6);
+  expect(retained.sketches[0]!.entities.length).toBeGreaterThan(0);
+  expect(retained.pieces?.names ?? []).toEqual([]);
+  expect(retained.pieces?.mirrored ?? []).toEqual([]);
+  const expected = kind === 'body' ? ['Root'] : ['Parent', ...(copies ? ['Parent 2'] : []), 'Root'];
+  expect(cadViewBodies(result.document, result.parts).map(body => body.name)).toEqual(expected);
+  expect(result.report.assembly!.parts.map(part => part.name)).toEqual(expected);
+  expect(cadPartsToCut(result.document, result.parts).flatMap(piece => piece.names)).toEqual(expected);
+  expect(JSON.stringify(source)).toBe(before);
+});
