@@ -5,7 +5,8 @@ import type { MotionRole } from './motion';
 import { geometryTolerances, planAccuracy } from './accuracy';
 import { conservativePocketRingSpacing, pocketEndpointDeviation, pocketRingSpacing } from './pocketSpacing';
 import { createPocketRings } from './pocketRings';
-import { pocketRingsCoverFloor, pocketRowsCoverFloor } from './pocketCoverage';
+import { pocketCoverageRadius, pocketRingsCoverFloor, pocketRowsCoverFloor } from './pocketCoverage';
+import { nextPocketFloorSpacing } from './pocketFloorRefinement';
 import type { CamSettings, Operation, Pass, Tool } from './toolpathTypes';
 import {
   type Loop,
@@ -248,7 +249,8 @@ function openPocketPasses(
   floorZ: number,
   tool: Tool,
   s: CamSettings,
-  stepover = pocketRingSpacing(s, tool.diameter)
+  stepover = pocketRingSpacing(s, tool.diameter),
+  coverageAttempt = 0
 ): Pass[] {
   const r = tool.diameter / 2;
   const offsetPaths = (paths: PathsD, delta: number) => offset(paths, delta, offsetToleranceFor(s));
@@ -326,12 +328,24 @@ function openPocketPasses(
   // Every row hop must fit the selected stepover with both endpoint deviations reserved.
   const span = lo - near;
   const n = Math.max(0, Math.ceil(span / stepover - 1e-9));
+  if (coverageAttempt && n > 10_000)
+    throw new CamInputError([{ field: 'stepoverFactor', message: 'would require more than 10000 pocket coverage rows' }]);
   const rows = Array.from({ length: n + 1 }, (_, k) => along(n ? lo - (k * (lo - near)) / n : near));
   const conservative = conservativePocketRingSpacing(s, tool.diameter);
   const floorLines = [...rows.flat(), ...(allowance > 0 ? along(r) : [])];
-  // Parallel spacing alone misses diagonal gaps at smoothed corners. Preserve the established rows if the tighter set is unproved.
-  if (stepover !== conservative && !pocketRowsCoverFloor(comp, floorLines, tool.diameter, s, solid))
-    return openPocketPasses(comp, walls, solid, topZ, floorZ, tool, s, conservative);
+  // Parallel spacing alone misses diagonal gaps. Rebuild only this component until its actual clipped rows prove coverage.
+  if (!pocketRowsCoverFloor(comp, floorLines, tool.diameter, s, solid))
+    return openPocketPasses(
+      comp,
+      walls,
+      solid,
+      topZ,
+      floorZ,
+      tool,
+      s,
+      nextPocketFloorSpacing(stepover, conservative, coverageAttempt),
+      coverageAttempt + 1
+    );
   // The row next to the walls is climb; each row before it runs the way that ends where the next one starts.
   for (let k = n - 1; k >= 0; k--) {
     const next = rows[k + 1][0]?.[0];
@@ -473,11 +487,18 @@ export function pocketOperation(
     let ringSpacing = stepover;
     let rings = createPocketRings(comps[ci], r, allowance, s, ringSpacing);
     const conservative = conservativePocketRingSpacing(s, tool.diameter);
-    const floorRings = allowance > 0 ? [...rings, free] : rings;
-    // Prove the rounded paths cover the reachable floor within the unchanged job tolerance before spending fitting slack.
-    if (ringSpacing !== conservative && !pocketRingsCoverFloor(comps[ci], floorRings, tool.diameter, s, solid)) {
-      ringSpacing = conservative;
-      rings = createPocketRings(comps[ci], r, allowance, s, ringSpacing);
+    const covered = () => pocketRingsCoverFloor(comps[ci], allowance > 0 ? [...rings, free] : rings, tool.diameter, s, solid);
+    const terminalRadius = pocketCoverageRadius(tool.diameter, s);
+    if (terminalRadius <= 0)
+      throw new CamInputError([{ field: 'geometryTolerance', message: 'leaves no certifiable pocket floor sweep for this cutter' }]);
+    // Keep an already-proved layout. Otherwise an uncertainty-aware termination fills the last central strip before adding other rings.
+    if (!covered()) {
+      rings = createPocketRings(comps[ci], r, allowance, s, ringSpacing, terminalRadius);
+      // Diagonal gaps depend on the component, islands and smoothing. Refine failed high stepovers instead of accepting gaps.
+      for (let attempt = 0; !covered(); attempt++) {
+        ringSpacing = nextPocketFloorSpacing(ringSpacing, conservative, attempt);
+        rings = createPocketRings(comps[ci], r, allowance, s, ringSpacing, terminalRadius);
+      }
     }
     let prevZ = topZ;
     for (const z of depthLevels(topZ, floorZ, stepdown)) {
