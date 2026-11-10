@@ -212,7 +212,13 @@ export default function WorkspaceView({
     [section.plane, sectionAvailable, section.editing]
   );
   useEffect(() => {
-    if (section.active) setView('assembled');
+    if (section.active) {
+      // Inspection uses assembled geometry; a pending animation must not move its cut solids afterward.
+      explosion.scrub(0);
+      setView('assembled');
+    }
+    // The scrub callback reads playback refs. Cancel once on entry rather than on each offset preview.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section.active]);
   // The Assembled button changes first; parts can still be animating back in the rendered exploded layout.
   const measureEnabled = sectionEnabled && view === 'assembled' && explosion.modelView === 'assembled' && !sectionEditing;
@@ -312,14 +318,14 @@ export default function WorkspaceView({
             <button
               key={option.view}
               type="button"
-              aria-pressed={view === option.view}
+              aria-pressed={(section.active ? 'assembled' : view) === option.view}
               disabled={section.active && option.view !== 'assembled'}
               onClick={() => explosion.chooseView(option.view)}>
               {option.label}
             </button>
           ))}
         </div>
-        {view === 'exploded' && <ExplosionSlider progress={explosion.progress} onChange={explosion.scrub} />}
+        {!section.active && view === 'exploded' && <ExplosionSlider progress={explosion.progress} onChange={explosion.scrub} />}
         {controlled && (
           <select aria-label="Display" value={display} onChange={event => setDisplay(event.target.value as ModelDisplay)}>
             {kDisplays.map(option => (
@@ -380,8 +386,8 @@ export default function WorkspaceView({
         sectionCaps={model.sectionCaps}
         sectionControl={sectionEnabled && !sectionProblem ? section.control : null}
         parts={model.parts}
-        view={explosion.modelView}
-        explosionProgress={explosion.progress}
+        view={section.active ? 'assembled' : explosion.modelView}
+        explosionProgress={section.active ? 0 : explosion.progress}
         viewRequest={viewRequest}
         onViewRequest={onViewRequest}
         transparentIds={transparentIds}
