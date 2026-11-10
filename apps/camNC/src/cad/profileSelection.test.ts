@@ -1,6 +1,22 @@
-import { createPlateDocument, newExtrudeOf, sketchRegions, CAD_CHORD_TOLERANCE } from '@wbcnc/cad';
+import { createPlateDocument, newExtrudeOf, sketchRegions, CAD_CHORD_TOLERANCE, parseCadDocument } from '@wbcnc/cad';
 import { expect, it } from 'vitest';
 import { replaceExtrudeProfile, sketchSelectionRegions } from './profileSelection';
+import saved from '../../../../packages/cad-script/fixtures/designs/extrude-three-profiles.json';
+
+it('chooses the whole authored sketch without losing Remove settings or feature identity', () => {
+  const document = parseCadDocument(structuredClone(saved));
+  const target = document.parts[1]!;
+  expect(target.regions).toHaveLength(2);
+  expect(sketchRegions(target.sketch, CAD_CHORD_TOLERANCE)).toHaveLength(3);
+  const next = replaceExtrudeProfile(document, target.id, { sketch: target.id });
+  expect(next.parts[1]!.regions).toBeUndefined();
+  expect(next.parts[1]!.sketch).toBe(target.sketch);
+  expect(next.parts[1]!.remove).toEqual({ depth: 6 });
+  expect(next.parts[1]!.drawnOn).toEqual(target.drawnOn);
+  expect(next.parts[1]!.id).toBe(target.id);
+  expect(target.regions).toHaveLength(2);
+  expect(replaceExtrudeProfile(next, target.id, { sketch: target.id })).toBe(next);
+});
 
 it('preserves authored sketch ownership, downstream shared sketches, depth and feature identity when retargeting', () => {
   const source = createPlateDocument({ width: 60, height: 80, thickness: 25 });

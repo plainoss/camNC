@@ -1,0 +1,877 @@
+{
+ "design": {
+  "name": "Untitled design (16)",
+  "revision": 34,
+  "version": 2
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [
+  {
+   "code": "redundant-constraint",
+   "message": "Some constraints repeat relationships that are already defined. Entities: 410a, 972b, 9ad4, e26a.",
+   "part": "Part 1",
+   "entities": [
+    "410a",
+    "972b",
+    "9ad4",
+    "e26a"
+   ]
+  },
+  {
+   "code": "underconstrained",
+   "message": "2 degrees of freedom remain. Add dimensions to keep this shape predictable.",
+   "part": "Part 2"
+  },
+  {
+   "code": "region-count",
+   "message": "The picked regions don’t touch. Extrude each into a part of its own.",
+   "part": "Part 2"
+  }
+ ],
+ "features": [
+  {
+   "id": "c681ef81-03d7-4162-9658-82760580f5c9",
+   "kind": "variable",
+   "label": "#material",
+   "settings": {
+    "expression": "18"
+   },
+   "result": {
+    "value": 18,
+    "kind": "number"
+   }
+  },
+  {
+   "id": "ce5cb7ce-ceb6-4675-907b-362125fb0da1:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Part 1 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "ce5cb7ce-ceb6-4675-907b-362125fb0da1:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "#material"
+    },
+    "regions": [
+     "r1"
+    ],
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      -150,
+      0
+     ],
+     "size": [
+      150,
+      80
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "055606ff-87d1-45cb-b541-7a8f9505f664",
+   "kind": "fillet",
+   "label": "Fillet · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "corners": 4,
+    "radius": {
+     "value": 5
+    }
+   },
+   "result": {
+    "corners": 4
+   }
+  },
+  {
+   "id": "93185efe-9a70-47dd-ae63-a1cc2962df92:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 2",
+   "part": "Part 2",
+   "settings": {
+    "on": "Part 1's top (-y)"
+   },
+   "result": {
+    "sketch": "Part 2 / profile",
+    "freedom": 2,
+    "status": "solved",
+    "regions": 3
+   }
+  },
+  {
+   "id": "93185efe-9a70-47dd-ae63-a1cc2962df92:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 2",
+   "part": "Part 2",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "material"
+    },
+    "regions": [
+     "r1",
+     "r2"
+    ],
+    "remove": {
+     "depth": {
+      "value": 6
+     }
+    },
+    "drawnOn": {
+     "on": "Part 1's top (-y)",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "removesFrom": "Part 1",
+    "cuts": [
+     {
+      "side": "top",
+      "from": 0,
+      "to": 6,
+      "through": false,
+      "at": [
+       -136.017,
+       4.602
+      ],
+      "size": [
+       12.238,
+       12.238
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 6,
+      "through": false,
+      "at": [
+       -32.717,
+       62.141
+      ],
+      "size": [
+       12.238,
+       12.238
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 6,
+      "through": false,
+      "at": [
+       -84.367,
+       33.372
+      ],
+      "size": [
+       12.238,
+       12.238
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Part 1",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 5,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "horizontalPoints": 1,
+    "midpoint": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "verticalPoints": 1
+   },
+   "entities": [
+    {
+     "ref": "fac7",
+     "type": "line",
+     "a": [
+      -150,
+      0
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "2735",
+      "972b"
+     ]
+    },
+    {
+     "ref": "93ea",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      0,
+      80
+     ],
+     "ends": [
+      "f117",
+      "ec6c"
+     ]
+    },
+    {
+     "ref": "bbe5",
+     "type": "line",
+     "a": [
+      0,
+      80
+     ],
+     "b": [
+      -150,
+      80
+     ],
+     "ends": [
+      "9ad4",
+      "18ff"
+     ]
+    },
+    {
+     "ref": "10f5",
+     "type": "line",
+     "a": [
+      -150,
+      80
+     ],
+     "b": [
+      -150,
+      0
+     ],
+     "ends": [
+      "e26a",
+      "d09a"
+     ]
+    },
+    {
+     "ref": "c46c",
+     "type": "line",
+     "a": [
+      -150,
+      0
+     ],
+     "b": [
+      0,
+      80
+     ],
+     "ends": [
+      "2735",
+      "9ad4"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "1eb5",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      -150,
+      80
+     ],
+     "ends": [
+      "972b",
+      "18ff"
+     ],
+     "construction": true
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -150,
+      0
+     ],
+     "size": [
+      150,
+      80
+     ],
+     "area": 12000,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Part 1",
+   "ref": "4805",
+   "on": "top",
+   "freedom": null,
+   "status": "shared",
+   "constraints": {
+    "linearPattern": 1,
+    "pointOnLine": 1
+   },
+   "entities": [
+    {
+     "ref": "5039",
+     "type": "line",
+     "a": [
+      -150,
+      0
+     ],
+     "b": [
+      0,
+      80
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:2",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:e"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "a239",
+     "type": "circle",
+     "at": [
+      -129.898,
+      10.721
+     ],
+     "d": 12.238
+    },
+    {
+     "ref": "4805c55e-ec68-4119-ab03-1676c9b1797d:face:f",
+     "type": "line",
+     "a": [
+      -150,
+      0
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:2",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:97"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "4805c55e-ec68-4119-ab03-1676c9b1797d:face:93",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      0,
+      80
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:97",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:e"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "4805c55e-ec68-4119-ab03-1676c9b1797d:face:b",
+     "type": "line",
+     "a": [
+      0,
+      80
+     ],
+     "b": [
+      -150,
+      80
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:e",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:18"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "4805c55e-ec68-4119-ab03-1676c9b1797d:face:10",
+     "type": "line",
+     "a": [
+      -150,
+      80
+     ],
+     "b": [
+      -150,
+      0
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:18",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:2"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "bb5c",
+     "type": "circle",
+     "at": [
+      -78.248,
+      39.491
+     ],
+     "d": 12.238
+    },
+    {
+     "ref": "24f4",
+     "type": "circle",
+     "at": [
+      -26.598,
+      68.26
+     ],
+     "d": 12.238
+    }
+   ],
+   "patterns": [
+    {
+     "ref": "77e5",
+     "copies": 2
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -150,
+      0
+     ],
+     "size": [
+      150,
+      80
+     ],
+     "area": 11626.216,
+     "islands": 3
+    },
+    {
+     "ref": "r2",
+     "at": [
+      -136.007,
+      4.604
+     ],
+     "size": [
+      12.228,
+      12.233
+     ],
+     "area": 117.378,
+     "islands": 0
+    },
+    {
+     "ref": "r3",
+     "at": [
+      -84.357,
+      33.374
+     ],
+     "size": [
+      12.228,
+      12.233
+     ],
+     "area": 117.378,
+     "islands": 0
+    },
+    {
+     "ref": "r4",
+     "at": [
+      -32.707,
+      62.144
+     ],
+     "size": [
+      12.228,
+      12.233
+     ],
+     "area": 117.378,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Part 2",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 2,
+   "status": "solved",
+   "constraints": {
+    "linearPattern": 1,
+    "pointOnLine": 1
+   },
+   "entities": [
+    {
+     "ref": "5039",
+     "type": "line",
+     "a": [
+      -150,
+      0
+     ],
+     "b": [
+      0,
+      80
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:2",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:e"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "a239",
+     "type": "circle",
+     "at": [
+      -129.898,
+      10.721
+     ],
+     "d": 12.238
+    },
+    {
+     "ref": "4805c55e-ec68-4119-ab03-1676c9b1797d:face:f",
+     "type": "line",
+     "a": [
+      -150,
+      0
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:2",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:97"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "4805c55e-ec68-4119-ab03-1676c9b1797d:face:93",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      0,
+      80
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:97",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:e"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "4805c55e-ec68-4119-ab03-1676c9b1797d:face:b",
+     "type": "line",
+     "a": [
+      0,
+      80
+     ],
+     "b": [
+      -150,
+      80
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:e",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:18"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "4805c55e-ec68-4119-ab03-1676c9b1797d:face:10",
+     "type": "line",
+     "a": [
+      -150,
+      80
+     ],
+     "b": [
+      -150,
+      0
+     ],
+     "ends": [
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:18",
+      "4805c55e-ec68-4119-ab03-1676c9b1797d:face:2"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "bb5c",
+     "type": "circle",
+     "at": [
+      -78.248,
+      39.491
+     ],
+     "d": 12.238
+    },
+    {
+     "ref": "24f4",
+     "type": "circle",
+     "at": [
+      -26.598,
+      68.26
+     ],
+     "d": 12.238
+    }
+   ],
+   "patterns": [
+    {
+     "ref": "77e5",
+     "copies": 2
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -136.007,
+      4.604
+     ],
+     "size": [
+      12.228,
+      12.233
+     ],
+     "area": 117.378,
+     "islands": 0
+    },
+    {
+     "ref": "r2",
+     "at": [
+      -84.357,
+      33.374
+     ],
+     "size": [
+      12.228,
+      12.233
+     ],
+     "area": 117.378,
+     "islands": 0
+    },
+    {
+     "ref": "r3",
+     "at": [
+      -32.707,
+      62.144
+     ],
+     "size": [
+      12.228,
+      12.233
+     ],
+     "area": 117.378,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Part 1",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     -150,
+     0
+    ],
+    "size": [
+     150,
+     80
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "93185efe-9a70-47dd-ae63-a1cc2962df92:cut:4805c55e-ec68-4119-ab03-1676c9b1797d:region:a",
+     "side": "top",
+     "from": 0,
+     "to": 6,
+     "through": false,
+     "at": [
+      -136.017,
+      4.602
+     ],
+     "size": [
+      12.238,
+      12.238
+     ]
+    },
+    {
+     "ref": "93185efe-9a70-47dd-ae63-a1cc2962df92:cut:4805c55e-ec68-4119-ab03-1676c9b1797d:region:a~2,0",
+     "side": "top",
+     "from": 0,
+     "to": 6,
+     "through": false,
+     "at": [
+      -32.717,
+      62.141
+     ],
+     "size": [
+      12.238,
+      12.238
+     ]
+    },
+    {
+     "ref": "93185efe-9a70-47dd-ae63-a1cc2962df92:cut:4805c55e-ec68-4119-ab03-1676c9b1797d:region:b",
+     "side": "top",
+     "from": 0,
+     "to": 6,
+     "through": false,
+     "at": [
+      -84.367,
+      33.372
+     ],
+     "size": [
+      12.238,
+      12.238
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 6.3,
+    "operations": [
+     {
+      "label": "3 pockets 6 deep",
+      "depth": 6,
+      "steps": 4
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 13
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      -18,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "remove",
+   "name": "Part 2",
+   "thickness": 18,
+   "cuts": []
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Part 1",
+    "at": [
+     -150,
+     -18,
+     0
+    ],
+    "size": [
+     150,
+     18,
+     80
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    163.4,
+    93.4
+   ],
+   "yield": 0.786,
+   "parts": [
+    {
+     "name": "Part 1",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      150,
+      80
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Part 1",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 6.3,
+   "operations": [
+    {
+     "label": "3 pockets 6 deep",
+     "depth": 6,
+     "steps": 4
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 13
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}
