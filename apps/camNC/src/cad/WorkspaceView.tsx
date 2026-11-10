@@ -194,8 +194,15 @@ export default function WorkspaceView({
   const choosing = controlled ? choosingProp : ownChoosing;
   const setChoosing = (value: boolean) => (controlled ? onChoosingChange?.(value) : setOwnChoosing(value));
   // A mirror picker owns geometry input even without the editor's broader feature-dialog flag.
+  // The Assembled button changes first; parts can still be animating back in the rendered exploded layout.
   const measureEnabled =
-    measurementEnabled && view === 'assembled' && !choosing && !pickingMirrorPlane && !onPickPoint && !(onPickRegion && regions?.length);
+    measurementEnabled &&
+    view === 'assembled' &&
+    explosion.modelView === 'assembled' &&
+    !choosing &&
+    !pickingMirrorPlane &&
+    !onPickPoint &&
+    !(onPickRegion && regions?.length);
   const measure = useStudioMeasure(document, model, frame, measureEnabled);
   const [notice, setNotice] = useState<string | null>(null);
   // Escape stops picking, so the view takes the keyboard while it picks.
@@ -306,6 +313,8 @@ export default function WorkspaceView({
           aria-pressed={measure.expanded}
           disabled={!measurementEnabled || choosing || pickingMirrorPlane || !model.meshes.length}
           onClick={() => {
+            // Inspection uses assembled coordinates immediately; an old playback frame must not move them again.
+            explosion.scrub(0);
             setView('assembled');
             measure.open();
           }}>

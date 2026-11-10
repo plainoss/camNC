@@ -16,9 +16,8 @@ afterEach(async () => {
   await page.viewport(1280, 800);
 });
 
-async function setup(lengthUnit?: CadLengthUnit) {
+async function setup(lengthUnit?: CadLengthUnit, source = createPlateDocument({ width: 100, height: 60, thickness: 18 })) {
   await page.viewport(1776, 1115);
-  const source = createPlateDocument({ width: 100, height: 60, thickness: 18 });
   if (lengthUnit) source.lengthUnit = lengthUnit;
   const original = JSON.stringify(source);
   sessionId = source.id;
@@ -55,7 +54,7 @@ async function setup(lengthUnit?: CadLengthUnit) {
       position: { x: box.width / 2 + (dot(right) * box.height) / height, y: box.height / 2 - (dot(up) * box.height) / height },
     });
   };
-  return { source, original, change, frame, view, click };
+  return { source, original, change, frame, view, click, props };
 }
 
 it.each([
@@ -172,6 +171,60 @@ it(
     await userEvent.click(row);
     expect(within(dialog).queryByRole('list', { name: 'Measured entities' })).toBeNull();
     expect(dialog).toBeVisible();
+  },
+  kViewportWorkflowTimeout
+);
+
+it(
+  'measures assembled stock after animated return and cancels partial explosion before opening Measure',
+  async () => {
+    const source = createPlateDocument({ width: 100, height: 60, thickness: 18 });
+    source.parts[0]!.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    const second = createPlateDocument({ width: 100, height: 60, thickness: 18 }).parts[0]!;
+    second.placement = { position: [160, 0, 0], rotation: [0, 0, 0, 1] };
+    source.parts.push(second);
+    const { original, change, frame, view, click, props } = await setup(undefined, source);
+    const meshes = props().meshes;
+    const positions = meshes.map(mesh => Array.from(mesh.positions));
+    const assembled = async () => {
+      // A selected Assembled button precedes the rendered endpoint and camera refit during reverse playback.
+      await waitFor(
+        () => {
+          expect(props().view).toBe('assembled');
+          expect(props().explosionProgress).toBe(0);
+          expect(props().cameraState!.current!.key).toBe('assembled');
+          expect(props().onMeasurePick).toBeTypeOf('function');
+        },
+        { timeout: 20_000 }
+      );
+    };
+    await userEvent.click(screen.getByRole('button', { name: 'Exploded' }));
+    const slider = await screen.findByRole('slider', { name: 'Explosion amount' });
+    await waitFor(() => expect(slider).toHaveValue('100'), { timeout: 10_000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Assembled' }));
+    await assembled();
+    await view(5, 1);
+    await click([50, 0, 18]);
+    expect(await screen.findByRole('button', { name: 'Length: 100 mm' })).toBeVisible();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Exploded' }));
+    fireEvent.change(screen.getByRole('slider', { name: 'Explosion amount' }), { target: { value: '37' } });
+    expect(props().view).toBe('exploded');
+    expect(props().explosionProgress).toBe(0.37);
+    await userEvent.click(screen.getByRole('button', { name: 'Measure' }));
+    await assembled();
+    const dialog = await screen.findByRole('dialog', { name: 'Measure' });
+    await view(5, 1);
+    await click([50, 30, 18]);
+    await view(6, -1);
+    await click([50, 30, 0]);
+    expect(await within(dialog).findByRole('button', { name: 'Min distance: 18 mm' })).toBeVisible();
+    expect(props().meshes).toBe(meshes);
+    expect(props().meshes.map(mesh => Array.from(mesh.positions))).toEqual(positions);
+    expect(JSON.stringify(source)).toBe(original);
+    expect(change.mock.calls.at(-1)?.[0] ?? source).toEqual(source);
+    expect(screen.getByRole('button', { name: 'Undo (Ctrl or Command Z)' })).toBeDisabled();
+    expect(frame).toBeVisible();
   },
   kViewportWorkflowTimeout
 );
