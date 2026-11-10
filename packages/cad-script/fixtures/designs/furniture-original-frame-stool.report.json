@@ -1,0 +1,4283 @@
+{
+ "design": {
+  "name": "Untitled design",
+  "revision": 1,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "1277014e-7f61-41ec-85f5-8d67f37bbb5a:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Part 1 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "1277014e-7f61-41ec-85f5-8d67f37bbb5a:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 632
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      300,
+      300
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "58e7cd23-3aad-42a3-92b4-26c3e490648a:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Leg front left",
+   "part": "Leg front left",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Leg front left / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "58e7cd23-3aad-42a3-92b4-26c3e490648a:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Leg front left",
+   "part": "Leg front left",
+   "settings": {
+    "thickness": {
+     "value": 40
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -55
+     }
+    }
+   },
+   "result": {
+    "thickness": 40,
+    "outline": {
+     "at": [
+      -15,
+      0
+     ],
+     "size": [
+      70,
+      632
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "dcbf1d6c-c80e-4ee8-8a90-5ee7761b1279:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Leg front right",
+   "part": "Leg front right",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Leg front right / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "dcbf1d6c-c80e-4ee8-8a90-5ee7761b1279:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Leg front right",
+   "part": "Leg front right",
+   "settings": {
+    "thickness": {
+     "value": 40
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -55
+     }
+    }
+   },
+   "result": {
+    "thickness": 40,
+    "outline": {
+     "at": [
+      245,
+      0
+     ],
+     "size": [
+      70,
+      632
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "01b8c024-1ac0-4522-a7e2-cfcf9593a56a:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Leg back left",
+   "part": "Leg back left",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Leg back left / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "01b8c024-1ac0-4522-a7e2-cfcf9593a56a:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Leg back left",
+   "part": "Leg back left",
+   "settings": {
+    "thickness": {
+     "value": 40
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -285
+     }
+    }
+   },
+   "result": {
+    "thickness": 40,
+    "outline": {
+     "at": [
+      -15,
+      0
+     ],
+     "size": [
+      70,
+      632
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "4579e064-d2fd-4889-8d87-bc5ec5756370:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Leg back right",
+   "part": "Leg back right",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Leg back right / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "4579e064-d2fd-4889-8d87-bc5ec5756370:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Leg back right",
+   "part": "Leg back right",
+   "settings": {
+    "thickness": {
+     "value": 40
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -285
+     }
+    }
+   },
+   "result": {
+    "thickness": 40,
+    "outline": {
+     "at": [
+      245,
+      0
+     ],
+     "size": [
+      70,
+      632
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "364ffbe0-c154-4260-83e5-a9a696385768:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Apron front",
+   "part": "Apron front",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Apron front / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "364ffbe0-c154-4260-83e5-a9a696385768:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Apron front",
+   "part": "Apron front",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -33
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      210,
+      70
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "fa07c322-4651-4ea2-b954-5d593056df2a:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Apron back",
+   "part": "Apron back",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Apron back / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "fa07c322-4651-4ea2-b954-5d593056df2a:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Apron back",
+   "part": "Apron back",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -285
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      210,
+      70
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "337ba5c3-8ad0-4028-8dda-ab4e803f7c1d:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Apron left",
+   "part": "Apron left",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Apron left / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "337ba5c3-8ad0-4028-8dda-ab4e803f7c1d:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Apron left",
+   "part": "Apron left",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 15
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      210,
+      70
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "5d937ecb-27f2-4161-bb82-3c6151178923:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Apron right",
+   "part": "Apron right",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Apron right / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "5d937ecb-27f2-4161-bb82-3c6151178923:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Apron right",
+   "part": "Apron right",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 267
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      210,
+      70
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "0a8fb154-68f4-42b0-9f01-ff229f44b331:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Footrest rail front",
+   "part": "Footrest rail front",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Footrest rail front / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "0a8fb154-68f4-42b0-9f01-ff229f44b331:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Footrest rail front",
+   "part": "Footrest rail front",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -33
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      210,
+      40
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "c883033f-0321-48fd-9fc0-df7f8cb8a442:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Footrest rail back",
+   "part": "Footrest rail back",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Footrest rail back / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "c883033f-0321-48fd-9fc0-df7f8cb8a442:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Footrest rail back",
+   "part": "Footrest rail back",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -285
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      210,
+      40
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "3195f379-5a27-492e-845b-af4824c18682:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Footrest rail left",
+   "part": "Footrest rail left",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Footrest rail left / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "3195f379-5a27-492e-845b-af4824c18682:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Footrest rail left",
+   "part": "Footrest rail left",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 15
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      210,
+      40
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "60b18929-d186-49ec-bcc1-c0aee3715ca9:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Footrest rail right",
+   "part": "Footrest rail right",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Footrest rail right / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "60b18929-d186-49ec-bcc1-c0aee3715ca9:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Footrest rail right",
+   "part": "Footrest rail right",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 267
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      210,
+      40
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "b3fc52ca-d4aa-4275-8d90-080ebfd52467",
+   "kind": "partCut",
+   "label": "Cut Leg front left with Apron front, Apron back, Apron left, Apron right, Footrest rail front, Footrest rail back, Footrest rail left, Footrest rail right",
+   "part": "Leg front left",
+   "settings": {
+    "tools": [
+     "Apron front",
+     "Apron back",
+     "Apron left",
+     "Apron right",
+     "Footrest rail front",
+     "Footrest rail back",
+     "Footrest rail left",
+     "Footrest rail right"
+    ],
+    "targets": [
+     "Leg front left"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Leg front left",
+      "tool": "Apron front",
+      "side": "top",
+      "width": 10,
+      "length": 70,
+      "depth": 18,
+      "through": false,
+      "at": {
+       "x": 45,
+       "y": 562
+      }
+     },
+     {
+      "target": "Leg front left",
+      "tool": "Apron left",
+      "side": "underside",
+      "width": 18,
+      "length": 70,
+      "depth": 10,
+      "through": false,
+      "at": {
+       "x": 15,
+       "y": 562
+      }
+     },
+     {
+      "target": "Leg front left",
+      "tool": "Footrest rail front",
+      "side": "top",
+      "width": 10,
+      "length": 40,
+      "depth": 18,
+      "through": false,
+      "at": {
+       "x": 45,
+       "y": 250
+      }
+     },
+     {
+      "target": "Leg front left",
+      "tool": "Footrest rail left",
+      "side": "underside",
+      "width": 18,
+      "length": 40,
+      "depth": 10,
+      "through": false,
+      "at": {
+       "x": 15,
+       "y": 250
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "736a03c7-c610-407f-b5cc-4e9c979830c2",
+   "kind": "partCut",
+   "label": "Cut Leg front right with Apron front, Apron back, Apron left, Apron right, Footrest rail front, Footrest rail back, Footrest rail left, Footrest rail right",
+   "part": "Leg front right",
+   "settings": {
+    "tools": [
+     "Apron front",
+     "Apron back",
+     "Apron left",
+     "Apron right",
+     "Footrest rail front",
+     "Footrest rail back",
+     "Footrest rail left",
+     "Footrest rail right"
+    ],
+    "targets": [
+     "Leg front right"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Leg front right",
+      "tool": "Apron front",
+      "side": "top",
+      "width": 10,
+      "length": 70,
+      "depth": 18,
+      "through": false,
+      "at": {
+       "x": 245,
+       "y": 562
+      }
+     },
+     {
+      "target": "Leg front right",
+      "tool": "Apron right",
+      "side": "underside",
+      "width": 18,
+      "length": 70,
+      "depth": 10,
+      "through": false,
+      "at": {
+       "x": 267,
+       "y": 562
+      }
+     },
+     {
+      "target": "Leg front right",
+      "tool": "Footrest rail front",
+      "side": "top",
+      "width": 10,
+      "length": 40,
+      "depth": 18,
+      "through": false,
+      "at": {
+       "x": 245,
+       "y": 250
+      }
+     },
+     {
+      "target": "Leg front right",
+      "tool": "Footrest rail right",
+      "side": "underside",
+      "width": 18,
+      "length": 40,
+      "depth": 10,
+      "through": false,
+      "at": {
+       "x": 267,
+       "y": 250
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "bbacd696-a63e-4717-960f-553cd2096666",
+   "kind": "partCut",
+   "label": "Cut Leg back left with Apron front, Apron back, Apron left, Apron right, Footrest rail front, Footrest rail back, Footrest rail left, Footrest rail right",
+   "part": "Leg back left",
+   "settings": {
+    "tools": [
+     "Apron front",
+     "Apron back",
+     "Apron left",
+     "Apron right",
+     "Footrest rail front",
+     "Footrest rail back",
+     "Footrest rail left",
+     "Footrest rail right"
+    ],
+    "targets": [
+     "Leg back left"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Leg back left",
+      "tool": "Apron back",
+      "side": "underside",
+      "width": 10,
+      "length": 70,
+      "depth": 18,
+      "through": false,
+      "at": {
+       "x": 45,
+       "y": 562
+      }
+     },
+     {
+      "target": "Leg back left",
+      "tool": "Apron left",
+      "side": "top",
+      "width": 18,
+      "length": 70,
+      "depth": 10,
+      "through": false,
+      "at": {
+       "x": 15,
+       "y": 562
+      }
+     },
+     {
+      "target": "Leg back left",
+      "tool": "Footrest rail back",
+      "side": "underside",
+      "width": 10,
+      "length": 40,
+      "depth": 18,
+      "through": false,
+      "at": {
+       "x": 45,
+       "y": 250
+      }
+     },
+     {
+      "target": "Leg back left",
+      "tool": "Footrest rail left",
+      "side": "top",
+      "width": 18,
+      "length": 40,
+      "depth": 10,
+      "through": false,
+      "at": {
+       "x": 15,
+       "y": 250
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "4d287a87-8078-40d3-b400-efd42c4b288f",
+   "kind": "partCut",
+   "label": "Cut Leg back right with Apron front, Apron back, Apron left, Apron right, Footrest rail front, Footrest rail back, Footrest rail left, Footrest rail right",
+   "part": "Leg back right",
+   "settings": {
+    "tools": [
+     "Apron front",
+     "Apron back",
+     "Apron left",
+     "Apron right",
+     "Footrest rail front",
+     "Footrest rail back",
+     "Footrest rail left",
+     "Footrest rail right"
+    ],
+    "targets": [
+     "Leg back right"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Leg back right",
+      "tool": "Apron back",
+      "side": "underside",
+      "width": 10,
+      "length": 70,
+      "depth": 18,
+      "through": false,
+      "at": {
+       "x": 245,
+       "y": 562
+      }
+     },
+     {
+      "target": "Leg back right",
+      "tool": "Apron right",
+      "side": "top",
+      "width": 18,
+      "length": 70,
+      "depth": 10,
+      "through": false,
+      "at": {
+       "x": 267,
+       "y": 562
+      }
+     },
+     {
+      "target": "Leg back right",
+      "tool": "Footrest rail back",
+      "side": "underside",
+      "width": 10,
+      "length": 40,
+      "depth": 18,
+      "through": false,
+      "at": {
+       "x": 245,
+       "y": 250
+      }
+     },
+     {
+      "target": "Leg back right",
+      "tool": "Footrest rail right",
+      "side": "top",
+      "width": 18,
+      "length": 40,
+      "depth": 10,
+      "through": false,
+      "at": {
+       "x": 267,
+       "y": 250
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Part 1",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "99ff",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      300,
+      0
+     ],
+     "ends": [
+      "1c92",
+      "2eeb"
+     ]
+    },
+    {
+     "ref": "362b",
+     "type": "line",
+     "a": [
+      300,
+      0
+     ],
+     "b": [
+      300,
+      300
+     ],
+     "ends": [
+      "84c5",
+      "770e"
+     ]
+    },
+    {
+     "ref": "4475",
+     "type": "line",
+     "a": [
+      300,
+      300
+     ],
+     "b": [
+      0,
+      300
+     ],
+     "ends": [
+      "bf77",
+      "eeb6"
+     ]
+    },
+    {
+     "ref": "771d",
+     "type": "line",
+     "a": [
+      0,
+      300
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "cab3",
+      "394b"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      300,
+      300
+     ],
+     "area": 90000,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Leg front left",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 2,
+    "distanceY": 1,
+    "horizontal": 2,
+    "positionX": 1,
+    "positionY": 1,
+    "vertical": 1
+   },
+   "entities": [
+    {
+     "ref": "1244",
+     "type": "line",
+     "a": [
+      -15,
+      0
+     ],
+     "b": [
+      55,
+      0
+     ],
+     "ends": [
+      "c246",
+      "688b"
+     ]
+    },
+    {
+     "ref": "ca09",
+     "type": "line",
+     "a": [
+      55,
+      0
+     ],
+     "b": [
+      55,
+      632
+     ],
+     "ends": [
+      "688b",
+      "26e3"
+     ]
+    },
+    {
+     "ref": "5871",
+     "type": "line",
+     "a": [
+      55,
+      632
+     ],
+     "b": [
+      15,
+      632
+     ],
+     "ends": [
+      "26e3",
+      "7ded"
+     ]
+    },
+    {
+     "ref": "6179",
+     "type": "line",
+     "a": [
+      15,
+      632
+     ],
+     "b": [
+      -15,
+      0
+     ],
+     "ends": [
+      "7ded",
+      "c246"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -15,
+      0
+     ],
+     "size": [
+      70,
+      632
+     ],
+     "area": 34760,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Leg front right",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 3,
+    "distanceY": 1,
+    "horizontal": 2,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "4a17",
+     "type": "line",
+     "a": [
+      245,
+      0
+     ],
+     "b": [
+      315,
+      0
+     ],
+     "ends": [
+      "6a06",
+      "f8b1"
+     ]
+    },
+    {
+     "ref": "a078",
+     "type": "line",
+     "a": [
+      315,
+      0
+     ],
+     "b": [
+      285,
+      632
+     ],
+     "ends": [
+      "f8b1",
+      "482b"
+     ]
+    },
+    {
+     "ref": "b451",
+     "type": "line",
+     "a": [
+      285,
+      632
+     ],
+     "b": [
+      245,
+      632
+     ],
+     "ends": [
+      "482b",
+      "464b"
+     ]
+    },
+    {
+     "ref": "1617",
+     "type": "line",
+     "a": [
+      245,
+      632
+     ],
+     "b": [
+      245,
+      0
+     ],
+     "ends": [
+      "464b",
+      "6a06"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      245,
+      0
+     ],
+     "size": [
+      70,
+      632
+     ],
+     "area": 34760,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Leg back left",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 2,
+    "distanceY": 1,
+    "horizontal": 2,
+    "positionX": 1,
+    "positionY": 1,
+    "vertical": 1
+   },
+   "entities": [
+    {
+     "ref": "7f02",
+     "type": "line",
+     "a": [
+      -15,
+      0
+     ],
+     "b": [
+      55,
+      0
+     ],
+     "ends": [
+      "10d6",
+      "d37b"
+     ]
+    },
+    {
+     "ref": "745c",
+     "type": "line",
+     "a": [
+      55,
+      0
+     ],
+     "b": [
+      55,
+      632
+     ],
+     "ends": [
+      "d37b",
+      "f5d3"
+     ]
+    },
+    {
+     "ref": "953d",
+     "type": "line",
+     "a": [
+      55,
+      632
+     ],
+     "b": [
+      15,
+      632
+     ],
+     "ends": [
+      "f5d3",
+      "0ec2"
+     ]
+    },
+    {
+     "ref": "d5a2",
+     "type": "line",
+     "a": [
+      15,
+      632
+     ],
+     "b": [
+      -15,
+      0
+     ],
+     "ends": [
+      "0ec2",
+      "10d6"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -15,
+      0
+     ],
+     "size": [
+      70,
+      632
+     ],
+     "area": 34760,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Leg back right",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 3,
+    "distanceY": 1,
+    "horizontal": 2,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "f338",
+     "type": "line",
+     "a": [
+      245,
+      0
+     ],
+     "b": [
+      315,
+      0
+     ],
+     "ends": [
+      "2a03",
+      "e311"
+     ]
+    },
+    {
+     "ref": "181f",
+     "type": "line",
+     "a": [
+      315,
+      0
+     ],
+     "b": [
+      285,
+      632
+     ],
+     "ends": [
+      "e311",
+      "d9bf"
+     ]
+    },
+    {
+     "ref": "1ad3",
+     "type": "line",
+     "a": [
+      285,
+      632
+     ],
+     "b": [
+      245,
+      632
+     ],
+     "ends": [
+      "d9bf",
+      "7862"
+     ]
+    },
+    {
+     "ref": "0cc6",
+     "type": "line",
+     "a": [
+      245,
+      632
+     ],
+     "b": [
+      245,
+      0
+     ],
+     "ends": [
+      "7862",
+      "2a03"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      245,
+      0
+     ],
+     "size": [
+      70,
+      632
+     ],
+     "area": 34760,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Apron front",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "9b04",
+     "type": "line",
+     "a": [
+      45,
+      562
+     ],
+     "b": [
+      255,
+      562
+     ],
+     "ends": [
+      "e05e",
+      "30ea"
+     ]
+    },
+    {
+     "ref": "fbd9",
+     "type": "line",
+     "a": [
+      255,
+      562
+     ],
+     "b": [
+      255,
+      632
+     ],
+     "ends": [
+      "caae",
+      "4125"
+     ]
+    },
+    {
+     "ref": "3e47",
+     "type": "line",
+     "a": [
+      255,
+      632
+     ],
+     "b": [
+      45,
+      632
+     ],
+     "ends": [
+      "713d",
+      "67b0"
+     ]
+    },
+    {
+     "ref": "20d3",
+     "type": "line",
+     "a": [
+      45,
+      632
+     ],
+     "b": [
+      45,
+      562
+     ],
+     "ends": [
+      "c573",
+      "ffa5"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      210,
+      70
+     ],
+     "area": 14700,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Apron back",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "fb99",
+     "type": "line",
+     "a": [
+      45,
+      562
+     ],
+     "b": [
+      255,
+      562
+     ],
+     "ends": [
+      "9cae",
+      "f25e"
+     ]
+    },
+    {
+     "ref": "f174",
+     "type": "line",
+     "a": [
+      255,
+      562
+     ],
+     "b": [
+      255,
+      632
+     ],
+     "ends": [
+      "d6ac",
+      "392c"
+     ]
+    },
+    {
+     "ref": "82f1",
+     "type": "line",
+     "a": [
+      255,
+      632
+     ],
+     "b": [
+      45,
+      632
+     ],
+     "ends": [
+      "0280",
+      "7d6c"
+     ]
+    },
+    {
+     "ref": "11ba",
+     "type": "line",
+     "a": [
+      45,
+      632
+     ],
+     "b": [
+      45,
+      562
+     ],
+     "ends": [
+      "4c5f",
+      "51a2"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      210,
+      70
+     ],
+     "area": 14700,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Apron left",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "9705",
+     "type": "line",
+     "a": [
+      45,
+      562
+     ],
+     "b": [
+      255,
+      562
+     ],
+     "ends": [
+      "f2b5",
+      "c4a9"
+     ]
+    },
+    {
+     "ref": "15c5",
+     "type": "line",
+     "a": [
+      255,
+      562
+     ],
+     "b": [
+      255,
+      632
+     ],
+     "ends": [
+      "dcf6",
+      "60fd"
+     ]
+    },
+    {
+     "ref": "ad82",
+     "type": "line",
+     "a": [
+      255,
+      632
+     ],
+     "b": [
+      45,
+      632
+     ],
+     "ends": [
+      "b643",
+      "7155"
+     ]
+    },
+    {
+     "ref": "f01d",
+     "type": "line",
+     "a": [
+      45,
+      632
+     ],
+     "b": [
+      45,
+      562
+     ],
+     "ends": [
+      "530d",
+      "3b21"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      210,
+      70
+     ],
+     "area": 14700,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Apron right",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "c40f",
+     "type": "line",
+     "a": [
+      45,
+      562
+     ],
+     "b": [
+      255,
+      562
+     ],
+     "ends": [
+      "c970",
+      "f717"
+     ]
+    },
+    {
+     "ref": "01ab",
+     "type": "line",
+     "a": [
+      255,
+      562
+     ],
+     "b": [
+      255,
+      632
+     ],
+     "ends": [
+      "7279",
+      "eeef"
+     ]
+    },
+    {
+     "ref": "a923",
+     "type": "line",
+     "a": [
+      255,
+      632
+     ],
+     "b": [
+      45,
+      632
+     ],
+     "ends": [
+      "2af7",
+      "9d21"
+     ]
+    },
+    {
+     "ref": "05b0",
+     "type": "line",
+     "a": [
+      45,
+      632
+     ],
+     "b": [
+      45,
+      562
+     ],
+     "ends": [
+      "ec84",
+      "28f3"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      210,
+      70
+     ],
+     "area": 14700,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Footrest rail front",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "9c87",
+     "type": "line",
+     "a": [
+      45,
+      250
+     ],
+     "b": [
+      255,
+      250
+     ],
+     "ends": [
+      "9772",
+      "8f1c"
+     ]
+    },
+    {
+     "ref": "6fd3",
+     "type": "line",
+     "a": [
+      255,
+      250
+     ],
+     "b": [
+      255,
+      290
+     ],
+     "ends": [
+      "c926",
+      "86a7"
+     ]
+    },
+    {
+     "ref": "add5",
+     "type": "line",
+     "a": [
+      255,
+      290
+     ],
+     "b": [
+      45,
+      290
+     ],
+     "ends": [
+      "6571",
+      "da4c"
+     ]
+    },
+    {
+     "ref": "5738",
+     "type": "line",
+     "a": [
+      45,
+      290
+     ],
+     "b": [
+      45,
+      250
+     ],
+     "ends": [
+      "86fb",
+      "ad94"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      210,
+      40
+     ],
+     "area": 8400,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Footrest rail back",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "f2ff",
+     "type": "line",
+     "a": [
+      45,
+      250
+     ],
+     "b": [
+      255,
+      250
+     ],
+     "ends": [
+      "5678",
+      "5a07"
+     ]
+    },
+    {
+     "ref": "4965",
+     "type": "line",
+     "a": [
+      255,
+      250
+     ],
+     "b": [
+      255,
+      290
+     ],
+     "ends": [
+      "30b8",
+      "9560"
+     ]
+    },
+    {
+     "ref": "5c9a",
+     "type": "line",
+     "a": [
+      255,
+      290
+     ],
+     "b": [
+      45,
+      290
+     ],
+     "ends": [
+      "5405",
+      "3859"
+     ]
+    },
+    {
+     "ref": "403a",
+     "type": "line",
+     "a": [
+      45,
+      290
+     ],
+     "b": [
+      45,
+      250
+     ],
+     "ends": [
+      "a9ce",
+      "a109"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      210,
+      40
+     ],
+     "area": 8400,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Footrest rail left",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "95a1",
+     "type": "line",
+     "a": [
+      45,
+      250
+     ],
+     "b": [
+      255,
+      250
+     ],
+     "ends": [
+      "baf0",
+      "5bc5"
+     ]
+    },
+    {
+     "ref": "d6b4",
+     "type": "line",
+     "a": [
+      255,
+      250
+     ],
+     "b": [
+      255,
+      290
+     ],
+     "ends": [
+      "cf74",
+      "1987"
+     ]
+    },
+    {
+     "ref": "a6f3",
+     "type": "line",
+     "a": [
+      255,
+      290
+     ],
+     "b": [
+      45,
+      290
+     ],
+     "ends": [
+      "1c2f",
+      "0a3e"
+     ]
+    },
+    {
+     "ref": "f366",
+     "type": "line",
+     "a": [
+      45,
+      290
+     ],
+     "b": [
+      45,
+      250
+     ],
+     "ends": [
+      "4aad",
+      "7ebf"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      210,
+      40
+     ],
+     "area": 8400,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Footrest rail right",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "b969",
+     "type": "line",
+     "a": [
+      45,
+      250
+     ],
+     "b": [
+      255,
+      250
+     ],
+     "ends": [
+      "9313",
+      "d08a"
+     ]
+    },
+    {
+     "ref": "0587",
+     "type": "line",
+     "a": [
+      255,
+      250
+     ],
+     "b": [
+      255,
+      290
+     ],
+     "ends": [
+      "774b",
+      "d2ad"
+     ]
+    },
+    {
+     "ref": "e27b",
+     "type": "line",
+     "a": [
+      255,
+      290
+     ],
+     "b": [
+      45,
+      290
+     ],
+     "ends": [
+      "07fb",
+      "6907"
+     ]
+    },
+    {
+     "ref": "dd1c",
+     "type": "line",
+     "a": [
+      45,
+      290
+     ],
+     "b": [
+      45,
+      250
+     ],
+     "ends": [
+      "d1e6",
+      "b842"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      210,
+      40
+     ],
+     "area": 8400,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Part 1",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     300,
+     300
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 9.7,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      650
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      632
+     ]
+    },
+    {
+     "face": "edge 99ff",
+     "looks": "-y",
+     "origin": [
+      0,
+      0,
+      632
+     ]
+    },
+    {
+     "face": "edge 362b",
+     "looks": "+x",
+     "origin": [
+      300,
+      0,
+      632
+     ]
+    },
+    {
+     "face": "edge 4475",
+     "looks": "+y",
+     "origin": [
+      300,
+      300,
+      632
+     ]
+    },
+    {
+     "face": "edge 771d",
+     "looks": "-x",
+     "origin": [
+      0,
+      300,
+      632
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Leg front left",
+   "thickness": 40,
+   "outline": {
+    "at": [
+     -15,
+     0
+    ],
+    "size": [
+     70,
+     632
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Apron front",
+     "side": "top",
+     "from": 0,
+     "to": 18,
+     "through": false,
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      10,
+      70
+     ]
+    },
+    {
+     "ref": "Apron left",
+     "side": "underside",
+     "from": 0,
+     "to": 10,
+     "through": false,
+     "at": [
+      15,
+      562
+     ],
+     "size": [
+      18,
+      70
+     ]
+    },
+    {
+     "ref": "Footrest rail front",
+     "side": "top",
+     "from": 0,
+     "to": 18,
+     "through": false,
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      10,
+      40
+     ]
+    },
+    {
+     "ref": "Footrest rail left",
+     "side": "underside",
+     "from": 0,
+     "to": 10,
+     "through": false,
+     "at": [
+      15,
+      250
+     ],
+     "size": [
+      18,
+      40
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0,
+    "undersidePockets": 1
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 45.3,
+    "operations": [
+     {
+      "label": "2 edge grooves 18 deep",
+      "depth": 18,
+      "steps": 12
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 40.3,
+      "steps": 26
+     },
+     {
+      "label": "Side B: 1 pocket 10 deep + edge groove 10 deep",
+      "depth": 10,
+      "steps": 7
+     }
+    ],
+    "warnings": [
+     "Leg front left: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",
+     "Leg front left: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      15,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      55,
+      0
+     ]
+    },
+    {
+     "face": "edge 1244",
+     "looks": "-z",
+     "origin": [
+      -15,
+      55,
+      0
+     ]
+    },
+    {
+     "face": "edge ca09",
+     "looks": "+x",
+     "origin": [
+      55,
+      55,
+      0
+     ]
+    },
+    {
+     "face": "edge 5871",
+     "looks": "+z",
+     "origin": [
+      55,
+      55,
+      632
+     ]
+    },
+    {
+     "face": "edge 6179",
+     "looks": "(-0.999, 0, 0.047)",
+     "origin": [
+      15,
+      55,
+      632
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Leg front right",
+   "thickness": 40,
+   "outline": {
+    "at": [
+     245,
+     0
+    ],
+    "size": [
+     70,
+     632
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Apron front",
+     "side": "top",
+     "from": 0,
+     "to": 18,
+     "through": false,
+     "at": [
+      245,
+      562
+     ],
+     "size": [
+      10,
+      70
+     ]
+    },
+    {
+     "ref": "Apron right",
+     "side": "underside",
+     "from": 0,
+     "to": 10,
+     "through": false,
+     "at": [
+      267,
+      562
+     ],
+     "size": [
+      18,
+      70
+     ]
+    },
+    {
+     "ref": "Footrest rail front",
+     "side": "top",
+     "from": 0,
+     "to": 18,
+     "through": false,
+     "at": [
+      245,
+      250
+     ],
+     "size": [
+      10,
+      40
+     ]
+    },
+    {
+     "ref": "Footrest rail right",
+     "side": "underside",
+     "from": 0,
+     "to": 10,
+     "through": false,
+     "at": [
+      267,
+      250
+     ],
+     "size": [
+      18,
+      40
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0,
+    "undersidePockets": 1
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 45.3,
+    "operations": [
+     {
+      "label": "2 edge grooves 18 deep",
+      "depth": 18,
+      "steps": 12
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 40.3,
+      "steps": 26
+     },
+     {
+      "label": "Side B: 1 pocket 10 deep + edge groove 10 deep",
+      "depth": 10,
+      "steps": 7
+     }
+    ],
+    "warnings": [
+     "Leg front right: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",
+     "Leg front right: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      15,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      55,
+      0
+     ]
+    },
+    {
+     "face": "edge 4a17",
+     "looks": "-z",
+     "origin": [
+      245,
+      55,
+      0
+     ]
+    },
+    {
+     "face": "edge a078",
+     "looks": "(0.999, 0, 0.047)",
+     "origin": [
+      315,
+      55,
+      0
+     ]
+    },
+    {
+     "face": "edge b451",
+     "looks": "+z",
+     "origin": [
+      285,
+      55,
+      632
+     ]
+    },
+    {
+     "face": "edge 1617",
+     "looks": "-x",
+     "origin": [
+      245,
+      55,
+      632
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Leg back left",
+   "thickness": 40,
+   "outline": {
+    "at": [
+     -15,
+     0
+    ],
+    "size": [
+     70,
+     632
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Apron back",
+     "side": "underside",
+     "from": 0,
+     "to": 18,
+     "through": false,
+     "at": [
+      45,
+      562
+     ],
+     "size": [
+      10,
+      70
+     ]
+    },
+    {
+     "ref": "Apron left",
+     "side": "top",
+     "from": 0,
+     "to": 10,
+     "through": false,
+     "at": [
+      15,
+      562
+     ],
+     "size": [
+      18,
+      70
+     ]
+    },
+    {
+     "ref": "Footrest rail back",
+     "side": "underside",
+     "from": 0,
+     "to": 18,
+     "through": false,
+     "at": [
+      45,
+      250
+     ],
+     "size": [
+      10,
+      40
+     ]
+    },
+    {
+     "ref": "Footrest rail left",
+     "side": "top",
+     "from": 0,
+     "to": 10,
+     "through": false,
+     "at": [
+      15,
+      250
+     ],
+     "size": [
+      18,
+      40
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0,
+    "undersidePockets": 1
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 45.3,
+    "operations": [
+     {
+      "label": "1 pocket 10 deep + edge groove 10 deep",
+      "depth": 10,
+      "steps": 7
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 40.3,
+      "steps": 26
+     },
+     {
+      "label": "Side B: 2 edge grooves 18 deep",
+      "depth": 18,
+      "steps": 12
+     }
+    ],
+    "warnings": [
+     "Leg back left: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+     "Leg back left: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      245,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      285,
+      0
+     ]
+    },
+    {
+     "face": "edge 7f02",
+     "looks": "-z",
+     "origin": [
+      -15,
+      285,
+      0
+     ]
+    },
+    {
+     "face": "edge 745c",
+     "looks": "+x",
+     "origin": [
+      55,
+      285,
+      0
+     ]
+    },
+    {
+     "face": "edge 953d",
+     "looks": "+z",
+     "origin": [
+      55,
+      285,
+      632
+     ]
+    },
+    {
+     "face": "edge d5a2",
+     "looks": "(-0.999, 0, 0.047)",
+     "origin": [
+      15,
+      285,
+      632
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Leg back right",
+   "thickness": 40,
+   "outline": {
+    "at": [
+     245,
+     0
+    ],
+    "size": [
+     70,
+     632
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Apron back",
+     "side": "underside",
+     "from": 0,
+     "to": 18,
+     "through": false,
+     "at": [
+      245,
+      562
+     ],
+     "size": [
+      10,
+      70
+     ]
+    },
+    {
+     "ref": "Apron right",
+     "side": "top",
+     "from": 0,
+     "to": 10,
+     "through": false,
+     "at": [
+      267,
+      562
+     ],
+     "size": [
+      18,
+      70
+     ]
+    },
+    {
+     "ref": "Footrest rail back",
+     "side": "underside",
+     "from": 0,
+     "to": 18,
+     "through": false,
+     "at": [
+      245,
+      250
+     ],
+     "size": [
+      10,
+      40
+     ]
+    },
+    {
+     "ref": "Footrest rail right",
+     "side": "top",
+     "from": 0,
+     "to": 10,
+     "through": false,
+     "at": [
+      267,
+      250
+     ],
+     "size": [
+      18,
+      40
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0,
+    "undersidePockets": 1
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 45.3,
+    "operations": [
+     {
+      "label": "1 pocket 10 deep + edge groove 10 deep",
+      "depth": 10,
+      "steps": 7
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 40.3,
+      "steps": 26
+     },
+     {
+      "label": "Side B: 2 edge grooves 18 deep",
+      "depth": 18,
+      "steps": 12
+     }
+    ],
+    "warnings": [
+     "Leg back right: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+     "Leg back right: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      245,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      285,
+      0
+     ]
+    },
+    {
+     "face": "edge f338",
+     "looks": "-z",
+     "origin": [
+      245,
+      285,
+      0
+     ]
+    },
+    {
+     "face": "edge 181f",
+     "looks": "(0.999, 0, 0.047)",
+     "origin": [
+      315,
+      285,
+      0
+     ]
+    },
+    {
+     "face": "edge 1ad3",
+     "looks": "+z",
+     "origin": [
+      285,
+      285,
+      632
+     ]
+    },
+    {
+     "face": "edge 0cc6",
+     "looks": "-x",
+     "origin": [
+      245,
+      285,
+      632
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Apron front",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     45,
+     562
+    ],
+    "size": [
+     210,
+     70
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 5.1,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      15,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      33,
+      0
+     ]
+    },
+    {
+     "face": "edge 9b04",
+     "looks": "-z",
+     "origin": [
+      45,
+      33,
+      562
+     ]
+    },
+    {
+     "face": "edge fbd9",
+     "looks": "+x",
+     "origin": [
+      255,
+      33,
+      562
+     ]
+    },
+    {
+     "face": "edge 3e47",
+     "looks": "+z",
+     "origin": [
+      255,
+      33,
+      632
+     ]
+    },
+    {
+     "face": "edge 20d3",
+     "looks": "-x",
+     "origin": [
+      45,
+      33,
+      632
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Apron back",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     45,
+     562
+    ],
+    "size": [
+     210,
+     70
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 5.1,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      267,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      285,
+      0
+     ]
+    },
+    {
+     "face": "edge fb99",
+     "looks": "-z",
+     "origin": [
+      45,
+      285,
+      562
+     ]
+    },
+    {
+     "face": "edge f174",
+     "looks": "+x",
+     "origin": [
+      255,
+      285,
+      562
+     ]
+    },
+    {
+     "face": "edge 82f1",
+     "looks": "+z",
+     "origin": [
+      255,
+      285,
+      632
+     ]
+    },
+    {
+     "face": "edge 11ba",
+     "looks": "-x",
+     "origin": [
+      45,
+      285,
+      632
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Apron left",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     45,
+     562
+    ],
+    "size": [
+     210,
+     70
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 5.1,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      33,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      15,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 9705",
+     "looks": "-z",
+     "origin": [
+      15,
+      45,
+      562
+     ]
+    },
+    {
+     "face": "edge 15c5",
+     "looks": "+y",
+     "origin": [
+      15,
+      255,
+      562
+     ]
+    },
+    {
+     "face": "edge ad82",
+     "looks": "+z",
+     "origin": [
+      15,
+      255,
+      632
+     ]
+    },
+    {
+     "face": "edge f01d",
+     "looks": "-y",
+     "origin": [
+      15,
+      45,
+      632
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Apron right",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     45,
+     562
+    ],
+    "size": [
+     210,
+     70
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 5.1,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      285,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      267,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge c40f",
+     "looks": "-z",
+     "origin": [
+      267,
+      45,
+      562
+     ]
+    },
+    {
+     "face": "edge 01ab",
+     "looks": "+y",
+     "origin": [
+      267,
+      255,
+      562
+     ]
+    },
+    {
+     "face": "edge a923",
+     "looks": "+z",
+     "origin": [
+      267,
+      255,
+      632
+     ]
+    },
+    {
+     "face": "edge 05b0",
+     "looks": "-y",
+     "origin": [
+      267,
+      45,
+      632
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Footrest rail front",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     45,
+     250
+    ],
+    "size": [
+     210,
+     40
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 4.7,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      15,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      33,
+      0
+     ]
+    },
+    {
+     "face": "edge 9c87",
+     "looks": "-z",
+     "origin": [
+      45,
+      33,
+      250
+     ]
+    },
+    {
+     "face": "edge 6fd3",
+     "looks": "+x",
+     "origin": [
+      255,
+      33,
+      250
+     ]
+    },
+    {
+     "face": "edge add5",
+     "looks": "+z",
+     "origin": [
+      255,
+      33,
+      290
+     ]
+    },
+    {
+     "face": "edge 5738",
+     "looks": "-x",
+     "origin": [
+      45,
+      33,
+      290
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Footrest rail back",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     45,
+     250
+    ],
+    "size": [
+     210,
+     40
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 4.7,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      267,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      285,
+      0
+     ]
+    },
+    {
+     "face": "edge f2ff",
+     "looks": "-z",
+     "origin": [
+      45,
+      285,
+      250
+     ]
+    },
+    {
+     "face": "edge 4965",
+     "looks": "+x",
+     "origin": [
+      255,
+      285,
+      250
+     ]
+    },
+    {
+     "face": "edge 5c9a",
+     "looks": "+z",
+     "origin": [
+      255,
+      285,
+      290
+     ]
+    },
+    {
+     "face": "edge 403a",
+     "looks": "-x",
+     "origin": [
+      45,
+      285,
+      290
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Footrest rail left",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     45,
+     250
+    ],
+    "size": [
+     210,
+     40
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 4.7,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      33,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      15,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 95a1",
+     "looks": "-z",
+     "origin": [
+      15,
+      45,
+      250
+     ]
+    },
+    {
+     "face": "edge d6b4",
+     "looks": "+y",
+     "origin": [
+      15,
+      255,
+      250
+     ]
+    },
+    {
+     "face": "edge a6f3",
+     "looks": "+z",
+     "origin": [
+      15,
+      255,
+      290
+     ]
+    },
+    {
+     "face": "edge f366",
+     "looks": "-y",
+     "origin": [
+      15,
+      45,
+      290
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Footrest rail right",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     45,
+     250
+    ],
+    "size": [
+     210,
+     40
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 4.7,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      285,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      267,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge b969",
+     "looks": "-z",
+     "origin": [
+      267,
+      45,
+      250
+     ]
+    },
+    {
+     "face": "edge 0587",
+     "looks": "+y",
+     "origin": [
+      267,
+      255,
+      250
+     ]
+    },
+    {
+     "face": "edge e27b",
+     "looks": "+z",
+     "origin": [
+      267,
+      255,
+      290
+     ]
+    },
+    {
+     "face": "edge dd1c",
+     "looks": "-y",
+     "origin": [
+      267,
+      45,
+      290
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Part 1",
+    "at": [
+     0,
+     0,
+     632
+    ],
+    "size": [
+     300,
+     300,
+     18
+    ]
+   },
+   {
+    "name": "Leg front left",
+    "at": [
+     -15,
+     15,
+     0
+    ],
+    "size": [
+     70,
+     40,
+     632
+    ]
+   },
+   {
+    "name": "Leg front right",
+    "at": [
+     245,
+     15,
+     0
+    ],
+    "size": [
+     70,
+     40,
+     632
+    ]
+   },
+   {
+    "name": "Leg back left",
+    "at": [
+     -15,
+     245,
+     0
+    ],
+    "size": [
+     70,
+     40,
+     632
+    ]
+   },
+   {
+    "name": "Leg back right",
+    "at": [
+     245,
+     245,
+     0
+    ],
+    "size": [
+     70,
+     40,
+     632
+    ]
+   },
+   {
+    "name": "Apron front",
+    "at": [
+     45,
+     15,
+     562
+    ],
+    "size": [
+     210,
+     18,
+     70
+    ]
+   },
+   {
+    "name": "Apron back",
+    "at": [
+     45,
+     267,
+     562
+    ],
+    "size": [
+     210,
+     18,
+     70
+    ]
+   },
+   {
+    "name": "Apron left",
+    "at": [
+     15,
+     45,
+     562
+    ],
+    "size": [
+     18,
+     210,
+     70
+    ]
+   },
+   {
+    "name": "Apron right",
+    "at": [
+     267,
+     45,
+     562
+    ],
+    "size": [
+     18,
+     210,
+     70
+    ]
+   },
+   {
+    "name": "Footrest rail front",
+    "at": [
+     45,
+     15,
+     250
+    ],
+    "size": [
+     210,
+     18,
+     40
+    ]
+   },
+   {
+    "name": "Footrest rail back",
+    "at": [
+     45,
+     267,
+     250
+    ],
+    "size": [
+     210,
+     18,
+     40
+    ]
+   },
+   {
+    "name": "Footrest rail left",
+    "at": [
+     15,
+     45,
+     250
+    ],
+    "size": [
+     18,
+     210,
+     40
+    ]
+   },
+   {
+    "name": "Footrest rail right",
+    "at": [
+     267,
+     45,
+     250
+    ],
+    "size": [
+     18,
+     210,
+     40
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    533.4,
+    423.4
+   ],
+   "yield": 0.808,
+   "parts": [
+    {
+     "name": "Part 1",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      300,
+      300
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Apron front",
+     "at": [
+      316.7,
+      6.7
+     ],
+     "size": [
+      210,
+      70
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Apron back",
+     "at": [
+      316.7,
+      86.7
+     ],
+     "size": [
+      210,
+      70
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Apron left",
+     "at": [
+      316.7,
+      166.7
+     ],
+     "size": [
+      210,
+      70
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Apron right",
+     "at": [
+      316.7,
+      246.7
+     ],
+     "size": [
+      210,
+      70
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Footrest rail front",
+     "at": [
+      6.7,
+      316.7
+     ],
+     "size": [
+      210,
+      40
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Footrest rail back",
+     "at": [
+      226.7,
+      326.7
+     ],
+     "size": [
+      210,
+      40
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Footrest rail left",
+     "at": [
+      6.7,
+      366.7
+     ],
+     "size": [
+      210,
+      40
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Footrest rail right",
+     "at": [
+      226.7,
+      376.7
+     ],
+     "size": [
+      210,
+      40
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Part 1",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Apron front",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Apron back",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Apron left",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Apron right",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Footrest rail front",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Footrest rail back",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Footrest rail left",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Footrest rail right",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 48.6,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  },
+  {
+   "name": "Board B",
+   "thickness": 40,
+   "sides": 2,
+   "size": [
+    323.4,
+    645.4
+   ],
+   "yield": 0.848,
+   "parts": [
+    {
+     "name": "Leg front left",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      70,
+      632
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Leg front right",
+     "at": [
+      86.7,
+      6.7
+     ],
+     "size": [
+      70,
+      632
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Leg back left",
+     "at": [
+      166.7,
+      6.7
+     ],
+     "size": [
+      70,
+      632
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Leg back right",
+     "at": [
+      246.7,
+      6.7
+     ],
+     "size": [
+      70,
+      632
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Leg front left",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Leg front right",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Leg back left",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Leg back right",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 181,
+   "operations": [
+    {
+     "label": "2 edge grooves 18 deep",
+     "depth": 18,
+     "steps": 12
+    },
+    {
+     "label": "2 edge grooves 18 deep",
+     "depth": 18,
+     "steps": 12
+    },
+    {
+     "label": "1 pocket 10 deep + edge groove 10 deep",
+     "depth": 10,
+     "steps": 7
+    },
+    {
+     "label": "1 pocket 10 deep + edge groove 10 deep",
+     "depth": 10,
+     "steps": 7
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 40.3,
+     "steps": 26
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 40.3,
+     "steps": 26
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 40.3,
+     "steps": 26
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 40.3,
+     "steps": 26
+    },
+    {
+     "label": "Side B: 1 pocket 10 deep + edge groove 10 deep",
+     "depth": 10,
+     "steps": 7
+    },
+    {
+     "label": "Side B: 1 pocket 10 deep + edge groove 10 deep",
+     "depth": 10,
+     "steps": 7
+    },
+    {
+     "label": "Side B: 2 edge grooves 18 deep",
+     "depth": 18,
+     "steps": 12
+    },
+    {
+     "label": "Side B: 2 edge grooves 18 deep",
+     "depth": 18,
+     "steps": 12
+    }
+   ],
+   "warnings": [
+    "Leg front left: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",
+    "Leg front right: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",
+    "Leg back left: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+    "Leg back right: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+    "Leg front left: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+    "Leg front right: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+    "Leg back left: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",
+    "Leg back right: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175"
+   ],
+   "blocked": []
+  }
+ ]
+}

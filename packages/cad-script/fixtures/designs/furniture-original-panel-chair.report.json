@@ -1,0 +1,1631 @@
+{
+ "design": {
+  "name": "Untitled design",
+  "revision": 1,
+  "version": 3
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [
+  {
+   "code": "empty-sketch",
+   "message": "Draw a closed profile to create this flat part.",
+   "part": "Part 1"
+  }
+ ],
+ "features": [
+  {
+   "id": "386ee244-bc21-4e21-b21b-aa0b92102f70",
+   "kind": "variable",
+   "label": "#board",
+   "settings": {
+    "expression": "18mm"
+   },
+   "result": {
+    "value": 18,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "f52884b7-ce6c-4dac-a697-9341342deeca",
+   "kind": "variable",
+   "label": "#width",
+   "settings": {
+    "expression": "440mm"
+   },
+   "result": {
+    "value": 440,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "b9ae9c3e-7990-4569-bd12-e2d84018b55b",
+   "kind": "variable",
+   "label": "#depth",
+   "settings": {
+    "expression": "420mm"
+   },
+   "result": {
+    "value": 420,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "abb2fe6f-b040-45fb-97a8-0d1cd2c37792",
+   "kind": "variable",
+   "label": "#seatH",
+   "settings": {
+    "expression": "450mm"
+   },
+   "result": {
+    "value": 450,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "b984eee3-782a-421a-9373-5264ac057d39",
+   "kind": "variable",
+   "label": "#sideH",
+   "settings": {
+    "expression": "seatH + 60mm"
+   },
+   "result": {
+    "value": 510,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "b3c92365-3858-440c-89a4-54d2e5b19814",
+   "kind": "variable",
+   "label": "#backH",
+   "settings": {
+    "expression": "900mm"
+   },
+   "result": {
+    "value": 900,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "68dfdbac-b221-4660-88b0-a16c074660b3",
+   "kind": "variable",
+   "label": "#post",
+   "settings": {
+    "expression": "90mm"
+   },
+   "result": {
+    "value": 90,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "161201d4-1b97-4d9e-b303-f299a239dff2",
+   "kind": "variable",
+   "label": "#dado",
+   "settings": {
+    "expression": "9mm"
+   },
+   "result": {
+    "value": 9,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "b9f82eb0-78fb-4064-84bc-a17325a1a667",
+   "kind": "variable",
+   "label": "#fit",
+   "settings": {
+    "expression": "0.2mm"
+   },
+   "result": {
+    "value": 0.2,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "3b6a1358-2f0b-438a-878c-e51ca49adfc7:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "on": "not placed",
+    "extruded": false
+   },
+   "result": {
+    "sketch": "Part 1 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 0
+   }
+  },
+  {
+   "id": "7f6a263f-edff-431f-8bf9-eeb1bb2e89da:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Left side",
+   "part": "Left side",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Left side / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "7f6a263f-edff-431f-8bf9-eeb1bb2e89da:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Left side",
+   "part": "Left side",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      420,
+      900
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "4146070a-aa8d-4f22-bd5d-f3621f814a45",
+   "kind": "copy",
+   "label": "Copy · Right side",
+   "part": "Left side",
+   "settings": {
+    "name": "Right side",
+    "placement": {
+     "position": [
+      422,
+      0,
+      0
+     ],
+     "rotation": [
+      0.5,
+      0.5,
+      0.5,
+      0.5
+     ],
+     "positionExpressions": [
+      "width - board",
+      null,
+      null
+     ]
+    }
+   },
+   "result": {
+    "placement": {
+     "position": [
+      422,
+      0,
+      0
+     ],
+     "rotation": [
+      0.5,
+      0.5,
+      0.5,
+      0.5
+     ],
+     "positionExpressions": [
+      "width - board",
+      null,
+      null
+     ]
+    }
+   }
+  },
+  {
+   "id": "678ab1f7-075b-4cad-acd4-deba0f0e6cb8:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Seat",
+   "part": "Seat",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Seat / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "678ab1f7-075b-4cad-acd4-deba0f0e6cb8:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Seat",
+   "part": "Seat",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 432,
+      "expression": "seatH - board"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      9,
+      0
+     ],
+     "size": [
+      422,
+      402
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "4148a43a-1191-4c80-a681-c13856d44096:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Back panel",
+   "part": "Back panel",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Back panel / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "4148a43a-1191-4c80-a681-c13856d44096:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Back panel",
+   "part": "Back panel",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -420,
+      "expression": "-depth"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      9,
+      500
+     ],
+     "size": [
+      422,
+      350
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "6bd424f0-37db-48f0-be11-d092b5116044:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Lower rail",
+   "part": "Lower rail",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Lower rail / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "6bd424f0-37db-48f0-be11-d092b5116044:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Lower rail",
+   "part": "Lower rail",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -420,
+      "expression": "-depth"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      9,
+      100
+     ],
+     "size": [
+      422,
+      100
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "c71d5e3c-98f6-4723-8349-716067fa0f9a",
+   "kind": "partCut",
+   "label": "Cut Left side with Seat, Back panel, Lower rail",
+   "part": "Left side",
+   "settings": {
+    "tools": [
+     "Seat",
+     "Back panel",
+     "Lower rail"
+    ],
+    "targets": [
+     "Left side"
+    ],
+    "clearance": {
+     "value": 0.2,
+     "expression": "fit"
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Left side",
+      "tool": "Seat",
+      "side": "top",
+      "width": 402.2,
+      "length": 18.4,
+      "depth": 9.2,
+      "through": false,
+      "at": {
+       "x": 0,
+       "y": 431.8
+      }
+     },
+     {
+      "target": "Left side",
+      "tool": "Back panel",
+      "side": "top",
+      "width": 18.2,
+      "length": 350.4,
+      "depth": 9.2,
+      "through": false,
+      "at": {
+       "x": 401.8,
+       "y": 499.8
+      }
+     },
+     {
+      "target": "Left side",
+      "tool": "Lower rail",
+      "side": "top",
+      "width": 18.2,
+      "length": 100.4,
+      "depth": 9.2,
+      "through": false,
+      "at": {
+       "x": 401.8,
+       "y": 99.8
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Part 1",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {},
+   "entities": [],
+   "regions": []
+  },
+  {
+   "part": "Left side",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 3,
+    "distanceY": 2,
+    "horizontal": 3,
+    "vertical": 2
+   },
+   "entities": [
+    {
+     "ref": "8b31",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      420,
+      0
+     ],
+     "ends": [
+      "0bcd",
+      "a73c"
+     ]
+    },
+    {
+     "ref": "85e8",
+     "type": "line",
+     "a": [
+      420,
+      0
+     ],
+     "b": [
+      420,
+      900
+     ],
+     "ends": [
+      "a73c",
+      "0eab"
+     ]
+    },
+    {
+     "ref": "1119",
+     "type": "line",
+     "a": [
+      420,
+      900
+     ],
+     "b": [
+      330,
+      900
+     ],
+     "ends": [
+      "0eab",
+      "ab3d"
+     ]
+    },
+    {
+     "ref": "06d1",
+     "type": "line",
+     "a": [
+      330,
+      900
+     ],
+     "b": [
+      330,
+      510
+     ],
+     "ends": [
+      "ab3d",
+      "1e0c"
+     ]
+    },
+    {
+     "ref": "eca8",
+     "type": "line",
+     "a": [
+      330,
+      510
+     ],
+     "b": [
+      0,
+      510
+     ],
+     "ends": [
+      "1e0c",
+      "35af"
+     ]
+    },
+    {
+     "ref": "a14d",
+     "type": "line",
+     "a": [
+      0,
+      510
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "35af",
+      "0bcd"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      420,
+      900
+     ],
+     "area": 249300,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Seat",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "ff49",
+     "type": "line",
+     "a": [
+      9,
+      0
+     ],
+     "b": [
+      431,
+      0
+     ],
+     "ends": [
+      "8655",
+      "cb2f"
+     ]
+    },
+    {
+     "ref": "e185",
+     "type": "line",
+     "a": [
+      431,
+      0
+     ],
+     "b": [
+      431,
+      402
+     ],
+     "ends": [
+      "da71",
+      "3630"
+     ]
+    },
+    {
+     "ref": "20a7",
+     "type": "line",
+     "a": [
+      431,
+      402
+     ],
+     "b": [
+      9,
+      402
+     ],
+     "ends": [
+      "d614",
+      "9b79"
+     ]
+    },
+    {
+     "ref": "b790",
+     "type": "line",
+     "a": [
+      9,
+      402
+     ],
+     "b": [
+      9,
+      0
+     ],
+     "ends": [
+      "a772",
+      "20e0"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      9,
+      0
+     ],
+     "size": [
+      422,
+      402
+     ],
+     "area": 169644,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Back panel",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "0473",
+     "type": "line",
+     "a": [
+      9,
+      500
+     ],
+     "b": [
+      431,
+      500
+     ],
+     "ends": [
+      "4d1e",
+      "6709"
+     ]
+    },
+    {
+     "ref": "04e5",
+     "type": "line",
+     "a": [
+      431,
+      500
+     ],
+     "b": [
+      431,
+      850
+     ],
+     "ends": [
+      "d2ce",
+      "038d"
+     ]
+    },
+    {
+     "ref": "3bde",
+     "type": "line",
+     "a": [
+      431,
+      850
+     ],
+     "b": [
+      9,
+      850
+     ],
+     "ends": [
+      "fc41",
+      "71a9"
+     ]
+    },
+    {
+     "ref": "f984",
+     "type": "line",
+     "a": [
+      9,
+      850
+     ],
+     "b": [
+      9,
+      500
+     ],
+     "ends": [
+      "5e08",
+      "eb1e"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      9,
+      500
+     ],
+     "size": [
+      422,
+      350
+     ],
+     "area": 147700,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Lower rail",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "9cac",
+     "type": "line",
+     "a": [
+      9,
+      100
+     ],
+     "b": [
+      431,
+      100
+     ],
+     "ends": [
+      "b2e9",
+      "bbae"
+     ]
+    },
+    {
+     "ref": "91df",
+     "type": "line",
+     "a": [
+      431,
+      100
+     ],
+     "b": [
+      431,
+      200
+     ],
+     "ends": [
+      "a279",
+      "557d"
+     ]
+    },
+    {
+     "ref": "5277",
+     "type": "line",
+     "a": [
+      431,
+      200
+     ],
+     "b": [
+      9,
+      200
+     ],
+     "ends": [
+      "a60f",
+      "51b0"
+     ]
+    },
+    {
+     "ref": "205c",
+     "type": "line",
+     "a": [
+      9,
+      200
+     ],
+     "b": [
+      9,
+      100
+     ],
+     "ends": [
+      "6f74",
+      "4f12"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      9,
+      100
+     ],
+     "size": [
+      422,
+      100
+     ],
+     "area": 42200,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "sketch",
+   "name": "Part 1",
+   "thickness": 18,
+   "cuts": []
+  },
+  {
+   "kind": "part",
+   "name": "Left side",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     420,
+     900
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Seat",
+     "side": "top",
+     "from": 0,
+     "to": 9.2,
+     "through": false,
+     "at": [
+      0,
+      431.8
+     ],
+     "size": [
+      402.2,
+      18.4
+     ]
+    },
+    {
+     "ref": "Back panel",
+     "side": "top",
+     "from": 0,
+     "to": 9.2,
+     "through": false,
+     "at": [
+      401.8,
+      499.8
+     ],
+     "size": [
+      18.2,
+      350.4
+     ]
+    },
+    {
+     "ref": "Lower rail",
+     "side": "top",
+     "from": 0,
+     "to": 9.2,
+     "through": false,
+     "at": [
+      401.8,
+      99.8
+     ],
+     "size": [
+      18.2,
+      100.4
+     ]
+    }
+   ],
+   "copyFeatures": [
+    {
+     "ref": "7f6a263f-edff-431f-8bf9-eeb1bb2e89da:4146070a-aa8d-4f22-bd5d-f3621f814a45",
+     "name": "Right side",
+     "cuts": [
+      {
+       "ref": "Seat",
+       "side": "underside",
+       "from": 0,
+       "to": 9.2,
+       "through": false,
+       "at": [
+        0,
+        431.8
+       ],
+       "size": [
+        402.2,
+        18.4
+       ]
+      },
+      {
+       "ref": "Back panel",
+       "side": "underside",
+       "from": 0,
+       "to": 9.2,
+       "through": false,
+       "at": [
+        401.8,
+        499.8
+       ],
+       "size": [
+        18.2,
+        350.4
+       ]
+      },
+      {
+       "ref": "Lower rail",
+       "side": "underside",
+       "from": 0,
+       "to": 9.2,
+       "through": false,
+       "at": [
+        401.8,
+        99.8
+       ],
+       "size": [
+        18.2,
+        100.4
+       ]
+      }
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0
+   },
+   "pieces": {
+    "names": [
+     "Left side",
+     "Right side"
+    ],
+    "mirrored": []
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 72.3,
+    "operations": [
+     {
+      "label": "3 edge grooves 9.2 deep",
+      "depth": 9.2,
+      "steps": 6
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [
+     "Left side: pocket z=8.8: 3.3mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      18,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 8b31",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 85e8",
+     "looks": "+y",
+     "origin": [
+      0,
+      420,
+      0
+     ]
+    },
+    {
+     "face": "edge 1119",
+     "looks": "+z",
+     "origin": [
+      0,
+      420,
+      900
+     ]
+    },
+    {
+     "face": "edge 06d1",
+     "looks": "-y",
+     "origin": [
+      0,
+      330,
+      900
+     ]
+    },
+    {
+     "face": "edge eca8",
+     "looks": "+z",
+     "origin": [
+      0,
+      330,
+      510
+     ]
+    },
+    {
+     "face": "edge a14d",
+     "looks": "-y",
+     "origin": [
+      0,
+      0,
+      510
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Seat",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     9,
+     0
+    ],
+    "size": [
+     422,
+     402
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 13,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      450
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      432
+     ]
+    },
+    {
+     "face": "edge ff49",
+     "looks": "-y",
+     "origin": [
+      9,
+      0,
+      432
+     ]
+    },
+    {
+     "face": "edge e185",
+     "looks": "+x",
+     "origin": [
+      431,
+      0,
+      432
+     ]
+    },
+    {
+     "face": "edge 20a7",
+     "looks": "+y",
+     "origin": [
+      431,
+      402,
+      432
+     ]
+    },
+    {
+     "face": "edge b790",
+     "looks": "-x",
+     "origin": [
+      9,
+      402,
+      432
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Back panel",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     9,
+     500
+    ],
+    "size": [
+     422,
+     350
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 12.2,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      402,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      420,
+      0
+     ]
+    },
+    {
+     "face": "edge 0473",
+     "looks": "-z",
+     "origin": [
+      9,
+      420,
+      500
+     ]
+    },
+    {
+     "face": "edge 04e5",
+     "looks": "+x",
+     "origin": [
+      431,
+      420,
+      500
+     ]
+    },
+    {
+     "face": "edge 3bde",
+     "looks": "+z",
+     "origin": [
+      431,
+      420,
+      850
+     ]
+    },
+    {
+     "face": "edge f984",
+     "looks": "-x",
+     "origin": [
+      9,
+      420,
+      850
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Lower rail",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     9,
+     100
+    ],
+    "size": [
+     422,
+     100
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 8.6,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      402,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      420,
+      0
+     ]
+    },
+    {
+     "face": "edge 9cac",
+     "looks": "-z",
+     "origin": [
+      9,
+      420,
+      100
+     ]
+    },
+    {
+     "face": "edge 91df",
+     "looks": "+x",
+     "origin": [
+      431,
+      420,
+      100
+     ]
+    },
+    {
+     "face": "edge 5277",
+     "looks": "+z",
+     "origin": [
+      431,
+      420,
+      200
+     ]
+    },
+    {
+     "face": "edge 205c",
+     "looks": "-x",
+     "origin": [
+      9,
+      420,
+      200
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Left side",
+    "at": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     18,
+     420,
+     900
+    ]
+   },
+   {
+    "name": "Right side",
+    "at": [
+     422,
+     0,
+     0
+    ],
+    "size": [
+     18,
+     420,
+     900
+    ]
+   },
+   {
+    "name": "Seat",
+    "at": [
+     9,
+     0,
+     432
+    ],
+    "size": [
+     422,
+     402,
+     18
+    ]
+   },
+   {
+    "name": "Back panel",
+    "at": [
+     9,
+     402,
+     500
+    ],
+    "size": [
+     422,
+     18,
+     350
+    ]
+   },
+   {
+    "name": "Lower rail",
+    "at": [
+     9,
+     402,
+     100
+    ],
+    "size": [
+     422,
+     18,
+     100
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    435.4,
+    1795.4
+   ],
+   "yield": 0.943,
+   "parts": [
+    {
+     "name": "Left side",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      420,
+      900
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Seat",
+     "at": [
+      6.7,
+      916.7
+     ],
+     "size": [
+      422,
+      402
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Back panel",
+     "at": [
+      6.7,
+      1328.7
+     ],
+     "size": [
+      422,
+      350
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Lower rail",
+     "at": [
+      6.7,
+      1688.7
+     ],
+     "size": [
+      422,
+      100
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Left side",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Seat",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Back panel",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Lower rail",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 106.2,
+   "operations": [
+    {
+     "label": "3 edge grooves 9.2 deep",
+     "depth": 9.2,
+     "steps": 6
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [
+    "Left side: pocket z=8.8: 3.3mm² left in corners/narrow spots with D=3.175"
+   ],
+   "blocked": []
+  },
+  {
+   "name": "Board B",
+   "thickness": 18,
+   "sides": 2,
+   "size": [
+    433.4,
+    913.4
+   ],
+   "yield": 0.955,
+   "parts": [
+    {
+     "name": "Right side",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      420,
+      900
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Right side",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 72.4,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Side B: 3 edge grooves 9.2 deep",
+     "depth": 9.2,
+     "steps": 6
+    }
+   ],
+   "warnings": [
+    "Right side: pocket z=8.8: 3.3mm² left in corners/narrow spots with D=3.175"
+   ],
+   "blocked": []
+  }
+ ]
+}
