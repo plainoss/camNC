@@ -1,0 +1,52 @@
+[
+  {
+    "id": "studio/sketch/confirm-shortcut-keeps-cabinet",
+    "title": "Keyboard confirmation keeps a cabinet sketch and returns to its assembled parts",
+    "evidence": "design explicit sketch confirmation shortcut; complete cabinet with a mirrored side and dependent cuts",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/cupboard.json",
+      "closesketch",
+      "checkpoint assembled",
+      "feature Sketch · Side",
+      "key Enter",
+      { "expect": { "studio": { "dialog": "Sketch · Side" } } },
+      "key Control+Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "unchangedSince": "assembled",
+            "sameIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "workspacePartCount": 6,
+            "partIssues": []
+          }
+        }
+      },
+      "feature Sketch · Shelf",
+      "key Meta+Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "unchangedSince": "assembled",
+            "workspacePartCount": 6,
+            "partIssues": []
+          }
+        }
+      },
+      "reload",
+      {
+        "expect": {
+          "studio": {
+            "unchangedSince": "assembled",
+            "sameIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "workspacePartCount": 6,
+            "partIssues": []
+          }
+        }
+      }
+    ]
+  }
+]
