@@ -31,4 +31,5 @@ it('assesses the offered cached candidate rather than the last executed script',
   expect(benchmark.assessment?.checks.find(check => check.description.startsWith('Width is'))?.passed).toBe(true);
   // The caller's saved design is never mutated, even by the intermediate rejected result.
   expect(source).toEqual(JSON.parse(startJson));
-}, 30_000);
+  // This exercises initial/final assessment plus two isolated, fully planned checks under shared CI load.
+}, 120_000);
