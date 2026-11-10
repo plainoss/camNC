@@ -22,6 +22,7 @@ import {
 import { Matrix4, Vector3 } from 'three';
 import type { BodyMesh, CamPartInfo } from '@/cam/camTypes';
 import { nativePart } from '@/cam/nativeCadModel';
+import { assemblyDisplayPlacements } from './assemblyDisplayPlacements';
 
 /** Room left between parts that haven't been placed yet. */
 const kGap = 40;
@@ -114,16 +115,18 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
       right = Math.max(right, v.fromArray(shape.mesh.positions, i).applyMatrix4(matrix).x);
     return right;
   }, -Infinity);
-  let cursor = Number.isFinite(placedRight) ? placedRight + kGap : 0;
+  const displayPlacements = assemblyDisplayPlacements(
+    document,
+    given,
+    pieces.map(piece => ({ ...piece, origin: piece.shape.info.sourceOrigin, width: piece.shape.info.size[0] })),
+    Number.isFinite(placedRight) ? placedRight + kGap : 0,
+    kGap
+  );
   const model: AssemblyModel = { meshes: [], instances: [], parts: [], placements: new Map(), problems: [] };
   for (const entry of built)
     if ('problem' in entry) model.problems.push({ partId: entry.part.id, name: entry.part.name, message: entry.problem });
-  for (const { instance, placement: given, shape } of pieces) {
-    const placement: CadPlacement = given ?? {
-      position: [cursor - (shape.info.sourceOrigin?.[0] ?? 0), 0 - (shape.info.sourceOrigin?.[1] ?? 0), 0],
-      rotation: [0, 0, 0, 1],
-    };
-    if (!given) cursor += shape.info.size[0] + kGap;
+  for (const { instance, shape } of pieces) {
+    const placement = displayPlacements.get(instanceKey(instance))!;
     // A hidden part keeps its place in the row, so showing it again doesn't move the others.
     if (isHidden(instance)) continue;
     const matrix = new Matrix4().fromArray(placementMatrix(placement)).multiply(local(shape.info.sourceOrigin));

@@ -88,3 +88,43 @@ it.each([false, true])(
     expect(document.parts.find(part => part.id === f.bossId)!.copies).toBeUndefined();
   }
 );
+
+it.each([
+  [false, false],
+  [false, true],
+  [true, false],
+  [true, true],
+] as const)(
+  'keeps an unplaced host copy and its joined material together in the display row (mirrored: %s, implicit seed: %s)',
+  (mirrored, implicit) => {
+    const f = fixture(mirrored);
+    const document = {
+      ...f.document,
+      parts: f.document.parts.map(part => {
+        if (part.id !== f.parentId) return part;
+        const { placement, ...rest } = part;
+        return {
+          ...rest,
+          ...(!implicit && { placement }),
+          copies: part.copies!.map(copy => ({ id: copy.id, ...(copy.mirrored && { mirrored: true as const }) })),
+        };
+      }),
+    };
+    const before = JSON.stringify(document);
+    const model = assemblyModel(document);
+    expect(model.problems).toEqual([]);
+    expect(model.instances.map(instance => instance.name)).toEqual(['Parent', 'Parent 2', 'Boss', 'Boss · Parent 2']);
+    const host = model.instances.findIndex(instance => instance.partId === f.parentId && instance.copyId === f.copyId);
+    const joined = model.instances.findIndex(instance => instance.partId === f.bossId && instance.copyId === f.copyId);
+    expect(minimum(model.meshes[host]!)).toEqual([140, 0, 0]);
+    expect(minimum(model.meshes[joined]!)).toEqual([mirrored ? 205 : 155, 10, 18]);
+    const hostAt = model.placements.get(instanceKey(model.instances[host]!))!;
+    expect(model.placements.get(instanceKey(model.instances[joined]!))?.position).toEqual([hostAt.position[0], 0, 18]);
+    expect(meshVolume(model.meshes[joined]!)).toBeCloseTo((20 * 12 - 4 * 3) * 6, 6);
+    const hidden = assemblyModel(document, new Set([instanceKey({ partId: f.parentId, copyId: f.copyId })]));
+    expect(hidden.instances.map(instance => instance.name)).toEqual(['Parent', 'Boss']);
+    expect(JSON.stringify(document)).toBe(before);
+    expect(document.parts[0]!.copies![0]!.placement).toBeUndefined();
+    expect(document.parts.find(part => part.id === f.bossId)!.copies).toBeUndefined();
+  }
+);
