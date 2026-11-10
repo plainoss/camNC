@@ -21,7 +21,12 @@ it('shows image-only history and preserves constraints when moving to a text-onl
     { role: 'user', text: '', images: [{ name: 'reference.png', mediaType: 'image/png', data: 'AA==' }] },
   ]);
   rememberAssistantCredentials({ config: { ...defaultProvider, model: 'recorded', images: false }, key: 'recorded-key' });
+  let providerStarted!: () => void;
+  const providerRequested = new Promise<void>(resolve => {
+    providerStarted = resolve;
+  });
   vi.mocked(requestAssistant).mockImplementation(async request => {
+    providerStarted();
     expect(request.messages[0].text).toBe('No visible screws. Board is 18 mm.');
     expect(request.messages.every(message => !message.images?.length)).toBe(true);
     expect(request.messages[1].text).toContain('selected provider is text-only');
@@ -31,6 +36,8 @@ it('shows image-only history and preserves constraints when moving to a text-onl
   expect(screen.getByRole('img', { name: 'reference.png' })).toBeDefined();
   await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'Cut a hole.');
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+  // Real CAD context preparation precedes the mock; its work must not consume the reply query's deadline.
+  await providerRequested;
   await screen.findByText('Question: What diameter?');
   await userEvent.click(screen.getByText('Usage and limits'));
   expect(screen.getByLabelText('Last turn usage').textContent).toContain('input 123 tokens');
