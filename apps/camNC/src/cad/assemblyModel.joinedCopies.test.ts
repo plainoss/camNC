@@ -6,6 +6,7 @@ import {
   createCadPart,
   createPlateDocument,
   resolveDrawnPlacements,
+  type CadDocument,
 } from '@wbcnc/cad';
 import { expect, it } from 'vitest';
 import type { BodyMesh } from '@/cam/camTypes';
@@ -98,7 +99,7 @@ it.each([
   'keeps an unplaced host copy and its joined material together in the display row (mirrored: %s, implicit seed: %s)',
   (mirrored, implicit) => {
     const f = fixture(mirrored);
-    const document = {
+    const document: CadDocument = {
       ...f.document,
       parts: f.document.parts.map(part => {
         if (part.id !== f.parentId) return part;
