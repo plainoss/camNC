@@ -1,5 +1,11 @@
 [
   "src/test/routeFiles.test.ts",
+  "src/cad/assemblyModel.copyTransforms.test.ts",
+  "src/cad/studioGeometry.test.ts",
+  "src/cad/studioGeometry.woodworking.test.ts",
+  "src/cad/studioReferenceGeometry.test.ts",
+  "src/cad/studioNormalView.test.ts",
+  "src/cad/partAssemblyCamera.test.ts",
   "src/cad/partEdgeUse.test.ts",
   "src/cad/partEdges.test.ts",
   "src/cad/studioUsedEdgeOwners.test.ts",
