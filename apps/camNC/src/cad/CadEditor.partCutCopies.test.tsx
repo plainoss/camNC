@@ -99,7 +99,8 @@ it('does not rebind a disappeared preselected copy to its source family', async 
   await userEvent.click(within(variable).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '#dividerCount' })).toBeNull());
   await settled();
-  expect(within(screen.getByRole('list', { name: 'Parts' })).queryByRole('button', { name: 'Divider 3' })).toBeNull();
+  // Worker readiness can precede the evaluated Parts list; wait for the removed copy before using the selection.
+  await waitFor(() => expect(within(screen.getByRole('list', { name: 'Parts' })).queryByRole('button', { name: 'Divider 3' })).toBeNull());
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Cut parts/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Cut parts' });
   expect(within(within(dialog).getByRole('group', { name: 'Tools' })).queryByRole('listitem')).toBeNull();
