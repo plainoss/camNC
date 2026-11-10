@@ -1,4 +1,4 @@
-import { createPlateDocument, parseCadDocument } from '@wbcnc/cad';
+import { createCadDocument, createCadPart, createPlateDocument, parseCadDocument } from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { SvgInsert } from './SvgInsert';
@@ -54,3 +54,22 @@ it('disables import during an active edit', () => {
   render(<SvgInsert document={createPlateDocument()} disabled onProposal={() => {}} />);
   expect((screen.getByRole('button', { name: 'SVG…' }) as HTMLButtonElement).disabled).toBe(true);
 });
+
+it('imports into a fresh studio without losing its untouched starter identities', async () => {
+  const document = { ...createCadDocument(), lengthUnit: 'cm' as const };
+  document.parts.push(createCadPart('Part 1'));
+  const before = structuredClone(document),
+    onProposal = vi.fn();
+  render(<SvgInsert document={document} onProposal={onProposal} />);
+  fireEvent.click(screen.getByRole('button', { name: 'SVG…' }));
+  await screen.findByRole('dialog', { name: 'Import SVG into sketch' });
+  upload();
+  await screen.findByLabelText('Imported geometry preview');
+  fireEvent.click(screen.getByRole('button', { name: 'Review import' }));
+  await waitFor(() => expect(onProposal).toHaveBeenCalledTimes(1), { timeout: 20_000 });
+  const proposal = onProposal.mock.calls[0][0];
+  expect(document).toEqual(before);
+  expect(proposal.base).toEqual(before);
+  expect(proposal.document.parts[0]).toEqual({ ...before.parts[0], extrude: false });
+  expect(proposal.document.parts[1].sketch.entities.filter((entity: { type: string }) => entity.type === 'conic')).toHaveLength(4);
+}, 30_000);
