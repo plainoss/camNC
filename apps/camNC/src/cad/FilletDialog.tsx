@@ -92,8 +92,20 @@ export function FilletDialog({
   const owner = picked[0]?.partId ?? partId;
   const [featureId] = useState(() => fillet?.id ?? newCadId());
   const candidate = useMemo(() => {
+    if (!owner) return null;
+    if (!picked.length) {
+      if (!fillet) return null;
+      // Clear the edited fillet in the preview so its original sharp edges can be selected again.
+      return {
+        ...document,
+        revision: document.revision + 1,
+        parts: document.parts.map(part =>
+          part.id !== owner ? part : { ...part, fillets: part.fillets?.filter(current => current.id !== fillet.id) }
+        ),
+      };
+    }
     const radius = parseCadValue(radiusText, { unit: 'mm', variables });
-    if ('error' in radius || !(radius.value > 0) || !owner || !picked.length) return null;
+    if ('error' in radius || !(radius.value > 0)) return null;
     const next: CadEdgeFillet = {
       id: featureId,
       corners: picked.map(p => p.corner),
@@ -119,11 +131,42 @@ export function FilletDialog({
     if (candidate) onSave(candidate);
   };
   const name = owner && document.parts.find(part => part.id === owner)?.name;
+  const edgeName = (pick: Picked, index: number) => {
+    const part = document.parts.find(part => part.id === pick.partId);
+    const point = part?.sketch.entities.find(entity => entity.type === 'point' && entity.id === pick.corner);
+    return point?.type === 'point'
+      ? `${part!.name} at ${formatCadValue(point.x)}, ${formatCadValue(point.y)} mm`
+      : `${part?.name ?? 'Part'} edge ${index + 1}`;
+  };
   return (
     <FeatureDialog title="Fillet" okDisabled={!picked.length} onOk={save} onCancel={onCancel}>
       <div className="cad-feature-selection" data-active="">
         <small>Edges to round</small>
         <span>{picked.length ? `${picked.length} ${picked.length === 1 ? 'edge' : 'edges'} of ${name}` : 'Click edges of a part'}</span>
+        {/* Rounded previews replace the original edges, so each selection also needs an explicit removal control. */}
+        {!!picked.length && (
+          <ul aria-label="Selected edges" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {picked.map((pick, index) => {
+              const label = edgeName(pick, index);
+              return (
+                <li
+                  key={`${pick.partId}:${pick.corner}`}
+                  style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                  <span>{label}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove selected edge: ${label}`}
+                    onClick={() => {
+                      setError(null);
+                      setPicked(current => current.filter(edge => edge.partId !== pick.partId || edge.corner !== pick.corner));
+                    }}>
+                    Remove
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
       <label className="cad-number-field">
         Radius
