@@ -10,22 +10,23 @@ export interface ModelEdge {
 
 /** The angle between two faces, in degrees, above which their shared line is an edge, as the view draws edges. */
 const kEdgeAngle = 20;
-const featureEdges = new WeakMap<ArrayLike<number>, Float32Array>();
+const featureEdges = new WeakMap<Float32Array, { indices: ArrayLike<number>; lines: Float32Array }>();
 
 /** The mesh's edges as pairs of points, worked out once for each mesh. */
 function edgesOf(positions: Float32Array, indices: ArrayLike<number>): Float32Array {
-  let edges = featureEdges.get(positions);
-  if (!edges) {
+  let cached = featureEdges.get(positions);
+  if (cached?.indices !== indices) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setIndex(Array.from(indices));
     const lines = new THREE.EdgesGeometry(geometry, kEdgeAngle);
-    edges = lines.getAttribute('position').array as Float32Array;
+    const edges = lines.getAttribute('position').array as Float32Array;
     geometry.dispose();
     lines.dispose();
-    featureEdges.set(positions, edges);
+    cached = { indices, lines: edges };
+    featureEdges.set(positions, cached);
   }
-  return edges;
+  return cached.lines;
 }
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -76,8 +77,13 @@ export function nearestEdgeBy(
     if (away <= tolerance && (!best || away < best.distance)) best = { a, b, distance: away };
   }
   if (!best) return null;
+  return wholeEdge(edges, best);
+}
+
+function wholeEdge(edges: Float32Array, initial: ModelEdge): ModelEdge {
+  const at = (i: number): Vec3 => [edges[i]!, edges[i + 1]!, edges[i + 2]!];
   // Grow it along the same line through the pieces that touch its ends.
-  let { a, b } = best;
+  let { a, b } = initial;
   for (let grown = true; grown; ) {
     grown = false;
     for (let i = 0; i < edges.length; i += 6) {
@@ -100,6 +106,69 @@ export function nearestEdgeBy(
     }
   }
   return { a, b };
+}
+
+/** Complete straight edges from known boundary segments, with collinear triangulation splits joined. */
+export function joinStraightEdges(segments: readonly ModelEdge[]): ModelEdge[] {
+  const epsilon = 1e-6;
+  type Incident = { from: Vec3; to: Vec3; index: number };
+  const buckets = new Map<string, Incident[]>();
+  const cell = (p: Vec3) => p.map(value => Math.round(value / epsilon));
+  const add = (from: Vec3, to: Vec3, index: number) => {
+    const key = cell(from).join(','),
+      previous = buckets.get(key);
+    const incident = { from, to, index };
+    if (previous) previous.push(incident);
+    else buckets.set(key, [incident]);
+  };
+  segments.forEach(({ a, b }, index) => {
+    add(a, b, index);
+    add(b, a, index);
+  });
+  const near = (point: Vec3): Incident[] => {
+    const [x, y, z] = cell(point),
+      result: Incident[] = [];
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dz = -1; dz <= 1; dz++)
+          for (const incident of buckets.get(`${x! + dx},${y! + dy},${z! + dz}`) ?? [])
+            if (length(sub(incident.from, point)) < epsilon) result.push(incident);
+    return result;
+  };
+  const visited = new Set<number>();
+  const unique = new Map<string, ModelEdge>();
+  segments.forEach((segment, index) => {
+    if (visited.has(index)) return;
+    visited.add(index);
+    let { a, b } = segment;
+    // Only segments incident to an endpoint can extend its line. Scanning every boundary edge for every little
+    // pocket facet made a first cabinet-face click quadratic even when almost none of the edges were collinear.
+    for (const end of ['a', 'b'] as const)
+      for (;;) {
+        const point = end === 'a' ? a : b,
+          other = end === 'a' ? b : a,
+          along = sub(point, other);
+        let next: Incident | undefined,
+          reach = 0;
+        for (const incident of near(point)) {
+          if (!onLine(incident.to, a, b) || length(sub(incident.to, other)) < epsilon) continue;
+          const distance = dot(sub(incident.to, point), along);
+          if (distance > reach) {
+            next = incident;
+            reach = distance;
+          }
+        }
+        if (!next) break;
+        visited.add(next.index);
+        if (end === 'a') a = next.to;
+        else b = next.to;
+      }
+    const [first, second] = [a, b].sort((a, b) => a.join(',').localeCompare(b.join(',')));
+    const edge = { a: first!, b: second! };
+    const key = [edge.a.join(','), edge.b.join(',')].join('/');
+    unique.set(key, edge);
+  });
+  return [...unique.values()];
 }
 
 /**

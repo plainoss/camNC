@@ -16,8 +16,11 @@ import { sameFacePlane } from './faceHighlight';
 import { ModelConnector, type ViewConnector } from './ModelConnector';
 import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
+import { measurementEntityAt, type ModelMeasurePick } from './measurementPick';
+import { ModelMeasurement, type ModelMeasureWitness } from './ModelMeasurement';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
 import type { StudioCameraRef } from '@/cad/studioCamera';
+import type { MeasureEntity } from '@/cad/measureGeometry';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
 export interface ViewRequest {
@@ -402,6 +405,10 @@ export function ModelViewport({
   onPickSketch,
   pickingConnector = false,
   connectors = [],
+  onMeasurePick,
+  measuring = false,
+  measureSelection = [],
+  measureWitness,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -448,6 +455,12 @@ export function ModelViewport({
   selectedFace?: ModelFacePick | null;
   pickingConnector?: boolean;
   connectors?: ViewConnector[];
+  /** A geometry click in assembly coordinates, alongside ordinary part selection unless measuring is active. */
+  onMeasurePick?: (pick: ModelMeasurePick) => void;
+  /** The expanded measure tool picks geometry without opening or changing the selected part. */
+  measuring?: boolean;
+  measureSelection?: readonly MeasureEntity[];
+  measureWitness?: ModelMeasureWitness;
 }) {
   const [hoveredConnector, setHoveredConnector] = useState<ModelFacePick | null>(null);
   // A new pick must not briefly reuse a marker from an earlier dialog or different geometry.
@@ -534,6 +547,12 @@ export function ModelViewport({
     // Within a few pixels of an edge on screen, the edge is picked too, unless the click is on one of its corners.
     const canvas = e.nativeEvent.target as HTMLElement;
     const screen = screenDistance(e.camera, matrix, canvas.clientWidth, canvas.clientHeight, e.pointer);
+    if (!onPickFace && onMeasurePick && view === 'assembled' && e.faceIndex != null) {
+      const entity = measurementEntityAt(mesh.positions, mesh.indices, e.faceIndex, screen, canvas.clientWidth ? kEdgePixels : 0);
+      if (entity) onMeasurePick({ partId: mesh.partId, index, entity, additive: e.shiftKey });
+      // Shift explicitly adds measurement geometry; a second quick pick must not reach the part double-click editor.
+      if (measuring || (entity && e.shiftKey)) return;
+    }
     const edge = canvas.clientWidth ? nearestEdgeBy(mesh.positions, mesh.indices, screen.segment, kEdgePixels) : null;
     const near = edge && Math.min(screen.point(edge.a), screen.point(edge.b)) > kEdgePixels ? edge : null;
     const face: ModelFacePick = {
@@ -630,6 +649,11 @@ export function ModelViewport({
             <ModelConnector connector={{ ...hoveredConnector, label: 'Mate connector under pointer' }} model={assembled} />
           )}
         </>
+      )}
+      {view === 'assembled' && (measureSelection.length > 0 || measureWitness) && (
+        <group matrixAutoUpdate={false} matrix={assembled}>
+          <ModelMeasurement selection={measureSelection} witness={measureWitness} />
+        </group>
       )}
       {view === 'assembled' && sketchLines.length > 0 && (
         <group matrixAutoUpdate={false} matrix={assembled}>

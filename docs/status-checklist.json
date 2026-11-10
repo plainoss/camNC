@@ -164,10 +164,23 @@
           "note": "Cut parts subtracts tools from targets; existing bodies cannot be joined or intersected by a Boolean feature."
         },
         {
-          "item": "Measure and section view in the Part Studio",
+          "item": "Measure assembled vertices, edges and planar faces",
+          "status": "partial",
+          "evidence": [
+            "apps/camNC/src/cad/measureGeometry.test.ts",
+            "apps/camNC/src/cad/studioMeasurements.test.ts",
+            "apps/camNC/src/cad/CadEditor.measure.test.tsx",
+            "apps/camNC/src/cam/model/measurementPick.test.ts",
+            "apps/camNC/src/cam/model/ModelMeasurement.test.tsx",
+            "studio/measure/stock-faces-readonly"
+          ],
+          "note": "Quick readouts and the [ inspector show finite min/max/center distances, XYZ components, length, planar area and angles, with unit conversion and selectable witnesses. Exact physical copies remain distinct. Measurements clear when geometry changes or the view leaves Assembled. Curved outlines use the displayed faceted approximation; analytic radius/diameter, curvature, custom coordinate systems and measured variables are not supported."
+        },
+        {
+          "item": "Section view in the Part Studio",
           "status": "gap",
           "evidence": [],
-          "note": "Sketch measurements exist. Measuring and sectioning the assembled parts are not available."
+          "note": "Sectioning the assembled parts is not available."
         },
         {
           "item": "Variable types and ordered definitions",

@@ -94,6 +94,7 @@ it('accepts the face of an Add body inherited by a parent copy as a resolvable m
   const props = () => vi.mocked(ModelViewport).mock.lastCall![0];
   const index = props().instanceIds!.indexOf(`${boss.id}/along`);
   expect(index).toBeGreaterThanOrEqual(0);
+  expect(props().onMeasurePick).toBeUndefined();
   act(() => props().onPickFace!({ partId: boss.id, index, point: [250, 50, 28], normal: [0, 0, 1] }));
   expect(picked).toHaveBeenCalledExactlyOnceWith({ partId: boss.id, copyId: 'along', face: 'top' });
   const mirror = { across: picked.mock.calls[0]![0] };
