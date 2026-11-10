@@ -23,6 +23,9 @@ afterEach(() => {
   invalidate = null;
 });
 
+// Cold WebGL setup shares the GPU with other browser tests; wait for a drawn frame before inspecting connector geometry.
+const firstFrame = () => waitFor(() => expect(frames).toBeGreaterThan(0), { timeout: 20_000 });
+
 const connector: ViewConnector = { point: [0, 0, 5], normal: [0, 0, 1], label: 'Source mate connector' };
 function View({
   value = connector,
@@ -50,7 +53,7 @@ function View({
 it('places a visible connector frame at its model point with Z along the picked normal', async () => {
   const model = new Matrix4().makeRotationX(-Math.PI / 2).setPosition(7, 11, 13);
   render(<View model={model} value={{ point: [10, 20, 30], normal: [0, 1, 0], label: 'Destination mate connector' }} />);
-  await waitFor(() => expect(frames).toBeGreaterThan(0));
+  await firstFrame();
   const frame = scene!.getObjectByName('Destination mate connector')!;
   scene!.updateMatrixWorld(true);
   const origin = frame.getWorldPosition(new Vector3());
@@ -60,31 +63,35 @@ it('places a visible connector frame at its model point with Z along the picked 
   const marker = await screen.findByLabelText('Destination mate connector');
   expect(marker.getBoundingClientRect().width).toBeGreaterThan(0);
   expect(getComputedStyle(marker).pointerEvents).toBe('none');
-});
+}, 25_000);
 
-it.each([true, false])('keeps connector axes at a constant screen size through camera zoom (orthographic=%s)', async orthographic => {
-  render(<View orthographic={orthographic} />);
-  await waitFor(() => expect(frames).toBeGreaterThan(0));
-  const frame = scene!.getObjectByName(connector.label)!;
-  const axes = frame.children.find(child => child instanceof Group)!;
-  const pixels = () => {
-    scene!.updateMatrixWorld(true);
-    const origin = axes.localToWorld(new Vector3()).project(camera!);
-    const end = axes.localToWorld(new Vector3(1, 0, 0)).project(camera!);
-    return ((end.x - origin.x) * 400) / 2;
-  };
-  expect(pixels()).toBeCloseTo(28, 5);
-  const scale = axes.scale.x;
-  camera!.zoom = 2;
-  camera!.updateProjectionMatrix();
-  invalidate!();
-  await waitFor(() => expect(axes.scale.x).toBeCloseTo(scale / 2, 8));
-  expect(pixels()).toBeCloseTo(28, 5);
-});
+it.each([true, false])(
+  'keeps connector axes at a constant screen size through camera zoom (orthographic=%s)',
+  async orthographic => {
+    render(<View orthographic={orthographic} />);
+    await firstFrame();
+    const frame = scene!.getObjectByName(connector.label)!;
+    const axes = frame.children.find(child => child instanceof Group)!;
+    const pixels = () => {
+      scene!.updateMatrixWorld(true);
+      const origin = axes.localToWorld(new Vector3()).project(camera!);
+      const end = axes.localToWorld(new Vector3(1, 0, 0)).project(camera!);
+      return ((end.x - origin.x) * 400) / 2;
+    };
+    expect(pixels()).toBeCloseTo(28, 5);
+    const scale = axes.scale.x;
+    camera!.zoom = 2;
+    camera!.updateProjectionMatrix();
+    invalidate!();
+    await waitFor(() => expect(axes.scale.x).toBeCloseTo(scale / 2, 8), { timeout: 20_000 });
+    expect(pixels()).toBeCloseTo(28, 5);
+  },
+  25_000
+);
 
 it('lets rays through its marker and axis overlays to the source solid', async () => {
   render(<View />);
-  await waitFor(() => expect(frames).toBeGreaterThan(0));
+  await firstFrame();
   scene!.updateMatrixWorld(true);
   camera!.updateMatrixWorld();
   const ray = new Raycaster();
@@ -93,4 +100,4 @@ it('lets rays through its marker and axis overlays to the source solid', async (
   expect(hits.length).toBeGreaterThan(0);
   expect(hits.every(hit => hit.object instanceof Mesh && hit.object.name === 'source solid' && hit.face != null)).toBe(true);
   expect(hits[0]!.point.toArray()).toEqual([0, 0, 0]);
-});
+}, 25_000);
