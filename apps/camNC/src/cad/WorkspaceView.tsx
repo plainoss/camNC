@@ -196,7 +196,7 @@ export default function WorkspaceView({
   const controlled = choosingProp !== undefined;
   const choosing = controlled ? choosingProp : ownChoosing;
   const setChoosing = (value: boolean) => (controlled ? onChoosingChange?.(value) : setOwnChoosing(value));
-  // Feature pickers own geometry input even without the editor's broader feature-dialog flag.
+  // Feature pickers must own the first render, before an effect has closed the section's old picker state.
   const sectionEnabled = measurementEnabled && !choosing && !pickingMirrorPlane && !onPickPoint && !(onPickRegion && regions?.length);
   const section = useStudioSection(document, assembly, frame, sectionEnabled, onViewRequest, selectedPlane, selectedFace);
   const model = useMemo(() => sectionModel(assembly, section.plane), [assembly, section.plane]);
@@ -333,7 +333,9 @@ export default function WorkspaceView({
           aria-label="Measure"
           aria-keyshortcuts="["
           aria-pressed={measure.expanded}
-          disabled={!measurementEnabled || choosing || pickingMirrorPlane || section.editing || !model.meshes.some(mesh => mesh.indices.length > 0)}
+          disabled={
+            !measurementEnabled || choosing || pickingMirrorPlane || section.editing || !model.meshes.some(mesh => mesh.indices.length > 0)
+          }
           onClick={() => {
             // Inspection uses assembled coordinates immediately; an old playback frame must not move them again.
             explosion.scrub(0);

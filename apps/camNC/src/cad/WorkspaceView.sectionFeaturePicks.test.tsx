@@ -68,3 +68,25 @@ it('keeps cap faces out of new sketches and supplies the unclipped source mesh t
   expect(onNewPart).toHaveBeenCalledExactlyOnceWith({ partId, face: 'underside' });
   expect(JSON.stringify(document)).toBe(before);
 });
+
+it('gives mirror inputs priority on the first render while a section face pick is still being closed', () => {
+  const { document, partId, props, view, onNewPart } = setup();
+  const before = JSON.stringify(document),
+    onSelectFace = vi.fn();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit section view' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pick planar face' }));
+  const nextCall = vi.mocked(ModelViewport).mock.calls.length;
+  view.rerender(<WorkspaceView {...props} pickingMirrorPlane onSelectFace={onSelectFace} />);
+  // The feature must own even the render before the section's disabling effect has cleared its old picker state.
+  const first = vi.mocked(ModelViewport).mock.calls[nextCall]![0];
+  expect(first.onMeasurePick).toBeUndefined();
+  expect(screen.getByRole('button', { name: 'Measure' })).toBeDisabled();
+  expect(viewport().sectionControl).toBeNull();
+  expect(viewport().sectionCaps![0]!.count).toBeGreaterThan(0);
+  act(() => first.onPickFace!({ partId, index: 0, point: [50, 30, 9], normal: [0, 0, 1], sectionCap: true }));
+  expect(onSelectFace).not.toHaveBeenCalled();
+  act(() => first.onPickFace!({ partId, index: 0, point: [50, 30, 0], normal: [0, 0, -1] }));
+  expect(onSelectFace).toHaveBeenCalledExactlyOnceWith({ partId, face: 'underside' });
+  expect(onNewPart).not.toHaveBeenCalled();
+  expect(JSON.stringify(document)).toBe(before);
+});
