@@ -34,6 +34,23 @@
 .cad-editor .cad-studio-features button[aria-current='true']:not(:where(.cad-feature-dialog *)) {
   background: #dbe8f8;
 }
+/* The folder action belongs to the heading, so it must not take a full feature row's width. */
+.cad-editor .cad-studio-features .cad-panel-heading > button {
+  display: inline-flex;
+  flex: none;
+  inline-size: auto;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+@media (pointer: coarse) {
+  .cad-editor .cad-studio-features .cad-panel-heading > button {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+  }
+}
 .cad-studio-features button > span:first-child {
   color: #6b7c91;
   font-size: 10.5px;
