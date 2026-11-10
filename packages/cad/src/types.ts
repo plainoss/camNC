@@ -485,7 +485,11 @@ export interface CadCut {
   removedBy?: string;
 }
 export type CadFeature = CadFaceSketch | CadCut;
+export type CadLengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
+
 export interface CadDocument {
+  /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
+  lengthUnit?: CadLengthUnit;
   /** 2 when any part has features, so builds that don't know them refuse the file. */
   version: 1 | 2;
   id: string;

@@ -1,5 +1,6 @@
+import { DesignUnitContext } from './designUnits';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { createPlateDocument, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { createPlateDocument, parseCadValue, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { afterEach, expect, it, vi } from 'vitest';
 import { TransformDialog, type CadConnectorPick } from './PartFeatureDialogs';
 
@@ -188,4 +189,22 @@ it('releases an existing distance copy before previewing typed XYZ and saves tha
   expect(part.copies[0]!.along).toEqual({ along: { plane: 'front' }, distance: 30 });
   fireEvent.click(screen.getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(save).toHaveBeenCalledWith(candidate));
+});
+
+it('previews bare cm moves on an already moved part and stores explicit units for its numeric baseline', async () => {
+  const document = createPlateDocument();
+  document.lengthUnit = 'cm';
+  const part = document.parts[0]!;
+  part.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  part.moved = { by: [100, 0, 0] };
+  const preview = vi.fn<(document: CadDocument | null) => void>();
+  render(
+    <DesignUnitContext value="cm">
+      <TransformDialog document={document} part={part} onSave={() => {}} onCancel={() => {}} onPreview={preview} />
+    </DesignUnitContext>
+  );
+  fireEvent.change(screen.getByRole('textbox', { name: 'X' }), { target: { value: '2' } });
+  await waitFor(() => expect(preview.mock.calls.at(-1)?.[0]?.parts[0]?.moved).toMatchObject({ by: [120, 0, 0] }));
+  const moved = preview.mock.calls.at(-1)![0]!.parts[0]!.moved!;
+  expect('by' in moved && parseCadValue(moved.byExpressions![0]!)).toMatchObject({ value: 120 });
 });

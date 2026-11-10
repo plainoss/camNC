@@ -1,6 +1,6 @@
+import { useDesignUnits } from './designUnits';
 import type { CadPart, CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
-import { parseCadValue } from './valueExpressions';
 import './cadThicknessField.css';
 import { CadValueInput } from './CadValueInput';
 
@@ -20,8 +20,9 @@ export function CadReliefField({
   onDone?: () => void;
   livePreview?: boolean;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const id = useId();
-  const typed = relief ? (relief.diameterExpression ?? String(relief.diameter)) : kDefaultBit;
+  const typed = relief ? (relief.diameterExpression ?? lengthText(relief.diameter)) : lengthText(Number(kDefaultBit));
   const [text, setText] = useState(typed);
   const [error, setError] = useState<string | null>(null);
   // Only a size typed here and not cancelled is saved; anything else, such as undo, shows through.
@@ -85,7 +86,7 @@ export function CadReliefField({
               }}
             />
           </span>
-          mm
+          {lengthUnit}
         </label>
       )}
       {error && (

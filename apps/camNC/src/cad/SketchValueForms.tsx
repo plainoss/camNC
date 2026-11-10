@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import type { CadConstraint } from '@wbcnc/cad';
 import type { CSSProperties, Ref } from 'react';
 import { CadValueInput } from './CadValueInput';
@@ -6,7 +7,6 @@ import { CadValueInput } from './CadValueInput';
 
 type NumericConstraint = Extract<CadConstraint, { value: number }>;
 type Outcome = { ok: true } | { ok: false; message: string };
-const rounded = (n: number) => Math.round(n * 100) / 100;
 
 export function SketchPolygonForm({
   inputRef,
@@ -224,6 +224,7 @@ export function SketchDimensionEditor({
   onApply: () => void;
   onCancel: () => void;
 }) {
+  const { lengthText, lengthUnit } = useDesignUnits();
   return (
     <form
       className="cad-dimension-editor"
@@ -233,14 +234,14 @@ export function SketchDimensionEditor({
         onApply();
       }}>
       <label htmlFor="cad-edit-dimension" className="sr-only">
-        {dimension.label ?? dimension.type} <span>{dimension.type === 'angle' ? 'degrees' : 'mm'}</span>
+        {dimension.label ?? dimension.type} <span>{dimension.type === 'angle' ? 'degrees' : lengthUnit}</span>
       </label>
       <div>
         <CadValueInput
           id="cad-edit-dimension"
           inputRef={inputRef}
           key={dimension.id}
-          defaultValue={dimension.expression ?? String(dimension.value)}
+          defaultValue={dimension.expression ?? (dimension.type === 'angle' ? String(dimension.value) : lengthText(dimension.value))}
           inputMode="decimal"
           unit={dimension.type === 'angle' ? 'deg' : 'mm'}
           unitClassName="cad-dimension-unit"
@@ -285,6 +286,7 @@ export function SketchShapeSizeForm({
   onRadius: (value: string) => void;
   onCreate: () => void;
 }) {
+  const { formatLength } = useDesignUnits();
   return (
     <form
       className="cad-create-size"
@@ -293,7 +295,7 @@ export function SketchShapeSizeForm({
         onCreate();
       }}>
       <span>
-        From {rounded(from.x)}, {rounded(from.y)}
+        From {formatLength(from.x)}, {formatLength(from.y)}
       </span>
       {rectangle ? (
         <>

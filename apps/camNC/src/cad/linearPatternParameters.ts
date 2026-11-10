@@ -1,3 +1,5 @@
+import type { CadLengthUnit } from '@wbcnc/cad';
+import { lengthText } from './designUnits';
 import type { CadLinearPattern, CadLinearPatternExpressions, CadSketchPattern, CadPoint, CadSketch, CadValueScope } from '@wbcnc/cad';
 import { cadExpressionNames, entityPointIds, patternSourceIds } from '@wbcnc/cad';
 import { parseCadValue } from './valueExpressions';
@@ -10,31 +12,35 @@ export interface LinearPatternParameters {
   angleY: string;
   secondDirection: boolean;
 }
-export const initialLinearPatternParameters = (): LinearPatternParameters => ({
+export const initialLinearPatternParameters = (lengthUnit: CadLengthUnit = 'mm'): LinearPatternParameters => ({
   countX: '3',
   countY: '2',
-  spacingX: '40',
-  spacingY: '40',
+  spacingX: lengthText(40, lengthUnit),
+  spacingY: lengthText(40, lengthUnit),
   angleX: '0',
   angleY: '90',
   secondDirection: false,
 });
-export function linearPatternParameters(pattern: CadLinearPattern): LinearPatternParameters {
+export function linearPatternParameters(pattern: CadLinearPattern, lengthUnit: CadLengthUnit = 'mm'): LinearPatternParameters {
   return {
     countX: pattern.expressions?.countX ?? String(pattern.countX),
     countY: pattern.expressions?.countY ?? String(pattern.countY > 1 ? pattern.countY : 2),
-    spacingX: pattern.expressions?.spacingX ?? String(Math.hypot(pattern.stepX.x, pattern.stepX.y)),
-    spacingY: pattern.expressions?.spacingY ?? String(Math.hypot(pattern.stepY.x, pattern.stepY.y)),
+    spacingX: pattern.expressions?.spacingX ?? lengthText(Math.hypot(pattern.stepX.x, pattern.stepX.y), lengthUnit),
+    spacingY: pattern.expressions?.spacingY ?? lengthText(Math.hypot(pattern.stepY.x, pattern.stepY.y), lengthUnit),
     angleX: String((Math.atan2(pattern.stepX.y, pattern.stepX.x) * 180) / Math.PI),
     angleY: String((Math.atan2(pattern.stepY.y, pattern.stepY.x) * 180) / Math.PI),
     secondDirection: pattern.countY > 1,
   };
 }
 /** Counts and spacings may use the design's variables; those are kept as typed so the pattern follows them. */
-export function parseLinearPatternParameters(parameters: LinearPatternParameters, variables?: CadValueScope) {
+export function parseLinearPatternParameters(
+  parameters: LinearPatternParameters,
+  variables?: CadValueScope,
+  lengthUnit: CadLengthUnit = 'mm'
+) {
   const expressions: CadLinearPatternExpressions = {};
   const read = (key: Exclude<keyof LinearPatternParameters, 'secondDirection'>, unit: 'mm' | 'deg' | 'scalar') => {
-    const result = parseCadValue(parameters[key], { unit, variables });
+    const result = parseCadValue(parameters[key], { unit, variables, lengthUnit });
     if ('error' in result) throw new Error(result.error);
     if (
       (key === 'countX' || key === 'countY' || key === 'spacingX' || key === 'spacingY') &&

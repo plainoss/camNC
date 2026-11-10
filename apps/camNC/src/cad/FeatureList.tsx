@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import { cadVariableValues, type CadDocument } from '@wbcnc/cad';
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { kBasePlanes } from './basePlanes';
@@ -119,6 +120,7 @@ export function FeatureList({
   /** New sketch, from a base plane's right-click menu, as the reference's. */
   onNewSketch?: (plane: string) => void;
 }) {
+  const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
   const blank = new Set(
     document.parts
@@ -152,8 +154,8 @@ export function FeatureList({
     if (entry.kind === 'plane') return document.planes!.find(candidate => candidate.id === entry.id)!.name;
     const variable = document.variables!.find(candidate => candidate.id === entry.id)!;
     const result = scope[variable.name];
-    const unit = result?.kind === 'length' ? ' mm' : result?.kind === 'angle' ? '°' : '';
-    return `#${variable.name} = ${result ? `${formatCadValue(result.value)}${unit}` : variable.expression}`;
+    const unit = result?.kind === 'length' ? ` ${lengthUnit}` : result?.kind === 'angle' ? '°' : '';
+    return `#${variable.name} = ${result ? `${result.kind === 'length' ? formatLength(result.value) : formatCadValue(result.value)}${unit}` : variable.expression}`;
   };
   /** What a row's eye shows or hides: a sketch, by its step's id, or a plane. */
   const visibilityId = (entry: FeatureEntry) =>

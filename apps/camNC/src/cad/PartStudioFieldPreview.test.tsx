@@ -1,3 +1,4 @@
+import { DesignUnitContext } from './designUnits';
 import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -99,4 +100,18 @@ it('previews hole diameter and blind depth without leaving either field', () => 
   expect(latest.parts[0]!.remove?.depth).toBe(12);
   edit('Depth', '0');
   expect(latest.parts[0]!.remove?.depth).toBe(12);
+});
+
+it('previews bare centimeter thickness immediately while keeping the typed draft', () => {
+  const change = vi.fn();
+  render(
+    <DesignUnitContext value="cm">
+      <CadThicknessField livePreview value={18} onCommit={change} />
+    </DesignUnitContext>
+  );
+  const input = screen.getByRole('textbox', { name: 'Thickness' });
+  expect(input).toHaveValue('1.8');
+  fireEvent.change(input, { target: { value: '2' } });
+  expect(change).toHaveBeenLastCalledWith(20, '(2) cm');
+  expect(input).toHaveValue('2');
 });
