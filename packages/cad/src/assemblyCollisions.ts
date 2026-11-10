@@ -1,4 +1,6 @@
 import { pointInPolygon } from './geometry';
+import { isCadBody } from './extrudeSteps';
+import { activeDesign } from './suppression';
 import { evaluatedPartCopy } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
@@ -149,9 +151,12 @@ function collide(a: Placed, b: Placed): CadAssemblyReport['collisions'][number] 
 }
 
 /** Where the placed parts sit, and where any two of them would need the same material. Unplaced parts aren't in it. */
-export function assemblyReport(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadAssemblyReport | undefined {
+export function assemblyReport(given: CadDocument, parts: readonly EvaluatedCadPart[]): CadAssemblyReport | undefined {
+  // Evaluation retains sketch outlines; only active solids and their active copies occupy assembly space.
+  const document = activeDesign(given);
   const supports = cadDrawnOnSupports(document);
   const placed = document.parts.flatMap(source => {
+    if (!isCadBody(document, source)) return [];
     const part = parts.find(candidate => candidate.partId === source.id);
     if (!part?.outline.length) return [];
     // Copies are named as CAM names them: the part's name, then a number.
