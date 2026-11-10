@@ -1,10 +1,11 @@
 import { cadFaceSketches, designSteps, patternMaster, type CadDocument } from '@wbcnc/cad';
 import { shortHandles, type CadReport } from './inspect';
+import { reportPrefix } from './reportGeometry';
 
 /** A model-facing report groups pattern instances; the full report and evaluated geometry retain every instance. */
 export function compactCadReport(document: CadDocument, report: CadReport) {
   const partHandles = shortHandles(document.parts.map(part => part.id));
-  const steps = designSteps(document);
+  const steps = designSteps(reportPrefix(document));
   const stepHandles = shortHandles(steps.map(step => step.id));
   return {
     ...report,

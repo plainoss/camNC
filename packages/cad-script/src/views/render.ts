@@ -1,4 +1,4 @@
-import type { CadDocument, EvaluatedCadPart } from '@wbcnc/cad';
+import type { CadDocument, CadEvaluation, EvaluatedCadPart } from '@wbcnc/cad';
 import { cadViewBodies, cadViewLines, svgNumber as n, svgText, type CadViewLine } from './geometry';
 
 export type CadViewName = 'top' | 'front' | 'right';
@@ -28,8 +28,8 @@ function projectedPaths(lines: readonly CadViewLine[], u: number, v: number): st
 }
 
 /** Orthographic line drawings of real evaluated contours, including pockets and holes on all physical copies. */
-export function renderCadViews(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadDrawing[] {
-  const bodies = cadViewBodies(document, parts);
+export function renderCadViews(document: CadDocument, parts: readonly EvaluatedCadPart[], evaluation?: CadEvaluation): CadDrawing[] {
+  const bodies = cadViewBodies(document, parts, evaluation);
   const byBody = bodies.map(body => ({ body, lines: cadViewLines(body) }));
   const points = byBody.flatMap(body => body.lines.flatMap(line => line.points));
   return projections.map(({ name, axes, u, v }): CadDrawing => {
