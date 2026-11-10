@@ -1,7 +1,9 @@
 import { useDesignUnits } from './designUnits';
 import {
+  activeDesign,
   cadPartReferenceName,
   cadPartReferenceOwner,
+  isCadPart,
   newCadId,
   resolvePartCutTargets,
   updatePartCut,
@@ -14,7 +16,6 @@ import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
 import './partCutDialog.css';
 import { CadValueInput } from './CadValueInput';
-import { builtStudioParts } from './studioParts';
 
 const kDefaultClearance = '0.2';
 
@@ -100,7 +101,8 @@ export function PartCutDialog({
   const [featureId] = useState(() => step?.id ?? newCadId());
   const result = useMemo<{ error: string } | { change: PartCutChange }>(() => {
     if (!tools.length || !targets.length) return { error: 'Pick at least one part to cut out, and one to cut it from.' };
-    const selection = resolvePartCutTargets({ parts: builtStudioParts(document) }, targets);
+    // A later cut may consume this feature's target. Final visible membership must not invalidate its saved reference.
+    const selection = resolvePartCutTargets({ parts: activeDesign(document).parts.filter(isCadPart) }, targets);
     if (selection.missing.length) return { error: 'A target copy or part is not present. Restore it or choose another target.' };
     if (joint !== 'none' && selection.targets.some(target => target.copyId !== undefined))
       return { error: 'Split joints on a single target copy are not supported. Choose Cut out or target the source family.' };
