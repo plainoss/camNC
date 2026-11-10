@@ -1,0 +1,1233 @@
+{
+  "version": 1,
+  "id": "5824d94e-3989-4b7f-8344-ecd7990cc8de",
+  "name": "Divided tray regeneration",
+  "revision": 17,
+  "parts": [
+    {
+      "id": "588b8e8a-0956-4462-84ea-9561b779411e",
+      "name": "Base",
+      "thickness": 12,
+      "sketch": {
+        "id": "b6ed6595-1cd2-4d24-8cc1-1fc0d1989661",
+        "entities": [
+          {
+            "id": "b6ed6595-1cd2-4d24-8cc1-1fc0d1989661:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "a98f657b-b443-4bd1-8db3-403651586873",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "standalone": false
+          },
+          {
+            "id": "d2152700-d2e6-450f-8a90-a2ac73b928d8",
+            "type": "point",
+            "x": 360,
+            "y": 0,
+            "standalone": false
+          },
+          {
+            "id": "fcf101ec-e5b0-4519-80cc-e14d3f540749",
+            "type": "point",
+            "x": 360,
+            "y": 0,
+            "standalone": false
+          },
+          {
+            "id": "47b9e4c4-8554-4402-8e94-5f6c9ce1b745",
+            "type": "point",
+            "x": 360,
+            "y": 240,
+            "standalone": false
+          },
+          {
+            "id": "cd271068-e6c4-4426-8a90-905e864d3525",
+            "type": "point",
+            "x": 360,
+            "y": 240,
+            "standalone": false
+          },
+          {
+            "id": "33de361b-c2d8-4f02-87e7-57f300f84ece",
+            "type": "point",
+            "x": 0,
+            "y": 240,
+            "standalone": false
+          },
+          {
+            "id": "4270b420-72a6-4eb3-8961-8c1ca30d5837",
+            "type": "point",
+            "x": 0,
+            "y": 240,
+            "standalone": false
+          },
+          {
+            "id": "2a9b6685-e383-4142-8340-ffd9a8c23880",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "standalone": false
+          },
+          {
+            "id": "fdc0832f-fe38-4627-8ddd-c6c2477195be",
+            "type": "line",
+            "startId": "a98f657b-b443-4bd1-8db3-403651586873",
+            "endId": "d2152700-d2e6-450f-8a90-a2ac73b928d8"
+          },
+          {
+            "id": "16d9cad1-7083-44fe-876a-0a13a896fd13",
+            "type": "line",
+            "startId": "fcf101ec-e5b0-4519-80cc-e14d3f540749",
+            "endId": "47b9e4c4-8554-4402-8e94-5f6c9ce1b745"
+          },
+          {
+            "id": "d2fd641e-74f3-4190-8f08-4ea160d1b5c8",
+            "type": "line",
+            "startId": "cd271068-e6c4-4426-8a90-905e864d3525",
+            "endId": "33de361b-c2d8-4f02-87e7-57f300f84ece"
+          },
+          {
+            "id": "e82937c1-59e6-4b87-8d43-d427cb928dc5",
+            "type": "line",
+            "startId": "4270b420-72a6-4eb3-8961-8c1ca30d5837",
+            "endId": "2a9b6685-e383-4142-8340-ffd9a8c23880"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "1f625c45-eb38-4ea6-813d-a558d65c366c",
+            "type": "coincident",
+            "pointAId": "2a9b6685-e383-4142-8340-ffd9a8c23880",
+            "pointBId": "a98f657b-b443-4bd1-8db3-403651586873"
+          },
+          {
+            "id": "0457e6fb-2a07-44e7-822d-b760317d4f8a",
+            "type": "coincident",
+            "pointAId": "d2152700-d2e6-450f-8a90-a2ac73b928d8",
+            "pointBId": "fcf101ec-e5b0-4519-80cc-e14d3f540749"
+          },
+          {
+            "id": "c4f4c4c9-5577-493c-8cc4-0375c1f5993d",
+            "type": "coincident",
+            "pointAId": "47b9e4c4-8554-4402-8e94-5f6c9ce1b745",
+            "pointBId": "cd271068-e6c4-4426-8a90-905e864d3525"
+          },
+          {
+            "id": "f43f4175-6fae-44d7-899a-fa13ca5fc8e6",
+            "type": "coincident",
+            "pointAId": "33de361b-c2d8-4f02-87e7-57f300f84ece",
+            "pointBId": "4270b420-72a6-4eb3-8961-8c1ca30d5837"
+          },
+          {
+            "id": "42a6f435-6272-4b85-8ea2-2e810fb9ed9b",
+            "type": "horizontal",
+            "entityId": "fdc0832f-fe38-4627-8ddd-c6c2477195be"
+          },
+          {
+            "id": "58f72933-35a9-493d-8291-8ebd0a45872e",
+            "type": "parallel",
+            "entityAId": "fdc0832f-fe38-4627-8ddd-c6c2477195be",
+            "entityBId": "d2fd641e-74f3-4190-8f08-4ea160d1b5c8"
+          },
+          {
+            "id": "87f1e362-cba2-4c9d-88e2-bf1d90260c26",
+            "type": "parallel",
+            "entityAId": "16d9cad1-7083-44fe-876a-0a13a896fd13",
+            "entityBId": "e82937c1-59e6-4b87-8d43-d427cb928dc5"
+          },
+          {
+            "id": "5668f320-683a-4389-8a9c-eaaeea97766b",
+            "type": "perpendicular",
+            "entityAId": "fdc0832f-fe38-4627-8ddd-c6c2477195be",
+            "entityBId": "16d9cad1-7083-44fe-876a-0a13a896fd13"
+          },
+          {
+            "id": "0a9abf4c-6ab5-477a-8509-e306e8c5f09e",
+            "type": "distanceX",
+            "pointAId": "a98f657b-b443-4bd1-8db3-403651586873",
+            "pointBId": "d2152700-d2e6-450f-8a90-a2ac73b928d8",
+            "value": 360,
+            "label": "Width",
+            "sourceEntityId": "fdc0832f-fe38-4627-8ddd-c6c2477195be",
+            "expression": "width"
+          },
+          {
+            "id": "83fa9b6e-4bf2-4d3e-86d4-2ba0fd07e689",
+            "type": "distanceY",
+            "pointAId": "fcf101ec-e5b0-4519-80cc-e14d3f540749",
+            "pointBId": "47b9e4c4-8554-4402-8e94-5f6c9ce1b745",
+            "value": 240,
+            "label": "Height",
+            "sourceEntityId": "16d9cad1-7083-44fe-876a-0a13a896fd13",
+            "expression": "depth"
+          },
+          {
+            "id": "3639b760-88fe-4aa6-8506-d9bc1f3ef493",
+            "type": "positionX",
+            "pointId": "a98f657b-b443-4bd1-8db3-403651586873",
+            "value": 0,
+            "label": "X",
+            "expression": "0mm"
+          },
+          {
+            "id": "68cb2d27-e403-4eb0-8c6a-38227a48ce42",
+            "type": "positionY",
+            "pointId": "a98f657b-b443-4bd1-8db3-403651586873",
+            "value": 0,
+            "label": "Y",
+            "expression": "0mm"
+          }
+        ]
+      },
+      "thicknessExpression": "board",
+      "drawnOn": {
+        "on": {
+          "plane": "top"
+        },
+        "offset": 0
+      }
+    },
+    {
+      "id": "9aaec509-7cdf-4386-882c-35d352088a7f",
+      "name": "Left wall",
+      "thickness": 12,
+      "sketch": {
+        "id": "eff26813-ada7-433d-832e-6d76ef0acf77",
+        "entities": [
+          {
+            "id": "eff26813-ada7-433d-832e-6d76ef0acf77:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "c0b8b811-328d-4855-8d5d-6c15d29f1650",
+            "type": "point",
+            "x": 0,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "39803a36-d1fc-4073-8666-191b8dcb31af",
+            "type": "point",
+            "x": 240,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "57a2c608-b620-40ae-83b8-31df2d6f2e33",
+            "type": "point",
+            "x": 240,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "a776eb4a-b502-41a9-8973-5f1c83c36fe5",
+            "type": "point",
+            "x": 240,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "eed7ff88-66af-4756-874c-a10bbdd705d8",
+            "type": "point",
+            "x": 240,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "1417c0a0-fd9b-431e-8bbc-0e37ba6e4f42",
+            "type": "point",
+            "x": 0,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "b5905a8b-c837-49c3-8a1f-dded0b85da1c",
+            "type": "point",
+            "x": 0,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "a450bf40-9d98-4c9a-8d9d-34047d5bd9bb",
+            "type": "point",
+            "x": 0,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "d357c5ed-d7b7-4925-86da-71e450e7bc2d",
+            "type": "line",
+            "startId": "c0b8b811-328d-4855-8d5d-6c15d29f1650",
+            "endId": "39803a36-d1fc-4073-8666-191b8dcb31af"
+          },
+          {
+            "id": "3cf2ae33-1774-44b8-8014-9ed47703889b",
+            "type": "line",
+            "startId": "57a2c608-b620-40ae-83b8-31df2d6f2e33",
+            "endId": "a776eb4a-b502-41a9-8973-5f1c83c36fe5"
+          },
+          {
+            "id": "9576aa69-2a24-4073-80f8-17f09ce48fbf",
+            "type": "line",
+            "startId": "eed7ff88-66af-4756-874c-a10bbdd705d8",
+            "endId": "1417c0a0-fd9b-431e-8bbc-0e37ba6e4f42"
+          },
+          {
+            "id": "98abd835-26fc-45e5-88c6-df67d278955f",
+            "type": "line",
+            "startId": "b5905a8b-c837-49c3-8a1f-dded0b85da1c",
+            "endId": "a450bf40-9d98-4c9a-8d9d-34047d5bd9bb"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "4d48dce2-33ec-4440-8377-a66ac9047646",
+            "type": "coincident",
+            "pointAId": "a450bf40-9d98-4c9a-8d9d-34047d5bd9bb",
+            "pointBId": "c0b8b811-328d-4855-8d5d-6c15d29f1650"
+          },
+          {
+            "id": "a410c0f6-2e80-47a9-8c3c-d53d23e438e3",
+            "type": "coincident",
+            "pointAId": "39803a36-d1fc-4073-8666-191b8dcb31af",
+            "pointBId": "57a2c608-b620-40ae-83b8-31df2d6f2e33"
+          },
+          {
+            "id": "77cac640-d72a-498d-89f3-9372d375849e",
+            "type": "coincident",
+            "pointAId": "a776eb4a-b502-41a9-8973-5f1c83c36fe5",
+            "pointBId": "eed7ff88-66af-4756-874c-a10bbdd705d8"
+          },
+          {
+            "id": "cad0de3e-5a48-4b74-8294-5bee4b2bc019",
+            "type": "coincident",
+            "pointAId": "1417c0a0-fd9b-431e-8bbc-0e37ba6e4f42",
+            "pointBId": "b5905a8b-c837-49c3-8a1f-dded0b85da1c"
+          },
+          {
+            "id": "cb2837d0-5452-45fc-8108-ddd29b4a9795",
+            "type": "horizontal",
+            "entityId": "d357c5ed-d7b7-4925-86da-71e450e7bc2d"
+          },
+          {
+            "id": "d6686221-7aa5-42ba-8b4d-e6c68d670592",
+            "type": "parallel",
+            "entityAId": "d357c5ed-d7b7-4925-86da-71e450e7bc2d",
+            "entityBId": "9576aa69-2a24-4073-80f8-17f09ce48fbf"
+          },
+          {
+            "id": "28d845f2-5547-4f80-8651-430525f54b73",
+            "type": "parallel",
+            "entityAId": "3cf2ae33-1774-44b8-8014-9ed47703889b",
+            "entityBId": "98abd835-26fc-45e5-88c6-df67d278955f"
+          },
+          {
+            "id": "6a1bd4f3-a9b4-48ca-83ed-daf5f14a93d4",
+            "type": "perpendicular",
+            "entityAId": "d357c5ed-d7b7-4925-86da-71e450e7bc2d",
+            "entityBId": "3cf2ae33-1774-44b8-8014-9ed47703889b"
+          },
+          {
+            "id": "21b09743-3e99-460e-8108-2e719f9d9a1a",
+            "type": "distanceX",
+            "pointAId": "c0b8b811-328d-4855-8d5d-6c15d29f1650",
+            "pointBId": "39803a36-d1fc-4073-8666-191b8dcb31af",
+            "value": 240,
+            "label": "Width",
+            "sourceEntityId": "d357c5ed-d7b7-4925-86da-71e450e7bc2d",
+            "expression": "depth"
+          },
+          {
+            "id": "1f604fcf-b40a-457d-812a-8f29fc06b552",
+            "type": "distanceY",
+            "pointAId": "57a2c608-b620-40ae-83b8-31df2d6f2e33",
+            "pointBId": "a776eb4a-b502-41a9-8973-5f1c83c36fe5",
+            "value": 68,
+            "label": "Height",
+            "sourceEntityId": "3cf2ae33-1774-44b8-8014-9ed47703889b",
+            "expression": "height - board"
+          },
+          {
+            "id": "f2527942-2736-4b81-840c-3cc2968a3536",
+            "type": "positionX",
+            "pointId": "c0b8b811-328d-4855-8d5d-6c15d29f1650",
+            "value": 0,
+            "label": "X",
+            "expression": "0mm"
+          },
+          {
+            "id": "ee1d08b7-4787-4f9c-82f2-4feabfddc801",
+            "type": "positionY",
+            "pointId": "c0b8b811-328d-4855-8d5d-6c15d29f1650",
+            "value": 12,
+            "label": "Y",
+            "expression": "board"
+          }
+        ]
+      },
+      "thicknessExpression": "board",
+      "drawnOn": {
+        "on": {
+          "plane": "right"
+        },
+        "offset": 0,
+        "offsetExpression": "0mm"
+      }
+    },
+    {
+      "id": "451d74a6-65c0-471d-8073-e43e550b355b",
+      "name": "Right wall",
+      "thickness": 12,
+      "sketch": {
+        "id": "4136d3df-2a88-4beb-87da-668b19392b1f",
+        "entities": [
+          {
+            "id": "4136d3df-2a88-4beb-87da-668b19392b1f:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "f6295856-b007-4734-83b0-97ed83054d26",
+            "type": "point",
+            "x": 0,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "02c4d4a7-b1c0-4482-8dbc-247cfa57b952",
+            "type": "point",
+            "x": 240,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "d8d3ca66-3930-42e3-84d8-4a06383c2227",
+            "type": "point",
+            "x": 240,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "cf43a67b-b9f8-40be-8f08-f02d485a83c1",
+            "type": "point",
+            "x": 240,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "47400d09-133f-46a6-8af0-115365e55878",
+            "type": "point",
+            "x": 240,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "5707d711-202d-4d7c-8cd4-c78b0708bce2",
+            "type": "point",
+            "x": 0,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "610b1c4d-cb71-4233-8fde-4901f41faf68",
+            "type": "point",
+            "x": 0,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "c6829259-73e5-40d9-82b2-87c71b11ff15",
+            "type": "point",
+            "x": 0,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "4688de87-422a-4c5c-8db2-6467710d498f",
+            "type": "line",
+            "startId": "f6295856-b007-4734-83b0-97ed83054d26",
+            "endId": "02c4d4a7-b1c0-4482-8dbc-247cfa57b952"
+          },
+          {
+            "id": "20108e12-875d-4e7a-855e-fcc05b39021e",
+            "type": "line",
+            "startId": "d8d3ca66-3930-42e3-84d8-4a06383c2227",
+            "endId": "cf43a67b-b9f8-40be-8f08-f02d485a83c1"
+          },
+          {
+            "id": "380e04ad-eb93-4305-8b7f-0a6576a3e2d9",
+            "type": "line",
+            "startId": "47400d09-133f-46a6-8af0-115365e55878",
+            "endId": "5707d711-202d-4d7c-8cd4-c78b0708bce2"
+          },
+          {
+            "id": "66f66d8f-af2c-46c1-8f82-35f64f6f0f3e",
+            "type": "line",
+            "startId": "610b1c4d-cb71-4233-8fde-4901f41faf68",
+            "endId": "c6829259-73e5-40d9-82b2-87c71b11ff15"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "3b9b1ef5-ebef-4ada-8bd6-636d2031c309",
+            "type": "coincident",
+            "pointAId": "c6829259-73e5-40d9-82b2-87c71b11ff15",
+            "pointBId": "f6295856-b007-4734-83b0-97ed83054d26"
+          },
+          {
+            "id": "2cb894cc-357b-4ae5-8940-96ee554873ef",
+            "type": "coincident",
+            "pointAId": "02c4d4a7-b1c0-4482-8dbc-247cfa57b952",
+            "pointBId": "d8d3ca66-3930-42e3-84d8-4a06383c2227"
+          },
+          {
+            "id": "d0304dca-ef76-4838-848b-41ae41eb1127",
+            "type": "coincident",
+            "pointAId": "cf43a67b-b9f8-40be-8f08-f02d485a83c1",
+            "pointBId": "47400d09-133f-46a6-8af0-115365e55878"
+          },
+          {
+            "id": "97578e1f-42b6-4354-8dbc-87a11ca7d129",
+            "type": "coincident",
+            "pointAId": "5707d711-202d-4d7c-8cd4-c78b0708bce2",
+            "pointBId": "610b1c4d-cb71-4233-8fde-4901f41faf68"
+          },
+          {
+            "id": "9f0897d8-28ad-4770-8bd7-2364a2a02277",
+            "type": "horizontal",
+            "entityId": "4688de87-422a-4c5c-8db2-6467710d498f"
+          },
+          {
+            "id": "00dab0c5-09cf-4e88-896c-1529d537dbb6",
+            "type": "parallel",
+            "entityAId": "4688de87-422a-4c5c-8db2-6467710d498f",
+            "entityBId": "380e04ad-eb93-4305-8b7f-0a6576a3e2d9"
+          },
+          {
+            "id": "080660cb-b783-495a-8993-a04f489e1c82",
+            "type": "parallel",
+            "entityAId": "20108e12-875d-4e7a-855e-fcc05b39021e",
+            "entityBId": "66f66d8f-af2c-46c1-8f82-35f64f6f0f3e"
+          },
+          {
+            "id": "dbf17e47-c741-424b-8fac-d2150faaaa09",
+            "type": "perpendicular",
+            "entityAId": "4688de87-422a-4c5c-8db2-6467710d498f",
+            "entityBId": "20108e12-875d-4e7a-855e-fcc05b39021e"
+          },
+          {
+            "id": "4f5ee74f-50b2-437f-86a8-7d061269b8f4",
+            "type": "distanceX",
+            "pointAId": "f6295856-b007-4734-83b0-97ed83054d26",
+            "pointBId": "02c4d4a7-b1c0-4482-8dbc-247cfa57b952",
+            "value": 240,
+            "label": "Width",
+            "sourceEntityId": "4688de87-422a-4c5c-8db2-6467710d498f",
+            "expression": "depth"
+          },
+          {
+            "id": "c358cc82-bf2e-4115-8f1d-b934bac346ef",
+            "type": "distanceY",
+            "pointAId": "d8d3ca66-3930-42e3-84d8-4a06383c2227",
+            "pointBId": "cf43a67b-b9f8-40be-8f08-f02d485a83c1",
+            "value": 68,
+            "label": "Height",
+            "sourceEntityId": "20108e12-875d-4e7a-855e-fcc05b39021e",
+            "expression": "height - board"
+          },
+          {
+            "id": "06ba99a9-0f68-4c9a-8536-5ad5463bd4e2",
+            "type": "positionX",
+            "pointId": "f6295856-b007-4734-83b0-97ed83054d26",
+            "value": 0,
+            "label": "X",
+            "expression": "0mm"
+          },
+          {
+            "id": "380eb6cf-4530-4dc7-8cfa-e4cb825c3abe",
+            "type": "positionY",
+            "pointId": "f6295856-b007-4734-83b0-97ed83054d26",
+            "value": 12,
+            "label": "Y",
+            "expression": "board"
+          }
+        ]
+      },
+      "thicknessExpression": "board",
+      "drawnOn": {
+        "on": {
+          "plane": "right"
+        },
+        "offset": 348,
+        "offsetExpression": "width - board"
+      }
+    },
+    {
+      "id": "2ba1e7f4-8d69-4cec-8913-f65a7903786a",
+      "name": "Front wall",
+      "thickness": 12,
+      "sketch": {
+        "id": "8a39b7ba-11e1-46a6-85df-27f9f71fc73c",
+        "entities": [
+          {
+            "id": "8a39b7ba-11e1-46a6-85df-27f9f71fc73c:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "f1cea4f9-b510-430b-88de-fb39c27034d1",
+            "type": "point",
+            "x": 12,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "152ba843-2c40-48b7-8690-d8a784064d41",
+            "type": "point",
+            "x": 348,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "8286e157-cbe0-454f-880c-6fd648638e29",
+            "type": "point",
+            "x": 348,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "15de271c-0643-4abb-8545-f986261af357",
+            "type": "point",
+            "x": 348,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "19dca878-867f-4546-873a-f094a2b35ab1",
+            "type": "point",
+            "x": 348,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "56ad7fe6-f1c1-42a1-8e3b-da89119c9d2b",
+            "type": "point",
+            "x": 12,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "11d13bfd-37f7-4af5-8bae-cb41e7ae8fe3",
+            "type": "point",
+            "x": 12,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "b3253c70-4bc5-4385-8362-411e24529d5f",
+            "type": "point",
+            "x": 12,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "b815af53-9753-4a29-8f71-ba8230db4828",
+            "type": "line",
+            "startId": "f1cea4f9-b510-430b-88de-fb39c27034d1",
+            "endId": "152ba843-2c40-48b7-8690-d8a784064d41"
+          },
+          {
+            "id": "e29139f4-74d2-4374-8f21-3e19e025a97d",
+            "type": "line",
+            "startId": "8286e157-cbe0-454f-880c-6fd648638e29",
+            "endId": "15de271c-0643-4abb-8545-f986261af357"
+          },
+          {
+            "id": "b45ac236-380a-4b6c-8728-91b64ef6db86",
+            "type": "line",
+            "startId": "19dca878-867f-4546-873a-f094a2b35ab1",
+            "endId": "56ad7fe6-f1c1-42a1-8e3b-da89119c9d2b"
+          },
+          {
+            "id": "0e6008c7-582f-484a-8329-5ebcf7897296",
+            "type": "line",
+            "startId": "11d13bfd-37f7-4af5-8bae-cb41e7ae8fe3",
+            "endId": "b3253c70-4bc5-4385-8362-411e24529d5f"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "df8c67b7-de1f-4bfa-845a-4e9f8a1913de",
+            "type": "coincident",
+            "pointAId": "b3253c70-4bc5-4385-8362-411e24529d5f",
+            "pointBId": "f1cea4f9-b510-430b-88de-fb39c27034d1"
+          },
+          {
+            "id": "7d1f20d8-957e-4e5c-85e4-8b0182f11fa7",
+            "type": "coincident",
+            "pointAId": "152ba843-2c40-48b7-8690-d8a784064d41",
+            "pointBId": "8286e157-cbe0-454f-880c-6fd648638e29"
+          },
+          {
+            "id": "f6f92318-4b4c-43b8-89c3-3f23e3a47ace",
+            "type": "coincident",
+            "pointAId": "15de271c-0643-4abb-8545-f986261af357",
+            "pointBId": "19dca878-867f-4546-873a-f094a2b35ab1"
+          },
+          {
+            "id": "1b168153-5e14-4153-83bd-bd1f8756c521",
+            "type": "coincident",
+            "pointAId": "56ad7fe6-f1c1-42a1-8e3b-da89119c9d2b",
+            "pointBId": "11d13bfd-37f7-4af5-8bae-cb41e7ae8fe3"
+          },
+          {
+            "id": "67cf5f7d-2a69-42b2-872b-bc90b0c692ce",
+            "type": "horizontal",
+            "entityId": "b815af53-9753-4a29-8f71-ba8230db4828"
+          },
+          {
+            "id": "9c30b957-b826-4245-893e-3f5b5c90ad84",
+            "type": "parallel",
+            "entityAId": "b815af53-9753-4a29-8f71-ba8230db4828",
+            "entityBId": "b45ac236-380a-4b6c-8728-91b64ef6db86"
+          },
+          {
+            "id": "8874dcd7-96bd-45e9-8c4f-f10dc8274dad",
+            "type": "parallel",
+            "entityAId": "e29139f4-74d2-4374-8f21-3e19e025a97d",
+            "entityBId": "0e6008c7-582f-484a-8329-5ebcf7897296"
+          },
+          {
+            "id": "f1801633-af8a-455d-89df-59da7e0dbfa3",
+            "type": "perpendicular",
+            "entityAId": "b815af53-9753-4a29-8f71-ba8230db4828",
+            "entityBId": "e29139f4-74d2-4374-8f21-3e19e025a97d"
+          },
+          {
+            "id": "ea2ddd0e-c164-4da5-8723-971c9ae83bad",
+            "type": "distanceX",
+            "pointAId": "f1cea4f9-b510-430b-88de-fb39c27034d1",
+            "pointBId": "152ba843-2c40-48b7-8690-d8a784064d41",
+            "value": 336,
+            "label": "Width",
+            "sourceEntityId": "b815af53-9753-4a29-8f71-ba8230db4828",
+            "expression": "width - 2*board"
+          },
+          {
+            "id": "0ef2037c-a3f4-43ab-8045-f0f7f7aa6090",
+            "type": "distanceY",
+            "pointAId": "8286e157-cbe0-454f-880c-6fd648638e29",
+            "pointBId": "15de271c-0643-4abb-8545-f986261af357",
+            "value": 68,
+            "label": "Height",
+            "sourceEntityId": "e29139f4-74d2-4374-8f21-3e19e025a97d",
+            "expression": "height - board"
+          },
+          {
+            "id": "2f937495-e907-4b98-8b2d-74451b0a4550",
+            "type": "positionX",
+            "pointId": "f1cea4f9-b510-430b-88de-fb39c27034d1",
+            "value": 12,
+            "label": "X",
+            "expression": "board"
+          },
+          {
+            "id": "478f3fe8-c440-4af9-8e10-ad8f2a064023",
+            "type": "positionY",
+            "pointId": "f1cea4f9-b510-430b-88de-fb39c27034d1",
+            "value": 12,
+            "label": "Y",
+            "expression": "board"
+          }
+        ]
+      },
+      "thicknessExpression": "board",
+      "drawnOn": {
+        "on": {
+          "plane": "front"
+        },
+        "offset": 0,
+        "offsetExpression": "0mm",
+        "inward": true
+      }
+    },
+    {
+      "id": "75f6ae2d-3963-41ed-8f9e-9314c1fa2303",
+      "name": "Back wall",
+      "thickness": 12,
+      "sketch": {
+        "id": "032ac554-e622-479a-8451-0183234663a0",
+        "entities": [
+          {
+            "id": "032ac554-e622-479a-8451-0183234663a0:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "7e35a1b9-27d4-433d-8c32-8bbc35809715",
+            "type": "point",
+            "x": 12,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "7de12e51-a04c-427e-852b-611c723a2c55",
+            "type": "point",
+            "x": 348,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "3ab61df5-2444-47b3-8d28-f4619e25e9c7",
+            "type": "point",
+            "x": 348,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "7696c880-3860-42b4-896a-8422b1b6fd6c",
+            "type": "point",
+            "x": 348,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "23c019b9-8336-465b-898e-97e9f5037ade",
+            "type": "point",
+            "x": 348,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "d825ad0e-7ffd-427f-8ce1-9e1dbcf6b645",
+            "type": "point",
+            "x": 12,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "3fa17de9-07dd-4dd6-8731-9862a5dd6651",
+            "type": "point",
+            "x": 12,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "0bec1ed2-df5d-4898-8f0f-47225c98cc11",
+            "type": "point",
+            "x": 12,
+            "y": 12,
+            "standalone": false
+          },
+          {
+            "id": "0e99748c-4209-482f-8b98-7db0b02c110d",
+            "type": "line",
+            "startId": "7e35a1b9-27d4-433d-8c32-8bbc35809715",
+            "endId": "7de12e51-a04c-427e-852b-611c723a2c55"
+          },
+          {
+            "id": "24719ff7-da5e-46e7-848e-03ca8c7d804a",
+            "type": "line",
+            "startId": "3ab61df5-2444-47b3-8d28-f4619e25e9c7",
+            "endId": "7696c880-3860-42b4-896a-8422b1b6fd6c"
+          },
+          {
+            "id": "db0a2668-4b00-49dd-8725-2b32cbc97e59",
+            "type": "line",
+            "startId": "23c019b9-8336-465b-898e-97e9f5037ade",
+            "endId": "d825ad0e-7ffd-427f-8ce1-9e1dbcf6b645"
+          },
+          {
+            "id": "099737ac-5374-4854-87e4-4e688964330e",
+            "type": "line",
+            "startId": "3fa17de9-07dd-4dd6-8731-9862a5dd6651",
+            "endId": "0bec1ed2-df5d-4898-8f0f-47225c98cc11"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "a5995853-917e-42d1-8552-d135d56d6501",
+            "type": "coincident",
+            "pointAId": "0bec1ed2-df5d-4898-8f0f-47225c98cc11",
+            "pointBId": "7e35a1b9-27d4-433d-8c32-8bbc35809715"
+          },
+          {
+            "id": "e1c65fc6-98f2-4d44-8d23-d73c0fa19000",
+            "type": "coincident",
+            "pointAId": "7de12e51-a04c-427e-852b-611c723a2c55",
+            "pointBId": "3ab61df5-2444-47b3-8d28-f4619e25e9c7"
+          },
+          {
+            "id": "586e694a-7a43-419e-8f7e-76890dfcc3c0",
+            "type": "coincident",
+            "pointAId": "7696c880-3860-42b4-896a-8422b1b6fd6c",
+            "pointBId": "23c019b9-8336-465b-898e-97e9f5037ade"
+          },
+          {
+            "id": "4f657c5a-7bcc-4b25-8b5f-95a6c279b2fd",
+            "type": "coincident",
+            "pointAId": "d825ad0e-7ffd-427f-8ce1-9e1dbcf6b645",
+            "pointBId": "3fa17de9-07dd-4dd6-8731-9862a5dd6651"
+          },
+          {
+            "id": "88cef996-da62-4bc1-8f22-ace2704cbf39",
+            "type": "horizontal",
+            "entityId": "0e99748c-4209-482f-8b98-7db0b02c110d"
+          },
+          {
+            "id": "69a34aed-1a97-4eff-8400-8c941d7e8671",
+            "type": "parallel",
+            "entityAId": "0e99748c-4209-482f-8b98-7db0b02c110d",
+            "entityBId": "db0a2668-4b00-49dd-8725-2b32cbc97e59"
+          },
+          {
+            "id": "fa28f09b-016b-45ae-8ab8-3c49b54f2070",
+            "type": "parallel",
+            "entityAId": "24719ff7-da5e-46e7-848e-03ca8c7d804a",
+            "entityBId": "099737ac-5374-4854-87e4-4e688964330e"
+          },
+          {
+            "id": "404af7bd-588c-40f7-8fb9-7733a5d1ae20",
+            "type": "perpendicular",
+            "entityAId": "0e99748c-4209-482f-8b98-7db0b02c110d",
+            "entityBId": "24719ff7-da5e-46e7-848e-03ca8c7d804a"
+          },
+          {
+            "id": "4bf6359b-93d7-4857-89f1-f5d642b044c1",
+            "type": "distanceX",
+            "pointAId": "7e35a1b9-27d4-433d-8c32-8bbc35809715",
+            "pointBId": "7de12e51-a04c-427e-852b-611c723a2c55",
+            "value": 336,
+            "label": "Width",
+            "sourceEntityId": "0e99748c-4209-482f-8b98-7db0b02c110d",
+            "expression": "width - 2*board"
+          },
+          {
+            "id": "5f55a894-ae26-4812-8541-052d2716586f",
+            "type": "distanceY",
+            "pointAId": "3ab61df5-2444-47b3-8d28-f4619e25e9c7",
+            "pointBId": "7696c880-3860-42b4-896a-8422b1b6fd6c",
+            "value": 68,
+            "label": "Height",
+            "sourceEntityId": "24719ff7-da5e-46e7-848e-03ca8c7d804a",
+            "expression": "height - board"
+          },
+          {
+            "id": "4c66d371-34e5-493b-8031-c3be9e2a3a51",
+            "type": "positionX",
+            "pointId": "7e35a1b9-27d4-433d-8c32-8bbc35809715",
+            "value": 12,
+            "label": "X",
+            "expression": "board"
+          },
+          {
+            "id": "efa2c3c4-d85f-4d1d-8d4e-b50e727c92af",
+            "type": "positionY",
+            "pointId": "7e35a1b9-27d4-433d-8c32-8bbc35809715",
+            "value": 12,
+            "label": "Y",
+            "expression": "board"
+          }
+        ]
+      },
+      "thicknessExpression": "board",
+      "drawnOn": {
+        "on": {
+          "plane": "front"
+        },
+        "offset": -228,
+        "offsetExpression": "-(depth - board)",
+        "inward": true
+      }
+    },
+    {
+      "id": "003fd972-33e3-4eb6-8350-1a3aacfbff49",
+      "name": "Divider",
+      "thickness": 12,
+      "sketch": {
+        "id": "2abe7b46-2f2f-438b-87d4-0c2f87513f62",
+        "entities": [
+          {
+            "id": "2abe7b46-2f2f-438b-87d4-0c2f87513f62:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "62553495-603a-49bc-8184-c58eb517f0d2",
+            "type": "point",
+            "x": 12,
+            "y": 8,
+            "standalone": false
+          },
+          {
+            "id": "6ea887d8-9498-40c8-8e05-232071e40ce1",
+            "type": "point",
+            "x": 228,
+            "y": 8,
+            "standalone": false
+          },
+          {
+            "id": "12235cf2-84f2-4aef-8ea4-e60b6ac3e348",
+            "type": "point",
+            "x": 228,
+            "y": 8,
+            "standalone": false
+          },
+          {
+            "id": "e0d98cab-cc25-4674-8783-d33dcc0297d8",
+            "type": "point",
+            "x": 228,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "4457c378-f633-4bea-8d94-6131f69f54f2",
+            "type": "point",
+            "x": 228,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "fa63262a-0863-4b07-8986-0eb7604db707",
+            "type": "point",
+            "x": 12,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "85e0452c-6537-44d3-8ffa-81816460ad6d",
+            "type": "point",
+            "x": 12,
+            "y": 80,
+            "standalone": false
+          },
+          {
+            "id": "cd723408-7202-4488-8919-603ca3a81d4e",
+            "type": "point",
+            "x": 12,
+            "y": 8,
+            "standalone": false
+          },
+          {
+            "id": "6934f7c4-1533-48c0-859a-5b5d75f1254b",
+            "type": "line",
+            "startId": "62553495-603a-49bc-8184-c58eb517f0d2",
+            "endId": "6ea887d8-9498-40c8-8e05-232071e40ce1"
+          },
+          {
+            "id": "ba317491-357e-4309-898d-0b74507e1df9",
+            "type": "line",
+            "startId": "12235cf2-84f2-4aef-8ea4-e60b6ac3e348",
+            "endId": "e0d98cab-cc25-4674-8783-d33dcc0297d8"
+          },
+          {
+            "id": "dc0f1b8a-70a6-4cb4-84d4-7bbac5777739",
+            "type": "line",
+            "startId": "4457c378-f633-4bea-8d94-6131f69f54f2",
+            "endId": "fa63262a-0863-4b07-8986-0eb7604db707"
+          },
+          {
+            "id": "34f2bf02-127b-4751-88b7-35583de12898",
+            "type": "line",
+            "startId": "85e0452c-6537-44d3-8ffa-81816460ad6d",
+            "endId": "cd723408-7202-4488-8919-603ca3a81d4e"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "a329610b-1902-4e50-8800-38fb4825520a",
+            "type": "coincident",
+            "pointAId": "cd723408-7202-4488-8919-603ca3a81d4e",
+            "pointBId": "62553495-603a-49bc-8184-c58eb517f0d2"
+          },
+          {
+            "id": "e1c80843-9b1b-4152-8662-e98f4ec0f57b",
+            "type": "coincident",
+            "pointAId": "6ea887d8-9498-40c8-8e05-232071e40ce1",
+            "pointBId": "12235cf2-84f2-4aef-8ea4-e60b6ac3e348"
+          },
+          {
+            "id": "7b1cc4f1-950a-466d-821e-facb8157f840",
+            "type": "coincident",
+            "pointAId": "e0d98cab-cc25-4674-8783-d33dcc0297d8",
+            "pointBId": "4457c378-f633-4bea-8d94-6131f69f54f2"
+          },
+          {
+            "id": "819e1a07-c2d6-41c4-851b-b677d92566a8",
+            "type": "coincident",
+            "pointAId": "fa63262a-0863-4b07-8986-0eb7604db707",
+            "pointBId": "85e0452c-6537-44d3-8ffa-81816460ad6d"
+          },
+          {
+            "id": "c7fbe444-2740-44c5-8063-e0489647c3a8",
+            "type": "horizontal",
+            "entityId": "6934f7c4-1533-48c0-859a-5b5d75f1254b"
+          },
+          {
+            "id": "5ce06f32-9bc3-409f-8541-90f1b6c6f230",
+            "type": "parallel",
+            "entityAId": "6934f7c4-1533-48c0-859a-5b5d75f1254b",
+            "entityBId": "dc0f1b8a-70a6-4cb4-84d4-7bbac5777739"
+          },
+          {
+            "id": "f851f391-54b8-4484-8829-c39c71da3920",
+            "type": "parallel",
+            "entityAId": "ba317491-357e-4309-898d-0b74507e1df9",
+            "entityBId": "34f2bf02-127b-4751-88b7-35583de12898"
+          },
+          {
+            "id": "8dc3d454-9b6d-42ff-8c4a-a19c9f055d01",
+            "type": "perpendicular",
+            "entityAId": "6934f7c4-1533-48c0-859a-5b5d75f1254b",
+            "entityBId": "ba317491-357e-4309-898d-0b74507e1df9"
+          },
+          {
+            "id": "5b05b535-7d99-4ee9-8c40-b0675ab64587",
+            "type": "distanceX",
+            "pointAId": "62553495-603a-49bc-8184-c58eb517f0d2",
+            "pointBId": "6ea887d8-9498-40c8-8e05-232071e40ce1",
+            "value": 216,
+            "label": "Width",
+            "sourceEntityId": "6934f7c4-1533-48c0-859a-5b5d75f1254b",
+            "expression": "depth - 2*board"
+          },
+          {
+            "id": "af5a76cb-97d2-4530-8290-1cf8c371424b",
+            "type": "distanceY",
+            "pointAId": "12235cf2-84f2-4aef-8ea4-e60b6ac3e348",
+            "pointBId": "e0d98cab-cc25-4674-8783-d33dcc0297d8",
+            "value": 72,
+            "label": "Height",
+            "sourceEntityId": "ba317491-357e-4309-898d-0b74507e1df9",
+            "expression": "height - board + rebate"
+          },
+          {
+            "id": "ea47549d-3d72-4a0e-8d5d-e0c228c68301",
+            "type": "positionX",
+            "pointId": "62553495-603a-49bc-8184-c58eb517f0d2",
+            "value": 12,
+            "label": "X",
+            "expression": "board"
+          },
+          {
+            "id": "53823983-6583-497c-8f77-c041b669e5ba",
+            "type": "positionY",
+            "pointId": "62553495-603a-49bc-8184-c58eb517f0d2",
+            "value": 8,
+            "label": "Y",
+            "expression": "board - rebate"
+          }
+        ]
+      },
+      "thicknessExpression": "board",
+      "drawnOn": {
+        "on": {
+          "plane": "right"
+        },
+        "offset": 90,
+        "offsetExpression": "board/2 + pitch + shift"
+      },
+      "pattern": {
+        "id": "27b43ee9-8fe6-4ffa-855f-1b022f98b9f7",
+        "axis": "x",
+        "count": 3,
+        "countExpression": "dividers",
+        "spacing": 84,
+        "spacingExpression": "pitch"
+      },
+      "copies": [
+        {
+          "id": "27b43ee9-8fe6-4ffa-855f-1b022f98b9f7:1",
+          "pattern": "27b43ee9-8fe6-4ffa-855f-1b022f98b9f7"
+        },
+        {
+          "id": "27b43ee9-8fe6-4ffa-855f-1b022f98b9f7:2",
+          "pattern": "27b43ee9-8fe6-4ffa-855f-1b022f98b9f7"
+        }
+      ]
+    }
+  ],
+  "variables": [
+    {
+      "id": "482b6484-8019-44f0-8ca8-117542cb6838",
+      "name": "width",
+      "expression": "360mm"
+    },
+    {
+      "id": "5e1fc37e-225a-4e55-8bc6-c3c715965673",
+      "name": "depth",
+      "expression": "240mm"
+    },
+    {
+      "id": "eff0963b-5198-4657-8974-13fb51e4f7d5",
+      "name": "height",
+      "expression": "80mm"
+    },
+    {
+      "id": "b679ad81-5945-49ab-8fd1-3aa61aa09d86",
+      "name": "board",
+      "expression": "12mm"
+    },
+    {
+      "id": "a1541232-51d0-4147-83e5-f38caf22d78b",
+      "name": "rebate",
+      "expression": "4mm"
+    },
+    {
+      "id": "ba2cd63c-cd40-48b7-80fe-2138a57878dd",
+      "name": "dividers",
+      "expression": "3"
+    },
+    {
+      "id": "3c0f4643-c18c-41a4-867a-b693117d451f",
+      "name": "shift",
+      "expression": "0mm"
+    },
+    {
+      "id": "6a3f19df-e05b-4be1-8468-d741837d1f55",
+      "name": "fit",
+      "expression": "0mm"
+    },
+    {
+      "id": "9e68632c-48e5-47f9-8004-873251b9af05",
+      "name": "pitch",
+      "expression": "(width - 2*board)/(dividers + 1)"
+    }
+  ],
+  "partCuts": [
+    {
+      "id": "8961ee94-ebf7-41de-83df-d6edfef885c1",
+      "tools": [
+        "003fd972-33e3-4eb6-8350-1a3aacfbff49"
+      ],
+      "targets": [
+        "588b8e8a-0956-4462-84ea-9561b779411e"
+      ],
+      "clearance": 0,
+      "clearanceExpression": "fit"
+    }
+  ]
+}
