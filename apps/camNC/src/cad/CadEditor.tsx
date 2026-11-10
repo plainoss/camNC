@@ -4324,11 +4324,6 @@ export function CadEditor({
               {acceptanceNotice}
             </p>
           )}
-          {studioSession && studioRefusal && (
-            <p className="cad-notice cad-studio-refusal" role="alert">
-              {studioRefusal}
-            </p>
-          )}
           {showWorkspace && (
             <StudioStepDialogs
               document={doc}
@@ -4489,6 +4484,11 @@ export function CadEditor({
               )}
             </div>
           </div>
+          {studioSession && studioRefusal && (
+            <p className="cad-notice cad-studio-refusal" role="alert">
+              {studioRefusal}
+            </p>
+          )}
           {showWorkspace && (
             <Suspense fallback={<div className="cad-part-view" />}>
               <WorkspaceView

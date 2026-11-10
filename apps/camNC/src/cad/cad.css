@@ -351,6 +351,15 @@
   box-shadow: 0 3px 12px #24324712;
   pointer-events: none;
 }
+/* Refusal guidance takes its own row so wrapping text cannot collide with the workspace's floating controls. */
+.cad-studio-refusal {
+  position: static;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: none;
+  margin: 8px 12px;
+  overflow-wrap: anywhere;
+}
 .cad-canvas-bar {
   display: flex;
   /* The studio and sketch share a viewport: changing the controls must not move its centre. */
