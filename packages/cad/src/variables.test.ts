@@ -106,6 +106,19 @@ describe('design variables', () => {
     });
   });
 
+  it('follows depth variables beyond 300 mm and preserves them across save and reload', () => {
+    let document = createPlateDocument({ width: 200, height: 100, thickness: 18 });
+    document.parts[0]!.thicknessExpression = 'depth';
+    document = variable(document, 'depth', '2000mm');
+    expect(cadVariableProblems(document)).toEqual([]);
+    expect(document.parts[0]!.thickness).toBe(2000);
+    document = variable(document, 'depth', '3m', document.variables![0]!.id);
+    expect(document.parts[0]!.thickness).toBe(3000);
+    const restored = parseCadDocument(JSON.parse(JSON.stringify(document)));
+    expect(restored?.parts[0]!.thickness).toBe(3000);
+    expect(restored?.parts[0]!.thicknessExpression).toBe('depth');
+  });
+
   it('updates every part that uses a variable, and its thickness', async () => {
     let document: CadDocument = { ...createCadDocument(), parts: [plate('Left side', 'width'), plate('Shelf', 'width - 2*board')] };
     document.parts[1]!.thicknessExpression = 'board';

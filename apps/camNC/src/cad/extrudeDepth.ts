@@ -1,5 +1,5 @@
 import {
-  CAD_THICKNESS_RANGE,
+  CAD_MIN_THICKNESS,
   cadSketchFrame,
   evaluateCadPart,
   resolveDrawnPlacements,
@@ -63,8 +63,7 @@ export function extrudeDepthView(document: CadDocument, partId: string): Extrude
   };
 }
 
-export const clampExtrudeDepth = (depth: number) =>
-  Math.round(Math.min(CAD_THICKNESS_RANGE.max, Math.max(CAD_THICKNESS_RANGE.min, depth)) * 10) / 10;
+export const clampExtrudeDepth = (depth: number) => Math.round(Math.max(CAD_MIN_THICKNESS, depth) * 10) / 10;
 
 export function withExtrudeDepth(document: CadDocument, partId: string, depth: number): CadDocument {
   return {
