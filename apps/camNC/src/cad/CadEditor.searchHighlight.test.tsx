@@ -30,7 +30,7 @@ async function setup(width = 1200) {
   const session = cadSession(source);
   sessions.push(source.id);
   const published = vi.fn();
-  render(
+  const { container } = render(
     <div style={{ width, height: 800, display: 'flex' }}>
       <CadEditor document={source} editSession={session} startIn3D onDraftChange={published} onFinish={() => {}} onCancel={() => {}} />
     </div>
@@ -42,6 +42,7 @@ async function setup(width = 1200) {
     future = [...session.future];
   published.mockClear();
   return {
+    host: container.firstElementChild as HTMLElement,
     unchanged: () => {
       expect(published).not.toHaveBeenCalled();
       expect(session.document).toBe(baseline);
@@ -67,6 +68,12 @@ it.each(['Linear pattern', 'Circular pattern'])(
     expect(pattern).toHaveAttribute('data-command-highlight', 'true');
     expect(pattern).toHaveAttribute('aria-pressed', 'false');
     expect(getComputedStyle(pattern).outlineWidth).toBe('2px');
+    const style = getComputedStyle(pattern),
+      bounds = pattern.getBoundingClientRect();
+    const clip = pattern.closest('.cad-drawing-tools')!.getBoundingClientRect();
+    const outside = Math.max(0, Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset));
+    expect(bounds.top - outside).toBeGreaterThanOrEqual(clip.top);
+    expect(bounds.bottom + outside).toBeLessThanOrEqual(clip.bottom);
     expect(document.activeElement).toBe(input);
     expect(highlighted()).toHaveLength(1);
     const toggle = screen.getByRole('checkbox', { name: 'Highlight tool in toolbar' });
@@ -150,5 +157,21 @@ it('reveals the actual highlighted command in an overflowed toolbar without movi
   expect(strip.scrollLeft).toBeGreaterThan(0);
   expect(pattern).toHaveAttribute('data-command-highlight', 'true');
   expect(document.activeElement).toBe(input);
+  unchanged();
+});
+
+it('keeps the highlighted command visible when the toolbar narrows while search is open', async () => {
+  const { host, unchanged } = await setup();
+  const input = await search('circular pattern');
+  const pattern = studioToolbar().getByRole('button', { name: 'Pattern' });
+  host.style.width = '700px';
+  await waitFor(() => {
+    const button = pattern.getBoundingClientRect(),
+      visible = pattern.closest('.cad-drawing-tools')!.getBoundingClientRect();
+    expect(button.left).toBeGreaterThanOrEqual(visible.left);
+    expect(button.right).toBeLessThanOrEqual(visible.right);
+  });
+  expect(document.activeElement).toBe(input);
+  expect(pattern).toHaveAttribute('aria-pressed', 'false');
   unchanged();
 });

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
 import { kStudioCommands, type StudioCommand } from './studioCommands';
+import './studioToolbar.css';
 
 export type { StudioCommand };
 
@@ -44,10 +45,15 @@ export function StudioToolbar({
 }) {
   const features = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const strip = features.current;
+    if (!strip || !searchHighlight) return;
     // Reveal overflowed commands on narrow screens while keyboard focus stays in search.
-    features.current
-      ?.querySelector<HTMLElement>('[data-command-highlight="true"]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const reveal = () =>
+      strip.querySelector<HTMLElement>('[data-command-highlight="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    reveal();
+    const observer = new ResizeObserver(reveal);
+    observer.observe(strip);
+    return () => observer.disconnect();
   }, [searchHighlight]);
   return (
     <header
