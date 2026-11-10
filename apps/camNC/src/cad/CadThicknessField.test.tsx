@@ -67,7 +67,7 @@ describe('CAD thickness entry', () => {
     }
   );
 
-  it.each(['0', '-3', '', '2000'])('keeps invalid %j visible and focused after real Enter without changing source', async text => {
+  it.each(['0', '-3', '', '0.01', '1/0'])('keeps invalid %j visible and focused after real Enter without changing source', async text => {
     const ui = setup();
     await type(ui.input, text);
     await userEvent.keyboard('{Enter}');
@@ -84,10 +84,10 @@ describe('CAD thickness entry', () => {
 
   it('keeps invalid blurred text and lets the clicked next control retain focus', async () => {
     const ui = setup();
-    await type(ui.input, '2000');
+    await type(ui.input, '0.01');
     await userEvent.click(ui.next);
     expect(document.activeElement).toBe(ui.next);
-    expect(ui.input.value).toBe('2000');
+    expect(ui.input.value).toBe('0.01');
     expect(ui.input.getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByRole('alert')).toBeTruthy();
     expect(ui.commit).not.toHaveBeenCalled();
@@ -99,6 +99,9 @@ describe('CAD thickness entry', () => {
     ['1/2in', 12.7],
     ['1/10', 0.1],
     ['2*150', 300],
+    ['2000', 2000],
+    ['2m', 2000],
+    ['2*1500', 3000],
   ])('commits valid %s once and finishes on real Enter', async (text, expected) => {
     const ui = setup();
     await type(ui.input, text);
@@ -190,7 +193,7 @@ describe('CAD thickness entry', () => {
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(finish).not.toBeDisabled());
     expect(validity.mock.calls.map(([valid]) => valid)).toEqual([true, false, true]);
-    await type(input, '2000');
+    await type(input, '0.01');
     await userEvent.keyboard('{Enter}');
     expect(validity.mock.calls.at(-1)).toEqual([false]);
     view.unmount();
@@ -199,13 +202,13 @@ describe('CAD thickness entry', () => {
 
   it('accepts a variable, keeps it as typed and reports the value it stands for', async () => {
     const commit = vi.fn<(value: number, expression?: string) => void>();
-    const variables = { board: { value: 19, kind: 'length' as const } };
+    const variables = { depth: { value: 2000, kind: 'length' as const } };
     render(<CadThicknessField value={18} variables={variables} onCommit={commit} />);
     const input = screen.getByRole('textbox', { name: 'Thickness' }) as HTMLInputElement;
-    await type(input, 'board');
+    await type(input, 'depth');
     await userEvent.keyboard('{Enter}');
-    expect(commit).toHaveBeenCalledWith(19, 'board');
-    expect(input.value).toBe('board');
+    expect(commit).toHaveBeenCalledWith(2000, 'depth');
+    expect(input.value).toBe('depth');
     await type(input, 'boards');
     await userEvent.keyboard('{Enter}');
     expect(screen.getByRole('alert').textContent).toBe("There's no variable called boards.");

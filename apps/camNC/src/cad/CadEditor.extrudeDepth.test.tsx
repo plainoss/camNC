@@ -44,7 +44,7 @@ it.each(['normal', 'symmetric', 'flipped', 'add'])(
     try {
       await waitFor(() => expect(props().cameraState?.current?.height).toBeGreaterThan(0), { timeout: 20000 });
       await userEvent.dblClick(screen.getByRole('button', { name: /^Extrude · Plate/ }));
-      const arrow = await screen.findByRole('slider', { name: 'Extrusion depth' });
+      const arrow = await screen.findByRole('spinbutton', { name: 'Extrusion depth' });
       await userEvent.click(arrow);
       expect(selected().thickness).toBe(25.73);
       expect(selected().thicknessExpression).toBe('25.73');
