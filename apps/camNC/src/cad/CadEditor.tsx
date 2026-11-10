@@ -3778,7 +3778,7 @@ export function CadEditor({
       const made = profiles.pickedProfile(newExtrudeOf(before, part, `Part ${before.parts.length + 1}`));
       commit({ ...before, revision: before.revision + 1, parts: [...before.parts, made] });
       openFeature('extrude', made.id, before);
-    } else if (part) openFeature(command, part.id);
+    } else if (part) cutSelection.featurePart(command, openFeature, setStudioRefusal);
   };
   const faceEditor = faceSketchHost({
     part,
