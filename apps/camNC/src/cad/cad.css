@@ -405,9 +405,11 @@
   gap: 8px;
   left: auto;
   right: 12px;
+  max-width: calc(100% - 24px);
 }
 .cad-assembly-tools [role='group'] {
   display: flex;
+  flex-wrap: wrap;
 }
 .cad-assembly-tools [role='group'] button {
   border-radius: 0;
@@ -765,6 +767,16 @@
   }
   .cad-toolbar {
     gap: 3px;
+    /* Keep both modes the same height so entering a sketch does not move the view. */
+    flex-wrap: wrap;
+    height: auto;
+    flex-basis: auto;
+  }
+  .cad-toolbar > .cad-drawing-tools {
+    flex-basis: 100%;
+  }
+  .cad-toolbar > .cad-search-trigger {
+    margin-left: 0;
   }
   .cad-session-actions {
     gap: 0;
@@ -998,6 +1010,7 @@
 .cad-editor .cad-studio-command,
 .cad-editor .cad-studio-done {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 5px;
   height: 32px;

@@ -1,4 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import '@/style.css';
+import { page } from '@vitest/browser/context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { addFaceSketch, addLine, cadFaceSketches, createPlateDocument, updateDimension, type CadDocument } from '@wbcnc/cad';
 import { useImperativeHandle, useRef, type ComponentType, type Ref } from 'react';
@@ -153,6 +155,24 @@ const open = () =>
   );
 
 describe('returning from a design edit', () => {
+  it('reserves the phone tabs and follows viewport height changes', async () => {
+    const original = { width: window.innerWidth, height: window.innerHeight };
+    const view = open();
+    const design = view.container.querySelector('.cam-page')!;
+    try {
+      for (const [width, height] of [
+        [390, 720],
+        [390, 600],
+        [980, 720],
+      ]) {
+        await page.viewport(width, height);
+        expect(design.getBoundingClientRect().height).toBe(width < 768 ? height - 56 : height);
+      }
+    } finally {
+      await page.viewport(original.width, original.height);
+    }
+  });
+
   it('recovers the newest edit when reloading interrupts an older queued save', async () => {
     const saved = state.job!.design!.draft;
     state.save.mockImplementation(() => new Promise<CamJobV1>(() => {}));
