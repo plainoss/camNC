@@ -587,7 +587,7 @@ export function ModelViewport({
   const opacityOf = (mesh: BodyMesh, index: number) =>
     display === 'translucent' || transparentIds?.has(instanceIds?.[index] ?? mesh.partId) ? 0.3 : milled(mesh.partId) ? 1 : 0.35;
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
-    // A captured depth drag must not also select the face beneath its release point.
+    // A captured depth or section drag must not also select the face beneath its release point.
     if (extrusionDepth?.dragging || sectionControl?.dragging) return;
     if (!e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.
