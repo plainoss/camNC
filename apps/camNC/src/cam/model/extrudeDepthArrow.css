@@ -1,0 +1,27 @@
+.cad-editor .cad-extrude-depth-arrow {
+  width: 36px;
+  height: 40px;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cad-extrude-depth-arrow svg {
+  overflow: visible;
+  fill: white;
+  stroke: #245585;
+  stroke-width: 1.5;
+}
+.cad-extrude-depth-arrow:hover svg,
+.cad-extrude-depth-arrow[data-dragging] svg {
+  fill: #65b5f5;
+}
+.cad-editor .cad-extrude-depth-arrow[data-dragging] {
+  cursor: grabbing;
+}
+.cad-editor .cad-extrude-depth-arrow[aria-disabled='true'] {
+  cursor: default;
+}

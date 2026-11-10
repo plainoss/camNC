@@ -220,7 +220,7 @@ import {
   transitionModification,
   type ModificationWorkflow,
 } from '@wbcnc/cad-editor/modificationWorkflow';
-import { useSvgPixelScale, SKETCH_APPEARANCE } from './sketchAppearance';
+import { useSvgPixelScale, SKETCH_APPEARANCE, sketchStrokeColor } from './sketchAppearance';
 import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
@@ -251,7 +251,7 @@ import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
 import { ShapeStepDialogs } from './ShapeStepDialogs';
 import { HoleDialog } from './HoleDialog';
-import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
+import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, type DesignStep } from '@wbcnc/cad';
@@ -264,9 +264,10 @@ import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView, assemblyCameraFromPart, type FaceSketchScene } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
 import { fitSketchView, pointsOf } from './fitSketchView';
-import { sketchValuePosition, projectSketchPoint, focusSketchCanvas } from './sketchViewport';
+import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions } from './sketchViewport';
 import { addUsedPartEdges } from './partEdgeUse';
 import { faceSketchHost } from './faceSketchHost';
+import { useExtrudeDepth } from './useExtrudeDepth';
 import { bindPartCorners, partCornerInference } from './partCornerInference';
 import { newSketchPart } from './newSketchPart';
 import { ExtrudeDialog, PartPatternDialog, TransformDialog } from './PartFeatureDialogs';
@@ -649,8 +650,9 @@ export function CadEditor({
   );
   useProvideCadVariableFields(variableFields);
   const blankDesign = studioSession && doc.parts.length === 1 && isBlank(doc.parts[0]!);
+  const extrusionDepth = useExtrudeDepth(doc, featureDialog?.kind === 'extrude' ? featureDialog.partId : undefined, next => commit(next));
   const { rollbackStep, shownDocument } = useFeaturePreview({
-    document: doc,
+    document: extrusionDepth.document,
     enabled: studioSession && showWorkspace,
     blank: blankDesign,
     rolledTo,
@@ -3798,13 +3800,13 @@ export function CadEditor({
         !sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).length &&
         evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
       if (problem) return setStudioRefusal(`Can’t extrude this sketch yet: ${problem.message}`);
-      commit(replacePart(before, part.id, p => extrudedSketch(before, p, sketchRowPicked === p.id)));
+      commit(replacePart(before, part.id, p => profiles.pickedProfile(extrudedSketch(before, p, sketchRowPicked === p.id))));
       openFeature('extrude', part.id, before);
     } else if (command === 'extrude' && part) {
       // Extrude always starts a new extrude, of the part's sketch here, as in the reference: it starts with the regions
       // the sketch's extrudes leave, or none. An extrude already made is edited from its step in the feature list.
       const before = documentRef.current;
-      const made = newExtrudeOf(before, part, `Part ${before.parts.length + 1}`);
+      const made = profiles.pickedProfile(newExtrudeOf(before, part, `Part ${before.parts.length + 1}`));
       commit({ ...before, revision: before.revision + 1, parts: [...before.parts, made] });
       openFeature('extrude', made.id, before);
     } else if (part) openFeature(command, part.id);
@@ -3827,16 +3829,7 @@ export function CadEditor({
     currentDimension && numeric(currentDimension) && sketch
       ? valuePosition(dimensionAnchor(currentDimension, sketch, markerScale))
       : undefined;
-  const creationPositions =
-    creationValues && sketch
-      ? creationValues.steps.map((_, index) =>
-          valuePosition(
-            creationValueAnchor(creationValues, sketch, index, markerScale),
-            creationValues.editing && index === creationValues.index ? 170 : 72,
-            -12
-          )
-        )
-      : [];
+  const creationPositions = creationEditorPositions(creationValues, sketch, markerScale, valuePosition);
   const offsetDimension = offsetPreview?.ok
     ? (offsetPreview.sketch.constraints.find(c => c.id === offsetPreview.dimensionId && numeric(c)) as NumericConstraint | undefined)
     : undefined;
@@ -3876,26 +3869,12 @@ export function CadEditor({
     activeSketchStatus?.status === 'solved'
       ? activeSketchStatus.entityStatus
       : undefined;
-  const stroke =
-    activeSketchStatus?.status === 'conflict'
-      ? '#c73535'
-      : currentSolverResult && activeSketchStatus?.status === 'solved' && activeSketchStatus.dof === 0
-        ? SKETCH_APPEARANCE.constrainedColor
-        : SKETCH_APPEARANCE.freeColor;
+  const stroke = sketchStrokeColor(activeSketchStatus, currentSolverResult);
   const grid = Math.max(1, 10 ** Math.floor(Math.log10(view.w / 20)));
   const chainPreview = sketch && chainGeometry(sketch, chain);
   const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
   const acceptanceNotice = notice ?? finishError;
-  // The parts already built, behind an open sketch in the studio, seen straight at its plane as the drawing is.
-  // The regions of the sketch being extruded, to pick in the view as the reference's Extrude does, when there's a choice.
-  const extrudeRegions = useMemo(() => {
-    const target = featureDialog?.kind === 'extrude' ? doc.parts.find(candidate => candidate.id === featureDialog.partId) : undefined;
-    return studioSession && target ? extrudeRegionViews(doc, target) : [];
-  }, [studioSession, featureDialog, doc]);
-  /** A region clicked while extruding is added to the extrude, or taken off it when it's clicked again. */
-  const pickRegion = (regionId: string) => {
-    if (featureDialog) commit(withRegionToggled(documentRef.current, featureDialog.partId, regionId));
-  };
+  const profiles = useProfileSelection(doc, featureDialog, commit, setStudioRefusal);
   const faceBackdrop = useFaceSketchCamera(faceSketch?.scene, view, sketchTurn, sketchCameraShift, canvasBox);
   const studioBackdrop = useMemo(() => {
     if (!studioSession || showWorkspace || show3D || !part || !canvasBox?.width || !canvasBox.height) return null;
@@ -4429,10 +4408,10 @@ export function CadEditor({
           {showWorkspace &&
             featureDialog &&
             (() => {
-              const target = doc.parts.find(candidate => candidate.id === featureDialog.partId);
+              const target = extrusionDepth.document.parts.find(candidate => candidate.id === featureDialog.partId);
               if (!target) return null;
               const props = {
-                document: doc,
+                document: extrusionDepth.document,
                 part: target,
                 variables: variableScope,
                 onChange: (change: (document: CadDocument) => CadDocument) => commit(change(documentRef.current)),
@@ -4444,6 +4423,9 @@ export function CadEditor({
                 <ExtrudeDialog
                   key={target.id}
                   {...props}
+                  depthDragging={extrusionDepth.control(shownDocument)?.dragging}
+                  profilePicking={profiles.enabled}
+                  onPickProfile={() => profiles.setEnabled(!profiles.enabled)}
                   onEditSketch={() => openSketch(target.id)}
                   pickFace={picked => setDirectionPicker(() => picked)}
                 />
@@ -4571,8 +4553,10 @@ export function CadEditor({
             <Suspense fallback={<div className="cad-part-view" />}>
               <WorkspaceView
                 cameraState={studioCamera}
+                extrusionDepth={extrusionDepth.control(shownDocument)}
                 onReady={focusViewIfIdle}
                 document={shownDocument}
+                profileDocument={doc}
                 viewRequest={viewRequest}
                 onViewRequest={
                   studioSession ? request => setViewRequest(previous => ({ ...request, seq: (previous?.seq ?? 0) + 1 })) : undefined
@@ -4610,14 +4594,26 @@ export function CadEditor({
                 picked={
                   selectedPlane ? (pickedPlane(doc, selectedPlane)?.name ?? null) : selectedFace ? drawnOnName(doc, selectedFace) : null
                 }
-                regions={extrudeRegions}
-                onPickRegion={extrudeRegions.length ? pickRegion : undefined}
+                regions={directionPicker ? [] : profiles.regions}
+                onPickRegion={profiles.pickRegion}
+                onPickSketch={
+                  studioSession && !directionPicker && !choosingFace && !pointPicker.onPick && !partCutting
+                    ? (id, region) => {
+                        if (profiles.pickSketch(id, region)) return;
+                        setSelectedFace(null);
+                        setSketchRowPicked(id);
+                        cutSelection.selectPart(id);
+                        setSelected([]);
+                      }
+                    : undefined
+                }
                 onPickPoint={pointPicker.onPick}
                 onSelectFace={on => {
                   if (directionPicker && on) {
                     directionPicker(on);
                     return setDirectionPicker(null);
                   }
+                  if (on && profiles.pickFace(on)) return;
                   setSelectedFace(on);
                   if (on) setSelectedPlane(null);
                 }}>

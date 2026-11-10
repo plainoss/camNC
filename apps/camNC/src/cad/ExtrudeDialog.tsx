@@ -63,8 +63,14 @@ export function ExtrudeDialog({
   onCancel,
   onEditSketch,
   pickFace,
+  depthDragging = false,
+  profilePicking = false,
+  onPickProfile,
 }: PartDialogProps & {
   onEditSketch: () => void;
+  depthDragging?: boolean;
+  profilePicking?: boolean;
+  onPickProfile?: () => void;
   /** Starts picking a plane or a face, for Up to face; the pick comes back once. Null stops a pick under way. */
   pickFace?: (picked: ((on: CadDrawnOn['on'], datum?: string) => void) | null) => void;
 }) {
@@ -279,6 +285,9 @@ export function ExtrudeDialog({
         <div className="cad-feature-selection" data-active={stepProblem ? '' : undefined}>
           <small>{part.faceProfile ? 'Face to extrude' : operation === 'add' ? 'Regions to add' : 'Sketch to cut'}</small>
           <span>{selection}</span>
+          <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
+            Select profile
+          </button>
           {!part.faceProfile && (
             <button type="button" onClick={onEditSketch}>
               Edit sketch
@@ -414,6 +423,9 @@ export function ExtrudeDialog({
             <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
               <small>{part.faceProfile ? 'Face to extrude' : 'Sketch to extrude'}</small>
               <span>{selection}</span>
+              <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
+                Select profile
+              </button>
               {!part.faceProfile && (
                 <button type="button" onClick={onEditSketch}>
                   Edit sketch
@@ -506,7 +518,7 @@ export function ExtrudeDialog({
           )}
           {solidControls && !part.upTo && (
             <CadThicknessField
-              key={`${part.id}:thickness`}
+              key={`${part.id}:thickness:${depthDragging}`}
               value={part.thickness}
               expression={part.thicknessExpression}
               variables={variables}

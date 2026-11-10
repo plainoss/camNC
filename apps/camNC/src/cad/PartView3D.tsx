@@ -39,6 +39,7 @@ const kPick = '#8b5cf6';
 const kSketch = '#3f5f8a';
 /** A region's pick surface sits just over the face it stands for, so it wins against that face. */
 const kLift = 0.01;
+const kPartViewDirection: [number, number, number] = [0.2, -0.75, 1];
 const faceLabel = (face: CadFaceRef | { edge: string }) =>
   face === 'top' ? 'top' : face === 'underside' ? 'underside' : 'edge' in face ? 'side face' : 'pocket floor';
 const alone = (part: CadPart): CadDocument => ({ version: 2, id: 'part-view', name: part.name, revision: 0, parts: [part] });
@@ -263,7 +264,7 @@ export default function PartView3D({
         <directionalLight position={[-400, 300, 200]} intensity={0.4} />
         {/* Enough light underneath to work on the underside. */}
         <directionalLight position={[200, -300, -800]} intensity={1.1} />
-        <FitCamera box={box} fitKey={part.id} cameraState={cameraState} />
+        <FitCamera box={box} fitKey={part.id} cameraState={cameraState} initialDirection={kPartViewDirection} />
         {solid.geometry && (
           <mesh
             geometry={solid.geometry}

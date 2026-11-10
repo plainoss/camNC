@@ -1,4 +1,18 @@
-import type { CadPoint } from '@wbcnc/cad';
+import type { CadPoint, CadSketch } from '@wbcnc/cad';
+import { creationValueAnchor, type CreationValues } from './creationValues';
+
+export function creationEditorPositions(
+  values: CreationValues | null,
+  sketch: CadSketch | undefined,
+  scale: number,
+  position: (anchor: CadPoint | null, width: number, offset: number) => ReturnType<typeof sketchValuePosition>
+) {
+  return values && sketch
+    ? values.steps.map((_, index) =>
+        position(creationValueAnchor(values, sketch, index, scale), values.editing && index === values.index ? 170 : 72, -12)
+      )
+    : [];
+}
 
 /** Keep a value editor inside the sketch's viewport, above the selected geometry. */
 export function sketchValuePosition(

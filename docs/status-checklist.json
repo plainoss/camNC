@@ -38,8 +38,8 @@
         {
           "item": "Sketch on faces in the current view and extrude a solid face up to another face",
           "status": "done",
-          "evidence": ["apps/camNC/src/cad/CadEditor.faceWorkflow.test.tsx", "apps/camNC/src/cad/WorkspaceView.faceSelection.test.tsx", "packages/cad/src/faceExtrude.test.ts", "packages/cad-script/fixtures/designs/face-extrusion-bracket.report.json"],
-          "note": "Selected faces are highlighted individually; rapid picks on different faces do not open a base sketch. Per-part side-face selection starts a studio profile. Manual camera changes persist through sketches and feature dialogs. Drawing snaps to existing part corners; a solid-face Add requires an explicit merge scope. Direct face extrusion requires an unmodified body face."
+          "evidence": ["apps/camNC/src/cad/CadEditor.faceWorkflow.test.tsx", "apps/camNC/src/cad/CadEditor.extrudeDepth.test.tsx", "apps/camNC/src/cad/WorkspaceView.faceSelection.test.tsx", "packages/cad/src/faceExtrude.test.ts", "packages/cad-script/fixtures/designs/face-extrusion-bracket.report.json", "apps/camNC/src/cad/CadEditor.profileSelection.test.tsx"],
+          "note": "Selected faces and visible sketch regions can be picked in 3D. Extrude profiles can be changed through canvas sketch or face picks; cancelled edits restore the design. The depth arrow previews independent Blind solid extrusion depth without moving the camera and commits one undoable edit. Per-part side-face selection starts a studio profile. Manual camera changes persist through sketches and feature dialogs. Direct face extrusion requires an unmodified body face."
         },
         {
           "item": "Datum planes",

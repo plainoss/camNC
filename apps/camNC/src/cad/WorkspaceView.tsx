@@ -21,7 +21,9 @@ import {
 import { assemblyModel, instanceKey } from './assemblyModel';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
+import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
+import type { ExtrudeDepthControl } from './extrudeDepth';
 
 const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
@@ -41,7 +43,9 @@ const kDoubleClickMs = 400;
 export default function WorkspaceView({
   onReady,
   cameraState,
+  extrusionDepth,
   document,
+  profileDocument = document,
   selectedId,
   selectedCopyId,
   selectedFace,
@@ -64,6 +68,7 @@ export default function WorkspaceView({
   hoverIds,
   regions,
   onPickRegion,
+  onPickSketch,
   viewRequest,
   onViewRequest,
   showPlanes = true,
@@ -72,7 +77,9 @@ export default function WorkspaceView({
   /** The lazy view has mounted; a pending keyboard handoff can now focus it. */
   onReady?: () => void;
   cameraState?: StudioCameraRef;
+  extrusionDepth?: ExtrudeDepthControl | null;
   document: CadDocument;
+  profileDocument?: CadDocument;
   selectedId: string | null;
   selectedFace?: Extract<CadDrawnOn['on'], { partId: string }> | null;
   selectedCopyId?: string;
@@ -120,6 +127,7 @@ export default function WorkspaceView({
   /** A sketch's regions to pick for its extrude, while its Extrude dialog is open. */
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
+  onPickSketch?: (id: string, region?: string) => void;
   viewRequest?: ViewRequest;
   onViewRequest?: (request: Omit<ViewRequest, 'seq'>) => void;
   showPlanes?: boolean;
@@ -152,8 +160,19 @@ export default function WorkspaceView({
     [document, selectedPlane, featureShown]
   );
   const sketchLines = useMemo(
-    () => sketchLinesInModel(document, featureShown && (partId => featureShown(`${partId}:sketch`))),
-    [document, featureShown]
+    () => sketchLinesInModel(profileDocument, featureShown && (partId => featureShown(`${partId}:sketch`))),
+    [profileDocument, featureShown]
+  );
+  const sketchRegions = useMemo(
+    () =>
+      onPickSketch
+        ? sketchSelectionRegions(
+            profileDocument,
+            featureShown ?? (id => profileDocument.parts.find(p => `${p.id}:sketch` === id)?.extrude === false),
+            selectedId
+          )
+        : [],
+    [profileDocument, featureShown, onPickSketch, selectedId]
   );
   // Choosing what a new part is drawn on: a plane, or a face clicked in the view.
   const [ownChoosing, setOwnChoosing] = useState(false);
@@ -267,6 +286,7 @@ export default function WorkspaceView({
       </div>
       <ModelViewport
         cameraState={cameraState}
+        extrusionDepth={extrusionDepth}
         meshes={model.meshes}
         parts={model.parts}
         view={view}
@@ -295,10 +315,16 @@ export default function WorkspaceView({
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
+        onPickSketch={onPickSketch}
         display={controlled ? display : 'shaded'}
         showOrigin={!!onNewPart && showPlanes && (featureShown?.('origin') ?? true)}
-        regions={regions}
-        onPickRegion={onPickRegion}
+        regions={[...(regions ?? []), ...sketchRegions]}
+        onPickRegion={id => {
+          if (sketchRegions.some(region => region.id === id)) {
+            const [part, region] = JSON.parse(id) as [string, string];
+            onPickSketch?.(part, region);
+          } else onPickRegion?.(id);
+        }}
         onPickPlane={id => {
           // Picked while choosing, the new part is drawn on it; otherwise it's picked for the next sketch, as a face is.
           const plane = pickedPlane(document, id);

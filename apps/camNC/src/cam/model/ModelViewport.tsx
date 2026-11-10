@@ -8,6 +8,8 @@ import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { ViewCube } from './ViewCube';
 import { ModelBody } from './ModelBody';
 import { ModelFaceHighlight } from './ModelFaceHighlight';
+import { ExtrudeDepthArrow } from './ExtrudeDepthArrow';
+import type { ExtrudeDepthControl } from '@/cad/extrudeDepth';
 import { sameFacePlane } from './faceHighlight';
 import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
@@ -194,11 +196,13 @@ export function FitCamera({
   fitKey,
   viewRequest,
   cameraState,
+  initialDirection,
 }: {
   box: THREE.Box3;
   fitKey?: string;
   viewRequest?: ViewRequest;
   cameraState?: StudioCameraRef;
+  initialDirection?: [number, number, number];
 }) {
   const camera = useThree(s => s.camera) as THREE.PerspectiveCamera | THREE.OrthographicCamera;
   const controls = useThree(s => s.controls) as OrbitControlsImpl | null;
@@ -257,7 +261,7 @@ export function FitCamera({
         ? camera.getWorldDirection(new THREE.Vector3()).negate()
         : name === 'normal' || viewRequest?.direction
           ? new THREE.Vector3(...(viewRequest?.direction ?? [0, 0, 1])).normalize()
-          : new THREE.Vector3(...(ortho && !viewRequest ? [0.77, -1, 0.17] : kViewDirections[name])).normalize();
+          : new THREE.Vector3(...(ortho && !viewRequest ? (initialDirection ?? [0.77, -1, 0.17]) : kViewDirections[name])).normalize();
     if (name === 'normal') camera.up.set(...(viewRequest?.up ?? [0, 1, 0]));
     else if (name !== 'fit') {
       const vertical = Math.abs(direction.z) > 1 - 1e-10;
@@ -292,7 +296,7 @@ export function FitCamera({
     }
     // The view draws only when something changes, and moving the camera is a change.
     invalidate();
-  }, [box, camera, controls, aspect, fitKey, viewRequest, invalidate, cameraState]);
+  }, [box, camera, controls, aspect, fitKey, viewRequest, invalidate, cameraState, initialDirection]);
   return null;
 }
 
@@ -391,6 +395,8 @@ export function ModelViewport({
   regions = [],
   onPickRegion,
   cameraState,
+  extrusionDepth,
+  onPickSketch,
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -432,6 +438,8 @@ export function ModelViewport({
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
   cameraState?: StudioCameraRef;
+  extrusionDepth?: ExtrudeDepthControl | null;
+  onPickSketch?: (id: string) => void;
   selectedFace?: ModelFacePick | null;
 }) {
   const [hoveredFace, setHoveredFace] = useState<ModelFacePick | null>(null);
@@ -490,6 +498,8 @@ export function ModelViewport({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meshes, matrices, shownPlanes.length, planeSize, assembled, sketchLines, regions, view]);
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
+    // A captured depth drag must not also select the face beneath its release point.
+    if (extrusionDepth?.dragging) return;
     if (!e.face) return onSelect(mesh.partId, index);
     // Back from where the view drew it to where the part sits in the model.
     const point = e.point.clone().applyMatrix4(matrix.clone().invert()),
@@ -583,6 +593,14 @@ export function ModelViewport({
               points={line.points}
               color={highlightIds.includes(line.partId) || line.partId === selectedId ? kStudioPicked : '#1f6fc5'}
               lineWidth={highlightIds.includes(line.partId) || line.partId === selectedId ? 2.5 : 1.5}
+              onClick={
+                onPickSketch
+                  ? event => {
+                      event.stopPropagation();
+                      if (event.delta <= 4) onPickSketch(line.partId);
+                    }
+                  : undefined
+              }
             />
           ))}
         </group>
@@ -604,8 +622,11 @@ export function ModelViewport({
       {shownPlanes.map(plane => (
         <Plane key={plane.id} plane={plane} size={planeSize} model={assembled} onPick={onPickPlane && (() => onPickPlane(plane.id))} />
       ))}
+      {extrusionDepth && view === 'assembled' && <ExtrudeDepthArrow key={extrusionDepth.partId} control={extrusionDepth} />}
       {!sketchView && onViewRequest && <ViewCube onViewRequest={onViewRequest} />}
-      {!sketchView && <OrbitControls makeDefault dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />}
+      {!sketchView && (
+        <OrbitControls makeDefault enabled={!extrusionDepth?.dragging} dampingFactor={kOrbitDamping} mouseButtons={kCadMouseButtons} />
+      )}
     </Canvas>
   );
 }
