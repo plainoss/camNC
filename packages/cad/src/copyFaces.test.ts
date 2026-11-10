@@ -1,8 +1,10 @@
+import { newExtrudeOnFace } from './faceExtrude';
+import { evaluateCadPart } from './geometry';
 import { extrudeStepProblem, removeSupport, resolveExtrudeSteps, isJoinedBody } from './extrudeSteps';
 import { designSteps } from './designSteps';
 import { parseCadDocument } from './parseCadDocument';
 import { describe, expect, it } from 'vitest';
-import { addLine, addArc, createCadDocument, createCadPart, createPlateDocument } from './document';
+import { addLine, addArc, addCircle, createCadDocument, createCadPart, createPlateDocument } from './document';
 import { cadFaceFrame, resolveDrawnPlacements } from './drawnOn';
 import { setPartPattern } from './partPatterns';
 
@@ -159,4 +161,18 @@ it('refuses copy-face Add, Remove and Hole instead of modifying the source famil
     expect(isJoinedBody(document, child)).toBe(false);
     expect(resolveExtrudeSteps(document).parts[0]!.features).toBeUndefined();
   }
+});
+
+it('preserves the reflected holes when a mirrored copy face is extruded as New', () => {
+  const source = createPlateDocument({ width: 100, height: 80, thickness: 19 }).parts[0]!;
+  source.sketch = addCircle(source.sketch, { x: 20, y: 30, radius: 4 });
+  source.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  source.copies = [{ id: 'mirror', mirrored: true, placement: { position: [300, 0, 0], rotation: [0, 0, 0, 1] } }];
+  const document = { ...createCadDocument(), parts: [source] };
+  const made = newExtrudeOnFace(document, { partId: source.id, copyId: 'mirror', face: 'top' }, 'New');
+  const result = evaluateCadPart(made);
+  expect(result.part).toBeDefined();
+  expect(result.part!.holes).toHaveLength(1);
+  expect(Math.min(...result.part!.holes[0]!.map(point => point.x))).toBeCloseTo(-24, 1);
+  expect(Math.max(...result.part!.holes[0]!.map(point => point.x))).toBeCloseTo(-16, 1);
 });
