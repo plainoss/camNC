@@ -343,22 +343,10 @@ export function AssistantDock({
                   if (!event.repeat) event.currentTarget.form?.requestSubmit();
                 }}
                 disabled={running}
-                rows={3}
+                rows={2}
               />
             </label>
             <small className="cad-assistant-shortcut">⌘ / Ctrl + Enter to send · Enter for a new line</small>
-            <div className="cad-assistant-composer-actions">
-              <button
-                type="button"
-                className="cad-assistant-attach"
-                aria-label="Add reference image"
-                title={credentials?.config.images ? 'Add reference image' : 'Enable image support in Connection'}
-                disabled={running || readingImage || !credentials?.config.images || images.length >= 3}
-                onClick={() => attachment.current?.click()}>
-                <span aria-hidden="true">＋</span> Attach
-              </button>
-              <small>PNG, JPG, WebP or GIF · up to 3</small>
-            </div>
             <input
               ref={attachment}
               type="file"
@@ -394,23 +382,35 @@ export function AssistantDock({
                 </button>
               </div>
             ))}
-            {running ? (
+            <div className="cad-assistant-composer-actions">
               <button
                 type="button"
-                onClick={() => {
-                  controller.current?.abort();
-                  setActivity('Stopping…');
-                }}>
-                Stop
+                className="cad-assistant-attach"
+                aria-label="Add reference image"
+                title={credentials?.config.images ? 'Add reference image' : 'Enable image support in Connection'}
+                disabled={running || readingImage || !credentials?.config.images || images.length >= 3}
+                onClick={() => attachment.current?.click()}>
+                <span aria-hidden="true">＋</span> Attach
               </button>
-            ) : (
-              <button
-                type="submit"
-                className="cad-assistant-primary"
-                disabled={readingImage || !credentials || (!text.trim() && !images.length)}>
-                Send
-              </button>
-            )}
+              <small>PNG, JPG, WebP or GIF · up to 3</small>
+              {running ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    controller.current?.abort();
+                    setActivity('Stopping…');
+                  }}>
+                  Stop
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="cad-assistant-primary"
+                  disabled={readingImage || !credentials || (!text.trim() && !images.length)}>
+                  Send
+                </button>
+              )}
+            </div>
           </form>
           <button
             className="cad-assistant-footer"

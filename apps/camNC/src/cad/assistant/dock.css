@@ -65,7 +65,7 @@
   font: inherit;
   line-height: 1.5;
 }
-.cad-editor .cad-assistant-dock textarea { resize: vertical; min-height: 82px; max-height: 200px; }
+.cad-editor .cad-assistant-dock textarea { resize: vertical; min-height: 58px; max-height: 200px; }
 .cad-editor .cad-assistant-dock textarea::placeholder { color: #657774; }
 .cad-editor .cad-assistant-dock .cad-assistant-check { flex-direction: row; align-items: center; gap: 9px; font-weight: 400; }
 .cad-editor .cad-assistant-check input { min-height: 0; accent-color: #32695b; }
@@ -124,14 +124,14 @@
 .cad-editor .cad-assistant-composer > label:first-child { margin-top: 0; }
 .cad-editor .cad-assistant-composer input[type='file'] { width: 100%; min-width: 0; font-size: 11px; color: #5c6b61; }
 .cad-editor .cad-assistant-composer input::file-selector-button { border: 1px solid #d5ddda; border-radius: 6px; padding: 6px 8px; margin-right: 8px; background: #f5f7f4; color: #354c42; cursor: pointer; }
-.cad-editor .cad-assistant-composer > button { margin-top: 10px; width: 100%; }
+.cad-editor .cad-assistant-composer-actions > button:last-child { margin-left: auto; min-width: 60px; flex-shrink: 0; }
 .cad-editor .cad-assistant-dock .cad-assistant-footer { align-self: center; background: transparent; border-color: transparent; color: #5a6d64; padding: 5px 10px; font-size: 11px; }
 .cad-editor .cad-assistant-settings { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 2px 6px; }
 .cad-editor .cad-assistant-settings > p { color: #5c6d65; font-size: 11px; margin: 14px 0; }
 .cad-editor .cad-assistant-settings > button { margin: 4px 6px 0 0; }
 
 .cad-editor .cad-assistant-composer-actions { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-.cad-editor .cad-assistant-composer-actions small { font-size: 10px; }
+.cad-editor .cad-assistant-composer-actions small { min-width: 0; font-size: 10px; }
 .cad-editor .cad-assistant-dock .cad-assistant-attach { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; padding: 5px 8px; background: #f5f7f4; }
 .cad-editor .cad-assistant-attach span { font-size: 17px; font-weight: 400; line-height: 1; }
 .cad-editor .cad-assistant-attachment { display: flex; align-items: center; gap: 8px; margin-top: 9px; padding: 7px; border: 1px solid #dbe3db; border-radius: 8px; background: #f8faf7; }
@@ -160,7 +160,7 @@
   .cad-editor .cad-assistant-dock { gap: 8px; padding-top: 12px; padding-bottom: 10px; }
   .cad-editor .cad-assistant-empty { gap: 9px; padding-top: 10px; }
   .cad-editor .cad-assistant-composer { padding: 10px; }
-  .cad-editor .cad-assistant-dock textarea { min-height: 68px; }
+  .cad-editor .cad-assistant-dock textarea { min-height: 56px; }
 }
 @media (pointer: coarse) { .cad-editor .cad-assistant-dock button { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .cad-editor .cad-assistant-dock button { transition: none; } }
@@ -177,7 +177,7 @@
   .cad-editor .cad-assistant-dock { top: 79px; gap: 8px; padding: 12px 16px 10px; }
   .cad-editor .cad-assistant-activity-body { max-height: 80px; }
   .cad-editor .cad-assistant-composer { padding: 10px; }
-  .cad-editor .cad-assistant-dock textarea { min-height: 68px; }
+  .cad-editor .cad-assistant-dock textarea { min-height: 56px; }
   .cad-proposal-error { top: 79px; }
   .cad-proposal-tools { gap: 4px; }
   .cad-editor .cad-assistant-toggle { width: 32px; min-width: 32px; padding: 4px; }
