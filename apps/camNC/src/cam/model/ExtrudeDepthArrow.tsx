@@ -2,7 +2,7 @@ import { Html, Line } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Raycaster, Vector2, Vector3 } from 'three';
-import { CAD_THICKNESS_RANGE } from '@wbcnc/cad';
+import { CAD_MIN_THICKNESS } from '@wbcnc/cad';
 import { clampExtrudeDepth, distanceAlongAxis, type ExtrudeDepthControl } from '@/cad/extrudeDepth';
 import './extrudeDepthArrow.css';
 
@@ -82,12 +82,11 @@ export function ExtrudeDepthArrow({ control }: { control: ExtrudeDepthControl })
         <button
           ref={button}
           type="button"
-          role="slider"
+          role="spinbutton"
           className="cad-extrude-depth-arrow"
           aria-label="Extrusion depth"
           aria-valuenow={control.depth}
-          aria-valuemin={CAD_THICKNESS_RANGE.min}
-          aria-valuemax={Math.max(CAD_THICKNESS_RANGE.max, control.depth)}
+          aria-valuemin={CAD_MIN_THICKNESS}
           aria-valuetext={`${control.depth} mm`}
           aria-disabled={!control.editable}
           data-dragging={control.dragging || undefined}

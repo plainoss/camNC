@@ -420,6 +420,7 @@ export interface CadPartCopy {
    * A mirror image of the part across a plane, a part's face, or a plane made to sketch on (`datum`). Its placement
    * follows from where the part and that plane are, so it stays mirrored as either moves. It's always `mirrored`.
    */
+  /** For a copy face, across.partId is its physical cadPartReference, preserving the selected instance. */
   mirror?: { across: CadDrawnOn['on']; datum?: string };
 }
 /** Copies of a part in a row along an axis, each `spacing` on from the last. */

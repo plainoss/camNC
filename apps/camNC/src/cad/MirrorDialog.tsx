@@ -1,4 +1,4 @@
-import { addPartMirror, type CadDocument, type CadDrawnOn, type CadPartCopy } from '@wbcnc/cad';
+import { addPartMirror, cadMirrorPlaneWouldCycle, type CadDocument, type CadDrawnOn, type CadPartCopy } from '@wbcnc/cad';
 import { useEffect, useState } from 'react';
 import { drawnOnName } from './drawnOnName';
 import { FeatureDialog } from './FeatureDialog';
@@ -30,10 +30,18 @@ export function MirrorDialog({
   const copy = part?.copies?.find(candidate => candidate.id === copyId);
   const [across, setAcross] = useState<Across | null>(copy?.mirror ?? null);
   const [picking, setPicking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pick = () => {
     if (!pickPlane) return;
     setPicking(true);
     pickPlane((on, datum) => {
+      // A copy cannot define its own mirror plane: regeneration would keep reflecting it about its previous position.
+      if (copyId && cadMirrorPlaneWouldCycle(document, partId, copyId, on)) {
+        setError('Choose a face that does not depend on this mirror.');
+        setPicking(false);
+        return;
+      }
+      setError(null);
       setAcross(datum ? { across: on, datum } : { across: on });
       setPicking(false);
     });
@@ -59,7 +67,7 @@ export function MirrorDialog({
     });
   };
   return (
-    <FeatureDialog title="Mirror" okDisabled={!across || !part} onOk={save} onCancel={onCancel}>
+    <FeatureDialog title="Mirror" okDisabled={!across || !part || !!error} onOk={save} onCancel={onCancel}>
       <div className="cad-feature-selection">
         <small>Entities to mirror</small>
         <span>{part?.name ?? 'Select a part'}</span>
@@ -73,6 +81,7 @@ export function MirrorDialog({
         <small>Mirror plane</small>
         <span>{name ?? 'Pick a plane or a face'}</span>
       </button>
+      {error && <p role="alert">{error}</p>}
     </FeatureDialog>
   );
 }

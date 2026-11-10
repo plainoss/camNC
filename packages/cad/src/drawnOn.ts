@@ -218,11 +218,16 @@ export function partFaceAt(
   part: CadPart,
   placement: CadPlacement,
   point: Vec3,
-  normal: Vec3
+  normal: Vec3,
+  mirrored = false
 ): Extract<CadDrawnOn['on'], { partId: string }>['face'] | null {
   const back = [-placement.rotation[0], -placement.rotation[1], -placement.rotation[2], placement.rotation[3]];
   const local = rotateVector(back, [point[0] - placement.position[0], point[1] - placement.position[1], point[2] - placement.position[2]]);
   const facing = rotateVector(back, normal);
+  if (mirrored) {
+    local[0] *= -1;
+    facing[0] *= -1;
+  }
   // A pocket's floor looks the same way as the top, but isn't the face a part would sit on.
   if (facing[2] > 0.99) return Math.abs(local[2] - part.thickness) < 0.5 ? 'top' : null;
   if (facing[2] < -0.99) return Math.abs(local[2]) < 0.5 ? 'underside' : null;

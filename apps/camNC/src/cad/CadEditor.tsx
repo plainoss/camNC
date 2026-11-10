@@ -4565,7 +4565,7 @@ export function CadEditor({
                   : { onCutParts: () => setPartCutting({}) })}
                 onNewPart={newPartOn}
                 selectedPlane={selectedPlane}
-                selectedFace={selectedFace}
+                {...{ selectedFace, pickingMirrorPlane: !!mirrorDialog && !!directionPicker }}
                 onSelectPlane={pickPlane}
                 hoverIds={hoveredStepPart ? [hoveredStepPart] : undefined}
                 picked={

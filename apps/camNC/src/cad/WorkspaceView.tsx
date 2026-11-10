@@ -2,6 +2,7 @@ import {
   activeDesign,
   assemblyReport,
   cadPartReferenceMatches,
+  cadPartReference,
   cadFaceFrame,
   evaluateCadDocument,
   isCadBody,
@@ -63,6 +64,7 @@ export default function WorkspaceView({
   selectedPlane,
   onSelectPlane,
   onSelectFace,
+  pickingMirrorPlane = false,
   onPickPoint,
   picked,
   hoverIds,
@@ -112,6 +114,8 @@ export default function WorkspaceView({
   onSelectPlane?: (plane: string) => void;
   /** The face of the part last clicked, for a sketch started next to be drawn on, as the reference sketches on a selection. */
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
+  /** Mirror accepts a planar face of a physical copy without selecting or opening that part. */
+  pickingMirrorPlane?: boolean;
   /** While set, a click picks the corner or face middle it snaps to, as a mate connector, instead of selecting. */
   onPickPoint?: (pick: {
     partId: string;
@@ -185,12 +189,13 @@ export default function WorkspaceView({
     if (choosing) frame.current?.focus({ preventScroll: true });
   }, [choosing]);
   /** The face of a part a click landed on, as a new part can be drawn on it. */
-  const faceAt = (pick: ModelFacePick) => {
+  const faceAt = (pick: ModelFacePick, copies = false) => {
     const instance = model.instances[pick.index]!;
-    if (instance.copyId) return null;
+    if (instance.copyId && !copies) return null;
     const part = document.parts.find(candidate => candidate.id === instance.partId)!;
-    const face = partFaceAt(part, model.placements.get(instanceKey(instance))!, pick.point, pick.normal);
-    return face ? { part, face } : null;
+    const copy = instance.copyId && part.copies?.find(copy => copy.id === instance.copyId);
+    const face = partFaceAt(part, model.placements.get(instanceKey(instance))!, pick.point, pick.normal, !!copy && !!copy.mirrored);
+    return face ? { part, face, reference: cadPartReference(part.id, instance.copyId) } : null;
   };
   const pickFace = (pick: ModelFacePick) => {
     if (model.instances[pick.index]!.copyId) return setNotice('Draw on the part itself rather than a copy of it.');
@@ -200,6 +205,13 @@ export default function WorkspaceView({
     setChoosing(false);
     setNotice(null);
     onNewPart?.({ partId: part.id, face });
+  };
+  const pickMirrorFace = (pick: ModelFacePick) => {
+    const found = faceAt(pick, true);
+    if (!found) return setNotice('Pick a flat face: a part’s top, its underside, or one of its straight edges.');
+    setNotice(null);
+    lastClick.current = null;
+    onSelectFace?.({ partId: found.reference, face: found.face });
   };
   const selectedIndexes = model.instances.flatMap((instance, index) =>
     (
@@ -311,7 +323,7 @@ export default function WorkspaceView({
         palette={controlled ? 'studio' : undefined}
         highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
-        onPickFace={choosing ? pickFace : undefined}
+        onPickFace={pickingMirrorPlane ? pickMirrorFace : choosing ? pickFace : undefined}
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}

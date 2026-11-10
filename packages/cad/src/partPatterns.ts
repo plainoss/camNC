@@ -1,6 +1,7 @@
 import { newCadId } from './document';
-import { cadDatumFrame } from './datumPlanes';
-import { cadDrawnOnSupports, cadFaceFrame, effectivePlacement } from './drawnOn';
+import { cadMirrorPlaneFrame } from './mirrorPlane';
+import { cadPartReference, cadPartReferenceOwner } from './partReferences';
+import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { mirroredPlacement, turnAbout } from './placement';
 import { cadDirectionVector } from './directions';
 import type { CadDocument, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
@@ -60,12 +61,7 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
             ...copy,
             offset: { position: vector.map(value => value * copy.along!.distance) as [number, number, number], rotation: [0, 0, 0, 1] },
           };
-        // A mirror image sits across its plane from where the part is now.
-        if (copy.mirror) {
-          const frame = copy.mirror.datum ? cadDatumFrame(document, copy.mirror.datum) : cadFaceFrame(document, copy.mirror.across);
-          if (!at || !frame || 'error' in frame) return copy;
-          return { ...copy, mirrored: true, placement: mirroredPlacement(at, frame) };
-        }
+        if (copy.mirror) return copy;
         if (!copy.offset) return copy;
         const { placement: _placement, ...rest } = copy;
         if (!at) return rest;
@@ -82,7 +78,48 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
     if (!copies.length) delete next.copies;
     return next;
   });
-  return changed ? { ...document, parts } : document;
+  // Lay out pattern and transform copies first: a mirror must follow this edit's picked instance, not its old placement.
+  const resolved = new Map<string, CadPartCopy>();
+  const visiting = new Set<string>();
+  const failed = new Set<string>();
+  const resolve = (part: CadPart, copy: CadPartCopy): CadPartCopy | null => {
+    const key = cadPartReference(part.id, copy.id);
+    if (resolved.has(key)) return resolved.get(key)!;
+    // Cyclic copy-face dependencies must not move on each regeneration.
+    if (visiting.has(key) || failed.has(key)) return null;
+    if (!copy.mirror) return copy;
+    visiting.add(key);
+    const on = copy.mirror.across;
+    if ('partId' in on) {
+      const support = cadPartReferenceOwner({ parts }, on.partId);
+      const supportCopy = support?.copies?.find(candidate => cadPartReference(support.id, candidate.id) === on.partId);
+      if (support && supportCopy && !resolve(support, supportCopy)) {
+        failed.add(key);
+        visiting.delete(key);
+        return null;
+      }
+    }
+    const current = {
+      ...document,
+      parts: parts.map(candidate => ({
+        ...candidate,
+        copies: candidate.copies?.map(c => resolved.get(cadPartReference(candidate.id, c.id)) ?? c),
+      })),
+    };
+    const at = effectivePlacement(part, supports);
+    const frame = at && cadMirrorPlaneFrame(current, copy.mirror);
+    const next = frame && !('error' in frame) ? { ...copy, mirrored: true, placement: mirroredPlacement(at!, frame) } : copy;
+    visiting.delete(key);
+    resolved.set(key, next);
+    return next;
+  };
+  const mirrored = parts.map(part => {
+    const copies = part.copies?.map(copy => resolve(part, copy) ?? copy);
+    if (JSON.stringify(copies) === JSON.stringify(part.copies)) return part;
+    changed = true;
+    return { ...part, copies };
+  });
+  return changed ? { ...document, parts: mirrored } : document;
 }
 
 /** Sets a part's pattern, or removes it with `null`, and lays its copies out. */
