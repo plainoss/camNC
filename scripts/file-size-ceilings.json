@@ -10,7 +10,6 @@
     "apps/camNC/src/routes/cam/$jobId.carve.tsx": 1073,
     "packages/cad/src/document.ts": 1086,
     "packages/cad/src/solver.ts": 1101,
-    "packages/cam/src/settle.ts": 1099,
-    "packages/cam/src/toolpaths.ts": 1543
+    "packages/cam/src/settle.ts": 1099
   }
 }
