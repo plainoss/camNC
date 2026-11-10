@@ -1,0 +1,190 @@
+.cad-studio-measure {
+  position: absolute;
+  inset: auto 12px 34px auto;
+  z-index: 6;
+  width: min(18rem, calc(100% - 24px));
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid #b9c4cd;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 4px 18px #24324724;
+  color: #243247;
+  font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
+}
+.cad-studio-measure-full[open] {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - 48px);
+}
+.cad-studio-measure-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 3px 5px 3px 10px;
+  border-bottom: 1px solid #e3e8ef;
+}
+.cad-studio-measure-head h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.cad-editor .cad-studio-measure-head > button:first-child {
+  flex: 1;
+  text-align: start;
+  font-weight: 600;
+}
+.cad-studio-measure-body {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 10px;
+}
+.cad-studio-measure p {
+  margin: 0;
+}
+.cad-studio-measure-selection-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: #52647d;
+}
+.cad-studio-measure-selection {
+  display: grid;
+  gap: 3px;
+  max-height: 8rem;
+  overflow: auto;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid #9cc0e8;
+  border-radius: 3px;
+  background: #eef5fd;
+  list-style: none;
+}
+.cad-studio-measure-selection li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.cad-studio-measure-selection li span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.cad-editor .cad-studio-measure button {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px 5px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.cad-editor .cad-studio-measure button:disabled {
+  cursor: default;
+}
+.cad-editor .cad-studio-measure .cad-studio-measure-icon {
+  flex: none;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+.cad-studio-measure-options {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(6.5rem, 1fr);
+  align-items: center;
+  gap: 5px 8px;
+}
+.cad-studio-measure-options select {
+  min-width: 0;
+  min-height: 26px;
+  border: 1px solid #b9c6d6;
+  border-radius: 3px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.cad-studio-measure-results {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.cad-studio-measure-results > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.cad-studio-measure-results dt {
+  overflow-wrap: anywhere;
+}
+.cad-studio-measure-results dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+.cad-editor .cad-studio-measure-results button {
+  white-space: nowrap;
+}
+.cad-editor .cad-studio-measure-results button[aria-pressed='true'] {
+  border-color: #8eadd0;
+  background: #e5effa;
+}
+.cad-studio-measure-results [data-axis='x'] { color: #9b2828; }
+.cad-studio-measure-results [data-axis='y'] { color: #247032; }
+.cad-studio-measure-results [data-axis='z'] { color: #2558a6; }
+.cad-studio-measure-hint,
+.cad-studio-measure-more,
+.cad-studio-measure-copy-status {
+  color: #52647d;
+  font-size: 11px;
+}
+.cad-studio-measure-copy-status:empty {
+  min-height: 1em;
+}
+.cad-studio-measure-problem {
+  color: #ac2929;
+}
+.cad-studio-measure-quick .cad-studio-measure-results,
+.cad-studio-measure-quick > p {
+  padding: 5px 8px;
+}
+.cad-studio-measure-more {
+  display: block;
+  padding: 0 10px 6px;
+}
+.cad-studio-measure button:focus-visible,
+.cad-studio-measure select:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .cad-editor .cad-studio-measure button:hover {
+    background: #e8eef6;
+  }
+}
+@media (pointer: coarse) {
+  .cad-editor .cad-studio-measure button,
+  .cad-studio-measure-options select {
+    min-height: 32px;
+    min-width: 32px;
+  }
+}
+@media (forced-colors: active) {
+  .cad-studio-measure-results [data-axis] {
+    color: CanvasText;
+  }
+  .cad-editor .cad-studio-measure-results button[aria-pressed='true'] {
+    border-color: Highlight;
+  }
+}

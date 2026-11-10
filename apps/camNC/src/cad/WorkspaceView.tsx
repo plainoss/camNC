@@ -25,6 +25,8 @@ import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
 import type { CadConnectorPick } from './TransformDialog';
 import type { ExtrudeDepthControl } from './extrudeDepth';
+import { useStudioMeasure } from './useStudioMeasure';
+import { StudioMeasurePanel } from './StudioMeasurePanel';
 
 const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
@@ -75,6 +77,7 @@ export default function WorkspaceView({
   viewRequest,
   onViewRequest,
   showPlanes = true,
+  measurementEnabled = true,
   children,
 }: {
   /** The lazy view has mounted; a pending keyboard handoff can now focus it. */
@@ -137,6 +140,8 @@ export default function WorkspaceView({
   viewRequest?: ViewRequest;
   onViewRequest?: (request: Omit<ViewRequest, 'seq'>) => void;
   showPlanes?: boolean;
+  /** Feature selection has priority over read-only geometry inspection. */
+  measurementEnabled?: boolean;
   /** Shown over the view, such as a step's dialog. */
   children?: ReactNode;
 }) {
@@ -185,6 +190,10 @@ export default function WorkspaceView({
   const controlled = choosingProp !== undefined;
   const choosing = controlled ? choosingProp : ownChoosing;
   const setChoosing = (value: boolean) => (controlled ? onChoosingChange?.(value) : setOwnChoosing(value));
+  // A mirror picker owns geometry input even without the editor's broader feature-dialog flag.
+  const measureEnabled =
+    measurementEnabled && view === 'assembled' && !choosing && !pickingMirrorPlane && !onPickPoint && !(onPickRegion && regions?.length);
+  const measure = useStudioMeasure(document, model, frame, measureEnabled);
   const [notice, setNotice] = useState<string | null>(null);
   // Escape stops picking, so the view takes the keyboard while it picks.
   useEffect(() => {
@@ -239,21 +248,23 @@ export default function WorkspaceView({
     : -1;
   const status = notice
     ? notice
-    : onPickPoint
-      ? 'Click an edge, a corner or the middle of a face.'
-      : choosing
-        ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
-        : picked
-          ? `Picked ${picked}: Sketch or Shift+S draws on it.`
-          : clashes.length
-            ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
-            : model.problems.length
-              ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
-              : view === 'flat'
-                ? 'Each part turned so its machined side faces up, the way it lies on the board.'
-                : model.meshes.length
-                  ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
-                  : 'Draw a part to start.';
+    : measure.expanded
+      ? 'Select vertices, straight edges or flat faces to measure. Click a selected item again to remove it.'
+      : onPickPoint
+        ? 'Click an edge, a corner or the middle of a face.'
+        : choosing
+          ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
+          : picked
+            ? `Picked ${picked}: Sketch or Shift+S draws on it.`
+            : clashes.length
+              ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
+              : model.problems.length
+                ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
+                : view === 'flat'
+                  ? 'Each part turned so its machined side faces up, the way it lies on the board.'
+                  : model.meshes.length
+                    ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
+                    : 'Draw a part to start.';
   return (
     <div
       ref={frame}
@@ -284,6 +295,18 @@ export default function WorkspaceView({
             ))}
           </select>
         )}
+        <button
+          type="button"
+          aria-label="Measure"
+          aria-keyshortcuts="["
+          aria-pressed={measure.expanded}
+          disabled={!measurementEnabled || choosing || pickingMirrorPlane || !model.meshes.length}
+          onClick={() => {
+            setView('assembled');
+            measure.open();
+          }}>
+          Measure <kbd>[</kbd>
+        </button>
         {onNewPart && !controlled && (
           <button
             type="button"
@@ -340,20 +363,44 @@ export default function WorkspaceView({
         highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
         onPickFace={pickingMirrorPlane ? pickMirrorFace : choosing ? pickFace : undefined}
+        onMeasurePick={
+          measureEnabled
+            ? pick => {
+                if (pick.additive || measure.expanded) lastClick.current = null;
+                measure.pick(pick);
+              }
+            : undefined
+        }
+        measuring={measure.expanded}
+        measureSelection={measure.selection.map(item => item.entity)}
+        measureWitness={measure.witness}
+        onMissed={measure.clear}
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
-        onPickSketch={onPickSketch}
+        onPickSketch={
+          !measure.expanded && onPickSketch
+            ? id => {
+                measure.clear();
+                lastClick.current = null;
+                onPickSketch(id);
+              }
+            : undefined
+        }
         display={controlled ? display : 'shaded'}
         showOrigin={!!onNewPart && showPlanes && (featureShown?.('origin') ?? true)}
-        regions={[...(regions ?? []), ...sketchRegions]}
+        regions={[...(regions ?? []), ...(measure.expanded ? [] : sketchRegions)]}
         onPickRegion={id => {
           if (sketchRegions.some(region => region.id === id)) {
+            measure.clear();
+            lastClick.current = null;
             const [part, region] = JSON.parse(id) as [string, string];
             onPickSketch?.(part, region);
           } else onPickRegion?.(id);
         }}
         onPickPlane={id => {
+          measure.clear();
+          if (measure.expanded) return;
           // Picked while choosing, the new part is drawn on it; otherwise it's picked for the next sketch, as a face is.
           const plane = pickedPlane(document, id);
           if (choosing && plane) {
@@ -393,6 +440,19 @@ export default function WorkspaceView({
         }}
       />
       <p role="status">{status}</p>
+      {(measure.expanded || measure.selection.length > 0) && (
+        <StudioMeasurePanel
+          selection={measure.selection}
+          result={measure.result}
+          expanded={measure.expanded}
+          selectedRowId={measure.selectedRowId}
+          onExpand={measure.open}
+          onClose={measure.close}
+          onClear={measure.clear}
+          onRemove={measure.remove}
+          onSelectRow={measure.selectRow}
+        />
+      )}
       {children}
     </div>
   );
