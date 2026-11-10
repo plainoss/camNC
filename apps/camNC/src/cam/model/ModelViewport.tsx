@@ -586,6 +586,10 @@ export function ModelViewport({
             : kWood;
   const opacityOf = (mesh: BodyMesh, index: number) =>
     display === 'translucent' || transparentIds?.has(instanceIds?.[index] ?? mesh.partId) ? 0.3 : milled(mesh.partId) ? 1 : 0.35;
+  const sectionCapAt = (index: number, faceIndex: number | null | undefined) => {
+    const range = sectionCaps[index];
+    return !!range && faceIndex != null && faceIndex * 3 >= range.start && faceIndex * 3 < range.start + range.count;
+  };
   const pick = (mesh: BodyMesh, index: number, matrix: THREE.Matrix4, e: ThreeEvent<MouseEvent>) => {
     // A captured depth or section drag must not also select the face beneath its release point.
     if (extrusionDepth?.dragging || sectionControl?.dragging) return;
@@ -611,7 +615,7 @@ export function ModelViewport({
       point: snapToFace(source.positions, point.toArray(), normal),
       surfacePoint: point.toArray(),
       normal,
-      ...(e.faceIndex != null && sectionCaps[index] && e.faceIndex * 3 >= sectionCaps[index]!.start && { sectionCap: true }),
+      ...(sectionCapAt(index, e.faceIndex) && { sectionCap: true }),
       ...(near && { edge: near }),
     };
     if (onPickFace) onPickFace(face);
@@ -657,13 +661,15 @@ export function ModelViewport({
                 onSelect={e => pick(m, i, matrices[i]!, e)}
                 onHover={(hovered, event) => {
                   onHover?.(hovered ? m.partId : null, hovered ? i : undefined);
-              if (pickingConnector) {
-                if (hovered && event?.face) {
-                  const point = event.point.clone().applyMatrix4(matrices[i]!.clone().invert()).toArray();
-                  const normal = event.face.normal.clone().normalize().toArray();
-                  setHoveredConnector({ partId: m.partId, index: i, point: snapToFace(m.positions, point, normal), normal });
-                } else setHoveredConnector(current => (current?.index === i ? null : current));
-              }
+                  if (pickingConnector) {
+                    // The marker must preview the persistent source snap, never a temporary cut face or its bounds.
+                    if (hovered && event?.face && !sectionCapAt(i, event.faceIndex)) {
+                      const point = event.point.clone().applyMatrix4(matrices[i]!.clone().invert()).toArray();
+                      const normal = event.face.normal.clone().normalize().toArray();
+                      const source = sourceMeshes?.[i] ?? m;
+                      setHoveredConnector({ partId: m.partId, index: i, point: snapToFace(source.positions, point, normal), normal });
+                    } else setHoveredConnector(current => (current?.index === i ? null : current));
+                  }
                   if (palette !== 'studio') return;
                   if (!hovered || !event?.face) return setHoveredFace(current => (current?.index === i ? null : current));
                   const point = event.point.clone().applyMatrix4(matrices[i]!.clone().invert()).toArray();

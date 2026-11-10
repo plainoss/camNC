@@ -7,6 +7,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { assemblyModel } from '@/cad/assemblyModel';
 import { sectionModel } from '@/cad/sectionModel';
 import { ModelBody } from './ModelBody';
+import { ModelConnector, type ViewConnector } from './ModelConnector';
 import { ModelViewport } from './ModelViewport';
 
 vi.mock('@react-three/fiber', async importOriginal => ({
@@ -29,6 +30,18 @@ function bodyProps() {
   visit(vi.mocked(Canvas).mock.lastCall![0].children);
   expect(props).toBeDefined();
   return props!;
+}
+function hoveredConnector() {
+  let connector: ViewConnector | undefined;
+  const visit = (children: ReactNode) =>
+    Children.forEach(children, child => {
+      if (!isValidElement<{ children?: ReactNode; connector?: ViewConnector }>(child)) return;
+      if (child.type === ModelConnector && child.props.connector?.label === 'Mate connector under pointer')
+        connector = child.props.connector;
+      else visit(child.props.children);
+    });
+  visit(vi.mocked(Canvas).mock.lastCall![0].children);
+  return connector;
 }
 function setup() {
   const document = createPlateDocument({ width: 100, height: 60, thickness: 18 });
@@ -105,4 +118,28 @@ it('still measures the visible finite cut edge rather than the unclipped source 
     [100, 0, 9],
   ]);
   expect(props.onSelect).not.toHaveBeenCalled();
+});
+
+it('shows a mate marker at the same original face snap that a persistent pick receives', () => {
+  const { props, event, faceIndex } = setup();
+  render(<ModelViewport {...props} pickingConnector />);
+  const hit = event(new Vector3(50, 0, 4.5), new Vector3(0, -1, 0), faceIndex);
+  act(() => bodyProps().onHover(true, hit as unknown as ThreeEvent<PointerEvent>));
+  expect(hoveredConnector()?.point).toEqual([50, 0, 9]);
+  act(() => bodyProps().onSelect(hit));
+  expect(props.onSelect.mock.calls[0]![2].point).toEqual(hoveredConnector()!.point);
+});
+
+it('removes the mate marker when the pointer reaches a temporary cap', () => {
+  const { props, event, faceIndex } = setup();
+  render(<ModelViewport {...props} pickingConnector />);
+  act(() =>
+    bodyProps().onHover(true, event(new Vector3(50, 0, 4.5), new Vector3(0, -1, 0), faceIndex) as unknown as ThreeEvent<PointerEvent>)
+  );
+  expect(hoveredConnector()).toBeDefined();
+  const capIndex = props.sectionCaps[0]!.start / 3;
+  act(() =>
+    bodyProps().onHover(true, event(new Vector3(50, 30, 9), new Vector3(0, 0, 1), capIndex) as unknown as ThreeEvent<PointerEvent>)
+  );
+  expect(hoveredConnector()).toBeUndefined();
 });
