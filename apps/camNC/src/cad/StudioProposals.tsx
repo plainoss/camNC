@@ -9,6 +9,7 @@ import { assistantSelection } from './assistant/selection';
 import { recordAssistantEvent } from './assistant/conversationStore';
 import './assistant/dock.css';
 import { SvgInsert } from './svg/SvgInsert';
+import { useSvgAssetSession } from './svg/useSvgAssetSession';
 
 const AssistantDock = lazy(() => import('./assistant/Dock').then(module => ({ default: module.AssistantDock })));
 
@@ -26,6 +27,7 @@ export function StudioProposals({
   disabled?: boolean;
   onApply: (document: CadDocument) => void;
 }) {
+  useSvgAssetSession(document.id);
   const [assistant, setAssistant] = useState(false);
   const [proposal, setProposal] = useState<CadProposal | null>(null);
   const assistantProposal = useRef<CadProposal | null>(null);
