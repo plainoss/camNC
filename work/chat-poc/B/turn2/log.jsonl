@@ -1,0 +1,10 @@
+{"n":1,"kind":"ok","ms":2294,"errors":[],"warnings":[]}
+{"n":2,"kind":"scriptError","ms":1969}
+{"n":3,"kind":"scriptError","ms":2839}
+{"n":4,"kind":"checkFailed","ms":2867,"errors":["parts-collide","parts-collide"],"warnings":["part-cut-unresolved"]}
+{"n":5,"kind":"scriptError","ms":3039,"errors":[],"warnings":[]}
+{"n":6,"kind":"scriptError","ms":2742,"errors":[],"warnings":[]}
+{"n":7,"kind":"scriptError","ms":2009}
+{"n":8,"kind":"checkFailed","ms":1794,"errors":["cut-through-edge","cut-region-missing"],"warnings":["close-straight","close-straight"]}
+{"n":9,"kind":"checkFailed","ms":1820,"errors":["cut-through-edge","cut-region-missing"],"warnings":["close-straight","close-straight"]}
+{"n":10,"kind":"ok","ms":2150,"errors":[],"warnings":["part-cut-unresolved"]}

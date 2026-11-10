@@ -1,0 +1,5 @@
+{"n":1,"kind":"scriptError","ms":5797,"errors":[],"warnings":[]}
+{"n":2,"kind":"scriptError","ms":4649,"errors":[],"warnings":[]}
+{"n":3,"kind":"ok","ms":5998,"errors":[],"warnings":[]}
+{"n":4,"kind":"checkFailed","ms":2679,"errors":["empty-sketch"],"warnings":["part-cut-unresolved"]}
+{"n":5,"kind":"ok","ms":6414,"errors":[],"warnings":[]}
