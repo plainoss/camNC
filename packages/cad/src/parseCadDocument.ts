@@ -7,6 +7,9 @@ import { validPartCutSplit } from './partCutSplit';
 import type { CadDirection, CadDocument, CadPart, CadPlacement, CadSketch } from './types';
 import { splineHandleIssue, withSplineHandleSegments } from './splineHandles';
 import { constraintEntityIds, entityPointIds } from './entityReferences';
+import { cadFolderIssue, cadFolderStepIssue } from './folderModel';
+import { designSteps } from './designSteps';
+import { cadDocumentVersion } from './documentVersion';
 import { validCircularPartPattern } from './circularPartPattern';
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
@@ -15,14 +18,16 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
   if (
-    (d.version !== 1 && d.version !== 2) ||
+    (d.version !== 1 && d.version !== 2 && d.version !== 3) ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
     !Number.isSafeInteger(d.revision) ||
     d.revision < 0 ||
     !Array.isArray(d.parts) ||
-    (d.version === 2 && !d.parts.some(p => p?.features?.length))
+    (d.version === 2 && !d.parts.some(p => p?.features?.length)) ||
+    (d.version !== 3 && d.folders !== undefined) ||
+    (d.version === 3 && cadDocumentVersion(d) !== 3)
   )
     throw new Error('Invalid CAD document');
   const ids = new Set<string>([d.id]);
@@ -131,6 +136,13 @@ export function parseCadDocument(input: unknown): CadDocument {
       }
     }
     if (p.pattern !== undefined) {
+      if (
+        p.pattern?.excluded !== undefined &&
+        (!Array.isArray(p.pattern.excluded) ||
+          p.pattern.excluded.some(index => !Number.isInteger(index) || index < 1 || index >= 200) ||
+          new Set(p.pattern.excluded).size !== p.pattern.excluded.length)
+      )
+        throw new Error('Invalid CAD pattern exclusions');
       if (p.pattern?.circular !== undefined && !validCircularPartPattern(p.pattern.circular))
         throw new Error('Invalid CAD circular part pattern');
       if (p.pattern?.direction !== undefined) checkDirection(p.pattern.direction);
@@ -180,6 +192,10 @@ export function parseCadDocument(input: unknown): CadDocument {
     for (const f of p.features ?? []) {
       if (!f || typeof f !== 'object') throw new Error('Invalid CAD feature');
       addId(f.id);
+      if (f.copyId !== undefined) {
+        reference(f.copyId);
+        if (d.version !== 3) throw new Error('Copy features require CAD document version 3');
+      }
       if (f.type === 'sketch') {
         if (!f.sketch || typeof f.sketch !== 'object' || !Array.isArray(f.sketch.entities) || !Array.isArray(f.sketch.constraints))
           throw new Error('Invalid CAD feature');
@@ -452,6 +468,10 @@ export function parseCadDocument(input: unknown): CadDocument {
       }
     }
   }
+  const folderIssue = cadFolderIssue(d) || cadFolderStepIssue(d, designSteps(d));
+  if (folderIssue) throw new Error(folderIssue);
+  if (d.version < cadDocumentVersion(d)) throw new Error('These CAD source settings require document version 3');
+  for (const folder of d.folders ?? []) addId(folder.id);
   const parsed = structuredClone(d);
   for (const part of parsed.parts) {
     part.sketch = withSplineHandleSegments(part.sketch);

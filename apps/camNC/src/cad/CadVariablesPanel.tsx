@@ -124,10 +124,18 @@ function VariableRow({
 }
 
 /** The design's named values. Type a name into any dimension or thickness to use one; changing it here updates them all. */
-export function CadVariablesPanel({ document, onChange }: { document: CadDocument; onChange: (next: CadDocument) => void }) {
+export function CadVariablesPanel({
+  document,
+  onChange,
+  folderId,
+}: {
+  document: CadDocument;
+  onChange: (next: CadDocument) => void;
+  folderId?: string;
+}) {
   const [adding, setAdding] = useState(false);
   const { scope, errors } = cadVariableValues(document);
-  const variables = document.variables ?? [];
+  const variables = (document.variables ?? []).filter(variable => variable.folderId === folderId);
   const apply = (result: { document: CadDocument } | { error: string }) => {
     if ('error' in result) return result.error;
     onChange(result.document);
@@ -158,7 +166,7 @@ export function CadVariablesPanel({ document, onChange }: { document: CadDocumen
         ))}
         {adding && (
           <VariableRow
-            onSave={(name, expression) => apply(setCadVariable(document, { name, expression }))}
+            onSave={(name, expression) => apply(setCadVariable(document, { name, expression, folderId }))}
             onDone={() => setAdding(false)}
           />
         )}

@@ -4,7 +4,9 @@ import { createPlateDocument } from './document';
 import { withCadLengthUnit } from './lengthUnits';
 import { parseCadDocument } from './parseCadDocument';
 import { parseCadValue } from './valueExpressions';
-import { cadVariableScope } from './variables';
+import { cadVariableScope, setCadVariable } from './variables';
+import { createCadFolder, cadFolderIssue } from './folders';
+import { validateCadDocument } from './geometry';
 
 describe('design length units', () => {
   it.each([
@@ -77,4 +79,27 @@ it('preserves expressions outside a face editor when it changes the whole design
   expect(parseCadValue(merged.parts[0]!.thicknessExpression!, { variables: cadVariableScope(merged), lengthUnit: 'cm' })).toMatchObject({
     value: 18,
   });
+});
+
+it('keeps folder variables valid in a face editor and preserves their source membership on save', () => {
+  const base = createPlateDocument();
+  const partId = base.parts[0]!.id;
+  const grouped = createCadFolder(base, { id: 'cupboard', name: 'Cupboard', partIds: [partId] });
+  if ('error' in grouped) throw new Error(grouped.error);
+  const variable = setCadVariable(grouped.document, { name: 'stock', expression: '18 mm', folderId: grouped.id });
+  if ('error' in variable) throw new Error(variable.error);
+  const added = addFaceSketch(variable.document, partId, 'top');
+  const face = faceSketchDocument(added.document, partId, added.sketchId);
+  expect(cadFolderIssue(face)).toBeNull();
+  expect(validateCadDocument(face).filter(d => d.code === 'invalid-folder' || d.code === 'invalid-document')).toEqual([]);
+  expect(parseCadDocument(JSON.parse(JSON.stringify(face))).variables).toEqual(variable.document.variables);
+  const changed = setCadVariable(face, { id: variable.id, name: 'stock', expression: '21 mm' });
+  if ('error' in changed) throw new Error(changed.error);
+  const edited = withCadLengthUnit(changed.document, 'cm');
+  const merged = withFaceSketchDocument(added.document, partId, added.sketchId, edited);
+  expect(merged.folders).toEqual(added.document.folders);
+  expect(merged.variables).toEqual([{ id: variable.id, name: 'stock', expression: '21 mm', folderId: grouped.id }]);
+  expect(merged.lengthUnit).toBe('cm');
+  expect(cadFolderIssue(merged)).toBeNull();
+  expect(parseCadDocument(JSON.parse(JSON.stringify(merged)))).toEqual(merged);
 });

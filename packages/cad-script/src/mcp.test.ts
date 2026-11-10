@@ -33,7 +33,13 @@ const texts = (result: Awaited<ReturnType<Client['callTool']>>) =>
 
 it('offers the guide, the examples and the check', async () => {
   const { tools } = await client.listTools();
-  expect(tools.map(tool => tool.name).sort()).toEqual(['cad_script_example', 'cad_script_guide', 'check_design', 'read_design']);
+  expect(tools.map(tool => tool.name).sort()).toEqual([
+    'cad_script_example',
+    'cad_script_guide',
+    'check_design',
+    'insert_cupboard',
+    'read_design',
+  ]);
   const [guide] = texts(await client.callTool({ name: 'cad_script_guide', arguments: {} }));
   expect(guide).toContain('d.cutParts');
   expect(guide).toMatch(/Examples, readable with cad_script_example: .*cupboard/);
@@ -84,3 +90,42 @@ it('refuses a name that would reach outside its folder', async () => {
   const result = await client.callTool({ name: 'read_design', arguments: { name: '../secrets' } });
   expect(result.isError).toBe(true);
 });
+
+it('inserts two independent cupboards through the same builder as the studio', async () => {
+  const first = await client.callTool({ name: 'insert_cupboard', arguments: { name: 'first-cupboard', width: 600, shelves: 3 } });
+  expect(first.isError).toBe(false);
+  const original = await readFile(path.join(dir, 'first-cupboard.json'), 'utf8');
+  const second = await client.callTool({
+    name: 'insert_cupboard',
+    arguments: { name: 'two-cupboards', from: 'first-cupboard', width: 400, shelves: 2 },
+  });
+  expect(second.isError).toBe(false);
+  const start = JSON.parse(original),
+    inserted = JSON.parse(await readFile(path.join(dir, 'two-cupboards.json'), 'utf8'));
+  expect(inserted.folders).toHaveLength(2);
+  expect(inserted.parts.slice(0, start.parts.length)).toEqual(start.parts);
+  expect(
+    inserted.variables
+      .filter((variable: { name: string }) => /^width(?:_\d+)?$/.test(variable.name))
+      .map((variable: { expression: string }) => variable.expression)
+  ).toEqual(['600mm', '400mm']);
+  expect(await readFile(path.join(dir, 'first-cupboard.json'), 'utf8')).toBe(original);
+  await expect(access(path.join(dir, 'two-cupboards.cad.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(JSON.parse(texts(second)[0]!).ok).toBe(true);
+  const refused = await client.callTool({ name: 'insert_cupboard', arguments: { name: 'not-written', from: '../private' } });
+  expect(refused.isError).toBe(true);
+  await expect(access(path.join(dir, 'not-written.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+}, 120_000);
+
+it('returns requested evaluated views as SVG resources, not just files hidden from the model', async () => {
+  const source = await readFile(path.join(packageDir, 'examples/plate.cad.ts'), 'utf8');
+  const output = await client.callTool({ name: 'check_design', arguments: { name: 'viewed-plate', source, views: true } });
+  expect(output.isError).toBe(false);
+  const drawings = (output.content as { type: string; resource?: { mimeType: string; text: string; uri: string } }[]).filter(
+    item => item.type === 'resource'
+  );
+  expect(drawings).toHaveLength(3);
+  expect(
+    drawings.every(drawing => drawing.resource?.mimeType === 'image/svg+xml' && drawing.resource.text.includes('class="outline"'))
+  ).toBe(true);
+}, 60_000);

@@ -444,6 +444,8 @@ export interface CadPartPattern {
   /** mm from one to the next; a negative spacing goes the other way. */
   spacing: number;
   spacingExpression?: string;
+  /** Detached logical positions, numbered from one after the source; they stay skipped through count edits. */
+  excluded?: number[];
   /** Turns copies about a line in assembly space instead of spacing them in a row. */
   circular?: CadCircularPartPattern;
 }
@@ -465,6 +467,8 @@ export interface CadFaceSketch {
   id: string;
   on: CadFaceRef;
   sketch: CadSketch;
+  /** This copy only, in the source part's local coordinates. Kept while a pattern's count leaves the copy absent. */
+  copyId?: string;
   /** The Extrude → Remove step whose sketch this is, kept in step with it by the design. It's never edited here. */
   removedBy?: string;
 }
@@ -476,6 +480,7 @@ export interface CadCut {
   /** The part's profile sketch or a face sketch. */
   sketchId: string;
   regionId: string;
+  copyId?: string;
   depth: CadCutDepth;
   /** The depth as typed, kept when it uses design variables so the cut follows them. */
   depthExpression?: string;
@@ -490,8 +495,8 @@ export type CadLengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
-  /** 2 when any part has features, so builds that don't know them refuse the file. */
-  version: 1 | 2;
+  /** 2 for face features, 3 for folders, so older builds refuse instead of losing source settings. */
+  version: 1 | 2 | 3;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */
@@ -502,7 +507,20 @@ export interface CadDocument {
   partCuts?: CadPartCut[];
   /** Planes made to sketch on: a base plane or a part's face, moved out along its normal. */
   planes?: CadDatumPlane[];
+  /** Named groups over neighbouring source steps. They never replace or regenerate their contents. */
+  folders?: CadFolder[];
   parts: CadPart[];
+}
+export interface CadFolder {
+  id: string;
+  name: string;
+  /** Whole parts in source order, including their own sketches, features and copies. */
+  partIds: string[];
+  partCutIds?: string[];
+  planeIds?: string[];
+  collapsed?: true;
+  /** A mask over the contents, independent of every step's own suppression flag. */
+  suppressed?: true;
 }
 /** A plane offset from a base plane or a part's face, as a step of its own, to draw parts on. */
 export interface CadDatumPlane {
@@ -540,6 +558,8 @@ export interface CadVariable {
   id: string;
   name: string;
   expression: string;
+  /** Association only: variable names remain unique across the entire document. */
+  folderId?: string;
 }
 
 export interface CadDiagnostic {
@@ -570,6 +590,8 @@ export interface EvaluatedCadPart {
   cuts?: EvaluatedCadCut[];
   /** Complete cut sets for copies that differ, in the original's sketch frame before mirroring. Missing copies use `cuts`. */
   copyCuts?: Record<string, EvaluatedCadCut[]>;
+  /** A copy can fill a profile hole with No cut, or turn it into a pocket. Evaluated material only, never saved source. */
+  copyProfiles?: Record<string, Pick<EvaluatedCadPart, 'outline' | 'holes' | 'loops'>>;
 }
 export interface EvaluatedCadCut {
   id: string;

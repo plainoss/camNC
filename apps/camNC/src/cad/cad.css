@@ -748,16 +748,43 @@
 }
 @container cad-editor (max-width: 600px) {
   .cad-toolbar {
-    /* Keep both modes the same height so entering a sketch does not move the view. */
-    flex-wrap: wrap;
+    /* Fixed rows keep studio actions from wrapping to a third row and moving the sketch camera. */
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-rows: 32px 32px;
     height: auto;
     flex-basis: auto;
   }
   .cad-toolbar > .cad-drawing-tools {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
+    grid-row: 1;
   }
   .cad-toolbar > .cad-search-trigger {
+    grid-column: 1;
+    grid-row: 2;
     margin-left: 0;
+    /* Leave room for the same two toolbar rows in studio and sketch modes. */
+    font-size: 0;
+    min-width: 32px;
+    height: 32px;
+    padding: 4px;
+    line-height: 22px;
+  }
+  .cad-toolbar > .cad-search-trigger::before {
+    content: '⌕';
+    font-size: 20px;
+  }
+  .cad-toolbar > .cad-search-trigger kbd { display: none; }
+  .cad-toolbar > .cad-session-actions {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    margin-left: 0;
+    gap: 0;
+  }
+  .cad-session-actions .cad-insert-menu summary {
+    font-size: 11px;
+    padding-inline: 6px;
   }
 }
 .cad-constraint-list {

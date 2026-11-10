@@ -17,9 +17,9 @@ of this adds a second source of truth.
   the key that identifies a physical sheet, so rerunning a script over a job would mark
   its sheets out of date. The in-app chat below edits the open design instead, and
   keeps the IDs of the parts it doesn't touch.
-- **No live editing yet.** The editor reads its document once and takes no outside
-  changes, and designs live in the browser's IndexedDB, where no server can reach them.
-  Step 7 below changes this.
+- **Outside edits use the session's guarded proposal entry.** A candidate for the
+  open design is previewed and committed as one undo step. A newer local edit or
+  source conflict refuses it. Designs remain in the browser's IndexedDB.
 - **The chat runs in the browser with the user's own key.** It calls the provider
   directly, so no camNC server sees the key or the design.
 - **Only the user applies a change.** The model works on a copy and offers the
@@ -49,6 +49,14 @@ An assistant in a dock on the right of the Part Studio. The model reads the open
 design, writes a script, checks it on a copy and repairs it, then offers it or asks
 a question. The user sees a preview and applies it as one undo step.
 
+Building a whole piece from a sentence is a first-class request, alongside editing:
+“build a stool” or “build a shelf that looks like this”. The reference can be a short
+description or an attached picture. A new piece arrives in its own named folder
+beside the existing design, using the folder scope of roadmap PRs 20 and 24.
+When the request leaves sizes or joints open, the assistant asks for them or states
+its proposed choices before building. Visual requests need the cut-aware drawings
+of step 14 before the dock ships: dimensions and bounding boxes cannot judge a look.
+
 The model uses the tools the MCP server already has: the guide, the examples and the
 check. `editCad` already runs a script against a copy and leaves the design as it was
 when the script fails, so the model sends its whole script again on each try and
@@ -60,7 +68,7 @@ step 9 and the comparison in step 8 come from it, and the views moved to the end
 
 ```
 Shared:  7 → 8
-Chat:    9 → 10 → 11 → 12 (needs 7 and 8) → 13 → 14
+Chat:    9 → 13 → 10 → 11 → 14 → 12 (needs 7 and 8)
 ```
 
 7. **Apply an outside document.** The open design takes a whole new document as one
@@ -95,9 +103,9 @@ Chat:    9 → 10 → 11 → 12 (needs 7 and 8) → 13 → 14
 11. **Connect a provider.** A key store of its own, which is never synced and never
     part of a settings backup. Two adapters: Anthropic, and OpenAI-compatible with an
     address that can be changed, which covers OpenAI, OpenRouter and most others. Each
-    model says whether it can call tools, which the chat needs. **Done when:** the key
+    model says whether it can call tools, which the chat needs, and whether it can read images. Browser support for each provider is verified against its current documentation. **Done when:** the key
     appears in no synced setting, backup or log.
-12. **The assistant dock.** Messages, the selection as context, Stop, and a short log
+12. **The assistant dock.** Messages with image attachments, the selection as context, Stop, and a short log
     of what the model did ("floor 10 mm, wanted 12; made the pocket shallower"). The
     model ends a turn with a proposal or with a question, when the request and the
     design don't fit or the request can be read two ways. A proposal card lists what
@@ -109,13 +117,13 @@ Chat:    9 → 10 → 11 → 12 (needs 7 and 8) → 13 → 14
     hand edit made while the model works turns Apply off.
 13. **Saved tasks.** Modelling tasks with their outcomes stated independently, run
     through the same loop without a browser, to compare models and to measure again
-    after each API change. The nine requests of the simulated chat are the first.
+    after each API change. The nine requests of the simulated chat are the first. Include a stool, a shelf from a short description of its look, and a shelf from a picture, each with independently stated outcomes and human visual acceptance.
 14. **Views in the report.** Top, front and right drawings of the boards as placed,
     with their cuts, and a section through a named cut, as SVG from the evaluated
     geometry. They are made in `cad-script`, so the command line and the MCP server
     get them too, and the browser turns them into images for models that read
     images. In the simulated chat, views of the boards as boxes caught no mistake the
-    numbers hadn't, so this waits for a saved task that needs it.
+    numbers hadn't. Views with actual cuts and outlines precede step 12 for visual requests; box-only views do not satisfy that requirement.
 
 ### With cupboards as folders
 

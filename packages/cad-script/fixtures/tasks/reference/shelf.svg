@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="820" viewBox="0 0 620 820">
+  <rect width="620" height="820" fill="white"/>
+  <g transform="translate(100 80)" fill="#d7b889" stroke="#493a29" stroke-width="2">
+    <rect x="0" y="0" width="12" height="560"/><rect x="408" y="0" width="12" height="560"/>
+    <rect x="6" y="94" width="408" height="12"/><rect x="6" y="274" width="408" height="12"/><rect x="6" y="454" width="408" height="12"/>
+  </g>
+  <g fill="#222" font-family="sans-serif" font-size="20" text-anchor="middle">
+    <text x="310" y="45">Open shelf — front view</text>
+    <text x="310" y="685">600 mm wide × 800 mm tall</text>
+    <text x="310" y="720">220 mm deep · 18 mm plywood</text>
+    <text x="310" y="755">Three shelves · housed joints · open back</text>
+  </g>
+</svg>

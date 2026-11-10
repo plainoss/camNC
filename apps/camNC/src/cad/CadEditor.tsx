@@ -1,4 +1,3 @@
-import type { CadEditorController } from './editorController';
 import { DesignUnitContext, useDesignUnits } from './designUnits';
 import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
 import { previewSlot } from './slotPreview';
@@ -112,7 +111,6 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
-  type Ref,
 } from 'react';
 import { prepareDimensionCreation, solveCadDocument } from './solveCad';
 import { acquireCadKeyboard } from '@wbcnc/cad-editor/keyboardOwnership';
@@ -126,7 +124,6 @@ import {
   redoCadSession,
   undoCadSession,
   type CadCommandCheckpoint,
-  type CadSession,
 } from '@wbcnc/cad-editor/session';
 import { DimensionGraphics } from './DimensionGraphics';
 import {
@@ -250,19 +247,24 @@ import {
   withoutExtrude,
 } from './editorHelpers';
 import { useFeaturePreview } from './useFeaturePreview';
-import { FeatureList, type FeatureAction, type FeatureEntry } from './FeatureList';
+import type { FeatureAction, FeatureEntry } from './FeatureList';
+import { StudioFeatureList } from './StudioFeatureList';
+import { detachStudioCopy } from './detachStudioCopy';
+import { StudioProposals } from './StudioProposals';
+import type { CadEditorProps } from './CadEditor.types';
+export type { CadEditorController, CadEditorProps } from './CadEditor.types';
+import { trimCadFolders } from '@wbcnc/cad';
 import { HoleDialog } from './HoleDialog';
 import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
-import { reorderedSteps } from './reorderSteps';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnedBy, type SketchTurn } from './sketchOrbit';
-import { captureSketchCamera, carriedSketchCamera, type StudioCameraRef, type StudioCameraState } from './studioCamera';
+import { captureSketchCamera, carriedSketchCamera, type StudioCameraState } from './studioCamera';
 import { sketchBackdropView } from './sketchBackdropView';
-import { initialFaceSketchView, assemblyCameraFromPart, type FaceSketchScene } from './faceSketchScene';
+import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
 import { fitSketchView, pointsOf } from './fitSketchView';
 import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions } from './sketchViewport';
@@ -292,29 +294,6 @@ const FaceSketchBackdrop = lazy(() => import('./FaceSketchBackdrop'));
 const PartView3D = lazy(() => import('./PartView3D'));
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
 const SketchBackdrop = lazy(() => import('./SketchBackdrop'));
-
-export type { CadEditorController } from './editorController';
-
-export interface CadEditorProps {
-  document: CadDocument;
-  /** Join the route session without acknowledging a remount as a durable save. */
-  editSession?: CadSession;
-  onDraftChange: (document: CadDocument) => void;
-  onFinish: (document: CadDocument) => void | Promise<void>;
-  onCancel: () => void | Promise<void>;
-  onFinishBlocked?: (reason: string) => void;
-  saveStatus?: string;
-  notice?: string | null;
-  preferredPartId?: string;
-  controller?: Ref<CadEditorController>;
-  /** Hosts that can open a face sketch offer drawing on the part's top face. */
-  onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string, scene?: FaceSketchScene) => void;
-  partCameraState?: StudioCameraRef;
-  /** Editing one face sketch, with the part's outline shown behind it. It can be open, and it isn't a profile. */
-  faceSketch?: { outline: CadPoint[]; floor?: CadPoint[]; label: string; below?: boolean; scene?: FaceSketchScene };
-  /** Open in 3D, when there's an outline to show: the whole design, or with `'part'` the selected part on its own. */
-  startIn3D?: boolean | 'part';
-}
 
 /** Native editable source stays in one document while CAM remains a derived consumer of accepted revisions. */
 export function CadEditor({
@@ -911,7 +890,7 @@ export function CadEditor({
     callbacks.current.onDraftChange(next);
   };
   // What extrudes make of each other's sketches and parts follows each change straight away, as the solver keeps it.
-  const commit = (next: CadDocument) => publish(commitCadSession(session, resolveExtrudeSteps(next)));
+  const commit = (next: CadDocument) => publish(commitCadSession(session, resolveExtrudeSteps(trimCadFolders(next))));
   const changeSketch = (next: CadSketch) => part && commit(replacePart(documentRef.current, part.id, p => ({ ...p, sketch: next })));
 
   const solveDrag = async (moving: DragGesture) => {
@@ -3744,7 +3723,7 @@ export function CadEditor({
       }
       setChoosingFace(!choosingFace);
     } else if (command === 'transform') {
-      if (part) openTransform(part.id);
+      if (part) cutSelection.transformPart(openTransform, setStudioRefusal);
     } else if (command === 'variable') {
       setFeatureDialog(null);
       setPartCutting(null);
@@ -3798,6 +3777,7 @@ export function CadEditor({
   };
   const faceEditor = faceSketchHost({
     part,
+    copyId: cutSelection.selectedCopyId,
     prepare: prepareDocument,
     commit,
     read: () => documentRef.current,
@@ -3948,6 +3928,14 @@ export function CadEditor({
         )}
       </div>
       <PartsList
+        folders={doc.folders}
+        onSketchCopy={onEditFaceSketch && ((partId, copyId, face) => faceEditor.create(face, undefined, { partId, copyId }))}
+        onDetachCopy={(partId, copyId) => {
+          const result = detachStudioCopy(documentRef.current, partId, copyId);
+          if ('error' in result) return setStudioRefusal(result.error);
+          commit(result.document);
+          setPartId(result.partId);
+        }}
         hidden={!!faceSketch}
         studio={studioSession}
         rows={(studioSession ? builtParts : doc.parts).flatMap(p => [
@@ -4042,8 +4030,16 @@ export function CadEditor({
           onUndo={() => navigateHistory()}
           onRedo={() => navigateHistory(true)}
           onCancel={() => void cancel()}
-          onFinish={() => void finish()}
-        />
+          onFinish={() => void finish()}>
+          <StudioProposals
+            key={doc.id}
+            document={doc}
+            session={session}
+            selection={part && { partId: part.id, copyId: cutSelection.selectedCopyId }}
+            disabled={busy || !!rollbackStep || stepDialogOpen || !!filletDialog}
+            onApply={publish}
+          />
+        </StudioToolbar>
       ) : (
         <SketchToolbar
           tools={tools}
@@ -4085,7 +4081,11 @@ export function CadEditor({
             </div>
           )}
           {studioSession && (
-            <FeatureList
+            <StudioFeatureList
+              currentDocument={documentRef}
+              commit={commit}
+              onRefusal={setStudioRefusal}
+              workspace={showWorkspace}
               document={doc}
               selectedPartId={part?.id ?? null}
               onSelect={entry => {
@@ -4099,28 +4099,7 @@ export function CadEditor({
               onAction={featureAction}
               rollback={rollbackStep}
               onRollTo={showWorkspace ? setRolledTo : undefined}
-              onReorder={
-                showWorkspace
-                  ? (stepId, beforeId) => {
-                      const steps = designSteps(documentRef.current);
-                      const dragged = steps.find(step => step.id === stepId),
-                        target = steps.find(step => step.id === beforeId);
-                      if (!dragged || !target) return;
-                      const result = reorderedSteps(documentRef.current, dragged, target);
-                      if ('error' in result) return setStudioRefusal(result.error);
-                      setStudioRefusal(null);
-                      commit(result.document);
-                    }
-                  : undefined
-              }
               onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
-              onRename={(step, name) =>
-                commit(
-                  replacePart(documentRef.current, step.partId, p =>
-                    step.kind === 'extrude' ? { ...p, extrudeName: name } : { ...p, sketchName: name }
-                  )
-                )
-              }
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane, onNewSketch: newSketchOn })}
               shown={featureShown}
               onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}

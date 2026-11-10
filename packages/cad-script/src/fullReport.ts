@@ -23,6 +23,8 @@ import {
 } from '@wbcnc/cad';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, nestRects, planBoard, profileFeatures, type BoardRequest } from '@wbcnc/cam';
 import { inspectCadDocument, planSummary, shortHandles, type CadReport, type CadReportPart } from './inspect';
+import { renderCadViews, type CadDrawing } from './views/render';
+import { renderCadSection, type CadSectionDrawing, type CadSectionRequest } from './views/section';
 
 /** Numbers in the report are rounded to this many decimals, so float noise never changes it. */
 const kDecimals = 3;
@@ -126,6 +128,9 @@ export interface CadFullReport {
   boards: CadFullBoard[];
   /** Pieces CAM can't take, with why. */
   unplanned?: { name: string; problem: string }[];
+  /** Optional evaluated geometry drawings, shared by the CLI, MCP and browser assistant. */
+  views?: CadDrawing[];
+  section?: CadSectionDrawing;
 }
 
 const kAxes: [string, number[]][] = [
@@ -299,7 +304,8 @@ function sketchKey(part: CadPart, ref: string) {
 export async function fullCadReport(
   input: CadDocument,
   /** The check of `input`, when it's been made already, so it isn't solved and planned twice, with why its script stopped, if it did. */
-  inspected?: { document: CadDocument; report: CadReport; parts: EvaluatedCadPart[]; scriptError?: string }
+  inspected?: { document: CadDocument; report: CadReport; parts: EvaluatedCadPart[]; scriptError?: string },
+  drawings: { views?: boolean; section?: CadSectionRequest } = {}
 ): Promise<CadFullReport> {
   const { document, report, parts } = inspected ?? (await inspectCadDocument(input));
   const byId = new Map(document.parts.map(part => [part.id, part]));
@@ -620,5 +626,7 @@ export async function fullCadReport(
     ...(report.assembly && { assembly: report.assembly }),
     boards,
     ...(unplanned.length && { unplanned }),
+    ...(drawings.views && { views: renderCadViews(document, parts) }),
+    ...(drawings.section && { section: renderCadSection(document, parts, drawings.section) }),
   };
 }
