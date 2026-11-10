@@ -37,7 +37,7 @@ import { BoardInspector } from '@/cam/boards/BoardInspector';
 import { HoldSizesDialog } from '@/cam/boards/HoldSizesDialog';
 import { HoldTools } from '@/cam/boards/HoldTools';
 import { LayoutPanel } from '@/cam/boards/LayoutPanel';
-import { applySetupToAll, prepareGlobalRelayout } from '@/cam/boards/globalSetup';
+import { applySetupToAll, prepareGlobalRelayout, restorePhysicalBoardSetup } from '@/cam/boards/globalSetup';
 import { useHoldEditing } from '@/cam/boards/useHoldEditing';
 import type { PartMenuProps } from '@/cam/boards/PartMenu';
 import type { JobBoard } from '@/cam/useJobBoards';
@@ -486,7 +486,7 @@ function BoardsEditor({
       machine,
       kept.map(b => b.name)
     );
-    res.boards = [...kept, ...res.boards];
+    res.boards = restorePhysicalBoardSetup([...kept, ...res.boards], before);
     saveBoards(res.boards);
     const names = (ids: string[]) => ids.map(id => byId.get(id)?.name ?? id).join(', ');
     const returned = before

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardNest, BoardV1 } from '../boards';
 import type { JobBoard } from '../useJobBoards';
-import { applySetupToAll, prepareGlobalRelayout, setupDiffers, setupSummary, withBoardSetup } from './globalSetup';
+import {
+  applySetupToAll,
+  prepareGlobalRelayout,
+  restorePhysicalBoardSetup,
+  setupDiffers,
+  setupSummary,
+  withBoardSetup,
+} from './globalSetup';
 
 const baseBoard = (id: string, name: string): BoardV1 => ({
   id,
@@ -104,8 +111,29 @@ describe('globalSetup', () => {
     expect(free).toHaveLength(3);
     expect(free[1].margin).toBe(1);
     expect(free[1].gap).toBe(4);
-    // Deduplicated fixed-size sheet
+    // Deduplicated fixed-size sheet with exact quantity count (2 matching boards)
     expect(effectiveStock).toHaveLength(1);
-    expect(effectiveStock[0]).toMatchObject({ thickness: 8, w: 600, h: 145 });
+    expect(effectiveStock[0]).toMatchObject({ thickness: 8, w: 600, h: 145, quantity: 2 });
+  });
+
+  it('restores physical board identity, fixtures, and measured thickness on re-laid out boards', () => {
+    const origB = {
+      ...baseBoard('b', 'B'),
+      size: { fit: false as const, w: 600, h: 145 },
+      measuredThickness: 8.4,
+      fixtures: [{ kind: 'screw' as const, x: 50, y: 50 }],
+    };
+    const freshB = {
+      ...baseBoard('fresh-b', 'New Board'),
+      size: { fit: false as const, w: 600, h: 145 },
+      items: ['p1'],
+    };
+
+    const restored = restorePhysicalBoardSetup([freshB], [origB]);
+    expect(restored[0].id).toBe('b');
+    expect(restored[0].name).toBe('B');
+    expect(restored[0].measuredThickness).toBe(8.4);
+    expect(restored[0].fixtures).toEqual([{ kind: 'screw', x: 50, y: 50 }]);
+    expect(restored[0].items).toEqual(['p1']);
   });
 });

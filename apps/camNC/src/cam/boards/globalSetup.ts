@@ -62,7 +62,7 @@ export function applySetupToAll(
 
 /**
  * Applies `from`'s spacing and holding settings to every uncut board, unpins their parts, and returns the stock list to
- * pack them onto (using fixed-size uncut boards as sheets for thicknesses that have no stock list entry).
+ * pack them onto (using fixed-size uncut boards as sheets for thicknesses that have no stock list entry, with exact quantities).
  */
 export function prepareGlobalRelayout(
   boards: JobBoard[],
@@ -78,8 +78,44 @@ export function prepareGlobalRelayout(
   for (const { board, nest } of boards) {
     const t = +board.thickness.toFixed(1);
     if (isCut(board) || byThickness.has(t) || board.size.fit) continue;
-    if (effectiveStock.some(s => +s.thickness.toFixed(1) === t && s.w === nest.board.w && s.h === nest.board.h)) continue;
-    effectiveStock.push({ id: `sheet-${board.id}`, thickness: t, w: nest.board.w, h: nest.board.h });
+    const existing = effectiveStock.find(s => +s.thickness.toFixed(1) === t && s.w === nest.board.w && s.h === nest.board.h);
+    if (existing) {
+      existing.quantity = (existing.quantity ?? 1) + 1;
+    } else {
+      effectiveStock.push({ id: `sheet-${board.id}`, thickness: t, w: nest.board.w, h: nest.board.h, quantity: 1 });
+    }
   }
   return { free, effectiveStock };
+}
+
+/**
+ * Restores board identities, fixtures, measured thickness and physical sheet ids from the boards before re-layout
+ * onto the fresh boards produced by `autoFillFromStock`.
+ */
+export function restorePhysicalBoardSetup(newBoards: BoardV1[], originalBoards: BoardV1[]): BoardV1[] {
+  const available = originalBoards.filter(b => !isCut(b));
+  const used = new Set<string>();
+  return newBoards.map(b => {
+    if (isCut(b)) return b;
+    const matchIndex = available.findIndex(orig => {
+      if (used.has(orig.id)) return false;
+      if (+orig.thickness.toFixed(1) !== +b.thickness.toFixed(1)) return false;
+      if (b.size.fit !== orig.size.fit) return false;
+      if (!b.size.fit && !orig.size.fit) {
+        return orig.size.w === b.size.w && orig.size.h === b.size.h;
+      }
+      return orig.name === b.name;
+    });
+    if (matchIndex === -1) return b;
+    const orig = available[matchIndex];
+    used.add(orig.id);
+    return {
+      ...b,
+      id: orig.id,
+      name: orig.name,
+      ...(orig.fixtures?.length && { fixtures: orig.fixtures }),
+      ...(orig.measuredThickness !== undefined && { measuredThickness: orig.measuredThickness }),
+      ...(orig.physicalSheetId && { physicalSheetId: orig.physicalSheetId }),
+    };
+  });
 }
