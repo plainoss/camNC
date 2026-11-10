@@ -68,8 +68,9 @@ it('draws every original curved outline segment after creating, suppressing and 
     else expect(curve.sort()).toEqual(originalCurve);
     // Each wide-line segment is six GPU triangles. Checking uploaded endpoints alone misses a stale instanced draw cap.
     const triangles = solid.getAttribute('position').count / 3 + (points.count / 2) * 6;
-    await waitFor(() => expect(renderer?.info.render.triangles).toBe(triangles));
+    // Cold WebGL startup can outlast the default one-second wait; require the actual GPU draw count before continuing.
+    await waitFor(() => expect(renderer?.info.render.triangles).toBe(triangles), { timeout: 20_000 });
     edges.dispose();
     solid.dispose();
   }
-});
+}, 40_000);
