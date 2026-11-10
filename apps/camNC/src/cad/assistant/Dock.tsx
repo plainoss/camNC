@@ -6,7 +6,8 @@ import { readAssistantCredentials, redactAssistantText, type AssistantCredential
 import type { AssistantImage, AssistantMessage } from './provider';
 import { ProviderSettings } from './ProviderSettings';
 import { readAssistantImage, rasterizeAssistantView } from './images';
-import { resumeAssistantMessages, runDesignAssistant } from './loop';
+import { assistantQuestion, resumeAssistantMessages, runDesignAssistant } from './loop';
+import { ActivityView } from './ActivityView';
 import { checkScriptInBrowser } from './scriptCheck';
 import guide from '../../../../../packages/cad-script/README.md?raw';
 import cupboardExample from '../../../../../packages/cad-script/examples/cupboard.cad.ts?raw';
@@ -17,6 +18,23 @@ import './dock.css';
 import type { AssistantSelection } from './selection';
 
 const conversations = new Map<string, AssistantMessage[]>();
+const starters = [
+  {
+    title: 'Build a cupboard',
+    detail: 'Plan the size, shelves and joinery',
+    prompt: 'Help me design a cupboard. Ask me about dimensions, shelves and joinery before building.',
+  },
+  {
+    title: 'Design a tray',
+    detail: 'A small project, made your way',
+    prompt: 'Help me design a wooden tray. Ask me about its size and construction first.',
+  },
+  {
+    title: 'Review this design',
+    detail: 'Explore dimensions and improvements',
+    prompt: 'Review the open design and suggest improvements. Ask before making changes.',
+  },
+];
 const examples = { cupboard: cupboardExample, plate: plateExample, tray: trayExample, 'shelf-side': shelfExample };
 
 export function AssistantDock({
@@ -43,6 +61,16 @@ export function AssistantDock({
   const [proposal, setProposal] = useState<CadProposal | null>(null);
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(true);
+  const composer = useRef<HTMLTextAreaElement>(null);
+  const attachment = useRef<HTMLInputElement>(null);
+  const transcriptEnd = useRef<HTMLDivElement>(null);
+  const latest = messages.at(-1);
+  const questionMessage = messages.findLast(message => message.role === 'assistant');
+  const question = latest?.role !== 'user' && questionMessage ? assistantQuestion(questionMessage) : undefined;
+  useEffect(() => {
+    if (messages.length) transcriptEnd.current?.scrollIntoView({ block: 'nearest' });
+  }, [messages, activity]);
+
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -50,10 +78,10 @@ export function AssistantDock({
       controller.current?.abort();
     };
   }, []);
-  const send = async () => {
-    if (running || !credentials || (!text.trim() && !images.length)) return;
+  const send = async (reply = text) => {
+    if (running || !credentials || (!reply.trim() && !images.length)) return;
     const start = structuredClone(document);
-    const user: AssistantMessage = { role: 'user', text: text.trim(), ...(images.length && { images }) };
+    const user: AssistantMessage = { role: 'user', text: reply.trim(), ...(images.length && { images }) };
     const transcript = [...resumeAssistantMessages(messages), user];
     const abort = new AbortController();
     controller.current = abort;
@@ -126,14 +154,22 @@ export function AssistantDock({
   return (
     <aside className="cad-assistant-dock" aria-label="Design assistant" onKeyDown={event => event.stopPropagation()}>
       <header>
-        <h2>Design assistant</h2>
+        <div className="cad-assistant-heading">
+          <span className="cad-assistant-eyebrow">PART STUDIO · DESIGN PARTNER</span>
+          <h2>Design assistant</h2>
+        </div>
         <button type="button" onClick={onClose} aria-label="Close assistant">
           Close
         </button>
       </header>
-      <button type="button" disabled={running} onClick={() => setSettings(value => !value)}>
-        {settings ? 'Messages' : 'Connection'}
-      </button>
+      <nav className="cad-assistant-tabs" aria-label="Assistant views">
+        <button type="button" aria-pressed={!settings} disabled={running} onClick={() => setSettings(false)}>
+          Messages
+        </button>
+        <button type="button" aria-pressed={settings} disabled={running} onClick={() => setSettings(true)}>
+          Connection
+        </button>
+      </nav>
       {settings ? (
         <ProviderSettings
           value={credentials}
@@ -145,19 +181,52 @@ export function AssistantDock({
       ) : (
         <>
           <div className="cad-assistant-messages" role="log" aria-label="Conversation">
-            {!messages.length && <p>Describe a piece to build or a change to your design. Add a picture for its look.</p>}
+            {!messages.length && (
+              <div className="cad-assistant-empty">
+                <span className="cad-assistant-eyebrow">FROM IDEA TO WORKSHOP</span>
+                <h3>What shall we make?</h3>
+                <p>Shape a new piece or refine your design. Start with an idea, a question or a reference.</p>
+                <div className="cad-assistant-starters">
+                  {starters.map(starter => (
+                    <button
+                      type="button"
+                      key={starter.title}
+                      onClick={() => {
+                        setText(starter.prompt);
+                        composer.current?.focus();
+                      }}>
+                      <strong>{starter.title}</strong>
+                      <span>{starter.detail}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {messages
-              .filter(message => message.role !== 'tool' && message.text)
+              .filter(message => message.role !== 'tool' && (message.text || assistantQuestion(message) || message.images?.length))
               .map((message, index) => (
-                <article key={index}>
+                <article key={index} className="cad-assistant-message" data-role={message.role}>
                   <strong>{message.role === 'user' ? 'You' : 'Assistant'}</strong>
-                  <p>{message.text}</p>
+                  {message.text && <p>{message.text}</p>}
+                  {assistantQuestion(message) && assistantQuestion(message)?.question !== message.text && (
+                    <p>{assistantQuestion(message)?.question}</p>
+                  )}
                   {message.images?.map((image, i) => (
                     <img key={i} src={`data:${image.mediaType};base64,${image.data}`} alt={image.name} />
                   ))}
                 </article>
               ))}
+            <div ref={transcriptEnd} />
           </div>
+          {question && !proposal && (
+            <div className="cad-assistant-replies" role="group" aria-label="Suggested replies">
+              {question.choices.map(choice => (
+                <button type="button" key={choice} disabled={running} onClick={() => void send(choice)}>
+                  {choice}
+                </button>
+              ))}
+            </div>
+          )}
           {selection && <small>Selection: {selection.name}</small>}
           {proposal && (
             <div className="cad-assistant-proposal">
@@ -178,37 +247,61 @@ export function AssistantDock({
               </button>
             </div>
           )}
-          <p role="status">{activity}</p>
+          <p className="cad-assistant-status" data-running={running} role="status">
+            {activity}
+          </p>
+          <ActivityView messages={messages} activity={activity} running={running} />
           {error && <p role="alert">{error}</p>}
           <form
+            className="cad-assistant-composer"
             onSubmit={event => {
               event.preventDefault();
               void send();
             }}>
             <label>
               Message
-              <textarea value={text} onChange={event => setText(event.target.value)} disabled={running} rows={3} />
-            </label>
-            <label>
-              Reference image
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                disabled={running || !credentials?.config.images || images.length >= 3}
-                onChange={event => {
-                  const file = event.target.files?.[0];
-                  event.target.value = '';
-                  if (file)
-                    void readAssistantImage(file)
-                      .then(image => setImages(previous => [...previous, image]))
-                      .catch(cause => setError(String(cause.message)));
-                }}
+              <textarea
+                ref={composer}
+                placeholder="Describe your idea, or choose a suggestion…"
+                value={text}
+                onChange={event => setText(event.target.value)}
+                disabled={running}
+                rows={3}
               />
             </label>
+            <div className="cad-assistant-composer-actions">
+              <button
+                type="button"
+                className="cad-assistant-attach"
+                aria-label="Add reference image"
+                title={credentials?.config.images ? 'Add reference image' : 'Enable image support in Connection'}
+                disabled={running || !credentials?.config.images || images.length >= 3}
+                onClick={() => attachment.current?.click()}>
+                <span aria-hidden="true">＋</span> Attach
+              </button>
+              <small>PNG, JPG, WebP or GIF · up to 3</small>
+            </div>
+            <input
+              ref={attachment}
+              type="file"
+              hidden
+              aria-label="Reference image"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              disabled={running || !credentials?.config.images || images.length >= 3}
+              onChange={event => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file)
+                  void readAssistantImage(file)
+                    .then(image => setImages(previous => [...previous, image].slice(0, 3)))
+                    .catch(cause => setError(String(cause.message)));
+              }}
+            />
             {!credentials?.config.images && <small>Enable image support in Connection to attach a reference.</small>}
             {images.map((image, index) => (
-              <div key={index}>
-                {image.name}
+              <div key={index} className="cad-assistant-attachment">
+                <img src={`data:${image.mediaType};base64,${image.data}`} alt={image.name} />
+                <span>{image.name}</span>
                 <button type="button" onClick={() => setImages(previous => previous.filter((_, at) => at !== index))}>
                   Remove image
                 </button>
@@ -224,12 +317,13 @@ export function AssistantDock({
                 Stop
               </button>
             ) : (
-              <button type="submit" disabled={!credentials || (!text.trim() && !images.length)}>
+              <button type="submit" className="cad-assistant-primary" disabled={!credentials || (!text.trim() && !images.length)}>
                 Send
               </button>
             )}
           </form>
           <button
+            className="cad-assistant-footer"
             type="button"
             disabled={running}
             onClick={() => {
@@ -237,6 +331,9 @@ export function AssistantDock({
               setMessages([]);
               setProposal(null);
               setActivity('');
+              setText('');
+              setImages([]);
+              setError('');
             }}>
             New conversation
           </button>
