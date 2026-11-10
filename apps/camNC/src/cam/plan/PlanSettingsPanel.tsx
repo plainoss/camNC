@@ -29,12 +29,7 @@ export function PlanSettingsPanel({
         <h3 className="text-sm font-medium">
           Cutting data · ⌀{value.bit.diameter} in {material}
         </h3>
-        <CuttingDataEditor
-          bit={value.bit}
-          material={material}
-          job={jobCutting(value)}
-          onJobChange={cutting => set({ cutting, finalFeedFactor: undefined })}
-        />
+        <CuttingDataEditor bit={value.bit} material={material} job={jobCutting(value)} onJobChange={cutting => set({ cutting })} />
         {value.smallBit && value.smallBit.diameter < value.bit.diameter && (
           <>
             <h3 className="pt-2 text-sm font-medium">

@@ -3,7 +3,7 @@ import { createPlateDocument, type CadDocument, type CadSolveResult } from '@wbc
 import { cdp, userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const solver = vi.hoisted(() => ({ solve: vi.fn<typeof import('./solveCad').solveCadDocument>() }));
 vi.mock('./solveCad', async importOriginal => ({

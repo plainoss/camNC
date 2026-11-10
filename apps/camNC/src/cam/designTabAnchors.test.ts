@@ -125,17 +125,6 @@ describe('CAD tab boundary lineage', () => {
       expect(back.tabsAt![instance]![0]!.x).toBeCloseTo(10, 6);
     });
 
-    it('keeps tabs where they were for a job whose parts were not turned over yet', () => {
-      const document = cutFromBelow(createPlateDocument({ width: 100, height: 60, thickness: 12 })),
-        instance = `${document.parts[0]!.id}#0`;
-      const board = { ...newBoard([], 12, 'plywood', [instance]), tabsAt: { [instance]: [{ x: 10, y: 0 }] } };
-      const kept = carryDesignTabs([board], result(document), result(document), {}, { turnedBefore: false, turnedAfter: false })![0]!;
-      expect(kept.tabsAt![instance]![0]!.x).toBeCloseTo(10, 6);
-      // Accepted again, the part turns over and its tab goes with its edge.
-      const turned = carryDesignTabs([board], result(document), result(document), {}, { turnedBefore: false })![0]!;
-      expect(turned.tabsAt![instance]![0]!.x).toBeCloseTo(90, 6);
-    });
-
     it('turns a copy by its own cuts, not its part’s', () => {
       const plain = createPlateDocument({ width: 100, height: 60, thickness: 12 }),
         { document: withCopy } = addPartCopy(plain, plain.parts[0]!.id),

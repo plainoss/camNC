@@ -10,7 +10,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@wbcnc/ui/components/dropdown-menu';
-import { sketchContextItems, type SketchContext, type SketchContextAction } from './sketchContext';
+import { sketchContextItems, type SketchContext, type SketchContextAction } from '@wbcnc/cad-editor/sketchContext';
 import './SketchContextMenu.css';
 
 export interface SketchContextMenuProps {

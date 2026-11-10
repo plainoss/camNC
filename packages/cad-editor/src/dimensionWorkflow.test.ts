@@ -40,7 +40,6 @@ describe('pure dimension selection and placement workflow', () => {
     expect(placed.effect).toMatchObject({ type: 'create', constraint: { type: 'angle' } });
     if (placed.effect?.type !== 'create') throw Error();
     expect(placed.effect.constraint.labelPlacement).toBeDefined();
-    expect(placed.effect.constraint.labelPosition).toBeUndefined();
     expect(resolveDimensionPlacement(sketch, placed.effect.constraint)).toMatchObject({ x: expect.closeTo(65), y: expect.closeTo(35) });
     expect(sketch).toEqual(before);
   });
@@ -139,7 +138,6 @@ describe('pure dimension selection and placement workflow', () => {
     });
     if (placed.effect?.type !== 'create') throw Error();
     expect(placed.effect.constraint.labelPlacement).toBeDefined();
-    expect(placed.effect.constraint.labelPosition).toBeUndefined();
     expect(resolveDimensionPlacement(sketch, placed.effect.constraint)).toMatchObject({ x: expect.closeTo(80), y: expect.closeTo(50) });
     expect(placed.effect.constraint.value).toBeCloseTo(153.4349488, 6);
   });

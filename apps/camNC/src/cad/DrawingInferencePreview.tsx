@@ -1,6 +1,6 @@
 import type { CadPoint, CadSketch } from '@wbcnc/cad';
-import type { CadDrawingInference } from './drawingInference';
-import type { InlineConstraintKind } from './inlineConstraintLayout';
+import type { CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
+import type { InlineConstraintKind } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { ConstraintSymbol } from './inlineConstraints';
 
 export function DrawingInferencePreview({

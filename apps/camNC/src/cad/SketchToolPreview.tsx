@@ -6,7 +6,7 @@ import {
   circleThroughThreePoints,
   alignedRectangleFromPoints,
 } from '@wbcnc/cad';
-import { arcPreviewPath } from './arcPreviewGeometry';
+import { arcPreviewPath } from '@wbcnc/cad-editor/arcPreviewGeometry';
 import { ArcPreview } from './ArcPreview';
 import { SketchPreview } from './SketchGeometry';
 import { SKETCH_APPEARANCE } from './sketchAppearance';

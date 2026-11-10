@@ -51,14 +51,10 @@ export function authoringSignature(document: CadDocument): string {
       ),
       dimensions: part.sketch.constraints.map(c => {
         const definition = Object.fromEntries(
-          Object.entries(c).filter(([key]) => !['value', 'expression', 'label', 'labelPlacement', 'labelPosition'].includes(key))
+          Object.entries(c).filter(([key]) => !['value', 'expression', 'label', 'labelPlacement'].includes(key))
         );
         if (!('value' in c)) return definition;
-        // The parser intentionally turns matching bare millimetre literals into
-        // plain numeric dimensions. That normalization preserves authored intent.
-        const literal =
-          c.expression && /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)\s*mm\s*$/i.test(c.expression) && Number.parseFloat(c.expression) === c.value;
-        return { ...definition, ...(c.expression && !literal ? { expression: c.expression } : { value: c.value }) };
+        return { ...definition, ...(c.expression ? { expression: c.expression } : { value: c.value }) };
       }),
       thickness: part.thicknessExpression ?? part.thickness,
       on: part.drawnOn?.on ?? null,

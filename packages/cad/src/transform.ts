@@ -253,7 +253,6 @@ export function transformSketchEntities(sketch: CadSketch, options: CadTransform
     }
     c = directionRelation(c);
     if ('value' in c) {
-      delete c.labelPosition;
       delete c.labelPlacement;
       if (!['angle', 'positionX', 'positionY'].includes(c.type) && Math.abs(scale - 1) > 1e-12) {
         c.value *= scale;

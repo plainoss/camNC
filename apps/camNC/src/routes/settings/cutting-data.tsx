@@ -100,12 +100,7 @@ function CuttingDataPage() {
                           setMaterial(e.material);
                         }}>
                         <span className="font-medium">
-                          {e.bit
-                            ? `⌀ ${e.bit.diameter} · ${e.bit.name}`
-                            : e.shared
-                              ? 'Shared legacy cutting data'
-                              : 'A bit no longer in the library'}{' '}
-                          · {e.material}
+                          {e.bit ? `⌀ ${e.bit.diameter} · ${e.bit.name}` : 'A bit no longer in the library'} · {e.material}
                         </span>
                         <span className="font-mono text-xs text-muted-foreground">
                           {(Object.entries(e.values) as [CuttingField, number][])

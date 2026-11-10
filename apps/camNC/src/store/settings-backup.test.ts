@@ -49,16 +49,6 @@ describe('settings backup', () => {
     expect(state.machineBounds!.max.toArray()).toEqual([800, 600]);
   });
 
-  it('adds a single camera exported from the old Debug page', () => {
-    useStore.setState({ camSources: { a: camera('Existing') }, activeCamId: 'a' });
-
-    restoreSettingsBackup(parseSettingsBackup(superjson.stringify(camera('Old export'))));
-
-    const state = useStore.getState();
-    expect(Object.values(state.camSources).map(c => c.name)).toEqual(['Existing', 'Old export']);
-    expect(state.camSources[state.activeCamId!]!.calibration).toBeDefined();
-  });
-
   it('rejects files that are not a backup', () => {
     expect(() => parseSettingsBackup('not json')).toThrow('not a camNC settings backup');
     expect(() => parseSettingsBackup(superjson.stringify({ foo: 1 }))).toThrow('not a camNC settings backup');

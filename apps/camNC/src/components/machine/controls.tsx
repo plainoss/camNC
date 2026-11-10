@@ -29,7 +29,7 @@ import {
   Square,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { isCadEditorActive } from '@/cad/keyboardOwnership';
+import { isCadEditorActive } from '@wbcnc/cad-editor/keyboardOwnership';
 
 function report(promise: Promise<unknown>, what: string) {
   return promise.catch(err => {

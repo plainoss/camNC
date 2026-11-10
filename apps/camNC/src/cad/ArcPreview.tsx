@@ -1,4 +1,4 @@
-import { buildArcPreview, arcPreviewPath, type ArcPreviewInput } from './arcPreviewGeometry';
+import { buildArcPreview, arcPreviewPath, type ArcPreviewInput } from '@wbcnc/cad-editor/arcPreviewGeometry';
 import { SketchPreview } from './SketchGeometry';
 import { SKETCH_APPEARANCE } from './sketchAppearance';
 

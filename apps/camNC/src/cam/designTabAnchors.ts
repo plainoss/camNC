@@ -95,9 +95,7 @@ export function carryDesignTabs(
   boards: BoardV1[] | undefined,
   before: CadSolveResult | null,
   after: CadSolveResult,
-  acceptedBoardSourceKeys: Readonly<Record<string, string | undefined>> = {},
-  /** Whether each design's parts cut only from below were milled turned over (see `millsUndersideUp`). */
-  { turnedBefore = true, turnedAfter = true }: { turnedBefore?: boolean; turnedAfter?: boolean } = {}
+  acceptedBoardSourceKeys: Readonly<Record<string, string | undefined>> = {}
 ): BoardV1[] | undefined {
   if (!before || !boards) return boards;
   const oldParts = new Map(before.document.parts.map(p => [p.id, p]));
@@ -126,13 +124,13 @@ export function carryDesignTabs(
       const oldPiece = piece(oldPieces, oldShapes),
         nextPiece = piece(newPieces, newShapes);
       // A piece with cuts only from its underside lies turned over about the same axis, and can turn back when that changes.
-      const turns = (shape: EvaluatedCadPart | undefined, turning: boolean) => turning && !!shape && millsUndersideUp(shape);
+      const turns = (shape: EvaluatedCadPart | undefined) => !!shape && millsUndersideUp(shape);
       const flipFor = (turned: boolean) => {
         const flipped = mirrored !== turned;
         return (p: CadPoint): CadPoint => (flipped ? { x: -p.x, y: p.y } : p);
       };
-      const oldTurned = turns(oldPiece, turnedBefore),
-        nextTurned = turns(nextPiece, turnedAfter);
+      const oldTurned = turns(oldPiece),
+        nextTurned = turns(nextPiece);
       const oldShape = oldPiece && (oldTurned ? asMilled(oldPiece) : oldPiece),
         nextShape = nextPiece && (nextTurned ? asMilled(nextPiece) : nextPiece);
       const oldPart = oldParts.get(sourceId),

@@ -363,11 +363,6 @@ class VideoPipelineWorker implements VideoPipelineWorkerAPI {
     return this.maskBlitter.blitter;
   }
 
-  // The old on-demand process() API is deprecated – kept for debug route compatibility
-  async process(): Promise<ImageBitmap> {
-    throw new Error('process() is deprecated – use start() streaming instead');
-  }
-
   async updateParams(params: RemapStepParams): Promise<void> {
     if (this.cfg && this.cfg.mode !== 'none') {
       // Only update if structurally compatible

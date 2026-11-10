@@ -256,7 +256,7 @@ export async function runSetupSmoke(
     const reloaded = await waitForSavedCamera('extrinsics');
     assert.deepEqual(reloaded.calibration, positioned.calibration);
     assert.deepEqual(reloaded.extrinsics, positioned.extrinsics);
-    assert.deepEqual(reloaded.machineBounds, { min: [0, 0], max: [600, 500] });
+    assert.deepEqual((await savedState()).machineBounds, { min: [0, 0], max: [600, 500] });
     check('complete setup survives a page reload and opens the top view');
 
     // At the fixed viewport the four tags cover about 20k dark pixels. Wait
@@ -325,7 +325,6 @@ export async function runSetupSmoke(
 
     await navigate('Advanced settings');
     const configuration = JSON.parse(await page.getByRole('textbox', { name: 'Camera Source Configuration', exact: true }).inputValue());
-    assert.deepEqual(configuration.machineBounds, [0, 0, 600, 500]);
     assert.deepEqual(configuration.markerPositions, markers.positions);
     await navigate('Backup & restore');
     const downloading = page.waitForEvent('download');

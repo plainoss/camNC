@@ -9,7 +9,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { ComponentType, MouseEventHandler, ReactNode } from 'react';
 import { camKeys } from '@/cam/camQueries';
 import { createDesignJob, getJob } from '@/cam/jobDb';
-import { endCadSession } from '@/cad/session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 import { Route } from './$jobId.design';
 
 const h = vi.hoisted(() => ({

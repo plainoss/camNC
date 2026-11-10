@@ -1,4 +1,4 @@
-import type { ConstraintCommandTool } from './constraintCommands';
+import type { ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands';
 
 /** The sketch's constraint tools, as the toolbar lists them, with their keys. */
 export const sketchConstraints: { id: ConstraintCommandTool; label: string; key?: string }[] = [

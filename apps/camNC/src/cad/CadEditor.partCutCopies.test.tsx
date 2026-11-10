@@ -12,7 +12,7 @@ import {
 import { afterEach, expect, it, vi } from 'vitest';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 const sessions: string[] = [];

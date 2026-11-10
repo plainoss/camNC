@@ -2,7 +2,6 @@ import { removeUnusedSlotWidths } from './slot';
 import { materializePatternJoins, removeUnusedPatternCenters } from './patternTopology';
 import { sketchPatternOwner, afterPatternEntityRemoval } from './pattern';
 import { refreshDimensionMeasurement } from './dimensions';
-import { migrateDimensionPlacements } from './dimensionPlacement';
 import type {
   CadArcEntity,
   CadCircleEntity,
@@ -77,7 +76,7 @@ export function removeConstraint(sketch: CadSketch, id: string): CadSketch {
 /** Each edit is a detached JSON value suitable for undo history and persistence. */
 export function updateDimension(document: CadDocument, id: string, value: number, expression?: string): CadDocument {
   const sourceExpression = expression?.trim() || undefined;
-  const next = migrateDimensionPlacements(document);
+  const next = structuredClone(document);
   let changed = false;
   for (const part of next.parts) {
     for (const c of part.sketch.constraints) {
@@ -95,7 +94,7 @@ export function updateDimension(document: CadDocument, id: string, value: number
 
 /** Convert a numeric driver to a reference, or restore driving at its current measured value. */
 export function setDimensionDriven(document: CadDocument, id: string, driven: boolean): CadDocument {
-  const next = migrateDimensionPlacements(document);
+  const next = structuredClone(document);
   let changed = false;
   for (const part of next.parts) {
     part.sketch.constraints = part.sketch.constraints.map(constraint => {
@@ -117,7 +116,7 @@ export function setDimensionDriven(document: CadDocument, id: string, driven: bo
 }
 
 export function updatePoint(document: CadDocument, id: string, point: CadPoint): CadDocument {
-  const next = migrateDimensionPlacements(document);
+  const next = structuredClone(document);
   let changed = false;
   for (const part of next.parts) {
     const e = part.sketch.entities.find((e): e is CadPointEntity => e.id === id && e.type === 'point');

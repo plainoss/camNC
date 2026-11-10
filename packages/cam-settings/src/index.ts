@@ -97,39 +97,23 @@ export function without<T extends object>(o: T, key: keyof T): T {
   return copy;
 }
 
-export const legacyBitKey = (b: LibraryTool) => `${b.number}|${b.diameter}|${b.name}`;
-export const bitKey = (b: LibraryTool) => (b.guid ? `guid:${encodeURIComponent(b.guid)}` : legacyBitKey(b));
+/** A bit's identity: its library GUID, or for a bit without one, its number, diameter and name. */
+export const bitKey = (b: LibraryTool) => (b.guid ? `guid:${encodeURIComponent(b.guid)}` : `${b.number}|${b.diameter}|${b.name}`);
 /** The saved table's key: one bit (as the library names it) in one material. */
 export const cuttingKey = (bit: LibraryTool, material: MaterialKey) => `${bitKey(bit)}@${material}`;
-export const legacyCuttingKey = (bit: LibraryTool, material: MaterialKey) => `${legacyBitKey(bit)}@${material}`;
 
-/** Old name-based recipes stay shared until a physical tool is explicitly edited; no ambiguous recipe is moved. */
-export function savedCuttingFor(
-  saved: Record<string, Partial<CuttingData>>,
-  bit: LibraryTool,
-  material: MaterialKey
-): Partial<CuttingData> | undefined {
-  const key = cuttingKey(bit, material);
-  if (Object.prototype.hasOwnProperty.call(saved, key)) return saved[key];
-  return saved[legacyCuttingKey(bit, material)];
-}
+/** The values saved for a bit in a material. */
+export const savedCuttingFor = (saved: Record<string, Partial<CuttingData>>, bit: LibraryTool, material: MaterialKey) =>
+  saved[cuttingKey(bit, material)];
 
-/** Match saved recipes without assigning an ambiguous legacy name to one physical cutter. */
+/** Each saved recipe with its material, and its bit when that is still in `bits`. */
 export function savedCuttingEntries(saved: Record<string, Partial<CuttingData>>, bits: LibraryTool[]) {
   return Object.entries(saved)
     .filter(([, values]) => Object.keys(values).length > 0)
     .map(([key, values]) => {
       const separator = key.lastIndexOf('@');
       const identity = key.slice(0, separator);
-      const exact = bits.filter(bit => bitKey(bit) === identity);
-      const matches = exact.length ? exact : bits.filter(bit => legacyBitKey(bit) === identity);
-      return {
-        key,
-        values,
-        material: key.slice(separator + 1) as MaterialKey,
-        bit: matches.length === 1 ? matches[0] : undefined,
-        shared: matches.length > 1,
-      };
+      return { key, values, material: key.slice(separator + 1) as MaterialKey, bit: bits.find(bit => bitKey(bit) === identity) };
     });
 }
 

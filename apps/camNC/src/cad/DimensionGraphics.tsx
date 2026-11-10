@@ -1,6 +1,6 @@
 import { type CadDimension, type CadPoint, type CadSketch } from '@wbcnc/cad';
 import type { PointerEvent, ReactNode } from 'react';
-import { angleDimensionGeometry, dimensionAnchor, dimensionPoints, linearDimensionGeometry } from './dimensionGeometry';
+import { angleDimensionGeometry, dimensionAnchor, dimensionPoints, linearDimensionGeometry } from '@wbcnc/cad-editor/dimensionGeometry';
 import { SKETCH_APPEARANCE } from './sketchAppearance';
 import { formatCadValue } from './valueExpressions';
 

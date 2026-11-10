@@ -1,4 +1,4 @@
-import { addCircle, addConstraint, addLine, addPoint, addSpline, createCadPart, originId } from '@wbcnc/cad';
+import { addCircle, addConstraint, addLine, addPoint, addSpline, createCadPart, originId, withDimensionPlacement } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
 import {
   createSketchContext,
@@ -17,7 +17,7 @@ function fixture() {
   const circle = sketch.entities.at(-1)!;
   sketch = addPoint(sketch, { x: 23, y: 20 });
   const point = sketch.entities.at(-1)!;
-  sketch = addConstraint(sketch, { type: 'diameter', entityId: circle.id, value: 30, labelPosition: { x: 20, y: 20 } });
+  sketch = addConstraint(sketch, withDimensionPlacement(sketch, { type: 'diameter', entityId: circle.id, value: 30 }, { x: 20, y: 20 }));
   const dimension = sketch.constraints.at(-1)!;
   return { sketch, line, circle, point, dimension };
 }

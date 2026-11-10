@@ -2,8 +2,8 @@ import { addLine, createCadPart, createCadDocument, parseCadDocument, type CadDo
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
-import { saveCadViewState } from './viewState';
+import { endCadSession } from '@wbcnc/cad-editor/session';
+import { saveCadViewState } from '@wbcnc/cad-editor/viewState';
 const sessions: string[] = [];
 afterEach(() => {
   cleanup();

@@ -4,7 +4,7 @@ import { addFaceSketch, addLine, cadFaceSketches, createPlateDocument, updateDim
 import { useImperativeHandle, useRef, type ComponentType, type Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
-import { acknowledgeCadSession, cadSession, commitCadSession, endCadSession } from '@/cad/session';
+import { acknowledgeCadSession, cadSession, commitCadSession, endCadSession } from '@wbcnc/cad-editor/session';
 import { keepPendingDesignDraft, pendingDesignDraft } from '@/cam/designDraftRecovery';
 import type { CadEditorController } from '@/cad/CadEditor';
 import type { CamStageDestination } from '@/cam/CamJobBar';

@@ -11,10 +11,10 @@ import {
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SketchGeometry } from './SketchGeometry';
-import { pickBezierControlPolygon, pickSketchPoint, pickSketchSnap } from './picking';
-import { dragTargets } from './drag';
-import { layoutInlineConstraints, removeInlineConstraint } from './inlineConstraintLayout';
-import { buildConstraintForSelection } from './constraintCommands';
+import { pickBezierControlPolygon, pickSketchPoint, pickSketchSnap } from '@wbcnc/cad-editor/picking';
+import { dragTargets } from '@wbcnc/cad-editor/drag';
+import { layoutInlineConstraints, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
+import { buildConstraintForSelection } from '@wbcnc/cad-editor/constraintCommands';
 afterEach(cleanup);
 const map = (s: CadSketch) => new Map(s.entities.filter((e): e is CadPointEntity => e.type === 'point').map(p => [p.id, p]));
 const project = (p: { x: number; y: number }) => ({ x: p.x * 2 + 20, y: 200 - p.y * 2 });

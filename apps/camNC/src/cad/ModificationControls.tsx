@@ -1,5 +1,5 @@
 import { useEffect, type CSSProperties, type RefObject } from 'react';
-import type { ModificationWorkflow } from './modificationWorkflow';
+import type { ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import { CadUnitSuffix, CadValueInput } from './CadValueInput';
 
 export function ModificationControls({

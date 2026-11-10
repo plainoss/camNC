@@ -1,6 +1,6 @@
 import type { CadDocument, CadSketch } from '@wbcnc/cad';
 import type { CadSelectionBox } from './boxSelection';
-import type { CadDrawingInference } from './drawingInference';
+import type { CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 
 type Point = { x: number; y: number };
 

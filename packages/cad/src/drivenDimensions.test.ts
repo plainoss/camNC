@@ -13,6 +13,7 @@ import {
   parseCadDocument,
   removeEntity,
   resolveDimensionPlacement,
+  withDimensionPlacement,
   setDimensionDriven,
   solveCadDocument,
   updateDimension,
@@ -30,15 +31,14 @@ describe('driven source dimensions', () => {
     let sketch = addLine(createCadPart().sketch, { x1: 0, y1: 0, x2: 30, y2: 40 });
     const line = sketch.entities.at(-1)!;
     if (line.type !== 'line') throw Error();
-    sketch = addConstraint(sketch, {
-      type: 'distance',
-      pointAId: line.startId,
-      pointBId: line.endId,
-      sourceEntityId: line.id,
-      value: 50,
-      labelPosition: { x: 5, y: 20 },
-      expression: '5 * 10',
-    });
+    sketch = addConstraint(
+      sketch,
+      withDimensionPlacement(
+        sketch,
+        { type: 'distance', pointAId: line.startId, pointBId: line.endId, sourceEntityId: line.id, value: 50, expression: '5 * 10' },
+        { x: 5, y: 20 }
+      )
+    );
     const original = documentOf(sketch),
       id = sketch.constraints.at(-1)!.id;
     const reference = setDimensionDriven(original, id, true);

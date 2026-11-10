@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const sessions: string[] = [];
 afterEach(() => {

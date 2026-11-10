@@ -1,5 +1,5 @@
 import type { CadDocument } from '@wbcnc/cad';
-import { designSteps, type DesignStep } from './designSteps';
+import { designSteps, type DesignStep } from '@wbcnc/cad';
 import './designStepsList.css';
 
 const kIcons: Record<DesignStep['kind'], string> = {

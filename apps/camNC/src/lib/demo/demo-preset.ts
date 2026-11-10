@@ -20,7 +20,6 @@ function demoCamSource(origin: string): ICamSource {
     name: 'Demo camera',
     url: new URL(kDemoVideoPath, origin).href,
     maxResolution: [1280, 960],
-    machineBounds: new Box2(new Vector2(3, 3), new Vector2(621, 1241)),
     arucoTagSize: 30,
     calibration: {
       calibration_matrix: new Matrix3().fromArray([1318.400745, 0, 0, 0, 1317.714788, 0, 702.108745, 469.165494, 1]),
@@ -65,7 +64,7 @@ export function applyDemoPreset(origin = location.origin, { camera = true } = {}
   useStore.setState({
     camSources: camera ? { [id]: camSource } : {},
     activeCamId: camera ? id : null,
-    machineBounds: camSource.machineBounds!.clone(),
+    machineBounds: new Box2(new Vector2(3, 3), new Vector2(621, 1241)),
     machine: { host: kDemoMachineHost, variant: 'v4' },
   });
   useStore.getState().updateToolpath(demoGcode(), kDemoGcodeName);

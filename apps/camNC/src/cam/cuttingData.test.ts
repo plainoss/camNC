@@ -1,27 +1,17 @@
 import { camPart, splitByBit, toGcode, type PartFeatures } from '@wbcnc/cam';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  bitKey,
-  cuttingKey,
-  legacyCuttingKey,
-  savedCuttingFor,
-  savedCuttingEntries,
-  defaultCutting,
-  resolveCutting,
-  useCuttingData,
-} from './cuttingData';
+import { bitKey, cuttingKey, savedCuttingFor, savedCuttingEntries, defaultCutting, resolveCutting, useCuttingData } from './cuttingData';
 import { kDefaultPlan, toCamSettings } from './planSettings';
 
 const bit = { number: 1, diameter: 3.175, name: '1/8 mill v1', feed: 2400, plungeFeed: 360, rpm: 18000, stepover: 1.27 };
 
-it('shows unambiguous legacy recipes and hides reset markers without guessing between physical cutters', () => {
+it('lists saved recipes with their bit and hides emptied entries', () => {
   const first = { ...bit, guid: 'cutter-1', name: 'Mill @ shop' },
     second = { ...first, guid: 'cutter-2' };
-  const legacy = legacyCuttingKey(first, 'oak');
-  const saved = { [legacy]: { feed: 2200 }, [cuttingKey(first, 'oak')]: {} };
-  expect(savedCuttingEntries(saved, [first])).toMatchObject([{ key: legacy, bit: first, material: 'oak', shared: false }]);
-  expect(savedCuttingEntries(saved, [first, second])).toMatchObject([{ key: legacy, bit: undefined, material: 'oak', shared: true }]);
-  expect(savedCuttingFor(saved, first, 'oak')).toEqual({});
+  const saved = { [cuttingKey(first, 'oak')]: { feed: 2200 }, [cuttingKey(second, 'oak')]: {} };
+  expect(savedCuttingEntries(saved, [first, second])).toMatchObject([{ key: cuttingKey(first, 'oak'), bit: first, material: 'oak' }]);
+  expect(savedCuttingEntries(saved, [second])).toMatchObject([{ key: cuttingKey(first, 'oak'), bit: undefined, material: 'oak' }]);
+  expect(savedCuttingFor(saved, second, 'oak')).toEqual({});
 });
 
 afterEach(() => useCuttingData.setState({ saved: {} }));
@@ -170,35 +160,28 @@ describe('cutting data', () => {
     });
   });
 
-  it('keeps legacy keys for unnamed identity and separates physical tools by GUID', () => {
+  it('names a bit without a GUID by number, diameter and name, and separates physical tools by GUID', () => {
     expect(bitKey(bit)).toBe(`${bit.number}|${bit.diameter}|${bit.name}`);
     expect(bitKey({ ...bit, guid: 'first' })).not.toBe(bitKey({ ...bit, guid: 'second' }));
     expect(cuttingKey({ ...bit, guid: 'a@b|c' }, 'oak')).toBe('guid:a%40b%7Cc@oak');
     expect(bitKey({ ...bit, guid: 'first', name: 'renamed', number: 9 })).toBe(bitKey({ ...bit, guid: 'first' }));
   });
 
-  it('copies a legacy shared recipe on edit without assigning it to another physical tool, and reset blocks fallback', () => {
+  it('saves and resets each physical tool on its own', () => {
     const first = { ...bit, guid: 'first' },
       second = { ...bit, guid: 'second' };
-    const legacy = legacyCuttingKey(first, 'oak'),
-      key = cuttingKey(first, 'oak');
-    useCuttingData.setState({ saved: { [legacy]: { feed: 2000, stepdown: 1 } } });
+    const key = cuttingKey(first, 'oak');
     const read = (tool: typeof first) => savedCuttingFor(useCuttingData.getState().saved, tool, 'oak');
-    expect(read(first)).toEqual({ feed: 2000, stepdown: 1 });
-    expect(read(second)).toEqual({ feed: 2000, stepdown: 1 });
-    useCuttingData.getState().save(key, { feed: 2200 }, legacy);
+    useCuttingData.getState().save(key, { feed: 2200, stepdown: 1 });
     expect(read(first)).toEqual({ feed: 2200, stepdown: 1 });
-    expect(read(second)).toEqual({ feed: 2000, stepdown: 1 });
-    useCuttingData.getState().reset(key, 'stepdown', legacy);
+    expect(read(second)).toBeUndefined();
+    useCuttingData.getState().reset(key, 'stepdown');
     expect(read(first)).toEqual({ feed: 2200 });
-    useCuttingData.getState().reset(key, 'feed', legacy);
-    expect(read(first)).toEqual({});
-    expect(read(second)).toEqual({ feed: 2000, stepdown: 1 });
-    useCuttingData.getState().save(key, { plungeFeed: 300 }, legacy);
-    expect(read(first)).toEqual({ plungeFeed: 300 });
-    useCuttingData.getState().reset(cuttingKey(second, 'oak'), undefined, legacy);
-    expect(read(second)).toEqual({});
-    expect(useCuttingData.getState().saved[legacy]).toEqual({ feed: 2000, stepdown: 1 });
+    useCuttingData.getState().reset(key, 'feed');
+    expect(read(first)).toBeUndefined();
+    useCuttingData.getState().save(key, { plungeFeed: 300 });
+    useCuttingData.getState().reset(key);
+    expect(useCuttingData.getState().saved).toEqual({});
     expect(toCamSettings({ ...kDefaultPlan, bit: first }, 'oak', useCuttingData.getState().saved).feed).toBe(bit.feed);
   });
 
@@ -290,10 +273,5 @@ describe('cutting data', () => {
       leaveStock: 1,
       profileFinishStepdown: 4,
     });
-  });
-
-  it('keeps an older job’s full-feed final pass as this job’s choice', () => {
-    expect(toCamSettings({ ...kDefaultPlan, finalFeedFactor: 1 }).finalFeedFactor).toBe(1);
-    expect(toCamSettings({ ...kDefaultPlan, finalFeedFactor: 0.5 }).finalFeedFactor).toBe(0.5);
   });
 });

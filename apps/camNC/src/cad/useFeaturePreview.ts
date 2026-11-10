@@ -1,6 +1,6 @@
 import type { CadDocument } from '@wbcnc/cad';
 import { useEffect, useMemo, useState } from 'react';
-import { designSteps, rolledBackTo } from './designSteps';
+import { designSteps, rolledBackTo } from '@wbcnc/cad';
 import { offerFinalPreview } from './finalPreview';
 
 interface PreviewOptions {

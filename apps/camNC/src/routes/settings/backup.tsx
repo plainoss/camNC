@@ -107,17 +107,14 @@ function RestoreCard() {
   }
 
   const cameras = backup ? backupCameras(backup) : [];
-  const machineHost = backup?.kind === 'settings' ? backup.settings.machine?.host : undefined;
-  const replaces = backup?.kind === 'settings' && hasSettings;
+  const machineHost = backup?.machine?.host;
+  const replaces = !!backup && hasSettings;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Restore</CardTitle>
-        <CardDescription>
-          Load a backup made here, in the browser version or in the desktop app. A backup of a single camera from the old Debug page works
-          too.
-        </CardDescription>
+        <CardDescription>Load a backup made here, in the browser version or in the desktop app.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {backup && (
@@ -138,7 +135,7 @@ function RestoreCard() {
           <Button variant={backup ? 'outline' : 'default'} onClick={chooseFile}>
             <Upload className="size-4" /> {backup ? 'Choose another file…' : 'Choose backup file…'}
           </Button>
-          {backup && !replaces && <Button onClick={restore}>{backup.kind === 'camera' ? 'Add camera' : 'Restore'}</Button>}
+          {backup && !replaces && <Button onClick={restore}>Restore</Button>}
           {backup && replaces && (
             <AlertDialog>
               <AlertDialogTrigger asChild>

@@ -33,7 +33,6 @@ import { fixedConstraintConflicts } from './fixedConstraints';
 import { pointEquivalence, type CadPointEquivalence } from './pointEquivalence';
 import { classifyNativeEntities } from './entityFreedom';
 import { refreshDimensionMeasurement } from './dimensions';
-import { migrateDimensionPlacements } from './dimensionPlacement';
 import { applyCadVariables } from './variables';
 import { resolveDrawnPlacements } from './drawnOn';
 import { withFaceEdges } from './faceEdges';
@@ -518,7 +517,7 @@ function supportsFirst(parts: CadPart[]): CadPart[] {
 
 export async function solveCadDocument(document: CadDocument, options: CadSolveOptions = {}): Promise<CadSolveResult> {
   // Values that use variables follow them before anything is solved.
-  let next = migrateDimensionPlacements(resolveUpTo(resolveDatumPlanes(applyCadVariables(resolveExtrudeSteps(document)))));
+  let next = structuredClone(resolveUpTo(resolveDatumPlanes(applyCadVariables(resolveExtrudeSteps(document)))));
   for (const part of next.parts) {
     part.sketch = withSplineHandleSegments(part.sketch);
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);
