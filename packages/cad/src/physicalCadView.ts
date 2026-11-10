@@ -1,5 +1,36 @@
 import { activeDesign } from './suppression';
-import type { CadDocument, CadEvaluation } from './types';
+import type { CadDocument, CadEvaluation, CadPart, CadSketch } from './types';
+
+/** Retain generated coordinates and geometry; a physical query must not rebind them to a later source pose. */
+function frozenSketch(sketch: CadSketch): CadSketch {
+  let changed = false;
+  const entities = sketch.entities.map(entity => {
+    if (entity.type !== 'point' || !entity.used) return entity;
+    const { used: _used, ...point } = entity;
+    changed = true;
+    return point;
+  });
+  return changed ? { ...sketch, entities } : sketch;
+}
+
+function frozenBody(part: CadPart): CadPart {
+  const { drawnOn: _drawnOn, moved: _moved, faceProfile: _faceProfile, sketchOf: _sketchOf, addedRegions: _addedRegions, ...body } = part;
+  return {
+    ...body,
+    sketch: frozenSketch(part.sketch),
+    // Same-sketch Add rows are not physical pieces. Preserve their generated region union before dropping its link.
+    ...(part.regions && part.addedRegions?.length && { regions: [...new Set([...part.regions, ...part.addedRegions])] }),
+    ...(part.features && {
+      features: part.features.map(feature => {
+        // Remove generators are absent too; keep their cached cuts and named floors as ordinary local geometry.
+        const { removedBy: _removedBy, ...cached } = feature;
+        if (cached.type !== 'sketch') return cached;
+        const sketch = frozenSketch(cached.sketch);
+        return sketch === cached.sketch ? cached : { ...cached, sketch };
+      }),
+    }),
+  };
+}
 
 /**
  * Read-only projection shared by geometry consumers (assembly, faces, corners and backdrops), never saved or solved.
@@ -25,7 +56,9 @@ export function physicalCadView(source: CadDocument, evaluation: CadEvaluation):
         .map(part => {
           // A physical view freezes regeneration links. Legacy face/corner readers may regenerate copy placements before
           // reading them; doing that here must keep evaluated poses rather than recreating the original pattern slots.
-          const { pattern: _pattern, ...body } = part;
+          // Even an unplaced physical body has evaluated local geometry. Its Used/shared/face links must not
+          // regenerate that geometry against later poses; source-only sketches were filtered out above.
+          const { pattern: _pattern, ...body } = frozenBody(part);
           return {
             ...body,
             placement: poses[part.id],
