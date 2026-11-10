@@ -7,14 +7,18 @@ import { bindProposalRequirements, confirmRequirements, readRequirements, requir
 
 it('checks trusted measured geometry independently of script expectations', async () => {
   const base = createPlateDocument();
-  const checked = await editCad(base, d => {
-    const tray = d.newPart('Tray', { thickness: 40 });
-    tray.profile.rect({ at: [0, 0], w: 280, h: 190 });
-    const pocket = tray.sketchOn('top');
-    pocket.rect({ at: [18, 18], w: 244, h: 154 });
-    tray.cut(pocket.regionAt(100, 100), { depth: 30 });
-    tray.expect({ size: [280, 190] });
-  });
+  const checked = await editCad(
+    base,
+    d => {
+      const tray = d.newPart('Tray', { thickness: 40 });
+      tray.profile.rect({ at: [0, 0], w: 280, h: 190 });
+      const pocket = tray.sketchOn('top');
+      pocket.rect({ at: [18, 18], w: 244, h: 154 });
+      tray.cut(pocket.regionAt(100, 100), { depth: 30 });
+      tray.expect({ size: [280, 190] });
+    },
+    { toolpaths: false }
+  );
   expect(checked.ok).toBe(true);
   const requirements = {
     part: 'Tray',

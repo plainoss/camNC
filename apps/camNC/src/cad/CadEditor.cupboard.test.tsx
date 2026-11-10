@@ -123,10 +123,11 @@ it('inserts two cupboards, keeps one shelf hole through size/count changes, then
         text: '',
         calls: [{ id: `${prefix}-check`, name: 'check_design', arguments: { source: script } }],
       })
+      .mockResolvedValueOnce({ role: 'assistant', text: '', calls: [{ id: `${prefix}-finalize`, name: 'finalize_design', arguments: {} }] })
       .mockResolvedValueOnce({ role: 'assistant', text: 'Proposal: checked the requested cupboard change.' });
     await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), message);
     await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
-    await waitFor(() => expect(requestAssistant).toHaveBeenCalledTimes(callNumber * 3), { timeout: 60_000 });
+    await waitFor(() => expect(requestAssistant).toHaveBeenCalledTimes(callNumber * 4), { timeout: 60_000 });
     const preview = await within(dock).findByRole('button', { name: 'Preview proposal' }, { timeout: 60_000 });
     await waitFor(() => expect(preview).toHaveProperty('disabled', false));
     await userEvent.click(preview);
