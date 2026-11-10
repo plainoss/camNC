@@ -152,14 +152,23 @@ function fingersOutcome(step: CadPartCut, scope: CadValueScope): Outcome | null 
     : { error: 'A finger joint needs a whole number of fingers, at least 2.' };
 }
 
-/** A part pattern with its typed count and spacing worked out, or why one can't be. */
+/** A part pattern with its typed count, spacing and angle worked out, or why one can't be. */
 function partPatternOutcome(
   part: CadPart,
   scope: CadValueScope
-): { count: number; spacing: number } | { error: string; expression: string } | null {
+):
+  | { count: number; spacing: number; circular?: NonNullable<CadPart['pattern']>['circular'] }
+  | { error: string; expression: string }
+  | null {
   const pattern = part.pattern;
-  if (!pattern || (!usesVariables(pattern.countExpression) && !usesVariables(pattern.spacingExpression))) return null;
-  let { count, spacing } = pattern;
+  if (
+    !pattern ||
+    (!usesVariables(pattern.countExpression) &&
+      !usesVariables(pattern.spacingExpression) &&
+      !usesVariables(pattern.circular?.angleExpression))
+  )
+    return null;
+  let { count, spacing, circular } = pattern;
   if (usesVariables(pattern.countExpression)) {
     const parsed = parseCadValue(pattern.countExpression, { unit: 'scalar', variables: scope });
     if ('error' in parsed) return { error: parsed.error, expression: pattern.countExpression };
@@ -168,12 +177,17 @@ function partPatternOutcome(
     if (count < 1 || count > 200)
       return { error: 'A part pattern makes one to 200, counting the part itself.', expression: pattern.countExpression };
   }
-  if (usesVariables(pattern.spacingExpression)) {
+  if (!circular && usesVariables(pattern.spacingExpression)) {
     const parsed = parseCadValue(pattern.spacingExpression, { unit: 'mm', variables: scope });
     if ('error' in parsed) return { error: parsed.error, expression: pattern.spacingExpression };
     spacing = parsed.value;
   }
-  return { count, spacing };
+  if (circular && usesVariables(circular.angleExpression)) {
+    const parsed = parseCadValue(circular.angleExpression, { unit: 'deg', variables: scope });
+    if ('error' in parsed) return { error: parsed.error, expression: circular.angleExpression };
+    circular = parsed.value === circular.angle ? circular : { ...circular, angle: parsed.value };
+  }
+  return { count, spacing, ...(circular && { circular }) };
 }
 
 function reliefOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
@@ -349,7 +363,11 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     if (relief && 'value' in relief && relief.value !== sized.cornerRelief!.diameter)
       sized = { ...sized, cornerRelief: { ...sized.cornerRelief!, diameter: relief.value } };
     const pattern = partPatternOutcome(sized, scope);
-    if (pattern && 'count' in pattern && (pattern.count !== sized.pattern!.count || pattern.spacing !== sized.pattern!.spacing))
+    if (
+      pattern &&
+      'count' in pattern &&
+      (pattern.count !== sized.pattern!.count || pattern.spacing !== sized.pattern!.spacing || pattern.circular !== sized.pattern!.circular)
+    )
       sized = { ...sized, pattern: { ...sized.pattern!, ...pattern } };
     const removal = sized.remove && depthOutcome(sized.remove, scope);
     if (removal && 'value' in removal && removal.value !== sized.remove!.depth)
@@ -587,6 +605,9 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
                     ...part.pattern,
                     ...(part.pattern.countExpression && { countExpression: edit(part.pattern.countExpression) }),
                     ...(part.pattern.spacingExpression && { spacingExpression: edit(part.pattern.spacingExpression) }),
+                    ...(part.pattern.circular?.angleExpression && {
+                      circular: { ...part.pattern.circular, angleExpression: edit(part.pattern.circular.angleExpression) },
+                    }),
                   },
                 }),
               },

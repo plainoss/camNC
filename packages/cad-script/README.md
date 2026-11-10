@@ -214,10 +214,15 @@ export default design(d => {
 `d.existingCopy(nameOrHandle)` finds a copy, including a named pattern instance,
 without creating an empty part. `d.step(handleOrExactLabel)` finds a feature-list step;
 `set` accepts thickness on an extrude, depth on a cut, tools/targets/clearance on a
-cut-parts step, count/spacing/axis on a pattern, radius on a fillet, and suppression
+cut-parts step, count/spacing/axis on a linear pattern, radius on a fillet, and suppression
 on steps that support it. Unknown settings list the available ones. Removing a shelf
 from a housing step can leave interfering material: read the check and preview's
 cost before applying, and change the shelf's fit as well when necessary.
+
+For an existing circular part pattern, `set` accepts count and suppression while
+preserving its picked axis and angle. Edit its angle or axis in the Part Studio.
+`part.pattern(...)` creates a linear pattern and refuses an existing circular one;
+remove that pattern explicitly first when a conversion is intended.
 
 Use `d.removePart(partOrName)`, `d.removeCopy(copyOrName)`,
 `d.removePattern(partOrName)`, `d.removeStep(stepOrHandle)`, and

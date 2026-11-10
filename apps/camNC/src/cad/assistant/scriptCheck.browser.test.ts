@@ -126,6 +126,20 @@ describe('isolated browser design checks', () => {
     expect(start.parts).toEqual([]);
     expect(result.report.parts[0]).toMatchObject({ name: 'Panel', outline: { size: [100, 80] } });
   }, 45_000);
+  it('runs native script modules while CSP blocks JavaScript string evaluation', async () => {
+    const result = await checkScriptInBrowser(
+      createCadDocument(),
+      `d=>{
+      let blocked=false;
+      try{new Function('return 42')();}catch(error){blocked=error.name==='EvalError';}
+      if(!blocked)throw new Error('String evaluation must stay disabled.');
+      (${source})(d);
+    }`
+    );
+    expect(result.scriptError).toBeUndefined();
+    expect(result.ok).toBe(true);
+    expect(result.report.parts[0]).toMatchObject({ name: 'Panel', outline: { size: [100, 80] } });
+  }, 45_000);
   it.each(['fetch', 'localStorage', 'indexedDB', 'WebSocket'])(
     'refuses %s',
     async name => {

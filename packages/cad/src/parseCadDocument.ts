@@ -10,6 +10,7 @@ import { constraintEntityIds, entityPointIds } from './entityReferences';
 import { cadFolderIssue, cadFolderStepIssue } from './folderModel';
 import { designSteps } from './designSteps';
 import { cadDocumentVersion } from './documentVersion';
+import { validCircularPartPattern } from './circularPartPattern';
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
 export function parseCadDocument(input: unknown): CadDocument {
@@ -141,6 +142,8 @@ export function parseCadDocument(input: unknown): CadDocument {
           new Set(p.pattern.excluded).size !== p.pattern.excluded.length)
       )
         throw new Error('Invalid CAD pattern exclusions');
+      if (p.pattern?.circular !== undefined && !validCircularPartPattern(p.pattern.circular))
+        throw new Error('Invalid CAD circular part pattern');
       if (p.pattern?.direction !== undefined) checkDirection(p.pattern.direction);
       const vector = p.pattern?.vector;
       if (

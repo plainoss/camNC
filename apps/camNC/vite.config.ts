@@ -14,6 +14,9 @@ const ReactCompilerConfig = {
   target: '19',
 };
 
+// Colocated browser tests and their fixture are not routes; otherwise the router dumps their source as warnings.
+export const routeFileIgnorePattern = '(?:\\.(?:test|spec)|TestFixture)\\.[cm]?[jt]sx?$';
+
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
   const plugins: PluginOption[] = [
@@ -21,7 +24,7 @@ export default defineConfig(({ command }) => {
     cadSandboxPlugin(),
 
     tsconfigPaths(),
-    TanStackRouterVite({ target: 'react', autoCodeSplitting: true }),
+    TanStackRouterVite({ target: 'react', autoCodeSplitting: true, routeFileIgnorePattern }),
     react({
       babel: {
         plugins: [['babel-plugin-react-compiler', ReactCompilerConfig], ['module:@preact/signals-react-transform']],

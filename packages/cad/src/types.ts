@@ -446,6 +446,19 @@ export interface CadPartPattern {
   spacingExpression?: string;
   /** Detached logical positions, numbered from one after the source; they stay skipped through count edits. */
   excluded?: number[];
+  /** Turns copies about a line in assembly space instead of spacing them in a row. */
+  circular?: CadCircularPartPattern;
+}
+export interface CadCircularPartPattern {
+  /** A point on the picked axis, in assembly space. The picked line stays where it was picked. */
+  origin: [number, number, number];
+  axis: [number, number, number];
+  /** Degrees across the whole pattern when equally spaced, or between successive instances otherwise. */
+  angle: number;
+  angleExpression?: string;
+  /** Defaults to true. A full turn divides by the count, avoiding a second instance on top of the seed. */
+  equalSpacing?: boolean;
+  opposite?: boolean;
 }
 /** The face a sketch is drawn on. All sketches share the part's x and y, seen from above, whichever face they're on. */
 export type CadFaceRef = 'top' | 'underside' | { floorOf: string };

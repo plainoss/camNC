@@ -1,4 +1,5 @@
 [
+  "src/test/routeFiles.test.ts",
   "src/cad/studioCamera.test.ts",
   "src/cad/partCornerInference.test.ts",
   "src/cad/extrudeMergeTarget.test.ts",

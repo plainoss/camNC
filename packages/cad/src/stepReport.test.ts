@@ -120,6 +120,60 @@ describe('the step report', () => {
     expect(JSON.stringify(document)).toBe(before);
   });
 
+  it('reports the actual circular axis, angular mode and expressions without stale linear settings', () => {
+    const source = createPlateDocument({ width: 20, height: 30, thickness: 18 });
+    const part = source.parts[0]!;
+    const document = setPartPattern(source, part.id, {
+      axis: 'x',
+      spacing: 999,
+      count: 3,
+      countExpression: '#legs',
+      circular: {
+        origin: [1.123456, -0.000001, 3.987654],
+        axis: [0, 0.6, 0.8],
+        angle: 123.456789,
+        angleExpression: '#sweep',
+        equalSpacing: false,
+        opposite: true,
+      },
+    });
+    const before = JSON.stringify(document);
+    const report = cadStepReport(document, []);
+    expect(report).toEqual([
+      {
+        kind: 'pattern',
+        partId: part.id,
+        part: 'Plate',
+        count: 3,
+        countExpression: '#legs',
+        circular: {
+          origin: [1.123, 0, 3.988],
+          axis: [0, 0.6, 0.8],
+          angle: 123.457,
+          angleExpression: '#sweep',
+          equalSpacing: false,
+          opposite: true,
+        },
+        copies: [
+          { name: 'Plate 2', position: expect.any(Array) },
+          { name: 'Plate 3', position: expect.any(Array) },
+        ],
+      },
+    ]);
+    const entry = report[0];
+    if (entry?.kind !== 'pattern' || !entry.circular) throw new Error('Missing circular diagnostic');
+    entry.circular.origin[0] = 99;
+    entry.circular.axis[0] = 99;
+    expect(JSON.stringify(document)).toBe(before);
+    const defaults = setPartPattern(source, part.id, {
+      axis: 'x',
+      spacing: 999,
+      count: 4,
+      circular: { origin: [0, 0, 0], axis: [0, 0, 1], angle: 360 },
+    });
+    expect(cadStepReport(defaults, [])[0]).toMatchObject({ circular: { equalSpacing: true, opposite: false } });
+  });
+
   it('says what each step refers to and what it came to: the face, the copies and every opening', async () => {
     const side = plate('Side', 300, 720, { on: { plane: 'right' }, offset: 0 });
     // A shelf 250 deep on the top plane, raised to 300 mm, running through the side's thickness.

@@ -38,11 +38,14 @@ it('lists all available workflows without solving or writing artifacts, and filt
     'cupboard',
     'divided-tray',
     'fitted-joints',
+    'radial-stool',
     'tray-missing-tool',
     'joint-unconstrained',
   ]);
   expect(all.report.workflows.slice(0, 3).every((w: any) => w.checkpoints.length === 8)).toBe(true);
-  expect(all.report.workflows.slice(3).every((w: any) => w.unsupportedCheckpoints.length === 1)).toBe(true);
+  expect(all.report.workflows[3].checkpoints).toHaveLength(6);
+  expect(all.report.workflows.slice(0, 4).every((w: any) => w.unsupportedCheckpoints.length === 0)).toBe(true);
+  expect(all.report.workflows.slice(4).every((w: any) => w.unsupportedCheckpoints.length === 1)).toBe(true);
   const selected = await run(['--workflow', 'fitted-joints', '--list'], base);
   expect(selected.report.workflows.map((w: any) => w.key)).toEqual(['fitted-joints']);
   await expect(access(path.join(base, 'test-results'))).rejects.toThrow();

@@ -67,7 +67,10 @@ CAM acceptance remain the ordinary manual workflow.
 Scripts execute in a disposable worker hosted by an opaque sandboxed frame. The
 runtime and solver are bundled locally. CSP blocks external connections, the
 opaque origin denies application storage, and no key or apply capability is
-passed in. A private message channel carries results. The application inspects
+passed in. Scripts load as local native modules; CSP disables JavaScript string
+evaluation while permitting the solver's WebAssembly. User code remains arbitrary
+JavaScript: the disposable opaque worker is the security boundary. A private
+message channel carries results. The application inspects
 the returned ordinary document again using its own runtime before trusting a
 successful result. Stop and the timeout terminate the worker, including an
 infinite loop. The same script API validates method and option names at runtime.

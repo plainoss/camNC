@@ -2,7 +2,7 @@ import { initializeCadSolver, parseCadDocument } from '@wbcnc/cad';
 import { cupboard } from '../../../../../packages/cad-script/src/cupboard';
 import { editCad, type CadScript } from '../../../../../packages/cad-script/src/edit';
 
-function scriptFrom(source: string): CadScript {
+async function scriptFrom(source: string): Promise<CadScript> {
   if (typeof source !== 'string' || source.length > 256_000) throw new Error('A script must be JavaScript text of at most 256 KB.');
   const expression = source
     .replace(/^\s*import\s*\{([^}]+)\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/, (_line, names: string) => {
@@ -13,10 +13,17 @@ function scriptFrom(source: string): CadScript {
     .replace(/^\s*export\s*\{\s*cupboard\s*\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/m, '')
     .replace(/^\s*export\s+default\s+/m, '')
     .replace(/;\s*$/, '');
-  // Plain JavaScript only; no module loader, filesystem or application APIs are passed into the script.
-  const script = new Function('design', 'cupboard', `"use strict"; return (${expression});`)((fn: CadScript) => fn, cupboard) as unknown;
-  if (typeof script !== 'function') throw new Error('Export default design(d => { ... }) or pass a JavaScript function.');
-  return script as CadScript;
+  // Native module parsing keeps string evaluation disabled by CSP. This module still runs only inside the disposable
+  // opaque worker; importing it never grants application storage, network access, provider keys or an Apply capability.
+  const url = URL.createObjectURL(new Blob([`export default (design, cupboard) => (\n${expression}\n);`], { type: 'text/javascript' }));
+  try {
+    const loaded = await import(/* @vite-ignore */ url);
+    const script = loaded.default((fn: CadScript) => fn, cupboard) as unknown;
+    if (typeof script !== 'function') throw new Error('Export default design(d => { ... }) or pass a JavaScript function.');
+    return script as CadScript;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 self.addEventListener('message', async function run(event: MessageEvent) {
@@ -60,7 +67,7 @@ self.addEventListener('message', async function run(event: MessageEvent) {
         },
       });
     }
-    const script = scriptFrom(event.data.source);
+    const script = await scriptFrom(event.data.source);
     const result = await editCad(start, d => {
       const returned = script(d) as unknown;
       if (returned && typeof returned === 'object' && 'then' in returned) throw new Error('Design scripts must finish synchronously.');

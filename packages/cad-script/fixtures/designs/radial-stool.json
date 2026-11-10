@@ -1,0 +1,384 @@
+{
+  "version": 1,
+  "id": "woodworking:radial-stool",
+  "name": "Radial stool",
+  "revision": 1,
+  "parts": [
+    {
+      "id": "stool:seat",
+      "name": "Seat",
+      "thickness": 18,
+      "thicknessExpression": "board",
+      "sketch": {
+        "id": "stool:seat:sketch",
+        "entities": [
+          {
+            "id": "stool:seat:sketch:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "stool:seat:p0",
+            "type": "point",
+            "x": 230.0,
+            "y": 0.0,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p1",
+            "type": "point",
+            "x": 199.185842870421,
+            "y": 115.0,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p2",
+            "type": "point",
+            "x": 115.0,
+            "y": 199.185842870421,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p3",
+            "type": "point",
+            "x": 0.0,
+            "y": 230.0,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p4",
+            "type": "point",
+            "x": -115.0,
+            "y": 199.185842870421,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p5",
+            "type": "point",
+            "x": -199.185842870421,
+            "y": 115.0,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p6",
+            "type": "point",
+            "x": -230.0,
+            "y": 0.0,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p7",
+            "type": "point",
+            "x": -199.185842870421,
+            "y": -115.0,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p8",
+            "type": "point",
+            "x": -115.0,
+            "y": -199.185842870421,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p9",
+            "type": "point",
+            "x": -0.0,
+            "y": -230.0,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p10",
+            "type": "point",
+            "x": 115.0,
+            "y": -199.185842870421,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:p11",
+            "type": "point",
+            "x": 199.185842870421,
+            "y": -115.0,
+            "fixed": true
+          },
+          {
+            "id": "stool:seat:l0",
+            "type": "line",
+            "startId": "stool:seat:p0",
+            "endId": "stool:seat:p1"
+          },
+          {
+            "id": "stool:seat:l1",
+            "type": "line",
+            "startId": "stool:seat:p1",
+            "endId": "stool:seat:p2"
+          },
+          {
+            "id": "stool:seat:l2",
+            "type": "line",
+            "startId": "stool:seat:p2",
+            "endId": "stool:seat:p3"
+          },
+          {
+            "id": "stool:seat:l3",
+            "type": "line",
+            "startId": "stool:seat:p3",
+            "endId": "stool:seat:p4"
+          },
+          {
+            "id": "stool:seat:l4",
+            "type": "line",
+            "startId": "stool:seat:p4",
+            "endId": "stool:seat:p5"
+          },
+          {
+            "id": "stool:seat:l5",
+            "type": "line",
+            "startId": "stool:seat:p5",
+            "endId": "stool:seat:p6"
+          },
+          {
+            "id": "stool:seat:l6",
+            "type": "line",
+            "startId": "stool:seat:p6",
+            "endId": "stool:seat:p7"
+          },
+          {
+            "id": "stool:seat:l7",
+            "type": "line",
+            "startId": "stool:seat:p7",
+            "endId": "stool:seat:p8"
+          },
+          {
+            "id": "stool:seat:l8",
+            "type": "line",
+            "startId": "stool:seat:p8",
+            "endId": "stool:seat:p9"
+          },
+          {
+            "id": "stool:seat:l9",
+            "type": "line",
+            "startId": "stool:seat:p9",
+            "endId": "stool:seat:p10"
+          },
+          {
+            "id": "stool:seat:l10",
+            "type": "line",
+            "startId": "stool:seat:p10",
+            "endId": "stool:seat:p11"
+          },
+          {
+            "id": "stool:seat:l11",
+            "type": "line",
+            "startId": "stool:seat:p11",
+            "endId": "stool:seat:p0"
+          }
+        ],
+        "constraints": []
+      },
+      "drawnOn": {
+        "on": {
+          "plane": "top"
+        },
+        "offset": 400,
+        "offsetExpression": "height"
+      }
+    },
+    {
+      "id": "stool:leg",
+      "name": "Leg",
+      "thickness": 18,
+      "thicknessExpression": "board",
+      "sketch": {
+        "id": "stool:leg:sketch",
+        "entities": [
+          {
+            "id": "stool:leg:sketch:origin",
+            "type": "point",
+            "x": 0,
+            "y": 0,
+            "fixed": true,
+            "construction": true
+          },
+          {
+            "id": "stool:leg:p0",
+            "type": "point",
+            "x": -30,
+            "y": 0
+          },
+          {
+            "id": "stool:leg:p1",
+            "type": "point",
+            "x": 30,
+            "y": 0
+          },
+          {
+            "id": "stool:leg:p2",
+            "type": "point",
+            "x": 30,
+            "y": 400
+          },
+          {
+            "id": "stool:leg:p3",
+            "type": "point",
+            "x": -30,
+            "y": 400
+          },
+          {
+            "id": "stool:leg:l0",
+            "type": "line",
+            "startId": "stool:leg:p0",
+            "endId": "stool:leg:p1"
+          },
+          {
+            "id": "stool:leg:l1",
+            "type": "line",
+            "startId": "stool:leg:p1",
+            "endId": "stool:leg:p2"
+          },
+          {
+            "id": "stool:leg:l2",
+            "type": "line",
+            "startId": "stool:leg:p2",
+            "endId": "stool:leg:p3"
+          },
+          {
+            "id": "stool:leg:l3",
+            "type": "line",
+            "startId": "stool:leg:p3",
+            "endId": "stool:leg:p0"
+          }
+        ],
+        "constraints": [
+          {
+            "id": "stool:leg:x0",
+            "type": "positionX",
+            "pointId": "stool:leg:p0",
+            "value": -30
+          },
+          {
+            "id": "stool:leg:y0",
+            "type": "positionY",
+            "pointId": "stool:leg:p0",
+            "value": 0
+          },
+          {
+            "id": "stool:leg:x1",
+            "type": "positionX",
+            "pointId": "stool:leg:p1",
+            "value": 30
+          },
+          {
+            "id": "stool:leg:y1",
+            "type": "positionY",
+            "pointId": "stool:leg:p1",
+            "value": 0
+          },
+          {
+            "id": "stool:leg:x2",
+            "type": "positionX",
+            "pointId": "stool:leg:p2",
+            "value": 30
+          },
+          {
+            "id": "stool:leg:y2",
+            "type": "positionY",
+            "pointId": "stool:leg:p2",
+            "value": 400,
+            "expression": "height"
+          },
+          {
+            "id": "stool:leg:x3",
+            "type": "positionX",
+            "pointId": "stool:leg:p3",
+            "value": -30
+          },
+          {
+            "id": "stool:leg:y3",
+            "type": "positionY",
+            "pointId": "stool:leg:p3",
+            "value": 400,
+            "expression": "height"
+          }
+        ]
+      },
+      "drawnOn": {
+        "on": {
+          "plane": "front"
+        },
+        "offset": 0
+      },
+      "moved": {
+        "by": [
+          150,
+          9,
+          0
+        ],
+        "byExpressions": [
+          "radius",
+          "board/2",
+          null
+        ]
+      },
+      "pattern": {
+        "id": "stool:leg:pattern",
+        "axis": "z",
+        "count": 4,
+        "countExpression": "legs",
+        "spacing": 100,
+        "circular": {
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "angle": 360
+        }
+      },
+      "copies": [
+        {
+          "id": "stool:leg:pattern:1",
+          "pattern": "stool:leg:pattern"
+        },
+        {
+          "id": "stool:leg:pattern:2",
+          "pattern": "stool:leg:pattern"
+        },
+        {
+          "id": "stool:leg:pattern:3",
+          "pattern": "stool:leg:pattern"
+        }
+      ]
+    }
+  ],
+  "variables": [
+    {
+      "id": "stool:variable:board",
+      "name": "board",
+      "expression": "18mm"
+    },
+    {
+      "id": "stool:variable:radius",
+      "name": "radius",
+      "expression": "150mm"
+    },
+    {
+      "id": "stool:variable:legs",
+      "name": "legs",
+      "expression": "4"
+    },
+    {
+      "id": "stool:variable:height",
+      "name": "height",
+      "expression": "400mm"
+    }
+  ]
+}

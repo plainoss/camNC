@@ -135,9 +135,13 @@ export function existingDesignEdit(
       partCut: ['tools', 'targets', 'clearance', 'suppressed'],
       fillet: ['radius', 'suppressed'],
     };
-    const allowed = fields[step.kind];
+    const circularPattern = step.kind === 'pattern' && !!getPart(step.partId).pattern?.circular;
+    const allowed = circularPattern ? ['count', 'suppressed'] : fields[step.kind];
     const unknown = Object.keys(settings).find(key => !allowed.includes(key));
-    if (unknown) fail(`${step.kind} has no setting ${unknown}. Available settings: ${allowed.join(', ') || '(none)'}.`);
+    if (unknown)
+      fail(
+        `${circularPattern ? 'Circular pattern' : step.kind} has no setting ${unknown}. Available settings: ${allowed.join(', ') || '(none)'}.`
+      );
     if (settings.suppressed !== undefined && typeof settings.suppressed !== 'boolean') fail('suppressed must be true or false.');
     if (step.kind === 'partCut') {
       const ids = (items: readonly (PartEdit | PartCopy)[], what: string) => {

@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { type CadDrawnOn, setPartPattern, renamePartCopy, type CadDocument, type CadPart, type CadValueScope } from '@wbcnc/cad';
 import { CadCopyNames } from './CadCopyNames';
 import { CadPartPatternField } from './CadPartPatternField';
 import { FeatureDialog } from './FeatureDialog';
+import { CircularPartPatternField } from './CircularPartPatternField';
+import { circularPartPatternStart } from './circularPartPatternStart';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -20,7 +22,7 @@ import type { CadConnectorPick } from './TransformDialog';
 
 export { ExtrudeDialog } from './ExtrudeDialog';
 
-/** Copies of a whole part in a row, and what each piece is called. */
+/** Copies of a whole part in a row or around an axis, and what each piece is called. */
 export function PartPatternDialog({
   document,
   part,
@@ -31,28 +33,105 @@ export function PartPatternDialog({
   pickDirection,
   pickPoint,
 }: PartDialogProps & {
-  pickDirection?: (picked: (on: CadDrawnOn['on']) => void) => void;
+  pickDirection?: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
   /** Starts picking in the view, for an edge to pattern along. Null stops it. */
   pickPoint?: (picked: ((pick: CadConnectorPick) => void) | null) => void;
 }) {
+  const id = useId();
+  const initialPattern = useRef(part.pattern);
+  const [problem, setProblem] = useState<string | null>(null);
+  const circular = part.pattern?.circular;
+  const latestPickDirection = useRef(pickDirection);
+  latestPickDirection.current = pickDirection;
   // Closed while picking, the view stops picking.
-  useEffect(() => () => pickPoint?.(null), [pickPoint]);
+  useEffect(
+    () => () => {
+      pickPoint?.(null);
+      latestPickDirection.current?.(null);
+    },
+    [pickPoint]
+  );
   return (
-    <FeatureDialog title={`Linear pattern · ${part.name}`} onOk={onOk} onCancel={onCancel}>
+    <FeatureDialog
+      title={`${circular ? 'Circular' : 'Linear'} pattern · ${part.name}`}
+      onOk={onOk}
+      onCancel={onCancel}
+      okDisabled={!!problem}
+      okReason={problem}>
+      <label htmlFor={`${id}-type`} className="cad-number-field">
+        Pattern type
+        <span>
+          <select
+            id={`${id}-type`}
+            value={circular ? 'circular' : 'linear'}
+            onChange={event => {
+              pickPoint?.(null);
+              pickDirection?.(null);
+              setProblem(null);
+              const current = part.pattern;
+              const fresh =
+                !initialPattern.current &&
+                current?.count === 2 &&
+                current.spacing === 100 &&
+                current.axis === 'x' &&
+                !current.countExpression &&
+                !current.spacingExpression &&
+                !current.direction &&
+                !current.vector;
+              const pattern =
+                event.currentTarget.value === 'circular'
+                  ? circularPartPatternStart(fresh ? undefined : current)
+                  : {
+                      axis: current?.axis ?? 'x',
+                      count: current?.count ?? 2,
+                      spacing: current?.spacing ?? 100,
+                      ...(current?.suppressed && { suppressed: current.suppressed }),
+                      ...(current?.countExpression && { countExpression: current.countExpression }),
+                    };
+              onChange(document => setPartPattern(document, part.id, pattern));
+            }}>
+            <option value="linear">Linear</option>
+            <option value="circular">Circular</option>
+          </select>
+        </span>
+      </label>
       <div className="cad-feature-selection">
         <small>Part to pattern</small>
         <span>{part.name}</span>
       </div>
-      <CadPartPatternField
-        key={`${part.id}:pattern`}
-        ready
-        pattern={part.pattern}
-        document={document}
-        pickDirection={pickDirection}
-        pickEdge={pickPoint && (picked => pickPoint(pick => picked(pick.edge ?? null)))}
-        variables={variables}
-        onChange={pattern => onChange(document => setPartPattern(document, part.id, pattern))}
-      />
+      {circular && part.pattern ? (
+        <CircularPartPatternField
+          key={`${part.id}:circular-pattern`}
+          pattern={{ ...part.pattern, circular }}
+          variables={variables}
+          pickPoint={pickPoint}
+          onValidityChange={setProblem}
+          onChange={pattern => onChange(document => setPartPattern(document, part.id, pattern))}
+        />
+      ) : (
+        <CadPartPatternField
+          key={`${part.id}:pattern`}
+          ready
+          pattern={part.pattern}
+          document={document}
+          pickDirection={
+            pickDirection &&
+            (picked => {
+              pickPoint?.(null);
+              pickDirection(picked);
+            })
+          }
+          pickEdge={
+            pickPoint &&
+            (picked => {
+              pickDirection?.(null);
+              pickPoint(pick => picked(pick.edge ?? null));
+            })
+          }
+          variables={variables}
+          onChange={pattern => onChange(document => setPartPattern(document, part.id, pattern))}
+        />
+      )}
       <CadCopyNames part={part} onRename={(copyId, name) => onChange(document => renamePartCopy(document, part.id, copyId, name))} />
     </FeatureDialog>
   );
