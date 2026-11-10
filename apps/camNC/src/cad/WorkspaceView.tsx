@@ -29,6 +29,9 @@ import type { CadConnectorPick } from './TransformDialog';
 import type { ExtrudeDepthControl } from './extrudeDepth';
 import { useStudioMeasure } from './useStudioMeasure';
 import { StudioMeasurePanel } from './StudioMeasurePanel';
+import { useStudioSection } from './useStudioSection';
+import { sectionModel } from './sectionModel';
+import { StudioSectionControls, StudioSectionInspector } from './StudioSectionControls';
 
 const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
@@ -151,8 +154,8 @@ export default function WorkspaceView({
   useLayoutEffect(() => {
     onReady?.();
   }, [onReady]);
-  const lastClick = useRef<{ partId: string; face: string; at: number } | null>(null);
-  const model = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
+  const lastClick = useRef<{ partId: string; face: string; at: number; topology: object } | null>(null);
+  const assembly = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
   const clashes = useMemo(() => {
     // Sketches not yet extruded take up no space.
     const sketches = new Set(document.parts.filter(part => !isCadBody(document, part)).map(part => part.id));
@@ -193,17 +196,33 @@ export default function WorkspaceView({
   const controlled = choosingProp !== undefined;
   const choosing = controlled ? choosingProp : ownChoosing;
   const setChoosing = (value: boolean) => (controlled ? onChoosingChange?.(value) : setOwnChoosing(value));
-  // A mirror picker owns geometry input even without the editor's broader feature-dialog flag.
+  // Feature pickers must own the first render, before an effect has closed the section's old picker state.
+  const sectionEnabled = measurementEnabled && !choosing && !pickingMirrorPlane && !onPickPoint && !(onPickRegion && regions?.length);
+  const section = useStudioSection(document, assembly, frame, sectionEnabled, onViewRequest, selectedPlane, selectedFace);
+  const sectionEditing = sectionEnabled && section.editing;
+  const sectionPicking = sectionEnabled && section.picking;
+  const model = useMemo(() => sectionModel(assembly, section.plane), [assembly, section.plane]);
+  const sectionProblem = model.sectionProblems.length
+    ? `Section unavailable: ${model.sectionProblems.map(item => `${item.name}: ${item.message}`).join('; ')} Showing the full model.`
+    : null;
+  const sectionAvailable = model.sectionProblems.length === 0;
+  // Hiding an unsupported body can change a full-model fallback into a valid section without editing the design.
+  const inspectionTopology = useMemo(
+    () => ({ plane: section.plane, available: sectionAvailable, editing: section.editing }),
+    [section.plane, sectionAvailable, section.editing]
+  );
+  useEffect(() => {
+    if (section.active) {
+      // Inspection uses assembled geometry; a pending animation must not move its cut solids afterward.
+      explosion.scrub(0);
+      setView('assembled');
+    }
+    // The scrub callback reads playback refs. Cancel once on entry rather than on each offset preview.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section.active]);
   // The Assembled button changes first; parts can still be animating back in the rendered exploded layout.
-  const measureEnabled =
-    measurementEnabled &&
-    view === 'assembled' &&
-    explosion.modelView === 'assembled' &&
-    !choosing &&
-    !pickingMirrorPlane &&
-    !onPickPoint &&
-    !(onPickRegion && regions?.length);
-  const measure = useStudioMeasure(document, model, frame, measureEnabled);
+  const measureEnabled = sectionEnabled && view === 'assembled' && explosion.modelView === 'assembled' && !sectionEditing;
+  const measure = useStudioMeasure(document, model, frame, measureEnabled, inspectionTopology);
   const [notice, setNotice] = useState<string | null>(null);
   // Escape stops picking, so the view takes the keyboard while it picks.
   useEffect(() => {
@@ -211,6 +230,7 @@ export default function WorkspaceView({
   }, [choosing]);
   /** The face of a part a click landed on, as a new part can be drawn on it. */
   const faceAt = (pick: ModelFacePick) => {
+    if (pick.sectionCap) return null;
     const instance = model.instances[pick.index]!;
 
     const part = document.parts.find(candidate => candidate.id === instance.partId)!;
@@ -256,25 +276,29 @@ export default function WorkspaceView({
   const selectedFaceIndex = selectedFace
     ? model.instances.findIndex(instance => instance.partId === selectedFace.partId && instance.copyId === selectedFace.copyId)
     : -1;
-  const status = notice
-    ? notice
-    : measure.expanded
-      ? 'Select vertices, straight edges or flat faces to measure. Click a selected item again to remove it.'
-      : onPickPoint
-        ? 'Click an edge, a corner or the middle of a face.'
-        : choosing
-          ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
-          : picked
-            ? `Picked ${picked}: Sketch or Shift+S draws on it.`
-            : clashes.length
-              ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
-              : model.problems.length
-                ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
-                : view === 'flat'
-                  ? 'Each part turned so its machined side faces up, the way it lies on the board.'
-                  : model.meshes.length
-                    ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
-                    : 'Draw a part to start.';
+  const status =
+    sectionProblem ??
+    (sectionEnabled && section.active && section.reason ? `Section view: ${section.reason}` : null) ??
+    (sectionPicking ? 'Pick a planar model face, or choose a section plane.' : null) ??
+    (notice
+      ? notice
+      : measure.expanded
+        ? 'Select vertices, straight edges or flat faces to measure. Click a selected item again to remove it.'
+        : onPickPoint
+          ? 'Click an edge, a corner or the middle of a face.'
+          : choosing
+            ? 'Click the face of a part to draw the new part on, or pick a plane. Esc cancels.'
+            : picked
+              ? `Picked ${picked}: Sketch or Shift+S draws on it.`
+              : clashes.length
+                ? `${clashes.map(clash => `${clash.parts[0]} and ${clash.parts[1]}`).join(', ')} take up the same space.`
+                : model.problems.length
+                  ? `Not shown: ${model.problems.map(problem => `${problem.name} (${problem.message})`).join(', ')}`
+                  : view === 'flat'
+                    ? 'Each part turned so its machined side faces up, the way it lies on the board.'
+                    : model.meshes.length
+                      ? 'Click a part to select it, double-click to work on it. Right-drag to turn, middle-drag to pan.'
+                      : 'Draw a part to start.');
   return (
     <div
       ref={frame}
@@ -291,12 +315,17 @@ export default function WorkspaceView({
       <div className="cad-part-view-tools cad-assembly-tools">
         <div role="group" aria-label="Workspace view" className="cad-view-switch">
           {kViews.map(option => (
-            <button key={option.view} type="button" aria-pressed={view === option.view} onClick={() => explosion.chooseView(option.view)}>
+            <button
+              key={option.view}
+              type="button"
+              aria-pressed={(section.active ? 'assembled' : view) === option.view}
+              disabled={section.active && option.view !== 'assembled'}
+              onClick={() => explosion.chooseView(option.view)}>
               {option.label}
             </button>
           ))}
         </div>
-        {view === 'exploded' && <ExplosionSlider progress={explosion.progress} onChange={explosion.scrub} />}
+        {!section.active && view === 'exploded' && <ExplosionSlider progress={explosion.progress} onChange={explosion.scrub} />}
         {controlled && (
           <select aria-label="Display" value={display} onChange={event => setDisplay(event.target.value as ModelDisplay)}>
             {kDisplays.map(option => (
@@ -306,12 +335,13 @@ export default function WorkspaceView({
             ))}
           </select>
         )}
+        <StudioSectionControls section={section} enabled={sectionEnabled} />
         <button
           type="button"
           aria-label="Measure"
           aria-keyshortcuts="["
           aria-pressed={measure.expanded}
-          disabled={!measurementEnabled || choosing || pickingMirrorPlane || !model.meshes.length}
+          disabled={!sectionEnabled || sectionEditing || !model.meshes.some(mesh => mesh.indices.length > 0)}
           onClick={() => {
             // Inspection uses assembled coordinates immediately; an old playback frame must not move them again.
             explosion.scrub(0);
@@ -352,9 +382,12 @@ export default function WorkspaceView({
           label: end === 'from' ? 'Source mate connector' : 'Destination mate connector',
         }))}
         meshes={model.meshes}
+        sourceMeshes={assembly.meshes}
+        sectionCaps={model.sectionCaps}
+        sectionControl={sectionEnabled && !sectionProblem ? section.control : null}
         parts={model.parts}
-        view={explosion.modelView}
-        explosionProgress={explosion.progress}
+        view={section.active ? 'assembled' : explosion.modelView}
+        explosionProgress={section.active ? 0 : explosion.progress}
         viewRequest={viewRequest}
         onViewRequest={onViewRequest}
         transparentIds={transparentIds}
@@ -376,7 +409,7 @@ export default function WorkspaceView({
         palette={controlled ? 'studio' : undefined}
         highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
-        onPickFace={pickingMirrorPlane ? pickMirrorFace : choosing ? pickFace : undefined}
+        onPickFace={pickingMirrorPlane ? pickMirrorFace : sectionPicking ? section.pickFace : choosing ? pickFace : undefined}
         onMeasurePick={
           measureEnabled
             ? pick => {
@@ -393,7 +426,7 @@ export default function WorkspaceView({
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
         onPickSketch={
-          !measure.expanded && onPickSketch
+          !sectionEditing && !measure.expanded && onPickSketch
             ? id => {
                 measure.clear();
                 lastClick.current = null;
@@ -403,7 +436,7 @@ export default function WorkspaceView({
         }
         display={controlled ? display : 'shaded'}
         showOrigin={!!onNewPart && showPlanes && (featureShown?.('origin') ?? true)}
-        regions={[...(regions ?? []), ...(measure.expanded ? [] : sketchRegions)]}
+        regions={[...(regions ?? []), ...(measure.expanded || sectionEditing ? [] : sketchRegions)]}
         onPickRegion={id => {
           if (sketchRegions.some(region => region.id === id)) {
             measure.clear();
@@ -413,6 +446,7 @@ export default function WorkspaceView({
           } else onPickRegion?.(id);
         }}
         onPickPlane={id => {
+          if (sectionEnabled && section.pickPlane(id)) return;
           measure.clear();
           if (measure.expanded) return;
           // Picked while choosing, the new part is drawn on it; otherwise it's picked for the next sketch, as a face is.
@@ -427,6 +461,7 @@ export default function WorkspaceView({
           const instance = model.instances[index]!,
             partId = instance.partId;
           if (onPickPoint) {
+            if (pick?.sectionCap) return setNotice('Pick a model corner or edge; the section surface is temporary.');
             if (!pick) return setNotice('Click a face of a part: its corners and middle snap.');
             setNotice(null);
             return onPickPoint({
@@ -444,11 +479,16 @@ export default function WorkspaceView({
           const now = Date.now();
           const key = instanceKey(instance);
           // Changing faces quickly is another selection, not a request to edit the body's base sketch.
-          if (lastClick.current?.partId === key && lastClick.current.face === faceKey && now - lastClick.current.at < kDoubleClickMs) {
+          if (
+            lastClick.current?.topology === inspectionTopology &&
+            lastClick.current.partId === key &&
+            lastClick.current.face === faceKey &&
+            now - lastClick.current.at < kDoubleClickMs
+          ) {
             lastClick.current = null;
             return onOpen(partId, instance.copyId);
           }
-          lastClick.current = { partId: key, face: faceKey, at: now };
+          lastClick.current = { partId: key, face: faceKey, at: now, topology: inspectionTopology };
           onSelect(partId, instance.copyId);
           frame.current?.focus({ preventScroll: true });
         }}
@@ -467,6 +507,7 @@ export default function WorkspaceView({
         onRemove={measure.remove}
         onSelectRow={measure.selectRow}
       />
+      {sectionEnabled && <StudioSectionInspector section={section} problem={sectionProblem} />}
       {children}
     </div>
   );

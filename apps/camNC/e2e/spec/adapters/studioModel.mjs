@@ -58,7 +58,7 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
     if (JSON.stringify(want) !== JSON.stringify(got)) failures.push(`studio/${label}: wanted ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
   };
   for (const [key, wanted] of Object.entries(expected)) {
-    if (['variables', 'copies', 'measurements'].includes(key)) {
+    if (['variables', 'copies', 'measurements', 'section'].includes(key)) {
       for (const [name, value] of Object.entries(wanted)) equal(`${key}/${name}`, value, actual[key]?.[name]);
     } else if (['patterns', 'offsets'].includes(key)) {
       for (const [name, fields] of Object.entries(wanted)) {

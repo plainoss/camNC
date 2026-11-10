@@ -1,0 +1,23 @@
+.cad-editor .cad-section-offset-handle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 38px;
+  padding: 1px;
+  border: 0;
+  background: transparent;
+  touch-action: none;
+  cursor: ns-resize;
+}
+.cad-section-offset-handle svg {
+  width: 24px;
+  height: 36px;
+  fill: #fff4d2;
+  stroke: #b78628;
+  stroke-width: 1.5;
+  overflow: visible;
+}
+.cad-section-offset-handle:focus-visible {
+  outline: 2px solid #2762a8;
+  outline-offset: 3px;
+}
