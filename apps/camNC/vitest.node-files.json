@@ -1,5 +1,8 @@
 [
   "src/test/routeFiles.test.ts",
+  "src/cad/partEdgeUse.test.ts",
+  "src/cad/partEdges.test.ts",
+  "src/cad/studioUsedEdgeOwners.test.ts",
   "src/cad/measureGeometry.test.ts",
   "src/cad/studioMeasurements.test.ts",
   "src/cad/stoolOutline.test.ts",

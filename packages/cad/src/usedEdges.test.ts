@@ -140,3 +140,19 @@ it('updates a copy-bound vertex from its source’s move before saved copy place
   base.pattern.spacing = 250;
   expect(withUsedPoints(document, target).entities.find(entity => entity.id === 'used-copy')).toMatchObject({ x: 390, y: 18 });
 });
+
+it('restricts corner lookup to an exact physical instance without falling back to another copy or the seed', () => {
+  const document = design(),
+    source = document.parts[0]!,
+    target = document.parts[1]!;
+  source.copies = [{ id: 'copy', placement: { position: [100, 0, 0], rotation: [0, 0, 0, 1] } }];
+  const before = JSON.stringify(document),
+    frame = cadSketchFrame(document, target)!;
+  const copy = cadCornerSources(document, frame, target.id, { partId: source.id, copyId: 'copy' });
+  expect(copy.size).toBeGreaterThan(0);
+  expect([...copy.values()].every(reference => reference.partId === source.id && reference.copyId === 'copy')).toBe(true);
+  const seed = cadCornerSources(document, frame, target.id, { partId: source.id });
+  expect([...seed.values()].every(reference => reference.copyId === undefined)).toBe(true);
+  expect(cadCornerSources(document, frame, target.id, { partId: source.id, copyId: 'gone' }).size).toBe(0);
+  expect(JSON.stringify(document)).toBe(before);
+});
