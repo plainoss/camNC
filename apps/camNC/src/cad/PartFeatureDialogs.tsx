@@ -32,10 +32,13 @@ export function PartPatternDialog({
   onCancel,
   pickDirection,
   pickPoint,
+  blockedReason,
 }: PartDialogProps & {
   pickDirection?: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
   /** Starts picking in the view, for an edge to pattern along. Null stops it. */
   pickPoint?: (picked: ((pick: CadConnectorPick) => void) | null) => void;
+  /** A stale studio transaction cannot replace a newer source, even if its local fields are valid. */
+  blockedReason?: string | null;
 }) {
   const id = useId();
   const initialPattern = useRef(part.pattern);
@@ -56,8 +59,9 @@ export function PartPatternDialog({
       title={`${circular ? 'Circular' : 'Linear'} pattern · ${part.name}`}
       onOk={onOk}
       onCancel={onCancel}
-      okDisabled={!!problem}
-      okReason={problem}>
+      okDisabled={!!problem || !!blockedReason}
+      okReason={blockedReason ?? problem}>
+      {blockedReason && <p role="alert">{blockedReason}</p>}
       <label htmlFor={`${id}-type`} className="cad-number-field">
         Pattern type
         <span>
