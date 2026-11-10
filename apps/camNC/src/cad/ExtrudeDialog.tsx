@@ -12,6 +12,7 @@ import {
   partIsBuiltOn,
   removalRegions,
   removeSupport,
+  copyFaceOperationProblem,
   isSpatialRemoval,
   removalTargets,
   removalInward,
@@ -143,6 +144,7 @@ export function ExtrudeDialog({
     if (next === operation) return;
     if (next !== 'new') {
       const refused =
+        copyFaceOperationProblem(part) ||
         (part.thin && 'A thin board can only be a new part.') ||
         (isCadBody(document, part) && partIsBuiltOn(document, part, next === 'add' ? mergeable[0] : undefined)) ||
         (next === 'add' && !mergeable.length && 'There’s no part yet to add to. Make one with New first.') ||

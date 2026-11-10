@@ -62,9 +62,10 @@ export function extrudedSketch(document: CadDocument, sketch: CadPart, pickAll: 
   const made = { ...sketch };
   delete made.extrude;
   if (made.drawnOn && !made.thin && isSingleLine(made)) return { ...made, thin: { depth: 100, midPlane: true } };
-  const face = made.drawnOn && !('plane' in made.drawnOn.on) ? made.drawnOn.on.partId : null;
+  const on = made.drawnOn?.on;
+  const face = on && 'partId' in on ? on.partId : null;
   const onto = face && document.parts.find(candidate => candidate.id === face);
-  if (onto && isCadPart(onto)) made.addTo = extrudeMergeTarget(document, made, onto.id);
+  if (onto && isCadPart(onto) && !(on && 'partId' in on && on.copyId)) made.addTo = extrudeMergeTarget(document, made, onto.id);
   const regions = sketchRegions(made.sketch, CAD_CHORD_TOLERANCE);
   if (pickAll && !made.regions && regions.length > 1 && evaluateCadPart(made).diagnostics.some(d => d.severity === 'error'))
     made.regions = regions.map(region => region.id);

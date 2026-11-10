@@ -1237,7 +1237,8 @@
 }
 /** In a turned sketch, labels and points are turned back where they stand, to stay readable and round. */
 .cad-drawing-turned text:not([transform]),
-.cad-drawing-turned .cad-point {
+.cad-drawing-turned .cad-point,
+.cad-drawing-turned .cad-part-vertex {
   transform-box: fill-box;
   transform-origin: center;
   transform: var(--unturn);
@@ -1265,4 +1266,24 @@
   stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/** Constant screen-size targets let vertices win over adjacent edges at every sketch zoom. */
+.cad-part-vertex {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 1px;
+  stroke-linecap: round;
+  pointer-events: all;
+  cursor: pointer;
+}
+.cad-part-vertex:hover,
+.cad-part-vertex.is-picked {
+  stroke: rgb(47 128 237 / 0.85);
+}
+.cad-using-edges .cad-part-vertex {
+  stroke: rgb(47 128 237 / 0.25);
+}
+.cad-using-edges .cad-part-vertex:hover {
+  stroke: rgb(47 128 237 / 0.85);
 }
