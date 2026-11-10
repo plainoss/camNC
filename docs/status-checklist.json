@@ -190,9 +190,17 @@
         },
         {
           "item": "Section view in the Part Studio",
-          "status": "gap",
-          "evidence": [],
-          "note": "Sectioning the assembled parts is not available."
+          "status": "partial",
+          "evidence": [
+            "apps/camNC/src/cad/sectionGeometry.test.ts",
+            "apps/camNC/src/cad/studioSections.test.ts",
+            "apps/camNC/src/cad/sectionModel.test.ts",
+            "apps/camNC/src/cad/CadEditor.section.test.tsx",
+            "apps/camNC/src/cam/model/ModelSectionCap.test.tsx",
+            "studio/section/stock-cap-measurement",
+            "studio/section/cabinet-linked-offset"
+          ],
+          "note": "One plane from a base plane, datum or picked planar display face; signed offsets and expressions, a draggable normal handle, flip, normal view, edit and turn off, with accepted settings recalled when re-enabled. Hatched cut surfaces retain holes, pockets and islands and share geometry with picking and Measure. Source, history and CAM remain unchanged. Picked faces require a new pick after a design edit. Multiple planes, include/exclude filters, interference shading, angle/ball manipulators, sectioned named views and feature references to temporary cut surfaces are not supported."
         },
         {
           "item": "Variable types and ordered definitions",

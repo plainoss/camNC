@@ -237,6 +237,8 @@ The `studio` expectations check source variables, thicknesses, patterns, offsets
 
 `measurements` checks the visible measurement rows by label and displayed value, including units. The stock measurement scenario uses real top/bottom viewport clicks; its unchanged-content assertion keeps inspection separate from feature edits.
 
+`section` checks the visible section controls: `active` and `editing`, plus the selected `plane`, `offset` text and `flipped` state while the inspector is open. Section scenarios retain the complete cabinet Parts list and source identities, exercise a linked offset through a stock edit, and measure a stock cut surface through real canvas clicks. Geometry probes, cap orientation and source-mesh immutability are checked separately in the section domain tests.
+
 ## Goldens
 
 A golden is a normalized SVG of the canvas at a `frame`: screen pixels at a fixed
