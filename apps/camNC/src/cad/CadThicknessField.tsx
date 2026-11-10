@@ -1,6 +1,6 @@
+import { useDesignUnits } from './designUnits';
 import { CAD_MIN_THICKNESS, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
-import { parseCadValue } from './valueExpressions';
 import { CadValueInput } from './CadValueInput';
 import { variableDefinition } from './variableFields';
 import './cadThicknessField.css';
@@ -18,7 +18,11 @@ export interface CadThicknessFieldProps {
 }
 
 const rangeError = `Thickness must be at least ${CAD_MIN_THICKNESS} mm.`;
-function thicknessValue(text: string, variables?: CadValueScope): { value: number; expression?: string } | { error: string } {
+function thicknessValue(
+  text: string,
+  variables: CadValueScope | undefined,
+  parseCadValue: ReturnType<typeof useDesignUnits>['parseCadValue']
+): { value: number; expression?: string } | { error: string } {
   const parsed = parseCadValue(text, { unit: 'mm', variables });
   if ('error' in parsed) return parsed;
   return parsed.value >= CAD_MIN_THICKNESS ? parsed : { error: rangeError };
@@ -34,8 +38,9 @@ export function CadThicknessField({
   onValidityChange,
   livePreview = false,
 }: CadThicknessFieldProps) {
+  const { parseCadValue, lengthText } = useDesignUnits();
   const id = useId();
-  const typed = expression ?? String(value);
+  const typed = expression ?? lengthText(value);
   const [text, setText] = useState(typed);
   const [error, setError] = useState<string | null>(null);
   const dirty = useRef(false);
@@ -44,7 +49,7 @@ export function CadThicknessField({
   const lastValidity = useRef<boolean | undefined>(undefined);
   // `#name = value` is taken as its value, which the field uses once it has made the variable.
   const definition = variableDefinition(text);
-  const valid = !('error' in thicknessValue(definition ? definition.expression : text, variables));
+  const valid = !('error' in thicknessValue(definition ? definition.expression : text, variables, parseCadValue));
   useEffect(() => {
     validityCallback.current = onValidityChange;
     if (lastValidity.current !== valid) {
@@ -68,13 +73,13 @@ export function CadThicknessField({
   }, [typed]);
 
   const commit = () => {
-    const parsed = thicknessValue(text, variables);
+    const parsed = thicknessValue(text, variables, parseCadValue);
     if ('error' in parsed) {
       setError(parsed.error);
       return false;
     }
     dirty.current = false;
-    setText(parsed.expression ?? String(parsed.value));
+    setText(parsed.expression ?? lengthText(parsed.value));
     setError(null);
     if (parsed.value !== value || parsed.expression !== expression) onCommit(parsed.value, parsed.expression);
     return true;
@@ -96,7 +101,7 @@ export function CadThicknessField({
               const next = event.target.value;
               dirty.current = true;
               setText(next);
-              const parsed = thicknessValue(next, variables);
+              const parsed = thicknessValue(next, variables, parseCadValue);
               if (error) setError('error' in parsed ? parsed.error : null);
               // Keep the literal draft while previewing; normalizing it here would interrupt units and expressions.
               if (livePreview && !('error' in parsed) && (parsed.value !== value || parsed.expression !== expression))

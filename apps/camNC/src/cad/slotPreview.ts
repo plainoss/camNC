@@ -1,3 +1,4 @@
+import type { CadLengthUnit } from '@wbcnc/cad';
 import { reconcileSlot, slotSketchEntities, type CadSlot, type CadSketch } from '@wbcnc/cad';
 import { parseCadValue } from './valueExpressions';
 export function previewSlot(
@@ -5,9 +6,10 @@ export function previewSlot(
   entityIds: readonly string[],
   text: string,
   includeConnected: boolean,
-  sharedWidthEntityId?: string
+  sharedWidthEntityId?: string,
+  lengthUnit: CadLengthUnit = 'mm'
 ) {
-  const parsed = parseCadValue(text, { unit: 'mm' });
+  const parsed = parseCadValue(text, { unit: 'mm', lengthUnit });
   if ('error' in parsed) return { ok: false as const, message: parsed.error };
   let source = sketch;
   if (sharedWidthEntityId) {

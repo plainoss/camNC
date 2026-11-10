@@ -4,7 +4,7 @@
     "**/public/**"
   ],
   "ceilings": {
-    "apps/camNC/src/cad/CadEditor.tsx": 5430,
+    "apps/camNC/src/cad/CadEditor.tsx": 5415,
     "apps/camNC/src/cam/boards.ts": 1437,
     "apps/camNC/src/cam/boards/BoardDrawings.tsx": 1467,
     "apps/camNC/src/routes/cam/$jobId.carve.tsx": 1073,

@@ -1,4 +1,12 @@
-import { addCenterRectangle, addRectangle, parseCadValue, type CadPoint, type CadSketch, type CadValueScope } from '@wbcnc/cad';
+import {
+  addCenterRectangle,
+  addRectangle,
+  parseCadValue,
+  type CadLengthUnit,
+  type CadPoint,
+  type CadSketch,
+  type CadValueScope,
+} from '@wbcnc/cad';
 
 export type RectangleTool = 'rectangle' | 'centerRectangle';
 
@@ -8,6 +16,7 @@ export const rectanglePrompt = (tool: RectangleTool) =>
   `Click or drag from the ${tool === 'centerRectangle' ? 'center' : 'first corner'} to the opposite corner. Or enter sizes below.`;
 
 export interface RectangleInput {
+  lengthUnit?: CadLengthUnit;
   tool: RectangleTool;
   /** The first click: a corner, or the center of a center rectangle. */
   start: CadPoint;
@@ -30,8 +39,12 @@ export type RectangleResult =
 export function createRectangle(sketch: CadSketch, input: RectangleInput): RectangleResult {
   const { tool, start, end, construction } = input;
   const centered = tool === 'centerRectangle';
-  const widthValue = end ? null : parseCadValue(input.width ?? '', { unit: 'mm', variables: input.variables });
-  const heightValue = end ? null : parseCadValue(input.height ?? '', { unit: 'mm', variables: input.variables });
+  const widthValue = end
+    ? null
+    : parseCadValue(input.width ?? '', { unit: 'mm', variables: input.variables, lengthUnit: input.lengthUnit });
+  const heightValue = end
+    ? null
+    : parseCadValue(input.height ?? '', { unit: 'mm', variables: input.variables, lengthUnit: input.lengthUnit });
   if (widthValue && 'error' in widthValue) return { error: `Rectangle width: ${widthValue.error}` };
   if (heightValue && 'error' in heightValue) return { error: `Rectangle height: ${heightValue.error}` };
   const w = end ? (end.x - start.x) * (centered ? 2 : 1) : widthValue!.value;

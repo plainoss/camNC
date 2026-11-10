@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   newCadId,
@@ -12,7 +13,6 @@ import {
   type CadValueScope,
 } from '@wbcnc/cad';
 import { FeatureDialog } from './FeatureDialog';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 
@@ -85,6 +85,7 @@ export function TransformDialog({
   /** Starts picking a mate connector in the view: a part's face corner or middle, as a click snaps to. Null stops it. */
   pickPoint?: (picked: ((pick: CadConnectorPick) => void) | null) => void;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const copy = part.copies?.find(candidate => candidate.id === copyId);
   const moved = move ? part.moved : undefined;
   const alongNow = copy?.along ?? (moved && 'along' in moved ? moved : undefined);
@@ -95,7 +96,7 @@ export function TransformDialog({
   const [direction, setDirection] = useState<CadDrawnOn['on'] | null>(alongNow?.along ?? null);
   const [flip, setFlip] = useState(!!alongNow?.flip);
   const [distanceText, setDistanceText] = useState(
-    alongNow ? (copy?.along?.distanceExpression ?? formatCadValue(alongNow.distance)) : '100'
+    alongNow ? (copy?.along?.distanceExpression ?? lengthText(alongNow.distance)) : lengthText(100)
   );
   const [picking, setPicking] = useState(false);
   const pick = () => {
@@ -108,9 +109,9 @@ export function TransformDialog({
   };
   const typed = (axis: number) =>
     copy?.offset
-      ? (copy.offset.positionExpressions?.[axis] ?? formatCadValue(copy.offset.position[axis]!))
+      ? (copy.offset.positionExpressions?.[axis] ?? lengthText(copy.offset.position[axis]!))
       : moved && 'by' in moved
-        ? (moved.byExpressions?.[axis] ?? formatCadValue(moved.by[axis]!))
+        ? (moved.byExpressions?.[axis] ?? lengthText(moved.by[axis]!))
         : '0';
   const [text, setText] = useState([typed(0), typed(1), typed(2)]);
   const [mirrored, setMirrored] = useState(!!copy?.mirrored);
@@ -180,7 +181,7 @@ export function TransformDialog({
             byExpressions: [0, 1, 2].map(axis => {
               const a = before.byExpressions?.[axis] ?? null,
                 b = added.byExpressions?.[axis] ?? null;
-              return a || b ? `(${a ?? formatCadValue(before.by[axis]!)}) + (${b ?? formatCadValue(added.by[axis]!)})` : null;
+              return a || b ? `(${a ?? `${before.by[axis]!} mm`}) + (${b ?? `${added.by[axis]!} mm`})` : null;
             }) as [string | null, string | null, string | null],
           }),
         };
@@ -316,6 +317,7 @@ export function TransformDialog({
     axisPick,
     angleText,
     newCopyId,
+    parseCadValue,
   ]);
   const callbacks = useRef({ onPreview, onConnectorsChange });
   callbacks.current = { onPreview, onConnectorsChange };
@@ -380,7 +382,7 @@ export function TransformDialog({
                 onChange={event => setDistanceText(event.target.value)}
               />
             </span>
-            mm
+            {lengthUnit}
           </label>
           <label>
             <input type="checkbox" checked={flip} onChange={event => setFlip(event.target.checked)} />
@@ -402,7 +404,7 @@ export function TransformDialog({
             <span>
               {picked
                 ? picked.edge
-                  ? `Edge of ${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'a part'}, ${formatCadValue(Math.hypot(...picked.edge.b.map((value, axis) => value - picked.edge!.a[axis]!)))} mm`
+                  ? `Edge of ${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'a part'}, ${lengthText(Math.hypot(...picked.edge.b.map((value, axis) => value - picked.edge!.a[axis]!)))} ${lengthUnit}`
                   : `${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part'} at ${picked.point.map(value => +value.toFixed(2)).join(', ')}`
                 : end === 'from' || end === 'to'
                   ? 'Click a corner or the middle of a face'
@@ -440,7 +442,7 @@ export function TransformDialog({
                 onChange={event => setText(values => values.map((value, index) => (index === axis ? event.target.value : value)))}
               />
             </span>
-            mm
+            {lengthUnit}
           </label>
         ))}
       {!copy && !move && (

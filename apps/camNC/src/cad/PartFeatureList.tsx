@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import { useState } from 'react';
 import {
   cadCuts,
@@ -10,7 +11,6 @@ import {
   type CadPart,
   type CadValueScope,
 } from '@wbcnc/cad';
-import { parseCadValue } from './valueExpressions';
 
 const faceName = (face: CadFaceSketch) => (face.on === 'top' ? 'Top face' : face.on === 'underside' ? 'Underside' : 'Pocket floor');
 
@@ -27,7 +27,8 @@ function CutDepthInput({
   variables?: CadValueScope;
   onChange: (depth: number, expression?: string) => void;
 }) {
-  const typed = expression ?? String(depth);
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
+  const typed = expression ?? lengthText(depth);
   const [text, setText] = useState(typed);
   const apply = () => {
     const parsed = parseCadValue(text, { unit: 'mm', variables });
@@ -49,7 +50,7 @@ function CutDepthInput({
           if (event.key === 'Enter') apply();
         }}
       />{' '}
-      mm
+      {lengthUnit}
     </small>
   );
 }
@@ -76,6 +77,7 @@ export function PartFeatureList({
   onEdit?: (sketchId: string) => void;
   onNew?: (face: 'top' | 'underside') => void;
 }) {
+  const { formatLength, lengthUnit } = useDesignUnits();
   const faces = cadFaceSketches(part),
     profile = evaluateCadPart(part).part,
     outline = profile?.outline,
@@ -138,7 +140,7 @@ export function PartFeatureList({
                       ? 'Through'
                       : cut.depth === 0
                         ? 'No cut'
-                        : `${cut.depth} mm`}
+                        : `${formatLength(cut.depth)} ${lengthUnit}`}
                 </small>
               )}
             </span>
