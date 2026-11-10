@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import type { CadLengthUnit } from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { SectionViewPanel, type SectionViewPanelProps } from './SectionViewPanel';
 import { useProvideCadVariableFields } from './variableFields';
+import { DesignUnitContext } from './designUnits';
 import './cad.css';
 
 afterEach(cleanup);
@@ -43,7 +45,7 @@ function ControlledPanel(props: SectionViewPanelProps & { define: (name: string,
   );
 }
 
-function setup(overrides: Partial<SectionViewPanelProps> = {}, width = 500) {
+function setup(overrides: Partial<SectionViewPanelProps> = {}, width = 500, lengthUnit: CadLengthUnit = 'mm') {
   const callbacks = {
     onSelectPlane: vi.fn<(id: string) => void>(),
     onPickFace: vi.fn(),
@@ -61,7 +63,9 @@ function setup(overrides: Partial<SectionViewPanelProps> = {}, width = 500) {
       <button type="button" style={{ position: 'absolute', bottom: 8, right: 8 }}>
         Outside inspector
       </button>
-      <ControlledPanel {...current} define={define} />
+      <DesignUnitContext value={lengthUnit}>
+        <ControlledPanel {...current} define={define} />
+      </DesignUnitContext>
     </div>
   );
   const rendered = render(view());
@@ -199,4 +203,15 @@ it('rejects stale plane selections and keeps the inspector within a narrow viewp
   expect(panel.left).toBeGreaterThanOrEqual(host.left);
   expect(panel.right).toBeLessThanOrEqual(host.right);
   expect(panel.bottom).toBeLessThanOrEqual(host.bottom);
+});
+
+it('inherits the design length suffix while leaving explicitly typed units unchanged', async () => {
+  setup({ offset: '1/4' }, 500, 'in');
+  const offset = screen.getByRole('textbox', { name: 'Offset' });
+  const field = offset.closest('.cad-section-value')!;
+  expect(offset).toHaveValue('1/4');
+  expect(field.querySelector('[aria-hidden="true"]')).toHaveTextContent('in');
+  await userEvent.fill(offset, '9mm');
+  expect(offset).toHaveValue('9mm');
+  expect(field.querySelector('[aria-hidden="true"]')).toBeNull();
 });
