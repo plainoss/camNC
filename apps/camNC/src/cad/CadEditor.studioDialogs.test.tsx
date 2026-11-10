@@ -4,6 +4,9 @@ import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { endCadSession } from '@wbcnc/cad-editor/session';
+import { ModelViewport } from '@/cam/model/ModelViewport';
+
+vi.mock('@/cam/model/ModelViewport', { spy: true });
 
 const sessions: string[] = [];
 afterEach(() => {
@@ -87,12 +90,12 @@ it('previews a pattern on opening, cancels its changes, and keeps an accepted pa
   await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
   let dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
   expect(within(dialog).queryByRole('checkbox', { name: 'Pattern copies in a row' })).toBeNull();
-  await waitFor(() => expect(latest().parts[0]!.copies).toHaveLength(1));
+  await waitFor(() => expect(vi.mocked(ModelViewport).mock.lastCall![0].instanceIds).toHaveLength(2));
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(latest().parts[0]!.pattern).toBeUndefined());
   await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
   dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
-  await waitFor(() => expect(latest().parts[0]!.copies).toHaveLength(1));
+  await waitFor(() => expect(vi.mocked(ModelViewport).mock.lastCall![0].instanceIds).toHaveLength(2));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   expect(latest().parts[0]!.pattern).toBeDefined();
 });
