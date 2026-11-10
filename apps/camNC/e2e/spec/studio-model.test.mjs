@@ -5,6 +5,12 @@ import { checkStudio, studioContent, studioState } from './adapters/studioModel.
 
 const cupboard = JSON.parse(readFileSync(new URL('../../../../packages/cad-script/fixtures/designs/cupboard.json', import.meta.url)));
 describe('Part Studio workflow expectations', () => {
+  it('checks visible section lifecycle and fields independently of saved geometry', () => {
+    const actual = { section: { active: true, editing: true, plane: 'right', offset: '#board-4mm', flipped: false } };
+    expect(checkStudio({ section: { active: true, offset: '#board-4mm' } }, actual)).toEqual([]);
+    expect(checkStudio({ section: { active: false, offset: '14', flipped: true } }, actual)).toHaveLength(3);
+    expect(checkStudio({ section: { active: true } }, {})).toHaveLength(1);
+  });
   it('checks visible measurement values independently of saved geometry', () => {
     expect(checkStudio({ measurements: { 'Min distance': '18 mm' } }, { measurements: { 'Min distance': '18 mm' } })).toEqual([]);
     expect(checkStudio({ measurements: { 'Min distance': '18 mm' } }, { measurements: { 'Min distance': '0 mm' } })).toHaveLength(1);

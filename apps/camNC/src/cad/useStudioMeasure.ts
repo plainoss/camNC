@@ -9,10 +9,16 @@ import type { StudioMeasureSelection } from './StudioMeasurePanel';
 type PickedSelection = StudioMeasureSelection & { instance: string };
 
 /** Measurement selections are view state. A changed design invalidates their topology instead of showing stale values. */
-export function useStudioMeasure(document: CadDocument, model: AssemblyModel, frame: RefObject<HTMLDivElement | null>, enabled: boolean) {
+export function useStudioMeasure(
+  document: CadDocument,
+  model: AssemblyModel,
+  frame: RefObject<HTMLDivElement | null>,
+  enabled: boolean,
+  topology?: unknown
+) {
   // Rollback/Final previews can change topology without changing the persisted revision.
   const revision = document.revision;
-  const version = useMemo(() => ({ document, revision }), [document, revision]);
+  const version = useMemo(() => ({ document, revision, topology }), [document, revision, topology]);
   const [picked, setPicked] = useState<{ version: object; items: PickedSelection[] }>({ version, items: [] });
   const [expanded, setExpanded] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
