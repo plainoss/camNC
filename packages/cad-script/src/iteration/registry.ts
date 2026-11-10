@@ -1,6 +1,7 @@
 import { cupboardWorkflow } from './cupboard';
 import { dividedTrayWorkflow } from './dividedTray';
 import { fittedJointsWorkflow } from './fittedJoints';
+import { radialStoolWorkflow } from './radialStool';
 import { missingDividerToolWorkflow, underconstrainedJointWorkflow } from './woodworkingDiagnostics';
 import type { CadWorkflow } from './workflow';
 
@@ -8,6 +9,7 @@ const factories: Record<string, () => CadWorkflow> = {
   cupboard: cupboardWorkflow,
   'divided-tray': dividedTrayWorkflow,
   'fitted-joints': fittedJointsWorkflow,
+  'radial-stool': radialStoolWorkflow,
   'tray-missing-tool': missingDividerToolWorkflow,
   'joint-unconstrained': underconstrainedJointWorkflow,
 };

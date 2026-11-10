@@ -148,9 +148,14 @@
         },
         {
           "item": "Circular pattern of parts",
-          "status": "gap",
-          "evidence": [],
-          "note": "Circular sketch patterns exist; the part pattern is linear only."
+          "status": "partial",
+          "evidence": [
+            "packages/cad/src/circularPartPatterns.test.ts",
+            "packages/cad-script/src/iteration/radialStool.test.ts",
+            "apps/camNC/src/cad/CircularPartPatternField.test.tsx",
+            "studio/stool/circular-pattern-edit-reload"
+          ],
+          "note": "Makes separate copies of one part around a world axis or a picked straight edge or face normal. Count includes the seed; full rings, partial sweeps, step angles, opposite direction and variables are supported. Surviving slots retain names and identities. Picked axes stay as picked; cut tools retain the existing square-to-target limits. Centered patterns, skipped instances, multiple seeds, feature/face patterns and Boolean result modes are not available."
         },
         {
           "item": "Boolean Union and Intersect between existing parts",

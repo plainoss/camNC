@@ -4,6 +4,7 @@ import { cadPartReference } from './partReferences';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { mirroredPlacement, turnAbout } from './placement';
 import { cadDirectionVector } from './directions';
+import { circularPartPatternStep } from './circularPartPattern';
 import type { CadDocument, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
 
 const kAxes = { x: 0, y: 1, z: 2 } as const;
@@ -26,11 +27,17 @@ function patternCopies(
 ): CadPartCopy[] {
   const before = new Map((part.copies ?? []).map(copy => [copy.id, copy]));
   const axis = kAxes[pattern.axis];
+  const circular = pattern.circular;
+  const angle = circular && circularPartPatternStep(circular, pattern.count);
   return Array.from({ length: Math.max(0, pattern.count - 1) }, (_, i) => {
     const id = `${pattern.id}:${i + 1}`;
-    const name = before.get(id)?.name;
-    const copy: CadPartCopy = { id, pattern: pattern.id, ...(name && { name }) };
+    const { name, suppressed } = before.get(id) ?? {};
+    const copy: CadPartCopy = { id, pattern: pattern.id, ...(name && { name }), ...(suppressed && { suppressed }) };
     if (at) {
+      if (circular) {
+        copy.placement = turnAbout(at, circular.origin, circular.axis, (i + 1) * angle!);
+        return copy;
+      }
       const position = [...at.position] as [number, number, number];
       if (along) for (const k of [0, 1, 2]) position[k]! += (i + 1) * pattern.spacing * along[k]!;
       else position[axis] += (i + 1) * pattern.spacing;
