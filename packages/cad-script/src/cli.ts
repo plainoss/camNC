@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -7,10 +7,18 @@ import { editCad, type CadScript } from './edit';
 import { renderCadSvg } from './render';
 import { fullCadReport, fullReportText } from './fullReport';
 import { inspectCadDocument } from './inspect';
+import { compactCadReport } from './compactReport';
 import { typeErrors } from './typecheck';
+import { renderCadViews } from './views/render';
+import { renderCadSection, type CadSectionRequest } from './views/section';
 
 function parseArgs(args: string[]) {
-  const options: { file?: string; from?: string; out?: string; svg?: string; full?: boolean } = {};
+  const options: { file?: string; from?: string; out?: string; svg?: string; full?: boolean; views?: string; section?: CadSectionRequest } =
+    {};
+  let sectionPart: string | undefined,
+    sectionCut: string | undefined,
+    sectionAxis: 'x' | 'y' = 'x',
+    sectionAt: number | undefined;
   const cwd = process.env.INIT_CWD ?? process.cwd();
   for (let i = 0; i < args.length; i++) {
     const flag = args[i]!;
@@ -18,7 +26,17 @@ function parseArgs(args: string[]) {
     if (flag === '--from') options.from = path.resolve(cwd, args[++i]!);
     else if (flag === '--out') options.out = path.resolve(cwd, args[++i]!);
     else if (flag === '--svg') options.svg = path.resolve(cwd, args[++i]!);
-    else if (flag === '--report') {
+    else if (flag === '--views') options.views = path.resolve(cwd, args[++i]!);
+    else if (flag === '--section-part') sectionPart = args[++i];
+    else if (flag === '--section-cut') sectionCut = args[++i];
+    else if (flag === '--section-at') {
+      sectionAt = Number(args[++i]);
+      if (!Number.isFinite(sectionAt)) throw new Error('--section-at needs a finite coordinate.');
+    } else if (flag === '--section-axis') {
+      const axis = args[++i];
+      if (axis !== 'x' && axis !== 'y') throw new Error('--section-axis takes x or y.');
+      sectionAxis = axis;
+    } else if (flag === '--report') {
       const kind = args[++i];
       if (kind !== 'full' && kind !== 'check') throw new Error(`--report takes full or check, not ${kind ?? 'nothing'}.`);
       options.full = kind === 'full';
@@ -27,6 +45,11 @@ function parseArgs(args: string[]) {
   }
   if (!options.file && !options.from)
     throw new Error('Usage: check [design.cad.ts] [--from document.json] [--out document.json] [--svg drawing.svg] [--report full]');
+  if (sectionPart || sectionCut || sectionAt !== undefined) {
+    if (!sectionPart || !sectionCut || !options.views)
+      throw new Error('A section needs --views directory, --section-part name and --section-cut handle.');
+    options.section = { part: sectionPart, cut: sectionCut, axis: sectionAxis, ...(sectionAt !== undefined && { at: sectionAt }) };
+  }
   return options;
 }
 
@@ -43,12 +66,47 @@ const finish = async (ok: boolean, output: object, document?: unknown, svg?: str
   else if (!ok && options.out) await rm(options.out, { force: true });
   if (svg && options.svg) await writeFile(options.svg, svg);
   else if (!ok && options.svg) await rm(options.svg, { force: true });
+  let drawings: Record<string, string> | undefined;
+  if (options.views) {
+    const files = ['top', 'front', 'right', 'section'].map(name => path.join(options.views!, `${name}.svg`));
+    // A rejected revision cannot leave the preceding candidate's views beside its report.
+    await Promise.all(files.map(file => rm(file, { force: true })));
+    if (ok && inspected) {
+      await mkdir(options.views, { recursive: true });
+      drawings = {};
+      for (const view of renderCadViews(inspected.document, inspected.parts)) {
+        const file = path.join(options.views, `${view.name}.svg`);
+        await writeFile(file, view.svg);
+        drawings[view.name] = file;
+      }
+      if (options.section) {
+        const section = renderCadSection(inspected.document, inspected.parts, options.section);
+        const file = path.join(options.views, 'section.svg');
+        await writeFile(file, section.svg);
+        drawings.section = file;
+      }
+    }
+  }
   // Printed once the files are written, so a passing report means they're there. The full report is of the design as
   // written, or as it was when the script failed.
   if (options.full && document) {
-    const full = await fullCadReport(document as CadDocument, inspected);
+    const full = await fullCadReport(document as CadDocument, inspected, {
+      views: !!options.views && ok,
+      ...(ok && options.section && { section: options.section }),
+    });
     process.stdout.write(fullReportText(full));
-  } else print(JSON.stringify(output, null, 1));
+  } else
+    print(
+      JSON.stringify(
+        {
+          ...(inspected ? { ...output, ...compactCadReport(inspected.document, inspected.report) } : output),
+          ...(drawings && { drawings }),
+          ok,
+        },
+        null,
+        1
+      )
+    );
   process.exitCode = ok ? 0 : 1;
 };
 

@@ -102,13 +102,20 @@ export interface CadPartToCut {
   names: string[];
 }
 
+function loopKey(loop: CadPoint[]): string | undefined {
+  const points = loop.map(point => [Math.round(point.x * 1e6) / 1e6, Math.round(point.y * 1e6) / 1e6]);
+  return points.map((_, index) => JSON.stringify([...points.slice(index), ...points.slice(0, index)])).sort()[0];
+}
+
+/** Matching cuts alone do not establish matching stock: No cut can fill a profile hole on just one copy. */
+export function sameCadProfile(a: EvaluatedCadPart, b: EvaluatedCadPart): boolean {
+  const key = (part: EvaluatedCadPart) => JSON.stringify([part.thickness, loopKey(part.outline), part.holes.map(loopKey).sort()]);
+  return key(a) === key(b);
+}
+
 /** Whether two cut sets remove the same material, regardless of tool IDs or loop starting points. */
 export function sameCadCuts(a: readonly EvaluatedCadCut[] = [], b: readonly EvaluatedCadCut[] = []): boolean {
   const round = (n: number) => Math.round(n * 1e6) / 1e6;
-  const loopKey = (loop: CadPoint[]) => {
-    const points = loop.map(p => [round(p.x), round(p.y)]);
-    return points.map((_, i) => JSON.stringify([...points.slice(i), ...points.slice(0, i)])).sort()[0];
-  };
   const key = (cuts: readonly EvaluatedCadCut[]) =>
     JSON.stringify(
       cuts
@@ -129,7 +136,8 @@ export function sameCadCuts(a: readonly EvaluatedCadCut[] = [], b: readonly Eval
 /** A copy's own cuts, mirrored with its shape only after selecting cuts in the original's frame. */
 export function evaluatedPartCopy(part: EvaluatedCadPart, copy: CadPartCopy): EvaluatedCadPart {
   const own = part.copyCuts?.[copy.id];
-  const shape = own ? { ...part, cuts: own } : part;
+  const profile = part.copyProfiles?.[copy.id];
+  const shape = own || profile ? { ...part, ...profile, ...(own && { cuts: own }) } : part;
   return copy.mirrored ? mirrorEvaluatedPart(shape) : shape;
 }
 
@@ -147,7 +155,9 @@ export function cadPartsToCut(given: CadDocument, parts: readonly EvaluatedCadPa
     const groups: (CadPartToCut & { mirrored?: boolean })[] = [{ part, names: [part.name] }];
     for (const [index, copy] of (source?.copies ?? []).entries()) {
       const shape = evaluatedPartCopy(part, copy);
-      const group = groups.find(entry => !!entry.mirrored === !!copy.mirrored && sameCadCuts(entry.part.cuts, shape.cuts));
+      const group = groups.find(
+        entry => !!entry.mirrored === !!copy.mirrored && sameCadProfile(entry.part, shape) && sameCadCuts(entry.part.cuts, shape.cuts)
+      );
       const name = cadCopyName(source!, index);
       if (group) group.names.push(name);
       else {

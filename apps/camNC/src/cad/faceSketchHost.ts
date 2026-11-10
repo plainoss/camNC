@@ -1,4 +1,12 @@
-import { addFaceSketch, cadFaceSketches, rotateVector, type CadDocument, type CadPart, type CadFaceRef } from '@wbcnc/cad';
+import {
+  addCopyFaceSketch,
+  addFaceSketch,
+  cadFaceSketches,
+  rotateVector,
+  type CadDocument,
+  type CadPart,
+  type CadFaceRef,
+} from '@wbcnc/cad';
 import { hasOutline } from './editorHelpers';
 import { faceSketchScene, partViewSnapshot, type FaceSketchScene, type PartViewSnapshot } from './faceSketchScene';
 import type { StudioCameraRef } from './studioCamera';
@@ -7,6 +15,7 @@ import { assemblyModel } from './assemblyModel';
 /** All routed face-editor entry points must transfer the visible camera, including editing an existing sketch. */
 export function faceSketchHost(context: {
   part?: CadPart;
+  copyId?: string;
   prepare: () => CadDocument | null | undefined;
   commit: (document: CadDocument) => void;
   read: () => CadDocument;
@@ -17,13 +26,13 @@ export function faceSketchHost(context: {
   workspace: boolean;
   partView: boolean;
 }) {
-  const snapshot = (document: CadDocument, partId: string): PartViewSnapshot | undefined => {
+  const snapshot = (document: CadDocument, partId: string, copyId?: string): PartViewSnapshot | undefined => {
     if (!context.workspace) return partViewSnapshot(context.partCamera, context.root.current, context.partView);
     const camera = context.studioCamera.current;
     const bounds = context.root.current?.querySelector('[data-testid="workspace-3d"] canvas')?.getBoundingClientRect();
     if (!camera || !bounds?.height) return;
     // Include the visible row placement of parts not yet attached to an assembly plane.
-    const placement = assemblyModel(document).placements.get(partId);
+    const placement = assemblyModel(document).placements.get(copyId ? `${partId}/${copyId}` : partId);
     const inverse =
       placement &&
       ([-placement.rotation[0], -placement.rotation[1], -placement.rotation[2], placement.rotation[3]] as [number, number, number, number]);
@@ -43,16 +52,17 @@ export function faceSketchHost(context: {
     return { cameraState: context.partCamera, aspect: bounds.width / bounds.height };
   };
   return {
-    create(face: CadFaceRef, given?: PartViewSnapshot) {
-      if (!context.part || !context.onEdit) return;
+    create(face: CadFaceRef, given?: PartViewSnapshot, target?: { partId: string; copyId?: string }) {
+      if ((!context.part && !target) || !context.onEdit) return;
       // Validate before adding a feature: refusal must not leave an empty face sketch behind.
       const prepared = context.prepare(),
-        id = context.part.id;
+        id = target?.partId ?? context.part!.id;
+      const copyId = target?.copyId ?? context.copyId;
       if (!prepared || !hasOutline(prepared, id)) return;
-      const carried = given ?? snapshot(prepared, id);
-      const added = addFaceSketch(prepared, id, face);
+      const carried = given ?? snapshot(prepared, id, copyId);
+      const added = copyId ? addCopyFaceSketch(prepared, id, copyId, face) : addFaceSketch(prepared, id, face);
       context.commit(added.document);
-      context.onEdit(context.read(), id, added.sketchId, carried && faceSketchScene(prepared, id, face, carried));
+      context.onEdit(context.read(), id, added.sketchId, carried && faceSketchScene(prepared, id, face, carried, copyId));
     },
     edit(partId: string, sketchId: string) {
       if (!context.onEdit) return;
@@ -60,8 +70,13 @@ export function faceSketchHost(context: {
       if (!prepared || !hasOutline(prepared, partId)) return;
       const part = prepared.parts.find(part => part.id === partId)!;
       const face = cadFaceSketches(part).find(face => face.sketch.id === sketchId);
-      const carried = snapshot(prepared, partId);
-      context.onEdit(prepared, partId, sketchId, face && carried ? faceSketchScene(prepared, partId, face.on, carried) : undefined);
+      const carried = snapshot(prepared, partId, face?.copyId);
+      context.onEdit(
+        prepared,
+        partId,
+        sketchId,
+        face && carried ? faceSketchScene(prepared, partId, face.on, carried, face.copyId) : undefined
+      );
     },
   };
 }
