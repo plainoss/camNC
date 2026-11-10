@@ -7,7 +7,7 @@ import { isEdgeNotch } from './notch';
 describe('report sizes', () => {
   it.each(['top', 'underside'] as const)('measures circles and arcs exactly on %s', async side => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       part.profile.rect({ at: [0, 0], w: 200, h: 150 });
       const sketch = part.sketchOn(side);
       const x = side === 'underside' ? -100 : 100;
@@ -33,12 +33,12 @@ describe('report sizes', () => {
 describe('report pieces', () => {
   it('lists copies a tool reaches differently with the rest of the part', async () => {
     const { report } = await editCad(null, d => {
-      const panel = d.part('Panel', { thickness: 18 });
+      const panel = d.newPart('Panel', { thickness: 18 });
       panel.profile.rect({ at: [0, 0], w: 200, h: 100 });
       panel.place({ at: [0, 0, 0] });
       panel.copy({ at: [0, 0, 100] });
       panel.copy({ at: [1000, 0, 0] });
-      const pin = d.part('Pin', { thickness: 18 });
+      const pin = d.newPart('Pin', { thickness: 18 });
       pin.profile.rect({ at: [0, 0], w: 20, h: 20 });
       pin.place({ at: [90, 40, 10] });
       d.cutParts(panel, { with: [pin], clearance: 0 });
@@ -51,7 +51,7 @@ describe('report pieces', () => {
 describe('report holes', () => {
   it('counts profile holes and through cuts, including pattern copies and floor cuts, once each', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       part.profile.rect({ at: [0, 0], w: 200, h: 150 });
       part.profile.circle({ at: [15, 15], d: 8 });
       part.profile.circle({ at: [35, 15], d: 8 });
@@ -84,7 +84,7 @@ describe('report expectations with variables', () => {
       d.variable('width', '100mm');
       d.variable('board', '18mm');
       d.variable('pegDepth', '5mm');
-      const part = d.part('Panel', { thickness: 'board' });
+      const part = d.newPart('Panel', { thickness: 'board' });
       part.profile.rect({ at: [0, 0], w: 'width', h: 80 });
       const top = part.sketchOn('top');
       top.circle({ at: [20, 20], d: 10 });
@@ -100,7 +100,7 @@ describe('report expectations with variables', () => {
 
   it.each(['missingDepth', 'depth + ('])('reports invalid expression %s as a check failure', async expression => {
     const { report, scriptError } = await editCad(null, d => {
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       part.expect({ size: [expression, 80], thickness: expression, depths: [expression] });
     });
@@ -115,7 +115,7 @@ describe('report expectations with variables', () => {
 describe('report edge notches', () => {
   it('separates edge openings cut by tools from enclosed holes', async () => {
     const { report, parts } = await editCad(null, d => {
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       part.place({ at: [0, 0, 0] });
       const tools = [
@@ -123,7 +123,7 @@ describe('report edge notches', () => {
         [0, 40, 10],
         [40, 20, 10],
       ].map(([x, y, w], i) => {
-        const tool = d.part(`Tool ${i}`, { thickness: 18 });
+        const tool = d.newPart(`Tool ${i}`, { thickness: 18 });
         tool.profile.rect({ at: [0, 0], w: w!, h: 10 });
         tool.place({ at: [x!, y!, 0] });
         return tool;
@@ -142,7 +142,7 @@ describe('report edge notches', () => {
 describe('report missing pattern copies', () => {
   it('counts a copy with an island inside it as changed', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       part.profile.rect({ at: [0, 0], w: 200, h: 100 });
       const top = part.sketchOn('top');
       top.pattern([top.rect({ at: [20, 20], w: 20, h: 20 })], { count: 3, step: [40, 0] });
@@ -157,7 +157,7 @@ describe('report missing pattern copies', () => {
 
   it('warns when an overlapping shape swallows patterned cut regions', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       part.profile.rect({ at: [0, 0], w: 200, h: 100 });
       const top = part.sketchOn('top');
       const hole = top.circle({ at: [20, 20], d: 10 });
@@ -184,7 +184,7 @@ describe('report straight path closure', () => {
   it.each([false, true])('warns only when the added straight edge is unacknowledged (straight: %s)', async straight => {
     let firstEdge = '';
     const { report } = await editCad(null, d => {
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       const path = part.profile.path([0, 0]).lineTo([100, 0]).lineTo([100, 80]).lineTo([0, 80]);
       const closed = straight ? path.close({ straight: true }) : path.close();
       firstEdge = closed.edges[0]!.id;
@@ -202,7 +202,7 @@ describe('report straight path closure', () => {
 
   it('does not warn when the final segment already returns to the start', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       part.profile.path([0, 0]).lineTo([100, 0]).lineTo([0, 80]).lineTo([0, 0]).close();
     });
     expect(report.errors).toEqual([]);
@@ -214,7 +214,7 @@ describe('report constraint warning locations', () => {
   it('names the entities involved in redundant constraints', async () => {
     let lineId = '';
     const { document } = await editCad(null, d => {
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       const rect = part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       lineId = rect.edges.bottom.id;
     });
@@ -289,7 +289,7 @@ describe('report intact patterns', () => {
   it('does not warn about intact copies, separate cuts, or copies intentionally removed by a smaller count', async () => {
     const { report } = await editCad(null, d => {
       d.variable('count', '4');
-      const part = d.part('Panel', { thickness: 18 });
+      const part = d.newPart('Panel', { thickness: 18 });
       part.profile.rect({ at: [0, 0], w: 200, h: 100 });
       const top = part.sketchOn('top');
       top.pattern([top.circle({ at: [20, 20], d: 10 })], { count: 'count', step: [40, 0] });
@@ -307,10 +307,10 @@ describe('finger count variables', () => {
   it('follows the variable after creating a finger split', async () => {
     const created = await editCad(null, d => {
       d.variable('n', '5');
-      const front = d.part('Front', { thickness: 18 });
+      const front = d.newPart('Front', { thickness: 18 });
       front.profile.rect({ at: [0, 0], w: 300, h: 100 });
       front.drawOn('front', { offset: -500, inward: true });
-      const side = d.part('Side', { thickness: 18 });
+      const side = d.newPart('Side', { thickness: 18 });
       side.profile.rect({ at: [500, 0], w: 200, h: 100 });
       side.drawOn('right', { offset: 282 });
       d.cutParts(side, { with: front, split: { fingers: 'n' } });

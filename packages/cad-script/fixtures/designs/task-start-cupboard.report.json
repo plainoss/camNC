@@ -1,0 +1,3582 @@
+{
+ "design": {
+  "name": "cupboard",
+  "revision": 1,
+  "version": 2
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "65dbffa5-3dbb-4bb7-9858-fccbe4ef7fc7",
+   "kind": "variable",
+   "label": "#width",
+   "settings": {
+    "expression": "600mm"
+   },
+   "result": {
+    "value": 600,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "4592205d-d250-437a-bb2e-d941c8a066ac",
+   "kind": "variable",
+   "label": "#height",
+   "settings": {
+    "expression": "720mm"
+   },
+   "result": {
+    "value": 720,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "db267c28-e466-4db7-908e-52aa5c282dc6",
+   "kind": "variable",
+   "label": "#depth",
+   "settings": {
+    "expression": "300mm"
+   },
+   "result": {
+    "value": 300,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "03ae625d-9864-4482-b949-d7609bbb95e7",
+   "kind": "variable",
+   "label": "#board",
+   "settings": {
+    "expression": "18mm"
+   },
+   "result": {
+    "value": 18,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "59fc5572-8d98-461d-b938-dd38496de491",
+   "kind": "variable",
+   "label": "#back",
+   "settings": {
+    "expression": "6mm"
+   },
+   "result": {
+    "value": 6,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "9f193925-15a3-47eb-b8ab-fa3232222c70",
+   "kind": "variable",
+   "label": "#housing",
+   "settings": {
+    "expression": "8mm"
+   },
+   "result": {
+    "value": 8,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "38b1040c-8b41-453d-846b-09c408edd8aa",
+   "kind": "variable",
+   "label": "#pin",
+   "settings": {
+    "expression": "5mm"
+   },
+   "result": {
+    "value": 5,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "d95d913a-5835-4cac-b8e4-12347b485a90",
+   "kind": "variable",
+   "label": "#pitch",
+   "settings": {
+    "expression": "32mm"
+   },
+   "result": {
+    "value": 32,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "d9126c28-0bcd-484f-8ef8-fa91167e5986",
+   "kind": "variable",
+   "label": "#margin",
+   "settings": {
+    "expression": "80mm"
+   },
+   "result": {
+    "value": 80,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "e030e899-d294-494f-a6d6-ee983668740f:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Side",
+   "part": "Side",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Side / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "e030e899-d294-494f-a6d6-ee983668740f:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Side",
+   "part": "Side",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      300,
+      720
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "91af2c5e-cf63-4431-bac3-4d5ef1b60958",
+   "kind": "faceSketch",
+   "label": "Sketch on the top · Side",
+   "part": "Side",
+   "settings": {
+    "on": "top"
+   },
+   "result": {
+    "sketch": "Side / 3de8",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 35
+   }
+  },
+  {
+   "id": "22280bd8-4dc6-4964-9e81-9ac8faa3aacf",
+   "kind": "cut",
+   "label": "Cut 1 · Side",
+   "part": "Side",
+   "settings": {
+    "sketch": "Side / 3de8",
+    "region": "r2",
+    "depth": {
+     "value": 12
+    }
+   },
+   "result": {
+    "cuts": [
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       95.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       127.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       159.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       191.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       223.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       255.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       287.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       319.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       351.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       383.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       415.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       447.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       479.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       511.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       543.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       575.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       34.5,
+       607.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       95.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       127.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       159.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       191.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       223.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       255.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       287.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       319.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       351.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       383.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       415.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       447.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       479.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       511.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       543.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       575.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     },
+     {
+      "side": "top",
+      "from": 0,
+      "to": 12,
+      "through": false,
+      "at": [
+       254.5,
+       607.5
+      ],
+      "size": [
+       5,
+       5
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "9d181c37-ca94-4e8c-b9a4-ba0701bd325b",
+   "kind": "copy",
+   "label": "Mirrored copy · Right side",
+   "part": "Side",
+   "settings": {
+    "name": "Right side",
+    "mirrored": true,
+    "placement": {
+     "position": [
+      600,
+      0,
+      0
+     ],
+     "rotation": [
+      -0.5,
+      0.5,
+      0.5,
+      -0.5
+     ],
+     "positionExpressions": [
+      "width",
+      null,
+      null
+     ]
+    }
+   },
+   "result": {
+    "placement": {
+     "position": [
+      600,
+      0,
+      0
+     ],
+     "rotation": [
+      -0.5,
+      0.5,
+      0.5,
+      -0.5
+     ],
+     "positionExpressions": [
+      "width",
+      null,
+      null
+     ]
+    }
+   }
+  },
+  {
+   "id": "4d155ba3-4d02-48ac-838b-3fefc6eef133:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Bottom",
+   "part": "Bottom",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Bottom / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "4d155ba3-4d02-48ac-838b-3fefc6eef133:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Bottom",
+   "part": "Bottom",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      10,
+      0
+     ],
+     "size": [
+      580,
+      294
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "9c776645-a850-4d29-8db5-99ec1c7a90f2:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Top",
+   "part": "Top",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Top / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "9c776645-a850-4d29-8db5-99ec1c7a90f2:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Top",
+   "part": "Top",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 702,
+      "expression": "height - board"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      10,
+      0
+     ],
+     "size": [
+      580,
+      294
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "dd5c10af-a1f8-446c-b3e1-35392eac85fc:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Back",
+   "part": "Back",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Back / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "dd5c10af-a1f8-446c-b3e1-35392eac85fc:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Back",
+   "part": "Back",
+   "settings": {
+    "thickness": {
+     "value": 6,
+     "expression": "back"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -294,
+      "expression": "-(depth - back)"
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 6,
+    "outline": {
+     "at": [
+      10,
+      0
+     ],
+     "size": [
+      580,
+      720
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "665ac762-2e7b-49b2-a238-3bc32db5df7f",
+   "kind": "partCut",
+   "label": "Cut Side with Top, Bottom, Back",
+   "part": "Side",
+   "settings": {
+    "tools": [
+     "Top",
+     "Bottom",
+     "Back"
+    ],
+    "targets": [
+     "Side"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Side",
+      "tool": "Top",
+      "side": "top",
+      "width": 294,
+      "length": 18,
+      "depth": 8,
+      "through": false,
+      "at": {
+       "x": 0,
+       "y": 702
+      }
+     },
+     {
+      "target": "Side",
+      "tool": "Bottom",
+      "side": "top",
+      "width": 294,
+      "length": 18,
+      "depth": 8,
+      "through": false,
+      "at": {
+       "x": 0,
+       "y": 0
+      }
+     },
+     {
+      "target": "Side",
+      "tool": "Back",
+      "side": "top",
+      "width": 6,
+      "length": 720,
+      "depth": 8,
+      "through": false,
+      "at": {
+       "x": 294,
+       "y": 0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "9a1c9e87-a428-41b7-973b-d5b434d50e28:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Shelf",
+   "part": "Shelf",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Shelf / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "9a1c9e87-a428-41b7-973b-d5b434d50e28:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Shelf",
+   "part": "Shelf",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "board"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 260.5,
+      "expression": "board + margin + 5*pitch + pin/2"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      19,
+      0
+     ],
+     "size": [
+      562,
+      284
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Side",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "2929",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      300,
+      0
+     ],
+     "ends": [
+      "e46b",
+      "354f"
+     ]
+    },
+    {
+     "ref": "465b",
+     "type": "line",
+     "a": [
+      300,
+      0
+     ],
+     "b": [
+      300,
+      720
+     ],
+     "ends": [
+      "befe",
+      "20ae"
+     ]
+    },
+    {
+     "ref": "9fb4",
+     "type": "line",
+     "a": [
+      300,
+      720
+     ],
+     "b": [
+      0,
+      720
+     ],
+     "ends": [
+      "dfa1",
+      "21f2"
+     ]
+    },
+    {
+     "ref": "f23d",
+     "type": "line",
+     "a": [
+      0,
+      720
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "d3bc",
+      "30d1"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      300,
+      720
+     ],
+     "area": 216000,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Side",
+   "ref": "3de8",
+   "on": "top",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "diameter": 1,
+    "linearPattern": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "3e80",
+     "type": "circle",
+     "at": [
+      37,
+      98
+     ],
+     "d": 5
+    },
+    {
+     "ref": "d2db",
+     "type": "circle",
+     "at": [
+      37,
+      130
+     ],
+     "d": 5
+    },
+    {
+     "ref": "3a03",
+     "type": "circle",
+     "at": [
+      37,
+      162
+     ],
+     "d": 5
+    },
+    {
+     "ref": "9af2",
+     "type": "circle",
+     "at": [
+      37,
+      194
+     ],
+     "d": 5
+    },
+    {
+     "ref": "bfa7",
+     "type": "circle",
+     "at": [
+      37,
+      226
+     ],
+     "d": 5
+    },
+    {
+     "ref": "d777",
+     "type": "circle",
+     "at": [
+      37,
+      258
+     ],
+     "d": 5
+    },
+    {
+     "ref": "07f4",
+     "type": "circle",
+     "at": [
+      37,
+      290
+     ],
+     "d": 5
+    },
+    {
+     "ref": "84b6",
+     "type": "circle",
+     "at": [
+      37,
+      322
+     ],
+     "d": 5
+    },
+    {
+     "ref": "107e",
+     "type": "circle",
+     "at": [
+      37,
+      354
+     ],
+     "d": 5
+    },
+    {
+     "ref": "5dfc",
+     "type": "circle",
+     "at": [
+      37,
+      386
+     ],
+     "d": 5
+    },
+    {
+     "ref": "6924",
+     "type": "circle",
+     "at": [
+      37,
+      418
+     ],
+     "d": 5
+    },
+    {
+     "ref": "6046",
+     "type": "circle",
+     "at": [
+      37,
+      450
+     ],
+     "d": 5
+    },
+    {
+     "ref": "8693",
+     "type": "circle",
+     "at": [
+      37,
+      482
+     ],
+     "d": 5
+    },
+    {
+     "ref": "359f",
+     "type": "circle",
+     "at": [
+      37,
+      514
+     ],
+     "d": 5
+    },
+    {
+     "ref": "c564",
+     "type": "circle",
+     "at": [
+      37,
+      546
+     ],
+     "d": 5
+    },
+    {
+     "ref": "5a3a",
+     "type": "circle",
+     "at": [
+      37,
+      578
+     ],
+     "d": 5
+    },
+    {
+     "ref": "6d8b",
+     "type": "circle",
+     "at": [
+      37,
+      610
+     ],
+     "d": 5
+    },
+    {
+     "ref": "635b",
+     "type": "circle",
+     "at": [
+      257,
+      98
+     ],
+     "d": 5
+    },
+    {
+     "ref": "d399",
+     "type": "circle",
+     "at": [
+      257,
+      130
+     ],
+     "d": 5
+    },
+    {
+     "ref": "3bf9",
+     "type": "circle",
+     "at": [
+      257,
+      162
+     ],
+     "d": 5
+    },
+    {
+     "ref": "5bdc",
+     "type": "circle",
+     "at": [
+      257,
+      194
+     ],
+     "d": 5
+    },
+    {
+     "ref": "94c0",
+     "type": "circle",
+     "at": [
+      257,
+      226
+     ],
+     "d": 5
+    },
+    {
+     "ref": "0147",
+     "type": "circle",
+     "at": [
+      257,
+      258
+     ],
+     "d": 5
+    },
+    {
+     "ref": "b99f",
+     "type": "circle",
+     "at": [
+      257,
+      290
+     ],
+     "d": 5
+    },
+    {
+     "ref": "28ee",
+     "type": "circle",
+     "at": [
+      257,
+      322
+     ],
+     "d": 5
+    },
+    {
+     "ref": "54cd",
+     "type": "circle",
+     "at": [
+      257,
+      354
+     ],
+     "d": 5
+    },
+    {
+     "ref": "a9e9",
+     "type": "circle",
+     "at": [
+      257,
+      386
+     ],
+     "d": 5
+    },
+    {
+     "ref": "3d41",
+     "type": "circle",
+     "at": [
+      257,
+      418
+     ],
+     "d": 5
+    },
+    {
+     "ref": "c3be",
+     "type": "circle",
+     "at": [
+      257,
+      450
+     ],
+     "d": 5
+    },
+    {
+     "ref": "d995",
+     "type": "circle",
+     "at": [
+      257,
+      482
+     ],
+     "d": 5
+    },
+    {
+     "ref": "06eb",
+     "type": "circle",
+     "at": [
+      257,
+      514
+     ],
+     "d": 5
+    },
+    {
+     "ref": "b86b",
+     "type": "circle",
+     "at": [
+      257,
+      546
+     ],
+     "d": 5
+    },
+    {
+     "ref": "5cad",
+     "type": "circle",
+     "at": [
+      257,
+      578
+     ],
+     "d": 5
+    },
+    {
+     "ref": "f830",
+     "type": "circle",
+     "at": [
+      257,
+      610
+     ],
+     "d": 5
+    }
+   ],
+   "patterns": [
+    {
+     "ref": "ba70",
+     "copies": 33
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      300,
+      720
+     ],
+     "area": 215335.796,
+     "islands": 34
+    },
+    {
+     "ref": "r2",
+     "at": [
+      34.5,
+      95.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r3",
+     "at": [
+      254.5,
+      95.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r4",
+     "at": [
+      34.5,
+      127.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r5",
+     "at": [
+      254.5,
+      127.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r6",
+     "at": [
+      34.5,
+      159.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r7",
+     "at": [
+      254.5,
+      159.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r8",
+     "at": [
+      34.5,
+      191.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r9",
+     "at": [
+      254.5,
+      191.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r10",
+     "at": [
+      34.5,
+      223.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r11",
+     "at": [
+      254.5,
+      223.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r12",
+     "at": [
+      34.5,
+      255.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r13",
+     "at": [
+      254.5,
+      255.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r14",
+     "at": [
+      34.5,
+      287.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r15",
+     "at": [
+      254.5,
+      287.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r16",
+     "at": [
+      34.5,
+      319.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r17",
+     "at": [
+      254.5,
+      319.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r18",
+     "at": [
+      34.5,
+      351.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r19",
+     "at": [
+      254.5,
+      351.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r20",
+     "at": [
+      34.5,
+      383.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r21",
+     "at": [
+      254.5,
+      383.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r22",
+     "at": [
+      34.5,
+      415.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r23",
+     "at": [
+      254.5,
+      415.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r24",
+     "at": [
+      34.5,
+      447.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r25",
+     "at": [
+      254.5,
+      447.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r26",
+     "at": [
+      34.5,
+      479.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r27",
+     "at": [
+      254.5,
+      479.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r28",
+     "at": [
+      34.5,
+      511.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r29",
+     "at": [
+      254.5,
+      511.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r30",
+     "at": [
+      34.5,
+      543.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r31",
+     "at": [
+      254.5,
+      543.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r32",
+     "at": [
+      34.5,
+      575.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r33",
+     "at": [
+      254.5,
+      575.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r34",
+     "at": [
+      34.5,
+      607.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    },
+    {
+     "ref": "r35",
+     "at": [
+      254.5,
+      607.5
+     ],
+     "size": [
+      5,
+      5
+     ],
+     "area": 19.535,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Bottom",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "dcc0",
+     "type": "line",
+     "a": [
+      10,
+      0
+     ],
+     "b": [
+      590,
+      0
+     ],
+     "ends": [
+      "ebc2",
+      "2c19"
+     ]
+    },
+    {
+     "ref": "2b60",
+     "type": "line",
+     "a": [
+      590,
+      0
+     ],
+     "b": [
+      590,
+      294
+     ],
+     "ends": [
+      "5b27",
+      "47fe"
+     ]
+    },
+    {
+     "ref": "1a1f",
+     "type": "line",
+     "a": [
+      590,
+      294
+     ],
+     "b": [
+      10,
+      294
+     ],
+     "ends": [
+      "5332",
+      "94e6"
+     ]
+    },
+    {
+     "ref": "14c4",
+     "type": "line",
+     "a": [
+      10,
+      294
+     ],
+     "b": [
+      10,
+      0
+     ],
+     "ends": [
+      "41d5",
+      "1a77"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      10,
+      0
+     ],
+     "size": [
+      580,
+      294
+     ],
+     "area": 170520,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Top",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "ec82",
+     "type": "line",
+     "a": [
+      10,
+      0
+     ],
+     "b": [
+      590,
+      0
+     ],
+     "ends": [
+      "a6f9",
+      "ceae"
+     ]
+    },
+    {
+     "ref": "5fc0",
+     "type": "line",
+     "a": [
+      590,
+      0
+     ],
+     "b": [
+      590,
+      294
+     ],
+     "ends": [
+      "4347",
+      "d17d"
+     ]
+    },
+    {
+     "ref": "0526",
+     "type": "line",
+     "a": [
+      590,
+      294
+     ],
+     "b": [
+      10,
+      294
+     ],
+     "ends": [
+      "7da0",
+      "2fad"
+     ]
+    },
+    {
+     "ref": "7ed0",
+     "type": "line",
+     "a": [
+      10,
+      294
+     ],
+     "b": [
+      10,
+      0
+     ],
+     "ends": [
+      "6732",
+      "34dd"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      10,
+      0
+     ],
+     "size": [
+      580,
+      294
+     ],
+     "area": 170520,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Back",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "587f",
+     "type": "line",
+     "a": [
+      10,
+      0
+     ],
+     "b": [
+      590,
+      0
+     ],
+     "ends": [
+      "d3f1",
+      "d64c"
+     ]
+    },
+    {
+     "ref": "64a0",
+     "type": "line",
+     "a": [
+      590,
+      0
+     ],
+     "b": [
+      590,
+      720
+     ],
+     "ends": [
+      "d4f3",
+      "eb06"
+     ]
+    },
+    {
+     "ref": "75bf",
+     "type": "line",
+     "a": [
+      590,
+      720
+     ],
+     "b": [
+      10,
+      720
+     ],
+     "ends": [
+      "062c",
+      "f7cd"
+     ]
+    },
+    {
+     "ref": "957e",
+     "type": "line",
+     "a": [
+      10,
+      720
+     ],
+     "b": [
+      10,
+      0
+     ],
+     "ends": [
+      "cbe8",
+      "d01a"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      10,
+      0
+     ],
+     "size": [
+      580,
+      720
+     ],
+     "area": 417600,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Shelf",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "positionX": 1,
+    "positionY": 1
+   },
+   "entities": [
+    {
+     "ref": "5e2a",
+     "type": "line",
+     "a": [
+      19,
+      0
+     ],
+     "b": [
+      581,
+      0
+     ],
+     "ends": [
+      "649b",
+      "b3e7"
+     ]
+    },
+    {
+     "ref": "fa3d",
+     "type": "line",
+     "a": [
+      581,
+      0
+     ],
+     "b": [
+      581,
+      284
+     ],
+     "ends": [
+      "96ea",
+      "34cb"
+     ]
+    },
+    {
+     "ref": "4cca",
+     "type": "line",
+     "a": [
+      581,
+      284
+     ],
+     "b": [
+      19,
+      284
+     ],
+     "ends": [
+      "c690",
+      "1b04"
+     ]
+    },
+    {
+     "ref": "3a3f",
+     "type": "line",
+     "a": [
+      19,
+      284
+     ],
+     "b": [
+      19,
+      0
+     ],
+     "ends": [
+      "02fe",
+      "6568"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      19,
+      0
+     ],
+     "size": [
+      562,
+      284
+     ],
+     "area": 159608,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Side",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     300,
+     720
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "2228",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      95.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~1,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      127.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~2,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      159.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~3,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      191.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~4,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      223.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~5,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      255.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~6,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      287.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~7,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      319.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~8,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      351.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~9,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      383.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~10,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      415.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~11,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      447.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~12,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      479.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~13,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      511.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~14,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      543.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~15,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      575.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~16,0",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      34.5,
+      607.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~0,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      95.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~1,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      127.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~2,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      159.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~3,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      191.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~4,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      223.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~5,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      255.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~6,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      287.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~7,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      319.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~8,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      351.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~9,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      383.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~10,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      415.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~11,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      447.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~12,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      479.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~13,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      511.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~14,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      543.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~15,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      575.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "2228~16,1",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      254.5,
+      607.5
+     ],
+     "size": [
+      5,
+      5
+     ]
+    },
+    {
+     "ref": "Top",
+     "side": "top",
+     "from": 0,
+     "to": 8,
+     "through": false,
+     "at": [
+      0,
+      702
+     ],
+     "size": [
+      294,
+      18
+     ]
+    },
+    {
+     "ref": "Bottom",
+     "side": "top",
+     "from": 0,
+     "to": 8,
+     "through": false,
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      294,
+      18
+     ]
+    },
+    {
+     "ref": "Back",
+     "side": "top",
+     "from": 0,
+     "to": 8,
+     "through": false,
+     "at": [
+      294,
+      0
+     ],
+     "size": [
+      6,
+      720
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 2,
+    "throughHoles": 0
+   },
+   "pieces": {
+    "names": [
+     "Side"
+    ],
+    "mirrored": [
+     "Right side"
+    ]
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 114.8,
+    "operations": [
+     {
+      "label": "Edge groove 8 deep + 34 pockets to 8",
+      "depth": 8,
+      "steps": 6
+     },
+     {
+      "label": "34 pockets 12 deep, from 8",
+      "depth": 4,
+      "steps": 3
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      18,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 2929",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 465b",
+     "looks": "+y",
+     "origin": [
+      0,
+      300,
+      0
+     ]
+    },
+    {
+     "face": "edge 9fb4",
+     "looks": "+z",
+     "origin": [
+      0,
+      300,
+      720
+     ]
+    },
+    {
+     "face": "edge f23d",
+     "looks": "-y",
+     "origin": [
+      0,
+      0,
+      720
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Bottom",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     10,
+     0
+    ],
+    "size": [
+     580,
+     294
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 13.7,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      18
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge dcc0",
+     "looks": "-y",
+     "origin": [
+      10,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 2b60",
+     "looks": "+x",
+     "origin": [
+      590,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 1a1f",
+     "looks": "+y",
+     "origin": [
+      590,
+      294,
+      0
+     ]
+    },
+    {
+     "face": "edge 14c4",
+     "looks": "-x",
+     "origin": [
+      10,
+      294,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Top",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     10,
+     0
+    ],
+    "size": [
+     580,
+     294
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 13.7,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      720
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      702
+     ]
+    },
+    {
+     "face": "edge ec82",
+     "looks": "-y",
+     "origin": [
+      10,
+      0,
+      702
+     ]
+    },
+    {
+     "face": "edge 5fc0",
+     "looks": "+x",
+     "origin": [
+      590,
+      0,
+      702
+     ]
+    },
+    {
+     "face": "edge 0526",
+     "looks": "+y",
+     "origin": [
+      590,
+      294,
+      702
+     ]
+    },
+    {
+     "face": "edge 7ed0",
+     "looks": "-x",
+     "origin": [
+      10,
+      294,
+      702
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Back",
+   "thickness": 6,
+   "outline": {
+    "at": [
+     10,
+     0
+    ],
+    "size": [
+     580,
+     720
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 9.2,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 6.3,
+      "steps": 5
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      294,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      300,
+      0
+     ]
+    },
+    {
+     "face": "edge 587f",
+     "looks": "-z",
+     "origin": [
+      10,
+      300,
+      0
+     ]
+    },
+    {
+     "face": "edge 64a0",
+     "looks": "+x",
+     "origin": [
+      590,
+      300,
+      0
+     ]
+    },
+    {
+     "face": "edge 75bf",
+     "looks": "+z",
+     "origin": [
+      590,
+      300,
+      720
+     ]
+    },
+    {
+     "face": "edge 957e",
+     "looks": "-x",
+     "origin": [
+      10,
+      300,
+      720
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Shelf",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     19,
+     0
+    ],
+    "size": [
+     562,
+     284
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 13.3,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      278.5
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      260.5
+     ]
+    },
+    {
+     "face": "edge 5e2a",
+     "looks": "-y",
+     "origin": [
+      19,
+      0,
+      260.5
+     ]
+    },
+    {
+     "face": "edge fa3d",
+     "looks": "+x",
+     "origin": [
+      581,
+      0,
+      260.5
+     ]
+    },
+    {
+     "face": "edge 4cca",
+     "looks": "+y",
+     "origin": [
+      581,
+      284,
+      260.5
+     ]
+    },
+    {
+     "face": "edge 3a3f",
+     "looks": "-x",
+     "origin": [
+      19,
+      284,
+      260.5
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Side",
+    "at": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     18,
+     300,
+     720
+    ]
+   },
+   {
+    "name": "Right side",
+    "at": [
+     582,
+     0,
+     0
+    ],
+    "size": [
+     18,
+     300,
+     720
+    ]
+   },
+   {
+    "name": "Bottom",
+    "at": [
+     10,
+     0,
+     0
+    ],
+    "size": [
+     580,
+     294,
+     18
+    ]
+   },
+   {
+    "name": "Top",
+    "at": [
+     10,
+     0,
+     702
+    ],
+    "size": [
+     580,
+     294,
+     18
+    ]
+   },
+   {
+    "name": "Back",
+    "at": [
+     10,
+     294,
+     0
+    ],
+    "size": [
+     580,
+     6,
+     720
+    ]
+   },
+   {
+    "name": "Shelf",
+    "at": [
+     19,
+     0,
+     260.5
+    ],
+    "size": [
+     562,
+     284,
+     18
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 6,
+   "sides": 1,
+   "size": [
+    593.4,
+    733.4
+   ],
+   "yield": 0.96,
+   "parts": [
+    {
+     "name": "Back",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      580,
+      720
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Back",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 9.2,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 6.3,
+     "steps": 5
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  },
+  {
+   "name": "Board B",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    623.4,
+    1635.4
+   ],
+   "yield": 0.915,
+   "parts": [
+    {
+     "name": "Side",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      300,
+      720
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Right side",
+     "at": [
+      316.7,
+      6.7
+     ],
+     "size": [
+      300,
+      720
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Bottom",
+     "at": [
+      6.7,
+      736.7
+     ],
+     "size": [
+      580,
+      294
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Top",
+     "at": [
+      6.7,
+      1040.7
+     ],
+     "size": [
+      580,
+      294
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Shelf",
+     "at": [
+      6.7,
+      1344.7
+     ],
+     "size": [
+      562,
+      284
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Side",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Right side",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Bottom",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Top",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Shelf",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 268.8,
+   "operations": [
+    {
+     "label": "Edge groove 8 deep + 34 pockets to 8",
+     "depth": 8,
+     "steps": 6
+    },
+    {
+     "label": "34 pockets 12 deep, from 8",
+     "depth": 4,
+     "steps": 3
+    },
+    {
+     "label": "Edge groove 8 deep + 34 pockets to 8",
+     "depth": 8,
+     "steps": 6
+    },
+    {
+     "label": "34 pockets 12 deep, from 8",
+     "depth": 4,
+     "steps": 3
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}
