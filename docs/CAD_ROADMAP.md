@@ -287,6 +287,8 @@ Three things the code already does carry most of this:
   board with a quantity.
 - When a pattern's count drops below that copy, its features are kept, switched
   off, and listed with the reason. They come back when the count does.
+- A script can name one copy as what it sketches on and cuts. Today asking a script
+  for "Shelf 2" makes a new, empty part of that name.
 - Starts with a short spike: features are saved on the part and shared by all its
   copies, and what one copy's own feature costs in evaluation and CAM is not yet
   known.
