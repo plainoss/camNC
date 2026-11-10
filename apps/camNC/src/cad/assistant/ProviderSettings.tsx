@@ -29,6 +29,11 @@ export function ProviderSettings({
           setError(cause instanceof Error ? cause.message : 'Unable to save this connection.');
         }
       }}>
+      <div className="cad-assistant-connection-intro">
+        <span className="cad-assistant-eyebrow">YOUR DESIGN PARTNER</span>
+        <h3>Connect your assistant</h3>
+        <p>Choose a provider and bring your own key to start designing.</p>
+      </div>
       <label>
         Provider
         <select
