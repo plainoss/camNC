@@ -54,9 +54,9 @@ export function ModelBody({
         opacity={opacity}
         depthWrite={opacity >= 1}
       />
-      {/* Explicit geometry also invalidates a memoized overlay when the solid changes. */}
+      {/* Recreate the instanced lines with the solid: Three caches their first GPU draw count, truncating added edges. */}
       {/* Decorative edges must not intercept corner picks with a line intersection that has no face. */}
-      {edges && <Edges geometry={geometry} threshold={20} color="#2b3646" raycast={() => {}} />}
+      {edges && <Edges key={geometry.uuid} geometry={geometry} threshold={20} color="#2b3646" raycast={() => {}} />}
     </mesh>
   );
 }
