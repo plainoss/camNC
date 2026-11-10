@@ -8,6 +8,7 @@ export interface StockPlanOptions {
   footprint?: PathsD;
   tolerance?: number;
   pathTolerance?: number;
+  endpointTolerance?: number;
   verticalTolerance?: number;
   plungeFeed: number;
 }
