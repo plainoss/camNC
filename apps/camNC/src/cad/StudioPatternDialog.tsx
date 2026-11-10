@@ -3,17 +3,19 @@ import type { CadDocument } from '@wbcnc/cad';
 import { PartPatternDialog } from './PartFeatureDialogs';
 import { useDialogPreview } from './useDialogPreview';
 import { rebasePatternVariableSource } from './studioPatternVariableSource';
+import { studioPatternDraft, type PartPatternKind } from './partPatternKind';
 
 type Props = ComponentProps<typeof PartPatternDialog> & {
   owner: object;
   onPreview?: (document: CadDocument | null) => void;
+  initialPatternKind?: PartPatternKind;
 };
 const sameContent = (a: CadDocument, b: CadDocument) => JSON.stringify({ ...a, revision: 0 }) === JSON.stringify({ ...b, revision: 0 });
 
 /** A pattern previews one candidate; acceptance alone publishes its single undoable operation. */
-export function StudioPatternDialog({ owner, document, part, onChange, onOk, onCancel, onPreview, ...props }: Props) {
+export function StudioPatternDialog({ owner, document, part, onChange, onOk, onCancel, onPreview, initialPatternKind, ...props }: Props) {
   const [opening, setOpening] = useState(() => ({ document, owner }));
-  const [draft, setDraft] = useState(document);
+  const [draft, setDraft] = useState(() => studioPatternDraft(document, part.id, initialPatternKind));
   const latestDraft = useRef(draft);
   const mounted = useRef(true);
   const completed = useRef(false);
@@ -41,6 +43,7 @@ export function StudioPatternDialog({ owner, document, part, onChange, onOk, onC
       {...props}
       document={draft}
       part={draft.parts.find(candidate => candidate.id === part.id)!}
+      initiallyPatterned={!!opening.document.parts.find(candidate => candidate.id === part.id)?.pattern}
       blockedReason={valid ? null : 'The design changed while this pattern was open. Cancel and open the pattern again.'}
       onChange={change => {
         // A picker or field retained by an old dialog must never update a replacement source or another operation.
