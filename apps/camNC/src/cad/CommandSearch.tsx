@@ -2,11 +2,11 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { SketchToolGlyph } from './SketchToolbar';
 import type { SketchToolDefinition } from './sketchTools';
 import type { ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands';
-import type { StudioCommand } from './studioCommands';
+import type { StudioSearchId } from './studioSearchCommands';
 import './commandSearch.css';
 
 export type SearchCommand = Omit<SketchToolDefinition, 'id'> & {
-  id: SketchToolDefinition['id'] | ConstraintCommandTool | StudioCommand | 'construction' | 'fix' | 'fit';
+  id: SketchToolDefinition['id'] | ConstraintCommandTool | StudioSearchId | 'construction' | 'fix' | 'fit';
   description?: string;
   /** The command's own icon, for one that isn't a sketch tool. */
   glyph?: ReactNode;
