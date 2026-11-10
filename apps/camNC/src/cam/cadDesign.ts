@@ -85,14 +85,13 @@ export async function acceptDesign(base: CamJobV1, document: CadDocument): Promi
       readError: undefined,
       parts: [...nativeParts, ...current.parts.filter(p => !ids.has(p.id))],
       // CAD origin changes are not layout commands: the saved CAM positions remain authoritative.
-      boards: carryDesignTabs(current.boards, before, solved, boardSourceKeys, { turnedBefore: !!current.design.turnsUndersideUp }),
+      boards: carryDesignTabs(current.boards, before, solved, boardSourceKeys),
       design: {
         draft: solved.document,
         accepted: solved.document,
         acceptedRevision: current.design.acceptedRevision + (sameDesignContent(current.design.accepted, solved.document) ? 0 : 1),
         partRevisions,
         partGeometryKeys,
-        turnsUndersideUp: true,
         ...(holeChoiceIssues.length && { holeChoiceIssues }),
       },
     };

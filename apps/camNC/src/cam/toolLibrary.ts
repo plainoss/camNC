@@ -97,19 +97,6 @@ export const useToolLibrary = create(
     {
       storage: createJSONStorage(() => demoStorage),
       name: 'camnc-tool-library',
-      version: 2,
-      // v1 kept one imported list: those become library bits.
-      migrate: (old, version) => {
-        if (version < 2) {
-          const v1 = old as { tools?: LibraryTool[]; source?: string | null };
-          const file = v1.source ?? 'Fusion library';
-          return {
-            bits: (v1.tools ?? []).map(t => ({ ...t, id: crypto.randomUUID(), source: 'library' as const, library: file })),
-            imports: [],
-          };
-        }
-        return old as { bits: StoredBit[]; imports: LibraryImportRecord[] };
-      },
     }
   )
 );

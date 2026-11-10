@@ -1,5 +1,5 @@
 import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
-import { carvingBoard, carvingRegion, kCarvingBoard, kDefaultVBit, normalizeCarving, type CarvingV1 } from './carving';
+import { carvingBoard, carvingRegion, kCarvingBoard, kDefaultVBit, type CarvingV1 } from './carving';
 import { outlineArt } from './carvingOutline';
 import { rebaseJob } from './rebaseJob';
 import { trackPending } from '@/lib/settled';
@@ -38,12 +38,6 @@ export interface CamJobV1 {
     partRevisions: Record<string, number>;
     /** Evaluated geometry content, independent of monotonic revision numbers and source annotations. */
     partGeometryKeys?: Record<string, string>;
-    /**
-     * Whether parts cut only from below lie turned over, as CAM has done since `kUndersideUpSince`. A job accepted
-     * before keeps them the other way up until accepted again, so its cut sheets still match. Unset only on jobs saved
-     * before this was recorded: `normalizeJob` settles it from when they were saved.
-     */
-    turnsUndersideUp?: boolean;
     /** Removed hole targets retain their choices for Undo, but never apply to another hole. */
     holeChoiceIssues?: import('./holeChoices').MissingHoleChoice[];
   };
@@ -268,37 +262,22 @@ export function listJobs(): Promise<CamJobV1[]> {
   return listJobsIn(captureStorageContext());
 }
 
-/** When CAM started laying parts cut only from below turned over. Jobs saved from then on were cut that way. */
-export const kUndersideUpSince = Date.parse('2026-11-09T10:57:02Z');
-
-/** Older jobs as current code reads them. */
-export function normalizeJob(job: CamJobV1): CamJobV1 {
-  if (job.carving) return { ...job, carving: normalizeCarving(job.carving) };
-  // Accepted before the orientation was recorded: saved since parts turned over means they were turned over then.
-  if (job.design?.accepted && job.design.turnsUndersideUp === undefined)
-    return { ...job, design: { ...job.design, turnsUndersideUp: job.updatedAt >= kUndersideUpSince } };
-  return job;
-}
-
 async function listJobsIn(context: StorageContext): Promise<CamJobV1[]> {
-  if (context === 'rehearsal')
-    return structuredClone([...rehearsalJobs.values()])
-      .map(normalizeJob)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+  if (context === 'rehearsal') return structuredClone([...rehearsalJobs.values()]).sort((a, b) => b.updatedAt - a.updatedAt);
   const db = await openDb(context);
   const jobs = await request(db.transaction(kJobs).objectStore(kJobs).getAll() as IDBRequest<CamJobV1[]>);
-  return jobs.map(normalizeJob).sort((a, b) => b.updatedAt - a.updatedAt);
+  return jobs.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function getJob(id: string): Promise<CamJobV1 | null> {
   const context = captureStorageContext();
   if (context === 'rehearsal') {
     const job = rehearsalJobs.get(id);
-    return job ? normalizeJob(structuredClone(job)) : null;
+    return job ? structuredClone(job) : null;
   }
   const db = await openDb(context);
   const job = await request(db.transaction(kJobs).objectStore(kJobs).get(id) as IDBRequest<CamJobV1 | undefined>);
-  return job ? normalizeJob(job) : null;
+  return job ?? null;
 }
 
 export async function getModelBytes(id: string): Promise<Uint8Array | null> {
@@ -334,7 +313,7 @@ export const modelKey = (job: CamJobV1) =>
   job.carving
     ? `${job.id}:carving`
     : job.design
-      ? `${job.id}:cad:${job.design.acceptedRevision}${job.design.turnsUndersideUp ? ':turned' : ''}`
+      ? `${job.id}:cad:${job.design.acceptedRevision}`
       : `${job.id}:${job.fileName}:${job.modelRevision ?? 0}`;
 
 /**
@@ -353,7 +332,7 @@ async function updateJobForModelIn(
 ): Promise<CamJobV1 | null> {
   const apply = (current: CamJobV1 | undefined) => {
     if (!current || modelKey(current) !== modelKey(source)) return null;
-    const next = update(normalizeJob(current));
+    const next = update(current);
     return next && { ...next, updatedAt: Date.now() };
   };
   if (context === 'rehearsal') {

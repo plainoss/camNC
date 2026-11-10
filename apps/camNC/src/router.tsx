@@ -6,14 +6,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DefaultLoadingOverlay } from './components/DefaultLoadingOverlay';
 import { trackAppState } from './lib/settled';
 
-/**
- * Hack for hydrating zustand, prefer using it from the context elsewhere.
- * @deprecated
- **/
-export function getQueryClientStatic() {
-  return new QueryClient();
-}
-
 export function createRouter() {
   //  const router = routerWithQueryClient(
   const queryClient = new QueryClient();

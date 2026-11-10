@@ -7,7 +7,6 @@ import {
   carvingProblem,
   carvingRegion,
   itemName,
-  normalizeCarving,
   placeItem,
   withItems,
   hasWork,
@@ -19,7 +18,7 @@ import {
 } from './carving';
 import { maskOutline, outlineArt } from './carvingOutline';
 import { camWorker } from './camQueries';
-import { createCarvingJob, getJob, listJobs, modelKey, saveJob } from './jobDb';
+import { createCarvingJob, modelKey } from './jobDb';
 import { firstStage } from './openModelFile';
 import { kDefaultPlan, toCamSettings } from './planSettings';
 
@@ -266,26 +265,5 @@ describe('carving items', () => {
     expect(carving.region).toHaveLength(2);
     expect(request.carvings).toEqual([{ ...boardCarving(carving, kDefaultPlan), name: '2 items', region: carving.region }]);
     expect(boardCarving(withItems(carving, [items[0]]), kDefaultPlan).name).toBe('"Hi"');
-  });
-
-  it('normalizes legacy jobs on opening and listing without changing what they cut', async () => {
-    const job = await createCarvingJob();
-    const legacy = {
-      art: item().art,
-      height: 10,
-      x: 20,
-      y: 30,
-      region: placeItem(item()),
-      maxDepth: 3,
-      vBit: kDefaultVBit,
-      clearWithFlat: true,
-    };
-    const normalized = normalizeCarving(legacy);
-    expect(normalized.items).toEqual([item({ id: 'carving-1' })]);
-    expect(placeItem(normalized.items[0])).toEqual(legacy.region);
-    expect(normalizeCarving(normalized)).toBe(normalized);
-    await saveJob({ ...job, carving: legacy as unknown as CarvingV1 });
-    expect((await getJob(job.id))?.carving).toEqual(normalized);
-    expect((await listJobs()).find(saved => saved.id === job.id)?.carving).toEqual(normalized);
   });
 });

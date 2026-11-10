@@ -21,8 +21,8 @@ async function readBodies(bytes: Uint8Array, fileName: string): Promise<{ bodies
 
 const api = {
   /** Native design -> exact solved profiles, without STEP serialization or mesh feature extraction. */
-  async importDesign(document: CadDocument, key: string, options?: { turnUndersideUp?: boolean }): Promise<ModelImport> {
-    const { model, entries } = await nativeCadModel(document, options);
+  async importDesign(document: CadDocument, key: string): Promise<ModelImport> {
+    const { model, entries } = await nativeCadModel(document);
     models.set(key, entries);
     return Comlink.transfer(
       model,

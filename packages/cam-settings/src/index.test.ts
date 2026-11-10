@@ -9,9 +9,11 @@ describe('cutting recipes without browser storage', () => {
     expect(resolved.source).toMatchObject({ feed: 'saved', plungeFeed: 'job', stepdown: 'default' });
     expect(defaultCutting(6, 'oak').stepdown).toBe(3);
   });
-  it('keeps explicit zero values and reset markers instead of falling through to defaults', () => {
+  it('keeps explicit zero values, and reads saved values by physical tool', () => {
     const physical = { ...bit, guid: 'tool' };
     expect(resolveCutting(bit, 'oak', undefined, { outlineFinish: 0 }).values.outlineFinish).toBe(0);
-    expect(savedCuttingFor({ [cuttingKey(physical, 'oak')]: {}, ['1|6|flat@oak']: { feed: 2000 } }, physical, 'oak')).toEqual({});
+    expect(savedCuttingFor({ [cuttingKey(physical, 'oak')]: { feed: 1000 }, ['1|6|flat@oak']: { feed: 2000 } }, physical, 'oak')).toEqual({
+      feed: 1000,
+    });
   });
 });

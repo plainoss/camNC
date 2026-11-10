@@ -204,7 +204,7 @@ function PlanStep() {
           bit,
           material: current.board.material,
           job: jobCutting(settings),
-          onJobChange: cutting => save.mutate({ ...job, plan: { ...settings, cutting, finalFeedFactor: undefined } }),
+          onJobChange: cutting => save.mutate({ ...job, plan: { ...settings, cutting } }),
         }
       : { bit, material: current.board.material };
   };

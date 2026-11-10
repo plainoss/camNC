@@ -64,20 +64,6 @@ export const carvingRegion = (items: CarvingItemV1[]): Loop[] => unionPaths(item
 export const itemName = (item: CarvingItemV1): string => (item.art.kind === 'text' ? `"${item.art.text}"` : item.art.fileName);
 export const withItems = (carving: CarvingV1, items: CarvingItemV1[]): CarvingV1 => ({ ...carving, items, region: carvingRegion(items) });
 
-type LegacyCarving = Omit<CarvingV1, 'items'> & Pick<CarvingItemV1, 'art' | 'height' | 'x' | 'y'>;
-
-/** Older jobs saved one placed artwork directly on the carving. Keep its saved outlines and position. */
-export function normalizeCarving(raw: CarvingV1 | LegacyCarving): CarvingV1 {
-  if ('items' in raw) return raw;
-  const { art, height, x, y, ...carving } = raw;
-  return {
-    ...carving,
-    items: [
-      { id: 'carving-1', art, height, x, y, rotation: 0, outline: raw.region.map(loop => loop.map(p => ({ x: p.x - x, y: p.y - y }))) },
-    ],
-  };
-}
-
 /** V-bits offered for carving: the largest that fits the collet is ⌀8. Cutting data is cautious, for hardwood. */
 export const kVBits: LibraryTool[] = [
   { number: 16, diameter: 4, shape: 'v', angle: 60, name: '60° V-bit ⌀4', feed: 800, plungeFeed: 200, rpm: 18000 },

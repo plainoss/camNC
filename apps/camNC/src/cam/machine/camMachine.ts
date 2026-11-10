@@ -140,12 +140,6 @@ export const useCamMachine = create(
     ),
     {
       name: 'camnc-cam-machine',
-      // Version 1: once per part became the default, with the hand off the part while tabs are cut. Browsers saved the old
-      // default without anyone choosing it.
-      // Version 2: the overlay's path and parts aren't saved. A migration writes the state back, which frees what browsers
-      // already saved of them (megabytes, up to a full quota).
-      version: 2,
-      migrate: (saved, version) => (version < 1 ? { ...(saved as object), pauseEachTab: false } : saved) as never,
       storage: createJSONStorage(() => forgivingLocalStorage),
       // The path and parts are megabytes, and made again from the job when the entry is shown after a reload.
       partialize: state => ({
