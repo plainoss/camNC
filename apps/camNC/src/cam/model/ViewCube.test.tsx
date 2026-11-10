@@ -60,7 +60,8 @@ it('requests Top without moving the camera or missing, and leaves scene clicks o
       </Canvas>
     </div>
   );
-  await waitFor(() => expect(frames).toBeGreaterThan(2));
+  // Shared browser runs can delay the first frames; keep waiting for rendering, rather than clicking an unready scene.
+  await waitFor(() => expect(frames).toBeGreaterThan(2), { timeout: 10000 });
   const canvas = view.container.querySelector('canvas')!;
   const bounds = canvas.getBoundingClientRect();
   const click = (x: number, y: number) => {

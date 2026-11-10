@@ -1,4 +1,4 @@
-import { tessellateCurve, type CadEntity, type CadNurbsEntity, type CadPoint } from '@wbcnc/cad';
+import { tessellateCurve, type CadEntity, type CadNurbsEntity, type CadPoint, type CadSketchSolveStatus } from '@wbcnc/cad';
 import { useLayoutEffect, useState, type RefObject } from 'react';
 
 type SketchPoint = Extract<CadEntity, { type: 'point' }>;
@@ -24,6 +24,14 @@ export const SKETCH_APPEARANCE = {
   fixedPointColor: '#000000',
   previewColor: '#78b9cb',
 } as const;
+
+export function sketchStrokeColor(status: CadSketchSolveStatus | undefined, current: boolean): string {
+  return status?.status === 'conflict'
+    ? '#c73535'
+    : current && status?.status === 'solved' && status.dof === 0
+      ? SKETCH_APPEARANCE.constrainedColor
+      : SKETCH_APPEARANCE.freeColor;
+}
 
 /** Read after viewBox commit: a render-time CTM still describes the previous camera. */
 export function useSvgPixelScale(svgRef: RefObject<SVGSVGElement | null>, camera: unknown): number {

@@ -21,7 +21,7 @@ export function ModelBody({
   color: string;
   opacity: number;
   onSelect: (e: ThreeEvent<MouseEvent>) => void;
-  onHover: (hovered: boolean) => void;
+  onHover: (hovered: boolean, event?: ThreeEvent<PointerEvent>) => void;
 }) {
   const geometry = useMemo(() => modelGeometry(mesh), [mesh]);
   useEffect(() => () => geometry.dispose(), [geometry]);
@@ -32,11 +32,11 @@ export function ModelBody({
       matrix={matrix ?? new THREE.Matrix4()}
       onPointerOver={event => {
         event.stopPropagation();
-        onHover(true);
+        onHover(true, event);
       }}
       onPointerMove={event => {
         event.stopPropagation();
-        onHover(true);
+        onHover(true, event);
       }}
       onPointerOut={() => onHover(false)}
       onClick={(e: ThreeEvent<MouseEvent>) => {

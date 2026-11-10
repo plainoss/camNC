@@ -127,6 +127,15 @@
 .cad-drawing:has(.cad-sketch-dialog) .cad-part-view-tools {
   left: calc(13rem + 24px);
 }
+@media (max-width: 900px) {
+  /* Beside the dialog, these controls overflow a narrow canvas and focusing them scrolls the model sideways. */
+  .cad-drawing:has(.cad-sketch-dialog) .cad-part-view-tools {
+    left: 12px;
+    top: auto;
+    bottom: 36px;
+    max-width: calc(100% - 24px);
+  }
+}
 /** A step's kinds, as the reference's tabs across the top of a dialog: the chosen one underlined. */
 .cad-feature-tabs {
   display: flex;

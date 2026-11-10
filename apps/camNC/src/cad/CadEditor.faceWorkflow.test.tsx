@@ -9,7 +9,7 @@ import {
   type CadDocument,
   type CadDrawnOn,
 } from '@wbcnc/cad';
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
@@ -80,15 +80,6 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   };
   const ok = async () => {
     await userEvent.click(screen.getByRole('button', { name: 'OK' }));
-    await settled();
-  };
-  const pickFace = async (on: Extract<CadDrawnOn['on'], { partId: string }>, u: number, v: number) => {
-    const frame = cadFaceFrame(latest, on);
-    if ('error' in frame) throw new Error(frame.error);
-    const point = frame.origin.map((n, i) => n + frame.x[i]! * u + frame.y[i]! * v) as [number, number, number];
-    const props = studioProps(),
-      index = props.instanceIds!.indexOf(on.partId);
-    act(() => props.onSelect(on.partId, index, { partId: on.partId, index, point, normal: frame.normal }));
     await settled();
   };
   const faceFacing = (partId: string, way: '+x' | '+y') => {
@@ -172,7 +163,7 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   await ok();
   await unchanged(initial);
   const first = latest.parts[0]!.id;
-  await pickFace({ partId: first, face: 'top' }, 20, 55);
+  await clickFace({ partId: first, face: 'top' }, 20, 55);
   await command('Sketch');
   await settled();
   await drawRect([0, 48], [57, 63]);
@@ -186,7 +177,7 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
   const secondView = camera();
   await ok();
   await unchanged(secondView);
-  await pickFace(faceFacing(first, '+x'), 30, 12);
+  await clickFace(faceFacing(first, '+x'), 30, 12);
   await command('Sketch');
   await settled();
   await drawRect([0, 25], [63, 90.7]);

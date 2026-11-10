@@ -2,6 +2,7 @@ import {
   activeDesign,
   assemblyReport,
   cadPartReferenceMatches,
+  cadFaceFrame,
   evaluateCadDocument,
   isCadBody,
   partFaceAt,
@@ -20,7 +21,9 @@ import {
 import { assemblyModel, instanceKey } from './assemblyModel';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
+import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
+import type { ExtrudeDepthControl } from './extrudeDepth';
 
 const kViews: { view: ModelView; label: string }[] = [
   { view: 'assembled', label: 'Assembled' },
@@ -40,9 +43,12 @@ const kDoubleClickMs = 400;
 export default function WorkspaceView({
   onReady,
   cameraState,
+  extrusionDepth,
   document,
+  profileDocument = document,
   selectedId,
   selectedCopyId,
+  selectedFace,
   onSelect,
   onHover,
   onOpen,
@@ -62,6 +68,7 @@ export default function WorkspaceView({
   hoverIds,
   regions,
   onPickRegion,
+  onPickSketch,
   viewRequest,
   onViewRequest,
   showPlanes = true,
@@ -70,8 +77,11 @@ export default function WorkspaceView({
   /** The lazy view has mounted; a pending keyboard handoff can now focus it. */
   onReady?: () => void;
   cameraState?: StudioCameraRef;
+  extrusionDepth?: ExtrudeDepthControl | null;
   document: CadDocument;
+  profileDocument?: CadDocument;
   selectedId: string | null;
+  selectedFace?: Extract<CadDrawnOn['on'], { partId: string }> | null;
   selectedCopyId?: string;
   onSelect: (partId: string, copyId?: string) => void;
   onHover?: (id: string | null) => void;
@@ -117,6 +127,7 @@ export default function WorkspaceView({
   /** A sketch's regions to pick for its extrude, while its Extrude dialog is open. */
   regions?: ViewRegion[];
   onPickRegion?: (id: string) => void;
+  onPickSketch?: (id: string, region?: string) => void;
   viewRequest?: ViewRequest;
   onViewRequest?: (request: Omit<ViewRequest, 'seq'>) => void;
   showPlanes?: boolean;
@@ -127,7 +138,7 @@ export default function WorkspaceView({
   useLayoutEffect(() => {
     onReady?.();
   }, [onReady]);
-  const lastClick = useRef<{ partId: string; at: number } | null>(null);
+  const lastClick = useRef<{ partId: string; face: string; at: number } | null>(null);
   const model = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
   const clashes = useMemo(() => {
     // Sketches not yet extruded take up no space.
@@ -149,8 +160,19 @@ export default function WorkspaceView({
     [document, selectedPlane, featureShown]
   );
   const sketchLines = useMemo(
-    () => sketchLinesInModel(document, featureShown && (partId => featureShown(`${partId}:sketch`))),
-    [document, featureShown]
+    () => sketchLinesInModel(profileDocument, featureShown && (partId => featureShown(`${partId}:sketch`))),
+    [profileDocument, featureShown]
+  );
+  const sketchRegions = useMemo(
+    () =>
+      onPickSketch
+        ? sketchSelectionRegions(
+            profileDocument,
+            featureShown ?? (id => profileDocument.parts.find(p => `${p.id}:sketch` === id)?.extrude === false),
+            selectedId
+          )
+        : [],
+    [profileDocument, featureShown, onPickSketch, selectedId]
   );
   // Choosing what a new part is drawn on: a plane, or a face clicked in the view.
   const [ownChoosing, setOwnChoosing] = useState(false);
@@ -160,7 +182,7 @@ export default function WorkspaceView({
   const [notice, setNotice] = useState<string | null>(null);
   // Escape stops picking, so the view takes the keyboard while it picks.
   useEffect(() => {
-    if (choosing) frame.current?.focus();
+    if (choosing) frame.current?.focus({ preventScroll: true });
   }, [choosing]);
   /** The face of a part a click landed on, as a new part can be drawn on it. */
   const faceAt = (pick: ModelFacePick) => {
@@ -188,6 +210,10 @@ export default function WorkspaceView({
       ? [index]
       : []
   );
+  const selectedFrame = selectedFace && cadFaceFrame(document, selectedFace);
+  const selectedFaceIndex = selectedFace
+    ? model.instances.findIndex(instance => instance.partId === selectedFace.partId && !instance.copyId)
+    : -1;
   const status = notice
     ? notice
     : onPickPoint
@@ -242,7 +268,7 @@ export default function WorkspaceView({
             onClick={() => {
               setChoosing(!choosing);
               setNotice(null);
-              frame.current?.focus();
+              frame.current?.focus({ preventScroll: true });
             }}>
             New part
           </button>
@@ -260,6 +286,7 @@ export default function WorkspaceView({
       </div>
       <ModelViewport
         cameraState={cameraState}
+        extrusionDepth={extrusionDepth}
         meshes={model.meshes}
         parts={model.parts}
         view={view}
@@ -268,7 +295,17 @@ export default function WorkspaceView({
         transparentIds={transparentIds}
         instanceIds={model.instances.map(instanceKey)}
         selectedId={selectedId}
-        selectedIndexes={selectedIndexes}
+        selectedIndexes={selectedFace ? [] : selectedIndexes}
+        selectedFace={
+          selectedFrame && !('error' in selectedFrame) && selectedFaceIndex >= 0
+            ? {
+                partId: selectedFace!.partId,
+                index: selectedFaceIndex,
+                point: selectedFrame.origin,
+                normal: selectedFrame.normal,
+              }
+            : null
+        }
         // The studio shows parts as the reference does, and says in its status line when two overlap rather than colouring them.
         warnIds={controlled ? undefined : clashes.flatMap(clash => clash.partIds)}
         palette={controlled ? 'studio' : undefined}
@@ -278,10 +315,16 @@ export default function WorkspaceView({
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
+        onPickSketch={onPickSketch}
         display={controlled ? display : 'shaded'}
         showOrigin={!!onNewPart && showPlanes && (featureShown?.('origin') ?? true)}
-        regions={regions}
-        onPickRegion={onPickRegion}
+        regions={[...(regions ?? []), ...sketchRegions]}
+        onPickRegion={id => {
+          if (sketchRegions.some(region => region.id === id)) {
+            const [part, region] = JSON.parse(id) as [string, string];
+            onPickSketch?.(part, region);
+          } else onPickRegion?.(id);
+        }}
         onPickPlane={id => {
           // Picked while choosing, the new part is drawn on it; otherwise it's picked for the next sketch, as a face is.
           const plane = pickedPlane(document, id);
@@ -308,15 +351,17 @@ export default function WorkspaceView({
           // The face clicked is picked too, for a sketch started next to be drawn on it.
           const found = pick && faceAt(pick);
           onSelectFace?.(found ? { partId: found.part.id, face: found.face } : null);
+          const faceKey = JSON.stringify(found?.face ?? null);
           const now = Date.now();
           const key = instanceKey(instance);
-          if (lastClick.current?.partId === key && now - lastClick.current.at < kDoubleClickMs) {
+          // Changing faces quickly is another selection, not a request to edit the body's base sketch.
+          if (lastClick.current?.partId === key && lastClick.current.face === faceKey && now - lastClick.current.at < kDoubleClickMs) {
             lastClick.current = null;
             return onOpen(partId, instance.copyId);
           }
-          lastClick.current = { partId: key, at: now };
+          lastClick.current = { partId: key, face: faceKey, at: now };
           onSelect(partId, instance.copyId);
-          frame.current?.focus();
+          frame.current?.focus({ preventScroll: true });
         }}
       />
       <p role="status">{status}</p>
