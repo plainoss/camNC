@@ -1,5 +1,5 @@
 import { addConic, createCadDocument, createCadPart, createPlateDocument, type CadDocument } from '@wbcnc/cad';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
@@ -97,4 +97,38 @@ describe('manual sketch parameter expressions', () => {
     await settled();
     expect(latest().parts[0]!.sketch.entities.find(e => e.type === 'conic')).toMatchObject({ rho: 1 / 3 });
   });
+});
+
+it('uses the design unit for bare manual lengths and converts defaults without changing their size', async () => {
+  const document = createCadDocument();
+  document.lengthUnit = 'cm';
+  document.parts.push(createCadPart());
+  const { latest, click, fill, settled } = await setup(document);
+  await userEvent.keyboard('g');
+  await click(20, 20);
+  expect((screen.getByRole('textbox', { name: 'Rectangle width' }) as HTMLInputElement).value).toBe('10');
+  await fill('Rectangle width', '12');
+  await fill('Rectangle height', '8');
+  await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+  await settled();
+  expect(latest().parts[0]!.sketch.constraints.find(c => c.label === 'Width')).toMatchObject({ value: 120, expression: '(12) cm' });
+  expect(latest().parts[0]!.sketch.constraints.find(c => c.label === 'Height')).toMatchObject({ value: 80, expression: '(8) cm' });
+});
+
+it('keeps slot and offset physical defaults when the design uses cm', async () => {
+  const document = createPlateDocument();
+  document.lengthUnit = 'cm';
+  const { canvas, click } = await setup(document);
+  await click(60, 80);
+  const choose = (name: string) => {
+    fireEvent.keyDown(canvas, { key: 'c', altKey: true, code: 'KeyC' });
+    const search = screen.getByRole('combobox');
+    fireEvent.change(search, { target: { value: name } });
+    fireEvent.keyDown(search, { key: 'Enter' });
+  };
+  choose('Slot');
+  expect((screen.getByRole('textbox', { name: 'Slot width' }) as HTMLInputElement).value).toBe('1');
+  choose('Offset');
+  await userEvent.click(screen.getByRole('button', { name: 'Edit offset distance' }));
+  expect((screen.getByRole('textbox', { name: 'Offset distance' }) as HTMLInputElement).value).toBe('0.5');
 });

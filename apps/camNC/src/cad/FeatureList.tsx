@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import { cadFolderSteps, cadVariableValues, moveCadFolder, type CadDocument } from '@wbcnc/cad';
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { kBasePlanes } from './basePlanes';
@@ -124,6 +125,7 @@ export function FeatureList({
   onNewSketch?: (plane: string) => void;
   onChange?: (document: CadDocument) => void;
 }) {
+  const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
   const entries = folderFeatureEntries(document);
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
@@ -152,8 +154,8 @@ export function FeatureList({
     if (entry.kind === 'plane') return document.planes!.find(candidate => candidate.id === entry.id)!.name;
     const variable = document.variables!.find(candidate => candidate.id === entry.id)!;
     const result = scope[variable.name];
-    const unit = result?.kind === 'length' ? ' mm' : result?.kind === 'angle' ? '°' : '';
-    return `#${variable.name} = ${result ? `${formatCadValue(result.value)}${unit}` : variable.expression}`;
+    const unit = result?.kind === 'length' ? ` ${lengthUnit}` : result?.kind === 'angle' ? '°' : '';
+    return `#${variable.name} = ${result ? `${result.kind === 'length' ? formatLength(result.value) : formatCadValue(result.value)}${unit}` : variable.expression}`;
   };
   /** What a row's eye shows or hides: a sketch, by its step's id, or a plane. */
   const visibilityId = (entry: FeatureEntry) =>

@@ -15,3 +15,14 @@ it('S5 rejects an old editor source even when its route has refreshed to another
   await expect(saveDesignDraft(savedB, staleEdit, document)).rejects.toThrow(/changed in another view/);
   expect((await getJob(savedA.id))!.design!.draft).toEqual(draftB);
 });
+
+it('starts a new design in cm and saves a renamed title and preference without accepting geometry', async () => {
+  const original = await createDesignJob();
+  expect(original.design!.draft.lengthUnit).toBe('cm');
+  const draft = { ...original.design!.draft, name: 'Cupboard', lengthUnit: 'in' as const };
+  const saved = await saveDesignDraft(original, draft);
+  expect(saved.name).toBe('Cupboard');
+  expect(saved.fileName).toBe('Cupboard');
+  expect((await getJob(saved.id))!.design!.draft).toEqual(draft);
+  expect(saved.design!.accepted).toBeUndefined();
+});

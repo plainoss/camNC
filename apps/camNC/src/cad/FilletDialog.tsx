@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import {
   cadDrawnOnSupports,
   effectivePlacement,
@@ -12,7 +13,6 @@ import { CadValueInput } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
 import type { CadConnectorPick } from './PartFeatureDialogs';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 
 type Picked = { partId: string; corner: string };
 
@@ -62,9 +62,10 @@ export function FilletDialog({
   onPreview?: (document: CadDocument | null) => void;
   onCancel: () => void;
 }) {
+  const { parseCadValue, lengthText, formatLength, lengthUnit } = useDesignUnits();
   const fillet = document.parts.find(part => part.id === partId)?.fillets?.find(candidate => candidate.id === filletId);
   const [picked, setPicked] = useState<Picked[]>(() => (fillet && partId ? fillet.corners.map(corner => ({ partId, corner })) : []));
-  const [radiusText, setRadiusText] = useState(fillet ? (fillet.radiusExpression ?? formatCadValue(fillet.radius)) : '5');
+  const [radiusText, setRadiusText] = useState(fillet ? (fillet.radiusExpression ?? lengthText(fillet.radius)) : lengthText(5));
   const [error, setError] = useState<string | null>(null);
   // Edges are picked while the dialog is open, one click after another, each toggling its corner.
   useEffect(() => {
@@ -121,7 +122,7 @@ export function FilletDialog({
         return { ...part, fillets: fillet ? fillets.map(f => (f.id === fillet.id ? next : f)) : [...fillets, next] };
       }),
     };
-  }, [document, radiusText, variables, owner, picked, featureId, fillet]);
+  }, [document, radiusText, variables, owner, picked, featureId, fillet, parseCadValue]);
   useDialogPreview(candidate, onPreview);
   const save = () => {
     const radius = parseCadValue(radiusText, { unit: 'mm', variables });
@@ -135,7 +136,7 @@ export function FilletDialog({
     const part = document.parts.find(part => part.id === pick.partId);
     const point = part?.sketch.entities.find(entity => entity.type === 'point' && entity.id === pick.corner);
     return point?.type === 'point'
-      ? `${part!.name} at ${formatCadValue(point.x)}, ${formatCadValue(point.y)} mm`
+      ? `${part!.name} at ${formatLength(point.x)}, ${formatLength(point.y)} ${lengthUnit}`
       : `${part?.name ?? 'Part'} edge ${index + 1}`;
   };
   return (
@@ -173,7 +174,7 @@ export function FilletDialog({
         <span>
           <CadValueInput bare aria-label="Radius" value={radiusText} onChange={event => setRadiusText(event.target.value)} />
         </span>
-        mm
+        {lengthUnit}
       </label>
       {error && (
         <p role="alert" className="cad-thickness-error">
