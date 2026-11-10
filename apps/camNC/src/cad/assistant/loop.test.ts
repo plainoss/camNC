@@ -100,6 +100,34 @@ describe('recorded assistant repair loop', () => {
     expect(result.proposal).toBeUndefined();
   });
 
+  it('keeps optional illustrations in a question and falls back to text when a sketch is invalid', async () => {
+    const options = setup();
+    const sketches = [{ choiceIndex: 0, shapes: [{ kind: 'rect', coords: [10, 10, 80, 50] }] }];
+    const question: AssistantMessage = {
+      role: 'assistant',
+      text: '',
+      calls: [
+        {
+          id: 'visual-question',
+          name: 'ask_user',
+          arguments: {
+            question: 'Which shape?',
+            choices: ['Rectangle', 'Ellipse'],
+            sketches,
+          },
+        },
+      ],
+    };
+    options.request = vi.fn<NonNullable<AssistantRunOptions['request']>>(async () => question);
+    const result = await runDesignAssistant(options);
+    expect(result.status).toBe('question');
+    expect(assistantQuestion(question)?.sketches).toEqual(sketches);
+    expect(options.request).toHaveBeenCalledTimes(1);
+    expect(options.check).not.toHaveBeenCalled();
+    question.calls![0].arguments.sketches = [{ choiceIndex: 0, shapes: '<svg onload="bad()" />' }];
+    expect(assistantQuestion(question)).toEqual({ question: 'Which shape?', choices: ['Rectangle', 'Ellipse'] });
+  });
+
   it('rejects malformed options and mixed question/edit batches without running their edits', async () => {
     const options = setup();
     const invalid: AssistantMessage = {

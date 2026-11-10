@@ -6,6 +6,7 @@ export default defineConfig({
   resolve: { alias: { '@wbcnc/cad-script': fileURLToPath(new URL('./src/index.ts', import.meta.url)) } },
   test: {
     environment: 'node',
+    setupFiles: ['src/testSetup.ts'],
     maxWorkers: 2,
     // Checks solve designs and plan their toolpaths, which takes seconds when the machine is busy.
     testTimeout: 20_000,
