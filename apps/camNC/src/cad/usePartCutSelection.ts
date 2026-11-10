@@ -2,7 +2,9 @@ import { cadPartReference, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { builtStudioParts } from './studioParts';
 
-/** Carry physical-copy identity from list/viewport picks into the persisted cut reference. */
+type PartFeature = 'extrude' | 'pattern' | 'hole';
+
+/** Carry physical-copy identity into cut references and refuse unsupported family-only commands. */
 export function usePartCutSelection(document: CadDocument, part: CadPart | undefined, setPartId: (partId: string) => void) {
   const [physicalSelection, setPhysicalSelection] = useState<{ partId: string; copyId?: string } | null>(null);
   const [cutPick, setCutPick] = useState<{ partId: string; seq: number } | null>(null);
@@ -31,5 +33,22 @@ export function usePartCutSelection(document: CadDocument, part: CadPart | undef
       return refuse('Transforming only the selected copy is not supported. Select the source part in Parts to transform its whole family.');
     if (part) open(part.id);
   };
-  return { cutPick, cutPicked, showCutPicked, pickForCut, selectPart, selectedTool, selectedKey, selectedCopyId, transformPart };
+  const featurePart = (kind: PartFeature, open: (kind: PartFeature, partId: string) => void, refuse: (message: string) => void) => {
+    // Validate raw copy identity: an absent slot makes selectedCopyId undefined but must not become its source family.
+    if (kind === 'pattern' && (!valid || copyId !== undefined))
+      return refuse('Patterning only the selected copy is not supported. Select the source part in Parts to pattern its whole family.');
+    if (part) open(kind, part.id);
+  };
+  return {
+    cutPick,
+    cutPicked,
+    showCutPicked,
+    pickForCut,
+    selectPart,
+    selectedTool,
+    selectedKey,
+    selectedCopyId,
+    transformPart,
+    featurePart,
+  };
 }
