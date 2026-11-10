@@ -36,9 +36,10 @@ import { BoardDrawings } from '@/cam/boards/BoardDrawings';
 import { BoardInspector } from '@/cam/boards/BoardInspector';
 import { HoldSizesDialog } from '@/cam/boards/HoldSizesDialog';
 import { HoldTools } from '@/cam/boards/HoldTools';
+import { LayoutPanel } from '@/cam/boards/LayoutPanel';
+import { applySetupToAll, prepareGlobalRelayout } from '@/cam/boards/globalSetup';
 import { useHoldEditing } from '@/cam/boards/useHoldEditing';
 import type { PartMenuProps } from '@/cam/boards/PartMenu';
-import { StockList } from '@/cam/boards/StockList';
 import type { JobBoard } from '@/cam/useJobBoards';
 import type { ModelImport, PlanResult } from '@/cam/camTypes';
 import { useHoldHardware } from '@/cam/holdHardware';
@@ -60,9 +61,8 @@ import { createFileRoute, Link, useParams, useSearch } from '@tanstack/react-rou
 import { zodValidator } from '@tanstack/zod-adapter';
 import { z } from 'zod';
 import { Button } from '@wbcnc/ui/components/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
-import { ChevronDown, Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/boards')({
@@ -471,8 +471,7 @@ function BoardsEditor({
     }
     autoFill(free, before);
   };
-  const autoFill = (start = boards.map(b => b.board), before = start) => {
-    const stock = job.stock ?? [];
+  const autoFill = (start = boards.map(b => b.board), before = start, stock = job.stock ?? []) => {
     if (!stock.length) return setNote('Add the boards you have to the stock list first.');
     // Cut boards stay as they are, with their parts: the rest is filled around them.
     const kept = start.filter(isCut);
@@ -511,6 +510,31 @@ function BoardsEditor({
         returnedNote,
       undoTo(before)
     );
+  };
+
+  /** Apply selected board's spacing and holds to all uncut boards, with Undo. */
+  const applySetup = (relayout: boolean) => {
+    const before = boards.map(b => b.board);
+    if (!relayout) {
+      const next = applySetupToAll(boards, selected.board, instances, plan.bit.diameter, nestOptions);
+      if (saveBoards(next)) {
+        setNote(`Applied ${boardLabel(selected.board)}’s setup to all boards.`, undoTo(before));
+      }
+      return;
+    }
+    const { free, effectiveStock } = prepareGlobalRelayout(
+      boards,
+      selected.board,
+      instances,
+      job.stock ?? [],
+      plan.bit.diameter,
+      nestOptions
+    );
+    if (!effectiveStock.length) {
+      saveBoards(free);
+      return setNote(`Applied ${boardLabel(selected.board)}’s setup and laid out all boards again.`, undoTo(before));
+    }
+    autoFill(free, before, effectiveStock);
   };
 
   const addBoard = () => {
@@ -764,6 +788,7 @@ function BoardsEditor({
             const b = boards.find(x => x.board.id === id);
             if (b) updateBoard({ ...b.board, ...clearDesignIssue(b.board, item), tabsAt: { ...b.board.tabsAt, [item]: tabs } });
           }}
+          onApplyAll={applySetup}
         />
       </main>
       <aside className="flex min-h-0 flex-col border-l">
@@ -794,10 +819,13 @@ function BoardsEditor({
               newBoardLabel={`New ${sel.thickness} mm board`}
               stock={job.stock ?? []}
               objective={job.nestObjective ?? 'boards'}
+              boards={boards}
+              selectedBoard={selected}
               onStock={stock => save({ ...job, stock })}
               onObjective={nestObjective => save({ ...job, nestObjective })}
               onAutoFill={() => autoFill()}
               onRelayoutAll={relayoutAll}
+              onApplySetup={applySetup}
               onNewBoard={addBoard}
               onUndo={undo}
             />
@@ -822,94 +850,6 @@ function BoardsEditor({
     </div>
   );
 }
-
-/** What's about all the boards: what you have to cut them from, and nesting the parts onto them. */
-function LayoutPanel({
-  newBoardLabel,
-  stock,
-  objective,
-  onStock,
-  onObjective,
-  onAutoFill,
-  onRelayoutAll,
-  onNewBoard,
-  onUndo,
-}: {
-  newBoardLabel: string;
-  stock: CamJobV1['stock'] & {};
-  objective: (typeof kObjectives)[number][0];
-  onStock: (stock: CamJobV1['stock'] & {}) => void;
-  onObjective: (objective: (typeof kObjectives)[number][0]) => void;
-  onAutoFill: () => void;
-  onRelayoutAll: () => void;
-  onNewBoard: () => void;
-  onUndo?: () => void;
-}) {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
-      <h2 className="text-[15px] font-semibold">All boards</h2>
-      <StockList stock={stock} onChange={onStock} />
-      <section aria-label="Auto-fill" className="flex flex-col gap-2">
-        <div className="flex">
-          <Hint text="Puts the parts on boards from your stock list. Parts you moved by hand stay where they are.">
-            <Button size="sm" variant="outline" className="flex-1 rounded-r-none" onClick={onAutoFill}>
-              Auto-fill from stock
-            </Button>
-          </Hint>
-          <DropdownMenu modal={false}>
-            <Hint text="More layout actions: re-lay out everything from scratch.">
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="rounded-l-none border-l-0 px-1.5" aria-label="More layout actions">
-                  <ChevronDown />
-                </Button>
-              </DropdownMenuTrigger>
-            </Hint>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onRelayoutAll}>Re-lay out everything (unpin all)</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        <span id="nest-objective-label" className="text-xs text-muted-foreground">
-          Auto-fill prefers:
-        </span>
-        <div
-          role="group"
-          aria-label="Auto-fill optimizes for"
-          aria-describedby="nest-objective-label"
-          className="flex self-start rounded-md border p-0.5 text-xs">
-          {kObjectives.map(([value, label, hint]) => (
-            <Hint key={value} text={hint}>
-              <button
-                aria-pressed={objective === value}
-                onClick={() => onObjective(value)}
-                className={cn(
-                  'rounded px-2 py-1',
-                  objective === value ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted/60'
-                )}>
-                {label}
-              </button>
-            </Hint>
-          ))}
-        </div>
-        <p className="text-xs text-muted-foreground">Rectangle nesting for now. True-shape nesting is planned.</p>
-      </section>
-      <div className="flex gap-1.5">
-        <Button size="sm" variant="outline" onClick={onNewBoard}>
-          <Plus /> {newBoardLabel}
-        </Button>
-        <Button size="sm" variant="outline" disabled={!onUndo} onClick={onUndo}>
-          Undo
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/** Auto-fill's objective: value, label, what it costs. */
-const kObjectives = [
-  ['boards', 'Fewest boards', 'Fewer setups at the machine, may waste a bit more wood.'],
-  ['wood', 'Least wood', 'Least board area, may need more boards.'],
-] as const;
 
 const unpinned = (board: BoardV1, itemId: string) => (board.pinned ?? []).filter(i => i !== itemId);
 /** The board's layout without this body. */
