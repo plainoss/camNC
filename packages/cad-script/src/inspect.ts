@@ -26,6 +26,8 @@ import {
 } from '@wbcnc/cad';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
+import { nativeCurveReport, sketchCurveDetails } from './curveReport';
+import { curveExtremaPoints } from './curveBounds';
 import { isEdgeNotch } from './notch';
 
 export interface CadExpectation {
@@ -58,7 +60,7 @@ export type CadReportEntity =
   | { ref: string; type: 'line'; a: number[]; b: number[]; ends: string[]; construction?: true }
   | { ref: string; type: 'circle'; at: number[]; d: number; construction?: true }
   | { ref: string; type: 'arc'; at: number[]; r: number; a: number[]; b: number[]; ends: string[]; construction?: true }
-  | { ref: string; type: string; construction?: true };
+  | ({ ref: string; type: string; construction?: true } & Partial<ReturnType<typeof nativeCurveReport>>);
 export interface CadReportPart {
   name: string;
   thickness: number;
@@ -86,6 +88,8 @@ export interface CadReportPart {
     entities: CadReportEntity[];
     constraints: number;
     patterns?: { ref: string; copies: number }[];
+    offsets?: ReturnType<typeof sketchCurveDetails>['offsets'];
+    fitting?: ReturnType<typeof sketchCurveDetails>['fitting'];
   }[];
   /** Copy-specific material, in the family's local frame; ordinary copies continue sharing their source. */
   copyFeatures?: { ref: string; name: string; cuts: CadReportPart['cuts'] }[];
@@ -129,7 +133,14 @@ function curveExtremes(sketch: CadSketch | undefined): CadPoint[] {
   if (!sketch) return [];
   const points = new Map(sketch.entities.flatMap(e => (e.type === 'point' ? [[e.id, e] as const] : [])));
   return sketch.entities.flatMap(e => {
-    if (e.type !== 'circle' && e.type !== 'arc') return [];
+    if (e.type !== 'circle' && e.type !== 'arc') {
+      if (!['bezier', 'spline', 'ellipse', 'conic'].includes(e.type) || e.type === 'point') return [];
+      try {
+        return curveExtremaPoints(e, points);
+      } catch {
+        return [];
+      }
+    }
     const center = points.get(e.centerId);
     if (!center) return [];
     const extremes = [0, 1, 2, 3].map(quarter => ({
@@ -210,7 +221,7 @@ function reportEntities(sketch: CadSketch): CadReportEntity[] {
           ...flag,
         },
       ];
-    return [{ ref: ref(e.id), type: e.type, ...flag }];
+    return [{ ref: ref(e.id), type: e.type, ...nativeCurveReport(sketch, e, ref), ...flag }];
   });
 }
 
@@ -346,7 +357,7 @@ export async function inspectCadDocument(
   const toCut = cadPartsToCut(solved.document, solved.parts);
   // Bones widen a cut past what was drawn, so its opening is measured on the part without them.
   const unrelieved = solved.document.parts.some(part => part.cornerRelief)
-    ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(({ cornerRelief: _, ...part }) => part) }).parts
+    ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(part => ({ ...part, cornerRelief: undefined })) }).parts
     : solved.parts;
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
     const evaluated = solved.parts.find(candidate => candidate.partId === part.id);
@@ -386,6 +397,11 @@ export async function inspectCadDocument(
       status: solvedHere[i] ? (statusOf(i)?.status ?? 'invalid') : 'shared',
       entities: reportEntities(sketch),
       constraints: sketch.constraints.length,
+      ...sketchCurveDetails(
+        sketch,
+        id => shortHandles(sketch.entities.map(e => e.id)).get(id) ?? id,
+        id => shortHandles(sketch.constraints.map(c => c.id)).get(id) ?? id
+      ),
       ...(() => {
         const patterns = sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern');
         const handles = shortHandles(sketch.constraints.map(c => c.id));
