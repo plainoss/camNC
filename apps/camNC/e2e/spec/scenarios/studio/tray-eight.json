@@ -1,0 +1,684 @@
+[
+  {
+    "id": "studio/tray/eight-checkpoint-regeneration",
+    "title": "A complete divided tray keeps physical tools, linked parameters and identities through eight edits",
+    "evidence": "design eight-checkpoint multi-part tray workflow; real user controls, rendered membership and saved-source persistence",
+    "steps": [
+      "open ../../../../packages/cad-script/fixtures/designs/divided-tray.json",
+      "closesketch",
+      "checkpoint assembled",
+      {
+        "expect": {
+          "studio": {
+            "sourceParts": [
+              "Base",
+              "Left wall",
+              "Right wall",
+              "Front wall",
+              "Back wall",
+              "Divider"
+            ],
+            "workspacePartCount": 8,
+            "listedParts": [
+              {
+                "name": "Base",
+                "thickness": 12
+              },
+              {
+                "name": "Left wall",
+                "thickness": 12
+              },
+              {
+                "name": "Right wall",
+                "thickness": 12
+              },
+              {
+                "name": "Front wall",
+                "thickness": 12
+              },
+              {
+                "name": "Back wall",
+                "thickness": 12
+              },
+              {
+                "name": "Divider",
+                "thickness": 12
+              },
+              {
+                "name": "Divider 2",
+                "thickness": 12
+              },
+              {
+                "name": "Divider 3",
+                "thickness": 12
+              }
+            ],
+            "partIssues": [],
+            "copies": {
+              "Divider": 2
+            },
+            "variables": {
+              "board": "12mm",
+              "width": "360mm",
+              "dividers": "3",
+              "shift": "0mm",
+              "fit": "0mm",
+              "pitch": "(width - 2*board)/(dividers + 1)"
+            },
+            "patterns": {
+              "Divider": {
+                "axis": "x",
+                "count": 3,
+                "countExpression": "dividers",
+                "spacing": 84,
+                "spacingExpression": "pitch"
+              }
+            },
+            "offsets": {
+              "Divider": {
+                "expression": "board/2 + pitch + shift"
+              },
+              "Right wall": {
+                "expression": "width - board"
+              }
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ],
+            "cutExpressions": [
+              "fit"
+            ],
+            "dialog": null
+          }
+        }
+      },
+      "feature #board",
+      "dialogfill Value = 30mm",
+      "dialogcancel",
+      {
+        "expect": {
+          "studio": {
+            "unchangedSince": "assembled",
+            "dialog": null
+          }
+        }
+      },
+      "feature #board",
+      "dialogfill Value = 15mm",
+      "dialogconfirm",
+      "feature #width",
+      "dialogfill Value = 420mm",
+      "dialogconfirm",
+      "checkpoint resize-stock-and-width",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 8,
+            "listedParts": [
+              {
+                "name": "Base",
+                "thickness": 15
+              },
+              {
+                "name": "Left wall",
+                "thickness": 15
+              },
+              {
+                "name": "Right wall",
+                "thickness": 15
+              },
+              {
+                "name": "Front wall",
+                "thickness": 15
+              },
+              {
+                "name": "Back wall",
+                "thickness": 15
+              },
+              {
+                "name": "Divider",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 2",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 3",
+                "thickness": 15
+              }
+            ],
+            "partIssues": [],
+            "retainedIdsSince": "assembled",
+            "samePatternIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit"
+            ],
+            "dialog": null,
+            "variables": {
+              "board": "15mm",
+              "width": "420mm"
+            },
+            "thicknesses": {
+              "Base": 15,
+              "Left wall": 15,
+              "Right wall": 15,
+              "Front wall": 15,
+              "Back wall": 15,
+              "Divider": 15
+            },
+            "patterns": {
+              "Divider": {
+                "count": 3,
+                "spacing": 97.5
+              }
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "feature #dividers",
+      "dialogfill Value = 4",
+      "dialogconfirm",
+      "checkpoint grow-divider-count",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 9,
+            "listedParts": [
+              {
+                "name": "Base",
+                "thickness": 15
+              },
+              {
+                "name": "Left wall",
+                "thickness": 15
+              },
+              {
+                "name": "Right wall",
+                "thickness": 15
+              },
+              {
+                "name": "Front wall",
+                "thickness": 15
+              },
+              {
+                "name": "Back wall",
+                "thickness": 15
+              },
+              {
+                "name": "Divider",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 2",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 3",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 4",
+                "thickness": 15
+              }
+            ],
+            "partIssues": [],
+            "retainedIdsSince": "assembled",
+            "samePatternIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit"
+            ],
+            "dialog": null,
+            "addedCopyIdsSince": {
+              "checkpoint": "assembled",
+              "part": "Divider",
+              "count": 1
+            },
+            "variables": {
+              "dividers": "4"
+            },
+            "patterns": {
+              "Divider": {
+                "count": 4,
+                "countExpression": "dividers",
+                "spacing": 78,
+                "spacingExpression": "pitch"
+              }
+            },
+            "copies": {
+              "Divider": 3
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "feature Cut Base with Divider",
+      "dialogremove Tools = Divider",
+      "dialogfocus Tools",
+      "selectpart Divider 3",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": [
+                "Divider 3"
+              ],
+              "Targets": [
+                "Base"
+              ]
+            }
+          }
+        }
+      },
+      "dialogconfirm",
+      "checkpoint selected-third-divider",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 9,
+            "listedParts": [
+              {
+                "name": "Base",
+                "thickness": 15
+              },
+              {
+                "name": "Left wall",
+                "thickness": 15
+              },
+              {
+                "name": "Right wall",
+                "thickness": 15
+              },
+              {
+                "name": "Front wall",
+                "thickness": 15
+              },
+              {
+                "name": "Back wall",
+                "thickness": 15
+              },
+              {
+                "name": "Divider",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 2",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 3",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 4",
+                "thickness": 15
+              }
+            ],
+            "partIssues": [],
+            "retainedIdsSince": "grow-divider-count",
+            "samePatternIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit"
+            ],
+            "dialog": null,
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider 3"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "feature Cut Base with Divider 3",
+      "dialogremove Tools = Divider 3",
+      "dialogfocus Tools",
+      "selectpart Divider",
+      "dialogconfirm",
+      "feature #shift",
+      "dialogfill Value = 10mm",
+      "dialogconfirm",
+      "checkpoint restore-family-and-move",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 9,
+            "listedParts": [
+              {
+                "name": "Base",
+                "thickness": 15
+              },
+              {
+                "name": "Left wall",
+                "thickness": 15
+              },
+              {
+                "name": "Right wall",
+                "thickness": 15
+              },
+              {
+                "name": "Front wall",
+                "thickness": 15
+              },
+              {
+                "name": "Back wall",
+                "thickness": 15
+              },
+              {
+                "name": "Divider",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 2",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 3",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 4",
+                "thickness": 15
+              }
+            ],
+            "partIssues": [],
+            "retainedIdsSince": "grow-divider-count",
+            "samePatternIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit"
+            ],
+            "dialog": null,
+            "variables": {
+              "shift": "10mm"
+            },
+            "offsets": {
+              "Divider": {
+                "value": 95.5,
+                "expression": "board/2 + pitch + shift"
+              }
+            },
+            "cutSettings": [
+              {
+                "clearance": 0,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "feature #fit",
+      "dialogfill Value = 0.2mm",
+      "dialogconfirm",
+      "checkpoint clearance",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 9,
+            "listedParts": [
+              {
+                "name": "Base",
+                "thickness": 15
+              },
+              {
+                "name": "Left wall",
+                "thickness": 15
+              },
+              {
+                "name": "Right wall",
+                "thickness": 15
+              },
+              {
+                "name": "Front wall",
+                "thickness": 15
+              },
+              {
+                "name": "Back wall",
+                "thickness": 15
+              },
+              {
+                "name": "Divider",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 2",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 3",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 4",
+                "thickness": 15
+              }
+            ],
+            "partIssues": [],
+            "retainedIdsSince": "grow-divider-count",
+            "samePatternIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit"
+            ],
+            "dialog": null,
+            "variables": {
+              "fit": "0.2mm"
+            },
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "featureaction Cut Base with Divider = Suppress",
+      "checkpoint suppress-housings",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 9,
+            "listedParts": [
+              {
+                "name": "Base",
+                "thickness": 15
+              },
+              {
+                "name": "Left wall",
+                "thickness": 15
+              },
+              {
+                "name": "Right wall",
+                "thickness": 15
+              },
+              {
+                "name": "Front wall",
+                "thickness": 15
+              },
+              {
+                "name": "Back wall",
+                "thickness": 15
+              },
+              {
+                "name": "Divider",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 2",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 3",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 4",
+                "thickness": 15
+              }
+            ],
+            "partIssues": [],
+            "retainedIdsSince": "grow-divider-count",
+            "samePatternIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit"
+            ],
+            "dialog": null,
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": true,
+                "keepTools": true,
+                "tools": [
+                  "Divider"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "featureaction Cut Base with Divider = Unsuppress",
+      "checkpoint before-reload",
+      "reload",
+      "checkpoint restore-and-reload",
+      {
+        "expect": {
+          "studio": {
+            "workspacePartCount": 9,
+            "listedParts": [
+              {
+                "name": "Base",
+                "thickness": 15
+              },
+              {
+                "name": "Left wall",
+                "thickness": 15
+              },
+              {
+                "name": "Right wall",
+                "thickness": 15
+              },
+              {
+                "name": "Front wall",
+                "thickness": 15
+              },
+              {
+                "name": "Back wall",
+                "thickness": 15
+              },
+              {
+                "name": "Divider",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 2",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 3",
+                "thickness": 15
+              },
+              {
+                "name": "Divider 4",
+                "thickness": 15
+              }
+            ],
+            "partIssues": [],
+            "retainedIdsSince": "grow-divider-count",
+            "samePatternIdsSince": "assembled",
+            "sameFeatureIdsSince": "assembled",
+            "cutExpressions": [
+              "fit"
+            ],
+            "dialog": null,
+            "sameIdsSince": "before-reload",
+            "unchangedSince": "before-reload",
+            "variables": {
+              "board": "15mm",
+              "width": "420mm",
+              "dividers": "4",
+              "shift": "10mm",
+              "fit": "0.2mm"
+            },
+            "cutSettings": [
+              {
+                "clearance": 0.2,
+                "suppressed": false,
+                "keepTools": true,
+                "tools": [
+                  "Divider"
+                ],
+                "targets": [
+                  "Base"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+]

@@ -134,9 +134,11 @@
           "evidence": [
             "packages/cad-script/src/iteration/woodworkingWorkflows.test.ts",
             "packages/cad-script/src/iteration/axisMaterial.test.ts",
-            "packages/cad-script/src/iteration/woodworkingExpected.test.ts"
+            "packages/cad-script/src/iteration/woodworkingExpected.test.ts",
+            "studio/tray/eight-checkpoint-regeneration",
+            "studio/joints/eight-checkpoint-regeneration"
           ],
-          "note": "Eight cumulative core states per design check authored dependencies, source/copy IDs, occupied material, phase, clearance, collisions and reload. Missing-tool and unconstrained diagnostics stay incomplete. Full UI, boundary meshes and external equivalence remain separate gates."
+          "note": "Eight cumulative core states per design check authored dependencies, source/copy IDs, occupied material, phase, clearance, collisions and reload. Real controls exercise all eight edits, rendered membership, linked parameters and source/copy/feature identity. Missing-tool and unconstrained diagnostics stay incomplete. Broader interface details, boundary meshes and external equivalence remain separate gates."
         },
         {
           "item": "Split a part by a plane",
