@@ -1,0 +1,290 @@
+{
+ "design": {
+  "name": "Stock measurement",
+  "revision": 0,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "2d7ec5c1-99cb-4bac-9202-76985a237d56:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Stock",
+   "part": "Stock",
+   "settings": {
+    "on": "not placed"
+   },
+   "result": {
+    "sketch": "Stock / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "2d7ec5c1-99cb-4bac-9202-76985a237d56:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Stock",
+   "part": "Stock",
+   "settings": {
+    "thickness": {
+     "value": 18
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      100,
+      60
+     ]
+    },
+    "holes": 0,
+    "notches": 0
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Stock",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 5,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1
+   },
+   "entities": [
+    {
+     "ref": "f648",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      100,
+      0
+     ],
+     "ends": [
+      "ab4e",
+      "5541"
+     ]
+    },
+    {
+     "ref": "9fb6",
+     "type": "line",
+     "a": [
+      100,
+      0
+     ],
+     "b": [
+      100,
+      60
+     ],
+     "ends": [
+      "c39b",
+      "31c0"
+     ]
+    },
+    {
+     "ref": "41ef",
+     "type": "line",
+     "a": [
+      100,
+      60
+     ],
+     "b": [
+      0,
+      60
+     ],
+     "ends": [
+      "0cdf",
+      "cf9f"
+     ]
+    },
+    {
+     "ref": "80a4",
+     "type": "line",
+     "a": [
+      0,
+      60
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "0e83",
+      "fac6"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      100,
+      60
+     ],
+     "area": 6000,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Stock",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     100,
+     60
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 3.3,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      18
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge f648",
+     "looks": "-y",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 9fb6",
+     "looks": "+x",
+     "origin": [
+      100,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 41ef",
+     "looks": "+y",
+     "origin": [
+      100,
+      60,
+      0
+     ]
+    },
+    {
+     "face": "edge 80a4",
+     "looks": "-x",
+     "origin": [
+      0,
+      60,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    113.4,
+    73.4
+   ],
+   "yield": 0.721,
+   "parts": [
+    {
+     "name": "Stock",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      100,
+      60
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Stock",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 3.3,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}

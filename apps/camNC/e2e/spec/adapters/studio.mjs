@@ -32,14 +32,26 @@ export async function createAdapter(page, url) {
       if (await group.count()) dialogSelections[name] = await group.getByRole('listitem').evaluateAll(items => items.map(item =>
         [...item.childNodes].filter(node => node.nodeName !== 'BUTTON').map(node => node.textContent).join('').trim()));
     }
-    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, dialog: await dialog.count() ? await dialog.getAttribute('aria-label') : null };
+    const measurements = await page.locator('.cad-studio-measure-results button').evaluateAll(buttons => Object.fromEntries(buttons.map(button => {
+      const text = button.getAttribute('aria-label') ?? button.innerText, at = text.indexOf(': ');
+      return [text.slice(0, at), text.slice(at + 2)];
+    })));
+    const dialogName = await dialog.count() ? await dialog.evaluate(element => element.getAttribute('aria-label') ?? document.getElementById(element.getAttribute('aria-labelledby'))?.textContent ?? null) : null;
+    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, dialog: dialogName };
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
-    if (verb === 'studiotool') {
+    if (verb === 'pickviewcenter') {
+      // A single stock board is centered by the named camera view. This is a real canvas click, never a model edit.
+      const canvas = page.getByTestId('workspace-3d').locator('canvas').first();
+      await canvas.waitFor();
+      const box = await canvas.boundingBox();
+      if (!box) throw new Error('The workspace canvas has no visible bounds');
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    } else if (verb === 'studiotool') {
       await page.getByRole('toolbar', { name: 'Part Studio toolbar', exact: true }).getByRole('button', { name: rest, exact: true }).click();
     } else if (verb === 'selectpart') {
       const rows = page.getByRole('list', { name: 'Parts', exact: true }).getByRole('listitem').filter({ has: page.getByText(rest, { exact: true }) });
