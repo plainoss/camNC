@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import type { CadPoint, CadSketch } from '@wbcnc/cad';
 import { selectionMeasurements } from '@wbcnc/cad-editor/selectionMeasurements';
 import { formatCadValue } from './valueExpressions';
@@ -11,6 +12,7 @@ export interface SelectionReadoutProps {
 }
 
 export function SelectionReadout({ sketch, selectedIds, picks, className }: SelectionReadoutProps) {
+  const { formatLength, lengthUnit } = useDesignUnits();
   const measurements = selectionMeasurements(sketch, selectedIds, picks);
   if (!measurements.length) return null;
   return (
@@ -24,8 +26,8 @@ export function SelectionReadout({ sketch, selectedIds, picks, className }: Sele
           <div key={measurement.label}>
             <dt>{measurement.label}</dt>
             <dd>
-              {formatCadValue(measurement.value)}
-              {measurement.unit === 'deg' ? '°' : ' mm'}
+              {measurement.unit === 'deg' ? formatCadValue(measurement.value) : formatLength(measurement.value)}
+              {measurement.unit === 'deg' ? '°' : ` ${lengthUnit}`}
             </dd>
           </div>
         ))}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, type CSSProperties, type RefObject } from 'react';
 import type { CadSketch } from '@wbcnc/cad';
 import { creationValueAt, type CreationValues } from './creationValues';
-import { formatCadValue } from './valueExpressions';
+import { useDesignUnits } from './designUnits';
 import { CadValueInput } from './CadValueInput';
 
 export function CreationValueControls({
@@ -23,6 +23,7 @@ export function CreationValueControls({
   onCancel: () => void;
   inputRef?: RefObject<HTMLInputElement | null>;
 }) {
+  const { formatLength, lengthUnit } = useDesignUnits();
   const localInput = useRef<HTMLInputElement>(null);
   const input = inputRef ?? localInput;
   useEffect(() => {
@@ -75,9 +76,9 @@ export function CreationValueControls({
             type="button"
             className="cad-creation-value"
             style={positions[index]}
-            aria-label={`${step.label}: ${formatCadValue(value.constraint.value)} mm. Enter a value`}
+            aria-label={`${step.label}: ${formatLength(value.constraint.value)} ${lengthUnit}. Enter a value`}
             onClick={() => onStart(index)}>
-            {formatCadValue(value.constraint.value)}
+            {formatLength(value.constraint.value)}
           </button>
         );
       })}

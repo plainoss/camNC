@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import type { CadPoint } from '@wbcnc/cad';
 import type { PointerEvent } from 'react';
 import { CadValueInput } from './CadValueInput';
@@ -108,6 +109,7 @@ export function SketchLinearPatternManipulator({
   onStart: (index: number, event: PointerEvent<SVGElement>) => void;
   onEdit: (field: 'countX' | 'countY' | 'spacingX' | 'spacingY' | 'angleX' | 'angleY') => void;
 }) {
+  const { formatLength, lengthUnit } = useDesignUnits();
   const k = 1 / pixelScale;
   return (
     <g>
@@ -175,7 +177,7 @@ export function SketchLinearPatternManipulator({
                   edit(index === 0 ? 'spacingX' : 'spacingY')(e);
                 }
               }}>
-              {Math.round(Math.hypot(step.x, step.y) * 1000) / 1000} mm
+              {formatLength(Math.hypot(step.x, step.y))} {lengthUnit}
             </text>
           </g>
         );

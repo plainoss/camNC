@@ -1,3 +1,4 @@
+import { withCadLengthUnit } from './lengthUnits';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { cadDocumentVersion } from './documentVersion';
 import { featuresForCopy } from './copyFeatures';
@@ -98,10 +99,16 @@ export function faceSketchDocument(document: CadDocument, partId: string, sketch
   const part = document.parts.find(candidate => candidate.id === partId),
     face = part && cadFaceSketches(part).find(candidate => candidate.sketch.id === sketchId);
   if (!part || !face) throw new Error('This face sketch no longer exists.');
+  // Variables keep their folder IDs while the face editor omits the design's other source steps.
+  const folderIds = new Set(document.variables?.map(variable => variable.folderId));
+  const folders = document.folders?.filter(folder => folderIds.has(folder.id)).map(({ id, name }) => ({ id, name, partIds: [] }));
   return {
-    version: 1,
+    version: folders?.length ? 3 : 1,
+    ...(folders?.length && { folders }),
     id: `${document.id}:face:${sketchId}`,
     name: document.name,
+    lengthUnit: document.lengthUnit,
+    variables: document.variables,
     revision: document.revision,
     parts: [{ id: part.id, name: part.name, thickness: part.thickness, sketch: face.sketch }],
   };
@@ -109,8 +116,13 @@ export function faceSketchDocument(document: CadDocument, partId: string, sketch
 
 /** Puts an edited face sketch back into its document. */
 export function withFaceSketchDocument(document: CadDocument, partId: string, sketchId: string, edited: CadDocument): CadDocument {
+  // A face editor changes the preference for the whole design, including expressions outside its one sketch.
+  document = withCadLengthUnit(document, edited.lengthUnit ?? 'mm');
   return {
     ...document,
+    name: edited.name,
+    variables: edited.variables ?? document.variables,
+    lengthUnit: edited.lengthUnit,
     revision: Math.max(document.revision, edited.revision),
     parts: document.parts.map(part =>
       part.id !== partId

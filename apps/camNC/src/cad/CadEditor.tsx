@@ -1,3 +1,4 @@
+import { DesignUnitContext, useDesignUnits } from './designUnits';
 import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
 import { previewSlot } from './slotPreview';
 import { SketchCircularPatternControls, SketchCircularPatternManipulator } from './SketchCircularPatternControls';
@@ -9,6 +10,7 @@ import {
 } from './circularPatternParameters';
 import {
   CAD_GEOMETRY_TOLERANCE,
+  withCadLengthUnit,
   addArc,
   addInscribedPolygon,
   addCircumscribedPolygon,
@@ -75,7 +77,6 @@ import {
   removeEdgeFillet,
   splitApartRegions,
   cadCopyName,
-  setCadVariable,
   setCutDepth,
   setCutSuppressed,
   withFeatureVersion,
@@ -91,7 +92,6 @@ import {
   newExtrudeOnFace,
   faceExtrudeProblem,
   resolveExtrudeSteps,
-  cadVariableScope,
   addPartCut,
   updatePartCut,
   removePartCut,
@@ -160,7 +160,6 @@ import {
   type TransformParameters,
   type TransformDragKind,
 } from './transformParameters';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
@@ -225,7 +224,7 @@ import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
-import { builtStudioParts } from './studioParts';
+import { builtStudioParts, disabledStudioCommands } from './studioParts';
 import { usePartCutSelection } from './usePartCutSelection';
 import { FeatureDialog } from './FeatureDialog';
 import { StudioSketchDialog } from './StudioSketchDialog';
@@ -279,7 +278,7 @@ import { newSketchPart } from './newSketchPart';
 import { ExtrudeDialog, PartPatternDialog, type CadConnectorPick } from './PartFeatureDialogs';
 import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
-import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
+import { useEditorVariableFields } from './useEditorVariableFields';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -290,7 +289,6 @@ type DimensionMode = CadDimensionMode;
 type ConstraintTool = ConstraintCommandTool;
 type View = { x: number; y: number; w: number; h: number };
 const initialView: View = { x: -35, y: -175, w: 300, h: 210 };
-const rounded = (n: number) => Math.round(n * 100) / 100;
 const numeric = (c: CadConstraint): c is NumericConstraint => 'value' in c;
 
 const FaceSketchBackdrop = lazy(() => import('./FaceSketchBackdrop'));
@@ -301,6 +299,7 @@ const SketchBackdrop = lazy(() => import('./SketchBackdrop'));
 /** Native editable source stays in one document while CAM remains a derived consumer of accepted revisions. */
 export function CadEditor({
   document: initialDocument,
+  editSession,
   onDraftChange,
   onFinish,
   onCancel,
@@ -314,8 +313,9 @@ export function CadEditor({
   faceSketch,
   startIn3D,
 }: CadEditorProps) {
-  const [session] = useState(() => cadSession(initialDocument));
+  const [session] = useState(() => editSession ?? cadSession(initialDocument));
   const [doc, setDocument] = useState(session.document);
+  const { parseCadValue, lengthText, formatLength, lengthUnit } = useDesignUnits(doc.lengthUnit ?? 'mm');
   const [faceOpening] = useState(() => initialFaceSketchView(faceSketch?.scene));
   const [savedView] = useState(() => cadViewState(session.document, initialView, preferredPartId));
   const [partId, setPartId] = useState(savedView.selectedPartId);
@@ -381,10 +381,10 @@ export function CadEditor({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('Choose a drawing tool or select geometry.');
   const [finishError, setFinishError] = useState<string | null>(null);
-  const [width, setWidth] = useState('100');
-  const [height, setHeight] = useState('60');
-  const [radius, setRadius] = useState('10');
-  const [slotWidth, setSlotWidth] = useState('10');
+  const [width, setWidth] = useState(lengthText(100));
+  const [height, setHeight] = useState(lengthText(60));
+  const [radius, setRadius] = useState(lengthText(10));
+  const [slotWidth, setSlotWidth] = useState(lengthText(10));
   const [slotChain, setSlotChain] = useState(false);
   const [sharedSlotWidth, setSharedSlotWidth] = useState<string | undefined>();
   const slotWidthField = useRef<HTMLInputElement>(null);
@@ -398,20 +398,20 @@ export function CadEditor({
     last: number;
     sweep: number;
   } | null>(null);
-  const [linearParameters, setLinearParameters] = useState(initialLinearPatternParameters);
+  const [linearParameters, setLinearParameters] = useState(() => initialLinearPatternParameters(lengthUnit));
   const [patternEditId, setPatternEditId] = useState<string | null>(null);
   const [patternNotice, setPatternNotice] = useState('');
   const patternCommandId = useRef('');
   const patternFields = useRef<Partial<Record<Exclude<keyof LinearPatternParameters, 'secondDirection'>, HTMLInputElement>>>({});
   const patternDrag = useRef<{ index: number; anchor: CadPoint; parameters: LinearPatternParameters } | null>(null);
-  const [transformParameters, setTransformParameters] = useState(initialTransformParameters);
+  const [transformParameters, setTransformParameters] = useState(() => initialTransformParameters(undefined, lengthUnit));
   const [transformNotice, setTransformNotice] = useState('');
   const transformDrag = useRef<{ kind: TransformDragKind; start: CadPoint; parameters: TransformParameters } | null>(null);
   const [splitNotice, setSplitNotice] = useState('');
   const [splitFirst, setSplitFirst] = useState<{ entityId: string; parameter: number; point: CadPoint } | null>(null);
   const chamferDrag = useRef<{ side: number; origin: CadPoint; direction: CadPoint; previous: string[] } | null>(null);
-  const [chamferDistances, setChamferDistances] = useState(['10', '10']);
-  const [filletRadius, setFilletRadius] = useState('10');
+  const [chamferDistances, setChamferDistances] = useState([lengthText(10), lengthText(10)]);
+  const [filletRadius, setFilletRadius] = useState(lengthText(10));
   const [filletEditing, setFilletEditing] = useState(false);
   const [modification, setModification] = useState<ModificationWorkflow>(idleModificationWorkflow);
   const [hoveredModifyCurve, setHoveredModifyCurve] = useState<string | null>(null);
@@ -607,30 +607,7 @@ export function CadEditor({
   const solveSequence = useRef(0);
   const lastCheckedRevision = useRef('');
   const documentRef = useRef(doc);
-  // Every value field can use the design's variables by name.
-  const variableScope = useMemo(() => cadVariableScope(doc), [doc]);
-  // What every value field offers after `#`, and how it makes a variable from `#name = value`.
-  const variableFields = useMemo<CadVariableFields>(
-    () => ({
-      variables: (doc.variables ?? []).map(variable => {
-        const result = variableScope[variable.name];
-        const unitText = result?.kind === 'length' ? ' mm' : result?.kind === 'angle' ? '°' : '';
-        return { name: variable.name, shown: result ? `${formatCadValue(result.value)}${unitText}` : variable.expression };
-      }),
-      define: (name, expression) => {
-        const current = documentRef.current;
-        const existing = current.variables?.find(variable => variable.name === name);
-        const result = setCadVariable(current, { ...(existing && { id: existing.id }), name, expression });
-        if ('error' in result) return result.error;
-        commit(result.document);
-        return null;
-      },
-    }),
-    // commit and documentRef are stable for the session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doc.variables, variableScope]
-  );
-  useProvideCadVariableFields(variableFields);
+  const variableScope = useEditorVariableFields(doc, documentRef, next => commit(next));
   const blankDesign = studioSession && doc.parts.length === 1 && isBlank(doc.parts[0]!);
   const extrusionDepth = useExtrudeDepth(doc, featureDialog?.kind === 'extrude' ? featureDialog.partId : undefined, next => commit(next));
   const studioPreview = useStudioPreview(
@@ -707,7 +684,7 @@ export function CadEditor({
     return 'error' in radius
       ? { ok: false as const, message: radius.error, cornerPointIds: filletSelection.cornerPointIds }
       : filletLineCorners(sketch, { cornerPointIds: filletSelection.cornerPointIds, radius: radius.value });
-  }, [sketch, filletSelection, filletRadius, variableScope]);
+  }, [sketch, filletSelection, filletRadius, variableScope, parseCadValue]);
   const chamferSelection = useMemo(
     () => (sketch && tool === 'chamfer' ? resolveChamferCorners(sketch, selected) : null),
     [sketch, tool, selected]
@@ -724,15 +701,18 @@ export function CadEditor({
           distanceB: (values[1] as { value: number }).value,
           selectedLineIds: selected,
         });
-  }, [sketch, chamferSelection, chamferDistances, selected, variableScope]);
+  }, [sketch, chamferSelection, chamferDistances, selected, variableScope, parseCadValue]);
   const cornerPreview = tool === 'chamfer' ? chamferPreview : filletPreview;
-  const parsedTransform = useMemo(() => parseTransformParameters(transformParameters), [transformParameters]);
+  const parsedTransform = useMemo(() => parseTransformParameters(transformParameters, lengthUnit), [transformParameters, lengthUnit]);
   const transformPreview = useMemo(() => {
     if (!sketch || tool !== 'transform' || !selected.length) return null;
     return parsedTransform.ok ? transformSketchEntities(sketch, { ...parsedTransform, entityIds: selected }) : parsedTransform;
   }, [sketch, tool, selected, parsedTransform]);
-  const parsedCircular = useMemo(() => parseCircularPatternParameters(circularParameters), [circularParameters]);
-  const parsedLinear = useMemo(() => parseLinearPatternParameters(linearParameters, variableScope), [linearParameters, variableScope]);
+  const parsedCircular = useMemo(() => parseCircularPatternParameters(circularParameters, lengthUnit), [circularParameters, lengthUnit]);
+  const parsedLinear = useMemo(
+    () => parseLinearPatternParameters(linearParameters, variableScope, lengthUnit),
+    [linearParameters, variableScope, lengthUnit]
+  );
   const linearPreview = useMemo(() => {
     if (!sketch || !selected.length) return null;
     if (tool === 'circularPattern')
@@ -756,8 +736,11 @@ export function CadEditor({
   }, [sketch, tool, selected, patternEditId, parsedLinear, parsedCircular]);
   const patternAnchor = useMemo(() => (sketch ? linearPatternAnchor(sketch, selected) : { x: 0, y: 0 }), [sketch, selected]);
   const slotPreview = useMemo(
-    () => (sketch && tool === 'slot' && selected.length ? previewSlot(sketch, selected, slotWidth, slotChain, sharedSlotWidth) : null),
-    [sketch, tool, selected, slotWidth, slotChain, sharedSlotWidth]
+    () =>
+      sketch && tool === 'slot' && selected.length
+        ? previewSlot(sketch, selected, slotWidth, slotChain, sharedSlotWidth, lengthUnit)
+        : null,
+    [sketch, tool, selected, slotWidth, slotChain, sharedSlotWidth, lengthUnit]
   );
   const slotWidthCircle = slotPreview?.ok
     ? slotPreview.sketch.entities.find(
@@ -792,7 +775,7 @@ export function CadEditor({
     return 'error' in parsed
       ? { ok: false as const, message: parsed.error }
       : offsetSketch(sketch, { entityIds: modification.entityIds, value: parsed.value });
-  }, [sketch, modification, variableScope]);
+  }, [sketch, modification, variableScope, parseCadValue]);
   const extendPreview = useMemo(
     () =>
       sketch && modification.phase === 'extend' && modification.entityId && modification.end && modifyTarget
@@ -844,7 +827,7 @@ export function CadEditor({
     } catch {
       return locations;
     }
-  }, [sketch, pending, cursor, tool, rho, construction, markerScale]);
+  }, [sketch, pending, cursor, tool, rho, construction, markerScale, parseCadValue]);
   useEffect(() => {
     focusSketchCanvas(svg.current);
     const release = acquireCadKeyboard();
@@ -1151,7 +1134,7 @@ export function CadEditor({
     // Choosing any tool, Select included, ends Use.
     setUsingEdges(false);
     if (next === 'slot') {
-      setSlotWidth('10');
+      setSlotWidth(lengthText(10));
       setSlotChain(false);
       setSharedSlotWidth(undefined);
     }
@@ -1164,14 +1147,14 @@ export function CadEditor({
       patternCommandId.current = newCadId();
     }
     if (next === 'linearPattern') {
-      setLinearParameters(initialLinearPatternParameters());
+      setLinearParameters(initialLinearPatternParameters(lengthUnit));
       patternCommandId.current = newCadId();
     }
 
     setContextMenu(null);
     transformDrag.current = null;
     setTransformNotice('');
-    if (next === 'transform') setTransformParameters(initialTransformParameters(transformSelectionCenter(selected)));
+    if (next === 'transform') setTransformParameters(initialTransformParameters(transformSelectionCenter(selected), lengthUnit));
     contextPress.current = { phase: 'idle' };
     setCreationValues(null);
     drawingGesture.current = idleDrawingGesture();
@@ -1227,7 +1210,8 @@ export function CadEditor({
     }
     if (next === tool && next !== 'select') next = 'select';
     if (sketch && (next === 'offset' || next === 'mirror' || next === 'extend')) {
-      setModification(beginModification(sketch, next, selected));
+      const started = beginModification(sketch, next, selected);
+      setModification(started.phase === 'offset' ? { ...started, text: lengthText(Number(started.text)) } : started);
       setSelected(modificationSourceIds(sketch, selected, next));
     }
     if (next === 'tangentArc') {
@@ -1463,7 +1447,7 @@ export function CadEditor({
         return setMessage(error instanceof Error ? error.message : String(error));
       }
     } else if (isRectangleTool(tool)) {
-      const rectangle = createRectangle(sketch, { tool, start, end, width, height, variables: variableScope, construction });
+      const rectangle = createRectangle(sketch, { tool, start, end, width, height, variables: variableScope, lengthUnit, construction });
       if (rectangle.error !== undefined) return setMessage(rectangle.error);
       next = rectangle.sketch;
       Object.assign(sizeExpressions, rectangle.sizeExpressions);
@@ -1652,7 +1636,7 @@ export function CadEditor({
     const current = creationValueAt(creationValues, sketch);
     if (!current) return rejectValue('This drawing value no longer applies. Select its geometry again.', creationInput.current);
     const parsed = parseCadValue(
-      creationValues.editing ? (creationInput.current?.value ?? creationValues.text) : String(current.constraint.value),
+      creationValues.editing ? (creationInput.current?.value ?? creationValues.text) : lengthText(current.constraint.value),
       { unit: 'mm', variables: variableScope }
     );
     if ('error' in parsed) return rejectValue(parsed.error, creationInput.current);
@@ -1691,8 +1675,8 @@ export function CadEditor({
     chooseTool(pattern.type);
     setPatternEditId(id);
     patternCommandId.current = id;
-    if (pattern.type === 'linearPattern') setLinearParameters(linearPatternParameters(pattern));
-    else setCircularParameters(circularPatternParameters(pattern, sketch!));
+    if (pattern.type === 'linearPattern') setLinearParameters(linearPatternParameters(pattern, lengthUnit));
+    else setCircularParameters(circularPatternParameters(pattern, sketch!, lengthUnit));
     setSelected(editablePatternSources(pattern));
     setMessage('Edit the pattern counts, spacing or direction. Deleted instances remain excluded.');
   };
@@ -2297,7 +2281,8 @@ export function CadEditor({
       event.preventDefault();
       // Everything drawn, not the edges of the face it's drawn on, so it can all be moved or patterned.
       const ids = sketch?.entities.filter(e => e.type !== 'point' && !e.faceEdge).map(e => e.id) ?? [];
-      if (tool === 'transform' && !selected.length) setTransformParameters(initialTransformParameters(transformSelectionCenter(ids)));
+      if (tool === 'transform' && !selected.length)
+        setTransformParameters(initialTransformParameters(transformSelectionCenter(ids), lengthUnit));
       setSelected(ids);
       return;
     }
@@ -2754,7 +2739,7 @@ export function CadEditor({
         directEntityId && sketch.entities.some(e => e.id === directEntityId) ? directEntityId : (hit?.entityId ?? pointHit?.targetPointId);
       if (selectedId) {
         const next = selected.includes(selectedId) ? selected.filter(id => id !== selectedId) : [...selected, selectedId];
-        if (!selected.length) setTransformParameters(initialTransformParameters(transformSelectionCenter(next)));
+        if (!selected.length) setTransformParameters(initialTransformParameters(transformSelectionCenter(next), lengthUnit));
         setSelected(next);
       } else if (selected.length) acceptTransform();
       return;
@@ -2969,7 +2954,7 @@ export function CadEditor({
       if (!matrix) return;
       const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
         center = slotDrag.current.center;
-      setSlotWidth(String(Math.round(2 * Math.hypot(raw.x - center.x, -raw.y - center.y) * 1e6) / 1e6));
+      setSlotWidth(lengthText(Math.round(2 * Math.hypot(raw.x - center.x, -raw.y - center.y) * 1e6) / 1e6));
       return;
     }
     if (circularDrag.current) {
@@ -2978,14 +2963,14 @@ export function CadEditor({
       const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
         point = { x: raw.x, y: -raw.y },
         gesture = circularDrag.current,
-        parsed = parseCircularPatternParameters(gesture.parameters);
+        parsed = parseCircularPatternParameters(gesture.parameters, lengthUnit);
       if (!parsed.ok) return;
       const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
       if (gesture.kind === 'center')
         setCircularParameters({
           ...gesture.parameters,
-          centerX: text(parsed.center.x + point.x - gesture.start.x),
-          centerY: text(parsed.center.y + point.y - gesture.start.y),
+          centerX: lengthText(parsed.center.x + point.x - gesture.start.x),
+          centerY: lengthText(parsed.center.y + point.y - gesture.start.y),
         });
       else {
         const a = Math.atan2(point.y - parsed.center.y, point.x - parsed.center.x);
@@ -3006,7 +2991,7 @@ export function CadEditor({
         { index, anchor, parameters } = patternDrag.current;
       const x = raw.x - anchor.x,
         y = -raw.y - anchor.y,
-        spacing = String(Math.round(Math.hypot(x, y) * 1e6) / 1e6),
+        spacing = lengthText(Math.round(Math.hypot(x, y) * 1e6) / 1e6),
         angle = String(Math.round(((Math.atan2(y, x) * 180) / Math.PI) * 1e6) / 1e6);
       setLinearParameters({
         ...parameters,
@@ -3021,15 +3006,15 @@ export function CadEditor({
       const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
       let point = { x: raw.x, y: -raw.y };
       const { kind, start, parameters } = transformDrag.current,
-        parsed = parseTransformParameters(parameters);
+        parsed = parseTransformParameters(parameters, lengthUnit);
       if (!parsed.ok) return;
       const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
       const center = { x: parsed.pivot.x + parsed.translation.x, y: parsed.pivot.y + parsed.translation.y };
       if (kind === 'translate')
         setTransformParameters({
           ...parameters,
-          dx: text(parsed.translation.x + point.x - start.x),
-          dy: text(parsed.translation.y + point.y - start.y),
+          dx: lengthText(parsed.translation.x + point.x - start.x),
+          dy: lengthText(parsed.translation.y + point.y - start.y),
         });
       if (kind === 'rotate') {
         const delta = Math.atan2(point.y - center.y, point.x - center.x) - Math.atan2(start.y - center.y, start.x - center.x);
@@ -3057,10 +3042,10 @@ export function CadEditor({
           s = parsed.scale * Math.sin(r);
         setTransformParameters({
           ...parameters,
-          pivotX: text(x),
-          pivotY: text(y),
-          dx: text(parsed.translation.x + (1 - c) * dx + s * dy),
-          dy: text(parsed.translation.y - s * dx + (1 - c) * dy),
+          pivotX: lengthText(x),
+          pivotY: lengthText(y),
+          dx: lengthText(parsed.translation.x + (1 - c) * dx + s * dy),
+          dy: lengthText(parsed.translation.y - s * dx + (1 - c) * dy),
         });
       }
       return;
@@ -3073,7 +3058,7 @@ export function CadEditor({
       const { side, origin, direction } = chamferDrag.current;
       const distance = Math.max(0.001, (point.x - origin.x) * direction.x + (-point.y - origin.y) * direction.y);
       setChamferDistances(previous =>
-        previous.map((value, index) => (index === side ? String(Math.round(distance * 1000) / 1000) : value))
+        previous.map((value, index) => (index === side ? lengthText(Math.round(distance * 1000) / 1000) : value))
       );
       return;
     }
@@ -3413,7 +3398,16 @@ export function CadEditor({
       restoreCanvasKeyboard();
     }
   };
-  useImperativeHandle(controller, () => ({ finish, prepareDocument }));
+  useImperativeHandle(controller, () => ({
+    finish,
+    prepareDocument,
+    updateSettings: settings => {
+      const prepared = settings.lengthUnit === documentRef.current.lengthUnit ? documentRef.current : prepareDocument();
+      if (!prepared) return false;
+      commit({ ...withCadLengthUnit(prepared, settings.lengthUnit ?? 'mm'), name: settings.name });
+      return true;
+    },
+  }));
   const cancel = async () => {
     setBusy(true);
     try {
@@ -3898,17 +3892,7 @@ export function CadEditor({
   const turnDet = ta * td - tb * tc || 1;
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
-  const studioDisabled: Partial<Record<StudioCommand, string>> = {
-    // A sketch not yet extruded can be extruded; patterns and transforms need a part.
-    ...(part?.extrude === false
-      ? { pattern: 'Extrude the sketch first', transform: 'Extrude the sketch first' }
-      : part && !isCadPart(part)
-        ? { pattern: 'Select a part first', transform: 'Select a part first' }
-        : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
-    ...(builtParts.length < 2 && { cutParts: 'Cutting parts needs two parts' }),
-  };
-  // A mirror image is of a part, as a pattern is.
-  if (studioDisabled.pattern) studioDisabled.mirror = studioDisabled.pattern;
+  const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
   const featureShown = useCallback(
     (id: string) => {
       if (id in featureVisibility) return featureVisibility[id]!;
@@ -3989,7 +3973,7 @@ export function CadEditor({
       />
     </>
   );
-  return (
+  const content = (
     <div
       ref={root}
       className="cad-editor"
@@ -5102,7 +5086,7 @@ export function CadEditor({
               onStart={index => {
                 const value = creationValueAt(creationValues, sketch, index);
                 if (value)
-                  setCreationValues({ ...creationValues, index, editing: true, text: String(value.constraint.value), selectAll: true });
+                  setCreationValues({ ...creationValues, index, editing: true, text: lengthText(value.constraint.value), selectAll: true });
               }}
               onAccept={applyCreationValue}
               onCancel={() => {
@@ -5265,8 +5249,8 @@ export function CadEditor({
               parameters={transformParameters}
               onChange={next => {
                 if (next.pivotX !== transformParameters.pivotX || next.pivotY !== transformParameters.pivotY) {
-                  const parsed = parseTransformParameters(next);
-                  setTransformParameters(parsed.ok ? repositionTransformPivot(transformParameters, parsed.pivot) : next);
+                  const parsed = parseTransformParameters(next, lengthUnit);
+                  setTransformParameters(parsed.ok ? repositionTransformPivot(transformParameters, parsed.pivot, lengthUnit) : next);
                 } else setTransformParameters(next);
               }}
               onApply={acceptTransform}
@@ -5342,7 +5326,7 @@ export function CadEditor({
           )}
           <div className="cad-canvas-footer">
             <span>
-              {rounded(cursor.x)}, {rounded(cursor.y)} mm
+              {formatLength(cursor.x)}, {formatLength(cursor.y)} {lengthUnit}
             </span>
             <span>
               {sketchBackdrop
@@ -5423,4 +5407,5 @@ export function CadEditor({
       )}
     </div>
   );
+  return <DesignUnitContext value={lengthUnit}>{content}</DesignUnitContext>;
 }

@@ -73,4 +73,5 @@ export * from './slot';
 
 export * from './extrudeRemoval';
 
+export * from './lengthUnits';
 export * from './replaceFilletedSketch';

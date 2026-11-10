@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import {
   inscribedPolygonFromPoints,
   circumscribedPolygonFromPoints,
@@ -16,11 +17,12 @@ export type SketchToolPreviewProps = SketchToolPreviewInput;
 
 /** One rendering boundary for primitive, arc and rational previews; no document/history mutations. */
 export function SketchToolPreview(props: SketchToolPreviewProps) {
+  const { lengthUnit } = useDesignUnits();
   const { tool, pending, cursor, curvePreview, tangent, pixelScale, construction } = props,
     start = pending[0];
   if (!start) return null;
   const scale = Number.isFinite(pixelScale) && pixelScale > 0 ? pixelScale : 1;
-  const feedback = sketchPreviewFeedback(props);
+  const feedback = sketchPreviewFeedback({ ...props, lengthUnit });
   const ellipse = tool === 'ellipse' && pending[1] ? ellipseFromPoints(start, pending[1], cursor) : null;
   const threePointCircle = tool === 'threePointCircle' && pending[1] ? circleThroughThreePoints(start, pending[1], cursor) : null;
   const aligned = tool === 'alignedRectangle' && pending[1] ? alignedRectangleFromPoints(start, pending[1], cursor) : null;

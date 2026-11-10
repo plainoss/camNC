@@ -2,7 +2,7 @@ import { CAD_MAX_PART_PATTERN, type CadPartPattern, type CadValueScope } from '@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CadConnectorPick } from './PartFeatureDialogs';
 import { CadValueInput } from './CadValueInput';
-import { parseCadValue } from './valueExpressions';
+import { useDesignUnits } from './designUnits';
 import './cadThicknessField.css';
 import './circularPartPatternField.css';
 
@@ -27,12 +27,13 @@ export function CircularPartPatternField({
   onDone?: () => void;
   onValidityChange?: (problem: string | null) => void;
 }) {
+  const { parseCadValue, lengthText } = useDesignUnits();
   const id = useId();
   const circular = pattern.circular;
   const typedCount = pattern.countExpression ?? String(pattern.count);
   // Editable values must round-trip exactly: rounding a partial sweep to 360 changes its instance spacing semantics.
   const typedAngle = circular.angleExpression ?? String(circular.angle);
-  const typedOrigin = circular.origin.map(String) as [string, string, string];
+  const typedOrigin = circular.origin.map(lengthText) as [string, string, string];
   const originKey = typedOrigin.join(',');
   const axisKey = circular.axis.join(',');
   const [count, setCount] = useState(typedCount);
@@ -158,7 +159,7 @@ export function CircularPartPatternField({
               if (!point.every(Number.isFinite) || !Number.isFinite(length) || length < 1e-9)
                 return setPickProblem('Pick a straight edge or a face for the axis.');
               const axis = along.map(value => value / length) as Vec3;
-              const originText = point.map(String) as [string, string, string];
+              const originText = point.map(lengthText) as [string, string, string];
               // Keep the complete picked line while another draft field is invalid, ready to apply when corrected.
               dirty.current = true;
               setDraftAxis(axis);

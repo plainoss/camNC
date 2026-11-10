@@ -22,6 +22,7 @@ export function CamJobBar({
   job,
   board,
   tools,
+  title,
   actions,
   hideDemoMark,
   className,
@@ -33,6 +34,7 @@ export function CamJobBar({
   /** The board at the machine. */
   board?: string;
   tools?: ReactNode;
+  title?: ReactNode;
   actions?: ReactNode;
   /** For the machine view, which has the full demo bar. */
   hideDemoMark?: boolean;
@@ -69,7 +71,7 @@ export function CamJobBar({
         {/* A fixed width, for the tools to start at the same place whatever the name and board. */}
         <div className="flex w-full min-w-0 flex-col leading-tight md:w-28 min-[1680px]:w-44" title={job?.fileName}>
           <span className="flex min-w-0 gap-1 text-sm text-muted-foreground">
-            <span className="truncate">{job?.name ?? 'CAM job'}</span>
+            {title ?? <span className="truncate">{job?.name ?? 'CAM job'}</span>}
             {board && <span className="shrink-0 whitespace-nowrap text-foreground">· Board {board}</span>}
           </span>
           {note && (

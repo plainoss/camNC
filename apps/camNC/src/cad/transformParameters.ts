@@ -1,3 +1,5 @@
+import type { CadLengthUnit } from '@wbcnc/cad';
+import { lengthText } from './designUnits';
 import type { CadPoint } from '@wbcnc/cad';
 import { parseCadValue } from './valueExpressions';
 export type TransformDragKind = 'translate' | 'rotate' | 'scale' | 'pivot';
@@ -10,18 +12,18 @@ export interface TransformParameters {
   pivotY: string;
   copy: boolean;
 }
-export const initialTransformParameters = (pivot: CadPoint = { x: 0, y: 0 }): TransformParameters => ({
+export const initialTransformParameters = (pivot: CadPoint = { x: 0, y: 0 }, lengthUnit: CadLengthUnit = 'mm'): TransformParameters => ({
   dx: '0',
   dy: '0',
   angle: '0',
   scale: '1',
-  pivotX: String(pivot.x),
-  pivotY: String(pivot.y),
+  pivotX: lengthText(pivot.x, lengthUnit),
+  pivotY: lengthText(pivot.y, lengthUnit),
   copy: false,
 });
-export function parseTransformParameters(parameters: TransformParameters) {
+export function parseTransformParameters(parameters: TransformParameters, lengthUnit: CadLengthUnit = 'mm') {
   const read = (key: Exclude<keyof TransformParameters, 'copy'>, unit: 'mm' | 'deg' | 'scalar') => {
-    const result = parseCadValue(parameters[key], { unit });
+    const result = parseCadValue(parameters[key], { unit, lengthUnit });
     if ('error' in result) throw new Error(result.error);
     return result.value;
   };
@@ -39,9 +41,13 @@ export function parseTransformParameters(parameters: TransformParameters) {
   }
 }
 /** Repositioning the pivot preserves the current similarity map; it only changes its parameterization. */
-export function repositionTransformPivot(parameters: TransformParameters, pivot: CadPoint): TransformParameters {
-  const value = parseTransformParameters(parameters);
-  if (!value.ok) return { ...parameters, pivotX: String(pivot.x), pivotY: String(pivot.y) };
+export function repositionTransformPivot(
+  parameters: TransformParameters,
+  pivot: CadPoint,
+  lengthUnit: CadLengthUnit = 'mm'
+): TransformParameters {
+  const value = parseTransformParameters(parameters, lengthUnit);
+  if (!value.ok) return { ...parameters, pivotX: lengthText(pivot.x, lengthUnit), pivotY: lengthText(pivot.y, lengthUnit) };
   const dx = value.pivot.x - pivot.x,
     dy = value.pivot.y - pivot.y,
     r = (value.angle * Math.PI) / 180,
@@ -49,9 +55,9 @@ export function repositionTransformPivot(parameters: TransformParameters, pivot:
     s = value.scale * Math.sin(r);
   return {
     ...parameters,
-    pivotX: String(pivot.x),
-    pivotY: String(pivot.y),
-    dx: String(value.translation.x + (1 - c) * dx + s * dy),
-    dy: String(value.translation.y - s * dx + (1 - c) * dy),
+    pivotX: lengthText(pivot.x, lengthUnit),
+    pivotY: lengthText(pivot.y, lengthUnit),
+    dx: lengthText(value.translation.x + (1 - c) * dx + s * dy, lengthUnit),
+    dy: lengthText(value.translation.y - s * dx + (1 - c) * dy, lengthUnit),
   };
 }

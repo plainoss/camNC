@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import type { CadFolder, CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { PartRowMenu } from './PartRowMenu';
@@ -42,6 +43,7 @@ export function PartsList({
   /** A part, or one of its copies, named anew. */
   onRename: (partId: string, copyId: string | null, name: string) => void;
 }) {
+  const { formatLength, lengthUnit } = useDesignUnits();
   const [menu, setMenu] = useState<{ key: string; name: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -85,7 +87,9 @@ export function PartsList({
               ⚠
             </span>
           )}
-          <small>{p.thickness} mm</small>
+          <small>
+            {formatLength(p.thickness)} {lengthUnit}
+          </small>
         </button>
       )}
       {studio && (

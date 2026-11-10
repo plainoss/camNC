@@ -1,7 +1,7 @@
+import { useDesignUnits } from './designUnits';
 import type { CadDocument, CadDrawnOn, CadPart, CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
 import { drawnOnName } from './drawnOnName';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 import './cadThicknessField.css';
 import { CadValueInput } from './CadValueInput';
 
@@ -24,8 +24,9 @@ export function CadDrawnOnField({
   onChange: (drawnOn: CadDrawnOn) => void;
   onDone?: () => void;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const id = useId();
-  const typed = part.drawnOn.offsetExpression ?? formatCadValue(part.drawnOn.offset);
+  const typed = part.drawnOn.offsetExpression ?? lengthText(part.drawnOn.offset);
   const [text, setText] = useState(typed);
   const [error, setError] = useState<string | null>(null);
   const dirty = useRef(false);
@@ -86,7 +87,7 @@ export function CadDrawnOnField({
             }}
           />
         </span>
-        mm
+        {lengthUnit}
       </label>
       {inwardToggle && (
         <label>
