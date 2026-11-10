@@ -56,13 +56,13 @@ function DesignStep() {
   const { data: job, isPending } = useCamJob(jobId);
   if (isPending)
     return (
-      <CamPage className="h-dvh">
+      <CamPage className="h-app">
         <p className="p-6">Opening design…</p>
       </CamPage>
     );
   if (!job)
     return (
-      <CamPage className="h-dvh">
+      <CamPage className="h-app">
         <p className="p-6">This design no longer exists.</p>
       </CamPage>
     );
@@ -295,7 +295,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
         ? evaluateCadFeatures(facePartSource, facePart).part.cuts?.find(cut => cut.id === (faceOn as { floorOf: string }).floorOf)?.outline
         : undefined;
   return (
-    <CamPage className="h-dvh">
+    <CamPage className="h-app">
       <CamJobBar
         job={initialJob}
         onStageNavigate={destination => void navigateStage(destination)}
