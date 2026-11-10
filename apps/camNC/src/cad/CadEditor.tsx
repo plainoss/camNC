@@ -223,7 +223,8 @@ import { useSvgPixelScale, SKETCH_APPEARANCE, sketchStrokeColor } from './sketch
 import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
-import { kStudioCommands } from './studioCommands';
+import { StudioCommandSearch } from './StudioCommandSearch';
+import type { PartPatternKind } from './partPatternKind';
 import { selectStudioFeature } from './studioFeatureSelection';
 import { builtStudioParts, disabledStudioCommands } from './studioParts';
 import { usePartCutSelection } from './usePartCutSelection';
@@ -3437,7 +3438,12 @@ export function CadEditor({
       setBusy(false);
     }
   };
-  const openFeature = (kind: 'extrude' | 'pattern' | 'hole', partId: string, before = documentRef.current) => {
+  const openFeature = (
+    kind: 'extrude' | 'pattern' | 'hole',
+    partId: string,
+    before = documentRef.current,
+    initialPatternKind?: PartPatternKind
+  ) => {
     setSelectedFace(null);
     setPartCutting(null);
     setVariableDialog(null);
@@ -3449,7 +3455,7 @@ export function CadEditor({
     setSelected([]);
     chooseTool('select');
     setShowWorkspace(true);
-    setFeatureDialog({ kind, partId, before });
+    setFeatureDialog({ kind, partId, before, initialPatternKind });
   };
   const closeFeature = (keep: boolean) => {
     setDirectionPicker(null);
@@ -3709,7 +3715,7 @@ export function CadEditor({
     setSelectedFace(null);
     setSelectedPlane(picked => (picked === plane ? null : plane));
   };
-  const studioCommand = (command: StudioCommand) => {
+  const studioCommand = (command: StudioCommand, initialPatternKind?: PartPatternKind) => {
     setStudioRefusal(null);
     // Starting one step closes any other step's dialog.
     setVariableDialog(null);
@@ -3781,7 +3787,8 @@ export function CadEditor({
       const made = profiles.pickedProfile(newExtrudeOf(before, part, `Part ${before.parts.length + 1}`));
       commit({ ...before, revision: before.revision + 1, parts: [...before.parts, made] });
       openFeature('extrude', made.id, before);
-    } else if (part) cutSelection.featurePart(command, openFeature, setStudioRefusal);
+    } else if (part)
+      cutSelection.featurePart(command, (kind, partId) => openFeature(kind, partId, undefined, initialPatternKind), setStudioRefusal);
   };
   const faceEditor = faceSketchHost({
     part,
@@ -5126,20 +5133,7 @@ export function CadEditor({
           )}
           {palette && searchMode && studioSession && showWorkspace && (
             // In the studio the search is of its commands; in a sketch, of the sketch's tools.
-            <CommandSearch
-              commands={kStudioCommands
-                .filter(command => !studioDisabled[command.id])
-                .map(({ id, label, hint, glyph }) => ({ id, label, description: hint, glyph }))}
-              onHighlight={() => {}}
-              onClose={(restoreFocus = true) => {
-                setPalette(false);
-                if (restoreFocus) root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]')?.focus();
-              }}
-              onChoose={id => {
-                setPalette(false);
-                studioCommand(id as StudioCommand);
-              }}
-            />
+            <StudioCommandSearch disabled={studioDisabled} workspace={root} onOpenChange={setPalette} onCommand={studioCommand} />
           )}
           {palette && searchMode && !(studioSession && showWorkspace) && (
             <CommandSearch

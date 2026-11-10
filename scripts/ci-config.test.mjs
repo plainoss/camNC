@@ -151,6 +151,14 @@ test('CI covers every runtime task and both browser shards, without duplicating 
   const headless = suites.filter(suite => suite.tasks !== 'test:browser');
   assert.deepEqual(headless.map(suite => suite.suite), ['headless']);
   assert.match(headless[0].filter, /--concurrency=1/);
+  // Local cold runs must not multiply several independent CAD/WASM worker pools
+  // on the same host while CI runs those packages one at a time.
+  for (const name of ['test', 'test:fast']) {
+    const command = scripts[name].split(' && ')[0];
+    const turboOptions = command.slice(0, command.indexOf(' -- '));
+    assert.match(turboOptions, /--concurrency=1(?:\s|$)/, `${name} must serialize its headless packages like CI`);
+    assert.doesNotMatch(turboOptions, /--parallel(?:\s|$)/, '--parallel would ignore the worker budget');
+  }
   const specs = parse(read('.github/workflows/ci.yml')).jobs.specs;
   assert.deepEqual(specs.strategy.matrix.shard, ['1/4', '2/4', '3/4', '4/4']);
   assert.match(specs.steps.find(step => step.name === 'Run sketch behaviour specs').run, /--shard=\$\{\{ matrix.shard \}\}/);
