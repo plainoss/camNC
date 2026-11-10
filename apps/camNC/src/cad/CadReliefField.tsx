@@ -12,11 +12,13 @@ export function CadReliefField({
   variables,
   onChange,
   onDone,
+  livePreview = false,
 }: {
   relief: CadPart['cornerRelief'];
   variables?: CadValueScope;
   onChange: (relief: CadPart['cornerRelief']) => void;
   onDone?: () => void;
+  livePreview?: boolean;
 }) {
   const id = useId();
   const typed = relief ? (relief.diameterExpression ?? String(relief.diameter)) : kDefaultBit;
@@ -30,15 +32,15 @@ export function CadReliefField({
       setError(null);
     }
   }, [typed]);
-  const apply = (on: boolean, value = text) => {
+  const apply = (on: boolean, value = text, preview = false) => {
     if (!on) return onChange(undefined);
     const parsed = parseCadValue(value, { unit: 'mm', variables });
     if ('error' in parsed || parsed.value <= 0) {
-      setError('error' in parsed ? parsed.error : 'A bit needs to be wider than nothing.');
+      if (!preview) setError('error' in parsed ? parsed.error : 'A bit needs to be wider than nothing.');
       return;
     }
     setError(null);
-    dirty.current = false;
+    if (!preview) dirty.current = false;
     if (parsed.value !== relief?.diameter || parsed.expression !== relief?.diameterExpression)
       onChange({ diameter: parsed.value, ...(parsed.expression && { diameterExpression: parsed.expression }) });
   };
@@ -62,6 +64,7 @@ export function CadReliefField({
               onChange={event => {
                 dirty.current = true;
                 setText(event.target.value);
+                if (livePreview) apply(true, event.target.value, true);
               }}
               onBlur={() => {
                 if (dirty.current) apply(true);

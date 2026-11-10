@@ -59,15 +59,27 @@ export function CadPartPatternField({
   const apply = (
     axis = current.axis,
     direction: Pattern['direction'] | null = current.direction,
-    vector: Vec3 | null = direction ? null : (current.vector ?? null)
+    vector: Vec3 | null = direction ? null : (current.vector ?? null),
+    countText = count,
+    spacingText = spacing,
+    preview = false
   ) => {
-    const parsedCount = parseCadValue(count, { unit: 'scalar', variables });
-    if ('error' in parsedCount) return setError(parsedCount.error);
+    const parsedCount = parseCadValue(countText, { unit: 'scalar', variables });
+    if ('error' in parsedCount) {
+      if (!preview) setError(parsedCount.error);
+      return;
+    }
     const n = Math.floor(parsedCount.value + 1e-9);
-    if (n < 1 || n > CAD_MAX_PART_PATTERN) return setError(`A pattern makes one to ${CAD_MAX_PART_PATTERN}, counting the part itself.`);
-    const parsedSpacing = parseCadValue(spacing, { unit: 'mm', variables });
-    if ('error' in parsedSpacing) return setError(parsedSpacing.error);
-    dirty.current = false;
+    if (n < 1 || n > CAD_MAX_PART_PATTERN) {
+      if (!preview) setError(`A pattern makes one to ${CAD_MAX_PART_PATTERN}, counting the part itself.`);
+      return;
+    }
+    const parsedSpacing = parseCadValue(spacingText, { unit: 'mm', variables });
+    if ('error' in parsedSpacing) {
+      if (!preview) setError(parsedSpacing.error);
+      return;
+    }
+    if (!preview) dirty.current = false;
     setError(null);
     const next: Pattern = {
       axis,
@@ -103,9 +115,12 @@ export function CadPartPatternField({
       onDone?.();
     }
   };
-  const edit = (set: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const edit = (which: 'count' | 'spacing') => (event: React.ChangeEvent<HTMLInputElement>) => {
     dirty.current = true;
-    set(event.target.value);
+    const value = event.target.value;
+    if (which === 'count') setCount(value);
+    else setSpacing(value);
+    if (ready) apply(undefined, undefined, undefined, which === 'count' ? value : count, which === 'spacing' ? value : spacing, true);
   };
   return (
     <div className="cad-part-pattern-field">
@@ -208,7 +223,7 @@ export function CadPartPatternField({
                 value={count}
                 spellCheck={false}
                 aria-invalid={error ? true : undefined}
-                onChange={edit(setCount)}
+                onChange={edit('count')}
                 onBlur={() => dirty.current && apply()}
                 onKeyDown={keys}
               />
@@ -223,7 +238,7 @@ export function CadPartPatternField({
                 value={spacing}
                 spellCheck={false}
                 aria-invalid={error ? true : undefined}
-                onChange={edit(setSpacing)}
+                onChange={edit('spacing')}
                 onBlur={() => dirty.current && apply()}
                 onKeyDown={keys}
               />

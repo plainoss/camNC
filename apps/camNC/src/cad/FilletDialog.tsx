@@ -7,9 +7,10 @@ import {
   type CadEdgeFillet,
   type CadValueScope,
 } from '@wbcnc/cad';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
+import { useDialogPreview } from './useDialogPreview';
 import type { CadConnectorPick } from './PartFeatureDialogs';
 import { formatCadValue, parseCadValue } from './valueExpressions';
 
@@ -47,6 +48,7 @@ export function FilletDialog({
   variables,
   pickEdge,
   onSave,
+  onPreview,
   onCancel,
 }: {
   document: CadDocument;
@@ -57,6 +59,7 @@ export function FilletDialog({
   /** Starts picking in the view; the next click on a part comes back once, and null stops it. */
   pickEdge?: (picked: ((pick: CadConnectorPick) => void) | null) => void;
   onSave: (document: CadDocument) => void;
+  onPreview?: (document: CadDocument | null) => void;
   onCancel: () => void;
 }) {
   const fillet = document.parts.find(part => part.id === partId)?.fillets?.find(candidate => candidate.id === filletId);
@@ -87,18 +90,17 @@ export function FilletDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const owner = picked[0]?.partId ?? partId;
-  const save = () => {
+  const [featureId] = useState(() => fillet?.id ?? newCadId());
+  const candidate = useMemo(() => {
     const radius = parseCadValue(radiusText, { unit: 'mm', variables });
-    if ('error' in radius) return setError(radius.error);
-    if (!(radius.value > 0)) return setError('A fillet needs a radius.');
-    if (!owner || !picked.length) return setError('Pick the edges to round.');
+    if ('error' in radius || !(radius.value > 0) || !owner || !picked.length) return null;
     const next: CadEdgeFillet = {
-      id: fillet?.id ?? newCadId(),
+      id: featureId,
       corners: picked.map(p => p.corner),
       radius: radius.value,
       ...(radius.expression && { radiusExpression: radius.expression }),
     };
-    onSave({
+    return {
       ...document,
       revision: document.revision + 1,
       parts: document.parts.map(part => {
@@ -106,7 +108,15 @@ export function FilletDialog({
         const fillets = part.fillets ?? [];
         return { ...part, fillets: fillet ? fillets.map(f => (f.id === fillet.id ? next : f)) : [...fillets, next] };
       }),
-    });
+    };
+  }, [document, radiusText, variables, owner, picked, featureId, fillet]);
+  useDialogPreview(candidate, onPreview);
+  const save = () => {
+    const radius = parseCadValue(radiusText, { unit: 'mm', variables });
+    if ('error' in radius) return setError(radius.error);
+    if (!(radius.value > 0)) return setError('A fillet needs a radius.');
+    if (!owner || !picked.length) return setError('Pick the edges to round.');
+    if (candidate) onSave(candidate);
   };
   const name = owner && document.parts.find(part => part.id === owner)?.name;
   return (

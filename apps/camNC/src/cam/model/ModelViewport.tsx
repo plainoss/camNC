@@ -11,6 +11,7 @@ import { ModelFaceHighlight } from './ModelFaceHighlight';
 import { ExtrudeDepthArrow } from './ExtrudeDepthArrow';
 import type { ExtrudeDepthControl } from '@/cad/extrudeDepth';
 import { sameFacePlane } from './faceHighlight';
+import { ModelConnector, type ViewConnector } from './ModelConnector';
 import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
@@ -397,6 +398,8 @@ export function ModelViewport({
   cameraState,
   extrusionDepth,
   onPickSketch,
+  pickingConnector = false,
+  connectors = [],
 }: {
   meshes: BodyMesh[];
   parts: CamPartInfo[];
@@ -441,7 +444,12 @@ export function ModelViewport({
   extrusionDepth?: ExtrudeDepthControl | null;
   onPickSketch?: (id: string) => void;
   selectedFace?: ModelFacePick | null;
+  pickingConnector?: boolean;
+  connectors?: ViewConnector[];
 }) {
+  const [hoveredConnector, setHoveredConnector] = useState<ModelFacePick | null>(null);
+  // A new pick must not briefly reuse a marker from an earlier dialog or different geometry.
+  useEffect(() => setHoveredConnector(null), [pickingConnector, meshes]);
   const [hoveredFace, setHoveredFace] = useState<ModelFacePick | null>(null);
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
   // The studio shows a design where it is, about its origin, so hiding a part doesn't shift the rest.
@@ -533,9 +541,11 @@ export function ModelViewport({
       onPointerLeave={() => {
         onHover?.(null);
         setHoveredFace(null);
+        setHoveredConnector(null);
       }}
       onPointerMissed={() => {
         onHover?.(null);
+        setHoveredConnector(null);
         onMissed?.();
       }}>
       <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
@@ -570,6 +580,13 @@ export function ModelViewport({
             onSelect={e => pick(m, i, matrices[i]!, e)}
             onHover={(hovered, event) => {
               onHover?.(hovered ? m.partId : null, hovered ? i : undefined);
+              if (pickingConnector) {
+                if (hovered && event?.face) {
+                  const point = event.point.clone().applyMatrix4(matrices[i]!.clone().invert()).toArray();
+                  const normal = event.face.normal.clone().normalize().toArray();
+                  setHoveredConnector({ partId: m.partId, index: i, point: snapToFace(m.positions, point, normal), normal });
+                } else setHoveredConnector(current => (current?.index === i ? null : current));
+              }
               if (palette !== 'studio') return;
               if (!hovered || !event?.face) return setHoveredFace(current => (current?.index === i ? null : current));
               const point = event.point.clone().applyMatrix4(matrices[i]!.clone().invert()).toArray();
@@ -588,6 +605,16 @@ export function ModelViewport({
           meshes[face.index] && (
             <ModelFaceHighlight key={index} mesh={meshes[face.index]!} matrix={matrices[face.index]!} face={face} selected={index === 0} />
           )
+      )}
+      {view === 'assembled' && (
+        <>
+          {connectors.map(connector => (
+            <ModelConnector key={connector.label} connector={connector} model={assembled} />
+          ))}
+          {pickingConnector && hoveredConnector && (
+            <ModelConnector connector={{ ...hoveredConnector, label: 'Mate connector under pointer' }} model={assembled} />
+          )}
+        </>
       )}
       {view === 'assembled' && sketchLines.length > 0 && (
         <group matrixAutoUpdate={false} matrix={assembled}>
