@@ -1,5 +1,6 @@
 import { createCadPart, parseCadDocument, type CadDocument } from '@wbcnc/cad';
 import { inspectCadDocument } from '../inspect';
+import { prepareEmptyStudio } from '../emptyStudio';
 import { appendSvgToSketch } from './convert';
 import type { SvgAssetStore } from './assets';
 import type { SvgPlacement } from './types';
@@ -21,7 +22,7 @@ export async function checkSvgCandidate(base: CadDocument, store: SvgAssetStore,
   const thickness = options.thickness ?? 18;
   if (!Number.isFinite(thickness) || thickness <= 0 || thickness > 10_000)
     throw new Error('SVG part thickness must be positive and at most 10000 mm.');
-  const candidate = parseCadDocument(structuredClone(base));
+  const candidate = prepareEmptyStudio(parseCadDocument(structuredClone(base))).document;
   let name = options.partName?.trim() ?? 'Imported SVG';
   if (!name || name.length > 200 || [...name].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))
     throw new Error('SVG part name must contain 1–200 printable characters.');

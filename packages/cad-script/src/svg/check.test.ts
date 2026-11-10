@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest';
-import { createCadDocument, createPlateDocument } from '@wbcnc/cad';
+import { addLine, createCadDocument, createCadPart, createPlateDocument, designSteps, parseCadDocument } from '@wbcnc/cad';
+import { editCad } from '../edit';
+import { applyCadProposal, cadProposal } from '@wbcnc/cad-editor/proposal';
+import { cadSession, endCadSession, undoCadSession } from '@wbcnc/cad-editor/session';
 import { checkSvgCandidate, createDocumentSvgAssetRegistry, createSvgAssetStore } from './index';
 const source =
   '<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50"><rect width="100" height="50"/></svg>';
@@ -58,3 +61,67 @@ it('isolates document asset handles and releases retained source explicitly', ()
   registry.clear();
   expect(second.list()).toEqual([]);
 });
+
+// createDesignJob starts from this exact native draft shape. Its absent extrude
+// flag is an enabled implicit feature, not an already-disabled empty placeholder.
+const blankDesignJobDraft = () => {
+  const draft = { ...createCadDocument('New design'), lengthUnit: 'cm' as const };
+  draft.parts.push(createCadPart('Part 1'));
+  return draft;
+};
+it('imports into the real blank-studio shape while preserving the starter and document history', async () => {
+  const base = blankDesignJobDraft(),
+    before = structuredClone(base),
+    starter = base.parts[0],
+    store = createSvgAssetStore(),
+    asset = store.register(source);
+  expect(designSteps(base).find(step => step.kind === 'extrude')).toMatchObject({
+    id: `${starter.id}:extrude`,
+    partId: starter.id,
+    suppressed: false,
+  });
+  const result = await checkSvgCandidate(base, store, { handle: asset.handle, toolpaths: true });
+  expect(result.ok, JSON.stringify(result.report.errors)).toBe(true);
+  expect(base).toEqual(before);
+  expect(result.document).toMatchObject({ id: base.id, lengthUnit: 'cm', revision: base.revision + 1 });
+  expect(result.document.parts[0]).toEqual({ ...starter, extrude: false });
+  expect(result.document.parts[1].id).toBe(result.partId);
+  expect(result.report.parts.find(part => part.name === 'Imported SVG')?.toolpaths).toBeDefined();
+  expect(designSteps(result.document).filter(step => step.partId === starter.id)).toEqual([designSteps(base)[0]]);
+  const session = cadSession(base);
+  try {
+    applyCadProposal(session, cadProposal(base, result.document));
+    expect(session.past).toHaveLength(1);
+    expect(undoCadSession(session).parts).toEqual(before.parts);
+  } finally {
+    endCadSession(base.id);
+  }
+  const reloaded = parseCadDocument(JSON.parse(JSON.stringify(result.document)));
+  const repaired = await editCad(reloaded, d => d.part(starter.id).profile.rect({ at: [300, 0], w: 40, h: 30 }));
+  expect(repaired.ok, JSON.stringify(repaired.report.errors)).toBe(true);
+  expect(repaired.document.id).toBe(base.id);
+  expect(repaired.document.revision).toBe(base.revision + 2);
+  expect(repaired.document.parts[0]).toMatchObject({ id: starter.id, sketch: { id: starter.sketch.id }, extrude: false });
+  expect(repaired.document.parts[0].sketch.entities[0]).toEqual(starter.sketch.entities[0]);
+  expect(repaired.document.parts[0].sketch.entities.filter(entity => entity.type === 'line')).toHaveLength(4);
+  expect(repaired.document.parts[1]).toEqual(reloaded.parts[1]);
+});
+it.each(['unfinished', 'renamed', 'named-extrude', 'configured'] as const)(
+  'does not hide invalid non-pristine studio geometry: %s',
+  async kind => {
+    const base = blankDesignJobDraft(),
+      starter = base.parts[0];
+    if (kind === 'unfinished') starter.sketch = addLine(starter.sketch, { x1: 0, y1: 0, x2: 100, y2: 0 });
+    if (kind === 'renamed') starter.name = 'Profile to finish';
+    if (kind === 'named-extrude') starter.extrudeName = 'Extrude to finish';
+    if (kind === 'configured') starter.thickness = 40;
+    const before = structuredClone(base),
+      store = createSvgAssetStore(),
+      asset = store.register(source);
+    const result = await checkSvgCandidate(base, store, { handle: asset.handle });
+    expect(result.ok).toBe(false);
+    expect(result.report.errors.length).toBeGreaterThan(0);
+    expect(base).toEqual(before);
+    expect(result.document.parts[0]).toEqual(starter);
+  }
+);
