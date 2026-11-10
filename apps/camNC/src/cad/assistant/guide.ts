@@ -40,6 +40,7 @@ d.detachCopy('Shelf 2', 'Cable shelf') makes a separately editable part. Retriev
 cupboard({ name?, width?, height?, depth?, board?, shelves?, at? })(d) inserts a folder of editable parts/variables; lengths are expression strings, shelves a number, at XYZ mm. Defaults use pin rows.
 p.expect({ size: [400, 300], thickness: 18, holes: 1, pockets: 1, depths: [6], freedom: 0 }) checks those facts, not hole diameters/positions.
 Read report cuts, placements, diagnostics and lost-cut/joint costs; a valid check does not prove visual resemblance, joint strength or machining acceptance.
+Use a relevant supplied example for curved shapes rather than searching for geometry. Keep agreed sizes checked with expect; derive coordinates from expressions when dimensions must remain editable.
 Retrieve cad_script_guide with section: ${Object.keys(guideSections).join(', ')} for exact detailed options. Read a relevant worked example before complex construction. Do not invent API methods.`;
 
 export function readAssistantGuide(section?: string): string {

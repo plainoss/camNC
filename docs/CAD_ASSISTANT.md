@@ -64,6 +64,14 @@ If a provider omits cache-write counts and bills writes at its normal input rate
 select **Cache writes are billed at the input price**. This explicit pricing
 choice permits cost calculation while the unreported write count stays unknown.
 
+Anthropic connections enable five-minute prompt caching by default. Connection
+settings can disable it for an endpoint that does not implement caching. Stable
+tools, instructions and the core guide have explicit cache boundaries; automatic
+caching also covers the growing conversation. Cache writes are billed, and a
+short prompt may not meet the selected model's cache threshold. Signed thinking
+blocks stay attached to complete tool batches so their removal does not invalidate
+the provider's context. Other providers do not receive Anthropic cache fields.
+
 The default limits are 120,000 input characters per request, 8192 output tokens
 per response, six images totalling 20 MiB per request, 90 seconds per provider
 request and three minutes per run. Character and image limits are separate;
@@ -138,6 +146,64 @@ and 3 mm pin-hole floor. It also exposes a limitation in the saved starting
 fixture: all four shelf housings remain despite an earlier request to keep only
 the second fixed. The trial reports that discrepancy explicitly; its automatic
 C3 assessment does not establish that the earlier housing request was satisfied.
+
+## Live tray efficiency experiment
+
+On 2026-11-10, live `claude-sonnet-5-5` requests used the production loop and
+isolated browser checker for an agreed 280 × 190 mm organic tray, a 40 mm blank,
+one 30 mm pocket, a 10 mm floor and an 18 mm wall. Each run started with a fresh
+conversation and empty document. Repeated optimized runs intentionally reused
+the provider's prompt cache.
+
+| Configuration                                                          | Runs | Requests per run | Checks per run | Mean input tokens | Mean output tokens | Mean time | Mean usage-priced cost |
+| ---------------------------------------------------------------------- | ---: | ---------------- | -------------- | ----------------: | -----------------: | --------: | ---------------------: |
+| Previous guide-retrieval workflow, no cache controls                   |    3 | 7, 6, 6          | 4, 3, 3        |            38,259 |             11,917 |     103 s |               $0.19569 |
+| Cached core guide supplied up front, editable pebble example available |    3 | 3, 3, 3          | 1, 1, 1        |            14,710 |              1,646 |      22 s |               $0.02600 |
+
+All six candidates met independent size, thickness, pocket depth, hole count,
+floor and wall checks. The optimized runs cost $0.03360 on the first run and
+$0.02205/$0.02233 on repeats: about 87% less on average for this benchmark.
+Two cache-only intermediate trials also passed. Comparing their usage with the
+same token counts priced without caching isolates cache discounts of 24% and
+30%; differences between separate generated runs also include model variation.
+
+The `pebble-tray` example constructs four tangent circular arcs and their
+constant-width inset analytically, rather than searching for a curve. Its
+coordinates remain expressions, so folder variables reshape both profiles.
+An independent 240 × 160 mm live holdout with a 30 mm blank, 20 mm pocket and
+12 mm wall also passed in three requests and one check ($0.02436). Browser
+regressions additionally verify resizing preserves part IDs. The example requires
+width greater than height and wall smaller than 0.32 times height.
+
+The complete experiment used 45 requests, priced at approximately $0.92293,
+including one excluded holdout with a test-brief substitution error. Costs were
+computed from reported usage and the published Sonnet 5.5 rates: $2/$10 per
+million ordinary input/output tokens, $2.50 for five-minute cache writes and
+$0.10 for cache reads. See the [model pricing](https://platform.claude.com/docs/en/models/sonnet-5-5/overview).
+No live calls run in the automated regression suite. This small, single-model
+benchmark does not establish quality or savings for other requests. The valid
+candidates have different silhouettes; appearance and construction still need
+human review.
+
+## Separate tool improvements to evaluate
+
+- **Named recipes with parameters:** check a trusted construction directly without
+  generating its full example source again; preserve editable CAD output and the
+  ordinary proposal review.
+- **Native curves and offsets:** expose the engine's Bézier/spline/ellipse tools
+  to scripts, together with useful curve reports. Expose linked line/arc/circle
+  offsets first; reliable general curve offsets require additional work.
+- **App-owned requirements:** retain confirmed dimensions, floors and identity
+  constraints outside the model's script, so omitting `expect` cannot hide drift.
+- **SVG sketch assets:** import existing vector artwork once and reference an
+  asset handle. Use precise curve conversion, measured bounds, units/transforms,
+  hole handling and explicit unsupported-content errors. The existing carving
+  rasterizer is not a precision sketch importer. Scaling an inner SVG does not
+  give constant wall thickness, and imported curves do not recover design intent.
+- **Bounded script patches and selected views:** repair a saved script by revision
+  instead of resending it, and request only the relevant projections. A separate
+  geometry repair lane could defer toolpath planning, while retaining trusted
+  verification and a complete final check.
 
 ## Provider protocol references
 

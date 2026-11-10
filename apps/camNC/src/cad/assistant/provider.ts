@@ -1,4 +1,5 @@
 import { providerMetadata } from './providerMetadata';
+import { anthropicCachedSystem } from './anthropicCache';
 
 export type ProviderKind = 'anthropic' | 'compatible';
 export interface ProviderConfig {
@@ -8,6 +9,8 @@ export interface ProviderConfig {
   protocol: 'chat' | 'responses';
   tools: boolean;
   images: boolean;
+  /** Anthropic prompt caching is on by default; disable for endpoints that do not implement it. */
+  promptCaching?: boolean;
 }
 export interface AssistantImage {
   name: string;
@@ -41,6 +44,8 @@ export interface AssistantMessage {
   callId?: string;
   /** Responses reasoning items must accompany their function calls on the next request. */
   responseItems?: unknown[];
+  /** Preserve signed Anthropic thinking blocks with their complete tool-call batch. */
+  anthropicContent?: unknown[];
 }
 export interface AssistantTool {
   name: string;
@@ -109,29 +114,37 @@ export function providerPayload({
     for (const message of messages) {
       const role = message.role === 'assistant' ? 'assistant' : 'user';
       const content =
-        message.role === 'tool'
-          ? [
-              {
-                type: 'tool_result',
-                tool_use_id: message.callId,
-                content: [textBlock(message.text), ...(message.images ?? []).map(anthropicImage)],
-              },
-            ]
-          : [
-              ...(message.text ? [textBlock(message.text)] : []),
-              ...(message.images ?? []).map(anthropicImage),
-              ...(message.calls ?? []).map(call => ({ type: 'tool_use', id: call.id, name: call.name, input: call.arguments })),
-            ];
+        message.role === 'assistant' && message.anthropicContent
+          ? message.anthropicContent
+          : message.role === 'tool'
+            ? [
+                {
+                  type: 'tool_result',
+                  tool_use_id: message.callId,
+                  content: [textBlock(message.text), ...(message.images ?? []).map(anthropicImage)],
+                },
+              ]
+            : [
+                ...(message.text ? [textBlock(message.text)] : []),
+                ...(message.images ?? []).map(anthropicImage),
+                ...(message.calls ?? []).map(call => ({ type: 'tool_use', id: call.id, name: call.name, input: call.arguments })),
+              ];
       const previous = turns.at(-1);
       if (previous?.role === role) previous.content.push(...content);
       else turns.push({ role, content });
     }
     return {
       model: config.model,
-      system,
+      system: config.promptCaching === false ? system : anthropicCachedSystem(system),
+      ...(config.promptCaching !== false && { cache_control: { type: 'ephemeral' } }),
       max_tokens: maxOutputTokens,
       messages: turns,
-      tools: tools.map(tool => ({ name: tool.name, description: tool.description, input_schema: tool.parameters })),
+      tools: tools.map((tool, index) => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.parameters,
+        ...(config.promptCaching !== false && index === tools.length - 1 && { cache_control: { type: 'ephemeral' } }),
+      })),
     };
   }
   if (config.protocol === 'responses') {
@@ -258,6 +271,7 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
       calls: interrupted
         ? []
         : data.content.filter(block => block.type === 'tool_use').map(block => toolCall(block.id, block.name, block.input)),
+      ...(!interrupted && { anthropicContent: data.content }),
     };
   }
   if (config.protocol === 'responses') {

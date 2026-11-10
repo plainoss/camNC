@@ -18,6 +18,7 @@ import cupboardExample from '../../../../../packages/cad-script/examples/cupboar
 import plateExample from '../../../../../packages/cad-script/examples/plate.cad.ts?raw';
 import trayExample from '../../../../../packages/cad-script/examples/tray.cad.ts?raw';
 import shelfExample from '../../../../../packages/cad-script/examples/shelf-side.cad.ts?raw';
+import pebbleExample from '../../../../../packages/cad-script/examples/pebble-tray.cad.ts?raw';
 import './dock.css';
 import type { AssistantSelection } from './selection';
 
@@ -38,7 +39,13 @@ const starters = [
     prompt: 'Review the open design and suggest improvements. Ask before making changes.',
   },
 ];
-const examples = { cupboard: cupboardExample, plate: plateExample, tray: trayExample, 'shelf-side': shelfExample };
+const examples = {
+  cupboard: cupboardExample,
+  plate: plateExample,
+  tray: trayExample,
+  'shelf-side': shelfExample,
+  'pebble-tray': pebbleExample,
+};
 
 export function AssistantDock({
   document,

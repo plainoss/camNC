@@ -74,6 +74,7 @@ export function buildAssistantContext(messages: readonly AssistantMessage[], opt
     const message = structuredClone(messages[index]!);
     // Standalone assistant text is enough; raw Responses items would duplicate historical text/reasoning.
     if (message.role === 'assistant' && !message.calls?.length) delete message.responseItems;
+    if (message.role === 'assistant' && !message.calls?.length) delete message.anthropicContent;
     if (message.images?.length && (!options.images || (message.role === 'tool' && index !== latestImages))) {
       const names = message.images.map(image => image.name).join(', ');
       message.text += `\n[Application context data: images unavailable in this request: ${names}. ${options.images ? 'Superseded candidate views were omitted.' : 'The selected provider is text-only; ask for an image-capable provider when visual evidence is required.'}]`;

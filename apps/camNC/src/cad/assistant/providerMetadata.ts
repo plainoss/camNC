@@ -29,7 +29,7 @@ export function providerMetadata(config: ProviderConfig, input: unknown): Pick<A
     outputTokens: count(usage[anthropic || responses ? 'output_tokens' : 'completion_tokens']),
     cacheReadTokens,
     cacheWriteTokens,
-    reasoningTokens: count(outputDetails.reasoning_tokens),
+    reasoningTokens: count(anthropic ? (outputDetails.thinking_tokens ?? outputDetails.reasoning_tokens) : outputDetails.reasoning_tokens),
   };
   for (const key of Object.keys(values) as (keyof AssistantUsage)[]) {
     if (values[key] !== undefined) normalized[key] = values[key];
