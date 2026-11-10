@@ -75,3 +75,14 @@ it('rejects a result when cancelled during full acceptance', async () => {
   expect(final.ok).toBe(false);
   expect(final.scriptError).toContain('stopped');
 });
+
+it.each([
+  `d => { d.newPart('Oval').profile.ellipse({at:[33.3,44.4],rx:29.3,ry:10.2,angle:37}); }`,
+  `d => { const p=d.newPart('Rail');p.profile.spline({points:[[0,0],[22.2,33.3],[77.7,44.4],[100,0]]});p.profile.line([100,0],[0,0]); }`,
+])('fully accepts an exact native-curve candidate without numerical source drift: %s', async script => {
+  const geometry = await checkScriptInBrowser(createCadDocument(), script, { toolpaths: false });
+  expect(geometry.ok, JSON.stringify(geometry.report)).toBe(true);
+  const final = await finalizeBrowserCandidate(geometry, new AbortController().signal);
+  expect(final.ok, JSON.stringify(final.report)).toBe(true);
+  expect(final.document).toEqual(geometry.document);
+});
