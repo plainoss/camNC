@@ -3,6 +3,7 @@ import { SketchToolGlyph } from './SketchToolbar';
 import type { SketchToolDefinition } from './sketchTools';
 import type { ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands';
 import type { StudioCommand } from './studioCommands';
+import './commandSearch.css';
 
 export type SearchCommand = Omit<SketchToolDefinition, 'id'> & {
   id: SketchToolDefinition['id'] | ConstraintCommandTool | StudioCommand | 'construction' | 'fix' | 'fit';
