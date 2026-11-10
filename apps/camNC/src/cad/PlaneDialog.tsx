@@ -1,9 +1,10 @@
 import { useDesignUnits } from './designUnits';
 import { newCadId, nextDatumName, resolveDatumPlanes, type CadDocument, type CadDrawnOn, type CadValueScope } from '@wbcnc/cad';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 import { FeatureDialog } from './FeatureDialog';
+import { useDialogPreview } from './useDialogPreview';
 
 /**
  * A plane to sketch on, as a step of its own: a base plane or a part's face, moved out along its normal by an offset.
@@ -16,6 +17,7 @@ export function PlaneDialog({
   variables,
   pickPlane,
   onSave,
+  onPreview,
   onCancel,
 }: {
   document: CadDocument;
@@ -27,6 +29,7 @@ export function PlaneDialog({
   /** Starts picking a plane or a face; the pick comes back once. */
   pickPlane?: (picked: (on: CadDrawnOn['on']) => void) => void;
   onSave: (document: CadDocument) => void;
+  onPreview?: (document: CadDocument | null) => void;
   onCancel: () => void;
 }) {
   const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
@@ -49,12 +52,13 @@ export function PlaneDialog({
     // Only when it opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const save = () => {
-    if (!on) return setError('Pick a plane or a face to offset from.');
+  const [featureId] = useState(() => plane?.id ?? newCadId());
+  const candidate = useMemo(() => {
+    if (!on) return null;
     const offset = parseCadValue(offsetText, { unit: 'mm', variables });
-    if ('error' in offset) return setError(offset.error);
+    if ('error' in offset) return null;
     const next = {
-      id: plane?.id ?? newCadId(),
+      id: featureId,
       name: plane?.name ?? nextDatumName(document),
       on,
       offset: offset.value,
@@ -63,8 +67,14 @@ export function PlaneDialog({
     const planes = plane
       ? (document.planes ?? []).map(candidate => (candidate.id === plane.id ? next : candidate))
       : [...(document.planes ?? []), next];
-    // What's drawn on it goes where it now is.
-    onSave(resolveDatumPlanes({ ...document, revision: document.revision + 1, planes }));
+    return resolveDatumPlanes({ ...document, revision: document.revision + 1, planes });
+  }, [document, plane, featureId, on, offsetText, variables, parseCadValue]);
+  useDialogPreview(candidate, onPreview);
+  const save = () => {
+    if (!on) return setError('Pick a plane or a face to offset from.');
+    const offset = parseCadValue(offsetText, { unit: 'mm', variables });
+    if ('error' in offset) return setError(offset.error);
+    if (candidate) onSave(candidate);
   };
   return (
     <FeatureDialog title={plane ? plane.name : 'Plane'} onOk={save} onCancel={onCancel}>

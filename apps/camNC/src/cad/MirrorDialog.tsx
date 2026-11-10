@@ -1,14 +1,16 @@
 import {
-  addPartMirror,
+  newCadId,
+  resolvePartPatterns,
   cadMirrorPlaneFrame,
   cadMirrorPlaneWouldCycle,
   type CadDocument,
   type CadDrawnOn,
   type CadPartCopy,
 } from '@wbcnc/cad';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { drawnOnName } from './drawnOnName';
 import { FeatureDialog } from './FeatureDialog';
+import { useDialogPreview } from './useDialogPreview';
 
 type Across = NonNullable<CadPartCopy['mirror']>;
 
@@ -22,6 +24,7 @@ export function MirrorDialog({
   copyId,
   pickPlane,
   onSave,
+  onPreview,
   onCancel,
 }: {
   document: CadDocument;
@@ -31,6 +34,7 @@ export function MirrorDialog({
   /** Starts picking a plane or a face; the pick comes back once. */
   pickPlane?: (picked: (on: CadDrawnOn['on'], datum?: string) => void) => void;
   onSave: (document: CadDocument) => void;
+  onPreview?: (document: CadDocument | null) => void;
   onCancel: () => void;
 }) {
   const part = document.parts.find(candidate => candidate.id === partId);
@@ -64,18 +68,26 @@ export function MirrorDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const name = across && (document.planes?.find(plane => plane.id === across.datum)?.name ?? drawnOnName(document, across.across));
-  const save = () => {
-    if (!part || !across || issue) return;
-    if (!copy) return onSave(addPartMirror(document, part.id, across).document);
-    onSave({
+  const [featureId] = useState(() => copy?.id ?? newCadId());
+  const candidate = useMemo(() => {
+    if (!part || !across || issue) return null;
+    const nextCopy: CadPartCopy = { ...(copy ?? { id: featureId, mirrored: true }), mirror: across };
+    return resolvePartPatterns({
       ...document,
       revision: document.revision + 1,
       parts: document.parts.map(candidate =>
         candidate.id !== part.id
           ? candidate
-          : { ...candidate, copies: candidate.copies!.map(c => (c.id === copy.id ? { ...c, mirror: across } : c)) }
+          : {
+              ...candidate,
+              copies: copy ? candidate.copies!.map(c => (c.id === copy.id ? nextCopy : c)) : [...(candidate.copies ?? []), nextCopy],
+            }
       ),
     });
+  }, [document, part, copy, featureId, across, issue]);
+  useDialogPreview(candidate, onPreview);
+  const save = () => {
+    if (candidate) onSave(candidate);
   };
   return (
     <FeatureDialog title="Mirror" okDisabled={!across || !part || !!issue} onOk={save} onCancel={onCancel}>

@@ -30,13 +30,21 @@ export function HoleDialog({
   const [error, setError] = useState<string | null>(null);
   const change = (next: (p: CadPart) => CadPart) =>
     onChange(current => ({ ...current, parts: current.parts.map(p => (p.id === part.id ? next(p) : p)) }));
-  const apply = (diameter = diameterText, through = depth === 'through', blind = depthText) => {
+  const apply = (diameter = diameterText, through = depth === 'through', blind = depthText, preview = false) => {
     const across = parseCadValue(diameter, { unit: 'mm', variables });
     const deep = parseCadValue(blind, { unit: 'mm', variables });
     // A blind depth that can't be used is no reason to refuse a hole through the part.
     const refused =
-      'error' in across ? across.error : !(across.value > 0) ? 'A hole needs a diameter.' : !through && 'error' in deep ? deep.error : null;
-    setError(refused);
+      'error' in across
+        ? across.error
+        : !(across.value > 0)
+          ? 'A hole needs a diameter.'
+          : !through && 'error' in deep
+            ? deep.error
+            : !through && !('error' in deep) && !(deep.value > 0)
+              ? 'A hole needs some depth.'
+              : null;
+    if (!preview || !refused) setError(refused);
     if (refused || 'error' in across || (!through && 'error' in deep)) return;
     change(p => ({
       ...p,
@@ -57,7 +65,10 @@ export function HoleDialog({
             bare
             aria-label="Diameter"
             value={diameterText}
-            onChange={event => setDiameterText(event.target.value)}
+            onChange={event => {
+              setDiameterText(event.target.value);
+              apply(event.target.value, undefined, undefined, true);
+            }}
             onBlur={() => apply()}
             onKeyDown={event => event.key === 'Enter' && apply()}
           />
@@ -82,7 +93,10 @@ export function HoleDialog({
               bare
               aria-label="Depth"
               value={depthText}
-              onChange={event => setDepthText(event.target.value)}
+              onChange={event => {
+                setDepthText(event.target.value);
+                apply(undefined, false, event.target.value, true);
+              }}
               onBlur={() => apply(undefined, false)}
               onKeyDown={event => event.key === 'Enter' && apply(undefined, false)}
             />

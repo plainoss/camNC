@@ -197,10 +197,10 @@ export function ExtrudeDialog({
     );
   };
   /** Remove with the depth as typed, or all the way through. Whether it was taken. */
-  const remove = (through: boolean, text = removeDepthText) => {
+  const remove = (through: boolean, text = removeDepthText, preview = false) => {
     const parsed = through ? { value: 'through' as const } : parseCadValue(text, { unit: 'mm', variables });
     const refused = 'error' in parsed ? parsed.error : parsed.value !== 'through' && !(parsed.value > 0) ? 'A cut needs some depth.' : null;
-    setRemoveError(refused);
+    if (!preview || !refused) setRemoveError(refused);
     if ('error' in parsed || refused) return false;
     onChange(current =>
       changePart(current, part.id, p => ({
@@ -253,10 +253,10 @@ export function ExtrudeDialog({
     );
   };
   /** Takes the typed depth, or says why not. Whether it was taken. */
-  const applyDepth = () => {
-    const parsed = parseCadValue(depthText, { unit: 'mm', variables });
+  const applyDepth = (text = depthText, preview = false) => {
+    const parsed = parseCadValue(text, { unit: 'mm', variables });
     const refused = 'error' in parsed ? parsed.error : parsed.value <= 0 ? 'A thin board needs some depth.' : null;
-    setDepthError(refused);
+    if (!preview || !refused) setDepthError(refused);
     if ('error' in parsed || refused) return false;
     setThin({
       ...part.thin,
@@ -382,7 +382,10 @@ export function ExtrudeDialog({
                   value={removeDepthText}
                   spellCheck={false}
                   aria-invalid={removeError ? true : undefined}
-                  onChange={event => setRemoveDepthText(event.target.value)}
+                  onChange={event => {
+                    setRemoveDepthText(event.target.value);
+                    remove(false, event.target.value, true);
+                  }}
                   onBlur={() => remove(false)}
                   onKeyDown={event => {
                     if (event.key === 'Enter' && !remove(false)) {
@@ -521,6 +524,7 @@ export function ExtrudeDialog({
           )}
           {solidControls && !part.upTo && (
             <CadThicknessField
+              livePreview
               key={`${part.id}:thickness:${depthDragging}`}
               value={part.thickness}
               expression={part.thicknessExpression}
@@ -548,8 +552,11 @@ export function ExtrudeDialog({
                     value={depthText}
                     spellCheck={false}
                     aria-invalid={depthError ? true : undefined}
-                    onChange={event => setDepthText(event.target.value)}
-                    onBlur={applyDepth}
+                    onChange={event => {
+                      setDepthText(event.target.value);
+                      applyDepth(event.target.value, true);
+                    }}
+                    onBlur={() => applyDepth()}
                     onKeyDown={event => {
                       // A depth that isn't taken keeps the dialog open to fix it, rather than Enter keeping the old one.
                       if (event.key === 'Enter' && !applyDepth()) {
@@ -578,6 +585,7 @@ export function ExtrudeDialog({
           )}
           {part.drawnOn && (
             <CadDrawnOnField
+              livePreview
               key={`${part.id}:drawn-on`}
               inwardToggle={false}
               document={document}
@@ -588,6 +596,7 @@ export function ExtrudeDialog({
           )}
           {solidControls && (
             <CadReliefField
+              livePreview
               key={`${part.id}:relief`}
               relief={part.cornerRelief}
               variables={variables}

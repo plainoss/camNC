@@ -1,7 +1,8 @@
-import { setCadVariable, type CadDocument } from '@wbcnc/cad';
-import { useId, useState } from 'react';
+import { newCadId, setCadVariable, type CadDocument } from '@wbcnc/cad';
+import { useId, useMemo, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
+import { useDialogPreview } from './useDialogPreview';
 
 /**
  * A design variable as a step of its own: its name and its value, which can be a length, a number or an expression of
@@ -11,12 +12,14 @@ export function VariableDialog({
   document,
   variableId,
   onSave,
+  onPreview,
   onCancel,
 }: {
   document: CadDocument;
   /** The variable being changed, or none for a new one. */
   variableId?: string;
   onSave: (document: CadDocument) => void;
+  onPreview?: (document: CadDocument | null) => void;
   onCancel: () => void;
 }) {
   const id = useId();
@@ -24,8 +27,13 @@ export function VariableDialog({
   const [name, setName] = useState(variable?.name ?? '');
   const [expression, setExpression] = useState(variable?.expression ?? '');
   const [error, setError] = useState<string | null>(null);
+  const [featureId] = useState(() => variable?.id ?? newCadId());
+  const result = useMemo(
+    () => setCadVariable(document, { id: featureId, name: name.trim(), expression: expression.trim() }),
+    [document, featureId, name, expression]
+  );
+  useDialogPreview('error' in result ? null : result.document, onPreview);
   const save = () => {
-    const result = setCadVariable(document, { ...(variable && { id: variable.id }), name: name.trim(), expression: expression.trim() });
     if ('error' in result) return setError(result.error);
     onSave(result.document);
   };
