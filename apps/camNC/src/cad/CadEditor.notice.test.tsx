@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { CamJobV1 } from '@/cam/jobDb';
 import type { CamStageDestination } from '@/cam/CamJobBar';
 import { Route } from '@/routes/cam/$jobId.design';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const state = vi.hoisted(() => ({ job: null as CamJobV1 | null, navigate: vi.fn(), accept: vi.fn() }));
 vi.mock('@tanstack/react-router', () => ({

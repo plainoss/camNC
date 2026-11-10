@@ -117,7 +117,7 @@ import {
   type Ref,
 } from 'react';
 import { prepareDimensionCreation, solveCadDocument } from './solveCad';
-import { acquireCadKeyboard } from './keyboardOwnership';
+import { acquireCadKeyboard } from '@wbcnc/cad-editor/keyboardOwnership';
 import {
   amendCadSession,
   acceptCadSession,
@@ -128,15 +128,15 @@ import {
   redoCadSession,
   undoCadSession,
   type CadCommandCheckpoint,
-} from './session';
+} from '@wbcnc/cad-editor/session';
 import { DimensionGraphics } from './DimensionGraphics';
 import {
   idleDimensionWorkflow,
   transitionDimensionWorkflow,
   type DimensionWorkflow,
   type DimensionWorkflowEvent,
-} from './dimensionWorkflow';
-import { idleDrawingGesture, transitionDrawingGesture, type DrawingGesture } from './drawingGesture';
+} from '@wbcnc/cad-editor/dimensionWorkflow';
+import { idleDrawingGesture, transitionDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
 import { advanceCreationValue, beginCreationValues, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
 import {
@@ -186,24 +186,24 @@ import {
   type SketchContextAction,
   type SketchContextPress,
   type SketchContextTarget,
-} from './sketchContext';
-import { dimensionAnchor } from './dimensionGeometry';
-import { tangentArcFrom, threePointArc } from './geometry';
-import { trimSketchCurveAt } from './trimCurves';
-import { pickBezierControlPolygon, pickSketchPoint, pickSketchSnap, type CadSnapResult } from './picking';
-import { drawingClickPoint, type CadDrawingInference } from './drawingInference';
-import { addDrawingRelations, drawnSelection, withSizeExpressions } from './drawingCommit';
-import { createRectangle, isRectangleTool, rectanglePrompt } from './rectangleTool';
+} from '@wbcnc/cad-editor/sketchContext';
+import { dimensionAnchor } from '@wbcnc/cad-editor/dimensionGeometry';
+import { tangentArcFrom, threePointArc } from '@wbcnc/cad-editor/geometry';
+import { trimSketchCurveAt } from '@wbcnc/cad-editor/trimCurves';
+import { pickBezierControlPolygon, pickSketchPoint, pickSketchSnap, type CadSnapResult } from '@wbcnc/cad-editor/picking';
+import { drawingClickPoint, type CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
+import { addDrawingRelations, drawnSelection, withSizeExpressions } from '@wbcnc/cad-editor/drawingCommit';
+import { createRectangle, isRectangleTool, rectanglePrompt } from '@wbcnc/cad-editor/rectangleTool';
 import { DrawingInferencePreview } from './DrawingInferencePreview';
 import { tangentLineAxis, type InferredLineAxis } from './lineInference';
-import { buildConstraintForSelection, constraintPrompt, type ConstraintCommandTool } from './constraintCommands';
-import { cadViewState, saveCadViewState } from './viewState';
+import { buildConstraintForSelection, constraintPrompt, type ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands';
+import { cadViewState, saveCadViewState } from '@wbcnc/cad-editor/viewState';
 import { loadShownState, saveShownState } from './shownState';
-import { dragTargets, hasDragMovement } from './drag';
-import { dragSnapConstraints, inferDragPoint } from './dragSnap';
+import { dragTargets, hasDragMovement } from '@wbcnc/cad-editor/drag';
+import { dragSnapConstraints, inferDragPoint } from '@wbcnc/cad-editor/dragSnap';
 import { boxSelectSketch, type CadSelectionBox } from './boxSelection';
 import { chainGeometry, type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture } from './editorGestures';
-import { constraintColorNotice, sketchDofStatus, sketchFeedback } from './sketchFeedback';
+import { constraintColorNotice, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
@@ -223,10 +223,10 @@ import {
   modificationSourceIds,
   transitionModification,
   type ModificationWorkflow,
-} from './modificationWorkflow';
+} from '@wbcnc/cad-editor/modificationWorkflow';
 import { useSvgPixelScale, SKETCH_APPEARANCE } from './sketchAppearance';
 import { InlineConstraints } from './inlineConstraints';
-import { associatedEntityIds, removeInlineConstraint } from './inlineConstraintLayout';
+import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
 import { builtStudioParts } from './studioParts';
@@ -258,7 +258,7 @@ import { HoleDialog } from './HoleDialog';
 import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
 import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
-import { designSteps, type DesignStep } from './designSteps';
+import { designSteps, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
 import { reorderedSteps } from './reorderSteps';
 import type { PartEdge } from './partEdges';
@@ -5094,7 +5094,7 @@ export function CadEditor({
                   constraint={dimensionDraft}
                   sketch={sketch}
                   pixelScale={markerScale}
-                  position={dimensionDraft.labelPosition ?? cursor}
+                  position={cursor}
                   selected
                   interactive={false}
                 />

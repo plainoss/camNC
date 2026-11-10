@@ -157,8 +157,8 @@ numerical seed choices into permanent source fixation.
   points preserve dimensions on the original line extensions.
 - `dimensionPlacement.ts` captures and resolves annotations in their measured
   geometry's frame. Linear span fractions, radial ratios, and angular radius
-  and phase remain independent of camera scale and solver equations. Legacy
-  absolute labels normalize before point or value edits and solving. Rendering
+  and phase remain independent of camera scale and solver equations. Only a
+  dimension whose references give no frame keeps an absolute position. Rendering
   uses the live geometry; history and portable documents retain the placement.
   Outside-span labels retain a fixed overshoot. Radial labels use a bounded
   radius gain plus a fixed outward gap, so distant placements remain continuous
@@ -166,8 +166,7 @@ numerical seed choices into permanent source fixation.
   placement becomes a fixed gap, bounding the label at two diameters plus that
   gap. Remote angle intersections ease into a local centre;
   labels and decorations share that continuous frame, including at parallel
-  lines. Placement normalization never replaces a valid ratio merely because
-  its current radius is small.
+  lines. A valid ratio is kept while its current radius is small.
 
 `apps/camNC/src/cad` owns pointer and keyboard interaction, screen-space picking,
 inference previews, inline annotations, selection and command history. Drawing

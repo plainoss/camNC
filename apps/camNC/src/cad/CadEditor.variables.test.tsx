@@ -2,7 +2,7 @@ import { addCircle, cadCuts, createPlateDocument, setCadVariable, type CadDimens
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const ids: string[] = [];
 afterEach(() => {

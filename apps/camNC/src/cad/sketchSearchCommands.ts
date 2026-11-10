@@ -1,5 +1,5 @@
 import type { SearchCommand } from './CommandSearch';
-import { constraintPrompt } from './constraintCommands';
+import { constraintPrompt } from '@wbcnc/cad-editor/constraintCommands';
 import { sketchTools as tools } from './sketchTools';
 
 /** What a sketch's tool search offers: its drawing tools, its constraints, and a few other commands. */

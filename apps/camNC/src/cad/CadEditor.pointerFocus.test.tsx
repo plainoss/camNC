@@ -4,7 +4,7 @@ import { cdp, userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const menuFocus = vi.hoisted(() => ({ delayed: false, close: undefined as (() => void) | undefined }));
 vi.mock('./SketchToolbar', async original => {

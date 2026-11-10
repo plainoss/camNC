@@ -2,7 +2,7 @@ import { addEllipse, addCircle, createPlateDocument, type CadDocument } from '@w
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 const ids: string[] = [];
 afterEach(() => {
   cleanup();

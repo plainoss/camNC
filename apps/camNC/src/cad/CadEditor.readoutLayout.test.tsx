@@ -4,7 +4,7 @@ import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it } from 'vitest';
 import { setDemoModeForTest } from '@/lib/demo/demo-mode';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const initialViewport = { width: window.innerWidth, height: window.innerHeight };
 const sessions: string[] = [];

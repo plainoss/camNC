@@ -1,4 +1,4 @@
-import { createCarvingJob, getJob, saveJob, type CamJobV1 } from '@/cam/jobDb';
+import { createCarvingJob, getJob, type CamJobV1 } from '@/cam/jobDb';
 import { carvingRegion, placeItem } from '@/cam/carving';
 import { outlineArt } from '@/cam/carvingOutline';
 import { ensureWebFont, loadFontCatalog } from '@/cam/webFonts';
@@ -474,17 +474,6 @@ describe('the Carve step', () => {
     fireEvent.pointerUp(svg, at(210, 40));
     await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].height).toBe(60));
     expect(outlineArt).toHaveBeenCalledTimes(1);
-  });
-
-  it('opens a legacy carving as one selected item', async () => {
-    const job = await createCarvingJob();
-    const { items, ...carving } = job.carving!;
-    const { art, height, x, y } = items[0];
-    await saveJob({ ...job, carving: { ...carving, art, height, x, y, region: placeItem(items[0]) } as unknown as typeof job.carving });
-    await open(job);
-    expect(screen.getAllByTestId('carving-item')).toHaveLength(1);
-    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
-    expect((await getJob(job.id))!.carving!.items[0]).toMatchObject({ id: 'carving-1', rotation: 0 });
   });
 
   it('keeps the latest outline per item, other items, and moves made while outlining', async () => {

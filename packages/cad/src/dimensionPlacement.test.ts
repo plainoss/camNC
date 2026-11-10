@@ -9,12 +9,7 @@ import {
   parseCadDocument,
   updateDimension,
 } from './document';
-import {
-  captureDimensionPlacement,
-  migrateDimensionPlacements,
-  resolveDimensionPlacement,
-  withDimensionPlacement,
-} from './dimensionPlacement';
+import { captureDimensionPlacement, resolveDimensionPlacement, withDimensionPlacement } from './dimensionPlacement';
 import { solveCadDocument } from './solver';
 import type { CadDimension, CadDocument, CadPoint, CadSketch } from './types';
 
@@ -101,7 +96,6 @@ describe('geometric dimension placement frames', () => {
         { x: 165, y: 130 },
       ]) {
         const placed = withDimensionPlacement(sketch, dimension, position);
-        expect(placed).not.toHaveProperty('labelPosition');
         expect(placed.labelPlacement?.kind).toBe('linear');
         closePoint(resolveDimensionPlacement(sketch, placed), position);
       }
@@ -191,36 +185,28 @@ describe('geometric dimension placement frames', () => {
   it('keeps invalid referenced annotations editable with one finite absolute authority until repaired', () => {
     const { sketch, dimensions } = linearFixture();
     const placed = withDimensionPlacement(sketch, { ...dimensions[0]!, pointBId: 'missing' } as CadDimension, { x: 80, y: 90 });
-    expect(placed.labelPosition).toEqual({ x: 80, y: 90 });
-    expect(placed).not.toHaveProperty('labelPlacement');
+    expect(placed.labelPlacement).toEqual({ kind: 'absolute', position: { x: 80, y: 90 } });
     closePoint(resolveDimensionPlacement(sketch, placed), { x: 80, y: 90 });
     expect(captureDimensionPlacement(sketch, dimensions[0]!, { x: Infinity, y: 90 })).toBeNull();
     expect(() => withDimensionPlacement(sketch, dimensions[0]!, { x: Infinity, y: 90 })).toThrow('must be finite');
   });
 
-  it('gives canonical relative placement precedence over a stale absolute and leaves unplaced defaults to the renderer', () => {
+  it('leaves unplaced dimensions to the renderer', () => {
     const { sketch, dimensions } = linearFixture();
     expect(resolveDimensionPlacement(sketch, dimensions[0]!)).toBeNull();
-    const placed = { ...withDimensionPlacement(sketch, dimensions[0]!, { x: 45, y: 70 }), labelPosition: { x: -999, y: -999 } };
-    const source = documentOf({ ...sketch, constraints: [placed] });
-    const migrated = migrateDimensionPlacements(source);
-    const constraint = migrated.parts[0]!.sketch.constraints[0] as CadDimension;
-    expect(constraint).not.toHaveProperty('labelPosition');
-    closePoint(resolveDimensionPlacement(sketch, constraint), { x: 45, y: 70 });
-    expect(source.parts[0]!.sketch.constraints[0]).toHaveProperty('labelPosition');
-    expect(migrateDimensionPlacements(migrated)).toEqual(migrated);
   });
 
-  it('leaves finite legacy coordinates intact if converting them would overflow a derived placement parameter', () => {
-    let sketch = addCircle(createCadPart().sketch, { x: -1e308, y: -1e308, radius: 10 });
+  it('keeps finite coordinates absolute if a derived placement parameter would overflow', () => {
+    const sketch = addCircle(createCadPart().sketch, { x: -1e308, y: -1e308, radius: 10 });
     const circle = sketch.entities.find(entity => entity.type === 'circle')!;
-    sketch = addConstraint(sketch, { type: 'diameter', entityId: circle.id, value: 20, labelPosition: { x: 1e308, y: 1e308 } });
-    const document = documentOf(sketch),
-      migrated = migrateDimensionPlacements(document),
-      constraint = migrated.parts[0]!.sketch.constraints[0] as CadDimension;
-    expect(constraint).not.toHaveProperty('labelPlacement');
-    expect(constraint.labelPosition).toEqual({ x: 1e308, y: 1e308 });
-    expect(parseCadDocument(document)).toEqual(migrated);
+    const placed = withDimensionPlacement(sketch, { id: 'diameter', type: 'diameter', entityId: circle.id, value: 20 } as CadDimension, {
+      x: 1e308,
+      y: 1e308,
+    });
+    expect(placed.labelPlacement).toEqual({ kind: 'absolute', position: { x: 1e308, y: 1e308 } });
+    closePoint(resolveDimensionPlacement(sketch, placed), { x: 1e308, y: 1e308 });
+    const document = documentOf(addConstraint(sketch, placed));
+    expect(parseCadDocument(JSON.parse(JSON.stringify(document)))).toEqual(document);
   });
 });
 
@@ -232,6 +218,8 @@ describe('portable relative placement validation', () => {
     { kind: 'linear', fraction: 1, normalOffset: 0, overshoot: Infinity },
     { kind: 'fallback', offset: { x: 0, y: Infinity } },
     { kind: 'fallback' },
+    { kind: 'absolute' },
+    { kind: 'absolute', position: { x: 0, y: Infinity } },
     { kind: 'radial', angle: 0, radiusRatio: 1 },
     { kind: 'angle', radius: 20, angleOffset: 0 },
   ])('rejects malformed or incompatible linear annotation metadata %j', labelPlacement => {
@@ -243,8 +231,6 @@ describe('portable relative placement validation', () => {
   it.each([
     { kind: 'radial', angle: 0, radiusRatio: -1 },
     { kind: 'radial', angle: NaN, radiusRatio: 1 },
-    { kind: 'radial', angle: 0, radiusRatio: 0, distance: -1 },
-    { kind: 'radial', angle: 0, radiusRatio: 0, distance: Infinity },
     { kind: 'radial', angle: 0, radiusRatio: 4, radiusOffset: -1 },
     { kind: 'radial', angle: 0, radiusRatio: 4, radiusOffset: Infinity },
   ])('rejects invalid radial annotation metadata %j', labelPlacement => {
@@ -263,18 +249,6 @@ describe('portable relative placement validation', () => {
       constraints: [{ ...dimension, labelPlacement: { kind: 'angle', radius: -1, angleOffset: 0 } }],
     });
     expect(() => parseCadDocument(source)).toThrow('Invalid dimension label radius');
-    const invalidFrame = documentOf({
-      ...sketch,
-      constraints: [
-        {
-          ...dimension,
-          labelPlacement: { kind: 'angle', radius: 20, angleOffset: 0, frame: 'other' } as unknown as NonNullable<
-            CadDimension['labelPlacement']
-          >,
-        },
-      ],
-    });
-    expect(() => parseCadDocument(invalidFrame)).toThrow('Invalid dimension label frame');
     const geometric = documentOf({ ...sketch, constraints: [{ id: 'horizontal', type: 'horizontal', entityId: first.id }] });
     Object.assign(geometric.parts[0]!.sketch.constraints[0]!, { labelPlacement: { kind: 'fallback', offset: { x: 0, y: 0 } } });
     expect(() => parseCadDocument(geometric)).toThrow('Invalid dimension label placement');
@@ -282,14 +256,14 @@ describe('portable relative placement validation', () => {
 });
 
 describe('relative annotations through native value edits and portable snapshots', () => {
-  it('resolves a legacy quarter-span label against the solved edited line rather than its previous world position', async () => {
+  it('resolves a quarter-span label against the solved edited line rather than its previous world position', async () => {
     const { sketch, first, dimensions } = linearFixture();
     const source = documentOf({
       ...sketch,
       entities: sketch.entities.map(entity => (entity.id === first.startId ? { ...entity, fixed: true } : entity)),
       constraints: [
         { id: 'horizontal', type: 'horizontal', entityId: first.id },
-        { ...dimensions[0]!, labelPosition: { x: 45, y: 70 } },
+        withDimensionPlacement(sketch, dimensions[0]!, { x: 45, y: 70 }),
       ],
     });
     const solved = await solveCadDocument(updateDimension(source, 'length', 200));
@@ -306,7 +280,10 @@ describe('relative annotations through native value edits and portable snapshots
       ...sketch,
       entities: sketch.entities.map(entity => (entity.id === circle.centerId ? { ...entity, fixed: true } : entity)),
     };
-    sketch = addConstraint(sketch, { id: 'diameter', type: 'diameter', entityId: circle.id, value: 30, labelPosition: { x: 145, y: 100 } });
+    sketch = addConstraint(
+      sketch,
+      withDimensionPlacement(sketch, { id: 'diameter', type: 'diameter', entityId: circle.id, value: 30 }, { x: 145, y: 100 })
+    );
     const solved = await solveCadDocument(updateDimension(documentOf(sketch), 'diameter', 60));
     expect(solved.sketches[0]).toMatchObject({ status: 'solved', dof: 0 });
     const edited = solved.document.parts[0]!.sketch;
@@ -322,7 +299,7 @@ describe('relative annotations through native value edits and portable snapshots
         { id: 'horizontal', type: 'horizontal', entityId: first.id },
         { id: 'first-length', type: 'distance', pointAId: first.startId, pointBId: first.endId, value: 100 },
         { id: 'second-length', type: 'distance', pointAId: second.startId, pointBId: second.endId, value: 100 },
-        { ...dimension, labelPosition: { x: 105, y: 65 } },
+        withDimensionPlacement(sketch, dimension, { x: 105, y: 65 }),
       ],
     };
     const solved = await solveCadDocument(updateDimension(documentOf(constrained), dimension.id, 90));

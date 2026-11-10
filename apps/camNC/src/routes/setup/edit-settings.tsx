@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { toast } from '@wbcnc/ui/components/sonner';
 import { Textarea } from '@wbcnc/ui/components/textarea';
 import { useForm } from 'react-hook-form';
-import { Box2, Matrix3, Vector2, Vector3 } from 'three';
+import { Matrix3, Vector2, Vector3 } from 'three';
 import { z } from 'zod';
 
 export const Route = createFileRoute('/setup/edit-settings')({
@@ -26,7 +26,6 @@ const innerSchema = z.object({
     R: z.array(z.number()).length(9),
     t: z.array(z.number()).length(3),
   }),
-  machineBounds: z.array(z.number()).length(4),
   markerPosInCam: z.array(z.array(z.number()).length(2)).optional(),
   markerPositions: z.array(z.array(z.number()).length(3)).length(4),
   arucoTagSize: z.number(),
@@ -66,10 +65,6 @@ const schema = z.object({
           R: new Matrix3().set(...(data.extrinsics.R as Array9)),
           t: new Vector3().fromArray(data.extrinsics.t),
         },
-        machineBounds: new Box2(
-          new Vector2().fromArray(data.machineBounds.slice(0, 2)),
-          new Vector2().fromArray(data.machineBounds.slice(2, 4))
-        ),
         markerPositions: data.markerPositions.map(p => new Vector3(...p)),
         markerPosInCam: data.markerPosInCam?.map(p => new Vector2(...p)),
         arucoTagSize: data.arucoTagSize,
@@ -90,7 +85,6 @@ function calibToJson(data: ICamSource) {
         R: matrix3ToRowMajor(data.extrinsics!.R),
         t: data.extrinsics!.t.toArray(),
       },
-      machineBounds: data.machineBounds?.min.toArray().concat(data.machineBounds?.max.toArray()),
       markerPositions: data.markerPositions?.map(p => p.toArray()),
 
       markerPosInCam: data.markerPosInCam?.map(p => [p.x, p.y]), //.map(p => p.toArray()),

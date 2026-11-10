@@ -564,7 +564,7 @@ export function rebaseLinearPattern(
     JSON.stringify(
       Object.fromEntries(
         Object.entries(c)
-          .filter(([key]) => !['id', 'label', 'labelPosition', 'labelPlacement'].includes(key))
+          .filter(([key]) => !['id', 'label', 'labelPlacement'].includes(key))
           .sort(([a], [b]) => a.localeCompare(b))
       )
     );

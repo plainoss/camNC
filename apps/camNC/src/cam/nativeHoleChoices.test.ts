@@ -7,7 +7,7 @@ import { createDesignJob, getJob, modelKey, saveJob, type CamJobV1 } from './job
 import { nativeCadModel } from './nativeCadModel';
 import { holeChoiceKey } from './holeChoices';
 import { kDefaultPlan, toCamSettings, withHoleChoice } from './planSettings';
-import { cadSession, commitCadSession, endCadSession, undoCadSession } from '../cad/session';
+import { cadSession, commitCadSession, endCadSession, undoCadSession } from '@wbcnc/cad-editor/session';
 
 const sessions: string[] = [];
 afterEach(() => {

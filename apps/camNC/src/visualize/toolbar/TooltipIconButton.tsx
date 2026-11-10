@@ -3,7 +3,7 @@ import { Button } from '@heroui/react';
 import { allowCmdOnMac, Kbd } from '@wbcnc/ui/components/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@wbcnc/ui/components/tooltip';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { isCadEditorActive } from '@/cad/keyboardOwnership';
+import { isCadEditorActive } from '@wbcnc/cad-editor/keyboardOwnership';
 
 export function TooltipIconButton({
   label,

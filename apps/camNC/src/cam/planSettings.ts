@@ -11,8 +11,6 @@ export interface PlanSettingsV1 {
   /** Optional smaller bit for features the main bit can't reach; boards then pause once to swap. */
   smallBit?: LibraryTool;
   material: MaterialKey;
-  /** Older jobs: the final pass feed chosen for this job (now part of `cutting`). */
-  finalFeedFactor?: number;
   /** How far the final pass cuts below the board into the spoilboard, mm. */
   cutBelow: number;
   /** 2 mm high, 5 mm long holding tabs, at least 3 per outline. */
@@ -53,11 +51,8 @@ export const kDefaultPlan: PlanSettingsV1 = {
   tabs: false,
 };
 
-/** This job's overrides for the main bit; an older job's final pass feed other than the default counts as one. */
-export function jobCutting(p: PlanSettingsV1): Partial<CuttingData> {
-  const legacy = p.finalFeedFactor !== undefined && p.finalFeedFactor !== 0.5 ? { finalFeedFactor: p.finalFeedFactor } : {};
-  return { ...legacy, ...p.cutting };
-}
+/** This job's overrides for the main bit. */
+export const jobCutting = (p: PlanSettingsV1): Partial<CuttingData> => p.cutting ?? {};
 
 /** The most radial stock one full-depth outline lap takes, mm. */
 const kMaxOutlineSkim = 0.2;

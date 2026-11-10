@@ -1,5 +1,5 @@
 import type { CadDocument, CadPart } from '@wbcnc/cad';
-import type { DesignStep } from './designSteps';
+import type { DesignStep } from '@wbcnc/cad';
 
 /** The parts a part is built on: drawn on, sketched from, added to or cut into. They come before it. */
 function builtOn(part: CadPart): string[] {

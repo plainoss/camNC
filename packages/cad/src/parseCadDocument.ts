@@ -2,7 +2,6 @@ import { validateExtrudeSettings } from './validateExtrudeSettings';
 import { slotIssue } from './slot';
 import { linearPatternIssue } from './pattern';
 import { cadVariableNameError } from './valueExpressions';
-import { migrateDimensionPlacements } from './dimensionPlacement';
 import { nestedDeeperThan } from './nestingDepth';
 import { validPartCutSplit } from './partCutSplit';
 import type { CadDirection, CadDocument, CadPart, CadPlacement, CadSketch } from './types';
@@ -361,11 +360,6 @@ export function parseCadDocument(input: unknown): CadDocument {
             reference(member.targetId);
           }
         }
-        if (c.labelPosition !== undefined) {
-          if (!c.labelPosition || typeof c.labelPosition !== 'object') throw new Error('Invalid constraint label position');
-          number(c.labelPosition.x);
-          number(c.labelPosition.y);
-        }
         if ('labelPlacement' in c && c.labelPlacement !== undefined) {
           if (!('value' in c) || !c.labelPlacement || typeof c.labelPlacement !== 'object')
             throw new Error('Invalid dimension label placement');
@@ -385,20 +379,19 @@ export function parseCadDocument(input: unknown): CadDocument {
               number(placement.radiusOffset);
               if (placement.radiusOffset < 0) throw new Error('Invalid dimension label radius offset');
             }
-            if (placement.distance !== undefined) {
-              number(placement.distance);
-              if (placement.distance < 0) throw new Error('Invalid dimension label distance');
-            }
           } else if (placement.kind === 'angle') {
             if (c.type !== 'angle') throw new Error('Invalid dimension label placement kind');
             number(placement.radius);
             number(placement.angleOffset);
             if (placement.radius < 0) throw new Error('Invalid dimension label radius');
-            if (placement.frame !== undefined && placement.frame !== 'local') throw new Error('Invalid dimension label frame');
           } else if (placement.kind === 'fallback') {
             if (!placement.offset || typeof placement.offset !== 'object') throw new Error('Invalid dimension label fallback');
             number(placement.offset.x);
             number(placement.offset.y);
+          } else if (placement.kind === 'absolute') {
+            if (!placement.position || typeof placement.position !== 'object') throw new Error('Invalid dimension label position');
+            number(placement.position.x);
+            number(placement.position.y);
           } else throw new Error('Invalid dimension label placement kind');
         }
         if ('sourceEntityId' in c && c.sourceEntityId !== undefined) {
@@ -454,7 +447,7 @@ export function parseCadDocument(input: unknown): CadDocument {
       }
     }
   }
-  const parsed = migrateDimensionPlacements(d);
+  const parsed = structuredClone(d);
   for (const part of parsed.parts) {
     part.sketch = withSplineHandleSegments(part.sketch);
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);

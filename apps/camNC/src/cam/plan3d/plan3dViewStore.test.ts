@@ -32,7 +32,7 @@ describe('3D Plan view settings', () => {
     const saved = JSON.parse(localStorage.getItem(kKey)!);
     expect(saved).toEqual({
       state: { mode: 'compare', seeThrough: true, view: 'top', ortho3d: true, showRapids: false },
-      version: 1,
+      version: 0,
     });
 
     // A fresh page: defaults first, then what was saved.
@@ -42,21 +42,5 @@ describe('3D Plan view settings', () => {
     await usePlan3dView.persist.rehydrate();
     const r = usePlan3dView.getState();
     expect([r.mode, r.seeThrough, r.view, r.ortho3d, r.showRapids]).toEqual(['compare', true, 'top', true, false]);
-  });
-
-  it('carries over settings saved before Compare became a view', async () => {
-    const v0 = (mode: string, compare: boolean, p3d: string) => ({
-      state: { mode, seeThrough: false, view: '3d', projection: { top: 'perspective', '3d': p3d }, showRapids: true, compare },
-      version: 0,
-    });
-    localStorage.setItem(kKey, JSON.stringify(v0('result', true, 'orthographic')));
-    await usePlan3dView.persist.rehydrate();
-    expect(usePlan3dView.getState()).toMatchObject({ mode: 'compare', ortho3d: true });
-    expect(usePlan3dView.getState()).not.toHaveProperty('compare');
-
-    // Compare left on in Toolpath (the toggle couldn't be reached there): just Toolpath.
-    localStorage.setItem(kKey, JSON.stringify(v0('toolpath', true, 'perspective')));
-    await usePlan3dView.persist.rehydrate();
-    expect(usePlan3dView.getState()).toMatchObject({ mode: 'toolpath', ortho3d: false });
   });
 });

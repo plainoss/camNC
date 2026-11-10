@@ -13,8 +13,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
-import { endCadSession } from './session';
-import { pickSketchSnap } from './picking';
+import { endCadSession } from '@wbcnc/cad-editor/session';
+import { pickSketchSnap } from '@wbcnc/cad-editor/picking';
 const ids: string[] = [];
 afterEach(() => {
   cleanup();

@@ -1,8 +1,7 @@
 import { dimensionAngleWitness, dimensionWitnessPoints } from './dimensions';
 import { CAD_GEOMETRY_TOLERANCE } from './tolerances';
-import { isBareBaseUnitLiteral } from './dimensionExpressions';
 import { pointEquivalence } from './pointEquivalence';
-import type { CadDimension, CadDimensionPlacement, CadDocument, CadPoint, CadSketch, NewCadDimension } from './types';
+import type { CadDimension, CadDimensionPlacement, CadPoint, CadSketch, NewCadDimension } from './types';
 
 type Dimension = CadDimension | NewCadDimension;
 type Frame =
@@ -23,11 +22,12 @@ const smoothstep = (value: number) => {
 };
 const finitePlacement = (placement: CadDimensionPlacement) => {
   if (placement.kind === 'fallback') return finitePoint(placement.offset);
+  if (placement.kind === 'absolute') return finitePoint(placement.position);
   const values =
     placement.kind === 'linear'
       ? [placement.fraction, placement.normalOffset, placement.overshoot ?? 0]
       : placement.kind === 'radial'
-        ? [placement.angle, placement.radiusRatio, placement.radiusOffset ?? 0, placement.distance ?? 0]
+        ? [placement.angle, placement.radiusRatio, placement.radiusOffset ?? 0]
         : [placement.radius, placement.angleOffset];
   return values.every(Number.isFinite);
 };
@@ -105,38 +105,6 @@ function placementFrame(sketch: CadSketch, dimension: Dimension): Frame | null {
   return { kind: 'angle', origin: center, startAngle };
 }
 
-/** Preserve the prior display interpretation of unflagged input before its one-time local-frame upgrade. */
-function legacyAnglePosition(sketch: CadSketch, dimension: Dimension): CadPoint | null {
-  if (dimension.type !== 'angle' || dimension.labelPlacement?.kind !== 'angle') return null;
-  const raw = dimensionAngleWitness(sketch, dimension),
-    endpoints = angleEndpoints(sketch, dimension);
-  if (endpoints.length !== 4) return null;
-  const placement = dimension.labelPlacement;
-  const finiteCenter = centroid(endpoints),
-    start =
-      raw?.startAngle ??
-      Math.atan2(endpoints[1]!.y - endpoints[0]!.y, endpoints[1]!.x - endpoints[0]!.x) +
-        (dimension.orientation !== undefined && dimension.reversedA ? Math.PI : 0),
-    angle = start + placement.angleOffset;
-  let center = finiteCenter;
-  if (raw && finitePoint(raw.center)) {
-    const first = { x: endpoints[1]!.x - endpoints[0]!.x, y: endpoints[1]!.y - endpoints[0]!.y },
-      second = { x: endpoints[3]!.x - endpoints[2]!.x, y: endpoints[3]!.y - endpoints[2]!.y },
-      firstLength = Math.hypot(first.x, first.y),
-      secondLength = Math.hypot(second.x, second.y),
-      scale = Math.max(firstLength, secondLength),
-      cross = Math.abs((first.x / firstLength) * (second.y / secondLength) - (first.y / firstLength) * (second.x / secondLength)),
-      ratio = Math.hypot(raw.center.x - finiteCenter.x, raw.center.y - finiteCenter.y) / scale;
-    if (ratio <= 1000 && (cross >= 1e-3 || ratio <= 8)) center = raw.center;
-    else if (placement.radius > scale * 8) {
-      const original = { x: raw.center.x + Math.cos(angle) * placement.radius, y: raw.center.y + Math.sin(angle) * placement.radius };
-      if (finitePoint(original) && Math.hypot(original.x - finiteCenter.x, original.y - finiteCenter.y) <= scale * 8) return original;
-    }
-  }
-  const position = { x: center.x + Math.cos(angle) * placement.radius, y: center.y + Math.sin(angle) * placement.radius };
-  return finitePoint(position) ? position : null;
-}
-
 /** Annotation graphics share the label's conditioned vertex; numeric angle measurement remains unchanged. */
 export function dimensionAnnotationAngleWitness(sketch: CadSketch, dimension: Extract<Dimension, { type: 'angle' }>) {
   const frame = placementFrame(sketch, dimension);
@@ -166,12 +134,7 @@ export function captureDimensionPlacement(sketch: CadSketch, dimension: Dimensio
     placement = { kind: 'radial', angle: Math.atan2(offset.y, offset.x), radiusRatio, ...(radiusOffset !== 0 && { radiusOffset }) };
   } else if (frame.kind === 'angle') {
     const angle = Math.atan2(offset.y, offset.x) - frame.startAngle;
-    placement = {
-      kind: 'angle',
-      frame: 'local',
-      radius: Math.hypot(offset.x, offset.y),
-      angleOffset: Math.atan2(Math.sin(angle), Math.cos(angle)),
-    };
+    placement = { kind: 'angle', radius: Math.hypot(offset.x, offset.y), angleOffset: Math.atan2(Math.sin(angle), Math.cos(angle)) };
   } else placement = { kind: 'fallback', offset };
   return finitePlacement(placement) ? placement : null;
 }
@@ -179,10 +142,10 @@ export function captureDimensionPlacement(sketch: CadSketch, dimension: Dimensio
 /** Resolve only persisted placement. A null result lets the renderer choose its screen-space default. */
 export function resolveDimensionPlacement(sketch: CadSketch, dimension: Dimension): CadPoint | null {
   const placement = dimension.labelPlacement;
-  if (!placement) return dimension.labelPosition && finitePoint(dimension.labelPosition) ? { ...dimension.labelPosition } : null;
-  if (placement.kind === 'angle' && placement.frame !== 'local') return legacyAnglePosition(sketch, dimension);
+  if (!placement || !finitePlacement(placement)) return null;
+  if (placement.kind === 'absolute') return { ...placement.position };
   const frame = placementFrame(sketch, dimension);
-  if (!frame || !finitePlacement(placement)) return null;
+  if (!frame) return null;
   let origin = frame.origin;
   let offset: CadPoint;
   if (placement.kind === 'fallback') {
@@ -201,7 +164,7 @@ export function resolveDimensionPlacement(sketch: CadSketch, dimension: Dimensio
       y: axis.y * along + normal.y * placement.normalOffset,
     };
   } else if (placement.kind === 'radial' && frame.kind === 'radial') {
-    const radius = placement.distance ?? frame.radius * placement.radiusRatio + (placement.radiusOffset ?? 0);
+    const radius = frame.radius * placement.radiusRatio + (placement.radiusOffset ?? 0);
     offset = { x: Math.cos(placement.angle) * radius, y: Math.sin(placement.angle) * radius };
   } else if (placement.kind === 'angle' && frame.kind === 'angle') {
     const angle = frame.startAngle + placement.angleOffset;
@@ -211,65 +174,9 @@ export function resolveDimensionPlacement(sketch: CadSketch, dimension: Dimensio
   return finitePoint(position) ? position : null;
 }
 
-/** One authoritative persisted placement replaces any legacy absolute coordinates. */
+/** Place a dimension's label at `position`, kept in the dimension's geometric frame when it has one. */
 export function withDimensionPlacement<T extends Dimension>(sketch: CadSketch, dimension: T, position: CadPoint): T {
   if (!finitePoint(position)) throw new Error('Dimension label coordinates must be finite.');
-  const labelPlacement = captureDimensionPlacement(sketch, dimension, position);
-  if (!labelPlacement) {
-    const legacy = { ...dimension, labelPosition: { ...position } };
-    delete legacy.labelPlacement;
-    return legacy;
-  }
-  const next = { ...dimension, labelPlacement };
-  delete next.labelPosition;
-  return next;
-}
-
-/** Upgrade a detached source snapshot without creating an edit command or changing its revision. */
-export function migrateDimensionPlacements(document: CadDocument): CadDocument {
-  const next = structuredClone(document);
-  for (const part of next.parts.flatMap(owner => [owner, ...(owner.features ?? []).filter(f => f.type === 'sketch')]))
-    part.sketch.constraints = part.sketch.constraints.map(constraint => {
-      if (!('value' in constraint)) return constraint;
-      let current = constraint;
-      if (current.expression && isBareBaseUnitLiteral(current.expression, current.type === 'angle' ? 'deg' : 'mm', current.value)) {
-        current = { ...current };
-        delete current.expression;
-      }
-      const previous = current.labelPlacement;
-      const frame = previous?.kind === 'radial' ? placementFrame(part.sketch, current) : null;
-      if (
-        previous?.kind === 'radial' &&
-        previous.distance === undefined &&
-        previous.radiusRatio > MAX_RADIAL_GAIN &&
-        frame?.kind === 'radial'
-      ) {
-        const radiusOffset = (previous.radiusOffset ?? 0) + (previous.radiusRatio - MAX_RADIAL_GAIN) * frame.radius;
-        if (Number.isFinite(radiusOffset))
-          current = {
-            ...current,
-            labelPlacement: { ...previous, radiusRatio: MAX_RADIAL_GAIN, ...(radiusOffset !== 0 && { radiusOffset }) },
-          };
-      }
-      if (
-        (previous?.kind === 'linear' && (previous.fraction < 0 || previous.fraction > 1)) ||
-        (previous?.kind === 'angle' && previous.frame !== 'local')
-      ) {
-        const position = resolveDimensionPlacement(part.sketch, current);
-        const placement = position && captureDimensionPlacement(part.sketch, current, position);
-        if (placement) current = { ...current, labelPlacement: placement };
-      }
-      if (!current.labelPosition) return current;
-      if (current.labelPlacement) {
-        const normalized = { ...current };
-        delete normalized.labelPosition;
-        return normalized;
-      }
-      const placement = captureDimensionPlacement(part.sketch, current, current.labelPosition);
-      if (!placement) return current;
-      const normalized = { ...current, labelPlacement: placement };
-      delete normalized.labelPosition;
-      return normalized;
-    });
-  return next;
+  const labelPlacement = captureDimensionPlacement(sketch, dimension, position) ?? { kind: 'absolute', position: { ...position } };
+  return { ...dimension, labelPlacement };
 }

@@ -8,7 +8,7 @@ import { kDefaultPlan, type PlanSettingsV1 } from '../planSettings';
 import { useToolLibrary } from '../toolLibrary';
 import { PlanSettingsPanel } from './PlanSettingsPanel';
 import { selectToolPreset, type LibraryTool } from '@wbcnc/cam/tools';
-import { cuttingKey, legacyCuttingKey, useCuttingData } from '../cuttingData';
+import { cuttingKey, useCuttingData } from '../cuttingData';
 
 vi.mock('@tanstack/react-router', () => ({ Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }));
 
@@ -128,16 +128,14 @@ describe('Plan settings', () => {
     expect(useToolLibrary.getState().bits[0].presetId).toBe('rough');
   });
 
-  it('resets a legacy saved feed once instead of restoring it from the shared fallback', () => {
+  it('resets a saved feed to the library value', () => {
     const bit = { ...kDefaultPlan.bit, guid: 'physical' };
-    const legacy = legacyCuttingKey(bit, 'oak');
-    useCuttingData.setState({ saved: { [legacy]: { rampFeed: 390 } } });
+    useCuttingData.setState({ saved: { [cuttingKey(bit, 'oak')]: { rampFeed: 390 } } });
     render(<Panel initial={{ ...kDefaultPlan, bit }} onChange={() => {}} />);
     const ramp = screen.getByRole('textbox', { name: /^Ramp feed/ }) as HTMLInputElement;
     expect(ramp.value).toBe('390');
     fireEvent.click(screen.getByRole('button', { name: 'Ramp feed: back to the library or default value' }));
     expect(ramp.value).toBe('480');
-    expect(useCuttingData.getState().saved[cuttingKey(bit, 'oak')]).toEqual({});
-    expect(useCuttingData.getState().saved[legacy]).toEqual({ rampFeed: 390 });
+    expect(useCuttingData.getState().saved[cuttingKey(bit, 'oak')]).toBeUndefined();
   });
 });

@@ -38,19 +38,6 @@ export const usePlan3dView = create(
     {
       storage: createJSONStorage(() => demoStorage),
       name: 'camnc-plan-3d-view',
-      version: 1,
-      // v0 had a Compare toggle and a projection per view.
-      migrate: (saved, version) => {
-        type V0 = { mode?: 'result' | 'toolpath'; compare?: boolean; projection?: Record<ViewKind, Projection> };
-        const s = (saved ?? {}) as V0;
-        if (version >= 1) return s as never;
-        const { compare, projection, ...rest } = s;
-        return {
-          ...rest,
-          mode: rest.mode === 'result' && compare ? 'compare' : rest.mode,
-          ortho3d: projection?.['3d'] === 'orthographic',
-        } as never;
-      },
     }
   )
 );

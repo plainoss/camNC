@@ -159,9 +159,10 @@
             "value": 73,
             "label": "Length",
             "id": "constraint-10",
-            "labelPosition": {
-              "x": 59.9999899115445,
-              "y": 64.99999495577217
+            "labelPlacement": {
+              "kind": "linear",
+              "fraction": 0.46575356285555475,
+              "normalOffset": -22.999994955772166
             }
           }
         ]

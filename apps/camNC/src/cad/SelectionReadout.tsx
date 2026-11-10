@@ -1,5 +1,5 @@
 import type { CadPoint, CadSketch } from '@wbcnc/cad';
-import { selectionMeasurements } from './selectionMeasurements';
+import { selectionMeasurements } from '@wbcnc/cad-editor/selectionMeasurements';
 import { formatCadValue } from './valueExpressions';
 import './selectionReadout.css';
 

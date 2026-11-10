@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addCircle, addConstraint, addLine, createCadDocument, createCadPart } from './document';
-import {
-  dimensionAnnotationAngleWitness,
-  migrateDimensionPlacements,
-  resolveDimensionPlacement,
-  withDimensionPlacement,
-} from './dimensionPlacement';
+import { dimensionAnnotationAngleWitness, resolveDimensionPlacement, withDimensionPlacement } from './dimensionPlacement';
 import { dimensionAngleWitness } from './dimensions';
 import type { CadDimension, CadPoint } from './types';
 
@@ -40,32 +35,31 @@ describe('bounded annotation placement through large geometry changes', () => {
     closePoint(resolveDimensionPlacement(changed, placed), { x: 200 + 30 - 4 * radius, y: 0 });
   });
 
-  it('normalizes an almost-parallel legacy angle without a jump or a distant virtual-vertex excursion', () => {
+  it('places an almost-parallel angle without a distant virtual-vertex excursion', () => {
     let sketch = addLine(createCadPart().sketch, { x1: 0, y1: 0, x2: 100, y2: 0 });
     sketch = addLine(sketch, { x1: 0, y1: 10, x2: 100, y2: 10.001 });
     const [first, second] = sketch.entities.filter(entity => entity.type === 'line');
-    sketch = addConstraint(sketch, {
+    const dimension: Extract<CadDimension, { type: 'angle' }> = {
       id: 'angle',
       type: 'angle',
       entityAId: first!.id,
       entityBId: second!.id,
       value: (Math.atan2(0.001, 100) * 180) / Math.PI,
       orientation: 1,
-      labelPosition: { x: 50, y: 20 },
-    });
-    const source = createCadDocument();
-    source.parts.push({ ...createCadPart(), sketch });
-    const migrated = migrateDimensionPlacements(source).parts[0]!.sketch;
-    const placed = migrated.constraints[0] as CadDimension;
-    closePoint(resolveDimensionPlacement(migrated, placed), { x: 50, y: 20 });
-    const annotation = dimensionAnnotationAngleWitness(migrated, placed as Extract<CadDimension, { type: 'angle' }>)!;
+    };
+    const placed = withDimensionPlacement(sketch, dimension, { x: 50, y: 20 });
+    closePoint(resolveDimensionPlacement(sketch, placed), { x: 50, y: 20 });
+    const annotation = dimensionAnnotationAngleWitness(sketch, placed)!;
     closePoint(annotation.center, { x: 50, y: 5.00025 });
     expect(Math.hypot(annotation.center.x - 50, annotation.center.y - 20)).toBeLessThan(20);
     const changed = {
-      ...migrated,
-      entities: migrated.entities.map(entity => (entity.id === second!.endId ? { ...entity, y: 110 } : entity)),
+      ...sketch,
+      entities: sketch.entities.map(entity => (entity.id === second!.endId ? { ...entity, y: 110 } : entity)),
     };
     closePoint(resolveDimensionPlacement(changed, placed), { x: -10, y: 14.99975 });
+    const ordinary = withDimensionPlacement(changed, { ...dimension, value: 45 }, { x: 50, y: 20 });
+    const approaching = resolveDimensionPlacement(sketch, ordinary)!;
+    expect(Math.hypot(approaching.x, approaching.y)).toBeLessThan(200);
   });
 
   it('keeps a tiny angle at its nearby shared joint rather than treating the angle value alone as ill-conditioned', () => {
@@ -84,77 +78,6 @@ describe('bounded annotation placement through large geometry changes', () => {
     expect(placed.labelPlacement?.kind).toBe('angle');
     closePoint(resolveDimensionPlacement(sketch, placed), { x: 50, y: 20 });
     expect(dimensionAnnotationAngleWitness(sketch, dimension)).toEqual(dimensionAngleWitness(sketch, dimension));
-  });
-
-  it('upgrades older outside-span and excessive-ratio placements before geometry changes without shifting their initial labels', () => {
-    const source = createCadDocument(),
-      part = createCadPart();
-    part.sketch = addLine(part.sketch, { x1: 0, y1: 0, x2: 1, y2: 0 });
-    const line = part.sketch.entities.find(entity => entity.type === 'line')!;
-    part.sketch = addConstraint(part.sketch, {
-      id: 'line',
-      type: 'distanceX',
-      pointAId: line.startId,
-      pointBId: line.endId,
-      value: 1,
-      labelPlacement: { kind: 'linear', fraction: 30, normalOffset: 10 },
-    });
-    part.sketch = addCircle(part.sketch, { x: 0, y: 40, radius: 1 });
-    const circle = part.sketch.entities.find(entity => entity.type === 'circle')!;
-    part.sketch = addConstraint(part.sketch, {
-      id: 'circle',
-      type: 'diameter',
-      entityId: circle.id,
-      value: 2,
-      labelPlacement: { kind: 'radial', angle: 0, radiusRatio: 30 },
-    });
-    source.parts.push(part);
-    const migrated = migrateDimensionPlacements(source).parts[0]!.sketch;
-    closePoint(resolveDimensionPlacement(migrated, migrated.constraints[0] as CadDimension), { x: 30, y: 10 });
-    closePoint(resolveDimensionPlacement(migrated, migrated.constraints[1] as CadDimension), { x: 30, y: 40 });
-    const changed = {
-      ...migrated,
-      entities: migrated.entities.map(entity =>
-        entity.id === line.endId ? { ...entity, x: 100 } : entity.id === circle.id ? { ...entity, radius: 50 } : entity
-      ),
-    };
-    closePoint(resolveDimensionPlacement(changed, migrated.constraints[0] as CadDimension), { x: 129, y: 10 });
-    closePoint(resolveDimensionPlacement(changed, migrated.constraints[1] as CadDimension), { x: 226, y: 40 });
-  });
-
-  it('recovers an older remote-vertex angle encoding near the finite references and bounds an ordinary angle as it approaches parallel', () => {
-    let sketch = addLine(createCadPart().sketch, { x1: 0, y1: 0, x2: 100, y2: 0 });
-    sketch = addLine(sketch, { x1: 0, y1: 10, x2: 100, y2: 10.001 });
-    const [first, second] = sketch.entities.filter(entity => entity.type === 'line');
-    const dimension: Extract<CadDimension, { type: 'angle' }> = {
-      id: 'angle',
-      type: 'angle',
-      entityAId: first!.id,
-      entityBId: second!.id,
-      value: (Math.atan2(0.001, 100) * 180) / Math.PI,
-      orientation: 1,
-    };
-    const raw = dimensionAngleWitness(sketch, dimension)!;
-    const old: CadDimension = {
-      ...dimension,
-      labelPlacement: {
-        kind: 'angle',
-        radius: Math.hypot(50 - raw.center.x, 20 - raw.center.y),
-        angleOffset: Math.atan2(20 - raw.center.y, 50 - raw.center.x) - raw.startAngle,
-      },
-    };
-    closePoint(resolveDimensionPlacement(sketch, old), { x: 50, y: 20 });
-    const source = createCadDocument();
-    source.parts.push({ ...createCadPart(), sketch: { ...sketch, constraints: [old] } });
-    const migrated = migrateDimensionPlacements(source).parts[0]!.sketch;
-    const opened = {
-      ...migrated,
-      entities: migrated.entities.map(entity => (entity.id === second!.endId ? { ...entity, y: 110 } : entity)),
-    };
-    closePoint(resolveDimensionPlacement(opened, migrated.constraints[0] as CadDimension), { x: -10, y: 14.99975 });
-    const ordinary = withDimensionPlacement(opened, { ...dimension, value: 45 }, { x: 50, y: 20 });
-    const approaching = resolveDimensionPlacement(sketch, ordinary)!;
-    expect(Math.hypot(approaching.x, approaching.y)).toBeLessThan(200);
   });
 
   it('preserves ordinary inside-span fractions and ordinary circular scaling', () => {

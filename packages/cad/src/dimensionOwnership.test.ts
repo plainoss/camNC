@@ -12,6 +12,7 @@ import {
   parseCadDocument,
   removeEntity,
   resolveDimensionPlacement,
+  withDimensionPlacement,
   solveCadDocument,
   updateDimension,
   validateCadDocument,
@@ -98,7 +99,8 @@ describe('line dimension ownership', () => {
     const document = createPlateDocument();
     const width = document.parts[0]!.sketch.constraints.find(constraint => constraint.label === 'Width')!;
     if (!('sourceEntityId' in width)) throw new Error('Expected ownership');
-    width.labelPosition = { x: 60, y: -20 };
+    const sketch = document.parts[0]!.sketch;
+    sketch.constraints = sketch.constraints.map(c => (c.id === width.id ? withDimensionPlacement(sketch, width, { x: 60, y: -20 }) : c));
     const edited = updateDimension(document, width.id, 130);
     const beforeDelete = parseCadDocument(JSON.parse(JSON.stringify(edited)));
     const solved = await solveCadDocument(beforeDelete);

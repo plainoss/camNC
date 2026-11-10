@@ -1,7 +1,7 @@
 import { cadVariableValues, type CadDocument } from '@wbcnc/cad';
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { kBasePlanes } from './basePlanes';
-import { designSteps, type DesignStep } from './designSteps';
+import { designSteps, type DesignStep } from '@wbcnc/cad';
 import { PartRowMenu } from './PartRowMenu';
 import { formatCadValue } from './valueExpressions';
 import './featureList.css';

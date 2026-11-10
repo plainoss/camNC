@@ -11,7 +11,6 @@ import { useMemo } from 'react';
 import { createStorage } from './store-storage';
 import type { FirmwareVariant } from '@wbcnc/fluidnc';
 import { kDefaultMacros, Macro } from '../lib/machine/macros';
-import { kSettingsVersion, migrateSettings } from './settingsMigration';
 
 export interface CalibrationData {
   calibration_matrix: Matrix3;
@@ -45,8 +44,6 @@ export interface ICamSource {
   maxResolution: ITuple;
   // Technically machine is independent of source, but multiple cams per machine
   // seems rare enough that we'll store it here for now.
-  /** @deprecated Machine bounds belong to the machine, see `machineBounds` in the store. Still written for older builds. */
-  machineBounds?: Box2;
   // Position of markers in camera coordinates.
   markerPosInCam?: Vector2[];
   calibration?: CalibrationData;
@@ -148,12 +145,8 @@ export const useStore = create(subscribeWithSelector(persist(immer(combine(
     setToolpathOffset: (offset: Vector3) => set(state => {
       state.toolpathOffset = offset;
     }),
-    /** Sets the machine bounds, also on the active camera so that builds that keep them there still find them. */
     setMachineBounds: (xmin: number, ymin: number, xmax: number, ymax: number) => set(state => {
-      const bounds = new Box2(new Vector2(xmin, ymin), new Vector2(xmax, ymax));
-      state.machineBounds = bounds;
-      const cam = state.activeCamId ? state.camSources[state.activeCamId] : undefined;
-      if (cam) cam.machineBounds = bounds.clone();
+      state.machineBounds = new Box2(new Vector2(xmin, ymin), new Vector2(xmax, ymax));
     }),
     setShowStillFrame: (show: boolean) => set(state => {
       state.showStillFrame = show;
@@ -336,10 +329,8 @@ export const useStore = create(subscribeWithSelector(persist(immer(combine(
   })
 )), {
   name: 'settings',
-  version: kSettingsVersion,
   // skipHydration: true,
   storage: createStorage(),
-  migrate: migrateSettings,
   partialize: state => ({
     toolDiameter: state.toolDiameter,
     camSources: state.camSources,
@@ -389,15 +380,7 @@ export const useIsToolpathHovered = () => useStore(state => state.isToolpathHove
 
 type StoreState = ReturnType<typeof useStore.getState>;
 
-/**
- * The machine bounds. Settings saved before they moved to the machine only have them on a camera: the active camera's
- * are used, else any camera's, since all cameras look at the same machine.
- */
-export function selectMachineBounds(state: Pick<StoreState, 'machineBounds' | 'camSources' | 'activeCamId'>): Box2 | null {
-  if (state.machineBounds) return state.machineBounds;
-  const active = state.activeCamId ? state.camSources[state.activeCamId]?.machineBounds : undefined;
-  return active ?? Object.values(state.camSources).find(cam => cam.machineBounds)?.machineBounds ?? null;
-}
+export const selectMachineBounds = (state: Pick<StoreState, 'machineBounds'>): Box2 | null => state.machineBounds;
 
 export function getMachineBounds() {
   return selectMachineBounds(useStore.getState());

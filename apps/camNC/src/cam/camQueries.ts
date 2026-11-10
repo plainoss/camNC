@@ -86,7 +86,7 @@ export function useCamModel(job: CamJobV1 | null | undefined) {
       if (job!.design) {
         const document = job!.design.accepted;
         if (!document) return { parts: [], meshes: [], readMs: 0, analyzeMs: 0 };
-        return camWorker().importDesign(document, modelKey(job!), { turnUndersideUp: !!job!.design.turnsUndersideUp });
+        return camWorker().importDesign(document, modelKey(job!));
       }
       // Importing can outlive a replacement or deletion. The storage transaction checks model identity and existence;
       // the save counter and cache check also protect edits started while that transaction is running.

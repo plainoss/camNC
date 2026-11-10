@@ -14,7 +14,7 @@ import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { ModelViewport } from '@/cam/model/ModelViewport';
-import { endCadSession } from './session';
+import { endCadSession } from '@wbcnc/cad-editor/session';
 import type { StudioCameraState } from './studioCamera';
 import { OrthographicCamera, Vector3 } from 'three';
 

@@ -338,11 +338,8 @@ describe('machine queue', () => {
     expect(entryRotation(first, {})).toBe(0);
   });
 
-  it('tab removal pauses once per part by default, also in a browser that saved the old default', async () => {
+  it('tab removal pauses once per part by default', async () => {
     expect(useCamMachine.getInitialState().pauseEachTab).toBe(false);
-    localStorage.setItem('camnc-cam-machine', JSON.stringify({ state: { pauseEachTab: true }, version: 0 }));
-    await useCamMachine.persist.rehydrate();
-    expect(useCamMachine.getState().pauseEachTab).toBe(false);
     // Once chosen, it stays chosen.
     useCamMachine.getState().setPauseEachTab(true);
     await useCamMachine.persist.rehydrate();
@@ -384,26 +381,6 @@ describe('what’s saved of the overlay', () => {
     expect(() => useCamMachine.getState().setOverlay(big)).not.toThrow();
     expect(useCamMachine.getState().overlay).toBe(big);
     expect(warn).toHaveBeenCalled();
-  });
-
-  it('frees what a browser already saved of them when the app starts', async () => {
-    // As large as this browser takes: its storage is full.
-    for (let size = 6e6; ; size -= 1e5) {
-      const overlay = { ...big, path: 'x'.repeat(size) };
-      try {
-        localStorage.setItem(kKey, JSON.stringify({ state: { jobId: 'job', done: ['A:bit:0#x'], overlay }, version: 1 }));
-        break;
-      } catch {
-        // Too large, a bit less.
-      }
-    }
-    expect(() => localStorage.setItem('camnc-test-full', 'x'.repeat(2e5))).toThrow();
-    await useCamMachine.persist.rehydrate();
-    localStorage.setItem('camnc-test-full', 'x'.repeat(2e5));
-    localStorage.removeItem('camnc-test-full');
-    expect(saved()).toEqual({ w: 100, h: 50, rotationDeg: 0, tabs: [{ x: 1, y: 2 }] });
-    expect(JSON.parse(localStorage.getItem(kKey)!)).toMatchObject({ version: 2, state: { jobId: 'job', done: ['A:bit:0#x'] } });
-    useCamMachine.getState().leave();
   });
 });
 

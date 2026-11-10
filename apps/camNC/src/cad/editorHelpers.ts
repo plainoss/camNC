@@ -1,4 +1,4 @@
-import type { CadSnapResult } from './picking';
+import type { CadSnapResult } from '@wbcnc/cad-editor/picking';
 import {
   CAD_CHORD_TOLERANCE,
   entityPointIds as curvePointIds,
