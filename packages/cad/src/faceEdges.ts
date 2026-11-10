@@ -1,5 +1,6 @@
 import { constraintEntityIds, entityPointIds } from './document';
 import { drawnOnOutline } from './drawnOn';
+import { faceSupportPart } from './faceSupport';
 import { evaluateCadPart } from './geometry';
 import type { CadDocument, CadEntity, CadPart, CadPointEntity, CadSketch } from './types';
 
@@ -12,8 +13,11 @@ const faceEdgeId = (sketch: CadSketch, key: string) => `${sketch.id}:face:${key}
 function wantedFaceEdges(document: CadDocument, part: CadPart): CadEntity[] {
   const on = part.drawnOn?.on;
   if (!on || 'plane' in on) return [];
-  const support = document.parts.find(candidate => candidate.id === on.partId);
-  if (!support) return [];
+  const source = document.parts.find(candidate => candidate.id === on.partId);
+  if (!source) return [];
+  const copy = on.copyId ? source.copies?.find(copy => copy.id === on.copyId) : undefined;
+  if (on.copyId && !copy) return [];
+  const support = faceSupportPart(source, copy);
   const sketch = part.sketch;
   const point = (key: string, x: number, y: number): CadPointEntity => ({
     id: faceEdgeId(sketch, key),

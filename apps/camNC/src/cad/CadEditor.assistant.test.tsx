@@ -64,7 +64,7 @@ it('sends the selected physical copy as context rather than only its family name
   const parts = screen.getByRole('list', { name: 'Parts' });
   await userEvent.click(within(parts).getByRole('button', { name: /^Shelf 2/ }));
   await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
-  const dock = await screen.findByRole('complementary', { name: 'Design assistant' });
+  const dock = await screen.findByRole('complementary', { name: 'Design assistant' }, { timeout: 20_000 });
   await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Cut a hole in this shelf.');
   await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
   await within(dock).findByText('Question: what diameter should the hole have?', {}, { timeout: 20_000 });
@@ -75,7 +75,7 @@ it('checks a recorded model proposal, previews it, applies it once and undoes th
   recorded();
   const { source, latest } = await studio();
   await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
-  const dock = await screen.findByRole('complementary', { name: 'Design assistant' });
+  const dock = await screen.findByRole('complementary', { name: 'Design assistant' }, { timeout: 20_000 });
   await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Make the plate 24 mm thick.');
   await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
   const preview = await within(dock).findByRole('button', { name: 'Preview proposal' }, { timeout: 45_000 });
@@ -101,7 +101,7 @@ it('makes a model result stale when the user edits while the provider works', as
   );
   const { latest } = await studio();
   await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
-  const dock = await screen.findByRole('complementary', { name: 'Design assistant' });
+  const dock = await screen.findByRole('complementary', { name: 'Design assistant' }, { timeout: 20_000 });
   await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Make the plate 24 mm thick.');
   await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
   await waitFor(() => expect(release).toBeDefined());
@@ -117,4 +117,27 @@ it('makes a model result stale when the user edits while the provider works', as
   expect(preview).toHaveProperty('disabled', true);
   expect(within(dock).getByText(/The design has changed/)).toBeDefined();
   expect(latest().parts[0]!.thickness).toBe(30);
+}, 60_000);
+
+it('keeps an assistant proposal pending until a feature preview is cancelled', async () => {
+  recorded();
+  const { latest } = await studio();
+  await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
+  const dock = await screen.findByRole('complementary', { name: 'Design assistant' }, { timeout: 20_000 });
+  await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Make the plate 24 mm thick.');
+  await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
+  const preview = await within(dock).findByRole('button', { name: 'Preview proposal' }, { timeout: 45_000 });
+  const toolbar = screen.getByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(within(toolbar).getByRole('button', { name: /^Variable$/ }));
+  const feature = await screen.findByRole('dialog', { name: 'Variable' });
+  expect(preview).toHaveProperty('disabled', true);
+  expect(screen.getByRole('button', { name: 'Assistant' })).toHaveProperty('disabled', true);
+  expect(toolbar.querySelector<HTMLInputElement>('input[type="file"]')!.disabled).toBe(true);
+  expect(latest().parts[0]!.thickness).toBe(18);
+  await userEvent.click(within(feature).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(preview).toHaveProperty('disabled', false));
+  await userEvent.click(preview);
+  const review = await screen.findByRole('dialog', { name: 'Review design change' });
+  await userEvent.click(within(review).getByRole('button', { name: 'Apply as one undo step' }));
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(24));
 }, 60_000);

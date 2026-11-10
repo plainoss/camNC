@@ -183,6 +183,7 @@ export function StudioProposals({
                 <AssistantDock
                   key={document.id}
                   document={document}
+                  disabled={disabled}
                   selection={assistantSelection(document, selection)}
                   onProposal={setProposal}
                   onClose={() => setAssistant(false)}
@@ -194,6 +195,7 @@ export function StudioProposals({
                 proposal={proposal}
                 session={session}
                 currentDocument={document}
+                disabled={disabled}
                 onApply={onApply}
                 onClose={() => setProposal(null)}
               />

@@ -1,0 +1,36 @@
+import { expect, it } from 'vitest';
+import { Box3, BoxGeometry, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Vector2, Vector3 } from 'three';
+import { kOrbitSurface, pickOrbitPivot } from './orbitPicking';
+
+it('picks transformed geometry behind unmarked highlights and hidden parts, giving reference planes lower priority', () => {
+  const scene = new Scene();
+  const geometry = new BoxGeometry(20, 20, 20);
+  const material = new MeshBasicMaterial();
+  const body = new Mesh(geometry, material);
+  body.position.set(40, 30, 50);
+  body.userData = kOrbitSurface;
+  scene.add(body);
+  const overlay = body.clone();
+  overlay.position.z = 100;
+  overlay.userData = {};
+  scene.add(overlay);
+  const hidden = body.clone();
+  hidden.position.z = 150;
+  hidden.visible = false;
+  scene.add(hidden);
+  const plane = body.clone();
+  plane.position.z = 200;
+  plane.userData = { ...kOrbitSurface, plane: true };
+  scene.add(plane);
+  scene.updateMatrixWorld(true);
+  const camera = new PerspectiveCamera();
+  camera.position.set(40, 30, 1000);
+  camera.lookAt(40, 30, 0);
+  camera.updateMatrixWorld();
+  const ray = new Raycaster();
+  ray.setFromCamera(new Vector2(), camera);
+  const point = pickOrbitPivot(ray, scene, new Box3());
+  expect(point!.distanceTo(new Vector3(40, 30, 60))).toBeLessThan(1e-8);
+  geometry.dispose();
+  material.dispose();
+});

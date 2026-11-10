@@ -23,7 +23,7 @@ import {
   type CadVariableKind,
 } from './valueExpressions';
 
-export const CAD_THICKNESS_RANGE = { min: 0.1, max: 300 } as const;
+export const CAD_MIN_THICKNESS = 0.1;
 export interface CadVariableValue {
   value: number;
   kind: CadVariableKind;
@@ -202,9 +202,7 @@ function thicknessOutcome(part: CadPart, scope: CadValueScope): Outcome | null {
   if (!usesVariables(part.thicknessExpression)) return null;
   const parsed = parseCadValue(part.thicknessExpression, { unit: 'mm', variables: scope });
   if ('error' in parsed) return parsed;
-  return parsed.value >= CAD_THICKNESS_RANGE.min && parsed.value <= CAD_THICKNESS_RANGE.max
-    ? parsed
-    : { error: `Thickness must be between ${CAD_THICKNESS_RANGE.min} and ${CAD_THICKNESS_RANGE.max} mm.` };
+  return parsed.value >= CAD_MIN_THICKNESS ? parsed : { error: `Thickness must be at least ${CAD_MIN_THICKNESS} mm.` };
 }
 
 const kAxes = ['x', 'y', 'z'] as const;

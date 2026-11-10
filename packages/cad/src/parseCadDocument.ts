@@ -171,6 +171,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         ('plane' in on
           ? !['top', 'front', 'right'].includes(on.plane)
           : typeof on.partId !== 'string' ||
+            (on.copyId !== undefined && typeof on.copyId !== 'string') ||
             !(face === 'top' || face === 'underside' || (typeof face === 'object' && face && typeof face.edge === 'string'))) ||
         (offsetExpression !== undefined && typeof offsetExpression !== 'string') ||
         (inward !== undefined && typeof inward !== 'boolean') ||

@@ -3,6 +3,7 @@ import { addFaceSketch, setCutDepth, withFeatureVersion } from './features';
 import { resolveDrawnPlacements } from './drawnOn';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
 import { detachedMirroredPart } from './detachedMirror';
+import { rebindDetachedCopyReferences } from './detachedCopyReferences';
 import type { CadCut, CadCutDepth, CadDocument, CadFaceRef, CadFeature, CadPart } from './types';
 
 /** A copy keeps the family's features and adds only those explicitly addressed to it. */
@@ -235,5 +236,6 @@ export function detachPartCopy(
       ),
     }),
   });
-  return { document: next, partId: part.id };
+  const rebound = rebindDetachedCopyReferences(next, partId, copyId, part, ids, !!copy.mirrored);
+  return 'error' in rebound ? rebound : { document: rebound.document, partId: part.id };
 }

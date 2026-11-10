@@ -1,0 +1,699 @@
+{
+ "design": {
+  "name": "Untitled design (15)",
+  "revision": 18,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [
+  {
+   "code": "underconstrained",
+   "message": "11 degrees of freedom remain. Add dimensions to keep this shape predictable.",
+   "part": "Part 1"
+  }
+ ],
+ "features": [
+  {
+   "id": "80d90ba5-9e7f-4fc5-8eed-d2460b0809fe:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Part 1 / profile",
+    "freedom": 11,
+    "status": "solved",
+    "regions": 4
+   }
+  },
+  {
+   "id": "80d90ba5-9e7f-4fc5-8eed-d2460b0809fe:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "thickness": {
+     "value": 19
+    },
+    "regions": [
+     "r3",
+     "r2",
+     "r1"
+    ],
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "thickness": 19,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      400,
+      500
+     ]
+    },
+    "holes": 1,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Part 1",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 11,
+   "status": "solved",
+   "constraints": {
+    "coincident": 17,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 4,
+    "midpoint": 3,
+    "parallel": 8,
+    "perpendicular": 4,
+    "pointOnLine": 2,
+    "radius": 1,
+    "tangent": 2,
+    "verticalPoints": 1
+   },
+   "entities": [
+    {
+     "ref": "e58c",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      400,
+      0
+     ],
+     "ends": [
+      "7086",
+      "2253"
+     ]
+    },
+    {
+     "ref": "8c87",
+     "type": "line",
+     "a": [
+      400,
+      0
+     ],
+     "b": [
+      400,
+      500
+     ],
+     "ends": [
+      "86b9",
+      "3fdf"
+     ]
+    },
+    {
+     "ref": "ea32",
+     "type": "line",
+     "a": [
+      400,
+      500
+     ],
+     "b": [
+      0,
+      500
+     ],
+     "ends": [
+      "f316",
+      "d535"
+     ]
+    },
+    {
+     "ref": "b5a4",
+     "type": "line",
+     "a": [
+      0,
+      500
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "b920",
+      "ee01"
+     ]
+    },
+    {
+     "ref": "ac56",
+     "type": "line",
+     "a": [
+      62,
+      348
+     ],
+     "b": [
+      136,
+      348
+     ],
+     "ends": [
+      "7fed",
+      "4c16"
+     ]
+    },
+    {
+     "ref": "4a47",
+     "type": "line",
+     "a": [
+      136,
+      348
+     ],
+     "b": [
+      136,
+      428
+     ],
+     "ends": [
+      "264a",
+      "502b"
+     ]
+    },
+    {
+     "ref": "5deb",
+     "type": "line",
+     "a": [
+      136,
+      428
+     ],
+     "b": [
+      52,
+      428
+     ],
+     "ends": [
+      "4921",
+      "cc26"
+     ]
+    },
+    {
+     "ref": "0319",
+     "type": "line",
+     "a": [
+      52,
+      428
+     ],
+     "b": [
+      52,
+      358
+     ],
+     "ends": [
+      "e411",
+      "5537"
+     ]
+    },
+    {
+     "ref": "92e6",
+     "type": "line",
+     "a": [
+      52,
+      348
+     ],
+     "b": [
+      136,
+      428
+     ],
+     "ends": [
+      "7b00",
+      "4921"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "2a72",
+     "type": "line",
+     "a": [
+      136,
+      348
+     ],
+     "b": [
+      52,
+      428
+     ],
+     "ends": [
+      "4c16",
+      "cc26"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "46ef",
+     "type": "line",
+     "a": [
+      146,
+      126
+     ],
+     "b": [
+      274,
+      126
+     ],
+     "ends": [
+      "fa79",
+      "5f28"
+     ]
+    },
+    {
+     "ref": "1f17",
+     "type": "line",
+     "a": [
+      274,
+      126
+     ],
+     "b": [
+      274,
+      282
+     ],
+     "ends": [
+      "931b",
+      "908d"
+     ]
+    },
+    {
+     "ref": "c29b",
+     "type": "line",
+     "a": [
+      274,
+      282
+     ],
+     "b": [
+      146,
+      282
+     ],
+     "ends": [
+      "039d",
+      "804e"
+     ]
+    },
+    {
+     "ref": "a2d4",
+     "type": "line",
+     "a": [
+      146,
+      282
+     ],
+     "b": [
+      146,
+      126
+     ],
+     "ends": [
+      "0f90",
+      "4efe"
+     ]
+    },
+    {
+     "ref": "4f64",
+     "type": "line",
+     "a": [
+      146,
+      126
+     ],
+     "b": [
+      274,
+      282
+     ],
+     "ends": [
+      "fa79",
+      "039d"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "d3fa",
+     "type": "line",
+     "a": [
+      274,
+      126
+     ],
+     "b": [
+      146,
+      282
+     ],
+     "ends": [
+      "5f28",
+      "804e"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "ef16",
+     "type": "line",
+     "a": [
+      237,
+      366
+     ],
+     "b": [
+      311,
+      366
+     ],
+     "ends": [
+      "b661",
+      "b00a"
+     ]
+    },
+    {
+     "ref": "caa3",
+     "type": "line",
+     "a": [
+      311,
+      366
+     ],
+     "b": [
+      311,
+      448
+     ],
+     "ends": [
+      "b566",
+      "b534"
+     ]
+    },
+    {
+     "ref": "aae5",
+     "type": "line",
+     "a": [
+      311,
+      448
+     ],
+     "b": [
+      237,
+      448
+     ],
+     "ends": [
+      "b1da",
+      "9001"
+     ]
+    },
+    {
+     "ref": "e6a4",
+     "type": "line",
+     "a": [
+      237,
+      448
+     ],
+     "b": [
+      237,
+      366
+     ],
+     "ends": [
+      "f7d5",
+      "7a83"
+     ]
+    },
+    {
+     "ref": "80ed",
+     "type": "line",
+     "a": [
+      237,
+      366
+     ],
+     "b": [
+      311,
+      448
+     ],
+     "ends": [
+      "b661",
+      "b1da"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "2cbc",
+     "type": "line",
+     "a": [
+      311,
+      366
+     ],
+     "b": [
+      237,
+      448
+     ],
+     "ends": [
+      "b00a",
+      "9001"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "b49e",
+     "type": "arc",
+     "at": [
+      62,
+      358
+     ],
+     "r": 10,
+     "a": [
+      52,
+      358
+     ],
+     "b": [
+      62,
+      348
+     ],
+     "ends": [
+      "5537",
+      "7fed"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      400,
+      500
+     ],
+     "area": 167265.56,
+     "islands": 3
+    },
+    {
+     "ref": "r2",
+     "at": [
+      146,
+      126
+     ],
+     "size": [
+      128,
+      156
+     ],
+     "area": 19968,
+     "islands": 0
+    },
+    {
+     "ref": "r3",
+     "at": [
+      52,
+      348
+     ],
+     "size": [
+      84,
+      80
+     ],
+     "area": 6698.44,
+     "islands": 0
+    },
+    {
+     "ref": "r4",
+     "at": [
+      237,
+      366
+     ],
+     "size": [
+      74,
+      82
+     ],
+     "area": 6068,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Part 1",
+   "thickness": 19,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     400,
+     500
+    ]
+   },
+   "holes": 1,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 1
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 18.5,
+    "operations": [
+     {
+      "label": "Through hole",
+      "depth": 19.3,
+      "steps": 13
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 19.3,
+      "steps": 13
+     }
+    ],
+    "warnings": [
+     "Part 1: through hole 1: the 75.65 mm piece inside it comes loose on the last pass and can catch the bit. Tape it down, screw it down, or clear it (about 38 min)."
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      -19,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge e58c",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 8c87",
+     "looks": "+x",
+     "origin": [
+      400,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge ea32",
+     "looks": "+z",
+     "origin": [
+      400,
+      0,
+      500
+     ]
+    },
+    {
+     "face": "edge b5a4",
+     "looks": "-x",
+     "origin": [
+      0,
+      0,
+      500
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Part 1",
+    "at": [
+     0,
+     -19,
+     0
+    ],
+    "size": [
+     400,
+     19,
+     500
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 19,
+   "sides": 1,
+   "size": [
+    413.4,
+    513.4
+   ],
+   "yield": 0.942,
+   "parts": [
+    {
+     "name": "Part 1",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      400,
+      500
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Part 1",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 18.5,
+   "operations": [
+    {
+     "label": "Through hole",
+     "depth": 19.3,
+     "steps": 13
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 19.3,
+     "steps": 13
+    }
+   ],
+   "warnings": [
+    "Part 1: through hole 1: the 75.65 mm piece inside it comes loose on the last pass and can catch the bit. Tape it down, screw it down, or clear it (about 38 min)."
+   ],
+   "blocked": []
+  }
+ ]
+}

@@ -22,11 +22,13 @@ const examples = { cupboard: cupboardExample, plate: plateExample, tray: trayExa
 export function AssistantDock({
   document,
   selection,
+  disabled,
   onProposal,
   onClose,
 }: {
   document: CadDocument;
   selection?: AssistantSelection;
+  disabled?: boolean;
   onProposal: (proposal: CadProposal) => void;
   onClose: () => void;
 }) {
@@ -166,10 +168,11 @@ export function AssistantDock({
               )}
               <button
                 type="button"
-                disabled={JSON.stringify(document) !== JSON.stringify(proposal.base)}
+                disabled={disabled || JSON.stringify(document) !== JSON.stringify(proposal.base)}
                 onClick={() => onProposal(proposal)}>
                 Preview proposal
               </button>
+              {disabled && <p>Complete the current edit before reviewing this proposal.</p>}
               <button type="button" onClick={() => setProposal(null)}>
                 Discard proposal
               </button>

@@ -25,16 +25,28 @@ function setup() {
   ids.push(source.id);
   const session = cadSession(source);
   const onApply = vi.fn<(document: CadDocument) => void>();
+  let disabled = false;
   const component = () => (
     <div className="cad-editor">
-      <StudioProposals document={session.document} session={session} onApply={onApply} />
+      <StudioProposals document={session.document} session={session} disabled={disabled} onApply={onApply} />
     </div>
   );
   const view = render(component());
   const input = view.container.querySelector<HTMLInputElement>('input[type="file"]')!;
   const upload = (candidate: CadDocument) =>
     fireEvent.change(input, { target: { files: [new File([JSON.stringify(candidate)], 'candidate.json', { type: 'application/json' })] } });
-  return { source, session, onApply, input, upload, refresh: () => view.rerender(component()) };
+  return {
+    source,
+    session,
+    onApply,
+    input,
+    upload,
+    refresh: () => view.rerender(component()),
+    setDisabled: (value: boolean) => {
+      disabled = value;
+      view.rerender(component());
+    },
+  };
 }
 
 function resized(source: CadDocument) {
@@ -96,4 +108,21 @@ it('keeps the pre-import snapshot for stale refusal and blocks concurrent file s
   expect(within(review).getByRole<HTMLButtonElement>('button', { name: 'Apply as one undo step' }).disabled).toBe(true);
   expect(session.document.name).toBe('Hand edit while reading');
   expect(session.past).toHaveLength(1);
+}, 30_000);
+
+it('keeps a reviewed candidate pending while the host has an uncommitted feature preview', async () => {
+  const { source, session, onApply, upload, setDisabled } = setup();
+  upload(resized(source));
+  const review = await screen.findByRole('dialog', { name: 'Review design change' }, { timeout: 20_000 });
+  setDisabled(true);
+  const apply = within(review).getByRole<HTMLButtonElement>('button', { name: 'Apply as one undo step' });
+  expect(apply.disabled).toBe(true);
+  expect(within(review).getByText(/Finish or cancel the current edit/)).toBeDefined();
+  expect(onApply).not.toHaveBeenCalled();
+  expect(session.past).toHaveLength(0);
+  setDisabled(false);
+  await waitFor(() => expect(apply.disabled).toBe(false));
+  await userEvent.click(apply);
+  expect(onApply).toHaveBeenCalledTimes(1);
+  expect(width(onApply.mock.calls[0]![0])).toBeCloseTo(200, 6);
 }, 30_000);

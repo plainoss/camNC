@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { BodyMesh } from '../camTypes';
 import { modelGeometry } from './modelGeometry';
+import { kOrbitSurface } from './orbitPicking';
 
 export function ModelBody({
   mesh,
@@ -28,6 +29,7 @@ export function ModelBody({
   return (
     <mesh
       geometry={geometry}
+      userData={kOrbitSurface}
       matrixAutoUpdate={false}
       matrix={matrix ?? new THREE.Matrix4()}
       onPointerOver={event => {
@@ -53,7 +55,8 @@ export function ModelBody({
         depthWrite={opacity >= 1}
       />
       {/* Explicit geometry also invalidates a memoized overlay when the solid changes. */}
-      {edges && <Edges geometry={geometry} threshold={20} color="#2b3646" />}
+      {/* Decorative edges must not intercept corner picks with a line intersection that has no face. */}
+      {edges && <Edges geometry={geometry} threshold={20} color="#2b3646" raycast={() => {}} />}
     </mesh>
   );
 }

@@ -50,7 +50,9 @@ it.each([
     expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull();
     expect(latest().parts[0]!.sketch).toEqual(sketch);
     expect(finish).not.toHaveBeenCalled();
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('workspace-3d')));
+    // The lazy workspace can mount after the toolbar; wait for it before checking keyboard handoff (#474).
+    const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+    await waitFor(() => expect(document.activeElement).toBe(workspace));
     // Do not focus the workspace here: the confirmation must hand it the keyboard itself.
     await userEvent.keyboard('{Shift>}e{/Shift}');
     await screen.findByRole('dialog', { name: /^Extrude · / });

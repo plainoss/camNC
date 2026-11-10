@@ -12,6 +12,13 @@ preserves each child's setting. A variable used outside the folder prevents
 deletion and lists its users. Variable names are unique throughout the design;
 an inserted name clash gets a suffix.
 
+Detaching an ordinary copy preserves its placement and redirects dependent faces,
+corners, directions and mirror planes to the new part. A mirrored detach snapshots
+its evaluated contours and cuts as editable polygon sketches at the evaluator's
+curve tolerance. It refuses a mirrored copy with external face or corner references,
+or any copy referenced through an inherited joined body; remove those references
+before detaching.
+
 ## Connection and conversation
 
 Open **Assistant**, then **Connection**. Enter your provider address, model ID

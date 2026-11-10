@@ -23,6 +23,7 @@ import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
 import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
+import type { CadConnectorPick } from './TransformDialog';
 import type { ExtrudeDepthControl } from './extrudeDepth';
 
 const kViews: { view: ModelView; label: string }[] = [
@@ -63,7 +64,9 @@ export default function WorkspaceView({
   selectedPlane,
   onSelectPlane,
   onSelectFace,
+  pickingMirrorPlane = false,
   onPickPoint,
+  connectors,
   picked,
   hoverIds,
   regions,
@@ -112,6 +115,8 @@ export default function WorkspaceView({
   onSelectPlane?: (plane: string) => void;
   /** The face of the part last clicked, for a sketch started next to be drawn on, as the reference sketches on a selection. */
   onSelectFace?: (on: Extract<CadDrawnOn['on'], { partId: string }> | null) => void;
+  /** Mirror accepts a planar face of a physical copy without selecting or opening that part. */
+  pickingMirrorPlane?: boolean;
   /** While set, a click picks the corner or face middle it snaps to, as a mate connector, instead of selecting. */
   onPickPoint?: (pick: {
     partId: string;
@@ -120,6 +125,7 @@ export default function WorkspaceView({
     copy: boolean;
     edge?: { a: [number, number, number]; b: [number, number, number] };
   }) => void;
+  connectors?: { from?: CadConnectorPick; to?: CadConnectorPick };
   /** The name of the plane or face picked for the next sketch, said in the status line so the pick isn't hidden. */
   picked?: string | null;
   /** Parts shown highlighted, as when their row in the feature list is hovered. */
@@ -187,19 +193,36 @@ export default function WorkspaceView({
   /** The face of a part a click landed on, as a new part can be drawn on it. */
   const faceAt = (pick: ModelFacePick) => {
     const instance = model.instances[pick.index]!;
-    if (instance.copyId) return null;
+
     const part = document.parts.find(candidate => candidate.id === instance.partId)!;
-    const face = partFaceAt(part, model.placements.get(instanceKey(instance))!, pick.point, pick.normal);
-    return face ? { part, face } : null;
+    const copy = instance.copyId ? part.copies?.find(copy => copy.id === instance.copyId) : undefined;
+    // Mirrored instances share edge IDs while their sketch x coordinates are reflected.
+    const facePart = copy?.mirrored
+      ? {
+          ...part,
+          sketch: {
+            ...part.sketch,
+            entities: part.sketch.entities.map(entity => (entity.type === 'point' ? { ...entity, x: -entity.x } : entity)),
+          },
+        }
+      : part;
+    const face = partFaceAt(facePart, model.placements.get(instanceKey(instance))!, pick.point, pick.normal);
+    return face ? { part, face, ...(instance.copyId && { copyId: instance.copyId }) } : null;
   };
   const pickFace = (pick: ModelFacePick) => {
-    if (model.instances[pick.index]!.copyId) return setNotice('Draw on the part itself rather than a copy of it.');
     const found = faceAt(pick);
     if (!found) return setNotice('Pick a flat face: a part’s top, its underside, or one of its straight edges.');
-    const { part, face } = found;
+    const { part, face, copyId } = found;
     setChoosing(false);
     setNotice(null);
-    onNewPart?.({ partId: part.id, face });
+    onNewPart?.({ partId: part.id, face, ...(copyId && { copyId }) });
+  };
+  const pickMirrorFace = (pick: ModelFacePick) => {
+    const found = faceAt(pick);
+    if (!found) return setNotice('Pick a flat face: a part’s top, its underside, or one of its straight edges.');
+    setNotice(null);
+    lastClick.current = null;
+    onSelectFace?.({ partId: found.part.id, face: found.face, ...(found.copyId && { copyId: found.copyId }) });
   };
   const selectedIndexes = model.instances.flatMap((instance, index) =>
     (
@@ -212,7 +235,7 @@ export default function WorkspaceView({
   );
   const selectedFrame = selectedFace && cadFaceFrame(document, selectedFace);
   const selectedFaceIndex = selectedFace
-    ? model.instances.findIndex(instance => instance.partId === selectedFace.partId && !instance.copyId)
+    ? model.instances.findIndex(instance => instance.partId === selectedFace.partId && instance.copyId === selectedFace.copyId)
     : -1;
   const status = notice
     ? notice
@@ -287,6 +310,11 @@ export default function WorkspaceView({
       <ModelViewport
         cameraState={cameraState}
         extrusionDepth={extrusionDepth}
+        pickingConnector={!!onPickPoint}
+        connectors={Object.entries(connectors ?? {}).map(([end, pick]) => ({
+          ...pick,
+          label: end === 'from' ? 'Source mate connector' : 'Destination mate connector',
+        }))}
         meshes={model.meshes}
         parts={model.parts}
         view={view}
@@ -311,7 +339,7 @@ export default function WorkspaceView({
         palette={controlled ? 'studio' : undefined}
         highlightIds={hoverIds ? [...hoverIds] : undefined}
         milled={always}
-        onPickFace={choosing ? pickFace : undefined}
+        onPickFace={pickingMirrorPlane ? pickMirrorFace : choosing ? pickFace : undefined}
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
         planes={onNewPart && showPlanes ? planes : undefined}
         sketchLines={sketchLines}
@@ -350,7 +378,7 @@ export default function WorkspaceView({
           }
           // The face clicked is picked too, for a sketch started next to be drawn on it.
           const found = pick && faceAt(pick);
-          onSelectFace?.(found ? { partId: found.part.id, face: found.face } : null);
+          onSelectFace?.(found ? { partId: found.part.id, face: found.face, ...(found.copyId && { copyId: found.copyId }) } : null);
           const faceKey = JSON.stringify(found?.face ?? null);
           const now = Date.now();
           const key = instanceKey(instance);

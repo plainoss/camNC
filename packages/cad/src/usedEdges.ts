@@ -1,5 +1,7 @@
-import { cadFaceFrame } from './drawnOn';
+import { cadFaceFrame, resolveDrawnPlacements } from './drawnOn';
+import { resolvePartPatterns } from './partPatterns';
 import { isCadPart } from './features';
+import { placePoint } from './placement';
 import type { CadDocument, CadPart, CadPointEntity, CadSketch } from './types';
 
 type Vec3 = [number, number, number];
@@ -11,13 +13,21 @@ type Frame = { origin: Vec3; x: Vec3; y: Vec3; normal: Vec3 };
  * corner 600 mm out lands a micrometre off, enough that an upright edge used from it isn't upright, and a sketch tied
  * to both its ends can't be solved.
  */
-function cornerAt(document: CadDocument, part: CadPart, pointId: string, side: 'top' | 'bottom'): Vec3 | null {
-  if (part.thin || !part.drawnOn) return null;
+function cornerAt(document: CadDocument, part: CadPart, pointId: string, side: 'top' | 'bottom', copyId?: string): Vec3 | null {
+  if (part.thin || (!part.drawnOn && !part.placement)) return null;
   const point = part.sketch.entities.find((entity): entity is CadPointEntity => entity.type === 'point' && entity.id === pointId);
   const frame = cadSketchFrame(document, part);
   if (!point || !frame) return null;
+  if (copyId) {
+    const copy = part.copies?.find(copy => copy.id === copyId);
+    return copy?.placement
+      ? placePoint(copy.placement, [copy.mirrored ? -point.x : point.x, point.y, side === 'top' ? part.thickness : 0])
+      : null;
+  }
+  // Detach freezes a part at an explicit placement instead of a live support plane; its used corners still follow it.
+  if (!part.drawnOn && part.placement) return placePoint(part.placement, [point.x, point.y, side === 'top' ? part.thickness : 0]);
   // Where the sketch's origin is, as the part is placed, which takes in a move by a transform. Its underside sits there.
-  const inward = part.drawnOn.inward ? -part.thickness : 0;
+  const inward = part.drawnOn?.inward ? -part.thickness : 0;
   const origin = part.placement?.position ?? frame.origin.map((value, axis) => value + frame.normal[axis]! * inward);
   const up = side === 'top' ? part.thickness : 0;
   return [0, 1, 2].map(axis => origin[axis]! + frame.x[axis]! * point.x + frame.y[axis]! * point.y + frame.normal[axis]! * up) as Vec3;
@@ -52,16 +62,24 @@ export function cadCornerSources(
 ): Map<string, NonNullable<CadPointEntity['used']>> {
   const sources = new Map<string, NonNullable<CadPointEntity['used']>>();
   for (const part of document.parts) {
-    if (part.id === except || (sourcePartId && part.id !== sourcePartId) || !isCadPart(part) || part.thin || !part.drawnOn) continue;
+    if (
+      part.id === except ||
+      (sourcePartId && part.id !== sourcePartId) ||
+      !isCadPart(part) ||
+      part.thin ||
+      (!part.drawnOn && !part.placement)
+    )
+      continue;
     for (const entity of part.sketch.entities) {
       if (entity.type !== 'point' || entity.construction) continue;
-      for (const side of ['top', 'bottom'] as const) {
-        const at = cornerAt(document, part, entity.id, side);
-        if (!at) continue;
-        const { x, y } = onPlane(frame, at);
-        const key = cornerKey(x, y);
-        if (!sources.has(key)) sources.set(key, { partId: part.id, pointId: entity.id, side });
-      }
+      for (const copyId of [undefined, ...(part.copies ?? []).map(copy => copy.id)])
+        for (const side of ['top', 'bottom'] as const) {
+          const at = cornerAt(document, part, entity.id, side, copyId);
+          if (!at) continue;
+          const { x, y } = onPlane(frame, at);
+          const key = cornerKey(x, y);
+          if (!sources.has(key)) sources.set(key, { partId: part.id, pointId: entity.id, side, ...(copyId && { copyId }) });
+        }
     }
   }
   return sources;
@@ -75,13 +93,16 @@ export const cornerKey = (x: number, y: number) => `${Math.round(x * 1000) / 100
  */
 export function withUsedPoints(document: CadDocument, part: CadPart): CadSketch {
   if (!part.sketch.entities.some(entity => entity.type === 'point' && entity.used)) return part.sketch;
+  // Copy placements may still be from before this solver pass; regenerate them before reading a bound vertex.
+  if (part.sketch.entities.some(entity => entity.type === 'point' && entity.used?.copyId))
+    document = resolvePartPatterns(resolveDrawnPlacements(document).document);
   const frame = cadSketchFrame(document, part);
   if (!frame) return part.sketch;
   let changed = false;
   const entities = part.sketch.entities.map(entity => {
     if (entity.type !== 'point' || !entity.used) return entity;
     const source = document.parts.find(candidate => candidate.id === entity.used!.partId);
-    const at = source && cornerAt(document, source, entity.used.pointId, entity.used.side);
+    const at = source && cornerAt(document, source, entity.used.pointId, entity.used.side, entity.used.copyId);
     if (!at) return entity;
     const { x, y } = onPlane(frame, at);
     if (Math.abs(x - entity.x) < 1e-9 && Math.abs(y - entity.y) < 1e-9) return entity;

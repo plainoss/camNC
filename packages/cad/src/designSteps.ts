@@ -90,7 +90,24 @@ export function brokenParts(document: CadDocument): Map<string, string> {
     for (const part of document.parts) {
       if (broken.has(part.id)) continue;
       const on = part.drawnOn?.on;
-      const face = on && 'partId' in on ? missing(on.partId) : null;
+      const face =
+        on && 'partId' in on
+          ? missing(on.partId) ||
+            (() => {
+              if (!on.copyId) return null;
+              const host = byId.get(on.partId)!;
+              const copy = host.copies?.find(copy => copy.id === on.copyId);
+              if (!copy) return 'a deleted copy';
+              if (copy.suppressed || (copy.pattern && host.pattern?.suppressed)) return 'a suppressed copy';
+              if (
+                copy.pattern &&
+                host.pattern &&
+                !Array.from({ length: Math.max(0, host.pattern.count - 1) }, (_, i) => `${host.pattern!.id}:${i + 1}`).includes(copy.id)
+              )
+                return 'a deleted copy';
+              return null;
+            })()
+          : null;
       const adds = part.addTo ? missing(part.addTo) : null;
       const reason = face ? `It’s drawn on a face of ${face}.` : adds ? `It adds to ${adds}.` : null;
       if (reason) {

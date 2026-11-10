@@ -12,12 +12,14 @@ export function ProposalReview({
   proposal,
   session,
   currentDocument,
+  disabled,
   onApply,
   onClose,
 }: {
   proposal: CadProposal;
   session: CadSession;
   currentDocument: CadDocument;
+  disabled?: boolean;
   onApply: (document: CadDocument) => void;
   onClose: () => void;
 }) {
@@ -25,7 +27,7 @@ export function ProposalReview({
   const [original, setOriginal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const comparison = useMemo(() => compareCadProposal(proposal), [proposal]);
-  const refusal = cadProposalRefusal(session, proposal);
+  const refusal = disabled ? 'Finish or cancel the current edit before applying this design.' : cadProposalRefusal(session, proposal);
   useEffect(() => {
     const element = dialog.current!;
     element.showModal();
@@ -112,6 +114,8 @@ export function ProposalReview({
           type="button"
           disabled={!!refusal || comparison.errors.length > 0}
           onClick={() => {
+            // A host feature preview is not a document change, so the snapshot guard alone cannot detect it.
+            if (disabled) return;
             try {
               onApply(applyCadProposal(session, proposal));
               dialog.current?.close();

@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   assemblyReport,
+  addPartMirror,
+  cadCopyName,
   cadPartsToCut,
   createCadDocument,
   createPlateDocument,
+  detachPartCopy,
   parseCadDocument,
+  resolvePartPatterns,
   setPartPattern,
   solveCadDocument,
   type CadPart,
@@ -75,5 +79,33 @@ describe('part patterns', () => {
         .flatMap(piece => piece.names)
         .sort()
     ).toEqual(['Base', 'Base 2', 'Base 3', 'Cap']);
+  });
+  it('keeps mirrors tied to the same surviving logical copy after detaching a neighbour and changing the pattern', () => {
+    const target = createPlateDocument({ width: 80, height: 40, thickness: 18 }).parts[0]!;
+    target.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    const shelf = createPlateDocument({ width: 100, height: 60, thickness: 19 }).parts[0]!;
+    shelf.name = 'Shelf';
+    shelf.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+    let document = setPartPattern({ ...createCadDocument(), parts: [target, shelf] }, shelf.id, { axis: 'z', count: 4, spacing: 300 });
+    const detachedId = document.parts[1]!.copies![0]!.id;
+    const supportId = document.parts[1]!.copies![1]!.id;
+    const detached = detachPartCopy(document, shelf.id, detachedId);
+    if ('error' in detached) throw new Error(detached.error);
+    document = detached.document;
+    const made = addPartMirror(document, target.id, { across: { partId: shelf.id, copyId: supportId, face: 'top' } });
+    document = made.document;
+    expect(document.parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(1238, 6);
+    expect(document.parts[1]!.copies!.map((_, index) => cadCopyName(document.parts[1]!, index))).toEqual(['Shelf 3', 'Shelf 4']);
+    document = setPartPattern(document, shelf.id, { axis: 'z', count: 2, spacing: 400 });
+    expect(document.parts[1]!.copies ?? []).toEqual([]);
+    // A missing picked copy never becomes its source or its detached neighbour.
+    expect(document.parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(1238, 6);
+    document = setPartPattern(parseCadDocument(JSON.parse(JSON.stringify(document))), shelf.id, { axis: 'z', count: 4, spacing: 400 });
+    expect(document.parts[1]!.copies!.map(copy => copy.id)).toEqual([supportId, `${document.parts[1]!.pattern!.id}:3`]);
+    expect(document.parts[0]!.copies![0]!.id).toBe(made.id);
+    expect(document.parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(1638, 6);
+    expect(document.parts.find(part => part.id === detached.partId)!.placement!.position).toEqual([0, 0, 300]);
+    expect(document.version).toBe(3);
+    expect(resolvePartPatterns(document)).toEqual(document);
   });
 });

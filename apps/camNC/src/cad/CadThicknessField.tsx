@@ -1,4 +1,4 @@
-import { CAD_THICKNESS_RANGE, type CadValueScope } from '@wbcnc/cad';
+import { CAD_MIN_THICKNESS, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
 import { parseCadValue } from './valueExpressions';
 import { CadValueInput } from './CadValueInput';
@@ -11,19 +11,29 @@ export interface CadThicknessFieldProps {
   expression?: string;
   variables?: CadValueScope;
   onCommit: (value: number, expression?: string) => void;
+  /** Preview valid text immediately, keeping unfinished expressions in the field. */
+  livePreview?: boolean;
   onDone?: () => void;
   onValidityChange?: (valid: boolean) => void;
 }
 
-const rangeError = `Thickness must be between ${CAD_THICKNESS_RANGE.min} and ${CAD_THICKNESS_RANGE.max} mm.`;
+const rangeError = `Thickness must be at least ${CAD_MIN_THICKNESS} mm.`;
 function thicknessValue(text: string, variables?: CadValueScope): { value: number; expression?: string } | { error: string } {
   const parsed = parseCadValue(text, { unit: 'mm', variables });
   if ('error' in parsed) return parsed;
-  return parsed.value >= CAD_THICKNESS_RANGE.min && parsed.value <= CAD_THICKNESS_RANGE.max ? parsed : { error: rangeError };
+  return parsed.value >= CAD_MIN_THICKNESS ? parsed : { error: rangeError };
 }
 
 /** Invalid drafts stay visible until corrected or explicitly canceled; blur never moves focus. */
-export function CadThicknessField({ value, expression, variables, onCommit, onDone, onValidityChange }: CadThicknessFieldProps) {
+export function CadThicknessField({
+  value,
+  expression,
+  variables,
+  onCommit,
+  onDone,
+  onValidityChange,
+  livePreview = false,
+}: CadThicknessFieldProps) {
   const id = useId();
   const typed = expression ?? String(value);
   const [text, setText] = useState(typed);
@@ -86,10 +96,11 @@ export function CadThicknessField({ value, expression, variables, onCommit, onDo
               const next = event.target.value;
               dirty.current = true;
               setText(next);
-              if (error) {
-                const parsed = thicknessValue(next, variables);
-                setError('error' in parsed ? parsed.error : null);
-              }
+              const parsed = thicknessValue(next, variables);
+              if (error) setError('error' in parsed ? parsed.error : null);
+              // Keep the literal draft while previewing; normalizing it here would interrupt units and expressions.
+              if (livePreview && !('error' in parsed) && (parsed.value !== value || parsed.expression !== expression))
+                onCommit(parsed.value, parsed.expression);
             }}
             onBlur={() => {
               if (dirty.current) commit();
@@ -119,7 +130,7 @@ export function CadThicknessField({ value, expression, variables, onCommit, onDo
         </span>
       </label>
       <p id={`${id}-hint`} className="cad-thickness-hint">
-        0.1–300 mm. Units, arithmetic and variables accepted.
+        {CAD_MIN_THICKNESS} mm minimum. Units, arithmetic and variables accepted.
       </p>
       {error && (
         <p id={`${id}-error`} role="alert" className="cad-thickness-error">
