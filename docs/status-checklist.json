@@ -79,8 +79,8 @@
         {
           "item": "Linear pattern of parts along a picked edge",
           "status": "done",
-          "evidence": ["packages/cad/src/partPatterns.test.ts", "apps/camNC/src/cad/CadPartPatternField.test.tsx", "apps/camNC/src/cad/CadEditor.patternHistory.test.tsx"],
-          "note": "Dialog previews leave source and undo/redo history unchanged until confirmation. Cancel discards the pattern candidate; accepted inline variables remain separate operations."
+          "evidence": ["packages/cad/src/partPatterns.test.ts", "apps/camNC/src/cad/CadPartPatternField.test.tsx", "apps/camNC/src/cad/CadEditor.patternHistory.test.tsx", "apps/camNC/src/cad/CadEditor.patternScope.test.tsx"],
+          "note": "Dialog previews leave source and undo/redo history unchanged until confirmation. Cancel discards the pattern candidate; accepted inline variables remain separate operations. The Pattern command refuses a selected physical copy, including a slot removed by a count edit, rather than widening it to the source family."
         },
         {
           "item": "Mirror a part across a plane",
