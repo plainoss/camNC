@@ -5,6 +5,7 @@
   "src/cad/studioUsedEdgeOwners.test.ts",
   "src/cad/measureGeometry.test.ts",
   "src/cad/studioMeasurements.test.ts",
+  "src/cad/stoolOutline.test.ts",
   "src/cad/studioSections.test.ts",
   "src/cad/sectionGeometry.test.ts",
   "src/cad/sectionModel.test.ts",

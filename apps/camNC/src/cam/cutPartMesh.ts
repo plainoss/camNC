@@ -1,4 +1,4 @@
-import { unionPaths, type PartFeatures } from '@wbcnc/cam';
+import { intersectPaths, unionPaths, type PartFeatures } from '@wbcnc/cam';
 import { ShapeUtils, Vector2 } from 'three';
 
 type Path = { x: number; y: number }[];
@@ -52,28 +52,19 @@ export function cutPartMesh(features: PartFeatures, underside?: PartFeatures): {
     thickness = features.thickness;
   if (below.length) for (const level of below) cap(level.region, thickness - level.z, false);
   else cap(features.footprint, 0, false);
-  // With cuts from below, the outside walls of the top stack stop where the deepest of them starts, and the underside
-  // stack's own walls cover the rest, so a cut reaching the edge from below stays open.
-  const heights = [...levels.map(level => level.z), below.length ? thickness - below[below.length - 1]!.z : 0];
-  levels.forEach((_, i) => {
-    const high = heights[i]!,
-      low = heights[i + 1]!;
-    // The solid at this height is everything at least this high. Its paths run with the material on their left, so
-    // each wall faces outward.
-    for (const path of unionPaths(levels.slice(0, i + 1).flatMap(level => level.region))) {
-      path.forEach((p, n) => {
-        const q = path[(n + 1) % path.length]!;
-        triangle([p.x, p.y, low], [q.x, q.y, low], [q.x, q.y, high]);
-        triangle([p.x, p.y, low], [q.x, q.y, high], [p.x, p.y, high]);
-      });
-    }
-  });
-  below.slice(0, -1).forEach((_, i) => {
-    // The solid this low is everything the underside's cuts leave, so its walls run the same way as those above. The
-    // last step up is the part's own outside, which the walls above cover from there.
-    const low = thickness - below[i]!.z,
-      high = thickness - below[i + 1]!.z;
-    for (const path of unionPaths(below.slice(0, i + 1).flatMap(level => level.region)))
+  // Opposite-face pockets can overlap in depth without meeting in XY. Splicing the two stacks at the deepest
+  // underside floor then creates inverted/overlapping walls. Partition at every floor and keep only material
+  // present in both stacks, so each interval has one outward boundary even when their depths overlap.
+  const heights = [...new Set([0, ...levels.map(level => level.z), ...below.map(level => thickness - level.z)])].sort((a, b) => a - b);
+  heights.slice(0, -1).forEach((low, i) => {
+    const high = heights[i + 1]!,
+      middle = (low + high) / 2,
+      above = unionPaths(levels.filter(level => level.z > middle).flatMap(level => level.region)),
+      region = below.length
+        ? intersectPaths(above, unionPaths(below.filter(level => level.z > thickness - middle).flatMap(level => level.region)))
+        : above;
+    // Paths run with the material on their left, so each wall faces outward.
+    for (const path of region)
       path.forEach((p, n) => {
         const q = path[(n + 1) % path.length]!;
         triangle([p.x, p.y, low], [q.x, q.y, low], [q.x, q.y, high]);

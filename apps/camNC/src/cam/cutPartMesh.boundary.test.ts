@@ -1,5 +1,6 @@
 import { featuresFromCuts, type FlatCut, type FlatProfile } from '@wbcnc/cam';
 import { describe, expect, it } from 'vitest';
+import { BufferAttribute, BufferGeometry, EdgesGeometry } from 'three';
 import { cutPartMesh } from './cutPartMesh';
 
 const rect = (x: number, y: number, width: number, height: number) => [
@@ -52,6 +53,28 @@ function expectClosedBoundary(positions: Float64Array) {
 }
 
 describe('the boundary of a part with curved cut outlines', () => {
+  it.each([6, 9, 12])('keeps one closed boundary when opposite-face pocket depths are %s mm', depth => {
+    const outline = circle(50, 40, 40),
+      top = featuresFromCuts({ thickness: 18, outline, holes: [], cuts: [pocket('top', rect(30, 30, 10, 20), depth)] }).features,
+      below = featuresFromCuts({ thickness: 18, outline, holes: [], cuts: [pocket('below', rect(60, 30, 10, 20), depth)] }).features,
+      { positions, indices } = cutPartMesh(top, below);
+    expectClosedBoundary(positions);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(Float32Array.from(positions), 3));
+    geometry.setIndex(new BufferAttribute(indices, 1));
+    const edges = new EdgesGeometry(geometry, 20),
+      lines = edges.getAttribute('position');
+    // Pocket floors retain their outlines; an uninterrupted curved outside wall has no horizontal seams.
+    const outer = (i: number) => Math.hypot(lines.getX(i) - 50, lines.getY(i) - 40) > 39;
+    const seams = [];
+    for (let i = 0; i < lines.count; i += 2)
+      if (outer(i) && outer(i + 1) && lines.getZ(i) === lines.getZ(i + 1) && lines.getZ(i) > 0 && lines.getZ(i) < 18) seams.push(i);
+    expect(seams).toEqual([]);
+    expect(lines.count).toBeGreaterThan(2 * outline.length * 2);
+    edges.dispose();
+    geometry.dispose();
+  });
+
   it('keeps a circular island wall above the surrounding pocket floor', () => {
     const profile: FlatProfile = {
       thickness: 18,
