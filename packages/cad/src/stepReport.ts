@@ -3,6 +3,7 @@ import { cadCopyName } from './partPatterns';
 import { cadPartReferenceName } from './partReferences';
 import { resolvePartCutTargets } from './partCutTargetSelection';
 import { evaluatedPartCopy } from './copies';
+import { physicalJoinedCopies } from './physicalJoinedCopies';
 import type { CadCircularPartPattern, CadDocument, CadPartPattern, CadPlacement, EvaluatedCadPart } from './types';
 
 /** What one step of a design refers to, and what that came to, in words and numbers rather than pictures. */
@@ -81,7 +82,9 @@ const roundedFrame = (frame: CadFaceFrame | { error: string }): CadFaceFrame | {
  */
 export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadStepReportEntry[] {
   const report: CadStepReportEntry[] = [];
-  const byId = new Map(document.parts.map(part => [part.id, part]));
+  // Physical names/slots include inherited Add material without adding synthetic authoring steps to the report.
+  const physical = physicalJoinedCopies(document);
+  const byId = new Map(physical.parts.map(part => [part.id, part]));
   for (const part of document.parts) {
     if (part.drawnOn)
       report.push({
@@ -138,7 +141,7 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
   };
   for (const step of document.partCuts ?? []) {
     const prefix = `cut-parts:${step.id}:`;
-    const exactTargets = resolvePartCutTargets(document, step.targets).targets.filter(target => target.copyId !== undefined);
+    const exactTargets = resolvePartCutTargets(physical, step.targets).targets.filter(target => target.copyId !== undefined);
     const reportedParts = parts.flatMap(part => [
       { name: part.name, shape: part },
       ...exactTargets.flatMap(target => {

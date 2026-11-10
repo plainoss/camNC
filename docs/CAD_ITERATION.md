@@ -52,6 +52,8 @@ The saved `divided-tray-copy-tools.json` diagnostic keeps a complete tray while 
 
 The complete tray scenario follows all eight core states: stock and width, divider growth, an exact third-copy tool, family restoration and movement, linked clearance, suppression, restoration and reload. The fitted-joint scenario follows both joint pairs through stock and height edits, five-to-eight fingers, target/tool exchange, linked clearance, suppression and reload. Both use existing dialogs, feature menus and the Parts list. They check visible membership, linked expressions and source, copy, variable, sketch, pattern and cut-feature identities. Their source and interface assertions do not measure the resulting cuts; the core material gates do that separately.
 
+Legacy joined-copy machining has a complete cabinet gate in `packages/cad-script/src/iteration/joinedCopies.test.ts`. A one-shelf cabinet with a face-drawn cleat on its mirrored side has eight physical machining pieces. Repeated shelf cleats then follow count, width and reload edits with independent material and frame checks. Reduced tests cover unplaced quantities, suppression, consumption, mirrored holes, exact inherited-copy targets and whole-host tools and targets. Physical membership is derived for readers and cut evaluation; saved copy lists and feature history stay unchanged. Legacy Cut parts still takes tools from their original evaluated material across a batch, and unsupported relative angles remain explicit refusals.
+
 Use the existing interactive session or render command to investigate a failure instead of repeating a long scenario manually; see [behavior specs](../apps/camNC/e2e/spec/README.md).
 
 ## Agent procedure
