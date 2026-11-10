@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./proposal": "./src/proposal.ts",
     "./arcPreviewGeometry": "./src/arcPreviewGeometry.ts",
     "./constraintCommands": "./src/constraintCommands.ts",
     "./dimensionGeometry": "./src/dimensionGeometry.ts",

@@ -19,6 +19,7 @@ import {
   type CadPoint,
   type CadSketch,
   type EvaluatedCadPart,
+  type EvaluatedCadCut,
   evaluateCadDocument,
   cadCopyName,
   isCadPart,
@@ -86,6 +87,8 @@ export interface CadReportPart {
     constraints: number;
     patterns?: { ref: string; copies: number }[];
   }[];
+  /** Copy-specific material, in the family's local frame; ordinary copies continue sharing their source. */
+  copyFeatures?: { ref: string; name: string; cuts: CadReportPart['cuts'] }[];
   /** Features CAM received. */
   cam?: { pockets: number; throughHoles: number; undersidePockets?: number };
   /** Pieces CAM cuts when the part has copies, by name. Mirrored copies are cut as their own shape. */
@@ -439,24 +442,34 @@ export async function inspectCadDocument(
       return feature.sketchId === part.sketch.id ? part.sketch : faces.find(face => face.sketch.id === feature.sketchId)?.sketch;
     };
     const drawn = unrelieved.find(candidate => candidate.partId === part.id)?.cuts;
-    const cuts = (evaluated?.cuts ?? []).map(cut => {
-      // Evaluated underside loops are reflected into part coordinates, as their curve extremes must be too.
-      const curves = curveExtremes(sketchOfCut(cut.id)).map(p => (cut.side === 'underside' ? { x: -p.x, y: p.y } : p));
-      const relieved = bounds(cut.outline, curves);
-      const asDrawn = drawn?.find(candidate => candidate.id === cut.id);
-      const { at, size } = asDrawn ? bounds(asDrawn.outline, curves) : relieved;
-      const wider = relieved.size.some((length, i) => length > size[i]! + 1e-6);
-      return {
-        ref: cutHandle(cut.id),
-        side: cut.side,
-        from: round(cut.from),
-        to: round(cut.to),
-        through: cut.through,
-        at,
-        size,
-        ...(wider && { relieved: relieved.size }),
-      };
-    });
+    const reportCuts = (source: readonly EvaluatedCadCut[]) =>
+      source.map(cut => {
+        // Evaluated underside loops are reflected into part coordinates, as their curve extremes must be too.
+        const curves = curveExtremes(sketchOfCut(cut.id)).map(p => (cut.side === 'underside' ? { x: -p.x, y: p.y } : p));
+        const relieved = bounds(cut.outline, curves);
+        const asDrawn = drawn?.find(candidate => candidate.id === cut.id);
+        const { at, size } = asDrawn ? bounds(asDrawn.outline, curves) : relieved;
+        const wider = relieved.size.some((length, i) => length > size[i]! + 1e-6);
+        return {
+          ref: cutHandle(cut.id),
+          side: cut.side,
+          from: round(cut.from),
+          to: round(cut.to),
+          through: cut.through,
+          at,
+          size,
+          ...(wider && { relieved: relieved.size }),
+        };
+      });
+    const cuts = reportCuts(evaluated?.cuts ?? []);
+    const copyFeatures = Object.entries(evaluated?.copyCuts ?? {}).map(([id, cuts]) => ({
+      ref: `${part.id}:${id}`,
+      name: cadCopyName(
+        part,
+        (part.copies ?? []).findIndex(copy => copy.id === id)
+      ),
+      cuts: reportCuts(cuts),
+    }));
     // CAM clips a floor cut to its pocket without a word, so the drawing and the part would disagree.
     for (const cut of evaluated?.cuts ?? []) {
       const feature = part.features?.find(f => f.id === cut.id);
@@ -523,6 +536,7 @@ export async function inspectCadDocument(
       notches: evaluated && (evaluated.cuts ?? []).filter(cut => isEdgeNotch(cut, evaluated.outline)).length,
       cuts,
       sketches: reported,
+      ...(copyFeatures.length && { copyFeatures }),
       ...(cam && { cam }),
       ...(pieces && { pieces }),
       ...(toolpaths && { toolpaths }),

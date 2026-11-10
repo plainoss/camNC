@@ -1,4 +1,5 @@
 import { evaluateCadPart } from './geometry';
+import { evaluateCadFeatures } from './features';
 import { mirrorEvaluatedPart } from './copies';
 import type { CadPart, CadPartCopy } from './types';
 
@@ -16,6 +17,9 @@ export function faceSupportPart(part: CadPart, copy?: CadPartCopy): CadPart {
 
 /** Reflect evaluated curves as a whole; reflecting only sketch points would leave arc angles unchanged. */
 export function faceSupportShape(part: CadPart, copy?: CadPartCopy) {
-  const shape = evaluateCadPart(part).part;
-  return shape && copy?.mirrored ? mirrorEvaluatedPart(shape) : shape;
+  const profile = evaluateCadPart(part).part;
+  if (!profile || !copy) return profile;
+  // Copy features can fill profile holes or cut their own floors; choose that material before reflecting it.
+  const shape = evaluateCadFeatures(part, profile, copy.id).part;
+  return copy.mirrored ? mirrorEvaluatedPart(shape) : shape;
 }

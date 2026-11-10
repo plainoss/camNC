@@ -9,7 +9,7 @@ import { typeErrors } from './typecheck';
 
 const examples = fileURLToPath(new URL('../examples/', import.meta.url));
 const plate: CadScript = d => {
-  const part = d.part('Plate', { thickness: 18 });
+  const part = d.newPart('Plate', { thickness: 18 });
   part.profile.rect({ at: [0, 0], w: 100, h: 80 });
 };
 const codes = (issues: { code: string }[]) => issues.map(issue => issue.code);
@@ -48,7 +48,7 @@ describe('expressions', () => {
   it('lets a fillet radius follow a variable', async () => {
     const { document } = await editCad(null, d => {
       d.variable('round', '40mm');
-      const top = d.part('Top').profile.rect({ at: [0, 0], w: 400, h: 300 });
+      const top = d.newPart('Top').profile.rect({ at: [0, 0], w: 400, h: 300 });
       d.part('Top').profile.fillet(top.corners.slice(2), 'round');
     });
     const radius = document.parts[0]!.sketch.constraints.find(c => c.type === 'radius')!;
@@ -80,7 +80,7 @@ describe('expressions', () => {
   it('refuses a cut whose depth a variable takes to zero', async () => {
     const { scriptError } = await editCad(null, d => {
       d.variable('board', '18mm');
-      const plate = d.part('Plate', { thickness: 'board' });
+      const plate = d.newPart('Plate', { thickness: 'board' });
       plate.profile.rect({ at: [0, 0], w: 100, h: 100 });
       const top = plate.sketchOn('top');
       top.rect({ at: [20, 20], w: 20, h: 20 });
@@ -91,7 +91,7 @@ describe('expressions', () => {
 
   it('patterns a rectangle as its edges', async () => {
     const { report } = await editCad(null, d => {
-      const side = d.part('Side');
+      const side = d.newPart('Side');
       side.profile.rect({ at: [0, 0], w: 300, h: 900 });
       const dados = side.sketchOn('top');
       dados.pattern([dados.rect({ at: [20, 200], w: 260, h: 18 })], { count: 3, step: [0, 250] });
@@ -112,7 +112,7 @@ describe('review cases', () => {
   it('keeps a hole that starts on the origin following its expression', async () => {
     const { document } = await editCad(null, d => {
       d.variable('offset', '0mm');
-      const plate = d.part('Plate');
+      const plate = d.newPart('Plate');
       plate.profile.rect({ at: [-50, -50], w: 100, h: 100 });
       plate.profile.circle({ at: ['offset', 0], d: 8 });
     });
@@ -124,7 +124,12 @@ describe('review cases', () => {
   it('keeps a path vertex that starts on the origin following its expression', async () => {
     const { document } = await editCad(null, d => {
       d.variable('offset', '0mm');
-      d.part('Plate').profile.path([0, 'offset']).lineTo([100, 'offset']).lineTo([100, 'offset + 50']).lineTo([0, 'offset + 50']).close();
+      d.newPart('Plate')
+        .profile.path([0, 'offset'])
+        .lineTo([100, 'offset'])
+        .lineTo([100, 'offset + 50'])
+        .lineTo([0, 'offset + 50'])
+        .close();
     });
     const { report } = await inspectCadDocument(change(document, 'offset', '10mm'), new Map(), { toolpaths: false });
     expect(report.parts[0]!.outline).toEqual({ at: [0, 10], size: [100, 50] });
@@ -134,7 +139,7 @@ describe('review cases', () => {
   it('follows a step written backwards', async () => {
     const { document } = await editCad(null, d => {
       d.variable('pitch', '32mm');
-      const side = d.part('Side');
+      const side = d.newPart('Side');
       side.profile.rect({ at: [0, 0], w: 100, h: 400 });
       const pins = side.sketchOn('top');
       pins.pattern([pins.circle({ at: [50, 300], d: 5 })], { count: 3, step: [0, '-pitch'] });
@@ -147,14 +152,14 @@ describe('review cases', () => {
 
   it('splits a half circle into quarters even when asked for the long way round', async () => {
     const { report } = await editCad(null, d => {
-      d.part('Slot').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5, large: true }).lineTo([0, 5]).close();
+      d.newPart('Slot').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5, large: true }).lineTo([0, 5]).close();
     });
     expect(report.parts[0]!.outline).toEqual({ at: [0, 0], size: [42.5, 5] });
   });
 
   it("measures a cut against its own sketch's curves only", async () => {
     const { report } = await editCad(null, d => {
-      const plate = d.part('Plate');
+      const plate = d.newPart('Plate');
       plate.profile.rect({ at: [0, 0], w: 100, h: 100 });
       const pocket = plate.sketchOn('top');
       pocket.circle({ at: [50, 50], d: 20 });
@@ -166,7 +171,7 @@ describe('review cases', () => {
 
   it('measures a pocket made from a profile loop against the profile sketch', async () => {
     const { report } = await editCad(null, d => {
-      const plate = d.part('Plate');
+      const plate = d.newPart('Plate');
       plate.profile.rect({ at: [0, 0], w: 100, h: 100 });
       // A slot with round ends, which come out short when only their chords are measured.
       plate.profile
@@ -183,7 +188,7 @@ describe('review cases', () => {
 
   it('warns when a cut on the underside fits no tool, though side B then has nothing to cut', async () => {
     const { report } = await editCad(null, d => {
-      const plate = d.part('Plate');
+      const plate = d.newPart('Plate');
       plate.profile.rect({ at: [0, 0], w: 100, h: 80 });
       const under = plate.sketchOn('underside');
       under.circle({ at: [-50, 40], d: 2 });
@@ -196,14 +201,14 @@ describe('review cases', () => {
 describe('corner relief', () => {
   const mortised = (relief: string | number) => (d: DesignEdit) => {
     d.variable('bit', '6mm');
-    const seat = d.part('Seat', { thickness: 18, relief });
+    const seat = d.newPart('Seat', { thickness: 18, relief });
     seat.profile.rect({ at: [0, 0], w: 200, h: 200 });
     seat.profile.rect({ at: [80, 91], w: 40, h: 18 });
   };
 
   it('says where each corner too tight for a bone is, so it can be found', async () => {
     const { report } = await editCad(null, d => {
-      const seat = d.part('Seat', { thickness: 18, relief: 6 });
+      const seat = d.newPart('Seat', { thickness: 18, relief: 6 });
       seat.profile.rect({ at: [0, 0], w: 200, h: 200 });
       seat.profile.rect({ at: [80, 90], w: 5, h: 5 });
     });
@@ -226,7 +231,7 @@ describe('corner relief', () => {
 
   it('measures a dado as drawn, and says how far its bones reach', async () => {
     const { report } = await editCad(null, d => {
-      const side = d.part('Side', { thickness: 18, relief: 6 });
+      const side = d.newPart('Side', { thickness: 18, relief: 6 });
       side.profile.rect({ at: [0, 0], w: 300, h: 600 });
       const dado = side.sketchOn('top');
       dado.rect({ at: [20, 200], w: 260, h: 15 });
@@ -249,7 +254,7 @@ describe('corner relief', () => {
 describe('paths', () => {
   it('draws a slot of tangent arcs, fully constrained', async () => {
     const { ok, report } = await editCad(null, d => {
-      const part = d.part('Slot plate');
+      const part = d.newPart('Slot plate');
       part.profile
         .path([0, 0])
         .lineTo([100, 0])
@@ -268,11 +273,11 @@ describe('paths', () => {
   it('draws arcs of a given radius either way round, and keeps the radius as an expression', async () => {
     const { report, document } = await editCad(null, d => {
       d.variable('round', '30mm');
-      const part = d.part('Bracket');
+      const part = d.newPart('Bracket');
       // A quarter-round corner: up the right side, then round to the top.
       part.profile.path([0, 0]).lineTo([100, 0]).lineTo([100, 70]).arcTo([70, 100], { r: 'round' }).lineTo([0, 100]).close();
       // A clockwise scallop cut into the bottom edge of a second part.
-      d.part('Shelf').profile.path([0, 0]).arcTo([60, 0], { r: 40, clockwise: true }).lineTo([60, 50]).lineTo([0, 50]).close();
+      d.newPart('Shelf').profile.path([0, 0]).arcTo([60, 0], { r: 40, clockwise: true }).lineTo([60, 50]).lineTo([0, 50]).close();
     });
     expect(report.errors).toEqual([]);
     expect(report.parts[0]!.outline).toEqual({ at: [0, 0], size: [100, 100] });
@@ -288,7 +293,7 @@ describe('paths', () => {
 
   it('draws a wavy edge of arcs that run into each other smoothly', async () => {
     const { report } = await editCad(null, d => {
-      const path = d.part('Coat rack').profile.path([0, 0]).arcTo([150, 0], { r: 300 });
+      const path = d.newPart('Coat rack').profile.path([0, 0]).arcTo([150, 0], { r: 300 });
       for (let x = 300; x <= 900; x += 150) path.arcTo([x, 0], { tangent: true });
       path.lineTo([900, 130]).lineTo([0, 130]).close();
     });
@@ -298,7 +303,7 @@ describe('paths', () => {
 
   it('draws a half circle of a given radius fully constrained, through its top', async () => {
     const { report } = await editCad(null, d => {
-      d.part('Keyhole').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5 }).lineTo([0, 5]).close({ straight: true });
+      d.newPart('Keyhole').profile.path([0, 0]).lineTo([40, 0]).arcTo([40, 5], { r: 2.5 }).lineTo([0, 5]).close({ straight: true });
     });
     expect(report.warnings).toEqual([]);
     expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
@@ -307,7 +312,7 @@ describe('paths', () => {
 
   it('draws S-curves whose halves share a center without repeating a constraint', async () => {
     const { report } = await editCad(null, d => {
-      const path = d.part('Wave').profile.path([0, 0]);
+      const path = d.newPart('Wave').profile.path([0, 0]);
       // Each half leaves its crest level, so the halves on either side of a crest turn about the same center.
       let previous: [number, number] = [0, 0];
       for (const next of [
@@ -330,7 +335,7 @@ describe('paths', () => {
 
   it('reports sizes from where curves reach, not from the chords they are drawn with', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Rack');
+      const part = d.newPart('Rack');
       part.profile.path([0, 0]).arcTo([300, 0], { r: 400 }).lineTo([300, 115]).lineTo([0, 115]).close();
       const top = part.sketchOn('top');
       top.circle({ at: [150, 60], d: 14 });
@@ -348,7 +353,7 @@ describe('paths', () => {
       d.variable('legH', '432mm');
       d.variable('board', '18mm');
       // A leg with a tenon on top, as an agent writes it: absolute corners from expressions.
-      d.part('Leg')
+      d.newPart('Leg')
         .profile.path(['-legW/2', 0])
         .lineTo(['legW/2', 0])
         .lineTo(['legW/2', 'legH'])
@@ -373,7 +378,7 @@ describe('paths', () => {
       d.variable('a', '50mm');
       d.variable('b', '50mm');
       d.variable('h', '40mm');
-      d.part('P').profile.path([0, 0]).lineTo(['a', 0]).lineTo(['b', 'h']).lineTo([0, 'h']).close();
+      d.newPart('P').profile.path([0, 0]).lineTo(['a', 0]).lineTo(['b', 'h']).lineTo([0, 'h']).close();
       d.variable('b', '80mm');
     });
     const { parts } = await inspectCadDocument(document);
@@ -382,7 +387,7 @@ describe('paths', () => {
   });
 
   it('measures from the fixed origin when a path passes through it', async () => {
-    const { report } = await editCad(null, d => d.part('P').profile.path([10, 0]).lineTo([0, 0]).lineTo([0, 10]).close());
+    const { report } = await editCad(null, d => d.newPart('P').profile.path([10, 0]).lineTo([0, 0]).lineTo([0, 10]).close());
     expect(report.parts[0]!.sketches[0]!.freedom).toBe(0);
     expect(report.warnings.map(w => w.code)).not.toContain('redundant-constraint');
   });
@@ -413,7 +418,7 @@ describe('paths', () => {
   ])('keeps a path following %s', async (_, draw, from, to, width) => {
     const { report, document } = await editCad(null, d => {
       d.variable('w', from);
-      draw(d.part('P').profile);
+      draw(d.newPart('P').profile);
     });
     expect(report.warnings.map(w => w.code)).not.toContain('redundant-constraint');
     const changed = setCadVariable(document, { id: document.variables![0]!.id, name: 'w', expression: to });
@@ -426,7 +431,7 @@ describe('paths', () => {
   it('keeps the middle of a half circle between its ends when they move', async () => {
     const { document } = await editCad(null, d => {
       d.variable('w', '100mm');
-      d.part('R').profile.path([0, 0]).lineTo(['w', 0]).arcTo(['w', 60], { r: 30 }).lineTo([0, 60]).close();
+      d.newPart('R').profile.path([0, 0]).lineTo(['w', 0]).arcTo(['w', 60], { r: 30 }).lineTo([0, 60]).close();
       d.variable('w', '150mm');
     });
     const { report } = await inspectCadDocument(document);
@@ -437,11 +442,11 @@ describe('paths', () => {
   });
 
   it('says what went wrong', async () => {
-    const tooSmall = await editCad(null, d => d.part('A').profile.path([0, 0]).arcTo([100, 0], { r: 20 }));
+    const tooSmall = await editCad(null, d => d.newPart('A').profile.path([0, 0]).arcTo([100, 0], { r: 20 }));
     expect(tooSmall.scriptError).toBe("A 20 mm radius can't reach 100, 0: it needs at least 50 mm.");
-    const ahead = await editCad(null, d => d.part('A').profile.path([0, 0]).lineTo([50, 0]).arcTo([100, 0], { tangent: true }));
+    const ahead = await editCad(null, d => d.newPart('A').profile.path([0, 0]).lineTo([50, 0]).arcTo([100, 0], { tangent: true }));
     expect(ahead.scriptError).toBe('100, 0 is straight ahead: use lineTo.');
-    const first = await editCad(null, d => d.part('A').profile.path([0, 0]).arcTo([100, 0], { tangent: true }));
+    const first = await editCad(null, d => d.newPart('A').profile.path([0, 0]).arcTo([100, 0], { tangent: true }));
     expect(first.scriptError).toBe('A tangent arc needs a segment before it to carry on from.');
   });
 });
@@ -450,10 +455,10 @@ describe('part studio', () => {
   it('draws a part on a face picked by the way it looks, and keeps it there when that part grows', async () => {
     const script = (board: string) => (d: DesignEdit) => {
       d.variable('board', board);
-      const side = d.part('Side', { thickness: 'board' });
+      const side = d.newPart('Side', { thickness: 'board' });
       side.profile.rect({ at: [0, 0], w: 300, h: 600 });
       side.drawOn('right');
-      const cleat = d.part('Cleat', { thickness: 20 });
+      const cleat = d.newPart('Cleat', { thickness: 20 });
       cleat.profile.rect({ at: [0, 100], w: 300, h: 40 });
       cleat.drawOn(side.face('+x'));
     };
@@ -467,7 +472,7 @@ describe('part studio', () => {
 
   it('names the faces a part has when none looks the way asked', async () => {
     const { scriptError } = await editCad(null, d => {
-      const gusset = d.part('Gusset');
+      const gusset = d.newPart('Gusset');
       gusset.profile.polygon([
         [0, 0],
         [100, 0],
@@ -480,18 +485,18 @@ describe('part studio', () => {
   });
 
   it('asks for a profile before a part is drawn on a face', async () => {
-    const { scriptError } = await editCad(null, d => d.part('Block').drawOn('top'));
+    const { scriptError } = await editCad(null, d => d.newPart('Block').drawOn('top'));
     expect(scriptError).toBe('Draw Block’s profile before drawing it on a plane or face.');
   });
 
   it('cuts one part with another, with room to spare', async () => {
     const { report } = await editCad(null, d => {
       d.variable('fit', '0.2mm');
-      const leg = d.part('Leg', { thickness: 18 });
+      const leg = d.newPart('Leg', { thickness: 18 });
       leg.profile.rect({ at: [0, 0], w: 200, h: 400 });
       leg.drawOn('front');
       // A rail lying across the leg's top end, sunk 9 mm into it.
-      const rail = d.part('Rail', { thickness: 18 });
+      const rail = d.newPart('Rail', { thickness: 18 });
       rail.profile.rect({ at: [-50, -40], w: 300, h: 40 });
       rail.drawOn('top', { offset: '400mm - 9mm' });
       d.cutParts(leg, { with: rail, clearance: 'fit' });
@@ -508,18 +513,18 @@ describe('part studio', () => {
     const script = (fingers: number) => (d: DesignEdit) => {
       d.variable('board', '18mm');
       // Two legs crossing at their middles, as in a plant stand.
-      const a = d.part('Leg A', { thickness: 'board' });
+      const a = d.newPart('Leg A', { thickness: 'board' });
       a.profile.rect({ at: [-150, 0], w: 300, h: 400 });
       a.drawOn('front', { offset: 'board/2' });
-      const b = d.part('Leg B', { thickness: 'board' });
+      const b = d.newPart('Leg B', { thickness: 'board' });
       b.profile.rect({ at: [-150, 0], w: 300, h: 400 });
       b.drawOn('right', { offset: '-board/2' });
       d.cutParts(a, { with: b, split: 'half', clearance: '0.2mm' });
       // A frame's corner.
-      const front = d.part('Front', { thickness: 'board' });
+      const front = d.newPart('Front', { thickness: 'board' });
       front.profile.rect({ at: [0, 0], w: 300, h: 100 });
       front.drawOn('front', { offset: '-500mm', inward: true });
-      const side = d.part('Side', { thickness: 'board' });
+      const side = d.newPart('Side', { thickness: 'board' });
       side.profile.rect({ at: [500, 0], w: 200, h: 100 });
       side.drawOn('right', { offset: '300mm - board' });
       d.cutParts(side, { with: front, split: { fingers } });
@@ -540,11 +545,11 @@ describe('part studio', () => {
   it('cuts with one copy of a part, from a pattern or placed by hand', async () => {
     let names: string[] = [];
     const { report } = await editCad(null, d => {
-      const leg = d.part('Leg', { thickness: 18 });
+      const leg = d.newPart('Leg', { thickness: 18 });
       leg.profile.rect({ at: [0, 0], w: 200, h: 400 });
       leg.drawOn('front');
       // Rails across the leg at three heights, and one more off to the side.
-      const rail = d.part('Rail', { thickness: 18 });
+      const rail = d.newPart('Rail', { thickness: 18 });
       rail.profile.rect({ at: [-50, -40], w: 300, h: 40 });
       rail.drawOn('top', { offset: '100mm' });
       const [, middle] = rail.pattern({ axis: 'z', count: 3, spacing: '100mm' });
@@ -562,7 +567,7 @@ describe('part studio', () => {
   it('returns no copies from a pattern of one', async () => {
     let copies: readonly unknown[] = [0];
     const { ok } = await editCad(null, d => {
-      const slat = d.part('Slat', { thickness: 12 });
+      const slat = d.newPart('Slat', { thickness: 12 });
       slat.profile.rect({ at: [0, 0], w: 40, h: 600 });
       slat.drawOn('top');
       copies = slat.pattern({ axis: 'x', count: 1, spacing: '60mm' });
@@ -574,7 +579,7 @@ describe('part studio', () => {
   it('repeats a part in a row that follows a variable', async () => {
     const { report } = await editCad(null, d => {
       d.variable('slats', '5');
-      const slat = d.part('Slat', { thickness: 12 });
+      const slat = d.newPart('Slat', { thickness: 12 });
       slat.profile.rect({ at: [0, 0], w: 40, h: 600 });
       slat.drawOn('top');
       slat.pattern({ axis: 'x', count: 'slats', spacing: '60mm' });
@@ -584,7 +589,7 @@ describe('part studio', () => {
 
   it('refuses a part pattern too long for the document to reopen', async () => {
     const result = await editCad(null, d => {
-      const slat = d.part('Slat', { thickness: 12 });
+      const slat = d.newPart('Slat', { thickness: 12 });
       slat.profile.rect({ at: [0, 0], w: 10, h: 100 });
       slat.drawOn('top');
       slat.pattern({ axis: 'x', count: 201, spacing: 20 });
@@ -667,7 +672,7 @@ describe('variables and assembly', () => {
     expect(Math.max(...pinCuts.map(cut => cut.at[1]!))).toBeCloseTo(98 + 22 * 32 - 2.5, 1);
     expect(pins.freedom).toBe(0);
     expect(box(report, 'Top').at).toEqual([10, 0, 882]);
-    expect(box(report, 'Shelf').at).toEqual([19, 0, 260.5]);
+    expect(box(report, 'Shelf').at).toEqual([19, 0, 100.5]);
     expect(report.assembly!.collisions).toEqual([]);
   });
 
@@ -707,7 +712,7 @@ describe('variables and assembly', () => {
   it('places a mirrored copy as the mirror image of its part', async () => {
     const { report } = await editCad(null, d => {
       // A bracket with a notch near its left end: the other hand needs it at the right.
-      const bracket = d.part('Bracket', { thickness: 18 });
+      const bracket = d.newPart('Bracket', { thickness: 18 });
       bracket.profile.rect({ at: [0, 0], w: 200, h: 100 });
       bracket.profile.rect({ at: [20, 40], w: 30, h: 20 });
       bracket.place({ at: [0, 0, 0] });
@@ -725,10 +730,10 @@ describe('variables and assembly', () => {
   it('finds a shelf that runs into a side', async () => {
     const { report } = await editCad(null, d => {
       d.variable('board', '18mm');
-      const side = d.part('Side', { thickness: 'board' });
+      const side = d.newPart('Side', { thickness: 'board' });
       side.profile.rect({ at: [0, 0], w: 300, h: 600 });
       side.place({ at: [0, 0, 0], x: '+y', y: '+z' });
-      const shelf = d.part('Shelf', { thickness: 'board' });
+      const shelf = d.newPart('Shelf', { thickness: 'board' });
       shelf.profile.rect({ at: [0, 0], w: 400, h: 300 });
       shelf.place({ at: ['board - 1mm', 0, 300] });
     });
@@ -739,7 +744,7 @@ describe('variables and assembly', () => {
   it('saves expressions so the app keeps following them', async () => {
     const { document } = await editCad(null, d => {
       d.variable('board', '18mm');
-      const part = d.part('Panel', { thickness: 'board' });
+      const part = d.newPart('Panel', { thickness: 'board' });
       part.profile.rect({ center: ['100mm', 50], w: '2*board', h: 40 });
     });
     const part = document.parts[0]!;
@@ -751,7 +756,7 @@ describe('variables and assembly', () => {
   });
 
   it("refuses an expression it can't work out, naming the value", async () => {
-    const { scriptError } = await editCad(null, d => d.part('Panel').profile.rect({ at: [0, 0], w: 'depth + 10', h: 40 }));
+    const { scriptError } = await editCad(null, d => d.newPart('Panel').profile.rect({ at: [0, 0], w: 'depth + 10', h: 40 }));
     expect(scriptError).toMatch(/^Width "depth \+ 10": /);
   });
 });
@@ -759,7 +764,7 @@ describe('variables and assembly', () => {
 describe('toolpath summary', () => {
   it('counts each pocket on its own and warns when CAM can fit no tool in one', async () => {
     const { report } = await editCad(null, d => {
-      const door = d.part('Door', { thickness: 19 });
+      const door = d.newPart('Door', { thickness: 19 });
       door.profile.rect({ at: [0, 0], w: 400, h: 200 });
       const back = door.sketchOn('top');
       back.circle({ at: [40, 50], d: 35 });
@@ -770,7 +775,7 @@ describe('toolpath summary', () => {
       ] as const)
         door.cut(back.regionAt(x, y), { depth: 13 });
       door.expect({ pockets: 2 });
-      const rack = d.part('Rack', { thickness: 19 });
+      const rack = d.newPart('Rack', { thickness: 19 });
       rack.profile.rect({ at: [0, 0], w: 200, h: 100 });
       const face = rack.sketchOn('top');
       // A 2 mm pocket: the default 3.175 mm bit doesn't fit in it.
@@ -841,7 +846,7 @@ describe('editing a design', () => {
   it('removes a cut', async () => {
     let cut: { id: string };
     const first = await editCad(null, d => {
-      const part = d.part('Plate');
+      const part = d.newPart('Plate');
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       const top = part.sketchOn('top');
       top.rect({ at: [10, 10], w: 20, h: 20 });
@@ -853,7 +858,7 @@ describe('editing a design', () => {
 
   it('adds a depth to an inner loop, which stops it being a through-hole', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Plate');
+      const part = d.newPart('Plate');
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       part.profile.circle({ at: [50, 40], d: 20 });
       part.cut(part.profile.regionAt(50, 40), { depth: 5 });
@@ -872,7 +877,7 @@ describe('constraining by hand', () => {
 
   it('holds a line to a set length', async () => {
     const { report } = await editCad(null, d => {
-      const { profile } = d.part('Plate');
+      const { profile } = d.newPart('Plate');
       const line = profile.line([0, 0], [10, 0]);
       profile.distance(line.start, line.end, 25);
     });
@@ -884,7 +889,7 @@ describe('constraining by hand', () => {
 describe('picking regions', () => {
   it('picks the innermost region, as a click does', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Plate');
+      const part = d.newPart('Plate');
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       const top = part.sketchOn('top');
       top.rect({ at: [10, 10], w: 80, h: 60 });
@@ -896,7 +901,7 @@ describe('picking regions', () => {
 
   it('leaves out an island when the pick is outside it', async () => {
     const { parts } = await editCad(null, d => {
-      const part = d.part('Plate');
+      const part = d.newPart('Plate');
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       const top = part.sketchOn('top');
       top.rect({ at: [10, 10], w: 80, h: 60 });
@@ -923,7 +928,7 @@ describe('picking regions', () => {
 describe('reporting problems', () => {
   it('fails a design that is valid but not what was meant', async () => {
     const result = await editCad(null, d => {
-      const part = d.part('Plate');
+      const part = d.newPart('Plate');
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       part.expect({ size: [100, 90], thickness: 12, holes: 1, pockets: 1, depths: [5] });
     });
@@ -933,7 +938,7 @@ describe('reporting problems', () => {
 
   it('reports a cut deeper than the material, in terms a script can act on', async () => {
     const { ok, report } = await editCad(null, d => {
-      const part = d.part('Plate', { thickness: 10 });
+      const part = d.newPart('Plate', { thickness: 10 });
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       const top = part.sketchOn('top');
       top.rect({ at: [10, 10], w: 20, h: 20 });
@@ -946,7 +951,7 @@ describe('reporting problems', () => {
 
   it('reports conflicting dimensions', async () => {
     const { ok, report } = await editCad(null, d => {
-      const { profile } = d.part('Plate');
+      const { profile } = d.newPart('Plate');
       const { edges, corners } = profile.rect({ at: [0, 0], w: 100, h: 80 });
       profile.distance(corners[0]!, corners[1]!, 50, 'x');
       expect(edges.bottom.id).toBeTruthy();
@@ -957,7 +962,7 @@ describe('reporting problems', () => {
 
   it('warns about geometry left free, without failing', async () => {
     const { ok, report } = await editCad(null, d => {
-      const { profile } = d.part('Plate');
+      const { profile } = d.newPart('Plate');
       profile.rect({ at: [0, 0], w: 100, h: 80 });
       profile.line([10, 10], [20, 20]);
     });
@@ -968,7 +973,7 @@ describe('reporting problems', () => {
 
   it('warns when a floor cut reaches beyond its pocket', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Plate', { thickness: 20 });
+      const part = d.newPart('Plate', { thickness: 20 });
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       const top = part.sketchOn('top');
       top.rect({ at: [10, 10], w: 30, h: 30 });
@@ -981,7 +986,7 @@ describe('reporting problems', () => {
 
   it('plans cuts on the underside as a second side, after turning the board over', async () => {
     const { report } = await editCad(null, d => {
-      const door = d.part('Door', { thickness: 19 });
+      const door = d.newPart('Door', { thickness: 19 });
       door.profile.rect({ at: [0, 0], w: 500, h: 300 });
       const front = door.sketchOn('top');
       front.rect({ at: [80, 80], w: 340, h: 140 });
@@ -1003,7 +1008,7 @@ describe('reporting problems', () => {
 
   it('says when cuts from the two faces meet', async () => {
     const { report } = await editCad(null, d => {
-      const part = d.part('Plate', { thickness: 18 });
+      const part = d.newPart('Plate', { thickness: 18 });
       part.profile.rect({ at: [0, 0], w: 100, h: 80 });
       const top = part.sketchOn('top');
       top.rect({ at: [20, 20], w: 30, h: 30 });
@@ -1017,7 +1022,7 @@ describe('reporting problems', () => {
 
   it('gives the largest radius when a fillet does not fit', async () => {
     const result = await editCad(null, d => {
-      const { profile } = d.part('Plate');
+      const { profile } = d.newPart('Plate');
       const { corners } = profile.polygon([
         [0, 0],
         [20, 0],
@@ -1031,7 +1036,7 @@ describe('reporting problems', () => {
 
   it('applies the editor’s relation rules', async () => {
     const result = await editCad(null, d => {
-      const { profile } = d.part('Plate');
+      const { profile } = d.newPart('Plate');
       profile.relate('tangent', profile.line([0, 0], [10, 0]), profile.line([0, 5], [10, 5]));
     });
     expect(result.scriptError).toMatch(/line and a circular curve/);
@@ -1040,16 +1045,16 @@ describe('reporting problems', () => {
   it('rejects impossible shapes up front', async () => {
     const reasons = await Promise.all(
       [
-        (d: Parameters<CadScript>[0]) => d.part('P').profile.rect({ at: [0, 0], w: -1, h: 5 }),
-        (d: Parameters<CadScript>[0]) => d.part('P').profile.rect({ w: 1, h: 5 }),
-        (d: Parameters<CadScript>[0]) => d.part('P').profile.circle({ at: [0, 0], d: 0 }),
+        (d: Parameters<CadScript>[0]) => d.newPart('P').profile.rect({ at: [0, 0], w: -1, h: 5 }),
+        (d: Parameters<CadScript>[0]) => d.newPart('P').profile.rect({ w: 1, h: 5 }),
+        (d: Parameters<CadScript>[0]) => d.newPart('P').profile.circle({ at: [0, 0], d: 0 }),
         (d: Parameters<CadScript>[0]) =>
-          d.part('P').profile.polygon([
+          d.newPart('P').profile.polygon([
             [0, 0],
             [1, 1],
           ]),
-        (d: Parameters<CadScript>[0]) => d.part('P').thickness(0),
-        (d: Parameters<CadScript>[0]) => d.part('P').profile.find('nope'),
+        (d: Parameters<CadScript>[0]) => d.newPart('P').thickness(0),
+        (d: Parameters<CadScript>[0]) => d.newPart('P').profile.find('nope'),
       ].map(script => editCad(null, script).then(result => result.scriptError))
     );
     expect(reasons.every(Boolean)).toBe(true);
@@ -1071,7 +1076,7 @@ describe('typecheck', () => {
     const file = path.join(dir, 'bad.cad.ts');
     await writeFile(
       file,
-      `import { design } from '@wbcnc/cad-script';\nexport default design(d => {\n  d.part('P').profile.circle({ at: [0, 0], radius: 5 });\n});\n`
+      `import { design } from '@wbcnc/cad-script';\nexport default design(d => {\n  d.newPart('P').profile.circle({ at: [0, 0], radius: 5 });\n});\n`
     );
     const errors = typeErrors(file);
     expect(errors).toHaveLength(1);
@@ -1099,7 +1104,7 @@ describe('renderCadSvg', () => {
 
   it('keeps a hole inside a pocket visible and labels a round cut inside itself', async () => {
     const { parts } = await editCad(null, d => {
-      const part = d.part('Coaster', { thickness: 10 });
+      const part = d.newPart('Coaster', { thickness: 10 });
       part.profile.circle({ at: [45, 45], d: 90 });
       part.profile.rect({ at: [35, 35], w: 20, h: 20 });
       const top = part.sketchOn('top');
@@ -1129,7 +1134,7 @@ describe('inspectCadDocument', () => {
 
 it('applies a multi-curve concentric relation through the script API', async () => {
   const result = await editCad(null, d => {
-    const part = d.part('Plate');
+    const part = d.newPart('Plate');
     part.profile.rect({ at: [0, 0], w: 120, h: 100 });
     const sketch = part.sketchOn('top');
     const a = sketch.arc({ at: [20, 20], r: 5, from: 0, to: 180 });
@@ -1143,7 +1148,7 @@ it('applies a multi-curve concentric relation through the script API', async () 
 
 it('applies a general curve symmetry relation through the script API', async () => {
   const result = await editCad(null, d => {
-    const part = d.part('Plate');
+    const part = d.newPart('Plate');
     part.profile.rect({ at: [0, 0], w: 120, h: 100 });
     const sketch = part.sketchOn('top');
     const axis = sketch.line([60, 10], [60, 90]);

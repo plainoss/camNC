@@ -2,7 +2,7 @@ import { design } from '@wbcnc/cad-script';
 
 /** An L bracket with a rounded inside corner, two mounting holes and an adjustment slot. */
 export default design(d => {
-  const bracket = d.part('Bracket', { thickness: 12 });
+  const bracket = d.newPart('Bracket', { thickness: 12 });
   const l = bracket.profile.polygon([
     [0, 0],
     [120, 0],
