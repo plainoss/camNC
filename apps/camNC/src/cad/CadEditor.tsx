@@ -3751,7 +3751,7 @@ export function CadEditor({
       }
       setChoosingFace(!choosingFace);
     } else if (command === 'transform') {
-      if (part) openTransform(part.id);
+      if (part) cutSelection.transformPart(openTransform, setStudioRefusal);
     } else if (command === 'variable') {
       setFeatureDialog(null);
       setPartCutting(null);
