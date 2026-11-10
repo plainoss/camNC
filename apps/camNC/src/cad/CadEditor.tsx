@@ -224,6 +224,7 @@ import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { kStudioCommands } from './studioCommands';
+import { selectStudioFeature } from './studioFeatureSelection';
 import { builtStudioParts, disabledStudioCommands } from './studioParts';
 import { usePartCutSelection } from './usePartCutSelection';
 import { FeatureDialog } from './FeatureDialog';
@@ -4082,14 +4083,12 @@ export function CadEditor({
               workspace={showWorkspace}
               document={doc}
               selectedPartId={part?.id ?? null}
-              onSelect={entry => {
-                setSketchRowPicked(entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.partId : null);
-                setSelectedFace(null);
-                if (entry.kind === 'step') {
-                  cutSelection.selectPart(entry.step.partId);
-                  setSelected([]);
-                }
-              }}
+              onSelect={selectStudioFeature(profiles.pickSketch, {
+                sketch: setSketchRowPicked,
+                face: () => setSelectedFace(null),
+                part: cutSelection.selectPart,
+                entities: () => setSelected([]),
+              })}
               onAction={featureAction}
               rollback={rollbackStep}
               onRollTo={showWorkspace ? setRolledTo : undefined}
