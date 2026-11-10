@@ -5,6 +5,8 @@ import { deleteJob, replaceModel } from '@/cam/jobDb';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { Hint } from '@/cam/Hint';
 import { ModelViewport, type ModelView } from '@/cam/model/ModelViewport';
+import { ExplosionSlider } from '@/cam/model/ExplosionSlider';
+import { useExplodedView } from '@/cam/model/useExplodedView';
 import { PartInspector } from '@/cam/model/PartInspector';
 import { PartList } from '@/cam/model/PartList';
 import { pickModelFile, toastNotAModel } from '@/cam/openModelFile';
@@ -32,6 +34,8 @@ function ModelStep() {
   const [selected, setSelected] = useState<string | null>(null);
   const [chosenView, setView] = useState<ModelView | null>(null);
   const view = chosenView ?? (job?.origin?.kind === 'sample' && job.origin.id === 'standing-shelf' ? 'assembled' : 'flat');
+
+  const explosion = useExplodedView(view, setView);
 
   if (jobPending) return <Shell />;
   if (!job) return <Shell message="This job doesn't exist (any more)." />;
@@ -155,20 +159,29 @@ function ModelStep() {
                 <Hint key={v} text={kViewHints[v]} side="bottom">
                   <button
                     aria-pressed={view === v}
-                    onClick={() => setView(v)}
+                    onClick={() => explosion.chooseView(v)}
                     className={cn('h-8 whitespace-nowrap px-3 text-sm', view === v ? 'bg-muted font-medium' : 'text-muted-foreground')}>
                     {kViewNames[v]}
                   </button>
                 </Hint>
               ))}
             </div>
+            {view === 'exploded' && <ExplosionSlider progress={explosion.progress} onChange={explosion.scrub} />}
             <span className="grow" />
             <span className="text-xs text-muted-foreground">
               {view === 'flat' ? 'Each part is turned so its machined side faces up. ' : ''}Right-drag to turn, middle-drag to pan.
             </span>
           </div>
           <div className="min-h-0 flex-1">
-            <ModelViewport meshes={meshes} parts={parts} view={view} selectedId={part?.id ?? null} milled={milled} onSelect={setSelected} />
+            <ModelViewport
+              meshes={meshes}
+              parts={parts}
+              view={explosion.modelView}
+              explosionProgress={explosion.progress}
+              selectedId={part?.id ?? null}
+              milled={milled}
+              onSelect={setSelected}
+            />
           </div>
         </main>
         {part && (

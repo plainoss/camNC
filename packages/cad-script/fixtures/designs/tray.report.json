@@ -552,7 +552,7 @@
    },
    "toolpaths": {
     "bit": 3.175,
-    "minutes": 100.2,
+    "minutes": 95.3,
     "operations": [
      {
       "label": "1 pocket 8 deep",
@@ -666,7 +666,7 @@
      "ok": true
     }
    ],
-   "minutes": 100.2,
+   "minutes": 95.4,
    "operations": [
     {
      "label": "1 pocket 8 deep",

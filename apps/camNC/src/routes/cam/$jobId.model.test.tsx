@@ -31,7 +31,11 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 vi.mock('@/components/page-header', () => ({ PageHeader: () => null }));
 // WebGL is not what this test is about.
-vi.mock('@/cam/model/ModelViewport', () => ({ ModelViewport: () => <div data-testid="viewport" /> }));
+vi.mock('@/cam/model/ModelViewport', () => ({
+  ModelViewport: ({ view, explosionProgress }: { view: string; explosionProgress: number }) => (
+    <div data-testid="viewport" data-view={view} data-explosion={explosionProgress} />
+  ),
+}));
 
 const ModelStep = (Route as unknown as { options: { component: ComponentType } }).options.component;
 
@@ -84,8 +88,22 @@ describe('CAM model step', () => {
     );
     const assembled = await screen.findByRole('button', { name: 'As modeled' }, { timeout: 60_000 });
     expect(assembled.getAttribute('aria-pressed')).toBe('true');
+    const viewport = screen.getByTestId('viewport');
+    expect(viewport.getAttribute('data-view')).toBe('assembled');
+    fireEvent.click(screen.getByRole('button', { name: 'Exploded' }));
+    const slider = screen.getByRole('slider', { name: 'Explosion amount' }) as HTMLInputElement;
+    expect(viewport.getAttribute('data-view')).toBe('exploded');
+    // Other browser pages may throttle animation frames; wait for the visible playback endpoint.
+    await waitFor(() => expect(viewport.getAttribute('data-explosion')).toBe('1'), { timeout: 10_000 });
+    expect(slider.value).toBe('100');
+    fireEvent.change(slider, { target: { value: '35' } });
+    expect(slider.getAttribute('aria-valuetext')).toBe('35% exploded');
+    expect(viewport.getAttribute('data-explosion')).toBe('0.35');
     const flat = screen.getByRole('button', { name: 'Laid flat' });
     fireEvent.click(flat);
+    expect(viewport.getAttribute('data-view')).toBe('flat');
+    expect(viewport.getAttribute('data-explosion')).toBe('0');
+    expect(screen.queryByRole('slider', { name: 'Explosion amount' })).toBeNull();
     expect(flat.getAttribute('aria-pressed')).toBe('true');
     expect(assembled.getAttribute('aria-pressed')).toBe('false');
   }, 60_000);

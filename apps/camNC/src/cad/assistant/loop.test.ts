@@ -1,6 +1,6 @@
 import { createPlateDocument } from '@wbcnc/cad';
 import { describe, expect, it, vi } from 'vitest';
-import { resumeAssistantMessages, runDesignAssistant, type AssistantRunOptions } from './loop';
+import { assistantQuestion, resumeAssistantMessages, runDesignAssistant, type AssistantRunOptions } from './loop';
 import { defaultProvider } from './keyStore';
 import type { AssistantMessage } from './provider';
 
@@ -71,6 +71,85 @@ describe('recorded assistant repair loop', () => {
     expect(result.status).toBe('question');
     expect(result.proposal).toBeUndefined();
     expect(options.check).not.toHaveBeenCalled();
+  });
+
+  it('offers explicit choices and completes the tool protocol before waiting for a reply', async () => {
+    const options = setup();
+    const question: AssistantMessage = {
+      role: 'assistant',
+      text: '',
+      calls: [
+        {
+          id: 'question-1',
+          name: 'ask_user',
+          arguments: {
+            question: 'Which thickness?',
+            choices: ['18 mm', '24 mm'],
+          },
+        },
+      ],
+    };
+    options.request = vi.fn<NonNullable<AssistantRunOptions['request']>>(async () => question);
+    const result = await runDesignAssistant(options);
+    expect(result.status).toBe('question');
+    expect(assistantQuestion(question)).toEqual({ question: 'Which thickness?', choices: ['18 mm', '24 mm'] });
+    expect(result.messages.at(-1)).toMatchObject({ role: 'tool', callId: 'question-1' });
+    expect(resumeAssistantMessages(result.messages)).toEqual(result.messages);
+    expect(options.request).toHaveBeenCalledTimes(1);
+    expect(options.check).not.toHaveBeenCalled();
+    expect(result.proposal).toBeUndefined();
+  });
+
+  it('rejects malformed options and mixed question/edit batches without running their edits', async () => {
+    const options = setup();
+    const invalid: AssistantMessage = {
+      role: 'assistant',
+      text: '',
+      calls: [
+        {
+          id: 'bad-question',
+          name: 'ask_user',
+          arguments: {
+            question: 'Thickness?',
+            choices: ['18 mm', '18 mm'],
+          },
+        },
+      ],
+    };
+    const mixed: AssistantMessage = {
+      ...invalid,
+      calls: [
+        { id: 'mixed-question', name: 'ask_user', arguments: { question: 'Thickness?', choices: ['18 mm', '24 mm'] } },
+        { id: 'mixed-check', name: 'check_design', arguments: { source: 'd => {}' } },
+      ],
+    };
+    const replies: AssistantMessage[] = [invalid, mixed, { role: 'assistant', text: 'Question: what thickness?' }];
+    options.request = vi.fn<NonNullable<AssistantRunOptions['request']>>(async () => replies.shift()!);
+    const result = await runDesignAssistant(options);
+    expect(assistantQuestion(invalid)).toBeUndefined();
+    expect(assistantQuestion(mixed)).toBeUndefined();
+    expect(result.status).toBe('question');
+    expect(result.messages.filter(message => message.role === 'tool')).toHaveLength(3);
+    expect(resumeAssistantMessages(result.messages)).toEqual(result.messages);
+    expect(options.check).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { question: '', choices: ['18 mm', '24 mm'] },
+    { question: 'Thickness?', choices: ['18 mm'] },
+    { question: 'Thickness?', choices: ['1', '2', '3', '4', '5'] },
+    { question: 'Thickness?', choices: ['18 mm', 24] },
+    { question: 'Thickness?', choices: ['18 mm', ' '] },
+    { question: 'Thickness?', choices: ['18 mm', ' 18 mm '] },
+    { question: 'Thickness?', choices: ['18 mm', 'x'.repeat(201)] },
+  ])('does not turn malformed question arguments into response buttons: %j', argumentsValue => {
+    expect(
+      assistantQuestion({
+        role: 'assistant',
+        text: '',
+        calls: [{ id: 'question', name: 'ask_user', arguments: argumentsValue }],
+      })
+    ).toBeUndefined();
   });
 
   it('never exposes Apply and bounds both model turns and checked scripts', async () => {

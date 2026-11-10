@@ -20,6 +20,9 @@ export interface StockOptions {
   tolerance?: number;
   /** Reserved deviation of previously cut and proposed paths from the supplied centerlines. */
   pathTolerance?: number;
+  /** Deviation at occupied pass endpoints and straight cutting bridges. Defaults to pathTolerance;
+   * a tighter value requires a caller that preserves these endpoints through fitting and posting. */
+  endpointTolerance?: number;
   /** Reserved Z uncertainty; defaults to pathTolerance. Zero requires independently exact Z motion. */
   verticalTolerance?: number;
 }
@@ -261,6 +264,7 @@ export class StockModel {
   readonly stockTop: number;
   readonly tolerance: number;
   readonly pathTolerance: number;
+  readonly endpointTolerance: number;
   readonly verticalTolerance: number;
   private readonly footprint?: PathsD;
   private readonly sweeps: Sweep[] = [];
@@ -270,6 +274,7 @@ export class StockModel {
     this.stockTop = options.stockTop;
     this.tolerance = options.tolerance ?? 0.01;
     this.pathTolerance = options.pathTolerance ?? 0;
+    this.endpointTolerance = options.endpointTolerance ?? this.pathTolerance;
     this.verticalTolerance = options.verticalTolerance ?? this.pathTolerance;
     if (
       !Number.isFinite(this.stockTop) ||
@@ -277,6 +282,8 @@ export class StockModel {
       this.tolerance <= 0 ||
       !Number.isFinite(this.pathTolerance) ||
       this.pathTolerance < 0 ||
+      !Number.isFinite(this.endpointTolerance) ||
+      this.endpointTolerance < 0 ||
       !Number.isFinite(this.verticalTolerance) ||
       this.verticalTolerance < 0
     )
@@ -437,7 +444,9 @@ export class StockModel {
     if (policy.maximumStepover > 2 * radius) throw new Error('Pocket cutting transition stepover exceeds the cutter diameter');
     const allowance = policy.wallAllowance ?? 0;
     if (!Number.isFinite(allowance) || allowance < 0) throw new Error('Pocket cutting transition allowance must be nonnegative and finite');
-    const maximumImmersion = Math.hypot(to[0] - from[0], to[1] - from[1]) + 2 * this.pathTolerance;
+    // This certificate anchors the prior occupied disk and a straight bridge. Fitting uncertainty
+    // still applies to swept-path clearance and frontier bounds, but need not displace pinned endpoints.
+    const maximumImmersion = Math.hypot(to[0] - from[0], to[1] - from[1]) + 2 * this.endpointTolerance;
     const maximumFrontierWidth = 2 * (radius + this.pathTolerance);
     const feed = Math.min(policy.cutFeed, policy.transitionFeed, (policy.cutFeed * policy.maximumStepover) / maximumFrontierWidth);
     const result = (allowed: boolean, reason: CuttingTransitionCertificate['reason']): CuttingTransitionCertificate => ({
