@@ -223,7 +223,8 @@ import { useSvgPixelScale, SKETCH_APPEARANCE, sketchStrokeColor } from './sketch
 import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
-import { kStudioCommands } from './studioCommands';
+import { StudioCommandSearch } from './StudioCommandSearch';
+import type { PartPatternKind } from './partPatternKind';
 import { selectStudioFeature } from './studioFeatureSelection';
 import { builtStudioParts, disabledStudioCommands } from './studioParts';
 import { usePartCutSelection } from './usePartCutSelection';
@@ -470,9 +471,12 @@ export function CadEditor({
   // The edges of the parts behind a studio sketch, laid on its plane, and those picked to use in it with `u`.
   const [partEdges, setPartEdges] = useState<PartEdge[]>([]);
   const [pickedEdges, setPickedEdges] = useState<string[]>([]);
+  const [useNotice, setUseNotice] = useState<string | null>(null);
   // Use, started with `u` and nothing picked: each part edge clicked goes into the sketch, until Escape or another tool.
   const [usingEdges, setUsingEdges] = useState(false);
   useEffect(() => setUsingEdges(false), [part?.id, showWorkspace]);
+  // A Use refusal belongs only to the current sketch and command.
+  useEffect(() => setUseNotice(null), [part?.id, showWorkspace, tool, usingEdges]);
   const [transparentParts, setTransparentParts] = useState<ReadonlySet<string>>(() => new Set());
   // Parts hidden from the studio's view by their eye in the parts list.
   // Both are kept for the design in this browser, so a reload shows it as it was left.
@@ -3434,7 +3438,12 @@ export function CadEditor({
       setBusy(false);
     }
   };
-  const openFeature = (kind: 'extrude' | 'pattern' | 'hole', partId: string, before = documentRef.current) => {
+  const openFeature = (
+    kind: 'extrude' | 'pattern' | 'hole',
+    partId: string,
+    before = documentRef.current,
+    initialPatternKind?: PartPatternKind
+  ) => {
     setSelectedFace(null);
     setPartCutting(null);
     setVariableDialog(null);
@@ -3446,7 +3455,7 @@ export function CadEditor({
     setSelected([]);
     chooseTool('select');
     setShowWorkspace(true);
-    setFeatureDialog({ kind, partId, before });
+    setFeatureDialog({ kind, partId, before, initialPatternKind });
   };
   const closeFeature = (keep: boolean) => {
     setDirectionPicker(null);
@@ -3706,7 +3715,7 @@ export function CadEditor({
     setSelectedFace(null);
     setSelectedPlane(picked => (picked === plane ? null : plane));
   };
-  const studioCommand = (command: StudioCommand) => {
+  const studioCommand = (command: StudioCommand, initialPatternKind?: PartPatternKind) => {
     setStudioRefusal(null);
     // Starting one step closes any other step's dialog.
     setVariableDialog(null);
@@ -3778,7 +3787,8 @@ export function CadEditor({
       const made = profiles.pickedProfile(newExtrudeOf(before, part, `Part ${before.parts.length + 1}`));
       commit({ ...before, revision: before.revision + 1, parts: [...before.parts, made] });
       openFeature('extrude', made.id, before);
-    } else if (part) cutSelection.featurePart(command, openFeature, setStudioRefusal);
+    } else if (part)
+      cutSelection.featurePart(command, (kind, partId) => openFeature(kind, partId, undefined, initialPatternKind), setStudioRefusal);
   };
   const faceEditor = faceSketchHost({
     part,
@@ -3843,7 +3853,7 @@ export function CadEditor({
   const grid = Math.max(1, 10 ** Math.floor(Math.log10(view.w / 20)));
   const chainPreview = sketch && chainGeometry(sketch, chain);
   const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
-  const acceptanceNotice = notice ?? finishError;
+  const acceptanceNotice = notice ?? useNotice ?? finishError;
   const profiles = useProfileSelection(doc, featureDialog, commit, setStudioRefusal);
   const faceBackdrop = useFaceSketchCamera(faceSketch?.scene, view, sketchTurn, sketchCameraShift, canvasBox);
   const studioBackdrop = useMemo(() => {
@@ -3861,14 +3871,11 @@ export function CadEditor({
   /** `u`: the picked edges become the sketch's own, fixed where they are, to draw and constrain against. */
   const takeEdges = (keys = pickedEdges) => {
     if (!sketch) return;
-    const used = addUsedPartEdges(
-      sketch,
-      partEdges,
-      keys,
-      sketchBackdrop?.document ?? documentRef.current,
-      part && cadSketchFrame(documentRef.current, part),
-      part?.id
-    );
+    const source = sketchBackdrop?.document ?? documentRef.current,
+      frame = part && cadSketchFrame(documentRef.current, part);
+    const used = addUsedPartEdges(sketch, partEdges, keys, source, frame, part?.id);
+    if (used.problem) return setUseNotice(used.problem);
+    setUseNotice(null);
     changeSketch(used.sketch);
     setPickedEdges([]);
     setSelected(used.selected);
@@ -5126,20 +5133,7 @@ export function CadEditor({
           )}
           {palette && searchMode && studioSession && showWorkspace && (
             // In the studio the search is of its commands; in a sketch, of the sketch's tools.
-            <CommandSearch
-              commands={kStudioCommands
-                .filter(command => !studioDisabled[command.id])
-                .map(({ id, label, hint, glyph }) => ({ id, label, description: hint, glyph }))}
-              onHighlight={() => {}}
-              onClose={(restoreFocus = true) => {
-                setPalette(false);
-                if (restoreFocus) root.current?.querySelector<HTMLElement>('[data-testid="workspace-3d"]')?.focus();
-              }}
-              onChoose={id => {
-                setPalette(false);
-                studioCommand(id as StudioCommand);
-              }}
-            />
+            <StudioCommandSearch disabled={studioDisabled} workspace={root} onOpenChange={setPalette} onCommand={studioCommand} />
           )}
           {palette && searchMode && !(studioSession && showWorkspace) && (
             <CommandSearch

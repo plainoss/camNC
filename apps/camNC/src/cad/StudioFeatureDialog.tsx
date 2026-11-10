@@ -3,11 +3,13 @@ import { useRef } from 'react';
 import { ExtrudeDialog, type CadConnectorPick } from './PartFeatureDialogs';
 import { HoleDialog } from './HoleDialog';
 import { StudioPatternDialog } from './StudioPatternDialog';
+import type { PartPatternKind } from './partPatternKind';
 
 export interface StudioFeatureDialogState {
   kind: 'extrude' | 'pattern' | 'hole';
   partId: string;
   before: CadDocument;
+  initialPatternKind?: PartPatternKind;
 }
 
 /** Shared step wiring, keeping each dialog's own preview and acceptance behavior. */
@@ -63,6 +65,7 @@ export function StudioFeatureDialog({
     <StudioPatternDialog
       key={`${target.id}:${opening.current.generation}`}
       owner={state}
+      initialPatternKind={state.initialPatternKind}
       {...props}
       onPreview={onPreview}
       pickDirection={pickDirection}

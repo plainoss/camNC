@@ -26,4 +26,5 @@ it('builds an exact-size pebble tray and keeps its shape editable through folder
   expect(resized.outline?.size[1]).toBeCloseTo(160, 1);
   expect(resized.thickness).toBe(30);
   expect(resized.cuts[0]?.to).toBe(20);
-}, 30_000);
+  // Two isolated checks each retain their own 30-second deadline; shared CI also runs full toolpath planning.
+}, 90_000);

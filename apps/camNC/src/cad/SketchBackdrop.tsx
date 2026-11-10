@@ -31,7 +31,7 @@ export default function SketchBackdrop({
   const plane = JSON.stringify([view.origin, view.x, view.y, view.normal]);
   useEffect(() => {
     const [origin, x, y, normal] = JSON.parse(plane) as [SketchView['origin'], SketchView['x'], SketchView['y'], SketchView['normal']];
-    onEdges?.(partEdgesOnPlane(model.meshes, { origin, x, y, normal }));
+    onEdges?.(partEdgesOnPlane(model.meshes, { origin, x, y, normal }, model.instances));
   }, [model, plane, onEdges]);
   return (
     <div className="cad-sketch-backdrop" aria-hidden="true">

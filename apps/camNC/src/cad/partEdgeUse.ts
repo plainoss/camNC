@@ -1,8 +1,25 @@
-import { addLine, addPoint, cadCornerSources, cornerKey, type CadSketch, type CadDocument, type cadSketchFrame } from '@wbcnc/cad';
+import {
+  addLine,
+  addPoint,
+  cadCornerSources,
+  cornerKey,
+  type CadSketch,
+  type CadDocument,
+  type cadSketchFrame,
+  type CadPointEntity,
+} from '@wbcnc/cad';
 import type { PartEdge } from './partEdges';
 import { partVertices } from './partVertices';
+import { partEdgeSourceKey, type PartEdgeSource } from './partWorldEdges';
 
-/** Copy picked model vertices and edges into the sketch and keep their endpoints tied to source corners. */
+interface UsedPartEdges {
+  sketch: CadSketch;
+  selected: string[];
+  problem?: string;
+}
+type Corner = NonNullable<CadPointEntity['used']>;
+
+/** Copy picked model geometry only when every endpoint can stay tied to the chosen physical source. */
 export function addUsedPartEdges(
   sketch: CadSketch,
   partEdges: PartEdge[],
@@ -10,30 +27,45 @@ export function addUsedPartEdges(
   source: CadDocument,
   frame: ReturnType<typeof cadSketchFrame> | undefined,
   partId?: string
-) {
-  let next = sketch;
-  for (const edge of partEdges.filter(candidate => keys.includes(candidate.key)))
-    next = addLine(next, { x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2 });
-  for (const vertex of partVertices(partEdges).filter(candidate => keys.includes(candidate.key)))
-    next = addPoint(next, { x: vertex.x, y: vertex.y, fixed: true });
-  const before = new Set(sketch.entities.map(entity => entity.id));
-  const added = next.entities.filter(entity => !before.has(entity.id) && entity.type === 'line');
-  const vertices = next.entities.filter(entity => !before.has(entity.id) && entity.type === 'point' && entity.standalone);
-  const ends = new Set([
-    ...added.flatMap(line => (line.type === 'line' ? [line.startId, line.endId] : [])),
-    ...vertices.map(point => point.id),
-  ]);
-  // Each end at a corner of a part behind the sketch is tied to it, so the used edge follows that part, as in the reference.
-  const corners = frame ? cadCornerSources(source, frame, partId) : new Map();
-  return {
-    sketch: {
-      ...next,
-      entities: next.entities.map(entity => {
-        if (entity.type !== 'point' || !ends.has(entity.id)) return entity;
-        const used = corners.get(cornerKey(entity.x, entity.y));
-        return { ...entity, fixed: true, ...(used && { used }) };
-      }),
-    },
-    selected: [...added, ...vertices].map(entity => entity.id),
+): UsedPartEdges {
+  const refuse = (problem: string): UsedPartEdges => ({ sketch, selected: [], problem });
+  const corners = new Map<string, Map<string, Corner>>();
+  const corner = (owner: PartEdgeSource, x: number, y: number) => {
+    const key = partEdgeSourceKey(owner);
+    if (!corners.has(key)) corners.set(key, frame ? cadCornerSources(source, frame, partId, owner) : new Map());
+    return corners.get(key)!.get(cornerKey(x, y));
   };
+  const choices = [
+    ...partEdges.filter(edge => keys.includes(edge.key)).map(edge => ({ ...edge, type: 'edge' as const })),
+    ...partVertices(partEdges)
+      .filter(vertex => keys.includes(vertex.key))
+      .map(vertex => ({ ...vertex, type: 'vertex' as const })),
+  ];
+  if (!choices.length) return refuse('Use: pick an available model edge or vertex.');
+  let next = sketch;
+  const selected: string[] = [];
+  for (const choice of choices) {
+    if (choice.ambiguous)
+      return refuse('Use: this projection has more than one possible part or copy source. Hide an overlapping part, then pick again.');
+    const points =
+      choice.type === 'edge'
+        ? [
+            [choice.x1, choice.y1],
+            [choice.x2, choice.y2],
+          ]
+        : [[choice.x, choice.y]];
+    const references = points.map(([x, y]) => corner(choice, x!, y!));
+    if (references.some(reference => !reference)) return refuse('Use: this geometry cannot be linked to its source corners yet.');
+    // Imported references own their endpoints. Reusing a target point could steal another source's association,
+    // or leave an origin-bound endpoint fixed while the chosen source moves.
+    const empty = { ...sketch, entities: [], constraints: [] };
+    const copied = choice.type === 'edge' ? addLine(empty, choice) : addPoint(empty, { x: choice.x, y: choice.y, fixed: true });
+    let at = 0;
+    const entities = copied.entities.map(entity =>
+      entity.type === 'point' ? { ...entity, fixed: true, used: references[at++]! } : entity
+    );
+    next = { ...next, entities: [...next.entities, ...entities] };
+    selected.push(...entities.filter(entity => entity.type !== 'point' || entity.standalone).map(entity => entity.id));
+  }
+  return { sketch: next, selected };
 }
