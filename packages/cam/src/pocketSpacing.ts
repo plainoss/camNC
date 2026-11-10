@@ -8,6 +8,14 @@ export function pocketEndpointDeviation(settings: CamSettings): number {
   return budget.outputRounding + budget.controllerRounding;
 }
 
+/** Established fallback when the tighter spacing cannot prove coverage of the actual pocket geometry. */
+export function conservativePocketRingSpacing(settings: CamSettings, diameter: number): number {
+  const budget = planAccuracy(settings.geometryTolerance, settings.sourceTolerance).budget;
+  const reserve = 2 * (budget.fitting + budget.outputRounding + budget.controllerRounding) + 0.001;
+  const selected = settings.stepoverFactor * diameter;
+  return selected > 2 * reserve ? selected - reserve : selected;
+}
+
 export function pocketRingSpacing(settings: CamSettings, diameter: number): number {
   const budget = planAccuracy(settings.geometryTolerance, settings.sourceTolerance).budget;
   const endpoints = budget.outputRounding + budget.controllerRounding;

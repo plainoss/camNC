@@ -13,6 +13,30 @@ const circle = (radius: number): PathD =>
     y: 30 + radius * Math.sin((2 * Math.PI * i) / 96),
   }));
 
+it.each([
+  { factor: 0.86, corner: 0, point: [6.02, 6.02] },
+  { factor: 0.85, corner: 0.3, point: [6.02, 6.02] },
+  { factor: 0.99, corner: 0.3, point: [12.7, 12.7] },
+])('preserves diagonal corner coverage at stepover $factor with corner radius $corner', ({ factor, corner, point }) => {
+  const settings = { ...DEFAULT_SETTINGS, stepoverFactor: factor, maxStepdown: 3, innerCornerRadius: corner };
+  const region = [
+    [
+      { x: 0, y: 0 },
+      { x: 60, y: 0 },
+      { x: 60, y: 40 },
+      { x: 0, y: 40 },
+    ],
+  ];
+  const operation = pocketOperation('Corner coverage', region, 6, 3, { number: 1, diameter: 6 }, settings);
+  const job = finalizePlan({ stockTop: 6, operations: [operation], warnings: [] }, settings);
+  for (const arcs of [false, true]) {
+    const moves = readGcode(toGcode(job, { arcs })).filter(move => !move.rapid && move.from[2] === 3 && move.to[2] === 3);
+    expect(
+      Math.min(...moves.map(move => distPointSeg(point[0]!, point[1]!, move.from[0], move.from[1], move.to[0], move.to[1])))
+    ).toBeLessThanOrEqual(3);
+  }
+});
+
 it('preserves a very small positive coverage margin and rejects an uncertainty wider than the cutter', () => {
   const budget = planAccuracy().budget;
   const uncertainty = budget.fitting + budget.outputRounding + budget.controllerRounding;
