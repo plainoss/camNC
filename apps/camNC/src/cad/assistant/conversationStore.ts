@@ -12,7 +12,21 @@ export function writeConversation(id: string, messages: AssistantMessage[]) {
 }
 
 export function appendConversation(id: string, message: AssistantMessage) {
-  writeConversation(id, [...readConversation(id), message]);
+  const previous = readConversation(id);
+  if (message.role === 'tool' && message.callId) {
+    const call = previous.findLastIndex(entry => entry.role === 'assistant' && entry.calls?.some(call => call.id === message.callId));
+    if (call >= 0) {
+      let end = call + 1;
+      while (previous[end]?.role === 'tool') {
+        if (previous[end]!.callId === message.callId) return;
+        end++;
+      }
+      // A hand edit can append an application event while a check awaits cancellation. Keep its late result in its batch.
+      writeConversation(id, [...previous.slice(0, end), message, ...previous.slice(end)]);
+      return;
+    }
+  }
+  writeConversation(id, [...previous, message]);
 }
 
 export function recordAssistantEvent(id: string, text: string, proposalOutcome?: 'applied' | 'discarded') {
