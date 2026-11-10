@@ -256,6 +256,19 @@ it('preselects a datum, evaluates linked offsets, flips at the same location, an
   expect(result.current.plane).toEqual({ origin: [0, 0, 0], normal: [1, 0, 0] });
 });
 
+it('preselects an exact copy face at its displayed placement without changing the design', () => {
+  const document = source(),
+    partId = document.parts[0]!.id;
+  document.parts[0]!.copies = [{ id: 'copy', mirrored: true, placement: { position: [300, 0, 0], rotation: [0, 0, 0, 1] } }];
+  const before = JSON.stringify(document);
+  const { result } = setup(document, { selectedFace: { partId, copyId: 'copy', face: 'top' } });
+  act(() => result.current.start());
+  expect(result.current.planeId).toBe('picked-face');
+  expect(result.current.plane).toEqual({ origin: [200, 0, 18], normal: [0, 0, 1] });
+  expect(result.current.planes).toContainEqual({ id: 'picked-face', label: 'Panel 2 face' });
+  expect(JSON.stringify(document)).toBe(before);
+});
+
 it('preselects a source face and invalidates picked copy-face topology when the shown document changes', () => {
   const document = source(),
     partId = document.parts[0]!.id;
