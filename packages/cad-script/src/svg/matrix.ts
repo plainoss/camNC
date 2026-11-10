@@ -18,16 +18,25 @@ export function transformPoint(m: Matrix, p: SvgPoint): SvgPoint {
 export function numbers(source: string): number[] {
   boundSvgNumericText(source);
   const values: number[] = [];
-  let cursor = 0;
+  let cursor = 0,
+    commaPending = false;
   while (cursor < source.length) {
-    if (svgWhitespace(source[cursor]) || source[cursor] === ',') {
+    if (svgWhitespace(source[cursor])) {
+      cursor++;
+      continue;
+    }
+    if (source[cursor] === ',') {
+      if (!values.length || commaPending) throw new Error('Invalid SVG number-list separator.');
+      commaPending = true;
       cursor++;
       continue;
     }
     const token = readSvgNumber(source, cursor);
     values.push(finite(token.value));
+    commaPending = false;
     cursor = token.end;
   }
+  if (commaPending) throw new Error('Incomplete SVG number list.');
   return values;
 }
 const transformNames = new Set(['matrix', 'translate', 'scale', 'rotate', 'skewX', 'skewY']);

@@ -13,9 +13,12 @@ describe('linear SVG numeric grammar', () => {
     const token = readSvgNumber('-.25e+2mm');
     expect(token).toEqual({ value: -25, end: 7 });
   });
-  it.each(['.', '+', '-.', '1e', '1e+', '1e-', '1e2e3', '1x', '0x10', 'NaN', 'Infinity', '--1'])('rejects malformed tokens: %s', source => {
-    expect(() => numbers(source)).toThrow();
-  });
+  it.each(['.', '+', '-.', '1e', '1e+', '1e-', '1e2e3', '1x', '0x10', 'NaN', 'Infinity', '--1', ',1', '1,', '1,,2'])(
+    'rejects malformed tokens: %s',
+    source => {
+      expect(() => numbers(source)).toThrow();
+    }
+  );
   it('bounds exported numeric helpers by input size and finite CAD ranges', () => {
     const oversized = ' '.repeat(SVG_LIMITS.bytes + 1);
     for (const parse of [numbers, lengthMm, parseTransform]) expect(() => parse(oversized)).toThrow(/input limit/);
@@ -68,6 +71,9 @@ describe('SVG affine transforms', () => {
     'translate(scale(2))',
     'translate(1))',
     'translate(1),',
+    'translate(1,)',
+    'translate(,1)',
+    'translate(1,,2)',
     ',translate(1)',
     'translate(1),,scale(2)',
     'translate(1)junk',
