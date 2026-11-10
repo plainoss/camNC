@@ -34,8 +34,8 @@ export function usePartCutSelection(document: CadDocument, part: CadPart | undef
     if (part) open(part.id);
   };
   const featurePart = (kind: PartFeature, open: (kind: PartFeature, partId: string) => void, refuse: (message: string) => void) => {
-    // Validate raw copy identity: an absent slot makes selectedCopyId undefined but must not become its source family.
-    if (kind === 'pattern' && (!valid || copyId !== undefined))
+    // Source history stays editable after consumption. A raw copy ID, including an absent slot, must not become its family.
+    if (kind === 'pattern' && copyId !== undefined)
       return refuse('Patterning only the selected copy is not supported. Select the source part in Parts to pattern its whole family.');
     if (part) open(kind, part.id);
   };
