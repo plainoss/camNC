@@ -3,6 +3,7 @@ import { geometryBounds } from './bounds';
 import { identity, lengthMm, multiply, numbers, parseTransform, transformPoint, viewportMatrix, type Matrix } from './matrix';
 import { parsePath } from './path';
 import { preflightSvg } from './preflight';
+import { withoutSvgXmlDeclaration } from './xmlDeclaration';
 import { isOpaqueSvgPaint } from './paint';
 import { filledContours } from './topology';
 import { finite, SVG_LIMITS, type SvgContour, type SvgSketchAsset } from './types';
@@ -88,15 +89,16 @@ function scalar(source: string): number {
 /** Parse a deliberately bounded, geometry-only SVG subset. Supplied XML is never rendered. */
 export function parseSvgSketch(source: string): SvgSketchAsset {
   if (new TextEncoder().encode(source).length > SVG_LIMITS.bytes) throw new Error('SVG exceeds the 1 MB input limit.');
+  const xml = withoutSvgXmlDeclaration(source);
   // Reject declarations and resources before XML parsing, including entity expansion and CSS references.
-  if (/<!\s*(?:DOCTYPE|ENTITY)|<\s*\?|\b(?:href|style|class)\s*=|\burl\s*\(/i.test(source.replace(/^\s*<\?xml\s+[^?]*\?>/, '')))
+  if (/<!\s*(?:DOCTYPE|ENTITY)|<\s*\?|\b(?:href|style|class)\s*=|\burl\s*\(/i.test(xml))
     throw new Error('SVG declarations, styles and external resources are unsupported.');
-  preflightSvg(source);
+  preflightSvg(xml);
   const document = new DOMParser({
     onError: (_level, message) => {
       throw new Error(`Invalid SVG XML: ${message}`);
     },
-  }).parseFromString(source, 'image/svg+xml');
+  }).parseFromString(xml, 'image/svg+xml');
   const root = document.documentElement;
   if (!root || root.localName !== 'svg' || root.namespaceURI !== svgNamespace)
     throw new Error('Expected an SVG root in the SVG namespace.');
