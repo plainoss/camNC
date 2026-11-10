@@ -1,4 +1,12 @@
-import { evaluateCurvePoint, evaluateCurveTangent, type CadEntity, type CadPoint, type CadPointEntity, type CadSketch } from '@wbcnc/cad';
+import {
+  evaluateCurvePoint,
+  rationalBezierSpans,
+  rationalCurveData,
+  type CadEntity,
+  type CadPoint,
+  type CadPointEntity,
+  type CadSketch,
+} from '@wbcnc/cad';
 
 export interface MeasuredBounds {
   at: [number, number];
@@ -83,22 +91,24 @@ export function curveExtremaPoints(entity: Exclude<CadEntity, { type: 'point' }>
       parameters.push(...roots(bernsteinPolynomial(derivative)));
     }
   } else if (entity.type === 'spline') {
-    const lo = entity.knots[entity.degree]!,
-      hi = entity.knots[entity.closed ? entity.controlPointIds.length + 3 : entity.controlPointIds.length]!;
-    const spans = [...new Set([0, ...entity.knots.filter(k => k > lo && k < hi).map(k => (k - lo) / (hi - lo)), 1])];
     if (entity.degree > 3 || entity.weights.some(w => Math.abs(w - 1) > 1e-12))
       throw new Error('Measured fitting supports polynomial splines up to degree three.');
-    for (let i = 0; i + 1 < spans.length; i++)
-      for (const axis of ['x', 'y'] as const) {
-        const a = spans[i]!,
-          b = spans[i + 1]!;
-        const v0 = evaluateCurveTangent(entity, points, a)[axis],
-          vm = evaluateCurveTangent(entity, points, (a + b) / 2)[axis],
-          v1 = evaluateCurveTangent(entity, points, b)[axis];
-        const quadratic = 2 * (v1 + v0 - 2 * vm),
-          linear = v1 - v0 - quadratic;
-        parameters.push(a, b, ...roots([v0, linear, quadratic]).map(t => a + t * (b - a)));
+    const data = rationalCurveData(entity, points);
+    const lo = data.knots[data.degree]!,
+      hi = data.knots[data.poles.length]!;
+    const interior = data.knots.filter(k => k > lo && k < hi);
+    if (interior.some(k => interior.filter(value => value === k).length > entity.degree))
+      throw new Error('Measured fitting does not support discontinuous spline spans.');
+    // Knot boundaries can have different left/right derivatives. Extract each exact polynomial span instead of
+    // sampling a derivative at the knot, where the evaluator necessarily chooses just one side.
+    for (const span of rationalBezierSpans(data)) {
+      parameters.push(span.start, span.end);
+      for (const axis of [0, 1] as const) {
+        const coordinates = span.controls.map(control => control[axis] / control[2]);
+        const derivative = coordinates.slice(1).map((value, i) => entity.degree * (value - coordinates[i]!));
+        parameters.push(...roots(bernsteinPolynomial(derivative)).map(t => span.start + t * (span.end - span.start)));
       }
+    }
   } else {
     // Rational conic derivative numerator is quadratic; the positive weight denominator cannot add extrema.
     const p = [points.get(entity.startId)!, points.get(entity.controlId)!, points.get(entity.endId)!],

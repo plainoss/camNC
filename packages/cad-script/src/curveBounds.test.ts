@@ -76,3 +76,29 @@ it.each(sources)('measures %s extrema against independent dense curve samples', 
     expect(bounds.at[component] + bounds.size[component]).toBeCloseTo(high, 3);
   }
 });
+
+it('uses both one-sided polynomial spans at a repeated cubic knot', () => {
+  const values = [0, 100, 0, 0, -1000, 0, 0];
+  const sketch = createCadPart().sketch;
+  const controls = values.map((y, index) => ({ id: `pole${index}`, type: 'point' as const, x: index * 10, y }));
+  const curve = {
+    id: 'repeated-knot',
+    type: 'spline' as const,
+    startId: controls[0]!.id,
+    endId: controls[6]!.id,
+    controlPointIds: controls.map(p => p.id),
+    fitPointIds: [controls[0]!.id, controls[3]!.id, controls[6]!.id],
+    fitParameters: [0, 0.5, 1],
+    degree: 3,
+    knots: [0, 0, 0, 0, 0.5, 0.5, 0.5, 1, 1, 1, 1],
+    weights: Array(7).fill(1),
+    closed: false,
+  };
+  sketch.entities.push(...controls, curve);
+  const bounds = measuredSketchBounds(sketch, new Set([curve.id]));
+  // Each span is an independent cubic Bézier: its lone y control contributes 3*t*(1-t)^2, peaking at t=1/3.
+  expect(bounds.at[1]).toBeCloseTo(-4000 / 9, 8);
+  expect(bounds.at[1] + bounds.size[1]).toBeCloseTo(400 / 9, 8);
+  const points = new Map(controls.map(p => [p.id, p]));
+  expect(evaluateCurvePoint(curve, points, 1 / 6).y).toBeCloseTo(bounds.at[1] + bounds.size[1], 8);
+});
