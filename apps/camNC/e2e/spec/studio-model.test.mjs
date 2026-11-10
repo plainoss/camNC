@@ -64,3 +64,26 @@ it('names the exact persisted copy tool and rejects a sibling despite unchanged 
   expect(checkStudio(expected,studioState(design))).toHaveLength(1);
   expect(checkStudio({dialogSelections:{Tools:['Shelf 3'],Targets:['Side']}},{dialogSelections:{Tools:['Shelf'],Targets:['Side']}})).toHaveLength(1);
 });
+it('retains feature identities by variable, source sketch, pattern and joint slot', () => {
+  const design = JSON.parse(readFileSync(new URL('../../../../packages/cad-script/fixtures/designs/fitted-joints.json', import.meta.url)));
+  const snapshots = new Map([['assembled', studioState(design)]]);
+  const expected = { sameFeatureIdsSince: 'assembled' };
+  expect(checkStudio(expected, studioState(design), snapshots)).toEqual([]);
+  const changed = structuredClone(design);
+  [changed.partCuts[0].id, changed.partCuts[1].id] = [changed.partCuts[1].id, changed.partCuts[0].id];
+  expect(checkStudio(expected, studioState(changed), snapshots)).toHaveLength(1);
+  for (const mutate of [d => { d.variables[0].id = 'replacement'; }, d => { d.parts[0].sketch.id = 'replacement'; }]) {
+    const replacement = structuredClone(design); mutate(replacement);
+    expect(checkStudio(expected, studioState(replacement), snapshots)).toHaveLength(1);
+  }
+});
+it('checks linked clearance and independent split snapshots without changing housing expectations', () => {
+  const design = JSON.parse(readFileSync(new URL('../../../../packages/cad-script/fixtures/designs/fitted-joints.json', import.meta.url)));
+  const before = studioState(design);
+  expect(before.cutSettings.map(cut => cut.split)).toEqual(['half', { fingers: 5, fingersExpression: 'fingers' }]);
+  design.partCuts[1].split.fingers = 8;
+  design.partCuts[0].clearanceExpression = 'unlinked';
+  expect(checkStudio({ cutSettings: before.cutSettings, cutExpressions: ['fit', 'fit'] }, studioState(design))).toHaveLength(2);
+  expect(before.cutSettings[1].split.fingers).toBe(5);
+  expect(studioState(cupboard).cutSettings[0]).not.toHaveProperty('split');
+});

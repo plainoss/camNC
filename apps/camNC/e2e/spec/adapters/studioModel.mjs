@@ -15,6 +15,12 @@ export function studioState(document) {
     thicknesses: Object.fromEntries(document.parts.map(part => [part.name, part.thickness])),
     copies: Object.fromEntries(document.parts.map(part => [part.name, part.copies?.length ?? 0])),
     identities: document.parts.map(part => [part.id, ...(part.copies ?? []).map(copy => copy.id)]),
+    featureIds: {
+      variables: (document.variables ?? []).map(variable => [variable.name, variable.id]),
+      sketches: document.parts.map(part => [part.name, part.sketch.id]),
+      patterns: document.parts.map(part => [part.name, part.pattern?.id ?? null]),
+      partCuts: (document.partCuts ?? []).map(cut => cut.id),
+    },
     partCuts: document.partCuts?.length ?? 0,
     patterns: Object.fromEntries(document.parts.map(part => [part.name, part.pattern ? {
       id: part.pattern.id, axis: part.pattern.axis, count: part.pattern.count,
@@ -25,10 +31,12 @@ export function studioState(document) {
       value: part.drawnOn.offset, expression: part.drawnOn.offsetExpression ?? null,
     } : null])),
     copyIds: Object.fromEntries(document.parts.map(part => [part.name, (part.copies ?? []).map(copy => copy.id)])),
+    cutExpressions: (document.partCuts ?? []).map(cut => cut.clearanceExpression ?? null),
     cutSettings: (document.partCuts ?? []).map(cut => ({
       clearance: cut.clearance, suppressed: !!cut.suppressed, keepTools: !cut.consumeTools,
       tools: cut.tools.map(referenceName).sort(),
       targets: cut.targets.map(referenceName).sort(),
+      ...(cut.split === undefined ? {} : { split: structuredClone(cut.split) }),
     })),
   };
 }
@@ -52,7 +60,7 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
         if (fields === null) equal(`${key}/${name}`, null, actual[key]?.[name]);
         else for (const [field, value] of Object.entries(fields)) equal(`${key}/${name}/${field}`, value, actual[key]?.[name]?.[field]);
       }
-    } else if (key === 'cutSettings') equal(key, wanted, actual.cutSettings);
+    } else if (key === 'cutSettings' || key === 'cutExpressions') equal(key, wanted, actual[key]);
     else if (key === 'dialogSelections') equal(key, wanted, actual.dialogSelections);
     else if (key === 'retainedIdsSince') {
       const before = checkpoints.get(wanted);
@@ -86,10 +94,13 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
           failures.push(`studio/thicknesses/${name}: wanted ${value}, got ${actual.thicknesses[name]}`);
       }
     } else if (['sourceParts', 'partCuts', 'dialog', 'listedParts', 'partIssues', 'workspacePartCount'].includes(key)) equal(key, wanted, actual[key]);
-    else if (key === 'sameIdsSince' || key === 'unchangedSince') {
+    else if (['sameIdsSince', 'sameFeatureIdsSince', 'unchangedSince'].includes(key)) {
       const checkpoint = checkpoints.get(wanted);
       if (!checkpoint) failures.push(`studio/${key}: unknown checkpoint ${wanted}`);
-      else equal(key, key === 'sameIdsSince' ? checkpoint.identities : checkpoint.content, key === 'sameIdsSince' ? actual.identities : actual.content);
+      else {
+        const field = key === 'sameIdsSince' ? 'identities' : key === 'sameFeatureIdsSince' ? 'featureIds' : 'content';
+        equal(key, checkpoint[field], actual[field]);
+      }
     } else failures.push(`studio/unsupported expectation: ${key}`);
   }
   return failures;
