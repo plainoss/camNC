@@ -2,6 +2,8 @@ import { applyExtrudeRemovals } from './extrudeRemoval';
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
 import { validPartCutSplit } from './partCutSplit';
+import { resolvePartCutTargets } from './partCutTargetSelection';
+import { cadPartReferenceOwner } from './partReferences';
 import { evaluatedPartCopy, mirrorEvaluatedPart, sameCadCuts } from './copies';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { cadCopyName } from './partPatterns';
@@ -358,16 +360,36 @@ export function applyPartCuts(
       warn('Invalid split in a "cut parts" step: fingers must be an integer of at least 2.');
       continue;
     }
+    const selection = resolvePartCutTargets(document, step.targets);
+    for (const reference of selection.missing) {
+      refused = true;
+      const owner = cadPartReferenceOwner(document, reference);
+      warn(
+        owner
+          ? `The target copy of ${owner.name} is not present. Restore its pattern count or choose another target.`
+          : 'A target part of this cut no longer exists. Choose another target.',
+        'part-cut-target-missing'
+      );
+    }
+    // Exact-copy split joints need their own reciprocal-cut semantics; accepting them would promise an unsupported mode.
+    if (step.split && selection.targets.some(target => target.copyId !== undefined)) {
+      warn(
+        'Split joints on a single target copy are not supported. Choose Cut out or target the source family.',
+        'part-cut-copy-target-split'
+      );
+      continue;
+    }
     // A tool `<partId>:<copyId>` cuts with that one copy; a copy that's gone is said once, not once per target.
     const goneCopies = new Set<string>();
-    for (const targetId of step.targets)
+    for (const { part: intoSource, copyId: targetCopyId } of selection.targets)
       for (const toolId of step.tools) {
+        const targetId = intoSource.id;
         const [partId, copyId] = toolId.split(/:(.*)/s) as [string, string?];
+        // Source-family self cuts were already refused. An exact target must not bypass that owner guard.
         if (partId === targetId) continue;
-        const intoSource = sources.get(targetId),
-          toolSource = sources.get(partId);
+        const toolSource = sources.get(partId);
         const tool = before.get(partId);
-        if (!intoSource || !toolSource || !tool) continue;
+        if (!toolSource || !tool) continue;
         if (copyId !== undefined && !toolSource.copies?.some(copy => copy.id === copyId)) {
           refused = true;
           if (!goneCopies.has(toolId)) warn(`The copy of ${toolSource.name} this step cuts with no longer exists.`);
@@ -375,6 +397,7 @@ export function applyPartCuts(
           continue;
         }
         for (const target of targets.get(targetId) ?? []) {
+          if (targetCopyId !== undefined && target.key !== targetCopyId) continue;
           const original = before.get(targetId)!;
           const into = target.mirrored ? mirrorEvaluatedPart(original) : original,
             intoAt = target.at;
@@ -563,12 +586,14 @@ export function applyPartCuts(
  */
 export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): EvaluatedCadPart {
   const steps = (document.partCuts ?? []).filter(
-    step => step.targets.includes(part.partId) || (step.split && step.tools.some(id => id.split(':')[0] === part.partId))
+    step =>
+      step.targets.some(id => cadPartReferenceOwner(document, id)?.id === part.partId) ||
+      (step.split && step.tools.some(id => id.split(':')[0] === part.partId))
   );
   if (!steps.length && !document.parts.some(candidate => candidate.remove)) return part;
-  const toolIds = [...new Set(steps.flatMap(step => [...step.targets, ...step.tools.map(id => id.split(':')[0]!)]))].filter(
-    id => id !== part.partId
-  );
+  const toolIds = [
+    ...new Set(steps.flatMap(step => [...step.targets, ...step.tools].map(id => cadPartReferenceOwner(document, id)?.id))),
+  ].filter(id => id !== part.partId);
   const tools = toolIds.flatMap(id => {
     const source = document.parts.find(candidate => candidate.id === id);
     const profile = source && evaluateCadPart(source).part;

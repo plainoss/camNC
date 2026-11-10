@@ -541,6 +541,7 @@ export interface CadPartCut {
   suppressed?: true;
   /** Part IDs cut with the part and all its copies; `<partId>:<copyId>` cuts with only that copy, as placed and mirrored. */
   tools: string[];
+  /** Part IDs target the whole family; `<partId>:<copyId>` targets only that physical copy, retaining missing slot IDs. */
   targets: string[];
   /**
    * mm of room around each tool. It widens every side of the opening that lies inside the target, both across the

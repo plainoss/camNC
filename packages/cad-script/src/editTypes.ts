@@ -107,7 +107,7 @@ export interface PartEdit {
   /**
    * Another of this part, placed like `place`. A mirrored copy is the part's mirror image across its sketch's y axis
    * (x becomes -x), for a left and right pair that aren't alike; CAM cuts it as a part of its own. It can be a
-   * `cutParts` tool by itself.
+   * `cutParts` tool or ordinary Cut out target by itself.
    */
   copy(options: CadPlaceOptions & { mirrored?: boolean; name?: string }): PartCopy;
   /**
@@ -124,11 +124,11 @@ export interface PartEdit {
   drawOn(on: CadPlane | CadPartFace, options?: { offset?: Len; inward?: boolean }): void;
   /**
    * Copies of the part in a row along a studio axis, `spacing` apart. The count and spacing can follow variables. Each
-   * copy can be a `cutParts` tool by itself; one the count later drops cuts nothing, and the check warns.
+   * copy can be a `cutParts` tool or ordinary Cut out target by itself; one the count later drops cuts nothing, and the check warns.
    */
   pattern(options: { axis: 'x' | 'y' | 'z'; count: Len; spacing: Len }): readonly PartCopy[];
 }
-/** One copy of a part, to cut with on its own. As a `cutParts` tool, the part itself cuts with every copy. */
+/** One copy of a part, to cut with or into on its own. A source `cutParts` reference includes every copy. */
 export interface PartCopy {
   readonly id: string;
   readonly name: string;
@@ -171,7 +171,7 @@ export interface DesignEdit {
    * material where they meet instead: `'half'` for a half-lap, `{ fingers: n }` for a finger joint at a corner.
    */
   cutParts(
-    targets: PartEdit | readonly PartEdit[],
+    targets: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[],
     options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len; split?: 'half' | { fingers: Len } }
   ): void;
   /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
@@ -190,7 +190,7 @@ export interface ScriptStepSettings {
   depth?: Len | 'through';
   clearance?: Len;
   tools?: readonly (PartEdit | PartCopy)[];
-  targets?: readonly PartEdit[];
+  targets?: readonly (PartEdit | PartCopy)[];
   count?: Len;
   spacing?: Len;
   axis?: 'x' | 'y' | 'z';
