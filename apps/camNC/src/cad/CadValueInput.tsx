@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type Ref } from 'react';
 import { cadValueHasUnit } from './valueExpressions';
 import { settleField, useCadVariableFields, variableDefinition, variablePrefix, whenVariable } from './variableFields';
@@ -11,9 +12,10 @@ type Props = ComponentPropsWithoutRef<'input'> & {
 };
 
 export function CadUnitSuffix({ text, unit = 'mm', className }: { text: string; unit?: 'mm' | 'deg'; className?: string }) {
+  const { lengthUnit } = useDesignUnits();
   return cadValueHasUnit(text) ? null : (
     <span aria-hidden="true" className={className}>
-      {unit === 'deg' ? '°' : 'mm'}
+      {unit === 'deg' ? '°' : lengthUnit}
     </span>
   );
 }

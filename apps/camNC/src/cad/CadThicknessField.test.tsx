@@ -1,3 +1,4 @@
+import { DesignUnitContext } from './designUnits';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { useRef, useState } from 'react';
@@ -210,4 +211,21 @@ describe('CAD thickness entry', () => {
     await userEvent.keyboard('{Enter}');
     expect(screen.getByRole('alert').textContent).toBe("There's no variable called boards.");
   });
+});
+
+it('displays millimeter stock in cm and commits a bare centimeter thickness without changing explicit-unit input', () => {
+  const commit = vi.fn();
+  render(
+    <DesignUnitContext value="cm">
+      <CadThicknessField value={18} onCommit={commit} />
+    </DesignUnitContext>
+  );
+  const input = screen.getByRole('textbox', { name: 'Thickness' });
+  expect((input as HTMLInputElement).value).toBe('1.8');
+  fireEvent.change(input, { target: { value: '2' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  expect(commit).toHaveBeenLastCalledWith(20, '(2) cm');
+  fireEvent.change(input, { target: { value: '25mm' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  expect(commit).toHaveBeenLastCalledWith(25, undefined);
 });

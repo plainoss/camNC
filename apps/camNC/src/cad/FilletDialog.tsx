@@ -1,3 +1,4 @@
+import { useDesignUnits } from './designUnits';
 import {
   cadDrawnOnSupports,
   effectivePlacement,
@@ -11,7 +12,6 @@ import { useEffect, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { FeatureDialog } from './FeatureDialog';
 import type { CadConnectorPick } from './PartFeatureDialogs';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 
 type Picked = { partId: string; corner: string };
 
@@ -59,9 +59,10 @@ export function FilletDialog({
   onSave: (document: CadDocument) => void;
   onCancel: () => void;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const fillet = document.parts.find(part => part.id === partId)?.fillets?.find(candidate => candidate.id === filletId);
   const [picked, setPicked] = useState<Picked[]>(() => (fillet && partId ? fillet.corners.map(corner => ({ partId, corner })) : []));
-  const [radiusText, setRadiusText] = useState(fillet ? (fillet.radiusExpression ?? formatCadValue(fillet.radius)) : '5');
+  const [radiusText, setRadiusText] = useState(fillet ? (fillet.radiusExpression ?? lengthText(fillet.radius)) : lengthText(5));
   const [error, setError] = useState<string | null>(null);
   // Edges are picked while the dialog is open, one click after another, each toggling its corner.
   useEffect(() => {
@@ -120,7 +121,7 @@ export function FilletDialog({
         <span>
           <CadValueInput bare aria-label="Radius" value={radiusText} onChange={event => setRadiusText(event.target.value)} />
         </span>
-        mm
+        {lengthUnit}
       </label>
       {error && (
         <p role="alert" className="cad-thickness-error">

@@ -1,9 +1,9 @@
+import { useDesignUnits } from './designUnits';
 import { newCadId, nextDatumName, resolveDatumPlanes, type CadDocument, type CadDrawnOn, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
 import { FeatureDialog } from './FeatureDialog';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 
 /**
  * A plane to sketch on, as a step of its own: a base plane or a part's face, moved out along its normal by an offset.
@@ -29,9 +29,10 @@ export function PlaneDialog({
   onSave: (document: CadDocument) => void;
   onCancel: () => void;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const plane = document.planes?.find(candidate => candidate.id === planeId);
   const [on, setOn] = useState<CadDrawnOn['on'] | null>(plane?.on ?? preselected ?? null);
-  const [offsetText, setOffsetText] = useState(plane ? (plane.offsetExpression ?? formatCadValue(plane.offset)) : '100');
+  const [offsetText, setOffsetText] = useState(plane ? (plane.offsetExpression ?? lengthText(plane.offset)) : lengthText(100));
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pick = () => {
@@ -87,7 +88,7 @@ export function PlaneDialog({
             onChange={event => setOffsetText(event.target.value)}
           />
         </span>
-        mm
+        {lengthUnit}
       </label>
       {error && (
         <p role="alert" className="cad-thickness-error">

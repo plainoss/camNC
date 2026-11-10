@@ -68,3 +68,5 @@ export * from './circularPattern';
 export * from './slot';
 
 export * from './extrudeRemoval';
+
+export * from './lengthUnits';

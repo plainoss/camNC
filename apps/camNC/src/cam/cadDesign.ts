@@ -20,7 +20,7 @@ export async function saveDesignDraft(
   if (!base.design || document.id !== base.design.draft.id) throw new Error('This design is no longer open.');
   const saved = await updateJobForModel(base, current => {
     if (!current.design || !same(current.design.draft, expectedDraft)) return null;
-    return { ...current, design: { ...current.design, draft: document } };
+    return { ...current, name: document.name, fileName: document.name, design: { ...current.design, draft: document } };
   });
   if (!saved) {
     const error = new Error('This design changed in another view. Your local sketch is kept; save a copy or use the saved sketch.');

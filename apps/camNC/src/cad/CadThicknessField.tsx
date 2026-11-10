@@ -1,6 +1,6 @@
+import { useDesignUnits } from './designUnits';
 import { CAD_THICKNESS_RANGE, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
-import { parseCadValue } from './valueExpressions';
 import { CadValueInput } from './CadValueInput';
 import { variableDefinition } from './variableFields';
 import './cadThicknessField.css';
@@ -16,7 +16,11 @@ export interface CadThicknessFieldProps {
 }
 
 const rangeError = `Thickness must be between ${CAD_THICKNESS_RANGE.min} and ${CAD_THICKNESS_RANGE.max} mm.`;
-function thicknessValue(text: string, variables?: CadValueScope): { value: number; expression?: string } | { error: string } {
+function thicknessValue(
+  text: string,
+  variables: CadValueScope | undefined,
+  parseCadValue: ReturnType<typeof useDesignUnits>['parseCadValue']
+): { value: number; expression?: string } | { error: string } {
   const parsed = parseCadValue(text, { unit: 'mm', variables });
   if ('error' in parsed) return parsed;
   return parsed.value >= CAD_THICKNESS_RANGE.min && parsed.value <= CAD_THICKNESS_RANGE.max ? parsed : { error: rangeError };
@@ -24,8 +28,9 @@ function thicknessValue(text: string, variables?: CadValueScope): { value: numbe
 
 /** Invalid drafts stay visible until corrected or explicitly canceled; blur never moves focus. */
 export function CadThicknessField({ value, expression, variables, onCommit, onDone, onValidityChange }: CadThicknessFieldProps) {
+  const { parseCadValue, lengthText } = useDesignUnits();
   const id = useId();
-  const typed = expression ?? String(value);
+  const typed = expression ?? lengthText(value);
   const [text, setText] = useState(typed);
   const [error, setError] = useState<string | null>(null);
   const dirty = useRef(false);
@@ -34,7 +39,7 @@ export function CadThicknessField({ value, expression, variables, onCommit, onDo
   const lastValidity = useRef<boolean | undefined>(undefined);
   // `#name = value` is taken as its value, which the field uses once it has made the variable.
   const definition = variableDefinition(text);
-  const valid = !('error' in thicknessValue(definition ? definition.expression : text, variables));
+  const valid = !('error' in thicknessValue(definition ? definition.expression : text, variables, parseCadValue));
   useEffect(() => {
     validityCallback.current = onValidityChange;
     if (lastValidity.current !== valid) {
@@ -58,13 +63,13 @@ export function CadThicknessField({ value, expression, variables, onCommit, onDo
   }, [typed]);
 
   const commit = () => {
-    const parsed = thicknessValue(text, variables);
+    const parsed = thicknessValue(text, variables, parseCadValue);
     if ('error' in parsed) {
       setError(parsed.error);
       return false;
     }
     dirty.current = false;
-    setText(parsed.expression ?? String(parsed.value));
+    setText(parsed.expression ?? lengthText(parsed.value));
     setError(null);
     if (parsed.value !== value || parsed.expression !== expression) onCommit(parsed.value, parsed.expression);
     return true;
@@ -87,7 +92,7 @@ export function CadThicknessField({ value, expression, variables, onCommit, onDo
               dirty.current = true;
               setText(next);
               if (error) {
-                const parsed = thicknessValue(next, variables);
+                const parsed = thicknessValue(next, variables, parseCadValue);
                 setError('error' in parsed ? parsed.error : null);
               }
             }}

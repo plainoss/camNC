@@ -73,6 +73,7 @@ vi.mock('@/cad/CadEditor', () => ({
   }) => {
     const current = useRef(cadSession(props.document).document);
     useImperativeHandle(props.controller, () => ({
+      updateSettings: () => false,
       prepareDocument: () => (state.prepared === undefined ? current.current : state.prepared),
       finish: async () => {
         state.finishRequests();

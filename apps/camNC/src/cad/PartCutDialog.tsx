@@ -1,7 +1,7 @@
+import { useDesignUnits } from './designUnits';
 import { cadPartReferenceName, type CadDocument, type CadPartCut, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useRef, useState } from 'react';
 import { FeatureDialog } from './FeatureDialog';
-import { formatCadValue, parseCadValue } from './valueExpressions';
 import './partCutDialog.css';
 import { CadValueInput } from './CadValueInput';
 
@@ -47,12 +47,15 @@ export function PartCutDialog({
   onRemove?: () => void;
   onClose: () => void;
 }) {
+  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const fit = ['tolerance', 'tollerance', 'clearance', 'fit'].find(name => variables && Object.hasOwn(variables, name));
   const [tools, setTools] = useState<string[]>(step?.tools ?? (tool ? [tool] : []));
   const [targets, setTargets] = useState<string[]>(step?.targets ?? []);
   // A new step has its tool already, so the targets are picked next.
   const [active, setActive] = useState<Box>(step || !tool ? 'tools' : 'targets');
-  const [text, setText] = useState(step ? (step.clearanceExpression ?? formatCadValue(step.clearance)) : (fit ?? kDefaultClearance));
+  const [text, setText] = useState(
+    step ? (step.clearanceExpression ?? lengthText(step.clearance)) : (fit ?? lengthText(Number(kDefaultClearance)))
+  );
   // Kept, the tools stay parts of their own, as a tenon does; not kept, only the cut they make is left.
   const [keepTools, setKeepTools] = useState(!step?.consumeTools);
   const [joint, setJoint] = useState<Joint>(step?.split === 'half' ? 'half' : step?.split ? 'fingers' : 'none');
@@ -162,7 +165,7 @@ export function PartCutDialog({
           aria-invalid={error ? true : undefined}
           onChange={event => setText(event.target.value)}
         />
-        mm
+        {lengthUnit}
       </label>
       {joint === 'none' && (
         <label>

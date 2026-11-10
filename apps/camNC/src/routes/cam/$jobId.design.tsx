@@ -1,3 +1,4 @@
+import { DesignName, DesignSettings, type DesignSettingsValue } from '@/cam/DesignSettings';
 import { useEffect, useRef, useState } from 'react';
 import {
   cadFaceSketches,
@@ -103,6 +104,9 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   const queue = useRef(Promise.resolve());
   const failure = useRef<Error | null>(session.conflict ? new Error(draftConflictMessage) : null);
   const editor = useRef<CadEditorController>(null);
+  const [settings, setSettings] = useState<DesignSettingsValue>(session.document);
+  const unitPreference = useRef(session.document.lengthUnit);
+  const updateSettings = (value: DesignSettingsValue) => editor.current?.updateSettings(value) ?? false;
   const stageDestination = useRef<CamStageDestination | null>(null);
   const [navigationPending, setNavigationPending] = useState(false);
   const [status, setStatus] = useState('Draft saved');
@@ -130,6 +134,13 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     if (recoveryInProgress.current || activeSession.current !== session) return;
     if (!keepPendingDesignDraft(initialJob.id, session.saved, document))
       setError('Reload recovery is unavailable. Wait for Draft saved before reloading.');
+    setSettings({ name: document.name, lengthUnit: document.lengthUnit });
+    if (unitPreference.current !== document.lengthUnit) {
+      unitPreference.current = document.lengthUnit;
+      setEditorDocument(document);
+      setFaceEdit(previous => (previous ? { ...previous, base: document } : null));
+      setEditorEpoch(epoch => epoch + 1);
+    }
     noteDocumentChange();
     setStatus('Saving draft…');
     queue.current = trackPending(
@@ -232,6 +243,8 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       persisted.current = current;
       failure.current = null;
       setSession(nextSession);
+      setSettings(nextSession.document);
+      unitPreference.current = nextSession.document.lengthUnit;
       setEditorDocument(current.design.draft);
       setReturnToPart(null);
       setEditorEpoch(epoch => epoch + 1);
@@ -301,17 +314,21 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     <CamPage className="h-app">
       <CamJobBar
         job={initialJob}
+        title={<DesignName name={settings.name} onRename={name => updateSettings({ ...settings, name })} />}
         onStageNavigate={destination => void navigateStage(destination)}
         navigationPending={navigationPending}
         tools={
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-muted-foreground"
-            title="Save the whole design, with its sketches and features, as a .json file. Open it again from Projects."
-            onClick={saveToFile}>
-            <Download /> Save to file
-          </Button>
+          <>
+            <DesignSettings value={settings} onSave={updateSettings} />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              title="Save the whole design, with its sketches and features, as a .json file. Open it again from Projects."
+              onClick={saveToFile}>
+              <Download /> Save to file
+            </Button>
+          </>
         }
       />
       <div className="relative min-h-0 flex-1">
@@ -330,7 +347,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
         )}
         {faceEdit && facePart ? (
           <CadEditor
-            key={faceEdit.sketchId}
+            key={`${faceEdit.sketchId}:${editorEpoch}`}
             document={faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId)}
             faceSketch={{
               outline: faceBelow ? flipUnderside(facePart.outline) : facePart.outline,
