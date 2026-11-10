@@ -460,7 +460,6 @@ function solvedCurveEquationsHold(part: CadPart): boolean {
   return true;
 }
 /** Solve a detached revision. Callers retain their accepted model while an invalid draft is edited. */
-/** Parts in an order where each comes after the part it's drawn on. */
 
 function* solveCadSteps(document: CadDocument, options: CadSolveOptions): Generator<string | undefined, CadSolveResult, ModuleStatic> {
   // Values that use variables follow them before anything is solved.
