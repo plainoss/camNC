@@ -1,17 +1,19 @@
-import { createPlateDocument, type CadDrawnOn } from '@wbcnc/cad';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { createPlateDocument, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { MirrorDialog } from './MirrorDialog';
 
 afterEach(cleanup);
 
-it.each(['self', 'dependent'])('rejects a %s mirror plane dependency and allows correction', kind => {
+it.each(['self', 'dependent'])('rejects a %s mirror plane dependency and allows correction', async kind => {
   const document = createPlateDocument({ width: 100, height: 60 });
   const part = document.parts[0]!;
+  const save = vi.fn();
   part.copies = [
     { id: 'first', mirrored: true, mirror: { across: { plane: 'top' } } },
     { id: 'second', mirrored: true, mirror: { across: { partId: part.id, copyId: 'first', face: 'top' } } },
   ];
+  const preview = vi.fn<(document: CadDocument | null) => void>();
   let picked: (on: CadDrawnOn['on']) => void = () => {};
   render(
     <MirrorDialog
@@ -21,21 +23,27 @@ it.each(['self', 'dependent'])('rejects a %s mirror plane dependency and allows 
       pickPlane={callback => {
         picked = callback;
       }}
-      onSave={vi.fn()}
+      onSave={save}
+      onPreview={preview}
       onCancel={vi.fn()}
     />
   );
   fireEvent.click(screen.getByRole('button', { name: 'Mirror plane' }));
   act(() => picked({ partId: part.id, copyId: kind === 'self' ? 'first' : 'second', face: 'top' }));
   expect(screen.getByRole('alert').textContent).toContain('does not depend on this mirror');
+  expect(preview.mock.calls.at(-1)?.[0]).toBeNull();
   expect(screen.getByRole('button', { name: 'OK' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Mirror plane' }));
   act(() => picked({ plane: 'right' }));
   expect(screen.queryByRole('alert')).toBeNull();
   expect(screen.getByRole('button', { name: 'OK' })).not.toBeDisabled();
+  const candidate = preview.mock.calls.at(-1)?.[0];
+  expect(candidate?.parts[0]?.copies?.[0]).toMatchObject({ id: 'first', mirror: { across: { plane: 'right' } } });
+  fireEvent.click(screen.getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(candidate));
 });
 
-it.each([false, true])('blocks a copy face without persisted placement and permits a valid replacement (editing: %s)', editing => {
+it.each([false, true])('blocks a copy face without persisted placement and permits a valid replacement (editing: %s)', async editing => {
   const document = createPlateDocument({ width: 100, height: 60 });
   const part = document.parts[0]!;
   part.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
@@ -44,6 +52,7 @@ it.each([false, true])('blocks a copy face without persisted placement and permi
   document.parts.push(support);
   const across: CadDrawnOn['on'] = { partId: support.id, copyId: 'unplaced', face: 'top' };
   if (editing) part.copies = [{ id: 'mirror', mirrored: true, mirror: { across } }];
+  const preview = vi.fn<(document: CadDocument | null) => void>();
   let picked: (on: CadDrawnOn['on']) => void = () => {};
   const save = vi.fn();
   render(
@@ -55,11 +64,13 @@ it.each([false, true])('blocks a copy face without persisted placement and permi
         picked = callback;
       }}
       onSave={save}
+      onPreview={preview}
       onCancel={vi.fn()}
     />
   );
   if (!editing) act(() => picked(across));
   expect(screen.getByRole('alert').textContent).toContain('cannot be placed');
+  expect(preview.mock.calls.at(-1)?.[0]).toBeNull();
   expect(screen.getByRole('button', { name: 'OK' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'OK' }));
   expect(save).not.toHaveBeenCalled();
@@ -67,4 +78,14 @@ it.each([false, true])('blocks a copy face without persisted placement and permi
   act(() => picked({ plane: 'right' }));
   expect(screen.queryByRole('alert')).toBeNull();
   expect(screen.getByRole('button', { name: 'OK' })).not.toBeDisabled();
+  const first = preview.mock.calls.at(-1)?.[0]?.parts[0]?.copies?.[0];
+  expect(first).toMatchObject({ mirror: { across: { plane: 'right' } } });
+  fireEvent.click(screen.getByRole('button', { name: 'Mirror plane' }));
+  act(() => picked({ plane: 'front' }));
+  const candidate = preview.mock.calls.at(-1)?.[0];
+  expect(candidate?.parts[0]?.copies).toHaveLength(1);
+  expect(candidate?.parts[0]?.copies?.[0]).toMatchObject({ id: first!.id, mirror: { across: { plane: 'front' } } });
+  expect(document.parts[0]?.copies?.length ?? 0).toBe(editing ? 1 : 0);
+  fireEvent.click(screen.getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(candidate));
 });
