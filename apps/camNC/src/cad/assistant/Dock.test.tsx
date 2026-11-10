@@ -1,5 +1,5 @@
 import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import '../../style.css';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -70,7 +70,8 @@ it('sends the exact suggested reply and removes answered choices during the next
   await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'Help me choose a thickness.');
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
   const reply = await screen.findByRole('button', { name: '24 mm' });
-  expect(screen.getByText('Which thickness?')).toBeDefined();
+  expect(screen.getAllByText('Which thickness?')).toHaveLength(1);
+  expect(within(screen.getByRole('group', { name: 'Suggested replies' })).getByText('Which thickness?')).toBeDefined();
   await waitFor(() => expect(reply).toHaveProperty('disabled', false));
   await userEvent.click(reply);
   await waitFor(() => expect(runDesignAssistant).toHaveBeenCalledTimes(2));

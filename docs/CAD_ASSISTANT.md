@@ -44,6 +44,11 @@ asks for them or proposes choices before building. Earlier conversation
 constraints remain in subsequent requests. Conversations are retained in memory
 for the current app session; they are not saved into a design or account settings.
 
+Send with **⌘+Enter** on macOS or **Ctrl+Enter**; plain Enter inserts a new line.
+Suggested replies appear as clickable cards. For visual decisions, the assistant
+can include simple **Illustration** thumbnails alongside the choices. These are
+schematic concepts, not checked CAD previews; custom typed replies remain available.
+
 The assistant reads the guide and examples, checks a script on a copy and repairs
 it. Each attempt starts from the original snapshot. Stop cancels provider access
 and terminates a running script. A turn is limited to five checks and twelve model
