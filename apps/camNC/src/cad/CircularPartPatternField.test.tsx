@@ -114,6 +114,44 @@ describe('circular part pattern controls', () => {
     expect(screen.getByText(/angle between each instance/)).toBeVisible();
   });
 
+  it('preserves a precise partial sweep and authored axis origin when only the count changes', () => {
+    const origin: [number, number, number] = [12.3456789012345, -0.000123456789, 98.7654321098765];
+    const pattern: CadPartPattern = { ...circular, circular: { ...circular.circular!, angle: 359.9999, origin } };
+    const { latest } = setup(pattern);
+    fireEvent.change(screen.getByLabelText('Instance count'), { target: { value: '5' } });
+    fireEvent.blur(screen.getByLabelText('Instance count'));
+    const changed = latest().parts[0]!;
+    expect(changed.pattern).toMatchObject({ count: 5, circular: { angle: 359.9999, origin } });
+    expect(screen.getByLabelText('Angle')).toHaveValue('359.9999');
+    fireEvent.click(screen.getByText('Axis origin', { selector: 'summary' }));
+    for (const [index, axis] of ['X', 'Y', 'Z'].entries())
+      expect(screen.getByLabelText(`Axis origin ${axis}`)).toHaveValue(String(origin[index]));
+    // Five instances over this partial sweep use four intervals; rounding to a closed ring would use five instead.
+    const angle = ((359.9999 / 4) * Math.PI) / 180;
+    const [x, y, z, w] = changed.copies![0]!.placement!.rotation;
+    expect(1 - 2 * (y * y + z * z)).toBeCloseTo(Math.cos(angle), 12);
+    expect(2 * (x * y + w * z)).toBeCloseTo(Math.sin(angle), 12);
+    expect(changed.copies![0]).toMatchObject({ id: 'legs:1', name: 'Other leg' });
+  });
+
+  it('retains a precise picked origin through an invalid draft and later count-only edits', () => {
+    const { latest, pick } = setup(circular);
+    const origin: [number, number, number] = [1.23456789012345, -2.34567890123456, 3.45678901234567];
+    fireEvent.click(screen.getByRole('button', { name: 'Axis of pattern' }));
+    fireEvent.change(screen.getByLabelText('Instance count'), { target: { value: '2.5' } });
+    pick({ partId: 'post', point: origin, normal: [0, 0, 1] });
+    expect(latest().parts[0]!.pattern).toBe(circular);
+    fireEvent.change(screen.getByLabelText('Instance count'), { target: { value: '5' } });
+    fireEvent.blur(screen.getByLabelText('Instance count'));
+    expect(latest().parts[0]!.pattern!.circular!.origin).toEqual(origin);
+    fireEvent.change(screen.getByLabelText('Instance count'), { target: { value: '6' } });
+    fireEvent.blur(screen.getByLabelText('Instance count'));
+    expect(latest().parts[0]!.pattern!.circular!.origin).toEqual(origin);
+    fireEvent.click(screen.getByText('Axis origin', { selector: 'summary' }));
+    for (const [index, axis] of ['X', 'Y', 'Z'].entries())
+      expect(screen.getByLabelText(`Axis origin ${axis}`)).toHaveValue(String(origin[index]));
+  });
+
   it('disables acceptance for invalid draft values and preserves the last valid preview', async () => {
     const { latest, onOk } = setup(circular);
     fireEvent.change(screen.getByLabelText('Instance count'), { target: { value: '2.5' } });
