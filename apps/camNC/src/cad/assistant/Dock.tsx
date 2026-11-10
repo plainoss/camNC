@@ -319,7 +319,7 @@ export function AssistantDock({
               ? staleProposal
                 ? 'Proposal out of date. It cannot be applied; ask again to check a new proposal.'
                 : 'Checked proposal ready to review.'
-              : activity || (question ? 'Waiting for your reply.' : '')}
+              : activity}
           </p>
           <ActivityView messages={messages} activity={activity} running={running} />
           <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />
