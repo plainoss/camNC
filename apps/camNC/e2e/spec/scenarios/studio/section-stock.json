@@ -37,6 +37,8 @@
       "pickviewcenter",
       { "expect": { "studio": { "measurements": { "Min distance": "18 mm" }, "section": { "active": false }, "unchangedSince": "initial", "sameIdsSince": "initial" } } },
       "button Close Measure",
+      "selectpart Stock",
+      { "expect": { "pageText": "Click a part to select it, double-click to work on it\\." } },
       "key Shift+X",
       { "expect": { "studio": { "section": { "active": true, "editing": true, "plane": "top", "offset": "9", "flipped": true }, "unchangedSince": "initial" } } },
       "key Escape",
