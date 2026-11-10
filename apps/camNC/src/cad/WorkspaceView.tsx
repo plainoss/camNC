@@ -18,6 +18,8 @@ import {
   type ViewRegion,
   type ViewRequest,
 } from '@/cam/model/ModelViewport';
+import { ExplosionSlider } from '@/cam/model/ExplosionSlider';
+import { useExplodedView } from '@/cam/model/useExplodedView';
 import { assemblyModel, instanceKey } from './assemblyModel';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
@@ -159,6 +161,7 @@ export default function WorkspaceView({
     );
   }, [document]);
   const [view, setView] = useState<ModelView>('assembled');
+  const explosion = useExplodedView(view, setView);
   // The studio shows parts with their edges, as a model usually is.
   const [display, setDisplay] = useState<ModelDisplay>('edges');
   const planes = useMemo(
@@ -270,11 +273,12 @@ export default function WorkspaceView({
       <div className="cad-part-view-tools cad-assembly-tools">
         <div role="group" aria-label="Workspace view" className="cad-view-switch">
           {kViews.map(option => (
-            <button key={option.view} type="button" aria-pressed={view === option.view} onClick={() => setView(option.view)}>
+            <button key={option.view} type="button" aria-pressed={view === option.view} onClick={() => explosion.chooseView(option.view)}>
               {option.label}
             </button>
           ))}
         </div>
+        {view === 'exploded' && <ExplosionSlider progress={explosion.progress} onChange={explosion.scrub} />}
         {controlled && (
           <select aria-label="Display" value={display} onChange={event => setDisplay(event.target.value as ModelDisplay)}>
             {kDisplays.map(option => (
@@ -317,7 +321,8 @@ export default function WorkspaceView({
         }))}
         meshes={model.meshes}
         parts={model.parts}
-        view={view}
+        view={explosion.modelView}
+        explosionProgress={explosion.progress}
         viewRequest={viewRequest}
         onViewRequest={onViewRequest}
         transparentIds={transparentIds}

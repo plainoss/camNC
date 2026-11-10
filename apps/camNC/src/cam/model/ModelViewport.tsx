@@ -16,7 +16,7 @@ import { sameFacePlane } from './faceHighlight';
 import { ModelConnector, type ViewConnector } from './ModelConnector';
 import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
-import { centerAssembled, explodeAssembled, layoutFlat } from './layoutFlat';
+import { centerAssembled, explodeAssembled, interpolateExplosion, layoutFlat } from './layoutFlat';
 import type { StudioCameraRef } from '@/cad/studioCamera';
 
 export type ModelView = 'assembled' | 'exploded' | 'flat';
@@ -374,6 +374,7 @@ export function ModelViewport({
   meshes,
   parts,
   view,
+  explosionProgress = 1,
   selectedId,
   milled,
   highlightIds = [],
@@ -406,6 +407,8 @@ export function ModelViewport({
   meshes: BodyMesh[];
   parts: CamPartInfo[];
   view: ModelView;
+  /** 0 is assembled, 1 is fully exploded; ignored by the other layouts. */
+  explosionProgress?: number;
   selectedId: string | null;
   milled: (partId: string) => boolean;
   /** Parts drawn as picked, besides the selected one. */
@@ -456,10 +459,26 @@ export function ModelViewport({
   const flat = useMemo(() => layoutFlat(meshes, parts), [meshes, parts]);
   // The studio shows a design where it is, about its origin, so hiding a part doesn't shift the rest.
   const assembled = useMemo(() => (palette === 'studio' ? new THREE.Matrix4() : centerAssembled(meshes)), [meshes, palette]);
-  const exploded = useMemo(() => explodeAssembled(meshes), [meshes]);
+  const exploded = useMemo(() => explodeAssembled(meshes, assembled), [meshes, assembled]);
   const matrices = useMemo(
-    () => (view === 'flat' ? flat : view === 'exploded' ? exploded : meshes.map(() => assembled)),
-    [view, flat, exploded, assembled, meshes]
+    () =>
+      view === 'flat'
+        ? flat
+        : view === 'exploded'
+          ? interpolateExplosion(assembled, exploded, explosionProgress)
+          : meshes.map(() => assembled),
+    [view, flat, exploded, assembled, meshes, explosionProgress]
+  );
+  // Fit the complete travel once, so the first animated frame doesn't crop the final exploded parts.
+  const explosionBox = useMemo(
+    () =>
+      boundsOf(meshes, exploded).union(
+        boundsOf(
+          meshes,
+          meshes.map(() => assembled)
+        )
+      ),
+    [meshes, exploded, assembled]
   );
   // Size the normal display planes around the origin and model, with a useful extent before any geometry exists.
   const modelPlaneSize = useMemo(() => {
@@ -479,6 +498,8 @@ export function ModelViewport({
   const planeSize = extrusionDepth ? referencePlaneSize.current : modelPlaneSize;
   const shownPlanes = view === 'assembled' ? planes : [];
   const geometryBox = useMemo(() => {
+    // Playback and scrubbing keep a stable rotation center without rescanning every vertex each frame.
+    if (view === 'exploded') return explosionBox;
     const fit = boundsOf(meshes, matrices);
     // Finished sketches are in view too, as a first one is before it has any part.
     for (const line of view === 'assembled' ? sketchLines : [])
@@ -493,7 +514,7 @@ export function ModelViewport({
             .applyMatrix4(assembled)
         );
     return fit;
-  }, [meshes, matrices, assembled, sketchLines, regions, view]);
+  }, [meshes, matrices, assembled, sketchLines, regions, view, explosionBox]);
   const box = useMemo(() => {
     const fit = geometryBox.clone();
     if (!shownPlanes.length) return fit;
@@ -569,7 +590,7 @@ export function ModelViewport({
       {sketchView ? (
         <SketchCamera view={sketchView} model={assembled} />
       ) : (
-        <FitCamera box={box} fitKey={view} viewRequest={viewRequest} cameraState={cameraState} />
+        <FitCamera box={view === 'exploded' ? explosionBox : box} fitKey={view} viewRequest={viewRequest} cameraState={cameraState} />
       )}
       <group>
         {meshes.map((m, i) => (
