@@ -26,10 +26,11 @@ export function usePartCutSelection(document: CadDocument, part: CadPart | undef
   const selectedTool = part && valid ? cadPartReference(part.id, selectedCopyId) : undefined;
   const selectedKey = selectedTool ? (selectedCopyId ? `${part!.id}/${selectedCopyId}` : part!.id) : undefined;
   const transformPart = (open: (partId: string) => void, refuse: (message: string) => void) => {
-    // Source transforms precede Pattern/Mirror. Neither a copy nor a disappeared selection may silently become the family.
-    if (!valid || copyId !== undefined)
+    // Source transforms precede downstream cuts, so consumed history remains editable.
+    // Keep the raw copy ID: a selected or disappeared copy must never become its family.
+    if (!part || copyId !== undefined)
       return refuse('Transforming only the selected copy is not supported. Select the source part in Parts to transform its whole family.');
-    if (part) open(part.id);
+    open(part.id);
   };
   return { cutPick, cutPicked, showCutPicked, pickForCut, selectPart, selectedTool, selectedKey, selectedCopyId, transformPart };
 }
