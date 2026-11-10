@@ -1,6 +1,6 @@
 # Woodworking checkpoint contracts
 
-`dividedTrayWorkflow()` and `fittedJointsWorkflow()` each run eight cumulative edits through `runCadWorkflow`. Both start from self-contained ordinary saved designs in `fixtures/designs/`; no private reference files are needed. The cabinet remains the command's default workflow. Additional command selection is wired separately.
+`dividedTrayWorkflow()` and `fittedJointsWorkflow()` each run eight cumulative edits through `runCadWorkflow`. Both start from self-contained ordinary saved designs in `fixtures/designs/`; no private reference files are needed. Select them with `cad:iterate --workflow divided-tray` or `--workflow fitted-joints`. The cabinet remains the default. `--list` shows workflow keys and incomplete checkpoints; `--workflow <key> --list` shows only that workflow.
 
 The tray has a floor, four walls and three dividers in 12 mm stock. Its sequence changes stock to 15 mm and width 360→420, grows to four dividers, cuts the floor with the exact third physical divider, restores family tools and moves the stack 10 mm, adds 0.2 mm clearance, suppresses housings, then restores and reloads. The intentionally partial cut must collide only with the other three dividers; suppression must collide with all four. Named source owners and exact pattern-slot IDs remain fixed while growth adds one slot.
 
@@ -11,6 +11,8 @@ The fitted-joint design keeps two crossing legs and a separate Front/Side corner
 `axisMaterial.ts` measures the evaluator's actual orthogonal polygons and cut-height intervals. It integrates occupied cells after unioning cuts, including holes and retained islands, and follows solved rigid axis-permutation placements. Duplicate cuts therefore do not double-subtract volume. Unsupported diagonal geometry or non-rigid placement produces an explicit failure instead of a bounds-only pass. These checks measure evaluated material and face-connected cell components; they do not prove boundary-mesh validity, machining plans or equivalence to an external reference.
 
 `missingDividerToolWorkflow()` preserves the complete tray through exact-copy selection, then shrinks the pattern while retaining the missing tool reference. That state remains unsupported and exports its ordinary source without inventing replacement geometry. `underconstrainedJointWorkflow()` preserves the original face-sketch diagnostic whose strip height is not fixed; its expected geometry remains incomplete. Neither diagnostic is counted as a completed valid workflow.
+
+The diagnostic command keys are `tray-missing-tool` and `joint-unconstrained`. They exit2 while incomplete. The cabinet retains its existing default artifact directory; the other command keys use separate subdirectories beneath `test-results/cad-iteration/core/`. `--out` selects an explicit directory for any workflow.
 
 Artifacts contain the actual document after each edit and before the solver, with a hash of those exact source bytes. Every next edit starts from the previous solved document. Separate candidate files are marked as candidate-derived. This cumulative source progression can differ from a static fixture sequence; reference bindings require independent source-intent review and must not be transferred by matching candidate geometry.
 

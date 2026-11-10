@@ -85,7 +85,7 @@ one. Scripts make designs for this folder too: `check examples/tray.cad.ts --out
 
 `pnpm --silent cad:iterate` from the repository root runs the cabinet edit sequence headlessly and writes named source checkpoints with a first-failure report. `pnpm --silent cad:iterate:ui` exercises the corresponding browser workflow. See [the iteration loop](../../docs/CAD_ITERATION.md) for commands, coverage and the agent procedure.
 
-The package also exports `dividedTrayWorkflow()`, `fittedJointsWorkflow()` and `runCadWorkflow()` for complete eight-state source/material checks. Their [workflow contracts](src/iteration/WOODWORKING.md) describe independent recipe expectations, exact copy identities, actual cumulative source exports and explicit incomplete diagnostics. Command selection and complete interface scenarios are separate integrations.
+Use `pnpm --silent cad:iterate --workflow divided-tray` or `--workflow fitted-joints` from the repository root for the other complete eight-state source/material checks. `--list` lists available keys and incomplete diagnostic checkpoints. The package also exports `dividedTrayWorkflow()`, `fittedJointsWorkflow()` and `runCadWorkflow()`. Their [workflow contracts](src/iteration/WOODWORKING.md) describe independent expectations, exact identities and cumulative source exports; complete interface scenarios remain separate.
 
 ## From an MCP client
 
