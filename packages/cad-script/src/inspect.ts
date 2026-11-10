@@ -195,8 +195,7 @@ export function shortHandles(ids: readonly string[]): Map<string, string> {
   return handles;
 }
 
-function reportEntities(sketch: CadSketch): CadReportEntity[] {
-  const handles = shortHandles(sketch.entities.map(e => e.id));
+function reportEntities(sketch: CadSketch, handles: ReadonlyMap<string, string>): CadReportEntity[] {
   const ref = (id: string) => handles.get(id)!;
   const points = new Map(sketch.entities.flatMap(e => (e.type === 'point' ? [[e.id, e] as const] : [])));
   const at = (id: string) => xy(points.get(id)!);
@@ -390,29 +389,45 @@ export async function inspectCadDocument(
     // it's drawn, so it has no status of its own on this part.
     const solvedHere = [!part.sketchOf, ...faces.map(face => !face.removedBy)];
     const statusOf = (i: number) => (solvedHere[i] ? statusesOf[solvedHere.slice(0, i).filter(Boolean).length] : undefined);
-    const reported = sketches.map(({ sketch, ref, on }, i) => ({
-      ref,
-      on,
-      freedom: statusOf(i)?.dof ?? null,
-      status: solvedHere[i] ? (statusOf(i)?.status ?? 'invalid') : 'shared',
-      entities: reportEntities(sketch),
-      constraints: sketch.constraints.length,
-      ...sketchCurveDetails(
-        sketch,
-        id => shortHandles(sketch.entities.map(e => e.id)).get(id) ?? id,
-        id => shortHandles(sketch.constraints.map(c => c.id)).get(id) ?? id
-      ),
-      ...(() => {
-        const patterns = sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern');
-        const handles = shortHandles(sketch.constraints.map(c => c.id));
-        return patterns.length
-          ? { patterns: patterns.map(pattern => ({ ref: handles.get(pattern.id)!, copies: pattern.countX * pattern.countY - 1 })) }
-          : {};
-      })(),
-    }));
+    // Curve and fitting reports can reference every control and dimension. Build each shortest-prefix map once,
+    // rather than rebuilding its quadratic collision search for every reference in a large fitted sketch.
+    const handlesBySketch = new Map(
+      sketches.map(({ sketch }) => [
+        sketch.id,
+        {
+          entities: shortHandles(sketch.entities.map(entity => entity.id)),
+          constraints: shortHandles(sketch.constraints.map(constraint => constraint.id)),
+        },
+      ])
+    );
+    const reported = sketches.map(({ sketch, ref, on }, i) => {
+      const handles = handlesBySketch.get(sketch.id)!;
+      const patterns = sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern');
+      return {
+        ref,
+        on,
+        freedom: statusOf(i)?.dof ?? null,
+        status: solvedHere[i] ? (statusOf(i)?.status ?? 'invalid') : 'shared',
+        entities: reportEntities(sketch, handles.entities),
+        constraints: sketch.constraints.length,
+        ...sketchCurveDetails(
+          sketch,
+          id => handles.entities.get(id) ?? id,
+          id => handles.constraints.get(id) ?? id
+        ),
+        ...(patterns.length
+          ? {
+              patterns: patterns.map(pattern => ({
+                ref: handles.constraints.get(pattern.id)!,
+                copies: pattern.countX * pattern.countY - 1,
+              })),
+            }
+          : {}),
+      };
+    });
     for (const sketch of [part.sketch, ...faces.map(face => face.sketch)]) {
       const regions = cadSketchRegions(part, sketch.id);
-      const handles = shortHandles(sketch.constraints.map(c => c.id));
+      const handles = handlesBySketch.get(sketch.id)!.constraints;
       // A copy cuts its outline less any islands inside it, so an island changes it as much as a changed outline.
       const area = (region: (typeof regions)[number]) =>
         Math.abs(polygonArea(region.points)) - region.holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0);
