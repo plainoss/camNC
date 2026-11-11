@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import type { FeatureEntry } from './FeatureList';
-import { selectStudioFeature } from './studioFeatureSelection';
+import { featureRowPart, selectStudioFeature } from './studioFeatureSelection';
 
 const selection = () => ({ sketch: vi.fn(), face: vi.fn(), part: vi.fn(), entities: vi.fn() });
 const cut = (copyId?: string): FeatureEntry => ({
@@ -13,6 +13,11 @@ it('selects the saved copy target when its Cut parts feature is picked', () => {
   selectStudioFeature(() => false, picked)(cut('pattern:1'));
   expect(picked.part).toHaveBeenCalledExactlyOnceWith('shelf', 'pattern:1');
   expect(picked.entities).toHaveBeenCalledOnce();
+});
+
+it('names only the saved copy target as the part a hovered Cut parts row stands for', () => {
+  expect(featureRowPart((cut('pattern:1') as Extract<FeatureEntry, { kind: 'step' }>).step)).toBe('shelf:pattern:1');
+  expect(featureRowPart((cut() as Extract<FeatureEntry, { kind: 'step' }>).step)).toBe('shelf');
 });
 
 it('keeps a source target as a family selection', () => {

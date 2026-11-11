@@ -1,4 +1,12 @@
+import { cadPartReference } from '@wbcnc/cad';
 import type { FeatureEntry } from './FeatureList';
+
+type Step = Extract<FeatureEntry, { kind: 'step' }>['step'];
+
+/** The part a feature row stands for: a Cut saved on one copy names that copy, any other row its whole family. */
+export function featureRowPart(step: Step): string {
+  return step.kind === 'partCut' && step.copyId !== undefined ? cadPartReference(step.partId, step.copyId) : step.partId;
+}
 
 /** A profile picker consumes sketch rows before ordinary feature/physical-part selection changes. */
 export function selectStudioFeature(

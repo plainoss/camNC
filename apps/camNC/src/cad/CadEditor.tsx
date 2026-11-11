@@ -225,7 +225,7 @@ import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/i
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PartPatternKind } from './partPatternKind';
-import { selectStudioFeature } from './studioFeatureSelection';
+import { featureRowPart, selectStudioFeature } from './studioFeatureSelection';
 import { builtStudioParts, disabledStudioCommands } from './studioParts';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
@@ -4100,7 +4100,7 @@ export function CadEditor({
               onAction={featureAction}
               rollback={rollbackStep}
               onRollTo={showWorkspace ? setRolledTo : undefined}
-              onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
+              onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? featureRowPart(entry.step) : null)}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane, onNewSketch: newSketchOn })}
               shown={featureShown}
               onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}

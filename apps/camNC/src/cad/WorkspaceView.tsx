@@ -272,6 +272,10 @@ export default function WorkspaceView({
       ? [index]
       : []
   );
+  // A hovered Cut on one copy names that copy, which the viewport's part-wide highlight can't tell from its family.
+  const hoverIndexes = hoverIds
+    ? model.instances.flatMap((instance, index) => (cadPartReferenceMatches(hoverIds, instance.partId, instance.copyId) ? [index] : []))
+    : [];
   const selectedFrame = selectedFace && cadFaceFrame(document, selectedFace);
   const selectedFaceIndex = selectedFace
     ? model.instances.findIndex(instance => instance.partId === selectedFace.partId && instance.copyId === selectedFace.copyId)
@@ -393,7 +397,7 @@ export default function WorkspaceView({
         transparentIds={transparentIds}
         instanceIds={model.instances.map(instanceKey)}
         selectedId={selectedId}
-        selectedIndexes={selectedFace ? [] : selectedIndexes}
+        selectedIndexes={[...new Set([...(selectedFace ? [] : selectedIndexes), ...hoverIndexes])]}
         selectedFace={
           selectedFrame && !('error' in selectedFrame) && selectedFaceIndex >= 0
             ? {
