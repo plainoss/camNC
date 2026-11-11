@@ -96,12 +96,52 @@ describe('dragging a step in the feature list', () => {
     expect(over.dataTransfer!.dropEffect).toBe('none');
     expect(row('Sketch · A').classList).toContain('cad-feature-drop-refused');
     expect(screen.getByRole('status').textContent).toBe('B is built on A, so it comes after it.');
+    // At the top of the list the reason is shown under the row.
+    expect(screen.getByRole('status').classList).not.toContain('cad-feature-drop-reason-above');
     expect(document.querySelector('.cad-feature-drop-before')).toBeNull();
     // Ending the drag clears it.
     drag(button('Extrude · B'), 'dragend');
     expect(document.querySelector('.cad-feature-drop-refused')).toBeNull();
     expect(screen.queryByRole('status')).toBeNull();
     expect(commits).not.toHaveBeenCalled();
+  });
+
+  it('moves a fillet with its part, and says why it can’t go ahead of its extrude without moving the rows', () => {
+    const back = { ...plate('Back'), fillets: [{ id: 'round', corners: [], radius: 5 }] };
+    const { commits, row, drag, button } = setup({ ...createCadDocument(), parts: [plate('Top'), back, plate('Shelf')] });
+    const tops = () =>
+      ['Extrude · Back', 'Fillet · Back', 'Sketch · Shelf', 'Extrude · Shelf'].map(name => row(name).getBoundingClientRect().top);
+    const before = tops();
+    drag(button('Fillet · Back'), 'dragstart');
+    const refused = drag(row('Extrude · Back'), 'dragover');
+    expect(refused.defaultPrevented).toBe(false);
+    expect(row('Extrude · Back').classList).toContain('cad-feature-drop-refused');
+    expect(screen.getByRole('status').textContent).toBe('Fillet · Back rounds the edges Extrude · Back makes, so it comes after it.');
+    // The reason floats over the rows below, so none of them moves under the pointer.
+    expect(tops()).toEqual(before);
+    // Dropped on Top, the fillet takes Back's steps ahead of Top's.
+    expect(drag(row('Extrude · Top'), 'dragover').defaultPrevented).toBe(true);
+    expect([...document.querySelectorAll('.cad-feature-drop-before')]).toEqual([row('Sketch · Top')]);
+    drag(row('Extrude · Top'), 'drop');
+    expect(commits.mock.calls.at(-1)![0].parts.map(part => part.name)).toEqual(['Back', 'Top', 'Shelf']);
+    // And a part dropped on the fillet goes ahead of Back.
+    drag(button('Extrude · Shelf'), 'dragstart');
+    expect(drag(row('Fillet · Back'), 'dragover').defaultPrevented).toBe(true);
+    drag(row('Fillet · Back'), 'drop');
+    expect(commits.mock.calls.at(-1)![0].parts.map(part => part.name)).toEqual(['Shelf', 'Back', 'Top']);
+  });
+
+  it('shows the reason above a refused row in the lower half of the list, where it isn’t clipped', () => {
+    const back = { ...plate('Back'), fillets: [{ id: 'round', corners: [], radius: 5 }] };
+    const { row, drag, button } = setup({ ...createCadDocument(), parts: [plate('Top'), plate('Shelf'), back] });
+    const tops = () => ['Sketch · Back', 'Extrude · Back', 'Fillet · Back'].map(name => row(name).getBoundingClientRect().top);
+    const before = tops();
+    drag(button('Fillet · Back'), 'dragstart');
+    expect(drag(row('Extrude · Back'), 'dragover').defaultPrevented).toBe(false);
+    const reason = screen.getByRole('status');
+    expect(reason.classList).toContain('cad-feature-drop-reason-above');
+    expect(reason.getBoundingClientRect().bottom).toBeLessThanOrEqual(row('Extrude · Back').getBoundingClientRect().top + 1);
+    expect(tops()).toEqual(before);
   });
 
   it('marks the folder row when a step would land just ahead of the folder', () => {
