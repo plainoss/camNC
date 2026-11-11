@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { assemblyReport, evaluateCadDocument, type CadDocument } from '@wbcnc/cad';
+import { assemblyReport, evaluateCadDocument, parseCadDocument, type CadDocument } from '@wbcnc/cad';
 import { cupboard, editCad, inspectCadDocument } from '@wbcnc/cad-script';
 import { cadProposal, type CadProposal } from '@wbcnc/cad-editor/proposal';
 import type { CadSession } from '@wbcnc/cad-editor/session';
@@ -38,6 +38,13 @@ export function StudioProposals({
   useEffect(() => setOverlayHost(tools.current?.closest('.cad-editor') ?? null), []);
   const insert = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  // The banner has no other way out: clear it on Escape, like the menu and dialogs around it.
+  useEffect(() => {
+    if (!error) return;
+    const dismiss = (event: KeyboardEvent) => event.key === 'Escape' && setError('');
+    window.addEventListener('keydown', dismiss);
+    return () => window.removeEventListener('keydown', dismiss);
+  }, [error]);
   const [sizes, setSizes] = useState({ width: 600, height: 720, depth: 300, board: 18, shelves: 3 });
   const reviewFile = async (file: File) => {
     if (building || disabled) return;
@@ -46,11 +53,17 @@ export function StudioProposals({
     setError('');
     setProposal(null);
     try {
-      const candidate = cadProposal(start, JSON.parse(await file.text()));
+      const parsed = parseCadDocument(JSON.parse(await file.text()));
+      if (parsed.id !== start.id) throw new Error('This file is a different design. Open it from Projects › Open model… instead.');
+      const unchanged = (candidate: CadDocument) => JSON.stringify(candidate) === JSON.stringify(parseCadDocument(structuredClone(start)));
+      // Check before solving: an untouched new design fails the check only because its sketch is still empty.
+      if (unchanged(parsed)) throw new Error('This file matches the open design. Reviewing it would change nothing.');
+      const candidate = cadProposal(start, parsed);
       // Saved coordinates can lag behind their constraints. Review exactly the solved geometry Apply will keep.
       const checked = await inspectCadDocument(candidate.document);
       if (!checked.report.ok)
         throw new Error(checked.report.errors.map(error => error.message).join('\n') || 'Fix this design before reviewing it.');
+      if (unchanged(checked.document)) throw new Error('This file matches the open design. Reviewing it would change nothing.');
       setProposal(cadProposal(start, checked.document));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to read this design.');
@@ -108,6 +121,7 @@ export function StudioProposals({
               disabled={disabled || building}
               onClick={event => {
                 event.currentTarget.closest('details')?.removeAttribute('open');
+                setError('');
                 input.current?.click();
               }}>
               Review design file…
@@ -120,7 +134,10 @@ export function StudioProposals({
           aria-label="Assistant"
           aria-pressed={assistant}
           disabled={disabled}
-          onClick={() => setAssistant(value => !value)}>
+          onClick={() => {
+            setError('');
+            setAssistant(value => !value);
+          }}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 4h16v12H9l-5 4V4Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </svg>
@@ -139,9 +156,12 @@ export function StudioProposals({
           }}
         />
         {error && !insert.current?.open && (
-          <span role="alert" className="cad-proposal-error">
-            {error}
-          </span>
+          <div role="alert" className="cad-proposal-error">
+            <span>{error}</span>
+            <button type="button" aria-label="Dismiss message" onClick={() => setError('')}>
+              ×
+            </button>
+          </div>
         )}
       </div>
       {overlayHost &&
