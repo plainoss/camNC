@@ -115,6 +115,8 @@ export interface CadFullReport {
   ok: boolean;
   /** Why the script stopped, when one did: the design reported on is then the one it started from. */
   scriptError?: string;
+  /** Why a sketch asked for with --export-sketch couldn't be written: no sketch is named so. */
+  exportError?: string;
   status: string;
   errors: CadReport['errors'];
   warnings: CadReport['warnings'];
