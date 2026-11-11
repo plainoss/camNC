@@ -1343,6 +1343,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.0.15
+      '@wbcnc/cam':
+        specifier: workspace:*
+        version: link:../cam
       '@wbcnc/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config

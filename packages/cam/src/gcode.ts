@@ -1,5 +1,5 @@
 import type { Vec3 } from './geom';
-import { pauseMarker, type PauseMarker } from './pauseMarker';
+import { pauseMarker, type PauseMarker, startPauseGap } from './pauseMarker';
 import { DEFAULT_SETTINGS, type Operation, type PartCam, type Tool } from './toolpaths';
 import { fitVerticalRun, verticalRunEnd, type VerticalPrimitive } from './verticalArcs';
 import { certifyStockLinks } from './stockPlan';
@@ -301,9 +301,12 @@ export function postProgram(cam: PartCam, opts: GcodeOptions = {}): PostedProgra
   move('G0', { z: safeZ });
   // Confirm before the spindle starts; a spindle the machine doesn't control (a router) is switched on here. A program
   // that begins with a pause confirms there: no spinning up just to stop again.
+  // Where the gap after the start pause goes, once the program's size is known (see below).
+  let startGapAt = -1;
   if (!cam.operations[0]?.pauseBefore) {
     const turnOn = byHand ? '. Manual spindle: turn it on now' : '';
     out.push(pauseMarker({ kind: 'start', rpm }), `M0 (MSG Spindle starts at ${rpm} RPM next${turnOn})`);
+    startGapAt = out.length;
     spindleOn();
   }
 
@@ -408,6 +411,14 @@ export function postProgram(cam: PartCam, opts: GcodeOptions = {}): PostedProgra
   // M5 did nothing on a router switched by hand: parked, say so. Not after a last pause that already did.
   if (byHand && !cam.operations.at(-1)?.pauseAfter) out.push(pauseMarker({ kind: 'done' }), `M0 (MSG Program done. ${kManualOff})`);
   out.push('M30');
+  if (startGapAt >= 0) {
+    // `;` comment lines between the start M0 and its M3, so that the machine view can tell a hold at that M0 from one
+    // after the M3 by the SD position up to about 40 MB (see startPauseGap). FluidNC reads each as an empty block:
+    // `collapseGCode` ends the line at `;` (GCode.cpp, `case ';'`: line 210 in 4.1.1, 183 in 3.9.9), and a block
+    // without words changes no state. Unlike `( )` comments, they are not looked at for MSG.
+    const bytes = new TextEncoder().encode(out.join('\n') + '\n').length;
+    out.splice(startGapAt, 0, ...startPauseGap(bytes, new TextEncoder().encode(out[startGapAt]!).length + 1));
+  }
   const program = out.join('\n') + '\n';
   validateFluidNCOutput(program);
   setup.statistics = programStatistics(program);

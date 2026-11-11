@@ -1,4 +1,4 @@
-import { pauseMarker } from '@wbcnc/cam/pauseMarker';
+import { pauseMarker, startPauseGap } from '@wbcnc/cam/pauseMarker';
 
 /** For tests: FluidNC's `SD:` percent at byte `position` of a `size` byte file: float maths, printed with two decimals. */
 export function controllerPercent(position: number, size: number) {
@@ -36,20 +36,21 @@ export const boardProgram = (() => {
  * 100 bytes before the end; at 2,000,000 bytes both are exactly half a hundredth of a percent of the file, where the
  * controller's rounding is closest to a tie. `m5End` is the end of the M5 before the done M0, within the position window
  * of that M0 on large files. After the start M0 come M3, a dwell and a travel at safe Z ending at `travelEnd`, then the
- * cut at work Z -6.
+ * cut at work Z -6. With `gap`, the comment lines camNC now writes between the start M0 and its M3 come first.
  */
-export function camProgram(size: number) {
-  let program = programs.get(size);
-  if (!program) programs.set(size, (program = buildCamProgram(size)));
+export function camProgram(size: number, { gap = false } = {}) {
+  const key = `${size}${gap ? ' gap' : ''}`;
+  let program = programs.get(key);
+  if (!program) programs.set(key, (program = buildCamProgram(size, gap)));
   return program;
 }
 
 /** Built once per size and shared, so that tests on the same program also share its parsed lines. */
-const programs = new Map<number, ReturnType<typeof buildCamProgram>>();
+const programs = new Map<string, ReturnType<typeof buildCamProgram>>();
 /** 800 different 22-byte moves, newline included: the cut repeats this block. */
 const kMoveBlock = Array.from({ length: 800 }, (_, i) => `G1 X${100 + i}.25 Y${100 + (i % 400)}.5 Z-6\n`).join('');
 
-function buildCamProgram(size: number) {
+function buildCamProgram(size: number, gap: boolean) {
   const doneEnd = size - 100;
   const header = ['(camNC CAM)', 'G21', 'G90', 'G0 Z23.3'];
   const start = [pauseMarker({ kind: 'start', rpm: 15000 }), 'M0 (MSG Spindle starts at 15000 RPM next. Manual spindle: turn it on now)'];
@@ -57,7 +58,7 @@ function buildCamProgram(size: number) {
   const done = [pauseMarker({ kind: 'done' }), 'M0 (MSG Program done. Manual spindle: off now)'];
   const end = ['G0 Z23.3', 'M5', 'G53 G0 Z-5', ...done];
   // 22-byte moves, then comments for the rest.
-  const spindleOn = ['M3 S15000', 'G4 P3', 'G0 X100 Y100'];
+  const spindleOn = [...(gap ? startPauseGap(size, bytes(['M3 S15000'])) : []), 'M3 S15000', 'G4 P3', 'G0 X100 Y100'];
   const cutBytes = doneEnd - bytes(head) - bytes(spindleOn) - bytes(end);
   const moves = Math.floor((cutBytes - 200) / 22);
   const cut = kMoveBlock.repeat(Math.floor(moves / 800)) + kMoveBlock.slice(0, 22 * (moves % 800));
@@ -71,6 +72,7 @@ function buildCamProgram(size: number) {
     size,
     startEnd: 300,
     travelEnd: 300 + bytes(spindleOn),
+    m3End: 300 + bytes(spindleOn.slice(0, spindleOn.indexOf('M3 S15000') + 1)),
     doneEnd,
     m5End: doneEnd - bytes(['G53 G0 Z-5', ...done]),
   };
