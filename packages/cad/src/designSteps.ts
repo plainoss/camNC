@@ -4,6 +4,8 @@ import { cadCopyName } from './partPatterns';
 import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import type { CadDocument, CadPart } from './types';
 import { trimCadFolders } from './folderModel';
+import { partCutLabel, partCutVariableErrors } from './partCutVariables';
+import { cadVariableScope } from './variables';
 
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
@@ -53,6 +55,10 @@ export function designSteps(document: CadDocument): DesignStep[] {
   const broken = brokenParts(document);
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
+  const partCutProblems = new Map<string, string>();
+  if (document.partCuts?.length)
+    for (const { stepId, message } of partCutVariableErrors(document, cadVariableScope(document)))
+      if (!partCutProblems.has(stepId)) partCutProblems.set(stepId, message);
   return listedSteps(document).map(step => {
     const own = broken.get(step.partId);
     const part = byId.get(step.partId);
@@ -64,7 +70,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
           : own && `It’s on ${part.name}, which can’t be built.`
         : null;
     const reason = (step.kind === 'sketch' || step.kind === 'extrude') && own ? own : onFace;
-    return reason ? { ...step, broken: reason } : step;
+    // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
+    const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;
+    return reason || values ? { ...step, broken: reason || values } : step;
   });
 }
 
@@ -131,7 +139,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
       {
         id: step.id,
         kind: 'partCut',
-        label: `Cut ${names(document, step.targets)} with ${names(document, step.tools)}`,
+        label: partCutLabel(document, step),
         detail: `clearance ${typed(step.clearanceExpression, step.clearance)}`,
         partId: owner?.id ?? reference,
         ...(owner && reference !== owner.id && { copyId: reference.slice(owner.id.length + 1) }),

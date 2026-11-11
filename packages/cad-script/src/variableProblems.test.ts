@@ -23,7 +23,7 @@ describe('values that can’t follow their variables', () => {
     expect(report.errors).toEqual(
       ['Front', 'Side'].map(part => ({
         code: 'variable-value',
-        message: 'Cut parts fingers fingers: A finger joint needs a whole number of fingers, at least 2.',
+        message: `Finger count fingers = ${fingers} in Cut Side with Front: a finger joint needs a whole number of fingers, at least 2.`,
         part,
       }))
     );

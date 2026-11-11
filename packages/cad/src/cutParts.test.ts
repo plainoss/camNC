@@ -547,7 +547,7 @@ describe('half-lap and finger joints', () => {
             code: 'variable-value',
             severity: 'error',
             partId,
-            message: expect.stringContaining('Cut parts fingers #n:'),
+            message: expect.stringMatching(/^Finger count #n( = [\d.]+)? in Cut Across with Along: /),
           })
         )
       );
