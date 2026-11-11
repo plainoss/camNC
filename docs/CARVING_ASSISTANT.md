@@ -30,12 +30,15 @@ accounting as the Part Studio assistant. It sends the current brief, physical
 constraints and, for a semantic revision, only the current source artwork. It
 does not replay old candidate artwork or the CAD script guide.
 
-The optional image-generator connection has its own endpoint, model and key.
-Those credentials stay in the panel until it closes; a text-provider key is never
-copied to an image-provider endpoint. Native SVG output requires support from
-the selected model and project. Image generation and image input are separate
-capabilities. See the provider's
-[image generation documentation](https://developers.openai.com/api/docs/guides/image-generation#generate-svg-output).
+Image generation uses the shared connection: when it has an image model (chosen
+automatically for OpenAI keys), **Image model** is the default generator and uses
+the same key and endpoint. With a provider without image generation, such as
+Anthropic, Carve uses text SVG unless **Use a different image provider** is
+ticked; that separate endpoint, model and key stay in the panel until it closes,
+and the text-provider key is never copied to a different image endpoint. Native SVG
+output requires that separate form and support from the selected model and
+project. Image generation and image input are separate capabilities. See the
+provider's [image generation documentation](https://developers.openai.com/api/docs/guides/image-generation#generate-svg-output).
 
 Image output can also be a monochrome PNG traced locally into filled regions.
 This route uses a short illustration prompt, for example: “Black and white
