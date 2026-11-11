@@ -73,7 +73,8 @@ it('exports a sketch from its row as DXF in the design’s unit, or as SVG in an
   expect(within(again).queryByRole('checkbox', { name: 'Export splines as polylines' })).toBeNull();
   await userEvent.click(within(again).getByRole('button', { name: 'Download' }));
   expect(files.map(file => file.name)).toEqual([`${rowName}.dxf`, `${rowName}.svg`]);
-  expect(await files[1]!.text).toMatch(/<svg [^>]*width="120mm" height="80mm"/);
+  // 120 x 80 mm, and half the 0.25 mm stroke on each side.
+  expect(await files[1]!.text).toMatch(/<svg [^>]*width="120.25mm" height="80.25mm"/);
   // The list's own actions don't see the export.
   expect(onAction).not.toHaveBeenCalled();
 });
