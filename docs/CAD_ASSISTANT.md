@@ -99,14 +99,14 @@ discarding user constraints.
 
 ## Review and acceptance
 
-**Preview proposal** opens the candidate in a 3D view. Orbit it or switch between
+**Review proposal** opens the checked candidate in a 3D view. Orbit it or switch between
 the original and candidate. The review lists added, changed and removed steps,
 new warnings and lost cuts or joint openings. A successful geometry check does
 not establish that a piece matches a picture or that its joints are strong.
 
 Only **Apply as one undo step** changes the open document. A hand edit made after
 the request invalidates the proposal, including when that edit has been undone.
-Discarding a preview leaves the document and undo history untouched. **Insert →
+Closing the review, including with Escape, keeps the same checked candidate and warnings available through **Review proposal**, even after closing the assistant or editing a sketch. A changed design marks the proposal out of date: it can still be reviewed, but Apply stays disabled. **Discard proposal** explicitly removes the candidate without changing the document or undo history. **Insert →
 Review design file** uses the same guarded path for a candidate with the open design's
 ID; importing a different design remains the Projects workflow.
 
