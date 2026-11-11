@@ -540,9 +540,17 @@ describe('half-lap and finger joints', () => {
     for (const expression of ['2.5', '1', '3mm']) {
       document = (await variables(document, { n: expression })).document;
       expect(document.partCuts![0]!.split).toEqual({ fingers: 7, fingersExpression: '#n' });
-      expect(cadVariableProblems(document)).toEqual([
-        expect.objectContaining({ code: 'variable-value', severity: 'error', message: expect.stringContaining('Cut parts fingers #n:') }),
-      ]);
+      // Said on both joined parts, so each part's row shows why the joint kept its last good count.
+      expect(cadVariableProblems(document)).toEqual(
+        [document.parts[1]!.id, document.parts[0]!.id].map(partId =>
+          expect.objectContaining({
+            code: 'variable-value',
+            severity: 'error',
+            partId,
+            message: expect.stringContaining('Cut parts fingers #n:'),
+          })
+        )
+      );
     }
     const id = document.variables![0]!.id;
     const renamed = setCadVariable(document, { id, name: 'count', expression: '5' });

@@ -523,20 +523,17 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
       }
   }
   for (const step of document.partCuts ?? []) {
+    // Said on each part the step joins, tools first, so every part's row shows why its cut kept its last good values.
+    const joined = [...new Set([...step.tools, ...step.targets].map(id => id.split(':')[0]!))].filter(id =>
+      document.parts.some(part => part.id === id)
+    );
+    const onJoined = (message: string) =>
+      joined.forEach(partId => problems.push({ code: 'variable-value', severity: 'error', partId, message }));
     const outcome = clearanceOutcome(step, scope);
-    if (outcome && 'error' in outcome)
-      problems.push({
-        code: 'variable-value',
-        severity: 'error',
-        message: `Cut parts clearance ${step.clearanceExpression}: ${outcome.error}`,
-      });
+    if (outcome && 'error' in outcome) onJoined(`Cut parts clearance ${step.clearanceExpression}: ${outcome.error}`);
     const fingers = fingersOutcome(step, scope);
     if (fingers && 'error' in fingers && typeof step.split === 'object')
-      problems.push({
-        code: 'variable-value',
-        severity: 'error',
-        message: `Cut parts fingers ${step.split.fingersExpression}: ${fingers.error}`,
-      });
+      onJoined(`Cut parts fingers ${step.split.fingersExpression}: ${fingers.error}`);
   }
   return problems;
 }
