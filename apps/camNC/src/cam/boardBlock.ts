@@ -26,7 +26,11 @@ export function unstable(plan: PlanResult | undefined) {
 }
 
 /** What's wrong with the board's layout, whatever its programs are. */
-export function layoutBlock(b: Pick<JobBoard, 'board' | 'nest'>, { bit, missing, sourceKey }: BlockContext): string | null {
+export function layoutBlock(
+  b: Pick<JobBoard, 'board' | 'nest' | 'carvingProblem'>,
+  { bit, missing, sourceKey }: BlockContext
+): string | null {
+  if (b.carvingProblem) return b.carvingProblem;
   if (b.board.cut?.sourceKey && sourceKey && b.board.cut.sourceKey !== sourceKey)
     return 'This board was cut from an earlier design. Start over on Boards with a new physical sheet before using this design.';
   const sizeProblem = boardSizeProblem(b);
@@ -59,6 +63,10 @@ export function planBlock(plan: PlanResult): string | null {
 }
 
 /** Why the board can't be cut, or null. `plan`: its programs, when it has any. */
-export function boardBlock(b: Pick<JobBoard, 'board' | 'nest'>, plan: PlanResult | undefined, context: BlockContext): string | null {
+export function boardBlock(
+  b: Pick<JobBoard, 'board' | 'nest' | 'carvingProblem'>,
+  plan: PlanResult | undefined,
+  context: BlockContext
+): string | null {
   return layoutBlock(b, { ...context, sourceKey: context.sourceKey ?? plan?.sourceKey }) ?? (plan ? planBlock(plan) : null);
 }

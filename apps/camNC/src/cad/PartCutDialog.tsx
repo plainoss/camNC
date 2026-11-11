@@ -159,6 +159,8 @@ export function PartCutDialog({
       ...document,
       revision: document.revision + 1,
       partCuts: [...(document.partCuts ?? []), { id: featureId, ...change, ...(cornerRelief !== undefined && { cornerRelief }) }],
+      // An ordered document lists every operation; a preview step missing from it would make the whole design invalid.
+      ...(document.operationOrder && { operationOrder: [...document.operationOrder, featureId] }),
     };
     // Relief overrides raise the reader floor; the preview must evaluate as the saved step will.
     return { ...next, version: cadDocumentVersion(next) };

@@ -1,25 +1,23 @@
 import { Canvas, useThree } from '@react-three/fiber';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import { Mesh, Raycaster, Vector3, type Scene } from 'three';
 import { ModelMeasurement } from './ModelMeasurement';
 import type { MeasureEntity } from '@/cad/measureGeometry';
+import { settledCanvas } from '@/lib/settledCanvas';
+import { settled } from '@/test/settled';
 
 let scene: Scene | null = null;
 function Probe() {
   scene = useThree(state => state.scene);
   return null;
 }
-// Html's separate DOM root can commit after the scene exists. Wait for its actual
-// witness child within the unchanged 15 s test budget before inspecting overlays.
-const renderedWitness = () =>
-  waitFor(
-    () => {
-      expect(scene).not.toBeNull();
-      return screen.getByTestId('measurement-witness');
-    },
-    { timeout: 10_000 }
-  );
+// Settles once the canvas has drawn and Html's separate DOM root has committed the witness after it.
+const renderedWitness = async () => {
+  await settled();
+  expect(scene).not.toBeNull();
+  return screen.getByTestId('measurement-witness');
+};
 afterEach(() => {
   cleanup();
   scene = null;
@@ -43,7 +41,7 @@ it('keeps selected faces and witnesses visible without intercepting the next geo
   ];
   render(
     <div style={{ width: 400, height: 300 }}>
-      <Canvas camera={{ position: [0, 0, 5] }}>
+      <Canvas {...settledCanvas} camera={{ position: [0, 0, 5] }}>
         <mesh userData={{ body: true }}>
           <planeGeometry args={[3, 3]} />
           <meshBasicMaterial />
@@ -75,7 +73,7 @@ it('keeps selected faces and witnesses visible without intercepting the next geo
 it('shows a touching-point witness without constructing an undefined zero-length thick line', async () => {
   render(
     <div style={{ width: 400, height: 300 }}>
-      <Canvas camera={{ position: [0, 0, 5] }}>
+      <Canvas {...settledCanvas} camera={{ position: [0, 0, 5] }}>
         <ModelMeasurement selection={[]} witness={{ a: [0, 0, 0], b: [0, 0, 0] }} />
         <Probe />
       </Canvas>

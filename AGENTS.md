@@ -53,7 +53,15 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - Before repairing a shared test driver or CI failure, inspect open PRs and current main for an existing fix. Coordinate one shared repair rather than independently patching it into several feature branches.
 - Claim a shared failure before fixing it: comment on its open `flaky-test` issue (CI files one when a test fails and then passes on the same code), or open one if there is none, with the `flaky-test` label and a title CI would give it, so later flakes land on it: `Flaky test: ` and then the spec (`sketch/machine/edit-after-cut-keeps-boards`) or `file > describe > test`, and link your PR there. If someone already claimed it, wait for their fix or help on their PR.
 - Read the failing assertion and its artifacts before classifying a failure as transient. A local pass does not establish that CI is flaky. Retry failed jobs only on the same candidate when there is evidence of a transient failure; if the same assertion fails again, investigate and repair its cause instead of repeatedly requeuing unchanged code.
+- Browser tests wait for the app with `await settled()` (`apps/camNC/src/test/settled.ts`), not sleeps or one-off polls; see "Waiting in browser tests" in `docs/TESTING.md`.
 - For asynchronous UI tests, wait for the specific observable readiness condition before acting or asserting. Preserve the expected result; do not replace assertions with fixed sleeps or blanket retries.
+
+## Keeping the merge queue moving
+
+- A blocked queue comes before feature work. When the same test or check ejects PRs from the merge queue, fix it, or claim its `flaky-test` issue, before pushing more features.
+- Once a test has ejected two batches, skip it first and fix it afterwards. Open a `flaky-test` PR whose only change is `it.skip` with the issue link in a comment, and queue it as soon as its checks pass. Then fix the cause in a second PR that removes the skip. Until the skip merges, each new batch fails on that test, and a skip PR is ready much sooner than a fix.
+- Put a test or CI fix in its own PR and label it `ci-fix` (or `flaky-test`), or title it `fix(ci)` / `fix(test)`. Mergify then tests it ahead of the queue (`priority_rules` in `.mergify.yml`).
+- Once the fix merges, re-queue the PRs it ejected with `@mergifyio queue`. Merge main into them first only if they conflict.
 
 ## Commit Messages
 

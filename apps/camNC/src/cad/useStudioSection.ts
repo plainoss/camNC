@@ -5,6 +5,7 @@ import type { SectionOffsetControl } from '@/cam/model/SectionOffsetHandle';
 import type { ModelFacePick, ViewRequest } from '@/cam/model/ModelViewport';
 import { instanceKey, type AssemblyModel } from './assemblyModel';
 import { basePlaneViews, pickedPlaneFrame } from './basePlanes';
+import { studioGeometry } from './studioGeometry';
 import { useDesignUnits } from './designUnits';
 import type { SectionPlane } from './sectionGeometry';
 
@@ -138,11 +139,12 @@ export function useStudioSection(
     }
     let source: Source | null = selectedPlane && pickedPlaneFrame(document, selectedPlane) ? { kind: 'plane', id: selectedPlane } : null;
     if (!source && selectedFace) {
+      const inspected = studioGeometry(document).document;
       const placement = model.placements.get(instanceKey(selectedFace));
       const placed = placement
         ? {
-            ...document,
-            parts: document.parts.map(part => {
+            ...inspected,
+            parts: inspected.parts.map(part => {
               if (part.id !== selectedFace.partId) return part;
               // Preview/layout placements belong to the exact physical instance, including a mirrored copy.
               if (!selectedFace.copyId) return { ...part, placement };
@@ -155,7 +157,7 @@ export function useStudioSection(
               return { ...part, copies };
             }),
           }
-        : document;
+        : inspected;
       const picked = cadFaceFrame(placed, selectedFace);
       if (!('error' in picked))
         source = {

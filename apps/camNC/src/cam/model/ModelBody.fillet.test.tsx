@@ -1,5 +1,5 @@
 import { Canvas, useThree } from '@react-three/fiber';
-import { cleanup, render, waitFor } from '@testing-library/react';
+import { cleanup, render } from '@testing-library/react';
 import { createPlateDocument, filletLineCorners } from '@wbcnc/cad';
 import { EdgesGeometry, type WebGLRenderer } from 'three';
 import { afterEach, expect, it } from 'vitest';
@@ -7,6 +7,8 @@ import { assemblyModel } from '../../cad/assemblyModel';
 import type { BodyMesh } from '../camTypes';
 import { ModelBody } from './ModelBody';
 import { modelGeometry } from './modelGeometry';
+import { settledCanvas } from '@/lib/settledCanvas';
+import { settled } from '@/test/settled';
 
 let renderer: WebGLRenderer | null = null;
 function Probe() {
@@ -20,7 +22,7 @@ afterEach(() => {
 function View({ mesh }: { mesh: BodyMesh }) {
   return (
     <div style={{ width: 400, height: 300 }}>
-      <Canvas orthographic camera={{ position: [50, 30, 200], zoom: 2 }}>
+      <Canvas {...settledCanvas} orthographic camera={{ position: [50, 30, 200], zoom: 2 }}>
         <ModelBody mesh={mesh} matrix={null} color="#b8c0c9" opacity={1} edges onSelect={() => {}} onHover={() => {}} />
         <Probe />
       </Canvas>
@@ -68,8 +70,9 @@ it('draws every original curved outline segment after creating, suppressing and 
     else expect(curve.sort()).toEqual(originalCurve);
     // Each wide-line segment is six GPU triangles. Checking uploaded endpoints alone misses a stale instanced draw cap.
     const triangles = solid.getAttribute('position').count / 3 + (points.count / 2) * 6;
-    // Cold WebGL startup can outlast the default one-second wait; require the actual GPU draw count before continuing.
-    await waitFor(() => expect(renderer?.info.render.triangles).toBe(triangles), { timeout: 20_000 });
+    // The draw of this mesh, however long cold WebGL startup takes: its GPU draw count, not just its uploaded endpoints.
+    await settled({ timeout: 20_000 });
+    expect(renderer?.info.render.triangles).toBe(triangles);
     edges.dispose();
     solid.dispose();
   }
