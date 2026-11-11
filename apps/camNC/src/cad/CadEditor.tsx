@@ -4542,7 +4542,7 @@ export function CadEditor({
                         : undefined
                     }
                     onSave={change => {
-                      const { clearance, clearanceExpression, split, consumeTools, ...parts } = change;
+                      const { clearance, clearanceExpression, split, consumeTools, cornerRelief, ...parts } = change;
                       const made = partCutting.id
                         ? updatePartCut(documentRef.current, partCutting.id, change)
                         : addPartCut(
@@ -4554,7 +4554,7 @@ export function CadEditor({
                           );
                       const document = 'document' in made ? made.document : made;
                       const id = 'document' in made ? made.id : partCutting.id!;
-                      commit(prepareStudioPreview(updatePartCut(document, id, { consumeTools })));
+                      commit(prepareStudioPreview(updatePartCut(document, id, { consumeTools, cornerRelief })));
                       setPartCutting(null);
                     }}
                   />

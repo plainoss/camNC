@@ -1,7 +1,14 @@
 import { expect, it } from 'vitest';
 import {
-  addPartCut, addRectangle, createCadDocument, createCadPart, evaluateCadDocument, parseCadDocument,
-  setCadVariable, updatePartCut, type CadDocument,
+  addPartCut,
+  addRectangle,
+  createCadDocument,
+  createCadPart,
+  evaluateCadDocument,
+  parseCadDocument,
+  setCadVariable,
+  updatePartCut,
+  type CadDocument,
 } from './index';
 
 function source() {
@@ -10,7 +17,11 @@ function source() {
   seat.sketch = addRectangle(seat.sketch, { x: 190, y: 140, width: 20, height: 20, dimensioned: true, positioned: true });
   seat.cornerRelief = { diameter: 6 };
   seat.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
-  const tools = [[20, 40], [110, 40], [70, 110]].map(([x, y], index) => {
+  const tools = [
+    [20, 40],
+    [110, 40],
+    [70, 110],
+  ].map(([x, y], index) => {
     const tool = createCadPart(`Tenon ${index + 1}`, 18);
     tool.sketch = addRectangle(tool.sketch, { x: x!, y: y!, width: 40, height: 18, dimensioned: true, positioned: true });
     tool.placement = structuredClone(seat.placement);
@@ -21,7 +32,10 @@ function source() {
   return { document, seat, tools };
 }
 const cutBounds = (outline: { x: number; y: number }[]) => [
-  Math.min(...outline.map(p => p.x)), Math.min(...outline.map(p => p.y)), Math.max(...outline.map(p => p.x)), Math.max(...outline.map(p => p.y)),
+  Math.min(...outline.map(p => p.x)),
+  Math.min(...outline.map(p => p.y)),
+  Math.max(...outline.map(p => p.x)),
+  Math.max(...outline.map(p => p.y)),
 ];
 
 it('keeps legacy inheritance but applies Off and Dogbone only to their own openings', () => {
@@ -67,12 +81,21 @@ it.each(['constructions'])('refuses unsupported %s even combined with its own re
   const relieved = updatePartCut(document, document.partCuts![0]!.id, { cornerRelief: null });
   const combined = { ...relieved, [key]: [] };
   expect(() => parseCadDocument(combined)).toThrow(/support/i);
-  expect(evaluateCadDocument(combined as CadDocument).diagnostics).toContainEqual(expect.objectContaining({ severity: 'error', code: 'invalid-document' }));
+  expect(evaluateCadDocument(combined as CadDocument).diagnostics).toContainEqual(
+    expect.objectContaining({ severity: 'error', code: 'invalid-document' })
+  );
 });
 
-it.each([false, true, 0, -1, 'off', {}, { diameter: 0 }, { diameter: Infinity }, { diameter: 6, kind: 'tbone' }])('refuses malformed relief %j before evaluating geometry', relief => {
-  const document = source().document;
-  const input = { ...document, version: 5, partCuts: document.partCuts!.map((step, i) => i ? step : { ...step, cornerRelief: relief }) };
-  expect(() => parseCadDocument(input)).toThrow();
-  expect(evaluateCadDocument(input as CadDocument).diagnostics).toContainEqual(expect.objectContaining({ severity: 'error' }));
-});
+it.each([false, true, 0, -1, 'off', {}, { diameter: 0 }, { diameter: Infinity }, { diameter: 6, kind: 'tbone' }])(
+  'refuses malformed relief %j before evaluating geometry',
+  relief => {
+    const document = source().document;
+    const input = {
+      ...document,
+      version: 5,
+      partCuts: document.partCuts!.map((step, i) => (i ? step : { ...step, cornerRelief: relief })),
+    };
+    expect(() => parseCadDocument(input)).toThrow();
+    expect(evaluateCadDocument(input as CadDocument).diagnostics).toContainEqual(expect.objectContaining({ severity: 'error' }));
+  }
+);

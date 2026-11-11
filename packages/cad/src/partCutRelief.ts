@@ -6,9 +6,13 @@ export function partCutReliefIssue(value: unknown): string | null {
   if (value === undefined || value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'Invalid Cut parts corner relief.';
   const setting = value as { diameter?: unknown; diameterExpression?: unknown };
-  if (Object.keys(setting).some(key => key !== 'diameter' && key !== 'diameterExpression') ||
-    typeof setting.diameter !== 'number' || !Number.isFinite(setting.diameter) || setting.diameter <= 0 ||
-    (setting.diameterExpression !== undefined && (typeof setting.diameterExpression !== 'string' || !setting.diameterExpression.trim())))
+  if (
+    Object.keys(setting).some(key => key !== 'diameter' && key !== 'diameterExpression') ||
+    typeof setting.diameter !== 'number' ||
+    !Number.isFinite(setting.diameter) ||
+    setting.diameter <= 0 ||
+    (setting.diameterExpression !== undefined && (typeof setting.diameterExpression !== 'string' || !setting.diameterExpression.trim()))
+  )
     return 'Cut parts corner relief needs a positive finite cutter diameter and a valid expression.';
   return null;
 }

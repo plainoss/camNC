@@ -354,9 +354,7 @@ export function applyPartCuts(
         const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
           through = reach >= t - kSquare;
         const setting = effectivePartCutRelief(step, intoSource);
-        const relief = setting
-          ? relieveLoopCorners(outline, true, setting.diameter, into.outline)
-          : { points: outline, skipped: [] };
+        const relief = setting ? relieveLoopCorners(outline, true, setting.diameter, into.outline) : { points: outline, skipped: [] };
         if (relief.skipped.length)
           warn(
             `${relief.skipped.length} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`,

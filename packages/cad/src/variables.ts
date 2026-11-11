@@ -541,7 +541,11 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
   for (const step of document.partCuts ?? []) {
     const relief = partCutReliefOutcome(step, scope);
     if (relief && 'error' in relief)
-      problems.push({ code: 'variable-value', severity: 'error', message: `Cut parts corner relief ${step.cornerRelief!.diameterExpression}: ${relief.error}` });
+      problems.push({
+        code: 'variable-value',
+        severity: 'error',
+        message: `Cut parts corner relief ${step.cornerRelief!.diameterExpression}: ${relief.error}`,
+      });
     const outcome = clearanceOutcome(step, scope);
     if (outcome && 'error' in outcome)
       problems.push({
