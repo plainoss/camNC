@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
 import { kStudioCommands, type StudioCommand } from './studioCommands';
+import { useToolbarOverflow } from './useToolbarOverflow';
+import './studioToolbar.css';
 
 export type { StudioCommand };
 
@@ -39,15 +42,38 @@ export function StudioToolbar({
   onSearch?: () => void;
   children?: ReactNode;
 }) {
+  const overflow = useToolbarOverflow<HTMLDivElement, HTMLDivElement>(kStudioCommands.length);
+  const shown = kStudioCommands.slice(0, overflow.visible);
+  const hidden = kStudioCommands.slice(overflow.visible);
   return (
     <header
       className="cad-toolbar cad-studio-toolbar"
       role="toolbar"
       aria-label="Part Studio toolbar"
       title="Views: Shift+1 Front, Shift+2 Back, Shift+3 Left, Shift+4 Right, Shift+5 Top, Shift+6 Bottom, Shift+7 Isometric. F fits the model. P toggles base planes. Y hides the part under the pointer, Shift+T toggles transparency, Shift+Y shows all, Shift+I isolates the selected part.">
-      {/* Scroll the feature commands so they cannot widen the mobile viewport or push Done off screen. */}
-      <div className="cad-tool-group cad-drawing-tools" role="group" aria-label="Part Studio features" inert={busy}>
-        {kStudioCommands.map(command => (
+      {/* What every command and the More control take, measured even while they are in the menu. */}
+      <div className="cad-studio-command-sizes" aria-hidden="true" inert>
+        <div ref={overflow.measureRef}>
+          {kStudioCommands.map(command => (
+            <button key={command.id} type="button" tabIndex={-1} className="cad-studio-command">
+              <StudioCommandGlyph command={command} />
+              {command.label}
+            </button>
+          ))}
+          <button type="button" tabIndex={-1} className="cad-studio-command cad-studio-more">
+            More
+            <MoreGlyph />
+          </button>
+        </div>
+      </div>
+      {/* Commands that do not fit move into a More menu, so they cannot widen the mobile viewport or push Done off screen. */}
+      <div
+        ref={overflow.ref}
+        className="cad-tool-group cad-drawing-tools cad-studio-commands"
+        role="group"
+        aria-label="Part Studio features"
+        inert={busy}>
+        {shown.map(command => (
           <ToolHint key={command.id} label={disabled[command.id] ?? command.hint}>
             <button
               type="button"
@@ -55,13 +81,43 @@ export function StudioToolbar({
               aria-pressed={active === command.id}
               aria-disabled={disabled[command.id] ? true : undefined}
               onClick={() => !disabled[command.id] && onCommand(command.id)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                {command.glyph}
-              </svg>
+              <StudioCommandGlyph command={command} />
               {command.label}
             </button>
           </ToolHint>
         ))}
+        {hidden.length > 0 && (
+          <DropdownMenu modal={false}>
+            <ToolHint label={`More features: ${hidden.map(command => command.label).join(', ')}`}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="cad-studio-command cad-studio-more"
+                  aria-pressed={hidden.some(command => command.id === active) || undefined}>
+                  More
+                  <MoreGlyph />
+                </button>
+              </DropdownMenuTrigger>
+            </ToolHint>
+            <DropdownMenuContent align="end" className="cad-tool-menu cad-studio-more-menu">
+              {hidden.map(command => (
+                <ToolHint key={command.id} label={disabled[command.id] ?? command.hint}>
+                  <DropdownMenuItem
+                    aria-disabled={disabled[command.id] ? true : undefined}
+                    data-active={active === command.id || undefined}
+                    onSelect={event => {
+                      // Like its toolbar button, a command that needs something first stays put and keeps its reason.
+                      if (disabled[command.id]) event.preventDefault();
+                      else onCommand(command.id);
+                    }}>
+                    <StudioCommandGlyph command={command} />
+                    <span>{command.label}</span>
+                  </DropdownMenuItem>
+                </ToolHint>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
       {onSearch && (
         <button type="button" className="cad-search-trigger" disabled={busy} onClick={onSearch} aria-keyshortcuts="Alt+C">
@@ -104,5 +160,21 @@ export function StudioToolbar({
         </ToolHint>
       </div>
     </header>
+  );
+}
+
+function StudioCommandGlyph({ command }: { command: (typeof kStudioCommands)[number] }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      {command.glyph}
+    </svg>
+  );
+}
+
+function MoreGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m7 10 5 5 5-5" />
+    </svg>
   );
 }

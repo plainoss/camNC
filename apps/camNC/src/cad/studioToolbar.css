@@ -1,0 +1,48 @@
+/*
+ * The feature commands grow into the toolbar's free width, so the overflow measure sees the room there is, not just
+ * the room the shown commands take. Their basis stays their content, so an editor sized by its content still makes
+ * room for every command.
+ */
+.cad-toolbar > .cad-studio-commands {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+/* A clipped, empty box, so the full-width row of copies inside it cannot widen the page. */
+.cad-studio-command-sizes {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.cad-studio-command-sizes > div {
+  display: flex;
+  width: max-content;
+}
+.cad-editor .cad-studio-more {
+  padding: 0 4px 0 9px;
+  gap: 2px;
+}
+.cad-studio-more-menu svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.cad-studio-more-menu [data-slot='dropdown-menu-item'][data-active] {
+  background: #dfeaf8;
+  color: #174f8f;
+}
+.cad-studio-more-menu [data-slot='dropdown-menu-item'][aria-disabled='true'] {
+  color: #9aa7b6;
+}
+/* Only the feature commands give up room: a squeezed search button would hand it back once commands move to More. */
+.cad-studio-toolbar > .cad-search-trigger {
+  flex-shrink: 0;
+}
+/* Above the view controls under the toolbar, also where the shared utility classes are not loaded. */
+.cad-studio-more-menu {
+  z-index: 50;
+}

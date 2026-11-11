@@ -5,6 +5,7 @@ import { endCadSession } from '@wbcnc/cad-editor/session';
 import { afterEach, expect, it } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
+import { studioCommand } from './studioToolbarTesting';
 
 let sessionId: string | undefined;
 afterEach(() => {
@@ -45,7 +46,7 @@ it('patterns an explicitly selected consumed source while retaining its cut and 
   const before = structuredClone(current);
   const features = within(screen.getByRole('region', { name: 'Features' }));
   await userEvent.click(features.getByRole('button', { name: /^Extrude · Tool/ }));
-  const pattern = within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Pattern/ });
+  const pattern = await studioCommand(/Pattern/);
   expect(pattern).not.toBeDisabled();
   await userEvent.click(pattern);
   expect(screen.queryAllByRole('alert').map(alert => alert.textContent)).toEqual([]);
@@ -69,7 +70,7 @@ it('patterns an explicitly selected consumed source while retaining its cut and 
   const patternId = family.pattern!.id,
     copyIds = family.copies!.map(copy => copy.id);
   await userEvent.click(features.getByRole('button', { name: /^Extrude · Tool/ }));
-  await userEvent.click(pattern);
+  await userEvent.click(await studioCommand(/Pattern/));
   const reopened = await screen.findByRole('dialog', { name: 'Linear pattern · Tool' });
   expect(within(reopened).getByRole('textbox', { name: 'How many' })).toHaveValue('2');
   await userEvent.click(within(reopened).getByRole('button', { name: 'OK' }));

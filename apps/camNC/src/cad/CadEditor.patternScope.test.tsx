@@ -7,6 +7,7 @@ import { ModelViewport } from '@/cam/model/ModelViewport';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
 import tray from '../../../../packages/cad-script/fixtures/designs/divided-tray.json';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 const sessions: string[] = [];
@@ -15,7 +16,6 @@ afterEach(() => {
   sessions.splice(0).forEach(endCadSession);
 });
 const viewport = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
-const toolbar = () => within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' }));
 const parts = () => within(screen.getByRole('list', { name: 'Parts' }));
 const refusal = 'Patterning only the selected copy is not supported. Select the source part in Parts to pattern its whole family.';
 
@@ -55,7 +55,7 @@ it.each(['viewport', 'Parts list'])(
     expect(copyRow()).toHaveAttribute('aria-pressed', 'true');
     const before = structuredClone(latest());
     const instances = [...viewport().instanceIds!];
-    await userEvent.click(toolbar().getByRole('button', { name: /Pattern/ }));
+    await userEvent.click(await studioCommand(/Pattern/));
     expect(screen.queryByRole('dialog', { name: /^Linear pattern/ })).toBeNull();
     expect(screen.getByRole('alert').textContent).toBe(refusal);
     expect(copyRow()).toHaveAttribute('aria-pressed', 'true');
@@ -65,7 +65,7 @@ it.each(['viewport', 'Parts list'])(
 
     // A deliberate source pick retains the established whole-family operation.
     await userEvent.click(parts().getByRole('button', { name: 'Divider' }));
-    await userEvent.click(toolbar().getByRole('button', { name: /Pattern/ }));
+    await userEvent.click(await studioCommand(/Pattern/));
     const dialog = await screen.findByRole('dialog', { name: /^Linear pattern/ });
     expect(screen.queryByRole('alert')).toBeNull();
     const count = within(dialog).getByRole('textbox', { name: 'How many' });
@@ -97,7 +97,7 @@ it('keeps a disappeared selected pattern slot from silently opening the source p
   const before = structuredClone(latest());
   const calls = change.mock.calls.length;
   const instances = [...viewport().instanceIds!];
-  await userEvent.click(toolbar().getByRole('button', { name: /Pattern/ }));
+  await userEvent.click(await studioCommand(/Pattern/));
   expect(screen.queryByRole('dialog', { name: /^Linear pattern/ })).toBeNull();
   expect(screen.getByRole('alert').textContent).toBe(refusal);
   expect(change).toHaveBeenCalledTimes(calls);
@@ -115,7 +115,7 @@ it.each([false, true])('refuses to create a family pattern from a standalone cop
   await userEvent.click(copyRow());
   const before = structuredClone(latest());
   const instances = [...viewport().instanceIds!];
-  await userEvent.click(toolbar().getByRole('button', { name: /Pattern/ }));
+  await userEvent.click(await studioCommand(/Pattern/));
   expect(screen.queryByRole('dialog', { name: /^Linear pattern/ })).toBeNull();
   expect(screen.getByRole('alert').textContent).toBe(refusal);
   expect(copyRow()).toHaveAttribute('aria-pressed', 'true');

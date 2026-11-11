@@ -7,6 +7,7 @@ import { ModelViewport } from '@/cam/model/ModelViewport';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
 import cabinet from '../../../../packages/cad-script/fixtures/designs/task-start-cupboard-three-shelves.json';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', () => ({ ModelViewport: vi.fn(() => null) }));
 const sessions: string[] = [];
@@ -91,7 +92,7 @@ it.each(['linear', 'circular'] as const)(
     expect(session.past).toHaveLength(0);
     expect(session.future).toHaveLength(0);
     expect(toolbar().getByRole('button', { name: 'Undo (Ctrl or Command Z)' })).toBeDisabled();
-    await userEvent.click(toolbar().getByRole('button', { name: 'Pattern' }));
+    await userEvent.click(await studioCommand('Pattern'));
     let generic = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
     if (kind === 'circular') {
       await userEvent.selectOptions(within(generic).getByRole('combobox', { name: 'Pattern type' }), 'circular');
@@ -171,7 +172,7 @@ it.each(['linear', 'circular'] as const)(
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(content(latest())).toEqual(content(before));
     expect(session.past).toHaveLength(0);
-    await userEvent.click(toolbar().getByRole('button', { name: 'Pattern' }));
+    await userEvent.click(await studioCommand('Pattern'));
     dialog = await screen.findByRole('dialog', { name: `${label(kind)} · Plate` });
     await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Pattern type' }), other);
     dialog = await screen.findByRole('dialog', { name: `${label(other)} · Plate` });
@@ -188,7 +189,9 @@ it('keeps both pattern search entries disabled for a sketch without an extrusion
   source.parts[0]!.extrude = false;
   const { session, latest } = await studio(source);
   const before = structuredClone(latest());
-  expect(toolbar().getByRole('button', { name: 'Pattern' })).toHaveAttribute('aria-disabled', 'true');
+  expect(await studioCommand('Pattern')).toHaveAttribute('aria-disabled', 'true');
+  // Close the More menu the command may sit in, so typing reaches the tool search.
+  if (screen.queryByRole('menu')) await userEvent.keyboard('{Escape}');
   const input = await search('circular pattern');
   expect(screen.queryByRole('option', { name: 'Circular pattern' })).toBeNull();
   expect(screen.getByText('No tools found')).toBeVisible();
@@ -213,7 +216,7 @@ it('opens the explicit circular controls for the complete cabinet shelf family w
   expect(content(latest())).toEqual(content(before));
   expect(session.past).toHaveLength(0);
   expect(session.future).toHaveLength(0);
-  await userEvent.click(toolbar().getByRole('button', { name: 'Pattern' }));
+  await userEvent.click(await studioCommand('Pattern'));
   const generic = await screen.findByRole('dialog', { name: 'Linear pattern · Shelf' });
   expect(count(generic, 'linear')).toHaveValue(shelf.pattern!.countExpression ?? String(shelf.pattern!.count));
   await userEvent.click(within(generic).getByRole('button', { name: 'Cancel' }));

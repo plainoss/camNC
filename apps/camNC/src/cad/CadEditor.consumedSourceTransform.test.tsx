@@ -14,6 +14,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { nativePart } from '@/cam/nativeCadModel';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
+import { studioCommand } from './studioToolbarTesting';
 
 const sessions: string[] = [];
 afterEach(() => {
@@ -74,7 +75,7 @@ it.each([false, true])(
     await settled();
     expect(within(screen.getByRole('list', { name: 'Parts' })).queryByRole('button', { name: 'Tool' })).toBeNull();
     await userEvent.click(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Extrude · Tool/ }));
-    const transform = toolbar().getByRole('button', { name: /Transform/ });
+    const transform = await studioCommand(/Transform/);
     expect(transform).not.toBeDisabled();
     await userEvent.click(transform);
     let dialog = await screen.findByRole('dialog', { name: /^Transform/ });
@@ -85,7 +86,7 @@ it.each([false, true])(
     expect(latest().parts.find(part => part.id === tool.id)?.moved).toBeUndefined();
     expect(latest().partCuts).toEqual(before.partCuts);
 
-    await userEvent.click(toolbar().getByRole('button', { name: /Transform/ }));
+    await userEvent.click(await studioCommand(/Transform/));
     dialog = await screen.findByRole('dialog', { name: /^Transform/ });
     await userEvent.clear(within(dialog).getByRole('textbox', { name: 'X' }));
     await userEvent.type(within(dialog).getByRole('textbox', { name: 'X' }), '5');
