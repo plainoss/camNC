@@ -1,10 +1,22 @@
 # Illustrations for carving
 
-Open a carving job and choose **Assistant** in the Carve step. Describe an
-illustration, such as an owl reading a book or a cute mouse playing with a ball.
-Set its maximum width and height in millimetres and choose Simple, Balanced or
-Detailed. The illustration keeps its proportions inside that envelope; its
-actual cut dimensions appear in the preview.
+Open a carving job and choose **Assistant** in the Carve step. A dashed box
+appears on the board in the nearest clear spot: it sets where the illustration
+goes and the largest size it may take. Drag the box to move it, or its corner to
+resize it; **Box width** and **Box height** in the panel do the same. The
+illustration keeps its proportions inside the box. Its actual cut size appears
+in the panel.
+
+Describe the illustration in the bar under the board, such as an owl reading a
+book or a cute mouse playing with a ball. Choose **Line art** or **Bold shapes**
+and 1, 2 or 4 variants, then **Generate**. Each variant is asked for a different
+composition. The variants appear above the bar. Hover one to preview it on the
+board, and click one to pick it. The picked variant is prepared at the box size
+and shown on the board in place, with any compact thin or lost spots circled in
+red. Moving or resizing the box, the **Detail** slider (Simple, Balanced,
+Detailed) and job edits all prepare the picked variant again, locally and without
+another request. **Refine picked** sends the current description together with
+the picked artwork as a revision. **New ideas** starts again from the description.
 
 The assistant produces filled regions for the existing variable-depth V-carving
 workflow. Black means removed material. This does not introduce height-map relief
@@ -37,8 +49,9 @@ refuses oversized images, noisy masks or excessively complex contours. Changing
 size/detail traces the original PNG again locally at the new tolerances. The API
 requests a standard 1024 × 1024 PNG. Source decoding accepts static PNGs up to
 2 MB and four million pixels, then downsamples to at most one million working
-pixels before contour extraction. **Trace generated PNG** also imports an image
-made with imagegen or another generator, without a provider connection.
+pixels before contour extraction. **More options → Trace an image (PNG)** also
+imports an image made with imagegen or another generator, without a provider
+connection.
 
 PNG tracing emits closed Bézier contours with filled holes, rather than a path
 around every pixel. A disposable worker fits curves, aligns gentle tangent joins
@@ -57,18 +70,21 @@ ellipses, curved strokes, small counters and the actual owl fixture exercise the
 guards. These measured bounds and visual inspections do not constitute a promise
 that every possible input image can be converted without a visible change.
 
-Generate one candidate, compare the source and prepared artwork, inspect the
-checked cutting paths and board placement, then Apply or Discard. Adding finds
-a clear position without moving existing artwork. Replacement keeps the selected
-item's identity, position and rotation. A candidate whose bounding box overlaps
-another item is refused: combining them could change the carve after checking.
-Reduce its size, move existing artwork, or select an item to replace.
+Check the prepared artwork on the board, the report and, if needed, the cutting
+paths in the panel, then **Apply artwork** or **Discard**. The artwork goes at the
+box's centre. **Replace** (offered when an item is selected) keeps the selected
+item's identity and rotation. A candidate whose bounding box overlaps another item
+is refused, because combining them could change the carve after checking: the
+panel asks you to move the box or make it smaller. Warnings from the checks are
+listed under **notes** and do not block Apply; errors do.
 
-Changing size or detail uses **Update preview locally**, with no provider request.
-Changing the subject or pose uses another generation. Accepted items save their
-original source, brief and detail setting, so local revisions work after reopening
-the job, including without a provider connection. Replacing the artwork manually
-ends that generated-source link.
+Accepted items save their original source, brief and detail setting. Selecting a
+generated item and opening the assistant brings that source back in the box for
+local rechecks, including without a provider connection. Replacing the artwork
+manually ends that generated-source link.
+
+When a token or USD limit is set, the variants are requested one after another so
+the limit can stop between requests; otherwise they are requested together.
 
 ## Physical detail checks
 
@@ -111,7 +127,7 @@ settings and unrelated job fields are preserved when a proposal is applied.
 
 ## Usage and budgets
 
-Usage accumulates across generation attempts while the panel is open, including
+Usage accumulates across generation attempts while the Carve step is open, including
 unusable responses. Local preparation makes no model request. Text-model pricing
 uses the shared assistant accounting; unknown usage or prices stay unknown.
 Interrupted or failed requests may have been billed and invalidate known totals
