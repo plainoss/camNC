@@ -429,6 +429,8 @@ export class FluidncProtocol {
       wpos,
       wco,
       workKnown: !!(parsed.wco || parsed.wpos || prev?.workKnown),
+      // Told by the decimals only as FluidNC prints them: unknown for other firmware, or before `$I` says it is FluidNC.
+      positionUnits: this.buildInfo ? (parsed.positionUnits ?? prev?.positionUnits) : undefined,
       overrides: parsed.overrides ?? prev?.overrides,
       spindleOn: parsed.overrides ? /[SC]/.test(parsed.accessories ?? '') : prev?.spindleOn,
       overridesReported: !!parsed.overrides,

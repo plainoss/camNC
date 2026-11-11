@@ -11,6 +11,13 @@ import {
 } from './stream-parser';
 
 describe('parseFluidNCLine', () => {
+  it('tells the position units by their decimals: 3 in mm, 4 in inches ($Report/Inches)', () => {
+    expect(parseFluidNCLine('<Idle|MPos:1.000,2.000,-3.000|FS:0,0>')!.positionUnits).toBe('mm');
+    expect(parseFluidNCLine('<Idle|MPos:0.0394,0.0787,-0.1181|FS:0,0>')!.positionUnits).toBe('inch');
+    expect(parseFluidNCLine('<Idle|WPos:1.0000,2.0000,3.0000|FS:0,0>')!.positionUnits).toBe('inch');
+    expect(parseFluidNCLine('<Idle|MPos:1,2,3|FS:0,0>')!.positionUnits).toBeUndefined();
+  });
+
   it('reads the accessory state that comes with the overrides', () => {
     const on = parseFluidNCLine('<Hold:0|MPos:1.000,2.000,3.000|FS:0,15000|Ov:100,100,100|A:SF|SD:3.61,/sd/job.gcode>')!;
     expect(on.accessories).toBe('SF');
