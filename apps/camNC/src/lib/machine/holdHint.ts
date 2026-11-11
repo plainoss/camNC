@@ -38,8 +38,9 @@ const kAtZ = 0.05;
  * - Every other M0 also needs the bit where the program put it before that M0: a hold from the machine's button or
  *   another client, with the reader blocked just before the M0 (at the M5, say), reports nearly the same position.
  *   That holds for M0s without a camNC marker (other posts) too: at or above the last Z before the M0.
- * - A first M0 with no move before it (Fusion's "Turn ON 15000RPM") has no Z to compare with. It needs the bit not to
- *   have moved since camNC started the job: then nothing has been cut yet.
+ * - A first M0 with no move before it (Fusion's "Turn ON 15000RPM") has no Z to compare with. It needs the reader to
+ *   be short of the first move after it, or the bit not to have moved since camNC started the job: then nothing has
+ *   been cut yet. Missing it would let a router switched by hand stay off for the cut.
  */
 export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
   if (c.percent === undefined) return null;
@@ -68,7 +69,14 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
   if (index < 0) return null;
   const hint = explainPause(lines, index, gcode);
   if (!hint.marker) {
-    if (index === first && !lines.slice(0, first).some(movesOrProbes)) return c.stillSinceStart === true ? hint : null;
+    if (index === first && !lines.slice(0, first).some(movesOrProbes)) {
+      // FluidNC cannot read past the M0 without Resume. While the furthest it can have read (the reported position plus
+      // the window) is short of the first move after it, the bit has not moved; that survives a reload. On a file so
+      // large that the window reaches that move, only the bit not having moved since camNC started the job tells.
+      const readTo = (Math.max(c.readTo ?? c.percent, c.percent) / 100) * size;
+      const unmoved = readTo + positionWindow(size) <= beforeFirstMoveAfter(lines, first);
+      return unmoved || c.stillSinceStart === true ? hint : null;
+    }
     return bitAtOrAbove(lines, index, c) ? hint : null;
   }
   // Past the start pause's reader position above, the job is past it.
@@ -102,14 +110,33 @@ function bitAtOrAbove(lines: Line[], index: number, c: HoldContext) {
   return !!at && z !== undefined && z >= at.z - kAtZ;
 }
 
-/** The Z the program last moved to before line `index`, and whether in machine coordinates (G53). `null` if unknown. */
+/**
+ * The Z the program last moved to before line `index`, and whether in machine coordinates (G53). `null` if unknown: no
+ * Z move yet, an offset, homing or probe since (G10, G28, G30, G38, G92), or relative moves (G91) at that point.
+ */
 function zBefore(lines: Line[], index: number) {
-  for (let i = index - 1; i >= 0; i--) {
+  let relative = false;
+  let last: { z: number; machine: boolean } | null = null;
+  for (let i = 0; i < index; i++) {
     const code = lines[i]!.code.toUpperCase();
-    // Offsets, homing, probing and relative moves change what a Z word means (G91.1 only sets the arc centre mode).
-    if (/\bG0*(?:10|28|30|38(?:\.\d)?|91|92(?:\.\d)?)(?![\d.])/.test(code)) return null;
-    const z = code.match(/Z(-?\d*\.?\d+)/);
-    if (z) return { z: Number(z[1]), machine: /\bG53\b/.test(code) };
+    // G90.1/G91.1 only set the arc centre mode.
+    if (/\bG0*90(?![\d.])/.test(code)) relative = false;
+    if (/\bG0*91(?![\d.])/.test(code)) relative = true;
+    if (/\bG0*(?:10|28|30|38(?:\.\d)?|92(?:\.\d)?)(?![\d.])/.test(code)) {
+      last = null;
+      continue;
+    }
+    const z = code.match(/Z\s*([-+]?(?:\d+\.?\d*|\.\d+))/);
+    if (!z) continue;
+    const machine = /\bG0*53(?![\d.])/.test(code);
+    // A relative Z move leaves the height unknown; G53 is in machine coordinates either way.
+    last = relative && !machine ? null : { z: Number(z[1]), machine };
   }
-  return null;
+  return relative ? null : last;
+}
+
+/** End byte of the line before the first move or probe after line `index`: the reader there has not moved the bit. */
+function beforeFirstMoveAfter(lines: Line[], index: number) {
+  for (let i = index + 1; i < lines.length; i++) if (movesOrProbes(lines[i]!)) return lines[i - 1]!.end;
+  return lines.at(-1)!.end;
 }

@@ -173,25 +173,27 @@ describe('the hold card, from the controller through CncApi', () => {
     expect(card()).toContain(generic);
   });
 
-  it('a Fusion program held at its first M0, before any move, says to turn the router on if camNC started it', async () => {
-    const m0 = 'M0 (MSG Turn ON 15000RPM)';
-    const atM0 = controllerPercent(
-      new TextEncoder().encode(fusionBack.slice(0, fusionBack.indexOf('\n', fusionBack.indexOf(m0)) + 1)).length,
-      new TextEncoder().encode(fusionBack).length
-    );
+  it('a Fusion program held at its first M0, before any move, says to turn the router on, also after a reload', async () => {
+    const bytes = (text: string) => new TextEncoder().encode(text).length;
+    const percentAfter = (text: string) =>
+      controllerPercent(bytes(fusionBack.slice(0, fusionBack.indexOf('\n', fusionBack.indexOf(text)) + 1)), bytes(fusionBack));
     useStore.getState().updateToolpath(fusionBack, 'back');
-    fake.files.set(file.slice(4), new TextEncoder().encode(fusionBack));
-    await h.api.runFile(file.slice(4));
+    // Found running at the M0: this tab did not start the job, so it does not know where the bit was then.
     fake.state = 'Hold:0';
-    fake.job = { file, percent: atM0 };
+    fake.job = { file, percent: percentAfter('M0 (MSG Turn ON 15000RPM)') };
     fake.pushStatus();
-    await until(() => h.api.jobProgress.value?.percent === atM0);
+    await until(() => h.api.jobProgress.value?.percent === fake.job!.percent);
+    expect(h.api.jobStartPos.value).toBeNull();
     view = render(<RunningView />);
     expect(card()).toContain('Turn ON 15000RPM');
-    // The same hold with the bit somewhere else: not the first M0.
-    fake.mpos = { ...fake.mpos, z: fake.mpos.z - 10 };
+    // Held again with the reader past the first move after the M0: the job ran on.
+    fake.state = 'Run';
+    fake.job = { file, percent: percentAfter('X-2.64 Y189.682 F9000') };
     fake.pushStatus();
-    await until(() => h.api.status.value?.mpos.z === fake.mpos.z);
+    await until(() => h.api.state.value === 'Run');
+    fake.state = 'Hold:0';
+    fake.pushStatus();
+    await until(() => h.api.state.value === 'Hold');
     view.rerender(<RunningView />);
     expect(card()).toContain(generic);
   });

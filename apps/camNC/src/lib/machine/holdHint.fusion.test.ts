@@ -20,14 +20,30 @@ const at = (percent: number, more: Partial<HoldContext> = {}): HoldContext => ({
 });
 
 describe('a Fusion program’s M0s, which have no camNC marker', () => {
-  it('its first M0, before any move, shows only while the bit has not moved since camNC started the job', () => {
-    const percent = after(back, 'M0 (MSG Turn ON 15000RPM)');
-    expect(holdHint(back, at(percent, { stillSinceStart: true }))?.reason).toBe(
-      'The job stopped at a program pause (M0) on line 56: “Turn ON 15000RPM”.'
-    );
-    // Unknown (a job found running after a reload) or moved: nothing to go by.
-    expect(holdHint(back, at(percent))).toBeNull();
-    expect(holdHint(back, at(percent, { stillSinceStart: undefined }))).toBeNull();
+  describe('its first M0, before any move', () => {
+    const m0 = 'M0 (MSG Turn ON 15000RPM)';
+
+    it('shows while the reader is short of the first move after it, also after a reload', () => {
+      const percent = after(back, m0);
+      // After a reload camNC does not know where the job started.
+      for (const stillSinceStart of [undefined, false, true])
+        expect(holdHint(back, at(percent, { stillSinceStart }))?.reason).toBe(
+          'The job stopped at a program pause (M0) on line 56: “Turn ON 15000RPM”.'
+        );
+      // The reader went on past the first move (G0 Z11): it ran after the M0.
+      expect(holdHint(back, at(percent, { readTo: after(back, 'G0 Z11 F1200') }))).toBeNull();
+    });
+
+    it('in a file so large that the window reaches that move, shows only if the bit has not moved since the start', () => {
+      const head = back.slice(0, back.indexOf('( *** SECTION end ***)'));
+      const big = head + left.slice(left.indexOf('( MOVEMENT_CUTTING)'), left.indexOf('( *** SECTION end ***)')).repeat(113);
+      expect(bytes(big)).toBeGreaterThan(2_400_000);
+      // At this size the percent the controller reports for the reader waiting at the M0 stands for a byte so far on that
+      // the position window reaches past the first move.
+      const percent = after(big, m0);
+      expect(holdHint(big, at(percent))).toBeNull();
+      expect(holdHint(big, at(percent, { stillSinceStart: true }))?.reason).toContain('Turn ON 15000RPM');
+    });
   });
 
   describe('a manual tool change in a long Fusion program', () => {
@@ -65,6 +81,17 @@ describe('a Fusion program’s M0s, which have no camNC marker', () => {
       const program = `G21\nG90\nG0 Z11\nG1 X10 F900\n${between}\nM0 (MSG Check)\nG90\n` + 'G1 X1\n'.repeat(500);
       expect(holdHint(program, at(after(program, 'Check'), { wpos: { z: 50 }, mpos: { z: 0 } }))).toBeNull();
     }
+    // Relative moves anywhere before, still active or for the last Z move: the height is unknown.
+    for (const prefix of ['G91\nG0 Z11\nG1 X10', 'G0 Z11\nG91 G1 X10', 'G91 G0 Z11\nG90 G1 X10', 'G0 Z11\nG91\nG90\nG91 Z1\nG90 X10']) {
+      const program = `G21\n${prefix}\nM0 (MSG Check)\n` + 'G1 X1\n'.repeat(500);
+      expect(holdHint(program, at(after(program, 'Check'), { wpos: { z: 50 } }))).toBeNull();
+      // With the prefix all absolute it would show.
+      const absolute = program.replaceAll('G91', 'G90');
+      expect(holdHint(absolute, at(after(absolute, 'Check'), { wpos: { z: 50 } }))?.reason).toContain('Check');
+    }
+    const signed = 'G21\nG90\nG0 Z+11\nG90.1 G91.1 G1 X10 F900\nM0 (MSG Check)\n' + 'G1 X1\n'.repeat(500);
+    expect(holdHint(signed, at(after(signed, 'Check')))?.reason).toContain('Check');
+    expect(holdHint(signed, at(after(signed, 'Check'), { wpos: { z: 10 } }))).toBeNull();
     const plain = 'G21\nG90\nG0 Z11\nG1 X10 F900\nM0 (MSG Check)\n' + 'G1 X1\n'.repeat(500);
     expect(holdHint(plain, at(after(plain, 'Check')))?.reason).toContain('Check');
     // Moves before the first M0 but no Z: it is not the "nothing moved yet" case either.
