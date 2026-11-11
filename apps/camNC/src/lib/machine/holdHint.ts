@@ -73,6 +73,8 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
       // FluidNC cannot read past the M0 without Resume. While the furthest it can have read (the reported position plus
       // the window) is short of the first move after it, the bit has not moved; that survives a reload. On a file so
       // large that the window reaches that move, only the bit not having moved since camNC started the job tells.
+      // Fusion's M0 comes before its M3: a spindle the controller reports running means the job is past it.
+      if (c.spindle === 'on') return null;
       const readTo = (Math.max(c.readTo ?? c.percent, c.percent) / 100) * size;
       const unmoved = readTo + positionWindow(size) <= beforeFirstMoveAfter(lines, first);
       return unmoved || c.stillSinceStart === true ? hint : null;

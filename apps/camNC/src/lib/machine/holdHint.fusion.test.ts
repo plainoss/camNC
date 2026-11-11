@@ -30,6 +30,9 @@ describe('a Fusion program’s M0s, which have no camNC marker', () => {
         expect(holdHint(back, at(percent, { stillSinceStart }))?.reason).toBe(
           'The job stopped at a program pause (M0) on line 56: “Turn ON 15000RPM”.'
         );
+      expect(holdHint(back, at(percent, { spindle: 'off' }))?.reason).toContain('Turn ON 15000RPM');
+      // A spindle the controller reports running: the job is past the M0, whatever the position or start says.
+      for (const stillSinceStart of [false, true]) expect(holdHint(back, at(percent, { spindle: 'on', stillSinceStart }))).toBeNull();
       // The reader went on past the first move (G0 Z11): it ran after the M0.
       expect(holdHint(back, at(percent, { readTo: after(back, 'G0 Z11 F1200') }))).toBeNull();
     });
