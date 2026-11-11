@@ -1,4 +1,5 @@
 import { resolveDatumPlanes } from './datumPlanes';
+import { partCutClearanceOutcome, partCutFingersOutcome, partCutVariableErrors } from './partCutVariables';
 import { dimensionValueError } from './dimensionValues';
 import { newCadId } from './document';
 import { partCutReliefOutcome } from './partCutRelief';
@@ -9,7 +10,6 @@ import type {
   CadDiagnostic,
   CadDocument,
   CadLinearPattern,
-  CadPartCut,
   CadPart,
   CadPlacement,
   CadTurn,
@@ -136,22 +136,6 @@ function dimensionOutcome(constraint: CadConstraint, scope: CadValueScope): Outc
   )
     return { error: 'That would flip this line over. It needs to stay above zero.' };
   return { value: parsed.value };
-}
-
-function clearanceOutcome(step: CadPartCut, scope: CadValueScope): Outcome | null {
-  if (!usesVariables(step.clearanceExpression)) return null;
-  const parsed = parseCadValue(step.clearanceExpression, { unit: 'mm', variables: scope });
-  if ('error' in parsed) return parsed;
-  return parsed.value >= 0 ? parsed : { error: 'A clearance can’t be less than nothing.' };
-}
-
-function fingersOutcome(step: CadPartCut, scope: CadValueScope): Outcome | null {
-  if (typeof step.split !== 'object' || !usesVariables(step.split.fingersExpression)) return null;
-  const parsed = parseCadValue(step.split.fingersExpression, { unit: 'scalar', variables: scope });
-  if ('error' in parsed) return parsed;
-  return Number.isInteger(parsed.value) && parsed.value >= 2
-    ? parsed
-    : { error: 'A finger joint needs a whole number of fingers, at least 2.' };
 }
 
 /** A part pattern with its typed count, spacing and angle worked out, or why one can't be. */
@@ -405,12 +389,12 @@ export function applyCadVariables(document: CadDocument): CadDocument {
     );
   });
   const partCuts = document.partCuts?.map(step => {
-    const outcome = clearanceOutcome(step, scope);
+    const outcome = partCutClearanceOutcome(step, scope);
     let next = outcome && 'value' in outcome && outcome.value !== step.clearance ? { ...step, clearance: outcome.value } : step;
     const relief = partCutReliefOutcome(step, scope);
     if (step.cornerRelief && relief && 'value' in relief && relief.value !== step.cornerRelief.diameter)
       next = { ...next, cornerRelief: { ...step.cornerRelief, diameter: relief.value } };
-    const fingers = fingersOutcome(step, scope);
+    const fingers = partCutFingersOutcome(step, scope);
     if (typeof step.split === 'object' && fingers && 'value' in fingers && fingers.value !== step.split.fingers)
       next = { ...next, split: { ...step.split, fingers: fingers.value } };
     return next;
@@ -538,29 +522,13 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
           });
       }
   }
-  for (const step of document.partCuts ?? []) {
-    const relief = partCutReliefOutcome(step, scope);
-    if (relief && 'error' in relief)
-      problems.push({
-        code: 'variable-value',
-        severity: 'error',
-        message: `Cut parts corner relief ${step.cornerRelief!.diameterExpression}: ${relief.error}`,
-      });
-    const outcome = clearanceOutcome(step, scope);
-    if (outcome && 'error' in outcome)
-      problems.push({
-        code: 'variable-value',
-        severity: 'error',
-        message: `Cut parts clearance ${step.clearanceExpression}: ${outcome.error}`,
-      });
-    const fingers = fingersOutcome(step, scope);
-    if (fingers && 'error' in fingers && typeof step.split === 'object')
-      problems.push({
-        code: 'variable-value',
-        severity: 'error',
-        message: `Cut parts fingers ${step.split.fingersExpression}: ${fingers.error}`,
-      });
-  }
+  // A variable in error is said once above, rather than again on every part whose joint uses it.
+  const broken = new Set((document.variables ?? []).filter(variable => errors[variable.id]).map(variable => variable.name));
+  const covered = (expression: string) => cadExpressionNames(expression).some(name => broken.has(name));
+  // On each part the step joins, so its row shows why; a step whose parts are all gone still says so once.
+  for (const { partIds, message } of partCutVariableErrors(document, scope, covered))
+    for (const partId of partIds.length ? partIds : [undefined])
+      problems.push({ code: 'variable-value', severity: 'error', ...(partId && { partId }), message });
   for (const move of document.copyTransforms ?? []) {
     if (move.suppressed) continue;
     const value = copyTransformValue(move, scope);

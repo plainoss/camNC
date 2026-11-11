@@ -1,7 +1,16 @@
-import { createPlateDocument, newExtrudeOf, sketchRegions, CAD_CHORD_TOLERANCE, parseCadDocument } from '@wbcnc/cad';
+import {
+  createPlateDocument,
+  evaluateCadPart,
+  newExtrudeOf,
+  sketchRegions,
+  splitApartRegions,
+  CAD_CHORD_TOLERANCE,
+  parseCadDocument,
+} from '@wbcnc/cad';
 import { expect, it } from 'vitest';
 import { replaceExtrudeProfile, sketchSelectionRegions } from './profileSelection';
 import saved from '../../../../packages/cad-script/fixtures/designs/extrude-three-profiles.json';
+import apart from '../../../../packages/cad-script/fixtures/designs/extrude-sketch-apart.json';
 
 it('chooses the whole authored sketch without losing Remove settings or feature identity', () => {
   const document = parseCadDocument(structuredClone(saved));
@@ -75,4 +84,26 @@ it('includes end conditions in cycle checks and keeps the feature direction when
     replaceExtrudeProfile(source, target.id, { face: { partId: profile.id, face: 'top' } }).parts.find(p => p.id === target.id)?.drawnOn
       ?.inward
   ).toBe(true);
+});
+
+it('picks every closed shape of a sketch of shapes apart, each a part on OK, rather than the sketch as one outline', () => {
+  const document = parseCadDocument(structuredClone(apart));
+  const selectme = document.parts.find(p => p.sketchName === 'selectme')!;
+  const target = document.parts.find(p => p.sketchOf === selectme.id)!;
+  // As saved, the extrude takes the whole sketch: two circles and a rectangle apart aren't one outline.
+  expect(evaluateCadPart(target).part).toBeUndefined();
+  const shapes = sketchRegions(selectme.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+  expect(shapes).toHaveLength(3);
+  // Picked again for this extrude, and picked for another, the sketch starts with all of its shapes.
+  const again = replaceExtrudeProfile(document, target.id, { sketch: selectme.id });
+  expect(again.parts.find(p => p.id === target.id)!.regions).toEqual(shapes);
+  const other = document.parts.find(p => p.name === 'Part 1 sketch')!;
+  const extruded = { ...other, extrude: undefined };
+  const retargeted = replaceExtrudeProfile({ ...document, parts: [...document.parts.filter(p => p.id !== other.id), extruded] }, other.id, {
+    sketch: selectme.id,
+  });
+  expect(retargeted.parts.find(p => p.id === other.id)!.regions).toEqual(shapes);
+  const split = splitApartRegions(again, target.id).parts.filter(p => p.sketchOf === selectme.id);
+  expect(split).toHaveLength(3);
+  for (const part of split) expect(evaluateCadPart(part).part).toBeDefined();
 });

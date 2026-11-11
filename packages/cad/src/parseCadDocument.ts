@@ -139,6 +139,7 @@ export function parseCadDocument(input: unknown): CadDocument {
         addId(copy.id);
         if (copy.mirrored !== undefined && typeof copy.mirrored !== 'boolean') throw new Error('Invalid CAD part copy');
         if (copy.name !== undefined && typeof copy.name !== 'string') throw new Error('Invalid CAD part copy');
+        if (copy.number !== undefined && (!Number.isInteger(copy.number) || copy.number < 2)) throw new Error('Invalid CAD part copy');
         if (copy.pattern !== undefined && typeof copy.pattern !== 'string') throw new Error('Invalid CAD part copy');
         if (copy.placement !== undefined) checkPlacement(copy.placement);
         if (copy.along !== undefined) {

@@ -1,0 +1,620 @@
+{
+ "design": {
+  "name": "Extrude sketch apart",
+  "revision": 36,
+  "version": 1
+ },
+ "ok": false,
+ "status": "invalid",
+ "errors": [
+  {
+   "code": "disconnected-profile",
+   "message": "Use a separate part for each disconnected outline.",
+   "part": "Part 1",
+   "entities": [
+    "e6d8"
+   ]
+  },
+  {
+   "code": "disconnected-profile",
+   "message": "Use a separate part for each disconnected outline.",
+   "part": "Part 1",
+   "entities": [
+    "8afc",
+    "e7f1",
+    "3a29",
+    "efd6"
+   ]
+  }
+ ],
+ "warnings": [
+  {
+   "code": "underconstrained",
+   "message": "9 degrees of freedom remain. Add dimensions to keep this shape predictable.",
+   "part": "Part 2"
+  },
+  {
+   "code": "underconstrained",
+   "message": "4 degrees of freedom remain. Add dimensions to keep this shape predictable.",
+   "part": "Part 1 sketch"
+  },
+  {
+   "code": "disconnected-profile",
+   "message": "Use a separate part for each disconnected outline.",
+   "part": "Part 2",
+   "entities": [
+    "e6d8"
+   ]
+  },
+  {
+   "code": "disconnected-profile",
+   "message": "Use a separate part for each disconnected outline.",
+   "part": "Part 2",
+   "entities": [
+    "8afc",
+    "e7f1",
+    "3a29",
+    "efd6"
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "a0c59654-7d03-4deb-8c25-6161e38c8931:sketch",
+   "kind": "sketch",
+   "label": "selectme",
+   "part": "Part 2",
+   "settings": {
+    "on": "the top plane",
+    "extruded": false
+   },
+   "result": {
+    "sketch": "Part 2 / profile",
+    "freedom": 9,
+    "status": "solved",
+    "regions": 3
+   }
+  },
+  {
+   "id": "eb6ceb7d-719a-4c4f-a938-682998632b0e:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 1 sketch",
+   "part": "Part 1 sketch",
+   "settings": {
+    "on": "the right plane",
+    "extruded": false
+   },
+   "result": {
+    "sketch": "Part 1 sketch / profile",
+    "freedom": 4,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "ce331f7c-f911-4451-89e1-d9eb787bda8b:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "thickness": {
+     "value": 5.2
+    },
+    "sketchOf": "Part 2",
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 0
+     }
+    }
+   },
+   "result": {
+    "error": "Use a separate part for each disconnected outline."
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Part 2",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 9,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "horizontal": 1,
+    "midpoint": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "pointOnCircle": 1,
+    "verticalPoints": 1
+   },
+   "entities": [
+    {
+     "ref": "7ed1",
+     "type": "circle",
+     "at": [
+      -18,
+      -23
+     ],
+     "d": 56.851
+    },
+    {
+     "ref": "8afc",
+     "type": "line",
+     "a": [
+      22,
+      -40
+     ],
+     "b": [
+      38,
+      -40
+     ],
+     "ends": [
+      "22e3",
+      "e7a2"
+     ]
+    },
+    {
+     "ref": "e7f1",
+     "type": "line",
+     "a": [
+      38,
+      -40
+     ],
+     "b": [
+      38,
+      -18
+     ],
+     "ends": [
+      "f328",
+      "d807"
+     ]
+    },
+    {
+     "ref": "3a29",
+     "type": "line",
+     "a": [
+      38,
+      -18
+     ],
+     "b": [
+      22,
+      -18
+     ],
+     "ends": [
+      "d133",
+      "29fb"
+     ]
+    },
+    {
+     "ref": "efd6",
+     "type": "line",
+     "a": [
+      22,
+      -18
+     ],
+     "b": [
+      22,
+      -40
+     ],
+     "ends": [
+      "f668",
+      "13bb"
+     ]
+    },
+    {
+     "ref": "fdda",
+     "type": "line",
+     "a": [
+      22,
+      -40
+     ],
+     "b": [
+      38,
+      -18
+     ],
+     "ends": [
+      "22e3",
+      "d133"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "1115",
+     "type": "line",
+     "a": [
+      38,
+      -40
+     ],
+     "b": [
+      22,
+      -18
+     ],
+     "ends": [
+      "e7a2",
+      "29fb"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "e6d8",
+     "type": "circle",
+     "at": [
+      -29,
+      54
+     ],
+     "d": 26.907
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -46.415,
+      -51.423
+     ],
+     "size": [
+      56.841,
+      56.846
+     ],
+     "area": 2537.228,
+     "islands": 0
+    },
+    {
+     "ref": "r2",
+     "at": [
+      22,
+      -40
+     ],
+     "size": [
+      16,
+      22
+     ],
+     "area": 352,
+     "islands": 0
+    },
+    {
+     "ref": "r3",
+     "at": [
+      -42.454,
+      40.556
+     ],
+     "size": [
+      26.907,
+      26.888
+     ],
+     "area": 568.072,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Part 1 sketch",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 4,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "horizontal": 1,
+    "midpoint": 1,
+    "parallel": 2,
+    "perpendicular": 1
+   },
+   "entities": [
+    {
+     "ref": "de6f",
+     "type": "line",
+     "a": [
+      -34,
+      17
+     ],
+     "b": [
+      -6,
+      17
+     ],
+     "ends": [
+      "6131",
+      "f866"
+     ]
+    },
+    {
+     "ref": "67ec",
+     "type": "line",
+     "a": [
+      -6,
+      17
+     ],
+     "b": [
+      -6,
+      59
+     ],
+     "ends": [
+      "a5cc",
+      "2aea"
+     ]
+    },
+    {
+     "ref": "36c3",
+     "type": "line",
+     "a": [
+      -6,
+      59
+     ],
+     "b": [
+      -34,
+      59
+     ],
+     "ends": [
+      "a8b0",
+      "034b"
+     ]
+    },
+    {
+     "ref": "749f",
+     "type": "line",
+     "a": [
+      -34,
+      59
+     ],
+     "b": [
+      -34,
+      17
+     ],
+     "ends": [
+      "7d65",
+      "3ef4"
+     ]
+    },
+    {
+     "ref": "cc2b",
+     "type": "line",
+     "a": [
+      -34,
+      17
+     ],
+     "b": [
+      -6,
+      59
+     ],
+     "ends": [
+      "6131",
+      "a8b0"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "ef66",
+     "type": "line",
+     "a": [
+      -6,
+      17
+     ],
+     "b": [
+      -34,
+      59
+     ],
+     "ends": [
+      "f866",
+      "034b"
+     ],
+     "construction": true
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -34,
+      17
+     ],
+     "size": [
+      28,
+      42
+     ],
+     "area": 1176,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Part 1",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": null,
+   "status": "shared",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "horizontal": 1,
+    "midpoint": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "pointOnCircle": 1,
+    "verticalPoints": 1
+   },
+   "entities": [
+    {
+     "ref": "7ed1",
+     "type": "circle",
+     "at": [
+      -18,
+      -23
+     ],
+     "d": 56.851
+    },
+    {
+     "ref": "8afc",
+     "type": "line",
+     "a": [
+      22,
+      -40
+     ],
+     "b": [
+      38,
+      -40
+     ],
+     "ends": [
+      "22e3",
+      "e7a2"
+     ]
+    },
+    {
+     "ref": "e7f1",
+     "type": "line",
+     "a": [
+      38,
+      -40
+     ],
+     "b": [
+      38,
+      -18
+     ],
+     "ends": [
+      "f328",
+      "d807"
+     ]
+    },
+    {
+     "ref": "3a29",
+     "type": "line",
+     "a": [
+      38,
+      -18
+     ],
+     "b": [
+      22,
+      -18
+     ],
+     "ends": [
+      "d133",
+      "29fb"
+     ]
+    },
+    {
+     "ref": "efd6",
+     "type": "line",
+     "a": [
+      22,
+      -18
+     ],
+     "b": [
+      22,
+      -40
+     ],
+     "ends": [
+      "f668",
+      "13bb"
+     ]
+    },
+    {
+     "ref": "fdda",
+     "type": "line",
+     "a": [
+      22,
+      -40
+     ],
+     "b": [
+      38,
+      -18
+     ],
+     "ends": [
+      "22e3",
+      "d133"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "1115",
+     "type": "line",
+     "a": [
+      38,
+      -40
+     ],
+     "b": [
+      22,
+      -18
+     ],
+     "ends": [
+      "e7a2",
+      "29fb"
+     ],
+     "construction": true
+    },
+    {
+     "ref": "e6d8",
+     "type": "circle",
+     "at": [
+      -29,
+      54
+     ],
+     "d": 26.907
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      -46.415,
+      -51.423
+     ],
+     "size": [
+      56.841,
+      56.846
+     ],
+     "area": 2537.228,
+     "islands": 0
+    },
+    {
+     "ref": "r2",
+     "at": [
+      22,
+      -40
+     ],
+     "size": [
+      16,
+      22
+     ],
+     "area": 352,
+     "islands": 0
+    },
+    {
+     "ref": "r3",
+     "at": [
+      -42.454,
+      40.556
+     ],
+     "size": [
+      26.907,
+      26.888
+     ],
+     "area": 568.072,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "sketch",
+   "name": "Part 2",
+   "thickness": 5.2,
+   "cuts": []
+  },
+  {
+   "kind": "sketch",
+   "name": "Part 1 sketch",
+   "thickness": 5.2,
+   "cuts": []
+  },
+  {
+   "kind": "part",
+   "name": "Part 1",
+   "thickness": 5.2,
+   "cuts": []
+  }
+ ],
+ "boards": []
+}

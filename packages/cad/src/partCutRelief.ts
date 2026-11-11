@@ -17,12 +17,12 @@ export function partCutReliefIssue(value: unknown): string | null {
   return null;
 }
 
-export function partCutReliefOutcome(step: CadPartCut, scope: CadValueScope): { value: number } | { error: string } | null {
+export function partCutReliefOutcome(step: CadPartCut, scope: CadValueScope): { value: number } | { error: string; got?: number } | null {
   const expression = step.cornerRelief?.diameterExpression;
   if (expression === undefined) return null;
   const parsed = parseCadValue(expression, { unit: 'mm', variables: scope });
   if ('error' in parsed) return parsed;
-  return parsed.value > 0 ? parsed : { error: 'A cutter diameter must be greater than zero.' };
+  return parsed.value > 0 ? parsed : { error: 'a cutter diameter must be greater than zero.', got: parsed.value };
 }
 
 /** An explicit Off must not fall back to the part-wide setting. */
