@@ -4,7 +4,13 @@ import type { CamJobV1 } from '../jobDb';
 import { kDefaultPlan } from '../planSettings';
 import { boardBlock } from '../boardBlock';
 import type { PreparedCarvingArt } from './prepare';
-import { applyCarvingProposal, carvingProposalRefusal, createCarvingProposal, generatedCarvingProblem } from './proposal';
+import {
+  applyCarvingProposal,
+  carvingProposalRefusal,
+  createCarvingProposal,
+  generatedCarvingProblem,
+  savedCarvingEnvelope,
+} from './proposal';
 
 const outline = [
   [
@@ -45,6 +51,7 @@ const prepared = (): PreparedCarvingArt => ({
   outline,
   width: 20,
   height: 10,
+  envelope: { width: 20, height: 10 },
   operations: [],
   report: {
     ok: true,
@@ -155,5 +162,17 @@ describe('guarded carving proposals', () => {
     full.width = 100;
     full.height = 80;
     expect(() => createCarvingProposal(base, full, { mode: 'add', asset: source, detail: 'balanced' })).toThrow(/no clear space/);
+  });
+
+  it('rechecks saved artwork in its original envelope after cleanup removed outlying detail', () => {
+    const cleaned = prepared();
+    cleaned.envelope = { width: 40, height: 30 };
+    const proposal = createCarvingProposal(job(), cleaned, { mode: 'add', asset: source, detail: 'balanced' });
+    expect(proposal.item.generated).toMatchObject({ width: 20, height: 10, envelope: { width: 40, height: 30 } });
+    expect(savedCarvingEnvelope(proposal.item.generated!)).toEqual({ width: 40, height: 30 });
+    // A later height edit scales the envelope with the ink instead of refitting into the ink box.
+    expect(savedCarvingEnvelope(proposal.item.generated!, 5)).toEqual({ width: 20, height: 15 });
+    const { envelope: _, ...legacy } = proposal.item.generated!;
+    expect(savedCarvingEnvelope(legacy, 10)).toEqual({ width: 20, height: 10 });
   });
 });

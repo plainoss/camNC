@@ -66,6 +66,19 @@ export function carvingSuitabilityKey(job: CamJobV1, item: CarvingItemV1): strin
   );
 }
 
+/**
+ * The size to fit the saved source into when it is rechecked: its original envelope, scaled by any later height
+ * edit. Fitting into the accepted ink size instead would shrink artwork whose cleanup removed outlying specks.
+ */
+export function savedCarvingEnvelope(
+  saved: NonNullable<CarvingItemV1['generated']>,
+  itemHeight = saved.height
+): { width: number; height: number } {
+  const scale = itemHeight / saved.height;
+  const envelope = saved.envelope ?? saved;
+  return { width: envelope.width * scale, height: envelope.height * scale };
+}
+
 export function generatedCarvingProblem(job: CamJobV1): string | null {
   const stale = job.carving?.items.find(item => item.generated && item.generated.checkedFor !== carvingSuitabilityKey(job, item));
   return stale
@@ -155,6 +168,7 @@ export function createCarvingProposal(
       detail: options.detail,
       width: prepared.width,
       height: prepared.height,
+      envelope: { ...prepared.envelope },
       checkedFor: '',
     },
   };

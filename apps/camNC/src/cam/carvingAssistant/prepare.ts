@@ -31,6 +31,8 @@ export interface PreparedCarvingArt {
   outline: Loop[];
   width: number;
   height: number;
+  /** Maximum size the whole source was fitted into; cleanup can leave the accepted ink smaller. */
+  envelope: { width: number; height: number };
   report: CarvingPreparationReport;
   operations: Operation[];
 }
@@ -246,6 +248,7 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
     outline,
     width: accepted.w,
     height: accepted.h,
+    envelope: { width, height },
     report,
     operations,
   };

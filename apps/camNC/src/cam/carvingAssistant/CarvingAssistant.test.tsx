@@ -39,6 +39,7 @@ const candidate = (): PreparedCarvingArt => ({
   ],
   width: 40,
   height: 30,
+  envelope: { width: 40, height: 30 },
   operations: [],
   report: {
     ok: true,

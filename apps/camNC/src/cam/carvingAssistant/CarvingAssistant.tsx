@@ -8,7 +8,7 @@ import { RunSettings, type AssistantRunSettings } from '../../cad/assistant/RunS
 import { createAssistantUsage, type AssistantRunUsage } from '../../cad/assistant/runBudget';
 import { generateCarvingAsset } from './generation';
 import { carvingDetailMm, prepareCarvingArt, type CarvingDetail, type PreparedCarvingArt } from './prepare';
-import { createCarvingProposal, type CarvingProposal } from './proposal';
+import { createCarvingProposal, savedCarvingEnvelope, type CarvingProposal } from './proposal';
 import { sanitizeCarvingSvg } from './sanitize';
 import { NativeSvgSettings, type NativeSvgConnection } from './NativeSvgSettings';
 import { generateNativeSvgAsset } from './nativeSvg';
@@ -55,10 +55,9 @@ export function CarvingAssistant({
   const usageTotal = useRef(createAssistantUsage());
   const [usage, setUsage] = useState<AssistantRunUsage | null>(null);
   const [prompt, setPrompt] = useState(saved?.prompt ?? '');
-  const [width, setWidth] = useState(
-    String(saved ? saved.width * ((selected?.height ?? saved.height) / saved.height) : Math.min(100, boardSize.w))
-  );
-  const [height, setHeight] = useState(String(selected?.height ?? saved?.height ?? Math.min(100, boardSize.h)));
+  const savedEnvelope = saved && savedCarvingEnvelope(saved, selected?.height);
+  const [width, setWidth] = useState(String(savedEnvelope?.width ?? Math.min(100, boardSize.w)));
+  const [height, setHeight] = useState(String(savedEnvelope?.height ?? selected?.height ?? Math.min(100, boardSize.h)));
   const [detail, setDetail] = useState<CarvingDetail>(saved?.detail ?? 'balanced');
   const [mode, setMode] = useState<'add' | 'replace'>(saved ? 'replace' : 'add');
   const [asset, setAsset] = useState<Asset | null>(() =>
@@ -117,8 +116,9 @@ export function CarvingAssistant({
       warnings: saved.warnings,
     });
     setPrompt(saved.prompt);
-    setWidth(String(saved.width * ((selected?.height ?? saved.height) / saved.height)));
-    setHeight(String(selected?.height ?? saved.height));
+    const envelope = savedCarvingEnvelope(saved, selected?.height);
+    setWidth(String(envelope.width));
+    setHeight(String(envelope.height));
     setDetail(saved.detail);
     setMode('replace');
     setPrepared(null);
