@@ -245,7 +245,11 @@ export function validateFluidNCOutput(program: string): void {
   for (const [index, raw] of program.split('\n').entries()) {
     if (encoder.encode(raw).length > FLUIDNC_POST_PROFILE.maxLineBytes)
       throw new Error(`Output line ${index + 1} exceeds the controller line limit`);
-    const code = raw.replace(/\([^()]*\)/g, '').trim();
+    // `( )` comments, and `;` to the end of the line (the gap after the start pause).
+    const code = raw
+      .replace(/\([^()]*\)/g, '')
+      .replace(/;.*$/, '')
+      .trim();
     const words = [...code.matchAll(/([A-Z])(-?(?:\d+(?:\.\d*)?|\.\d+))/g)];
     if (code.replace(/([A-Z])(-?(?:\d+(?:\.\d*)?|\.\d+))/g, '').trim()) throw new Error(`Invalid output on line ${index + 1}`);
     for (const [, word, number] of words) {

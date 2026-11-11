@@ -48,5 +48,34 @@ export function parsePauseMarker(comment: string): PauseMarker | null {
   return null;
 }
 
+/**
+ * How far (bytes) the position FluidNC's `SD:` percent stands for can be from the true one in a file of `size` bytes.
+ * FluidNC computes `(float)position * 100.0f / size` and prints two decimals: the printing is off by up to 0.005 % of the
+ * file (5e-5·size bytes), the float maths by under 3e-7·size more. Two bytes cover reading the percent back.
+ */
+export function positionWindow(size: number) {
+  return size * 5.03e-5 + 2;
+}
+
+/** One line of the gap after the start pause: a `;` comment, 80 bytes with its newline. */
+export const kStartPauseGapLine = `;${'-'.repeat(78)}`;
+/** At most this many gap lines (4 kB), enough for programs up to about 40 MB; larger ones get the cap. */
+export const kMaxStartPauseGapLines = 51;
+
+/**
+ * Comment lines to put between the start M0 and the spindle start (M3) after it, in a program of `size` bytes without
+ * them. The machine view tells a hold at the start M0 from one after the M3 by the SD position, which it knows only to
+ * within {@link positionWindow}: the furthest position it can have seen at the M0 is the M0's end plus the window, and
+ * the controller can have read that far plus the window again. So the M3 line has to end more than two windows after
+ * the M0. Sized for the program with the gap, which itself adds to the size.
+ */
+export function startPauseGap(size: number, m3LineBytes: number): string[] {
+  const linesFor = (total: number) => Math.max(0, Math.floor((2 * positionWindow(total) - m3LineBytes) / 80) + 1);
+  let n = linesFor(size);
+  // The gap's own bytes widen the window a little (by 0.01 % of the gap): one more pass settles it.
+  n = Math.max(n, linesFor(size + 80 * n));
+  return Array.from({ length: Math.min(n, kMaxStartPauseGapLines) }, () => kStartPauseGapLine);
+}
+
 /** Inside a `( )` comment and between our `;` separators: no parentheses or semicolons, one line, short. */
 const clean = (text: string) => text.replace(/[();]/g, '').replace(/\s+/g, ' ').trim();

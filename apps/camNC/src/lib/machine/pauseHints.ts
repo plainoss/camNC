@@ -1,4 +1,4 @@
-import { parsePauseMarker, type PauseMarker } from '@wbcnc/cam/pauseMarker';
+import { parsePauseMarker, type PauseMarker, positionWindow } from '@wbcnc/cam/pauseMarker';
 
 /** Why a job is paused and what Resume will do, from the uploaded G-code and FluidNC's SD progress. */
 export interface PauseHint {
@@ -22,16 +22,11 @@ const kPause = /(?<![A-Z])M0*0(?![\d.])/i;
 const kLookAhead = 12;
 
 /**
- * How far (bytes) the position FluidNC's `SD:` percent stands for can be from the true one in a file of `size` bytes.
- * FluidNC computes `(float)position * 100.0f / size` and prints two decimals: the printing is off by up to 0.005 % of the
- * file (5e-5·size bytes), the float maths by under 3e-7·size more. Two bytes cover reading the percent back here.
- *
- * FluidNC reads a job one line at a time and does not read on while it waits at an M0, so at a program pause the
- * position is the byte just after the M0 line. A feed hold leaves the reader wherever planning got to.
+ * FluidNC reads a job one line at a time and does not read on while it waits at an M0, so at a program pause the SD
+ * position is the byte just after the M0 line, known to within {@link positionWindow}. A feed hold leaves the reader
+ * wherever planning got to.
  */
-export function positionWindow(size: number) {
-  return size * 5.03e-5 + 2;
-}
+export { positionWindow };
 
 export interface Line {
   code: string;
@@ -104,8 +99,11 @@ function toolDescription(gcode: string, tool: number) {
 }
 
 function describeNext(lines: Line[], from: number, gcode: string): string | null {
-  for (const line of lines.slice(from, from + kLookAhead)) {
-    const code = line.code.toUpperCase();
+  // Only lines with code count: comment lines (such as the gap camNC writes after its start pause) are skipped.
+  for (let i = from, seen = 0; i < lines.length && seen < kLookAhead; i++) {
+    const code = lines[i]!.code.toUpperCase();
+    if (!code) continue;
+    seen++;
     if (/\bG38\.[2-5]\b/.test(code)) {
       return 'Next it probes Z (G38). Attach the probe clip and put the plate under the bit, then Resume.';
     }
