@@ -31,6 +31,9 @@ jobs:
       HAS_MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The PR merge commit and its first parent, the base the file-size check compares with.
+          fetch-depth: 2
       # The only job that saves the pnpm store, and only on main: PR and merge-queue jobs read main's entry.
       - name: Install dependencies
         uses: ./.github/actions/install-dependencies
@@ -74,8 +77,10 @@ jobs:
           restore-keys: turbo-checks-
       - name: Check formatting
         run: pnpm run check-format
+      # On PRs and queue batches, files with a ceiling must not grow compared with the base, so a PR that grows one fails
+      # here rather than in the queue after another PR lowered the ceiling.
       - name: Check file sizes
-        run: pnpm run check-file-size
+        run: pnpm run check-file-size ${{ github.event_name == 'pull_request' && '--base HEAD^1' || '' }}
       - name: Check status scorecard
         run: pnpm run check-status
       - name: Run linting
