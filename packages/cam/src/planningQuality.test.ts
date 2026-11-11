@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { machiningCases, machiningPart, rectangle } from '../test/machining-fixtures';
+import { machiningCases, rectangle } from '../test/machining-fixtures';
 import { camBoard, splitByBit } from './board';
 import { checkAccuracyBudget } from './accuracy';
-import { toGcode } from './gcode';
-import { checkGcodeSafety } from './safety';
 import { camPart } from './toolpaths';
 
 describe('integrated stock and geometry planning', () => {

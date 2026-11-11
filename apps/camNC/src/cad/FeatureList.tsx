@@ -7,6 +7,7 @@ import { PartRowMenu } from './PartRowMenu';
 import { formatCadValue } from './valueExpressions';
 import { useFolderControls } from './FolderControls';
 import { RollbackBar } from './RollbackBar';
+import { useStepDrop, type StepDropCheck } from './stepDrop';
 import { folderFeatureEntries, folderOfFeature, type ListedFeatureEntry } from './folderFeatureEntries';
 import './featureList.css';
 
@@ -88,6 +89,7 @@ export function FeatureList({
   rollback,
   onRollTo,
   onReorder,
+  reorderDrop,
   onHover,
   selectedPlane,
   onPickPlane,
@@ -111,6 +113,8 @@ export function FeatureList({
   onRollTo?: (stepId: string | null) => void;
   /** A step dragged onto another, to go just before it. */
   onReorder?: (stepId: string, beforeStepId: string) => void;
+  /** Where a step dragged over another would land, or why it can't go there, to show before it's dropped. */
+  reorderDrop?: StepDropCheck;
   /** A row hovered, for the view to highlight what it made; null when the pointer leaves. */
   onHover?: (entry: FeatureEntry | null) => void;
   /** The base plane picked, in the list or the view, and picking one, as the reference lists them first. */
@@ -178,6 +182,26 @@ export function FeatureList({
     select(entry);
     setMenu({ entry, x: event.clientX, y: event.clientY });
   };
+  const stepDrop = useStepDrop(reorderDrop);
+  /** The row a line is drawn at while a step is dragged: the folder's own when it lands just ahead of the folder or in it, closed. */
+  const dropRow = (index: number) => {
+    const entry = entries[index];
+    if (!entry || entry.kind === 'folder') return entry && key(entry);
+    const folder = document.folders?.find(candidate => candidate.id === folderOfFeature(document, entry));
+    const dragged = entries.find(candidate => candidate.kind === 'step' && candidate.step.id === stepDrop.drop?.stepId);
+    // The folder's variables and planes come before its steps, so the first step needn't follow the folder's row.
+    const first = !entries
+      .slice(0, index)
+      .some(candidate => candidate.kind === 'step' && folderOfFeature(document, candidate) === folder?.id);
+    if (folder && (folder.collapsed || (first && (!dragged || folderOfFeature(document, dragged) !== folder.id)))) return folder.id;
+    return key(entry);
+  };
+  const landing = stepDrop.drop?.before;
+  const dropBefore = landing ? dropRow(entries.findIndex(entry => key(entry) === landing)) : undefined;
+  const dropClasses = (rowKey: string) => [
+    rowKey === dropBefore && 'cad-feature-drop-before',
+    stepDrop.drop?.error && stepDrop.drop.onto === rowKey && 'cad-feature-drop-refused',
+  ];
   const brokenCount = entries.filter(entry => entry.kind === 'step' && entry.step.broken).length;
   return (
     <section className="cad-studio-features" aria-label="Features" tabIndex={-1}>
@@ -232,7 +256,10 @@ export function FeatureList({
           ))}
         </ul>
       )}
-      <ol>
+      <ol
+        onDragLeave={event => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) stepDrop.leave();
+        }}>
         {entries.map((entry, index) => {
           if (entry.kind === 'folder') {
             const folder = document.folders!.find(folder => folder.id === entry.id)!;
@@ -241,9 +268,12 @@ export function FeatureList({
             return (
               <li
                 key={folder.id}
-                className={folder.suppressed ? 'cad-feature-suppressed cad-folder-row' : 'cad-folder-row'}
+                className={[folder.suppressed && 'cad-feature-suppressed', 'cad-folder-row', ...dropClasses(folder.id)]
+                  .filter(Boolean)
+                  .join(' ')}
                 onDragOver={event => {
                   if (event.dataTransfer.types.includes('text/x-cad-folder')) event.preventDefault();
+                  if (event.dataTransfer.types.includes('text/x-cad-step')) stepDrop.leave();
                 }}
                 onDrop={event => {
                   const id = event.dataTransfer.getData('text/x-cad-folder');
@@ -332,9 +362,9 @@ export function FeatureList({
               key={key(entry)}
               hidden={!!folder?.collapsed}
               onDragOver={event => {
-                if (entry.kind !== 'step') return;
+                if (entry.kind !== 'step') return stepDrop.leave();
                 if (onRollTo && event.dataTransfer.types.includes('text/x-cad-rollback')) event.preventDefault();
-                if (onReorder && event.dataTransfer.types.includes('text/x-cad-step')) event.preventDefault();
+                if (onReorder && event.dataTransfer.types.includes('text/x-cad-step')) stepDrop.over(event, entry.step.id);
                 if (onChange && event.dataTransfer.types.includes('text/x-cad-folder')) event.preventDefault();
               }}
               onDrop={event => {
@@ -349,6 +379,7 @@ export function FeatureList({
                 if (event.dataTransfer.types.includes('text/x-cad-step')) {
                   // A step dropped on another goes just before it.
                   event.preventDefault();
+                  stepDrop.end();
                   const dragged = event.dataTransfer.getData('text/x-cad-step');
                   if (dragged && dragged !== entry.step.id) onReorder?.(dragged, entry.step.id);
                   return;
@@ -365,6 +396,7 @@ export function FeatureList({
                   step?.suppressed && 'cad-feature-suppressed',
                   step?.broken && 'cad-feature-broken',
                   visibilityId(entry) && shown?.(visibilityId(entry)!) === false && 'cad-feature-hidden',
+                  ...dropClasses(key(entry)),
                 ]
                   .filter(Boolean)
                   .join(' ') || undefined
@@ -386,7 +418,9 @@ export function FeatureList({
                   if (entry.kind !== 'step') return;
                   event.dataTransfer.setData('text/x-cad-step', entry.step.id);
                   event.dataTransfer.effectAllowed = 'move';
+                  stepDrop.start(entry.step.id);
                 }}
+                onDragEnd={stepDrop.end}
                 onContextMenu={event => open(entry, event)}
                 onPointerEnter={() => onHover?.(entry)}
                 onPointerLeave={() => onHover?.(null)}
@@ -418,12 +452,18 @@ export function FeatureList({
                   </span>
                 )}
               </button>
-              {onToggleShown && visibilityId(entry) && (
+              {/* Below the rollback bar a step is left out of the view, so there's nothing for an eye to show or hide. */}
+              {onToggleShown && visibilityId(entry) && !(rollbackAt >= 0 && index > rollbackAt) && (
                 <Eye
                   name={label(entry)}
                   shown={shown?.(visibilityId(entry)!) ?? true}
                   onToggle={() => onToggleShown(visibilityId(entry)!)}
                 />
+              )}
+              {step && stepDrop.drop?.error && stepDrop.drop.onto === step.id && (
+                <span className="cad-feature-drop-reason" role="status">
+                  {stepDrop.drop.error}
+                </span>
               )}
               {index === barAt && (index < entries.length - 1 || onRollTo) && (
                 <RollbackBar stepId={step?.id ?? null} stepIds={stepIds} onRollTo={onRollTo} onMenu={(x, y) => setBarMenu({ x, y })} />

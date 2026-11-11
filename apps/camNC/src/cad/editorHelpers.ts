@@ -1,12 +1,9 @@
 import type { CadSnapResult } from '@wbcnc/cad-editor/picking';
 import {
-  CAD_CHORD_TOLERANCE,
   entityPointIds as curvePointIds,
   evaluateCadPart,
   isCadPart,
-  pointInPolygon,
-  regionInteriorPoint,
-  sketchRegions,
+  solidSketchRegionIds,
   type CadDocument,
   type CadEntity,
   type CadPart,
@@ -69,7 +66,7 @@ export function extrudedSketch(document: CadDocument, sketch: CadPart, pickAll: 
   const onto = face && document.parts.find(candidate => candidate.id === face);
   if (onto && isCadPart(onto) && !(on && 'partId' in on && on.copyId)) made.addTo = extrudeMergeTarget(document, made, onto.id);
   if (pickAll && !made.regions && evaluateCadPart(made).diagnostics.some(d => d.severity === 'error')) {
-    const solid = solidRegionIds(made);
+    const solid = solidSketchRegionIds(made.sketch);
     if (solid.length > 1) made.regions = solid;
   }
   return made;
@@ -92,18 +89,6 @@ export function wholeSketch(extrude: CadPart): CadPart {
   const whole = { ...extrude };
   delete whole.regions;
   if (whole.remove || whole.addTo || whole.thin || evaluateCadPart(whole).part) return whole;
-  const solid = solidRegionIds(whole);
+  const solid = solidSketchRegionIds(whole.sketch);
   return solid.length ? { ...whole, regions: solid } : whole;
-}
-
-/** A sketch's regions that are solid: not inside a hole of another, or inside one again, as an island in it. */
-function solidRegionIds(part: CadPart): string[] {
-  const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE);
-  return regions
-    .filter(region => {
-      const inside = regionInteriorPoint(region.points);
-      const depth = inside ? regions.filter(other => other !== region && pointInPolygon(inside, other.points)).length : 0;
-      return depth % 2 === 0;
-    })
-    .map(region => region.id);
 }

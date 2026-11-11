@@ -8,6 +8,7 @@ import { endCadSession } from '@wbcnc/cad-editor/session';
 import { OrthographicCamera, Vector3 } from 'three';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { settled } from '@/test/settled';
+import { studioCommand } from './studioToolbarTesting';
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 
 const sessions: string[] = [];
@@ -28,10 +29,10 @@ it('mirrors the selected part across a picked plane, and changes the plane from 
   );
   await settled();
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   const features = screen.getByRole('region', { name: 'Features' });
   const geometry = within(features).getByRole('list', { name: 'Default geometry' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /^Mirror/ }));
+  await userEvent.click(await studioCommand(/^Mirror/));
   const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
   // The mirror plane is picked straight away.
   expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).hasAttribute('data-active')).toBe(true);
@@ -76,8 +77,8 @@ it('uses another part face as the mirror plane', async () => {
     vi
       .mocked(ModelViewport)
       .mock.calls.findLast(([props]) => props.cameraState && props.meshes.some(mesh => mesh.partId === support.id))?.[0];
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /^Mirror/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/^Mirror/));
   const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
   const frame = cadFaceFrame(source, { partId: support.id, face: 'top' });
   if ('error' in frame) throw new Error(frame.error);

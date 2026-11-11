@@ -323,7 +323,10 @@ function withEdges(
         const step = arc ? { edge: arc.edge, forward: arc.forward } : line(u, v);
         const last = used.at(-1);
         if (arc && u !== arc.first && last?.edge === step.edge && last.forward === step.forward) along++;
-        else used.push(step), (along = 1);
+        else {
+          used.push(step);
+          along = 1;
+        }
         // A loop that leaves an arc part way along can't use that edge.
         if (arc && v === arc.last && along !== arc.steps) partial++;
       });
