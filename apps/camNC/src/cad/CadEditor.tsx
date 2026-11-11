@@ -221,7 +221,8 @@ import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PartPatternKind } from './partPatternKind';
 import { featureRowParts, selectStudioFeature } from './studioFeatureSelection';
 import { startExtrude } from './studioExtrude';
-import { builtStudioParts, disabledStudioCommands } from './studioParts';
+import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts } from './studioParts';
+import { applyFramed } from './insertFraming';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
 import { FeatureDialog } from './FeatureDialog';
@@ -233,7 +234,7 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { asHole, editable, hasOutline, isBlank, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
+import { asHole, editable, hasOutline, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
 import { useFeaturePreview } from './useFeaturePreview';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
 import { StudioFeatureList } from './StudioFeatureList';
@@ -267,6 +268,7 @@ import { StudioFeatureDialog, type StudioFeatureDialogState } from './StudioFeat
 import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
+import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { useEditorVariableFields } from './useEditorVariableFields';
 import { featureShownByDefault } from './sketchShown';
 import './cad.css';
@@ -280,7 +282,6 @@ type ConstraintTool = ConstraintCommandTool;
 type View = { x: number; y: number; w: number; h: number };
 const initialView: View = { x: -35, y: -175, w: 300, h: 210 };
 const numeric = (c: CadConstraint): c is NumericConstraint => 'value' in c;
-
 const FaceSketchBackdrop = lazy(() => import('./FaceSketchBackdrop'));
 const PartView3D = lazy(() => import('./PartView3D'));
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
@@ -418,7 +419,7 @@ export function CadEditor({
   const [show3D, setShow3D] = useState(startIn3D === 'part');
   // Opening a design shows every part where it sits, once there's a part to show.
   // A new design opens there too, picking the plane its first part is sketched on, as the reference starts.
-  const startsBlank = startIn3D === true && !faceSketch && doc.parts.length === 1 && isBlank(doc.parts[0]!);
+  const startsBlank = startIn3D === true && !faceSketch && isBlankDesign(doc);
   const [showWorkspace, setShowWorkspace] = useState(
     () => startIn3D === true && (startsBlank || doc.parts.some(candidate => hasOutline(doc, candidate.id)))
   );
@@ -606,7 +607,7 @@ export function CadEditor({
     next => commit(next)
   );
   const variableScope = useEditorVariableFields(doc, documentRef, variableCommit);
-  const blankDesign = studioSession && doc.parts.length === 1 && isBlank(doc.parts[0]!);
+  const blankDesign = studioSession && isBlankDesign(doc);
   const extrusionDepth = useExtrudeDepth(doc, featureDialog?.kind === 'extrude' ? featureDialog.partId : undefined, next => commit(next));
   const studioPreview = useStudioPreview(
     doc,
@@ -845,7 +846,7 @@ export function CadEditor({
       release();
     };
   }, []);
-
+  useEditorDocumentKeys(root);
   useEffect(() => {
     const canvas = svg.current;
     if (!canvas) return;
@@ -3863,7 +3864,7 @@ export function CadEditor({
   // The studio's Parts list shows each physical instance, with an eye to show or hide it in the view.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
-  const builtParts = blankDesign ? [] : builtStudioParts(doc);
+  const builtParts = studioSession ? listedStudioParts(doc) : builtStudioParts(doc);
   const isolatePart = usePartIsolation(builtParts, cutSelection.selectedKey, hiddenParts, setHiddenParts);
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
   // An open sketch turned with its parts behind it, about the middle of the view.
@@ -4010,7 +4011,7 @@ export function CadEditor({
             checkedProposal={assistantProposalState}
             selection={part && { partId: part.id, copyId: cutSelection.selectedCopyId }}
             disabled={busy || !!rollbackStep || stepDialogOpen || !!filletDialog}
-            onApply={publish}
+            onApply={next => applyFramed(documentRef.current, next, studioCamera.current, publish, setViewRequest)}
           />
         </StudioToolbar>
       ) : (

@@ -31,7 +31,10 @@ Options: `--from <document.json>` edits an existing design, or reports on it if 
 script is given. `--out` writes the document, only if the check passed. Open that
 file in camNC's CAM page to get it as a new job. `--svg` draws
 the parts. A failed check removes any existing `--out` file and any existing `--svg`
-file unless it writes a new SVG for that run. See `examples/` for more.
+file unless it writes a new SVG for that run. `--export-sketch <name> --export
+<drawing.dxf|drawing.svg>` writes one sketch, named as the feature list names it,
+as DXF or SVG at 1:1; add `--export-unit in` (mm, cm, m, in or ft) and
+`--export-construction` to include construction geometry. See `examples/` for more.
 
 ## The full report
 

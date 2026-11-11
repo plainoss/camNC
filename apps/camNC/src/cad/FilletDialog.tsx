@@ -1,6 +1,7 @@
 import { useDesignUnits } from './designUnits';
 import {
   cadDrawnOnSupports,
+  edgeFilletProblems,
   effectivePlacement,
   newCadId,
   rotateVector,
@@ -124,6 +125,10 @@ export function FilletDialog({
     };
   }, [document, radiusText, variables, owner, picked, featureId, fillet, parseCadValue]);
   useDialogPreview(candidate, onPreview);
+  // Corners the radius can't take are left sharp where it's made: say so as it's previewed. It can still be kept, marked
+  // as broken on its row, as a step with an error can be.
+  const owned = candidate?.parts.find(part => part.id === owner);
+  const refusal = (owned && edgeFilletProblems(owned).find(problem => problem.filletId === featureId)?.message) ?? null;
   const save = () => {
     const radius = parseCadValue(radiusText, { unit: 'mm', variables });
     if ('error' in radius) return setError(radius.error);
@@ -176,9 +181,9 @@ export function FilletDialog({
         </span>
         {lengthUnit}
       </label>
-      {error && (
+      {(error ?? refusal) && (
         <p role="alert" className="cad-thickness-error">
-          {error}
+          {error ?? refusal}
         </p>
       )}
     </FeatureDialog>

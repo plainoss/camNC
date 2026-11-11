@@ -11,6 +11,7 @@
   "src/cad/sectionModel.test.ts",
   "src/cad/studioViewShortcut.test.ts",
   "src/cad/studioCamera.test.ts",
+  "src/cad/insertFraming.test.ts",
   "src/cad/partCornerInference.test.ts",
   "src/cad/extrudeMergeTarget.test.ts",
   "src/cam/planSettings.test.ts",
@@ -29,5 +30,6 @@
   "e2e/spec/session.test.mjs",
   "e2e/spec/settle.test.mjs",
   "e2e/spec/headless.test.mjs",
-  "e2e/spec/studio-model.test.mjs"
+  "e2e/spec/studio-model.test.mjs",
+  "src/cam/model/modelLightRig.test.ts"
 ]
