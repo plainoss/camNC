@@ -88,6 +88,40 @@ describe('studio toolbar overflow', () => {
     expect(screen.getByRole('menu')).toBeTruthy();
   });
 
+  it('greys a disabled command in the More menu and highlights the open one, as the toolbar does', async () => {
+    const view = render(
+      <div className="cad-editor" style={{ width: 500 }}>
+        <StudioToolbar
+          busy={false}
+          disabled={{ mirror: 'Select a part to mirror first' }}
+          active="variable"
+          canUndo={false}
+          canRedo={false}
+          canFinish={true}
+          onCommand={() => {}}
+          onUndo={() => {}}
+          onRedo={() => {}}
+          onCancel={() => {}}
+          onFinish={() => {}}
+        />
+      </div>
+    );
+    await userEvent.click(await view.findByRole('button', { name: /^More/ }));
+    const menu = await screen.findByRole('menu');
+    const item = (name: string) => within(menu).getByRole('menuitem', { name });
+    const style = (name: string) => getComputedStyle(item(name));
+    const glyphColor = (name: string) => getComputedStyle(item(name).querySelector('svg')!).color;
+    // The item keeps aria-disabled rather than a disabled menu item, so hovering it still shows the reason.
+    expect(item('Mirror')).toHaveAttribute('aria-disabled', 'true');
+    expect(style('Mirror').color).toBe('rgb(154, 167, 182)');
+    expect(glyphColor('Mirror')).toBe('rgb(154, 167, 182)');
+    expect(style('Plane').color).not.toBe('rgb(154, 167, 182)');
+    expect(style('Variable').backgroundColor).toBe('rgb(223, 234, 248)');
+    expect(style('Variable').color).toBe('rgb(23, 79, 143)');
+    expect(glyphColor('Variable')).toBe('rgb(23, 79, 143)');
+    expect(style('Plane').backgroundColor).not.toBe('rgb(223, 234, 248)');
+  });
+
   it('leaves focus where a command chosen from More put it, as a dialog focusing its first field does', async () => {
     const field = document.createElement('input');
     field.setAttribute('aria-label', 'Variable name');
