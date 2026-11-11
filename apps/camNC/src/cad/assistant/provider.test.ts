@@ -58,6 +58,21 @@ describe('assistant provider protocols', () => {
         ],
       }).calls?.[0].arguments
     ).toEqual({ source: 'x' });
+    // Gemini 3 refuses a follow-up whose tool calls lack the thought signature it returned with them.
+    const signed = parseProviderMessage(chat, {
+      choices: [
+        {
+          message: {
+            tool_calls: [
+              { id: '3', function: { name: 'read_design', arguments: '{}' }, extra_content: { google: { thought_signature: 'sig' } } },
+            ],
+          },
+        },
+      ],
+    });
+    expect(providerPayload({ config: chat, system: '', messages: [messages[0], signed], tools })).toMatchObject({
+      messages: [{}, {}, { tool_calls: [{ id: '3', extra_content: { google: { thought_signature: 'sig' } } }] }],
+    });
     const responses = { ...chat, protocol: 'responses' as const };
     const output = [
       { type: 'reasoning', id: 'reason-1', summary: [] },
