@@ -254,6 +254,7 @@ import type { FeatureAction, FeatureEntry } from './FeatureList';
 import { StudioFeatureList } from './StudioFeatureList';
 import { detachStudioCopy } from './detachStudioCopy';
 import { StudioProposals } from './StudioProposals';
+import { useAssistantProposal } from './assistant/useAssistantProposal';
 import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
 import { trimCadFolders } from '@wbcnc/cad';
@@ -319,6 +320,7 @@ export function CadEditor({
 }: CadEditorProps) {
   const [session] = useState(() => editSession ?? cadSession(initialDocument));
   const [doc, setDocument] = useState(session.document);
+  const assistantProposalState = useAssistantProposal(doc);
   const { parseCadValue, lengthText, formatLength, lengthUnit } = useDesignUnits(doc.lengthUnit ?? 'mm');
   const [faceOpening] = useState(() => initialFaceSketchView(faceSketch?.scene));
   const [savedView] = useState(() => cadViewState(session.document, initialView, preferredPartId));
@@ -375,6 +377,10 @@ export function CadEditor({
   const dimensionSelection = dimensionFlow.phase === 'idle' ? selected : dimensionFlow.entityIds;
   const [palette, setPalette] = useState(false);
   const [searchMode, setSearchMode] = useState(true);
+  const toggleCommandSearch = () => {
+    setSearchMode(true);
+    setPalette(value => !value);
+  };
   const [searchHighlight, setSearchHighlight] = useState<SearchCommand['id'] | null>(null);
   const [status, setStatus] = useState('Checking sketch…');
   const [problems, setProblems] = useState<string[]>([]);
@@ -2130,8 +2136,7 @@ export function CadEditor({
     if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && (event.code === 'KeyC' || event.key.toLowerCase() === 'c')) {
       event.preventDefault();
       if (!event.repeat && !busy) {
-        setSearchMode(true);
-        setPalette(value => !value);
+        toggleCommandSearch();
       }
       return;
     }
@@ -4026,10 +4031,7 @@ export function CadEditor({
             !transformDialog
           }
           onCommand={studioCommand}
-          onSearch={() => {
-            setSearchMode(true);
-            setPalette(value => !value);
-          }}
+          onSearch={toggleCommandSearch}
           onUndo={() => navigateHistory()}
           onRedo={() => navigateHistory(true)}
           onCancel={() => void cancel()}
@@ -4038,6 +4040,7 @@ export function CadEditor({
             key={doc.id}
             document={doc}
             session={session}
+            checkedProposal={assistantProposalState}
             selection={part && { partId: part.id, copyId: cutSelection.selectedCopyId }}
             disabled={busy || !!rollbackStep || stepDialogOpen || !!filletDialog}
             onApply={publish}
@@ -4047,10 +4050,7 @@ export function CadEditor({
         <SketchToolbar
           tools={tools}
           searchHighlight={searchHighlight}
-          onSearch={() => {
-            setSearchMode(true);
-            setPalette(value => !value);
-          }}
+          onSearch={toggleCommandSearch}
           tool={tool}
           construction={construction}
           constraintMode={fixMode ? 'fix' : constraintMode}

@@ -34,7 +34,14 @@ afterEach(() => {
 function composer() {
   render(
     <div className="cad-editor" style={{ position: 'relative', height: 780, width: 1000 }}>
-      <AssistantDock document={createPlateDocument()} onProposal={vi.fn()} onClose={vi.fn()} />
+      <AssistantDock
+        proposal={null}
+        onCheckedProposal={() => {}}
+        onDiscardProposal={() => {}}
+        document={createPlateDocument()}
+        onProposal={vi.fn()}
+        onClose={vi.fn()}
+      />
     </div>
   );
   return screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Message' });
