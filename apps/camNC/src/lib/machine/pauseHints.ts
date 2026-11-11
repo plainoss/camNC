@@ -99,8 +99,11 @@ function toolDescription(gcode: string, tool: number) {
 }
 
 function describeNext(lines: Line[], from: number, gcode: string): string | null {
-  for (const line of lines.slice(from, from + kLookAhead)) {
-    const code = line.code.toUpperCase();
+  // Only lines with code count: comment lines (such as the gap camNC writes after its start pause) are skipped.
+  for (let i = from, seen = 0; i < lines.length && seen < kLookAhead; i++) {
+    const code = lines[i]!.code.toUpperCase();
+    if (!code) continue;
+    seen++;
     if (/\bG38\.[2-5]\b/.test(code)) {
       return 'Next it probes Z (G38). Attach the probe clip and put the plate under the bit, then Resume.';
     }

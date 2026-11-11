@@ -78,6 +78,10 @@ describe('holdHint', () => {
         const { gcode, startEnd, m3End, travelEnd } = camProgram(size, { gap: true });
         const window = positionWindow(size);
         expect(m3End - startEnd).toBeLessThanOrEqual(kMaxStartPauseGapLines * 80 + 10);
+        // What comes next looks past the gap's comment lines, however many, to the M3.
+        expect(holdHint(gcode, at(controllerPercent(startEnd, size)))?.next).toBe(
+          'Next it starts the spindle. Make sure the spindle and dust collection are ready, then Resume.'
+        );
         // At the start M0, the spindle state unknown: as reported, and the furthest the report can be off.
         for (const reported of [controllerPercent(startEnd, size), ((startEnd + window) / size) * 100])
           for (const holdRequested of [false, true]) expect(holdHint(gcode, at(reported, { holdRequested }))?.marker?.kind).toBe('start');
