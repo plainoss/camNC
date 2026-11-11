@@ -1,5 +1,6 @@
 import {
   newCadId,
+  numberedCadCopy,
   resolvePartPatterns,
   cadMirrorPlaneFrame,
   cadMirrorPlaneWouldCycle,
@@ -71,7 +72,8 @@ export function MirrorDialog({
   const [featureId] = useState(() => copy?.id ?? newCadId());
   const candidate = useMemo(() => {
     if (!part || !across || issue) return null;
-    const nextCopy: CadPartCopy = { ...(copy ?? { id: featureId, mirrored: true }), mirror: across };
+    // A new mirror takes the next free number, so it doesn't renumber the part's other copies.
+    const nextCopy: CadPartCopy = { ...(copy ?? numberedCadCopy(part, { id: featureId, mirrored: true })), mirror: across };
     return resolvePartPatterns({
       ...document,
       revision: document.revision + 1,
