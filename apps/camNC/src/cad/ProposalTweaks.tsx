@@ -29,7 +29,8 @@ export function ProposalTweaks({
   proposal: CadProposal;
   currentDocument: CadDocument;
   stale: boolean;
-  onReplace: (proposal: CadProposal) => void;
+  /** False when the host dropped the result, e.g. because a newer proposal arrived meanwhile. */
+  onReplace: (proposal: CadProposal) => boolean | void;
   /** True from a slider move until its re-check ends: Apply must not take the old design while the slider shows another. */
   onBusy?: (busy: boolean) => void;
 }) {
@@ -63,8 +64,10 @@ export function ProposalTweaks({
     void recheckAssistantCandidate(base, origin, abort.signal, parameters && { ...origin.recipe!.parameters, ...parameters })
       .then(next => {
         if (abort.signal.aborted) return;
-        setMessage('✓ Checked again · no model request');
-        onReplace(next);
+        if (onReplace(next) === false) {
+          setMessage('A newer proposal arrived, so this change was not used.');
+          setValues(Object.fromEntries(tweakable));
+        } else setMessage('✓ Checked again · no model request');
       })
       .catch(cause => {
         if (abort.signal.aborted) return;
@@ -114,6 +117,10 @@ export function ProposalTweaks({
               onChange={event => {
                 const next = { ...values, [name]: Number(event.target.value) };
                 setValues(next);
+                // A re-check still running is for an older value: stop it now, so its end neither clears busy nor
+                // moves the slider back while the next one waits for its delay.
+                controller.current?.abort();
+                controller.current = null;
                 onBusy?.(true);
                 clearTimeout(timer.current);
                 timer.current = setTimeout(() => run(proposal.base, next), kRecheckDelayMs);

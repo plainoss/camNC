@@ -38,7 +38,7 @@ export function ProposalReview({
   onClose: () => void;
   onDiscard?: () => void;
   /** A re-checked candidate from review tweaks takes this proposal's place. */
-  onReplace?: (proposal: CadProposal) => void;
+  onReplace?: (proposal: CadProposal) => boolean | void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<Mode>('changes');

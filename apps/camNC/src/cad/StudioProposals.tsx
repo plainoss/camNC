@@ -284,10 +284,11 @@ export function StudioProposals({
                     ? next => {
                         // A tweak re-checked in review becomes the assistant's proposal, kept after closing as before,
                         // unless the dock has offered a newer one meanwhile.
-                        if (checkedProposal.proposal !== proposal) return;
+                        if (checkedProposal.proposal !== proposal) return false;
                         assistantProposal.current = next;
                         checkedProposal.receive(next);
                         setProposal(next);
+                        return true;
                       }
                     : undefined
                 }

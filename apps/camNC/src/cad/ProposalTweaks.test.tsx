@@ -63,3 +63,41 @@ it('reports busy from the slider move until the re-check ends, and puts a refuse
   expect(onBusy).toHaveBeenLastCalledWith(false);
   expect(width).toHaveProperty('value', '600');
 });
+
+it('stops an older re-check when the slider moves again, so busy stays set until the newest one ends', async () => {
+  const base = createPlateDocument();
+  const proposal = cadProposal(base, { ...base, name: 'Candidate' });
+  bindProposalOrigin(proposal, { source: 'recipe source', recipe: { name: 'cupboard', parameters } });
+  const finish: ((value: ReturnType<typeof cadProposal>) => void)[] = [];
+  vi.mocked(recheckAssistantCandidate).mockImplementation(() => new Promise(resolve => finish.push(resolve)));
+  const onBusy = vi.fn();
+  const onReplace = vi.fn(() => true);
+  render(<ProposalTweaks proposal={proposal} currentDocument={base} stale={false} onReplace={onReplace} onBusy={onBusy} />);
+  const width = screen.getByRole('slider', { name: /Width/ });
+  fireEvent.change(width, { target: { value: '700' } });
+  await waitFor(() => expect(recheckAssistantCandidate).toHaveBeenCalledTimes(1));
+  const first = vi.mocked(recheckAssistantCandidate).mock.calls[0]![2];
+  fireEvent.change(width, { target: { value: '800' } });
+  expect(first.aborted).toBe(true);
+  finish[0]!(cadProposal(base, { ...base, name: 'Old' }));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  expect(onBusy).toHaveBeenLastCalledWith(true);
+  expect(onReplace).not.toHaveBeenCalled();
+  expect(width).toHaveProperty('value', '800');
+  await waitFor(() => expect(recheckAssistantCandidate).toHaveBeenCalledTimes(2));
+  finish[1]!(cadProposal(base, { ...base, name: 'New' }));
+  await waitFor(() => expect(onBusy).toHaveBeenLastCalledWith(false));
+  expect(onReplace).toHaveBeenCalledTimes(1);
+});
+
+it('says so and resets the sliders when the host drops a result for a newer proposal', async () => {
+  const base = createPlateDocument();
+  const proposal = cadProposal(base, { ...base, name: 'Candidate' });
+  bindProposalOrigin(proposal, { source: 'recipe source', recipe: { name: 'cupboard', parameters } });
+  vi.mocked(recheckAssistantCandidate).mockResolvedValue(cadProposal(base, { ...base, name: 'Wider' }));
+  render(<ProposalTweaks proposal={proposal} currentDocument={base} stale={false} onReplace={() => false} />);
+  const width = screen.getByRole('slider', { name: /Width/ });
+  fireEvent.change(width, { target: { value: '700' } });
+  await screen.findByText('A newer proposal arrived, so this change was not used.');
+  expect(width).toHaveProperty('value', '600');
+});
