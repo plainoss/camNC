@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CamJobV1 } from '../jobDb';
+import { nativeImageFromConnection } from '../../cad/assistant/modelDefaults';
 import { readAssistantCredentials, redactAssistantText, type AssistantCredentials } from '../../cad/assistant/keyStore';
 import type { AssistantRunSettings } from '../../cad/assistant/RunSettings';
 import { createAssistantUsage, type AssistantRunUsage } from '../../cad/assistant/runBudget';
@@ -46,7 +47,12 @@ export function useCarvingAssistant({
   const selected = job.carving?.items.find(item => item.id === selectedId);
   const [open, setOpen] = useState(false);
   const [credentials, setCredentials] = useState<AssistantCredentials | null>(readAssistantCredentials);
-  const [generationMode, setGenerationMode] = useState<'text' | 'native'>('text');
+  // With an image model on the shared connection, image generation is the default: it traces into smoother art.
+  const [generationMode, setGenerationMode] = useState<'text' | 'native'>(() =>
+    nativeImageFromConnection(readAssistantCredentials()) ? 'native' : 'text'
+  );
+  // A separate image provider is an override; normally the connection's own key and image model are used.
+  const [separateImage, setSeparateImage] = useState(false);
   const [native, setNative] = useState<NativeSvgConnection>({
     endpoint: 'https://api.openai.com/v1',
     model: '',
@@ -168,16 +174,28 @@ export function useCarvingAssistant({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, picked, pickedVariant?.asset, key, disabled]);
 
+  const shared = nativeImageFromConnection(credentials, native.quality);
+  const modeChosen = useRef(false);
+  const chooseMode = (mode: 'text' | 'native') => {
+    modeChosen.current = true;
+    setGenerationMode(mode);
+  };
+  // Connecting a key with an image model switches to images, unless the person already chose a generator.
+  useEffect(() => {
+    if (shared?.model && !modeChosen.current) setGenerationMode('native');
+  }, [shared?.model]);
+  // Shared images always take the traced PNG route; SVG output needs the explicit opt-in of the separate form.
+  const nativeConfig: NativeSvgConnection = !separateImage && shared ? { ...native, ...shared, supportsSvg: true, format: 'png' } : native;
   const credentialsFor = (): AssistantCredentials | null =>
     generationMode === 'native'
-      ? native.key.trim() && native.model.trim() && native.supportsSvg
+      ? nativeConfig.key.trim() && nativeConfig.model.trim() && nativeConfig.supportsSvg
         ? {
-            key: native.key.trim(),
+            key: nativeConfig.key.trim(),
             config: {
               kind: 'compatible',
               protocol: 'chat',
-              endpoint: native.endpoint,
-              model: native.model.trim(),
+              endpoint: nativeConfig.endpoint,
+              model: nativeConfig.model.trim(),
               tools: true,
               images: false,
             },
@@ -220,7 +238,7 @@ export function useCarvingAssistant({
       try {
         const result =
           generationMode === 'native'
-            ? await (native.format === 'png' ? generateNativeRasterAsset : generateNativeSvgAsset)(options, native)
+            ? await (nativeConfig.format === 'png' ? generateNativeRasterAsset : generateNativeSvgAsset)(options, nativeConfig)
             : await generateCarvingAsset(options);
         if (abort.signal.aborted || !mounted.current) return;
         const asset: GeneratedCarvingAsset = { ...result.asset, prompt: prompt.trim() };
@@ -298,7 +316,8 @@ export function useCarvingAssistant({
     if (!proposal || disabled || preparing) return;
     try {
       onApply(proposal);
-      setStatus('Artwork applied as one undo step. Select it to change its size or detail.');
+      // The Carve step confirms the edit, with its Undo, as it closes the panel.
+      setStatus('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The proposal could not be applied.');
     }
@@ -318,7 +337,20 @@ export function useCarvingAssistant({
     open,
     setOpen,
     board,
-    connection: { credentials, setCredentials, generationMode, setGenerationMode, native, setNative, runSettings, setRunSettings, usage },
+    connection: {
+      credentials,
+      setCredentials,
+      generationMode,
+      setGenerationMode: chooseMode,
+      native,
+      setNative,
+      sharedImageModel: shared?.model,
+      separateImage,
+      setSeparateImage,
+      runSettings,
+      setRunSettings,
+      usage,
+    },
     request: { prompt, setPrompt, style, setStyle, count, setCount, canGenerate, generate, importPng, stop },
     target,
     setTarget,

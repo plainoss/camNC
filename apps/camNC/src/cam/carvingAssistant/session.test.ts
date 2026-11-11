@@ -8,7 +8,7 @@ describe('carving assistant session', () => {
   });
 
   it('starts a new box clear of existing items, and reworks generated artwork where it is', async () => {
-    const job = await createCarvingJob();
+    const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
     const { target, replace } = initialTarget(job);
     expect(replace).toBe(false);
     const text = job.carving!.items[0];
@@ -42,7 +42,7 @@ describe('carving assistant session', () => {
   });
 
   it('prepares again for any box, detail, placement or job change', async () => {
-    const job = await createCarvingJob();
+    const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
     const box = { x: 50, y: 50, w: 40, h: 30 };
     const key = preparationKey(job, box, 'balanced', 'add');
     expect(preparationKey(job, { ...box, x: 50.01 }, 'balanced', 'add')).toBe(key);

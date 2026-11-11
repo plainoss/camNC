@@ -375,9 +375,14 @@ export function newExtrudeOf(document: CadDocument, part: CadPart, name: string)
 
 /**
  * A New extrude of regions that lie apart makes a part of each group of them that touch, as the first is: the first
- * group stays with the extrude, and each other is a part of its own of the same sketch, as thick.
+ * group stays with the extrude, and each other is a part of its own of the same sketch, as thick. `id` names the part
+ * made of each group after the first, by its index, so a preview of the split and the split itself make the same parts.
  */
-export function splitApartRegions(document: CadDocument, partId: string): CadDocument {
+export function splitApartRegions(
+  document: CadDocument,
+  partId: string,
+  id: (groupIndex: number) => string = () => newCadId()
+): CadDocument {
   const part = document.parts.find(candidate => candidate.id === partId);
   if (!part?.regions || part.regions.length < 2 || part.addTo || part.remove) return document;
   const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).filter(region => part.regions!.includes(region.id));
@@ -387,7 +392,7 @@ export function splitApartRegions(document: CadDocument, partId: string): CadDoc
   const made = groups.slice(1).map((group, index): CadPart => {
     const next: CadPart = {
       ...part,
-      id: newCadId(),
+      id: id(index + 1),
       name: `Part ${document.parts.length + index + 1}`,
       sketchOf: owner,
       regions: group.regionIds,

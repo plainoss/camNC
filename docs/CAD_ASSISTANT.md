@@ -23,17 +23,24 @@ steps stay with the source family and are not copied into the detached part.
 
 ## Connection and conversation
 
-Open **Assistant**. Until a provider is connected the dock shows the connection form; later it is under the
-**⋯** menu as **Connection**. Choose Anthropic, OpenAI or **Other…**,
-paste the key and pick a model (Anthropic lists its current models, with the
-recommended one first). **Test and connect** sends one small tool-calling request
-with a 1 × 1 pixel image and no design data. It confirms that the browser can reach
-the provider, that the key and model work and that the model calls tools; if the
-model refuses the image, image support is turned off and the test is repeated
-without it. A failed test saves nothing and says why. **Address and capabilities**
-shows the API address, the API type (Anthropic Messages, OpenAI Responses or Chat
-Completions), image input and prompt caching, and offers **Save without testing**.
-The design assistant and the carving assistant use the same connection.
+Open **Assistant** and paste a provider key (later the connection is under the **⋯** menu as **Connection**). Its prefix picks the provider
+(`sk-ant-` Anthropic, `sk-` OpenAI); **Other…** covers compatible endpoints.
+**Test and connect** lists the provider's models with that key and picks the
+newest main-line model for design (for example Claude Sonnet), and for OpenAI the
+newest `gpt-image` model for Carve's image generation. If the list is unavailable,
+Anthropic falls back to its recommended model, and other providers ask for a model
+ID. The test then sends one small tool-calling request with a 1 × 1 pixel image and
+no design data. It confirms browser access, the key, the model and tool calls. If
+the model refuses the image, image support is turned off and the test is repeated
+without it. A failed test saves nothing and says why.
+
+**Models (optional)** overrides the design model and the image model.
+**Address and capabilities** shows the API address, the API type (Anthropic
+Messages, OpenAI Responses or Chat Completions), image input and prompt caching,
+and offers **Save without testing**. The design assistant and the carving
+assistant use the same connection; `nativeImageFromConnection` gives Carve the
+image model with the same key and endpoint, or nothing for providers without image
+generation.
 
 Requests go from the browser to the selected provider. **Remember on this device** is selected by default;
 without it the key stays in memory until the app reloads. Remembered keys use their own
