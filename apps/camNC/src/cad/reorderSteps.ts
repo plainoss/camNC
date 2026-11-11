@@ -1,4 +1,4 @@
-import { cadFolderForPart, cadFolderIssue, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { cadFolderForPart, cadFolderIssue, designSteps, type CadDocument, type CadPart } from '@wbcnc/cad';
 import type { DesignStep } from '@wbcnc/cad';
 
 /** The parts a part is built on: drawn on, sketched from, added to or cut into. They come before it. */
@@ -77,4 +77,28 @@ export function reorderedSteps(
     };
   }
   return { error: 'That step can’t go there: a part’s steps move together, and a cut stays with its part.' };
+}
+
+/**
+ * What dropping one step on another would do, shown while it's dragged: the step it would then sit just before (null
+ * at the end of the list), why it can't go there, or null when it would stay where it is.
+ */
+export function reorderDrop(
+  document: CadDocument,
+  draggedId: string,
+  targetId: string
+): { before: string | null } | { error: string } | null {
+  const steps = designSteps(document);
+  const dragged = steps.find(step => step.id === draggedId);
+  const target = steps.find(step => step.id === targetId);
+  if (!dragged || !target || dragged.id === target.id) return null;
+  const result = reorderedSteps(document, dragged, target);
+  if ('error' in result) return result;
+  if (result.document === document) return null;
+  // A part's steps move as one, so the line goes before whatever follows the whole run of them.
+  const moving = new Set(partLevel(dragged) ? steps.filter(step => step.partId === dragged.partId).map(step => step.id) : [dragged.id]);
+  const order = designSteps(result.document).map(step => step.id);
+  let at = order.findIndex(id => moving.has(id));
+  while (at < order.length && moving.has(order[at]!)) at++;
+  return { before: order[at] ?? null };
 }

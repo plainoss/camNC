@@ -270,3 +270,21 @@
   padding-inline-start: 18px;
   list-style: none;
 }
+/** While a step is dragged, a line marks where it would land: before a row, or after the last. */
+.cad-studio-features > ol > li.cad-feature-drop-before {
+  box-shadow: inset 0 2px 0 #2f80ed;
+}
+.cad-studio-features > ol > li.cad-feature-drop-after {
+  box-shadow: inset 0 -2px 0 #2f80ed;
+}
+/** A row the dragged step can't go to has a red line, and says why under it. */
+.cad-studio-features > ol > li.cad-feature-drop-refused {
+  box-shadow: inset 0 2px 0 #d64545;
+}
+.cad-feature-drop-reason {
+  flex-basis: 100%;
+  padding: 2px 8px 4px;
+  color: #b23434;
+  font-size: 11px;
+  line-height: 1.3;
+}
