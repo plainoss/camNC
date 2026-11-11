@@ -15,7 +15,8 @@ export interface CadSession {
 }
 const sessions = new Map<string, CadSession>();
 const copy = (document: CadDocument): CadDocument => structuredClone(document);
-const sameContent = (a: CadDocument, b: CadDocument) => JSON.stringify({ ...a, revision: 0 }) === JSON.stringify({ ...b, revision: 0 });
+export const sameContent = (a: CadDocument, b: CadDocument) =>
+  JSON.stringify({ ...a, revision: 0 }) === JSON.stringify({ ...b, revision: 0 });
 const fresh = (document: CadDocument): CadSession => ({
   entry: copy(document),
   document: copy(document),
