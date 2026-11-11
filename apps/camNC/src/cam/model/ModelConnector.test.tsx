@@ -1,8 +1,10 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import { Group, Matrix4, Mesh, OrthographicCamera, PerspectiveCamera, Raycaster, Vector2, Vector3, type Scene } from 'three';
 import { ModelConnector, type ViewConnector } from './ModelConnector';
+import { settledCanvas } from '@/lib/settledCanvas';
+import { settled } from '@/test/settled';
 
 let scene: Scene | null = null;
 let camera: OrthographicCamera | PerspectiveCamera | null = null;
@@ -23,8 +25,11 @@ afterEach(() => {
   invalidate = null;
 });
 
-// Cold WebGL setup shares the GPU with other browser tests; wait for a drawn frame before inspecting connector geometry.
-const firstFrame = () => waitFor(() => expect(frames).toBeGreaterThan(0), { timeout: 20_000 });
+// Cold WebGL setup shares the GPU with other browser tests; settle on a drawn frame before inspecting connector geometry.
+const firstFrame = async () => {
+  await settled({ timeout: 20_000 });
+  expect(frames).toBeGreaterThan(0);
+};
 
 const connector: ViewConnector = { point: [0, 0, 5], normal: [0, 0, 1], label: 'Source mate connector' };
 function View({
@@ -38,7 +43,7 @@ function View({
 }) {
   return (
     <div style={{ width: 400, height: 300 }}>
-      <Canvas orthographic={orthographic} camera={{ position: [0, 0, 200], fov: 30, near: 0.1, far: 1000 }}>
+      <Canvas {...settledCanvas} orthographic={orthographic} camera={{ position: [0, 0, 200], fov: 30, near: 0.1, far: 1000 }}>
         <mesh name="source solid">
           <planeGeometry args={[100, 100]} />
           <meshBasicMaterial />
@@ -60,7 +65,7 @@ it('places a visible connector frame at its model point with Z along the picked 
   expect(origin.distanceTo(new Vector3(17, 41, -7))).toBeLessThan(1e-8);
   const z = new Vector3(0, 0, 1).transformDirection(frame.matrixWorld);
   expect(z.distanceTo(new Vector3(0, 0, -1))).toBeLessThan(1e-8);
-  const marker = await screen.findByLabelText('Destination mate connector');
+  const marker = screen.getByLabelText('Destination mate connector');
   expect(marker.getBoundingClientRect().width).toBeGreaterThan(0);
   expect(getComputedStyle(marker).pointerEvents).toBe('none');
 }, 25_000);
@@ -83,7 +88,8 @@ it.each([true, false])(
     camera!.zoom = 2;
     camera!.updateProjectionMatrix();
     invalidate!();
-    await waitFor(() => expect(axes.scale.x).toBeCloseTo(scale / 2, 8), { timeout: 20_000 });
+    await settled({ timeout: 20_000 });
+    expect(axes.scale.x).toBeCloseTo(scale / 2, 8);
     expect(pixels()).toBeCloseTo(28, 5);
   },
   25_000

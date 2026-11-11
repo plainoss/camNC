@@ -22,6 +22,7 @@ import shelfExample from '../../../../../packages/cad-script/examples/shelf-side
 import pebbleExample from '../../../../../packages/cad-script/examples/pebble-tray.cad.ts?raw';
 import './dock.css';
 import type { AssistantSelection } from './selection';
+import { holdPending } from '@/lib/settled';
 
 const starters = [
   {
@@ -148,6 +149,7 @@ export function AssistantDock({
     setRunning(true);
     setError('');
     writeConversation(start.id, transcript);
+    const turn = holdPending('assistant');
     try {
       setActivity('Reading the open design…');
       const inspected = await inspectCadDocument(start);
@@ -222,6 +224,7 @@ export function AssistantDock({
         setRunning(false);
         if (abort.signal.aborted) setActivity(stopReason.current);
       }
+      turn();
     }
   };
   return (
