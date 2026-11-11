@@ -1,8 +1,10 @@
 import { cadFaceFrame, cadFaceName, type CadFaceFrame } from './drawnOn';
 import { cadCopyName } from './partPatterns';
-import { cadPartReferenceName } from './partReferences';
+import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
+import { joinedCutReferences } from './joinedCutReferences';
 import { resolvePartCutTargets } from './partCutTargetSelection';
 import { evaluatedPartCopy } from './copies';
+import { physicalJoinedCopies } from './physicalJoinedCopies';
 import type { CadCircularPartPattern, CadDocument, CadPartPattern, CadPlacement, EvaluatedCadPart } from './types';
 
 /** What one step of a design refers to, and what that came to, in words and numbers rather than pictures. */
@@ -81,7 +83,10 @@ const roundedFrame = (frame: CadFaceFrame | { error: string }): CadFaceFrame | {
  */
 export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadStepReportEntry[] {
   const report: CadStepReportEntry[] = [];
-  const byId = new Map(document.parts.map(part => [part.id, part]));
+  // Physical names/slots include inherited Add material without adding synthetic authoring steps to the report.
+  const physical = physicalJoinedCopies(document);
+  const byId = new Map(physical.parts.map(part => [part.id, part]));
+  const authoredById = new Map(document.parts.map(part => [part.id, part]));
   for (const part of document.parts) {
     if (part.drawnOn)
       report.push({
@@ -138,13 +143,29 @@ export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCa
   };
   for (const step of document.partCuts ?? []) {
     const prefix = `cut-parts:${step.id}:`;
-    const exactTargets = resolvePartCutTargets(document, step.targets).targets.filter(target => target.copyId !== undefined);
+    const exactTargets = resolvePartCutTargets(physical, step.targets).targets.filter(target => target.copyId !== undefined);
+    const references = joinedCutReferences(physical, step.targets);
+    const physicalTargets = resolvePartCutTargets(
+      physical,
+      references.map(item => item.reference)
+    ).targets;
+    const derivedOwners = new Set(
+      references.flatMap(({ reference, origin }) => {
+        const owner = cadPartReferenceOwner(physical, reference);
+        return owner && owner.id !== origin ? [owner.id] : [];
+      })
+    );
     const reportedParts = parts.flatMap(part => [
       { name: part.name, shape: part },
-      ...exactTargets.flatMap(target => {
-        if (target.part.id !== part.partId) return [];
-        const index = target.part.copies!.findIndex(copy => copy.id === target.copyId);
-        return [{ name: cadCopyName(target.part, index), shape: evaluatedPartCopy(part, target.part.copies![index]!) }];
+      ...(byId.get(part.partId)?.copies ?? []).flatMap((copy, index) => {
+        const exact = exactTargets.some(target => target.part.id === part.partId && target.copyId === copy.id);
+        const selected = physicalTargets.some(
+          target => target.part.id === part.partId && (target.copyId === undefined || target.copyId === copy.id)
+        );
+        const inherited = !authoredById.get(part.partId)?.copies?.some(own => own.id === copy.id);
+        // Preserve ordinary family reporting, but include the joined material this reader newly derives.
+        if (!exact && !(selected && (inherited || derivedOwners.has(part.partId)))) return [];
+        return [{ name: cadCopyName(byId.get(part.partId)!, index), shape: evaluatedPartCopy(part, copy) }];
       }),
     ]);
     report.push({

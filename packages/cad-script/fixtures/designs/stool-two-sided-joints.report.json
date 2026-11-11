@@ -1,0 +1,5470 @@
+{
+ "design": {
+  "name": "stool",
+  "revision": 28,
+  "version": 3
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [],
+ "features": [
+  {
+   "id": "e68505c0-3a77-4ac9-827b-b54f4df98a0c",
+   "kind": "variable",
+   "label": "#width",
+   "settings": {
+    "expression": "400mm"
+   },
+   "result": {
+    "value": 400,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "32c3620a-4bb1-47a0-9fb7-e344099ff579",
+   "kind": "variable",
+   "label": "#depth",
+   "settings": {
+    "expression": "300mm"
+   },
+   "result": {
+    "value": 300,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "fab21d3a-93b6-44bf-a853-f28816ac3571",
+   "kind": "variable",
+   "label": "#height",
+   "settings": {
+    "expression": "450mm"
+   },
+   "result": {
+    "value": 450,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "0c0647fe-477e-4965-a1c6-446c1007643a",
+   "kind": "variable",
+   "label": "#board",
+   "settings": {
+    "expression": "18mm"
+   },
+   "result": {
+    "value": 18,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "5dfe99ff-5236-4709-b91f-387fc913be47",
+   "kind": "variable",
+   "label": "#corner",
+   "settings": {
+    "expression": "60mm"
+   },
+   "result": {
+    "value": 60,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "9eccc631-840c-433b-9744-dcfef5f76b6d",
+   "kind": "variable",
+   "label": "#inset",
+   "settings": {
+    "expression": "40mm"
+   },
+   "result": {
+    "value": 40,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "c7e59f0b-a624-44c8-bd12-ffac67a7bc8c",
+   "kind": "variable",
+   "label": "#apronH",
+   "settings": {
+    "expression": "80mm"
+   },
+   "result": {
+    "value": 80,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "be8dd0ce-3271-44a0-b127-30ce4091a8da",
+   "kind": "variable",
+   "label": "#tenon",
+   "settings": {
+    "expression": "12mm"
+   },
+   "result": {
+    "value": 12,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "4e9bef24-f6ed-4909-ac97-23cbd14476ba",
+   "kind": "variable",
+   "label": "#tenonLen",
+   "settings": {
+    "expression": "14mm"
+   },
+   "result": {
+    "value": 14,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "9a4eff57-05f4-4f7b-8015-4932a57c0f95",
+   "kind": "variable",
+   "label": "#tenonH",
+   "settings": {
+    "expression": "40mm"
+   },
+   "result": {
+    "value": 40,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "0a3aedcd-0901-4f65-b7bc-a14a3d1f5c52",
+   "kind": "variable",
+   "label": "#backH",
+   "settings": {
+    "expression": "550mm"
+   },
+   "result": {
+    "value": 550,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "6dc16746-3f60-46f6-8209-eb836a9f5ccb",
+   "kind": "variable",
+   "label": "#railH",
+   "settings": {
+    "expression": "100mm"
+   },
+   "result": {
+    "value": 100,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "f3a4d9bc-f30c-4f5c-bd4c-d2b3eebab9b1",
+   "kind": "variable",
+   "label": "#postD",
+   "settings": {
+    "expression": "30mm"
+   },
+   "result": {
+    "value": 30,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "e1f1b988-706b-42f1-ad1c-167acb6d4684",
+   "kind": "variable",
+   "label": "#lgX",
+   "settings": {
+    "expression": "0"
+   },
+   "result": {
+    "value": 0,
+    "kind": "number"
+   }
+  },
+  {
+   "id": "844d9938-f6a8-42f2-85e6-293760557750",
+   "kind": "variable",
+   "label": "#lgW",
+   "settings": {
+    "expression": "460mm"
+   },
+   "result": {
+    "value": 460,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "e7b45d83-8585-47b2-8405-16aff5e308be",
+   "kind": "variable",
+   "label": "#lgD",
+   "settings": {
+    "expression": "400mm"
+   },
+   "result": {
+    "value": 400,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "7c951b04-567b-4a7d-93ea-615b7403b30e",
+   "kind": "variable",
+   "label": "#lgH",
+   "settings": {
+    "expression": "450mm"
+   },
+   "result": {
+    "value": 450,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "a4c80268-c9df-46a3-b4f7-1fe3a8bcdeca",
+   "kind": "variable",
+   "label": "#lgBoard",
+   "settings": {
+    "expression": "18mm"
+   },
+   "result": {
+    "value": 18,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "69c91be0-31e2-48a2-b2dd-73468c7a0db0",
+   "kind": "variable",
+   "label": "#lgCorner",
+   "settings": {
+    "expression": "70mm"
+   },
+   "result": {
+    "value": 70,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "a9a92d28-8b2b-4d67-b890-f8a12d33d737",
+   "kind": "variable",
+   "label": "#lgInset",
+   "settings": {
+    "expression": "50mm"
+   },
+   "result": {
+    "value": 50,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "4548c380-b361-46e8-86a1-5709b0cb9bb2",
+   "kind": "variable",
+   "label": "#lgM",
+   "settings": {
+    "expression": "40mm"
+   },
+   "result": {
+    "value": 40,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "1abb7698-444d-42c7-a116-0432c01ba056",
+   "kind": "variable",
+   "label": "#lgPostD",
+   "settings": {
+    "expression": "40mm"
+   },
+   "result": {
+    "value": 40,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "9a12403a-ff79-4e6e-897a-efee1c5be3e6",
+   "kind": "variable",
+   "label": "#lgBackH",
+   "settings": {
+    "expression": "480mm"
+   },
+   "result": {
+    "value": 480,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "e3c566ee-aae8-4780-8ec4-a5618e04bd7b",
+   "kind": "variable",
+   "label": "#lgTenon",
+   "settings": {
+    "expression": "12mm"
+   },
+   "result": {
+    "value": 12,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "3794b8f1-5ad8-4662-aa0b-963a91edb5f5",
+   "kind": "variable",
+   "label": "#lgTenonLen",
+   "settings": {
+    "expression": "14mm"
+   },
+   "result": {
+    "value": 14,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "ce562fae-6ac0-4b1e-bcfe-f5fea0b25faf",
+   "kind": "variable",
+   "label": "#lgTenonH",
+   "settings": {
+    "expression": "40mm"
+   },
+   "result": {
+    "value": 40,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "2ff7b14d-6301-4cbd-8734-f4e05998cb54",
+   "kind": "variable",
+   "label": "#lgApronH",
+   "settings": {
+    "expression": "90mm"
+   },
+   "result": {
+    "value": 90,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "57e56e43-b35b-4eef-af0b-4aedc45108c2",
+   "kind": "variable",
+   "label": "#lgSlatH",
+   "settings": {
+    "expression": "80mm"
+   },
+   "result": {
+    "value": 80,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "6f653590-47b2-4f1e-b26e-eaa4589a4219",
+   "kind": "variable",
+   "label": "#lgSlatGap",
+   "settings": {
+    "expression": "35mm"
+   },
+   "result": {
+    "value": 35,
+    "kind": "length"
+   }
+  },
+  {
+   "id": "623a97c7-9a48-4094-8e9b-293f39210538:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Large seat",
+   "part": "Large seat",
+   "settings": {
+    "on": "the top plane"
+   },
+   "result": {
+    "sketch": "Large seat / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "623a97c7-9a48-4094-8e9b-293f39210538:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Large seat",
+   "part": "Large seat",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the top plane",
+     "offset": {
+      "value": 432,
+      "expression": "lgH - lgBoard"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      460,
+      400
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the top plane: sketch origin at 0, 0, 0, its x along +x, its y along +y, looking +z."
+   }
+  },
+  {
+   "id": "e110635f-8b08-4dbf-b10a-a3e9b31f9772:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Large left panel",
+   "part": "Large left panel",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Large left panel / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "e110635f-8b08-4dbf-b10a-a3e9b31f9772:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Large left panel",
+   "part": "Large left panel",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 50,
+      "expression": "lgX + lgInset"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      40,
+      0
+     ],
+     "size": [
+      320,
+      444
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "970a1b34-da58-495c-8074-d345b3df6746:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Large right panel",
+   "part": "Large right panel",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Large right panel / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "970a1b34-da58-495c-8074-d345b3df6746:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Large right panel",
+   "part": "Large right panel",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 392,
+      "expression": "lgX + lgW - lgInset - lgBoard"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      40,
+      0
+     ],
+     "size": [
+      320,
+      444
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "8e669b6c-627c-4293-a917-b44c93c1523e",
+   "kind": "partCut",
+   "label": "Cut Large seat with Large left panel, Large right panel",
+   "part": "Large seat",
+   "settings": {
+    "tools": [
+     "Large left panel",
+     "Large right panel"
+    ],
+    "targets": [
+     "Large seat"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large seat",
+      "tool": "Large left panel",
+      "side": "underside",
+      "width": 18,
+      "length": 240,
+      "depth": 12,
+      "through": false,
+      "at": {
+       "x": 50,
+       "y": 70
+      }
+     },
+     {
+      "target": "Large seat",
+      "tool": "Large right panel",
+      "side": "underside",
+      "width": 18,
+      "length": 240,
+      "depth": 12,
+      "through": false,
+      "at": {
+       "x": 392,
+       "y": 70
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "dae12887-53d1-4293-a243-471ee5ac2f2a:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Large front apron",
+   "part": "Large front apron",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Large front apron / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "dae12887-53d1-4293-a243-471ee5ac2f2a:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Large front apron",
+   "part": "Large front apron",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -60,
+      "expression": "-(lgM + 20)"
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      54,
+      342
+     ],
+     "size": [
+      352,
+      90
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "b18a62bc-1a18-4f17-94fc-4e7a4cb91a50:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Large back apron",
+   "part": "Large back apron",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Large back apron / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "b18a62bc-1a18-4f17-94fc-4e7a4cb91a50:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Large back apron",
+   "part": "Large back apron",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -322,
+      "expression": "-(lgD - lgM - 20 - lgBoard)"
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      54,
+      342
+     ],
+     "size": [
+      352,
+      90
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "356697b2-b967-4a3d-bd74-4e9ddf3cca17",
+   "kind": "partCut",
+   "label": "Cut Large left panel with Large front apron, Large back apron",
+   "part": "Large left panel",
+   "settings": {
+    "tools": [
+     "Large front apron",
+     "Large back apron"
+    ],
+    "targets": [
+     "Large left panel"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large left panel",
+      "tool": "Large front apron",
+      "side": "top",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 60,
+       "y": 367
+      }
+     },
+     {
+      "target": "Large left panel",
+      "tool": "Large back apron",
+      "side": "top",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 322,
+       "y": 367
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "5be26c30-01ce-40fc-a15f-db7d5e83289a",
+   "kind": "partCut",
+   "label": "Cut Large right panel with Large front apron, Large back apron",
+   "part": "Large right panel",
+   "settings": {
+    "tools": [
+     "Large front apron",
+     "Large back apron"
+    ],
+    "targets": [
+     "Large right panel"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large right panel",
+      "tool": "Large front apron",
+      "side": "underside",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 60,
+       "y": 367
+      }
+     },
+     {
+      "target": "Large right panel",
+      "tool": "Large back apron",
+      "side": "underside",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 322,
+       "y": 367
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "a960ba63-8907-49ae-9aed-30c75eccf6dd:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Large left back post",
+   "part": "Large left back post",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Large left back post / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "a960ba63-8907-49ae-9aed-30c75eccf6dd:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Large left back post",
+   "part": "Large left back post",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 50,
+      "expression": "lgX + lgInset"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      320,
+      438
+     ],
+     "size": [
+      40,
+      492
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "82cca4e5-a867-444a-9ea9-487a553466a8:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Large right back post",
+   "part": "Large right back post",
+   "settings": {
+    "on": "the right plane"
+   },
+   "result": {
+    "sketch": "Large right back post / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "82cca4e5-a867-444a-9ea9-487a553466a8:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Large right back post",
+   "part": "Large right back post",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the right plane",
+     "offset": {
+      "value": 392,
+      "expression": "lgX + lgW - lgInset - lgBoard"
+     }
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      320,
+      438
+     ],
+     "size": [
+      40,
+      492
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the right plane: sketch origin at 0, 0, 0, its x along +y, its y along +z, looking +x."
+   }
+  },
+  {
+   "id": "519758c9-ecec-4660-a3a9-a5fe34e39971",
+   "kind": "partCut",
+   "label": "Cut Large seat with Large left back post, Large right back post",
+   "part": "Large seat",
+   "settings": {
+    "tools": [
+     "Large left back post",
+     "Large right back post"
+    ],
+    "targets": [
+     "Large seat"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large seat",
+      "tool": "Large left back post",
+      "side": "top",
+      "width": 18,
+      "length": 28,
+      "depth": 12,
+      "through": false,
+      "at": {
+       "x": 50,
+       "y": 326
+      }
+     },
+     {
+      "target": "Large seat",
+      "tool": "Large right back post",
+      "side": "top",
+      "width": 18,
+      "length": 28,
+      "depth": 12,
+      "through": false,
+      "at": {
+       "x": 392,
+       "y": 326
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "f782803d-c8fe-4062-8f8c-ed9b15fe8e38:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Back slat 1",
+   "part": "Back slat 1",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Back slat 1 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "f782803d-c8fe-4062-8f8c-ed9b15fe8e38:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Back slat 1",
+   "part": "Back slat 1",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -331,
+      "expression": "-(lgD - lgM - lgPostD/2 - lgBoard/2)"
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      54,
+      590
+     ],
+     "size": [
+      352,
+      80
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "a5bbe952-a165-4988-ae1a-e7d22f2b309a",
+   "kind": "partCut",
+   "label": "Cut Large left back post with Back slat 1",
+   "part": "Large left back post",
+   "settings": {
+    "tools": [
+     "Back slat 1"
+    ],
+    "targets": [
+     "Large left back post"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large left back post",
+      "tool": "Back slat 1",
+      "side": "top",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 331,
+       "y": 610
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "0d958b3b-6482-4dcd-8ac5-617a41791ea2",
+   "kind": "partCut",
+   "label": "Cut Large right back post with Back slat 1",
+   "part": "Large right back post",
+   "settings": {
+    "tools": [
+     "Back slat 1"
+    ],
+    "targets": [
+     "Large right back post"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large right back post",
+      "tool": "Back slat 1",
+      "side": "underside",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 331,
+       "y": 610
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "e7c818a4-97ab-4d2a-9934-0087201dfc97:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Back slat 2",
+   "part": "Back slat 2",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Back slat 2 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "e7c818a4-97ab-4d2a-9934-0087201dfc97:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Back slat 2",
+   "part": "Back slat 2",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -331,
+      "expression": "-(lgD - lgM - lgPostD/2 - lgBoard/2)"
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      54,
+      705
+     ],
+     "size": [
+      352,
+      80
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "4a678147-fe63-49ff-9792-4813c2936645",
+   "kind": "partCut",
+   "label": "Cut Large left back post with Back slat 2",
+   "part": "Large left back post",
+   "settings": {
+    "tools": [
+     "Back slat 2"
+    ],
+    "targets": [
+     "Large left back post"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large left back post",
+      "tool": "Back slat 2",
+      "side": "top",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 331,
+       "y": 725
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "706f8092-02fb-4460-9e91-e8c861a910be",
+   "kind": "partCut",
+   "label": "Cut Large right back post with Back slat 2",
+   "part": "Large right back post",
+   "settings": {
+    "tools": [
+     "Back slat 2"
+    ],
+    "targets": [
+     "Large right back post"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large right back post",
+      "tool": "Back slat 2",
+      "side": "underside",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 331,
+       "y": 725
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "ecb57618-350d-4a1c-9779-5a435a6d0ed9:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Back slat 3",
+   "part": "Back slat 3",
+   "settings": {
+    "on": "the front plane"
+   },
+   "result": {
+    "sketch": "Back slat 3 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "ecb57618-350d-4a1c-9779-5a435a6d0ed9:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Back slat 3",
+   "part": "Back slat 3",
+   "settings": {
+    "thickness": {
+     "value": 18,
+     "expression": "lgBoard"
+    },
+    "drawnOn": {
+     "on": "the front plane",
+     "offset": {
+      "value": -331,
+      "expression": "-(lgD - lgM - lgPostD/2 - lgBoard/2)"
+     },
+     "inward": true
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      54,
+      820
+     ],
+     "size": [
+      352,
+      80
+     ]
+    },
+    "holes": 0,
+    "notches": 0,
+    "on": "the front plane: sketch origin at 0, 0, 0, its x along +x, its y along +z, looking -y."
+   }
+  },
+  {
+   "id": "7d3b6e31-55e8-4d24-b331-5488664c0e6e",
+   "kind": "partCut",
+   "label": "Cut Large left back post with Back slat 3",
+   "part": "Large left back post",
+   "settings": {
+    "tools": [
+     "Back slat 3"
+    ],
+    "targets": [
+     "Large left back post"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large left back post",
+      "tool": "Back slat 3",
+      "side": "top",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 331,
+       "y": 840
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "6091097c-e169-4146-8448-50f278a779e5",
+   "kind": "partCut",
+   "label": "Cut Large right back post with Back slat 3",
+   "part": "Large right back post",
+   "settings": {
+    "tools": [
+     "Back slat 3"
+    ],
+    "targets": [
+     "Large right back post"
+    ],
+    "clearance": {
+     "value": 0
+    }
+   },
+   "result": {
+    "openings": [
+     {
+      "target": "Large right back post",
+      "tool": "Back slat 3",
+      "side": "underside",
+      "width": 18,
+      "length": 40,
+      "depth": 14,
+      "through": false,
+      "at": {
+       "x": 331,
+       "y": 840
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Large seat",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 4,
+    "distanceX": 1,
+    "distanceY": 1,
+    "equal": 3,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1,
+    "pointOnLine": 8,
+    "positionX": 1,
+    "positionY": 1,
+    "radius": 1,
+    "tangent": 8
+   },
+   "entities": [
+    {
+     "ref": "7a30",
+     "type": "line",
+     "a": [
+      70,
+      0
+     ],
+     "b": [
+      390,
+      0
+     ],
+     "ends": [
+      "f38a",
+      "1f57"
+     ]
+    },
+    {
+     "ref": "67de",
+     "type": "line",
+     "a": [
+      460,
+      70
+     ],
+     "b": [
+      460,
+      330
+     ],
+     "ends": [
+      "6dfa",
+      "b6d6"
+     ]
+    },
+    {
+     "ref": "6632",
+     "type": "line",
+     "a": [
+      390,
+      400
+     ],
+     "b": [
+      70,
+      400
+     ],
+     "ends": [
+      "5cc5",
+      "3b1c"
+     ]
+    },
+    {
+     "ref": "6980",
+     "type": "line",
+     "a": [
+      0,
+      330
+     ],
+     "b": [
+      0,
+      70
+     ],
+     "ends": [
+      "ddda",
+      "5afe"
+     ]
+    },
+    {
+     "ref": "ffd1",
+     "type": "arc",
+     "at": [
+      70,
+      70
+     ],
+     "r": 70,
+     "a": [
+      0,
+      70
+     ],
+     "b": [
+      70,
+      0
+     ],
+     "ends": [
+      "5afe",
+      "f38a"
+     ]
+    },
+    {
+     "ref": "3b19",
+     "type": "arc",
+     "at": [
+      390,
+      70
+     ],
+     "r": 70,
+     "a": [
+      390,
+      0
+     ],
+     "b": [
+      460,
+      70
+     ],
+     "ends": [
+      "1f57",
+      "6dfa"
+     ]
+    },
+    {
+     "ref": "bd75",
+     "type": "arc",
+     "at": [
+      390,
+      330
+     ],
+     "r": 70,
+     "a": [
+      460,
+      330
+     ],
+     "b": [
+      390,
+      400
+     ],
+     "ends": [
+      "b6d6",
+      "5cc5"
+     ]
+    },
+    {
+     "ref": "a06b",
+     "type": "arc",
+     "at": [
+      70,
+      330
+     ],
+     "r": 70,
+     "a": [
+      70,
+      400
+     ],
+     "b": [
+      0,
+      330
+     ],
+     "ends": [
+      "3b1c",
+      "ddda"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      460,
+      400
+     ],
+     "area": 179790.938,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Large left panel",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 6,
+    "distanceY": 3,
+    "horizontal": 5,
+    "horizontalPoints": 1,
+    "positionX": 1,
+    "positionY": 1,
+    "radius": 1,
+    "vertical": 3
+   },
+   "entities": [
+    {
+     "ref": "9985",
+     "type": "line",
+     "a": [
+      40,
+      0
+     ],
+     "b": [
+      80,
+      0
+     ],
+     "ends": [
+      "d0d4",
+      "eb81"
+     ]
+    },
+    {
+     "ref": "2ae2",
+     "type": "arc",
+     "at": [
+      200,
+      -50
+     ],
+     "r": 130,
+     "a": [
+      320,
+      0
+     ],
+     "b": [
+      80,
+      0
+     ],
+     "ends": [
+      "da79",
+      "eb81"
+     ]
+    },
+    {
+     "ref": "44f2",
+     "type": "line",
+     "a": [
+      320,
+      0
+     ],
+     "b": [
+      360,
+      0
+     ],
+     "ends": [
+      "da79",
+      "5463"
+     ]
+    },
+    {
+     "ref": "6580",
+     "type": "line",
+     "a": [
+      360,
+      0
+     ],
+     "b": [
+      360,
+      432
+     ],
+     "ends": [
+      "5463",
+      "30a9"
+     ]
+    },
+    {
+     "ref": "91f7",
+     "type": "line",
+     "a": [
+      360,
+      432
+     ],
+     "b": [
+      310,
+      432
+     ],
+     "ends": [
+      "30a9",
+      "5577"
+     ]
+    },
+    {
+     "ref": "b254",
+     "type": "line",
+     "a": [
+      310,
+      432
+     ],
+     "b": [
+      310,
+      444
+     ],
+     "ends": [
+      "5577",
+      "2446"
+     ]
+    },
+    {
+     "ref": "fc40",
+     "type": "line",
+     "a": [
+      310,
+      444
+     ],
+     "b": [
+      70,
+      444
+     ],
+     "ends": [
+      "2446",
+      "48f4"
+     ]
+    },
+    {
+     "ref": "3b0c",
+     "type": "line",
+     "a": [
+      70,
+      444
+     ],
+     "b": [
+      70,
+      432
+     ],
+     "ends": [
+      "48f4",
+      "bea1"
+     ]
+    },
+    {
+     "ref": "1122",
+     "type": "line",
+     "a": [
+      70,
+      432
+     ],
+     "b": [
+      40,
+      432
+     ],
+     "ends": [
+      "bea1",
+      "02c1"
+     ]
+    },
+    {
+     "ref": "664b",
+     "type": "line",
+     "a": [
+      40,
+      432
+     ],
+     "b": [
+      40,
+      0
+     ],
+     "ends": [
+      "02c1",
+      "d0d4"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      40,
+      0
+     ],
+     "size": [
+      320,
+      444
+     ],
+     "area": 127247.542,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Large right panel",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 6,
+    "distanceY": 3,
+    "horizontal": 5,
+    "horizontalPoints": 1,
+    "positionX": 1,
+    "positionY": 1,
+    "radius": 1,
+    "vertical": 3
+   },
+   "entities": [
+    {
+     "ref": "34c2",
+     "type": "line",
+     "a": [
+      40,
+      0
+     ],
+     "b": [
+      80,
+      0
+     ],
+     "ends": [
+      "172d",
+      "93c8"
+     ]
+    },
+    {
+     "ref": "b168",
+     "type": "arc",
+     "at": [
+      200,
+      -50
+     ],
+     "r": 130,
+     "a": [
+      320,
+      0
+     ],
+     "b": [
+      80,
+      0
+     ],
+     "ends": [
+      "a65c",
+      "93c8"
+     ]
+    },
+    {
+     "ref": "1e5c",
+     "type": "line",
+     "a": [
+      320,
+      0
+     ],
+     "b": [
+      360,
+      0
+     ],
+     "ends": [
+      "a65c",
+      "28f4"
+     ]
+    },
+    {
+     "ref": "4b67",
+     "type": "line",
+     "a": [
+      360,
+      0
+     ],
+     "b": [
+      360,
+      432
+     ],
+     "ends": [
+      "28f4",
+      "f767"
+     ]
+    },
+    {
+     "ref": "ec27",
+     "type": "line",
+     "a": [
+      360,
+      432
+     ],
+     "b": [
+      310,
+      432
+     ],
+     "ends": [
+      "f767",
+      "c78b"
+     ]
+    },
+    {
+     "ref": "5bf8",
+     "type": "line",
+     "a": [
+      310,
+      432
+     ],
+     "b": [
+      310,
+      444
+     ],
+     "ends": [
+      "c78b",
+      "cbab"
+     ]
+    },
+    {
+     "ref": "a3e3",
+     "type": "line",
+     "a": [
+      310,
+      444
+     ],
+     "b": [
+      70,
+      444
+     ],
+     "ends": [
+      "cbab",
+      "b275"
+     ]
+    },
+    {
+     "ref": "eea0",
+     "type": "line",
+     "a": [
+      70,
+      444
+     ],
+     "b": [
+      70,
+      432
+     ],
+     "ends": [
+      "b275",
+      "0509"
+     ]
+    },
+    {
+     "ref": "6b23",
+     "type": "line",
+     "a": [
+      70,
+      432
+     ],
+     "b": [
+      40,
+      432
+     ],
+     "ends": [
+      "0509",
+      "4436"
+     ]
+    },
+    {
+     "ref": "23a6",
+     "type": "line",
+     "a": [
+      40,
+      432
+     ],
+     "b": [
+      40,
+      0
+     ],
+     "ends": [
+      "4436",
+      "172d"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      40,
+      0
+     ],
+     "size": [
+      320,
+      444
+     ],
+     "area": 127247.542,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Large front apron",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 6,
+    "distanceY": 5,
+    "horizontal": 6,
+    "positionX": 1,
+    "positionY": 1,
+    "vertical": 5
+   },
+   "entities": [
+    {
+     "ref": "c03b",
+     "type": "line",
+     "a": [
+      68,
+      342
+     ],
+     "b": [
+      392,
+      342
+     ],
+     "ends": [
+      "2296",
+      "cf34"
+     ]
+    },
+    {
+     "ref": "a266",
+     "type": "line",
+     "a": [
+      392,
+      342
+     ],
+     "b": [
+      392,
+      367
+     ],
+     "ends": [
+      "cf34",
+      "d54e"
+     ]
+    },
+    {
+     "ref": "761a",
+     "type": "line",
+     "a": [
+      392,
+      367
+     ],
+     "b": [
+      406,
+      367
+     ],
+     "ends": [
+      "d54e",
+      "5b15"
+     ]
+    },
+    {
+     "ref": "df40",
+     "type": "line",
+     "a": [
+      406,
+      367
+     ],
+     "b": [
+      406,
+      407
+     ],
+     "ends": [
+      "5b15",
+      "25eb"
+     ]
+    },
+    {
+     "ref": "c1fa",
+     "type": "line",
+     "a": [
+      406,
+      407
+     ],
+     "b": [
+      392,
+      407
+     ],
+     "ends": [
+      "25eb",
+      "ee10"
+     ]
+    },
+    {
+     "ref": "6b09",
+     "type": "line",
+     "a": [
+      392,
+      407
+     ],
+     "b": [
+      392,
+      432
+     ],
+     "ends": [
+      "ee10",
+      "2cc2"
+     ]
+    },
+    {
+     "ref": "5e39",
+     "type": "line",
+     "a": [
+      392,
+      432
+     ],
+     "b": [
+      68,
+      432
+     ],
+     "ends": [
+      "2cc2",
+      "6adf"
+     ]
+    },
+    {
+     "ref": "2658",
+     "type": "line",
+     "a": [
+      68,
+      432
+     ],
+     "b": [
+      68,
+      407
+     ],
+     "ends": [
+      "6adf",
+      "e6a8"
+     ]
+    },
+    {
+     "ref": "d0db",
+     "type": "line",
+     "a": [
+      68,
+      407
+     ],
+     "b": [
+      54,
+      407
+     ],
+     "ends": [
+      "e6a8",
+      "a5dd"
+     ]
+    },
+    {
+     "ref": "ae53",
+     "type": "line",
+     "a": [
+      54,
+      407
+     ],
+     "b": [
+      54,
+      367
+     ],
+     "ends": [
+      "a5dd",
+      "fd1e"
+     ]
+    },
+    {
+     "ref": "e999",
+     "type": "line",
+     "a": [
+      54,
+      367
+     ],
+     "b": [
+      68,
+      367
+     ],
+     "ends": [
+      "fd1e",
+      "bd1f"
+     ]
+    },
+    {
+     "ref": "a322",
+     "type": "line",
+     "a": [
+      68,
+      367
+     ],
+     "b": [
+      68,
+      342
+     ],
+     "ends": [
+      "bd1f",
+      "2296"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      54,
+      342
+     ],
+     "size": [
+      352,
+      90
+     ],
+     "area": 30280,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Large back apron",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 6,
+    "distanceY": 5,
+    "horizontal": 6,
+    "positionX": 1,
+    "positionY": 1,
+    "vertical": 5
+   },
+   "entities": [
+    {
+     "ref": "895f",
+     "type": "line",
+     "a": [
+      68,
+      342
+     ],
+     "b": [
+      392,
+      342
+     ],
+     "ends": [
+      "9921",
+      "2f50"
+     ]
+    },
+    {
+     "ref": "4051",
+     "type": "line",
+     "a": [
+      392,
+      342
+     ],
+     "b": [
+      392,
+      367
+     ],
+     "ends": [
+      "2f50",
+      "cffe"
+     ]
+    },
+    {
+     "ref": "e47d",
+     "type": "line",
+     "a": [
+      392,
+      367
+     ],
+     "b": [
+      406,
+      367
+     ],
+     "ends": [
+      "cffe",
+      "51fb"
+     ]
+    },
+    {
+     "ref": "2d1c",
+     "type": "line",
+     "a": [
+      406,
+      367
+     ],
+     "b": [
+      406,
+      407
+     ],
+     "ends": [
+      "51fb",
+      "9909"
+     ]
+    },
+    {
+     "ref": "5fdd",
+     "type": "line",
+     "a": [
+      406,
+      407
+     ],
+     "b": [
+      392,
+      407
+     ],
+     "ends": [
+      "9909",
+      "3c71"
+     ]
+    },
+    {
+     "ref": "c2ba",
+     "type": "line",
+     "a": [
+      392,
+      407
+     ],
+     "b": [
+      392,
+      432
+     ],
+     "ends": [
+      "3c71",
+      "8329"
+     ]
+    },
+    {
+     "ref": "3536",
+     "type": "line",
+     "a": [
+      392,
+      432
+     ],
+     "b": [
+      68,
+      432
+     ],
+     "ends": [
+      "8329",
+      "342b"
+     ]
+    },
+    {
+     "ref": "7ec8",
+     "type": "line",
+     "a": [
+      68,
+      432
+     ],
+     "b": [
+      68,
+      407
+     ],
+     "ends": [
+      "342b",
+      "27ae"
+     ]
+    },
+    {
+     "ref": "8611",
+     "type": "line",
+     "a": [
+      68,
+      407
+     ],
+     "b": [
+      54,
+      407
+     ],
+     "ends": [
+      "27ae",
+      "31de"
+     ]
+    },
+    {
+     "ref": "7f95",
+     "type": "line",
+     "a": [
+      54,
+      407
+     ],
+     "b": [
+      54,
+      367
+     ],
+     "ends": [
+      "31de",
+      "a708"
+     ]
+    },
+    {
+     "ref": "5bf8",
+     "type": "line",
+     "a": [
+      54,
+      367
+     ],
+     "b": [
+      68,
+      367
+     ],
+     "ends": [
+      "a708",
+      "556e"
+     ]
+    },
+    {
+     "ref": "828d",
+     "type": "line",
+     "a": [
+      68,
+      367
+     ],
+     "b": [
+      68,
+      342
+     ],
+     "ends": [
+      "556e",
+      "9921"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      54,
+      342
+     ],
+     "size": [
+      352,
+      90
+     ],
+     "area": 30280,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Large left back post",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 5,
+    "distanceY": 5,
+    "horizontal": 3,
+    "positionX": 1,
+    "positionY": 1,
+    "radius": 2,
+    "vertical": 3
+   },
+   "entities": [
+    {
+     "ref": "6800",
+     "type": "line",
+     "a": [
+      326,
+      438
+     ],
+     "b": [
+      354,
+      438
+     ],
+     "ends": [
+      "6efd",
+      "a43c"
+     ]
+    },
+    {
+     "ref": "b1e4",
+     "type": "line",
+     "a": [
+      354,
+      438
+     ],
+     "b": [
+      354,
+      450
+     ],
+     "ends": [
+      "a43c",
+      "2673"
+     ]
+    },
+    {
+     "ref": "0b6f",
+     "type": "line",
+     "a": [
+      354,
+      450
+     ],
+     "b": [
+      360,
+      450
+     ],
+     "ends": [
+      "2673",
+      "7819"
+     ]
+    },
+    {
+     "ref": "5322",
+     "type": "line",
+     "a": [
+      360,
+      450
+     ],
+     "b": [
+      360,
+      910
+     ],
+     "ends": [
+      "7819",
+      "8527"
+     ]
+    },
+    {
+     "ref": "1839",
+     "type": "arc",
+     "at": [
+      340,
+      910
+     ],
+     "r": 20,
+     "a": [
+      360,
+      910
+     ],
+     "b": [
+      340,
+      930
+     ],
+     "ends": [
+      "8527",
+      "d950"
+     ]
+    },
+    {
+     "ref": "bd96",
+     "type": "arc",
+     "at": [
+      340,
+      910
+     ],
+     "r": 20,
+     "a": [
+      340,
+      930
+     ],
+     "b": [
+      320,
+      910
+     ],
+     "ends": [
+      "d950",
+      "315b"
+     ]
+    },
+    {
+     "ref": "8e3d",
+     "type": "line",
+     "a": [
+      320,
+      910
+     ],
+     "b": [
+      320,
+      450
+     ],
+     "ends": [
+      "315b",
+      "7ef8"
+     ]
+    },
+    {
+     "ref": "4a2e",
+     "type": "line",
+     "a": [
+      320,
+      450
+     ],
+     "b": [
+      326,
+      450
+     ],
+     "ends": [
+      "7ef8",
+      "2663"
+     ]
+    },
+    {
+     "ref": "ce6b",
+     "type": "line",
+     "a": [
+      326,
+      450
+     ],
+     "b": [
+      326,
+      438
+     ],
+     "ends": [
+      "2663",
+      "6efd"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      320,
+      438
+     ],
+     "size": [
+      40,
+      492
+     ],
+     "area": 19363.905,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Large right back post",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 5,
+    "distanceY": 5,
+    "horizontal": 3,
+    "positionX": 1,
+    "positionY": 1,
+    "radius": 2,
+    "vertical": 3
+   },
+   "entities": [
+    {
+     "ref": "276b",
+     "type": "line",
+     "a": [
+      326,
+      438
+     ],
+     "b": [
+      354,
+      438
+     ],
+     "ends": [
+      "bb56",
+      "cefa"
+     ]
+    },
+    {
+     "ref": "8ed7",
+     "type": "line",
+     "a": [
+      354,
+      438
+     ],
+     "b": [
+      354,
+      450
+     ],
+     "ends": [
+      "cefa",
+      "3596"
+     ]
+    },
+    {
+     "ref": "e400",
+     "type": "line",
+     "a": [
+      354,
+      450
+     ],
+     "b": [
+      360,
+      450
+     ],
+     "ends": [
+      "3596",
+      "de31"
+     ]
+    },
+    {
+     "ref": "9bc8",
+     "type": "line",
+     "a": [
+      360,
+      450
+     ],
+     "b": [
+      360,
+      910
+     ],
+     "ends": [
+      "de31",
+      "78bd"
+     ]
+    },
+    {
+     "ref": "e87f",
+     "type": "arc",
+     "at": [
+      340,
+      910
+     ],
+     "r": 20,
+     "a": [
+      360,
+      910
+     ],
+     "b": [
+      340,
+      930
+     ],
+     "ends": [
+      "78bd",
+      "7909"
+     ]
+    },
+    {
+     "ref": "3aad",
+     "type": "arc",
+     "at": [
+      340,
+      910
+     ],
+     "r": 20,
+     "a": [
+      340,
+      930
+     ],
+     "b": [
+      320,
+      910
+     ],
+     "ends": [
+      "7909",
+      "8493"
+     ]
+    },
+    {
+     "ref": "9dc6",
+     "type": "line",
+     "a": [
+      320,
+      910
+     ],
+     "b": [
+      320,
+      450
+     ],
+     "ends": [
+      "8493",
+      "8f47"
+     ]
+    },
+    {
+     "ref": "f15f",
+     "type": "line",
+     "a": [
+      320,
+      450
+     ],
+     "b": [
+      326,
+      450
+     ],
+     "ends": [
+      "8f47",
+      "b180"
+     ]
+    },
+    {
+     "ref": "cd76",
+     "type": "line",
+     "a": [
+      326,
+      450
+     ],
+     "b": [
+      326,
+      438
+     ],
+     "ends": [
+      "b180",
+      "bb56"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      320,
+      438
+     ],
+     "size": [
+      40,
+      492
+     ],
+     "area": 19363.905,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Back slat 1",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 6,
+    "distanceY": 5,
+    "horizontal": 6,
+    "positionX": 1,
+    "positionY": 1,
+    "vertical": 5
+   },
+   "entities": [
+    {
+     "ref": "c159",
+     "type": "line",
+     "a": [
+      68,
+      590
+     ],
+     "b": [
+      392,
+      590
+     ],
+     "ends": [
+      "685f",
+      "51d2"
+     ]
+    },
+    {
+     "ref": "6853",
+     "type": "line",
+     "a": [
+      392,
+      590
+     ],
+     "b": [
+      392,
+      610
+     ],
+     "ends": [
+      "51d2",
+      "ed91"
+     ]
+    },
+    {
+     "ref": "27e4",
+     "type": "line",
+     "a": [
+      392,
+      610
+     ],
+     "b": [
+      406,
+      610
+     ],
+     "ends": [
+      "ed91",
+      "9b69"
+     ]
+    },
+    {
+     "ref": "96e3",
+     "type": "line",
+     "a": [
+      406,
+      610
+     ],
+     "b": [
+      406,
+      650
+     ],
+     "ends": [
+      "9b69",
+      "1b09"
+     ]
+    },
+    {
+     "ref": "771f",
+     "type": "line",
+     "a": [
+      406,
+      650
+     ],
+     "b": [
+      392,
+      650
+     ],
+     "ends": [
+      "1b09",
+      "fbe8"
+     ]
+    },
+    {
+     "ref": "a950",
+     "type": "line",
+     "a": [
+      392,
+      650
+     ],
+     "b": [
+      392,
+      670
+     ],
+     "ends": [
+      "fbe8",
+      "8afe"
+     ]
+    },
+    {
+     "ref": "c2e6",
+     "type": "line",
+     "a": [
+      392,
+      670
+     ],
+     "b": [
+      68,
+      670
+     ],
+     "ends": [
+      "8afe",
+      "b116"
+     ]
+    },
+    {
+     "ref": "7df2",
+     "type": "line",
+     "a": [
+      68,
+      670
+     ],
+     "b": [
+      68,
+      650
+     ],
+     "ends": [
+      "b116",
+      "f2b5"
+     ]
+    },
+    {
+     "ref": "be86",
+     "type": "line",
+     "a": [
+      68,
+      650
+     ],
+     "b": [
+      54,
+      650
+     ],
+     "ends": [
+      "f2b5",
+      "4e8d"
+     ]
+    },
+    {
+     "ref": "0a69",
+     "type": "line",
+     "a": [
+      54,
+      650
+     ],
+     "b": [
+      54,
+      610
+     ],
+     "ends": [
+      "4e8d",
+      "1ee2"
+     ]
+    },
+    {
+     "ref": "cb25",
+     "type": "line",
+     "a": [
+      54,
+      610
+     ],
+     "b": [
+      68,
+      610
+     ],
+     "ends": [
+      "1ee2",
+      "2412"
+     ]
+    },
+    {
+     "ref": "7304",
+     "type": "line",
+     "a": [
+      68,
+      610
+     ],
+     "b": [
+      68,
+      590
+     ],
+     "ends": [
+      "2412",
+      "685f"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      54,
+      590
+     ],
+     "size": [
+      352,
+      80
+     ],
+     "area": 27040,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Back slat 2",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 6,
+    "distanceY": 5,
+    "horizontal": 6,
+    "positionX": 1,
+    "positionY": 1,
+    "vertical": 5
+   },
+   "entities": [
+    {
+     "ref": "b26d",
+     "type": "line",
+     "a": [
+      68,
+      705
+     ],
+     "b": [
+      392,
+      705
+     ],
+     "ends": [
+      "e1f8",
+      "589d"
+     ]
+    },
+    {
+     "ref": "10a4",
+     "type": "line",
+     "a": [
+      392,
+      705
+     ],
+     "b": [
+      392,
+      725
+     ],
+     "ends": [
+      "589d",
+      "4c34"
+     ]
+    },
+    {
+     "ref": "07e8",
+     "type": "line",
+     "a": [
+      392,
+      725
+     ],
+     "b": [
+      406,
+      725
+     ],
+     "ends": [
+      "4c34",
+      "f2d0"
+     ]
+    },
+    {
+     "ref": "60dc",
+     "type": "line",
+     "a": [
+      406,
+      725
+     ],
+     "b": [
+      406,
+      765
+     ],
+     "ends": [
+      "f2d0",
+      "a67c"
+     ]
+    },
+    {
+     "ref": "2d97",
+     "type": "line",
+     "a": [
+      406,
+      765
+     ],
+     "b": [
+      392,
+      765
+     ],
+     "ends": [
+      "a67c",
+      "a62c"
+     ]
+    },
+    {
+     "ref": "129f",
+     "type": "line",
+     "a": [
+      392,
+      765
+     ],
+     "b": [
+      392,
+      785
+     ],
+     "ends": [
+      "a62c",
+      "6c97"
+     ]
+    },
+    {
+     "ref": "65d5",
+     "type": "line",
+     "a": [
+      392,
+      785
+     ],
+     "b": [
+      68,
+      785
+     ],
+     "ends": [
+      "6c97",
+      "ba7d"
+     ]
+    },
+    {
+     "ref": "1f40",
+     "type": "line",
+     "a": [
+      68,
+      785
+     ],
+     "b": [
+      68,
+      765
+     ],
+     "ends": [
+      "ba7d",
+      "9398"
+     ]
+    },
+    {
+     "ref": "cc21",
+     "type": "line",
+     "a": [
+      68,
+      765
+     ],
+     "b": [
+      54,
+      765
+     ],
+     "ends": [
+      "9398",
+      "0ca1"
+     ]
+    },
+    {
+     "ref": "88d1",
+     "type": "line",
+     "a": [
+      54,
+      765
+     ],
+     "b": [
+      54,
+      725
+     ],
+     "ends": [
+      "0ca1",
+      "59ce"
+     ]
+    },
+    {
+     "ref": "6838",
+     "type": "line",
+     "a": [
+      54,
+      725
+     ],
+     "b": [
+      68,
+      725
+     ],
+     "ends": [
+      "59ce",
+      "cd80"
+     ]
+    },
+    {
+     "ref": "baf2",
+     "type": "line",
+     "a": [
+      68,
+      725
+     ],
+     "b": [
+      68,
+      705
+     ],
+     "ends": [
+      "cd80",
+      "e1f8"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      54,
+      705
+     ],
+     "size": [
+      352,
+      80
+     ],
+     "area": 27040,
+     "islands": 0
+    }
+   ]
+  },
+  {
+   "part": "Back slat 3",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "distanceX": 6,
+    "distanceY": 5,
+    "horizontal": 6,
+    "positionX": 1,
+    "positionY": 1,
+    "vertical": 5
+   },
+   "entities": [
+    {
+     "ref": "13f3",
+     "type": "line",
+     "a": [
+      68,
+      820
+     ],
+     "b": [
+      392,
+      820
+     ],
+     "ends": [
+      "11dc",
+      "c2e8"
+     ]
+    },
+    {
+     "ref": "5a93",
+     "type": "line",
+     "a": [
+      392,
+      820
+     ],
+     "b": [
+      392,
+      840
+     ],
+     "ends": [
+      "c2e8",
+      "7015"
+     ]
+    },
+    {
+     "ref": "58e0",
+     "type": "line",
+     "a": [
+      392,
+      840
+     ],
+     "b": [
+      406,
+      840
+     ],
+     "ends": [
+      "7015",
+      "1af1"
+     ]
+    },
+    {
+     "ref": "e799",
+     "type": "line",
+     "a": [
+      406,
+      840
+     ],
+     "b": [
+      406,
+      880
+     ],
+     "ends": [
+      "1af1",
+      "bdd5"
+     ]
+    },
+    {
+     "ref": "ea34",
+     "type": "line",
+     "a": [
+      406,
+      880
+     ],
+     "b": [
+      392,
+      880
+     ],
+     "ends": [
+      "bdd5",
+      "0baf"
+     ]
+    },
+    {
+     "ref": "c486",
+     "type": "line",
+     "a": [
+      392,
+      880
+     ],
+     "b": [
+      392,
+      900
+     ],
+     "ends": [
+      "0baf",
+      "b27f"
+     ]
+    },
+    {
+     "ref": "4662",
+     "type": "line",
+     "a": [
+      392,
+      900
+     ],
+     "b": [
+      68,
+      900
+     ],
+     "ends": [
+      "b27f",
+      "768b"
+     ]
+    },
+    {
+     "ref": "1ef9",
+     "type": "line",
+     "a": [
+      68,
+      900
+     ],
+     "b": [
+      68,
+      880
+     ],
+     "ends": [
+      "768b",
+      "98bc"
+     ]
+    },
+    {
+     "ref": "55ea",
+     "type": "line",
+     "a": [
+      68,
+      880
+     ],
+     "b": [
+      54,
+      880
+     ],
+     "ends": [
+      "98bc",
+      "2124"
+     ]
+    },
+    {
+     "ref": "6458",
+     "type": "line",
+     "a": [
+      54,
+      880
+     ],
+     "b": [
+      54,
+      840
+     ],
+     "ends": [
+      "2124",
+      "3495"
+     ]
+    },
+    {
+     "ref": "fddd",
+     "type": "line",
+     "a": [
+      54,
+      840
+     ],
+     "b": [
+      68,
+      840
+     ],
+     "ends": [
+      "3495",
+      "458c"
+     ]
+    },
+    {
+     "ref": "8a94",
+     "type": "line",
+     "a": [
+      68,
+      840
+     ],
+     "b": [
+      68,
+      820
+     ],
+     "ends": [
+      "458c",
+      "11dc"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      54,
+      820
+     ],
+     "size": [
+      352,
+      80
+     ],
+     "area": 27040,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Large seat",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     460,
+     400
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Large left panel",
+     "side": "underside",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      50,
+      70
+     ],
+     "size": [
+      18,
+      240
+     ]
+    },
+    {
+     "ref": "Large right panel",
+     "side": "underside",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      392,
+      70
+     ],
+     "size": [
+      18,
+      240
+     ]
+    },
+    {
+     "ref": "Large left back post",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      50,
+      326
+     ],
+     "size": [
+      18,
+      28
+     ]
+    },
+    {
+     "ref": "Large right back post",
+     "side": "top",
+     "from": 0,
+     "to": 12,
+     "through": false,
+     "at": [
+      392,
+      326
+     ],
+     "size": [
+      18,
+      28
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0,
+    "undersidePockets": 1
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 47.5,
+    "operations": [
+     {
+      "label": "2 pockets 12 deep",
+      "depth": 12,
+      "steps": 8
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     },
+     {
+      "label": "Side B: 2 pockets 12 deep",
+      "depth": 12,
+      "steps": 8
+     }
+    ],
+    "warnings": [
+     "Large seat: pocket z=6: 4.3mm² left in corners/narrow spots with D=3.175",
+     "Large seat: pocket z=6: 4.3mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      450
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      432
+     ]
+    },
+    {
+     "face": "edge 7a30",
+     "looks": "-y",
+     "origin": [
+      70,
+      0,
+      432
+     ]
+    },
+    {
+     "face": "edge 67de",
+     "looks": "+x",
+     "origin": [
+      460,
+      70,
+      432
+     ]
+    },
+    {
+     "face": "edge 6632",
+     "looks": "+y",
+     "origin": [
+      390,
+      400,
+      432
+     ]
+    },
+    {
+     "face": "edge 6980",
+     "looks": "-x",
+     "origin": [
+      0,
+      330,
+      432
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Large left panel",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     40,
+     0
+    ],
+    "size": [
+     320,
+     444
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Large front apron",
+     "side": "top",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      60,
+      367
+     ],
+     "size": [
+      18,
+      40
+     ]
+    },
+    {
+     "ref": "Large back apron",
+     "side": "top",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      322,
+      367
+     ],
+     "size": [
+      18,
+      40
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 21,
+    "operations": [
+     {
+      "label": "2 pockets 14 deep",
+      "depth": 14,
+      "steps": 9
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [
+     "Large left panel: pocket z=4: 4.3mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      68,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      50,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 9985",
+     "looks": "-z",
+     "origin": [
+      50,
+      40,
+      0
+     ]
+    },
+    {
+     "face": "edge 44f2",
+     "looks": "-z",
+     "origin": [
+      50,
+      320,
+      0
+     ]
+    },
+    {
+     "face": "edge 6580",
+     "looks": "+y",
+     "origin": [
+      50,
+      360,
+      0
+     ]
+    },
+    {
+     "face": "edge 91f7",
+     "looks": "+z",
+     "origin": [
+      50,
+      360,
+      432
+     ]
+    },
+    {
+     "face": "edge b254",
+     "looks": "+y",
+     "origin": [
+      50,
+      310,
+      432
+     ]
+    },
+    {
+     "face": "edge fc40",
+     "looks": "+z",
+     "origin": [
+      50,
+      310,
+      444
+     ]
+    },
+    {
+     "face": "edge 3b0c",
+     "looks": "-y",
+     "origin": [
+      50,
+      70,
+      444
+     ]
+    },
+    {
+     "face": "edge 1122",
+     "looks": "+z",
+     "origin": [
+      50,
+      70,
+      432
+     ]
+    },
+    {
+     "face": "edge 664b",
+     "looks": "-y",
+     "origin": [
+      50,
+      40,
+      432
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Large right panel",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     40,
+     0
+    ],
+    "size": [
+     320,
+     444
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Large front apron",
+     "side": "underside",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      60,
+      367
+     ],
+     "size": [
+      18,
+      40
+     ]
+    },
+    {
+     "ref": "Large back apron",
+     "side": "underside",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      322,
+      367
+     ],
+     "size": [
+      18,
+      40
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0,
+    "undersidePockets": 1
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 21,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     },
+     {
+      "label": "Side B: 2 pockets 14 deep",
+      "depth": 14,
+      "steps": 9
+     }
+    ],
+    "warnings": [
+     "Large right panel: pocket z=4: 4.3mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      410,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      392,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 34c2",
+     "looks": "-z",
+     "origin": [
+      392,
+      40,
+      0
+     ]
+    },
+    {
+     "face": "edge 1e5c",
+     "looks": "-z",
+     "origin": [
+      392,
+      320,
+      0
+     ]
+    },
+    {
+     "face": "edge 4b67",
+     "looks": "+y",
+     "origin": [
+      392,
+      360,
+      0
+     ]
+    },
+    {
+     "face": "edge ec27",
+     "looks": "+z",
+     "origin": [
+      392,
+      360,
+      432
+     ]
+    },
+    {
+     "face": "edge 5bf8",
+     "looks": "+y",
+     "origin": [
+      392,
+      310,
+      432
+     ]
+    },
+    {
+     "face": "edge a3e3",
+     "looks": "+z",
+     "origin": [
+      392,
+      310,
+      444
+     ]
+    },
+    {
+     "face": "edge eea0",
+     "looks": "-y",
+     "origin": [
+      392,
+      70,
+      444
+     ]
+    },
+    {
+     "face": "edge 6b23",
+     "looks": "+z",
+     "origin": [
+      392,
+      70,
+      432
+     ]
+    },
+    {
+     "face": "edge 23a6",
+     "looks": "-y",
+     "origin": [
+      392,
+      40,
+      432
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Large front apron",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     54,
+     342
+    ],
+    "size": [
+     352,
+     90
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 7.5,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      60,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      78,
+      0
+     ]
+    },
+    {
+     "face": "edge c03b",
+     "looks": "-z",
+     "origin": [
+      68,
+      78,
+      342
+     ]
+    },
+    {
+     "face": "edge a266",
+     "looks": "+x",
+     "origin": [
+      392,
+      78,
+      342
+     ]
+    },
+    {
+     "face": "edge 761a",
+     "looks": "-z",
+     "origin": [
+      392,
+      78,
+      367
+     ]
+    },
+    {
+     "face": "edge df40",
+     "looks": "+x",
+     "origin": [
+      406,
+      78,
+      367
+     ]
+    },
+    {
+     "face": "edge c1fa",
+     "looks": "+z",
+     "origin": [
+      406,
+      78,
+      407
+     ]
+    },
+    {
+     "face": "edge 6b09",
+     "looks": "+x",
+     "origin": [
+      392,
+      78,
+      407
+     ]
+    },
+    {
+     "face": "edge 5e39",
+     "looks": "+z",
+     "origin": [
+      392,
+      78,
+      432
+     ]
+    },
+    {
+     "face": "edge 2658",
+     "looks": "-x",
+     "origin": [
+      68,
+      78,
+      432
+     ]
+    },
+    {
+     "face": "edge d0db",
+     "looks": "+z",
+     "origin": [
+      68,
+      78,
+      407
+     ]
+    },
+    {
+     "face": "edge ae53",
+     "looks": "-x",
+     "origin": [
+      54,
+      78,
+      407
+     ]
+    },
+    {
+     "face": "edge e999",
+     "looks": "-z",
+     "origin": [
+      54,
+      78,
+      367
+     ]
+    },
+    {
+     "face": "edge a322",
+     "looks": "-x",
+     "origin": [
+      68,
+      78,
+      367
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Large back apron",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     54,
+     342
+    ],
+    "size": [
+     352,
+     90
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 7.5,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      322,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      340,
+      0
+     ]
+    },
+    {
+     "face": "edge 895f",
+     "looks": "-z",
+     "origin": [
+      68,
+      340,
+      342
+     ]
+    },
+    {
+     "face": "edge 4051",
+     "looks": "+x",
+     "origin": [
+      392,
+      340,
+      342
+     ]
+    },
+    {
+     "face": "edge e47d",
+     "looks": "-z",
+     "origin": [
+      392,
+      340,
+      367
+     ]
+    },
+    {
+     "face": "edge 2d1c",
+     "looks": "+x",
+     "origin": [
+      406,
+      340,
+      367
+     ]
+    },
+    {
+     "face": "edge 5fdd",
+     "looks": "+z",
+     "origin": [
+      406,
+      340,
+      407
+     ]
+    },
+    {
+     "face": "edge c2ba",
+     "looks": "+x",
+     "origin": [
+      392,
+      340,
+      407
+     ]
+    },
+    {
+     "face": "edge 3536",
+     "looks": "+z",
+     "origin": [
+      392,
+      340,
+      432
+     ]
+    },
+    {
+     "face": "edge 7ec8",
+     "looks": "-x",
+     "origin": [
+      68,
+      340,
+      432
+     ]
+    },
+    {
+     "face": "edge 8611",
+     "looks": "+z",
+     "origin": [
+      68,
+      340,
+      407
+     ]
+    },
+    {
+     "face": "edge 7f95",
+     "looks": "-x",
+     "origin": [
+      54,
+      340,
+      407
+     ]
+    },
+    {
+     "face": "edge 5bf8",
+     "looks": "-z",
+     "origin": [
+      54,
+      340,
+      367
+     ]
+    },
+    {
+     "face": "edge 828d",
+     "looks": "-x",
+     "origin": [
+      68,
+      340,
+      367
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Large left back post",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     320,
+     438
+    ],
+    "size": [
+     40,
+     492
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Back slat 1",
+     "side": "top",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      331,
+      610
+     ],
+     "size": [
+      18,
+      40
+     ]
+    },
+    {
+     "ref": "Back slat 2",
+     "side": "top",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      331,
+      725
+     ],
+     "size": [
+      18,
+      40
+     ]
+    },
+    {
+     "ref": "Back slat 3",
+     "side": "top",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      331,
+      840
+     ],
+     "size": [
+      18,
+      40
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 1,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 21.2,
+    "operations": [
+     {
+      "label": "3 pockets 14 deep",
+      "depth": 14,
+      "steps": 9
+     },
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [
+     "Large left back post: pocket z=4: 6.5mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      68,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      50,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 6800",
+     "looks": "-z",
+     "origin": [
+      50,
+      326,
+      438
+     ]
+    },
+    {
+     "face": "edge b1e4",
+     "looks": "+y",
+     "origin": [
+      50,
+      354,
+      438
+     ]
+    },
+    {
+     "face": "edge 0b6f",
+     "looks": "-z",
+     "origin": [
+      50,
+      354,
+      450
+     ]
+    },
+    {
+     "face": "edge 5322",
+     "looks": "+y",
+     "origin": [
+      50,
+      360,
+      450
+     ]
+    },
+    {
+     "face": "edge 8e3d",
+     "looks": "-y",
+     "origin": [
+      50,
+      320,
+      910
+     ]
+    },
+    {
+     "face": "edge 4a2e",
+     "looks": "-z",
+     "origin": [
+      50,
+      320,
+      450
+     ]
+    },
+    {
+     "face": "edge ce6b",
+     "looks": "-y",
+     "origin": [
+      50,
+      326,
+      450
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Large right back post",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     320,
+     438
+    ],
+    "size": [
+     40,
+     492
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [
+    {
+     "ref": "Back slat 1",
+     "side": "underside",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      331,
+      610
+     ],
+     "size": [
+      18,
+      40
+     ]
+    },
+    {
+     "ref": "Back slat 2",
+     "side": "underside",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      331,
+      725
+     ],
+     "size": [
+      18,
+      40
+     ]
+    },
+    {
+     "ref": "Back slat 3",
+     "side": "underside",
+     "from": 0,
+     "to": 14,
+     "through": false,
+     "at": [
+      331,
+      840
+     ],
+     "size": [
+      18,
+      40
+     ]
+    }
+   ],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0,
+    "undersidePockets": 1
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 21.2,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     },
+     {
+      "label": "Side B: 3 pockets 14 deep",
+      "depth": 14,
+      "steps": 9
+     }
+    ],
+    "warnings": [
+     "Large right back post: pocket z=4: 6.5mm² left in corners/narrow spots with D=3.175"
+    ],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+x",
+     "origin": [
+      410,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-x",
+     "origin": [
+      392,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 276b",
+     "looks": "-z",
+     "origin": [
+      392,
+      326,
+      438
+     ]
+    },
+    {
+     "face": "edge 8ed7",
+     "looks": "+y",
+     "origin": [
+      392,
+      354,
+      438
+     ]
+    },
+    {
+     "face": "edge e400",
+     "looks": "-z",
+     "origin": [
+      392,
+      354,
+      450
+     ]
+    },
+    {
+     "face": "edge 9bc8",
+     "looks": "+y",
+     "origin": [
+      392,
+      360,
+      450
+     ]
+    },
+    {
+     "face": "edge 9dc6",
+     "looks": "-y",
+     "origin": [
+      392,
+      320,
+      910
+     ]
+    },
+    {
+     "face": "edge f15f",
+     "looks": "-z",
+     "origin": [
+      392,
+      320,
+      450
+     ]
+    },
+    {
+     "face": "edge cd76",
+     "looks": "-y",
+     "origin": [
+      392,
+      326,
+      450
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Back slat 1",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     54,
+     590
+    ],
+    "size": [
+     352,
+     80
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 7.4,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      331,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      349,
+      0
+     ]
+    },
+    {
+     "face": "edge c159",
+     "looks": "-z",
+     "origin": [
+      68,
+      349,
+      590
+     ]
+    },
+    {
+     "face": "edge 6853",
+     "looks": "+x",
+     "origin": [
+      392,
+      349,
+      590
+     ]
+    },
+    {
+     "face": "edge 27e4",
+     "looks": "-z",
+     "origin": [
+      392,
+      349,
+      610
+     ]
+    },
+    {
+     "face": "edge 96e3",
+     "looks": "+x",
+     "origin": [
+      406,
+      349,
+      610
+     ]
+    },
+    {
+     "face": "edge 771f",
+     "looks": "+z",
+     "origin": [
+      406,
+      349,
+      650
+     ]
+    },
+    {
+     "face": "edge a950",
+     "looks": "+x",
+     "origin": [
+      392,
+      349,
+      650
+     ]
+    },
+    {
+     "face": "edge c2e6",
+     "looks": "+z",
+     "origin": [
+      392,
+      349,
+      670
+     ]
+    },
+    {
+     "face": "edge 7df2",
+     "looks": "-x",
+     "origin": [
+      68,
+      349,
+      670
+     ]
+    },
+    {
+     "face": "edge be86",
+     "looks": "+z",
+     "origin": [
+      68,
+      349,
+      650
+     ]
+    },
+    {
+     "face": "edge 0a69",
+     "looks": "-x",
+     "origin": [
+      54,
+      349,
+      650
+     ]
+    },
+    {
+     "face": "edge cb25",
+     "looks": "-z",
+     "origin": [
+      54,
+      349,
+      610
+     ]
+    },
+    {
+     "face": "edge 7304",
+     "looks": "-x",
+     "origin": [
+      68,
+      349,
+      610
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Back slat 2",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     54,
+     705
+    ],
+    "size": [
+     352,
+     80
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 7.4,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      331,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      349,
+      0
+     ]
+    },
+    {
+     "face": "edge b26d",
+     "looks": "-z",
+     "origin": [
+      68,
+      349,
+      705
+     ]
+    },
+    {
+     "face": "edge 10a4",
+     "looks": "+x",
+     "origin": [
+      392,
+      349,
+      705
+     ]
+    },
+    {
+     "face": "edge 07e8",
+     "looks": "-z",
+     "origin": [
+      392,
+      349,
+      725
+     ]
+    },
+    {
+     "face": "edge 60dc",
+     "looks": "+x",
+     "origin": [
+      406,
+      349,
+      725
+     ]
+    },
+    {
+     "face": "edge 2d97",
+     "looks": "+z",
+     "origin": [
+      406,
+      349,
+      765
+     ]
+    },
+    {
+     "face": "edge 129f",
+     "looks": "+x",
+     "origin": [
+      392,
+      349,
+      765
+     ]
+    },
+    {
+     "face": "edge 65d5",
+     "looks": "+z",
+     "origin": [
+      392,
+      349,
+      785
+     ]
+    },
+    {
+     "face": "edge 1f40",
+     "looks": "-x",
+     "origin": [
+      68,
+      349,
+      785
+     ]
+    },
+    {
+     "face": "edge cc21",
+     "looks": "+z",
+     "origin": [
+      68,
+      349,
+      765
+     ]
+    },
+    {
+     "face": "edge 88d1",
+     "looks": "-x",
+     "origin": [
+      54,
+      349,
+      765
+     ]
+    },
+    {
+     "face": "edge 6838",
+     "looks": "-z",
+     "origin": [
+      54,
+      349,
+      725
+     ]
+    },
+    {
+     "face": "edge baf2",
+     "looks": "-x",
+     "origin": [
+      68,
+      349,
+      725
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "part",
+   "name": "Back slat 3",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     54,
+     820
+    ],
+    "size": [
+     352,
+     80
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 7.4,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "-y",
+     "origin": [
+      0,
+      331,
+      0
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "+y",
+     "origin": [
+      0,
+      349,
+      0
+     ]
+    },
+    {
+     "face": "edge 13f3",
+     "looks": "-z",
+     "origin": [
+      68,
+      349,
+      820
+     ]
+    },
+    {
+     "face": "edge 5a93",
+     "looks": "+x",
+     "origin": [
+      392,
+      349,
+      820
+     ]
+    },
+    {
+     "face": "edge 58e0",
+     "looks": "-z",
+     "origin": [
+      392,
+      349,
+      840
+     ]
+    },
+    {
+     "face": "edge e799",
+     "looks": "+x",
+     "origin": [
+      406,
+      349,
+      840
+     ]
+    },
+    {
+     "face": "edge ea34",
+     "looks": "+z",
+     "origin": [
+      406,
+      349,
+      880
+     ]
+    },
+    {
+     "face": "edge c486",
+     "looks": "+x",
+     "origin": [
+      392,
+      349,
+      880
+     ]
+    },
+    {
+     "face": "edge 4662",
+     "looks": "+z",
+     "origin": [
+      392,
+      349,
+      900
+     ]
+    },
+    {
+     "face": "edge 1ef9",
+     "looks": "-x",
+     "origin": [
+      68,
+      349,
+      900
+     ]
+    },
+    {
+     "face": "edge 55ea",
+     "looks": "+z",
+     "origin": [
+      68,
+      349,
+      880
+     ]
+    },
+    {
+     "face": "edge 6458",
+     "looks": "-x",
+     "origin": [
+      54,
+      349,
+      880
+     ]
+    },
+    {
+     "face": "edge fddd",
+     "looks": "-z",
+     "origin": [
+      54,
+      349,
+      840
+     ]
+    },
+    {
+     "face": "edge 8a94",
+     "looks": "-x",
+     "origin": [
+      68,
+      349,
+      840
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Large seat",
+    "at": [
+     0,
+     0,
+     432
+    ],
+    "size": [
+     460,
+     400,
+     18
+    ]
+   },
+   {
+    "name": "Large left panel",
+    "at": [
+     50,
+     40,
+     0
+    ],
+    "size": [
+     18,
+     320,
+     444
+    ]
+   },
+   {
+    "name": "Large right panel",
+    "at": [
+     392,
+     40,
+     0
+    ],
+    "size": [
+     18,
+     320,
+     444
+    ]
+   },
+   {
+    "name": "Large front apron",
+    "at": [
+     54,
+     60,
+     342
+    ],
+    "size": [
+     352,
+     18,
+     90
+    ]
+   },
+   {
+    "name": "Large back apron",
+    "at": [
+     54,
+     322,
+     342
+    ],
+    "size": [
+     352,
+     18,
+     90
+    ]
+   },
+   {
+    "name": "Large left back post",
+    "at": [
+     50,
+     320,
+     438
+    ],
+    "size": [
+     18,
+     40,
+     492
+    ]
+   },
+   {
+    "name": "Large right back post",
+    "at": [
+     392,
+     320,
+     438
+    ],
+    "size": [
+     18,
+     40,
+     492
+    ]
+   },
+   {
+    "name": "Back slat 1",
+    "at": [
+     54,
+     331,
+     590
+    ],
+    "size": [
+     352,
+     18,
+     80
+    ]
+   },
+   {
+    "name": "Back slat 2",
+    "at": [
+     54,
+     331,
+     705
+    ],
+    "size": [
+     352,
+     18,
+     80
+    ]
+   },
+   {
+    "name": "Back slat 3",
+    "at": [
+     54,
+     331,
+     820
+    ],
+    "size": [
+     352,
+     18,
+     80
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    383.4,
+    975.4
+   ],
+   "yield": 0.828,
+   "parts": [
+    {
+     "name": "Large left panel",
+     "at": [
+      56.7,
+      6.7
+     ],
+     "size": [
+      320,
+      444
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Large front apron",
+     "at": [
+      6.7,
+      508.7
+     ],
+     "size": [
+      352,
+      90
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Large back apron",
+     "at": [
+      6.7,
+      608.7
+     ],
+     "size": [
+      352,
+      90
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Large left back post",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      40,
+      492
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Back slat 1",
+     "at": [
+      6.7,
+      708.7
+     ],
+     "size": [
+      352,
+      80
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Back slat 2",
+     "at": [
+      6.7,
+      798.7
+     ],
+     "size": [
+      352,
+      80
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Back slat 3",
+     "at": [
+      6.7,
+      888.7
+     ],
+     "size": [
+      352,
+      80
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Large left panel",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Large front apron",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Large back apron",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Large left back post",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Back slat 1",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Back slat 2",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    },
+    {
+     "name": "Back slat 3",
+     "how": "placed",
+     "tabs": 3,
+     "anchored": 3,
+     "ok": true
+    }
+   ],
+   "minutes": 79.3,
+   "operations": [
+    {
+     "label": "3 pockets 14 deep",
+     "depth": 14,
+     "steps": 9
+    },
+    {
+     "label": "2 pockets 14 deep",
+     "depth": 14,
+     "steps": 9
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [
+    "Large left panel: pocket z=4: 4.3mm² left in corners/narrow spots with D=3.175",
+    "Large left back post: pocket z=4: 6.5mm² left in corners/narrow spots with D=3.175"
+   ],
+   "blocked": []
+  },
+  {
+   "name": "Board B",
+   "thickness": 18,
+   "sides": 2,
+   "size": [
+    853.4,
+    505.4
+   ],
+   "yield": 0.802,
+   "parts": [
+    {
+     "name": "Large seat",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      460,
+      400
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Large right panel",
+     "at": [
+      476.7,
+      6.7
+     ],
+     "size": [
+      320,
+      444
+     ],
+     "rotated": false
+    },
+    {
+     "name": "Large right back post",
+     "at": [
+      806.7,
+      6.7
+     ],
+     "size": [
+      40,
+      492
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Large seat",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Large right panel",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    },
+    {
+     "name": "Large right back post",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 89.7,
+   "operations": [
+    {
+     "label": "2 pockets 12 deep",
+     "depth": 12,
+     "steps": 8
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    },
+    {
+     "label": "Side B: 2 pockets 12 deep",
+     "depth": 12,
+     "steps": 8
+    },
+    {
+     "label": "Side B: 2 pockets 14 deep",
+     "depth": 14,
+     "steps": 9
+    },
+    {
+     "label": "Side B: 3 pockets 14 deep",
+     "depth": 14,
+     "steps": 9
+    }
+   ],
+   "warnings": [
+    "Large seat: pocket z=6: 4.3mm² left in corners/narrow spots with D=3.175",
+    "Large seat: pocket z=6: 4.3mm² left in corners/narrow spots with D=3.175",
+    "Large right panel: pocket z=4: 4.3mm² left in corners/narrow spots with D=3.175",
+    "Large right back post: pocket z=4: 6.5mm² left in corners/narrow spots with D=3.175"
+   ],
+   "blocked": []
+  }
+ ]
+}
