@@ -62,6 +62,22 @@ describe('generated carving preparation', () => {
     expect(simple.report.warnings.join(' ')).toContain('narrow branches');
   });
 
+  it('locates a compact lost spike for the board to circle, but not slivers along long outlines', async () => {
+    const result = await prepareCarvingArt({
+      ...options,
+      art: svg('<path d="M10 10H90V90H10Z"/><rect x="49" y="4" width="1.5" height="7"/>'),
+      detail: 'simple',
+    });
+    const spots = result.problemAreas ?? [];
+    expect(spots.length).toBeGreaterThan(0);
+    for (const spot of spots) expect(spot.r).toBeLessThan(5);
+    // The spike sits at the top centre of the drawing: Y up, centred on the accepted ink.
+    expect(spots.some(spot => Math.abs(spot.x) < 2 && spot.y > 10)).toBe(true);
+    const branch = await prepareCarvingArt({ ...options, art: svg('<path d="M10 10H50V40H90V41H50V90H10Z"/>'), detail: 'simple' });
+    expect(branch.report.removedCutAreaMm2).toBeGreaterThan(1);
+    expect(branch.problemAreas?.every(spot => spot.r < 5)).toBe(true);
+  });
+
   it('warns about narrow remaining gaps without filling them', async () => {
     const result = await prepareCarvingArt({
       ...options,
