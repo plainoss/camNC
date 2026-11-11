@@ -1,7 +1,7 @@
 import { designSteps, type CadDocument } from '@wbcnc/cad';
 import type { ComponentProps, RefObject } from 'react';
 import { FeatureList } from './FeatureList';
-import { reorderedSteps } from './reorderSteps';
+import { reorderDrop, reorderedSteps } from './reorderSteps';
 
 /** Session wiring for the source list stays out of the sketch editor. */
 export function StudioFeatureList({
@@ -10,7 +10,7 @@ export function StudioFeatureList({
   onRefusal,
   workspace,
   ...props
-}: Omit<ComponentProps<typeof FeatureList>, 'onChange' | 'onRename' | 'onReorder'> & {
+}: Omit<ComponentProps<typeof FeatureList>, 'onChange' | 'onRename' | 'onReorder' | 'reorderDrop'> & {
   currentDocument: RefObject<CadDocument>;
   commit: (document: CadDocument) => void;
   onRefusal: (message: string | null) => void;
@@ -35,6 +35,7 @@ export function StudioFeatureList({
             }
           : undefined
       }
+      reorderDrop={workspace ? (stepId, ontoId) => reorderDrop(currentDocument.current, stepId, ontoId) : undefined}
       onRename={(step, name) => {
         const document = currentDocument.current;
         commit({
