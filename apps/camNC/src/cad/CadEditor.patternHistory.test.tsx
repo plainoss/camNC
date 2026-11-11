@@ -7,6 +7,7 @@ import cabinet from '../../../../packages/cad-script/fixtures/designs/task-start
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
 import { ModelViewport } from '@/cam/model/ModelViewport';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', () => ({ ModelViewport: vi.fn(() => null) }));
 const sessions: string[] = [];
@@ -79,7 +80,7 @@ it.each(['new plate', 'complete cabinet', 'new circular plate', 'existing circul
     const { session, toolbar, latest, settled } = await studio(source, name);
     const before = structuredClone(latest());
     expect(session.past).toHaveLength(0);
-    await userEvent.click(toolbar.getByRole('button', { name: /Pattern/ }));
+    await userEvent.click(await studioCommand(/Pattern/));
     let dialog = await screen.findByRole('dialog', {
       name: `${fixture === 'existing circular plate' ? 'Circular' : 'Linear'} pattern · ${name}`,
     });
@@ -126,7 +127,7 @@ it.each([
       });
     const { session, toolbar, latest, settled } = await studio(source, 'Plate');
     const before = structuredClone(latest());
-    await userEvent.click(toolbar.getByRole('button', { name: /Pattern/ }));
+    await userEvent.click(await studioCommand(/Pattern/));
     let dialog = await screen.findByRole('dialog', { name: `${existing && mode === 'circular' ? 'Circular' : 'Linear'} pattern · Plate` });
     if (mode === 'circular' && !existing) {
       await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Pattern type' }), 'circular');
@@ -165,7 +166,7 @@ it('keeps prior undo and redo boundaries when an existing pattern edit is cancel
   const before = structuredClone(latest()),
     past = structuredClone(session.past),
     future = structuredClone(session.future);
-  await userEvent.click(toolbar.getByRole('button', { name: /Pattern/ }));
+  await userEvent.click(await studioCommand(/Pattern/));
   let dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
   await userEvent.fill(within(dialog).getByRole('textbox', { name: 'How many' }), '5');
   await userEvent.tab();
@@ -175,7 +176,7 @@ it('keeps prior undo and redo boundaries when an existing pattern edit is cancel
   expect(content(latest())).toEqual(content(before));
   expect(session.past).toEqual(past);
   expect(session.future).toEqual(future);
-  await userEvent.click(toolbar.getByRole('button', { name: /Pattern/ }));
+  await userEvent.click(await studioCommand(/Pattern/));
   dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await settled();
@@ -194,7 +195,7 @@ it.each(['Cancel', 'OK'] as const)(
   async action => {
     const { session, toolbar, latest, settled } = await studio(createPlateDocument({ width: 60, height: 40 }), 'Plate');
     const before = structuredClone(latest());
-    await userEvent.click(toolbar.getByRole('button', { name: /Pattern/ }));
+    await userEvent.click(await studioCommand(/Pattern/));
     const dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
     await waitFor(() => expect(viewport().instanceIds).toHaveLength(2));
     const identities = [...viewport().instanceIds!];
@@ -242,7 +243,7 @@ it('keeps a pattern usable after an inline variable also resizes its source sket
   if ('error' in variable) throw new Error(variable.error);
   const { session, toolbar, latest, settled } = await studio(variable.document, 'Plate');
   const before = structuredClone(latest());
-  await userEvent.click(toolbar.getByRole('button', { name: /Pattern/ }));
+  await userEvent.click(await studioCommand(/Pattern/));
   const dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
   await userEvent.fill(within(dialog).getByRole('textbox', { name: /^Spacing/ }), '#width = 80mm');
   await userEvent.click(within(dialog).getByRole('textbox', { name: 'How many' }));

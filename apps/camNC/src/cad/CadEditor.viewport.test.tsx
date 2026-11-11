@@ -1,10 +1,11 @@
 import '@/style.css';
 import { createPlateDocument } from '@wbcnc/cad';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CamPage } from '@/cam/CamPage';
 import { CadEditor } from './CadEditor';
+import { kStudioCommands } from './studioCommands';
 import { endCadSession } from '@wbcnc/cad-editor/session';
 
 const initialViewport = { width: window.innerWidth, height: window.innerHeight };
@@ -29,7 +30,7 @@ describe.each([true, false])('Design viewport (studio: %s)', studio => {
     const toolbar = await screen.findByRole('toolbar', { name: studio ? 'Part Studio toolbar' : 'Sketch toolbar' });
     // The 3D workspace and its controls load separately from the toolbar.
     if (studio) await screen.findByRole('group', { name: 'Workspace view' }, { timeout: 20_000 });
-    for (const width of [320, 390, 600, 768, 980, 1440]) {
+    for (const width of [320, 390, 600, 768, 980, 1024, 1280, 1440]) {
       await page.viewport(width, 720);
       await waitFor(() => {
         expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width);
@@ -44,6 +45,14 @@ describe.each([true, false])('Design viewport (studio: %s)', studio => {
           const drawing = toolbar.closest('.cad-editor')!.querySelector('.cad-drawing')!.getBoundingClientRect();
           expect(views.left).toBeGreaterThanOrEqual(drawing.left);
           expect(views.right).toBeLessThanOrEqual(drawing.right);
+          // Every feature command shows in full or sits in the More menu: none is clipped at the group's edge.
+          const features = screen.getByRole('group', { name: 'Part Studio features' });
+          expect(features.scrollLeft).toBe(0);
+          for (const button of features.querySelectorAll('button')) {
+            expect(button.getBoundingClientRect().right).toBeLessThanOrEqual(features.getBoundingClientRect().right + 0.5);
+          }
+          const hidden = kStudioCommands.filter(command => !within(features).queryByRole('button', { name: command.label }));
+          expect(hidden.length > 0).toBe(!!within(features).queryByRole('button', { name: /^More/ }));
         }
       });
     }
