@@ -2,8 +2,10 @@ import { consumedTools } from './consumedTools';
 import { newCadId } from './document';
 import { isCadBody } from './extrudeSteps';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
+import { numberedCadCopy } from './copyNumbers';
 import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 import { activeDesign } from './suppression';
+import { physicalJoinedCopies } from './physicalJoinedCopies';
 
 /** Adds another of a part, laid out with the unplaced parts until it's placed. */
 export function addPartCopy(
@@ -22,7 +24,9 @@ export function addPartCopy(
     document: resolvePartPatterns({
       ...document,
       revision: document.revision + 1,
-      parts: document.parts.map(part => (part.id === partId ? { ...part, copies: [...(part.copies ?? []), copy] } : part)),
+      parts: document.parts.map(part =>
+        part.id === partId ? { ...part, copies: [...(part.copies ?? []), numberedCadCopy(part, copy)] } : part
+      ),
     }),
   };
 }
@@ -146,7 +150,7 @@ export function evaluatedPartCopy(part: EvaluatedCadPart, copy: CadPartCopy): Ev
  */
 export function cadPartsToCut(given: CadDocument, parts: readonly EvaluatedCadPart[]): CadPartToCut[] {
   // Copies switched off in the feature list aren't cut.
-  const document = activeDesign(given);
+  const document = physicalJoinedCopies(activeDesign(given));
   const consumed = consumedTools(document);
   return parts.flatMap(part => {
     const source = document.parts.find(candidate => candidate.id === part.partId);

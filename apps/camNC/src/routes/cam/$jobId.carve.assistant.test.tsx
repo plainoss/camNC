@@ -78,18 +78,24 @@ async function open(existing?: CamJobV1) {
   await screen.findByRole('complementary', { name: 'Carving assistant' });
   return { job, client, ...view };
 }
+function setBox(w: number, h: number) {
+  for (const [label, value] of [
+    ['Box width', w],
+    ['Box height', h],
+  ] as const) {
+    fireEvent.change(screen.getByLabelText(label), { target: { value: String(value) } });
+    fireEvent.blur(screen.getByLabelText(label));
+  }
+}
+const ready = () => screen.findByText(/^Ready ·/, {}, { timeout: 20_000 });
 async function generate() {
   fireEvent.change(screen.getByLabelText('Artwork description'), { target: { value: asset.prompt } });
-  fireEvent.change(screen.getByLabelText('Maximum width (mm)'), { target: { value: '30' } });
-  fireEvent.change(screen.getByLabelText('Maximum height (mm)'), { target: { value: '30' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Generate artwork' }));
-  await screen.findByRole('img', { name: 'Prepared carving artwork' }, { timeout: 20_000 });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Apply artwork' })).toHaveProperty('disabled', true));
+  fireEvent.change(screen.getByLabelText('Variants'), { target: { value: '1' } });
+  setBox(30, 30);
+  fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+  await ready();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Apply artwork' })).toHaveProperty('disabled', false));
 }
-function acknowledge() {
-  fireEvent.click(screen.getByRole('checkbox', { name: 'I have reviewed these detail warnings.' }));
-}
-
 it('ends the generated-source link when the artwork is explicitly replaced by a local SVG', async () => {
   const { job } = await open();
   await generate();
@@ -109,7 +115,6 @@ it('ends the generated-source link when the artwork is explicitly replaced by a 
   expect(screen.getByRole('link', { name: 'Next: Plan' }).getAttribute('aria-disabled')).not.toBe('true');
 });
 async function apply(jobId: string) {
-  acknowledge();
   await waitFor(() => expect(screen.getByRole('button', { name: 'Apply artwork' })).toHaveProperty('disabled', false));
   fireEvent.click(screen.getByRole('button', { name: 'Apply artwork' }));
   await waitFor(async () => expect((await getJob(jobId))!.carving!.items).toHaveLength(2));
@@ -123,7 +128,7 @@ it('prepares real owl geometry and CAM without saving, then applies as one rever
   expect(screen.getByRole('button', { name: 'Undo' })).toHaveProperty('disabled', true);
   const toolpaths = screen.getByRole('img', { name: 'Checked carving toolpaths' });
   expect(toolpaths.querySelector('path')?.getAttribute('d')).toContain('M');
-  expect(screen.getByRole('img', { name: 'Original generated artwork' })).toBeTruthy();
+  expect(screen.getByRole('img', { name: 'Proposed artwork on the board' })).toBeTruthy();
   await apply(job.id);
   const applied = (await getJob(job.id))!.carving!;
   expect(applied.items[0]).toEqual(before.items[0]);
@@ -141,9 +146,8 @@ it('prepares real owl geometry and CAM without saving, then applies as one rever
   rememberAssistantCredentials(null);
   fireEvent.click(screen.getByRole('button', { name: 'Assistant' }));
   expect(screen.getByLabelText('Artwork description')).toHaveProperty('value', asset.prompt);
-  expect(screen.getByLabelText('Placement')).toHaveProperty('value', 'replace');
-  fireEvent.click(screen.getByRole('button', { name: 'Update preview locally' }));
-  await screen.findByRole('img', { name: 'Prepared carving artwork' }, { timeout: 20_000 });
+  expect(screen.getByRole('checkbox', { name: /^Replace/ })).toHaveProperty('checked', true);
+  await ready();
   expect(generateCarvingAsset).toHaveBeenCalledTimes(1);
   expect((await getJob(job.id))!.carving).toEqual(applied);
 }, 30_000);
@@ -152,10 +156,10 @@ it('invalidates accepted suitability and a pending proposal after tool and board
   const { job } = await open();
   await generate();
   await apply(job.id);
-  fireEvent.click(screen.getByRole('button', { name: 'Update preview locally' }));
-  await screen.findByRole('img', { name: 'Prepared carving artwork' }, { timeout: 20_000 });
-  acknowledge();
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Apply artwork' })).toHaveProperty('disabled', false));
+  // The applied artwork is selected and comes back in the assistant for a local recheck, replacing itself.
+  await waitFor(() => expect(screen.getByRole('checkbox', { name: /^Replace/ })).toHaveProperty('checked', true));
+  // Rechecking unchanged artwork offers nothing new to apply.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Applied' })).toHaveProperty('disabled', true), { timeout: 20_000 });
   const changedBit = kVBits.find(bit => bit.angle === 90 && bit.diameter === 4)!;
   fireEvent.change(screen.getByLabelText('V-bit'), { target: { value: String(changedBit.number) } });
   fireEvent.change(screen.getByLabelText('Thick'), { target: { value: '20' } });
@@ -165,14 +169,11 @@ it('invalidates accepted suitability and a pending proposal after tool and board
     expect(changed.carving!.vBit.number).toBe(changedBit.number);
     expect(changed.boards![0].thickness).toBe(20);
   });
-  expect(screen.getByRole('button', { name: 'Apply artwork' })).toHaveProperty('disabled', true);
+  expect(screen.getByRole('button', { name: /^Appl/ })).toHaveProperty('disabled', true);
   expect(screen.getByRole('link', { name: /Next: Plan/ }).hasAttribute('disabled')).toBe(true);
   expect(screen.getByText(/Generated artwork changed size, placement or cutting settings/)).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'Update preview locally' }));
-  // Preparation clears old results and runs CAM in a worker before the review controls exist again.
-  await waitFor(() => expect(screen.getByText(/Preview ready/)).toBeTruthy(), { timeout: 20_000 });
-  expect(screen.getByRole('checkbox', { name: 'I have reviewed these detail warnings.' })).toHaveProperty('checked', false);
-  acknowledge();
+  // The assistant prepares again for the new tool and board by itself, running CAM in a worker.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Apply artwork' })).toHaveProperty('disabled', false), { timeout: 20_000 });
   fireEvent.click(screen.getByRole('button', { name: 'Apply artwork' }));
   await waitFor(() => expect(screen.getByRole('link', { name: /Next: Plan/ }).hasAttribute('disabled')).toBe(false));
   expect((await getJob(job.id))!.carving!.items).toHaveLength(2);
@@ -182,9 +183,7 @@ it('invalidates accepted suitability and a pending proposal after tool and board
 it('refuses Apply against a same-tick newer cache entry without saving or recording Undo', async () => {
   const { job, client } = await open();
   await generate();
-  acknowledge();
   const applyButton = screen.getByRole('button', { name: 'Apply artwork' });
-  await waitFor(() => expect(applyButton).toHaveProperty('disabled', false));
   const changed = await saveJob({ ...job, carving: { ...job.carving!, maxDepth: 1 } });
   act(() => {
     client.setQueryData(camKeys.job(job.id), changed);
@@ -200,10 +199,10 @@ it('restores the text field and redoes a same-item artwork replacement without i
   const { job } = await open();
   const before = structuredClone(job.carving!);
   await generate();
-  await userEvent.selectOptions(screen.getByLabelText('Placement'), 'replace');
-  await userEvent.click(screen.getByRole('button', { name: 'Update preview locally' }));
-  await waitFor(() => expect(screen.getByText(/Preview ready/)).toBeTruthy(), { timeout: 20_000 });
-  await userEvent.click(screen.getByRole('checkbox', { name: 'I have reviewed these detail warnings.' }));
+  // Opening the assistant clears the lettering's selection; selecting it again offers to replace it.
+  await userEvent.click(within(screen.getByRole('list', { name: 'Items' })).getByRole('button', { name: /^\W*Welcome\W*$/ }));
+  await userEvent.click(screen.getByRole('checkbox', { name: /^Replace/ }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Apply artwork' })).toHaveProperty('disabled', false), { timeout: 20_000 });
   await userEvent.click(screen.getByRole('button', { name: 'Apply artwork' }));
   await waitFor(async () => expect((await getJob(job.id))!.carving!.items[0].art.kind).toBe('svg'));
   const applied = (await getJob(job.id))!.carving!;

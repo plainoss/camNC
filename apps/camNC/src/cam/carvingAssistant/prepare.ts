@@ -35,6 +35,14 @@ export interface PreparedCarvingArt {
   envelope: { width: number; height: number };
   report: CarvingPreparationReport;
   operations: Operation[];
+  /** Where detail cleanup removed cut area or found narrow lands, in the same centred mm as `outline`; largest first. */
+  problemAreas?: CarvingProblemArea[];
+}
+export interface CarvingProblemArea {
+  x: number;
+  y: number;
+  r: number;
+  kind: 'removed' | 'narrow';
 }
 export interface PrepareCarvingArtOptions {
   art: CarvingArt;
@@ -162,9 +170,11 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
     .map(loop => simplifyCarvingLoop(loop, simplifyTolerance))
     .filter(loop => loop.length >= 3);
   const closed = offset(offset(outline, radius), -radius);
-  report.removedCutAreaMm2 = Math.max(0, polyArea(difference(sourceOutline, opened)));
+  const removedLoops = difference(sourceOutline, opened);
+  const narrowLoops = difference(closed, beforeOpening);
+  report.removedCutAreaMm2 = Math.max(0, polyArea(removedLoops));
+  report.narrowLandAreaMm2 = Math.max(0, polyArea(narrowLoops));
   report.removedCutAreaFraction = Math.min(1, report.removedCutAreaMm2 / Math.max(1e-9, polyArea(sourceOutline)));
-  report.narrowLandAreaMm2 = Math.max(0, polyArea(difference(closed, beforeOpening)));
   if (opened.length) outline = opened;
   else report.errors.push('No filled regions survive the selected physical detail threshold.');
   report.removedComponents = Math.max(0, report.sourceComponents - opened.filter(loop => area(loop) > 0).length);
@@ -190,6 +200,14 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   const accepted = bounds(outline);
   // Keep the final ink centered even if cleanup removed an outlying dot.
   outline = outline.map(loop => loop.map(p => ({ x: p.x - (accepted.x0 + accepted.x1) / 2, y: p.y - (accepted.y0 + accepted.y1) / 2 })));
+  const centre = { x: (accepted.x0 + accepted.x1) / 2, y: (accepted.y0 + accepted.y1) / 2 };
+  const problemAreas = [
+    ...problemSpots(removedLoops, 'removed', report.minFeatureMm),
+    ...problemSpots(narrowLoops, 'narrow', report.minFeatureMm),
+  ]
+    .sort((a, b) => b.r - a.r)
+    .slice(0, 12)
+    .map(spot => ({ ...spot, x: spot.x - centre.x, y: spot.y - centre.y }));
   report.points = outline.reduce((sum, loop) => sum + loop.length, 0);
   if (board.size.fit || ![board.size.w, board.size.h].every(n => Number.isFinite(n) && n > 0))
     report.errors.push('Carving requires a fixed board size.');
@@ -251,5 +269,21 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
     envelope: { width, height },
     report,
     operations,
+    problemAreas,
   };
+}
+
+/**
+ * One circle per compact lost or narrow piece, so the board can point at it instead of a checkbox. Long slivers
+ * along an outline are a shape change, not a spot; the report counts their area.
+ */
+function problemSpots(loops: Loop[], kind: CarvingProblemArea['kind'], minFeatureMm: number): CarvingProblemArea[] {
+  const least = Math.max(0.02, 0.25 * minFeatureMm ** 2),
+    widest = Math.max(3, 8 * minFeatureMm);
+  return loops.flatMap(loop => {
+    const box = bounds([loop]);
+    const diagonal = Math.hypot(box.w, box.h);
+    if (Math.abs(area(loop)) < least || diagonal > widest) return [];
+    return [{ x: (box.x0 + box.x1) / 2, y: (box.y0 + box.y1) / 2, r: Math.max(minFeatureMm * 2, diagonal / 2 + minFeatureMm), kind }];
+  });
 }

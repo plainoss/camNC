@@ -1,5 +1,6 @@
 import {
   cadFaceSketches,
+  cadVariableProblems,
   cadVariableScope,
   cadSketchRegions,
   patternMaster,
@@ -23,6 +24,8 @@ import {
   evaluateCadDocument,
   cadCopyName,
   isCadPart,
+  activeDesign,
+  physicalJoinedCopies,
 } from '@wbcnc/cad';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
@@ -319,7 +322,8 @@ export async function inspectCadDocument(
     const handles = shortHandles(all);
     return ids.map(id => handles.get(id) ?? id);
   };
-  for (const d of solved.diagnostics) {
+  // A value that can't follow its variables keeps its last good one, so the design the check solved disagrees with them.
+  for (const d of [...solved.diagnostics, ...cadVariableProblems(input)]) {
     const part = solved.document.parts.find(part => part.id === d.partId);
     const constraints = part && [part.sketch, ...cadFaceSketches(part).map(face => face.sketch)].flatMap(sketch => sketch.constraints);
     const ids =
@@ -344,11 +348,14 @@ export async function inspectCadDocument(
   }
   const statuses = solved.sketches;
   const toCut = cadPartsToCut(solved.document, solved.parts);
+  // Physical membership is derived for quantity/name metadata; authoring sketches and history stay in the saved source.
+  const physical = physicalJoinedCopies(activeDesign(solved.document));
   // Bones widen a cut past what was drawn, so its opening is measured on the part without them.
   const unrelieved = solved.document.parts.some(part => part.cornerRelief)
     ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(({ cornerRelief: _, ...part }) => part) }).parts
     : solved.parts;
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
+    const physicalPart = physical.parts.find(candidate => candidate.id === part.id)!;
     const evaluated = solved.parts.find(candidate => candidate.partId === part.id);
     const faces = cadFaceSketches(part);
     const statusesOf = statuses.filter(status => status.partId === part.id);
@@ -359,7 +366,7 @@ export async function inspectCadDocument(
       const byPart = /^cut-parts:[^:]+:([^:#]+)(?::([^#]+))?(#\d+)?$/.exec(id);
       if (byPart) {
         const [, toolId, copyId, piece = ''] = byPart;
-        const tool = solved.document.parts.find(candidate => candidate.id === toolId);
+        const tool = physical.parts.find(candidate => candidate.id === toolId);
         const index = copyId === undefined ? -1 : (tool?.copies ?? []).findIndex(copy => copy.id === copyId);
         return `${tool ? (index >= 0 ? cadCopyName(tool, index) : tool.name) : 'a part that is gone'}${piece}`;
       }
@@ -465,8 +472,8 @@ export async function inspectCadDocument(
     const copyFeatures = Object.entries(evaluated?.copyCuts ?? {}).map(([id, cuts]) => ({
       ref: `${part.id}:${id}`,
       name: cadCopyName(
-        part,
-        (part.copies ?? []).findIndex(copy => copy.id === id)
+        physicalPart,
+        (physicalPart.copies ?? []).findIndex(copy => copy.id === id)
       ),
       cuts: reportCuts(cuts),
     }));
@@ -524,7 +531,8 @@ export async function inspectCadDocument(
     // Copies cut differently are pieces of their own, `<id>[:mirrored]:copy:<copyId>`; list them with their kind.
     const names = (id: string) =>
       toCut.flatMap(entry => (entry.part.partId === id || entry.part.partId.startsWith(`${id}:copy:`) ? entry.names : []));
-    const pieces = part.copies?.length ? { names: names(part.id), mirrored: names(mirroredPartId(part.id)) } : undefined;
+    const pieces =
+      part.copies?.length || physicalPart.copies?.length ? { names: names(part.id), mirrored: names(mirroredPartId(part.id)) } : undefined;
     const report: CadReportPart = {
       name: part.name,
       thickness: part.thickness,
