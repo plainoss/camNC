@@ -47,7 +47,7 @@ const pickFont = async (family: string) => {
 };
 
 const open = async (existing?: Awaited<ReturnType<typeof createCarvingJob>>) => {
-  const job = existing ?? (await createCarvingJob());
+  const job = existing ?? (await createCarvingJob(undefined, { lettering: 'Welcome' }));
   params.jobId = job.id;
   render(
     <QueryClientProvider client={new QueryClient()}>
@@ -59,6 +59,9 @@ const open = async (existing?: Awaited<ReturnType<typeof createCarvingJob>>) => 
 };
 
 describe('the Carve step', () => {
+  /** Opens a side panel from the board's toolbar. */
+  const openPanel = (name: 'Items' | 'Board and bit') => fireEvent.click(screen.getByRole('button', { name }));
+
   it('shows the lettering on its board and goes on to Plan', async () => {
     const job = await open();
     expect(screen.getByRole('img', { name: 'Board 300 × 140 mm with the carving' })).toBeTruthy();
@@ -67,11 +70,45 @@ describe('the Carve step', () => {
     expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Welcome');
   });
 
+  it('starts a new carving empty, with the ways to start on the board and one side panel at a time', async () => {
+    const job = await createCarvingJob();
+    expect(job.carving!.items).toEqual([]);
+    params.jobId = job.id;
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <CarveStep />
+      </QueryClientProvider>
+    );
+    const start = await screen.findByRole('group', { name: 'Start your carving' });
+    // No panel takes room from the board until a tool asks for one.
+    expect(screen.queryByRole('complementary')).toBeNull();
+    const tool = (name: string) => within(screen.getByRole('group', { name: 'Carve tools' })).getByRole('button', { name });
+    fireEvent.click(tool('Items'));
+    expect(within(screen.getByRole('complementary', { name: 'Items' })).getByText(/Nothing on the board yet/)).toBeTruthy();
+    expect(tool('Items').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(tool('Board and bit'));
+    expect(screen.queryByText(/Nothing on the board yet/)).toBeNull();
+    expect(screen.getByLabelText('V-bit')).toBeTruthy();
+    fireEvent.click(tool('AI artwork'));
+    expect(screen.queryByLabelText('V-bit')).toBeNull();
+    expect(screen.getByRole('complementary', { name: 'AI artwork' })).toBeTruthy();
+    // With the assistant open, its box marks the spot, so the start card steps aside.
+    expect(screen.queryByRole('group', { name: 'Start your carving' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Close AI artwork' }));
+    expect(screen.queryByRole('complementary')).toBeNull();
+    fireEvent.click(
+      within(await screen.findByRole('group', { name: 'Start your carving' })).getByRole('button', { name: 'Add lettering' })
+    );
+    await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toHaveLength(1));
+    expect(start.isConnected).toBe(false);
+    expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Text');
+  });
+
   it('adds SVG alongside text, selects it, and replaces just that item', async () => {
     const job = await open();
     const input = screen.getByLabelText('SVG file') as HTMLInputElement;
     const click = vi.spyOn(input, 'click').mockImplementation(() => {});
-    const svgButton = screen.getByRole('button', { name: 'SVG' });
+    const svgButton = screen.getByRole('button', { name: 'Open SVG' });
     fireEvent.click(svgButton);
     expect(click).toHaveBeenCalledTimes(1);
     // The button shows the chooser is opening until it closes.
@@ -210,7 +247,8 @@ describe('the Carve step', () => {
 
   it('keeps text typed just before the selection changes', async () => {
     const job = await open();
-    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    openPanel('Items');
+    fireEvent.click(screen.getByRole('button', { name: 'Lettering' }));
     await waitFor(() => expect(screen.getAllByTestId('carving-item')).toHaveLength(2));
     // Within the debounce: picking another item from the list unmounts the editor.
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Second' } });
@@ -297,6 +335,7 @@ describe('the Carve step', () => {
 
   it('drops a board resize under way when undoing, keeping redo', async () => {
     const job = await open();
+    openPanel('Board and bit');
     const redo = screen.getByRole('button', { name: 'Redo' }) as HTMLButtonElement;
     const path = screen.getByTestId('carving-item');
     const svg = path.closest('svg')!;
@@ -380,7 +419,8 @@ describe('the Carve step', () => {
 
   it('adds text, selects items from the list and canvas, edits just the selection, and deletes it', async () => {
     const job = await open();
-    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    openPanel('Items');
+    fireEvent.click(screen.getByRole('button', { name: 'Lettering' }));
     await waitFor(() => expect(screen.getAllByTestId('carving-item')).toHaveLength(2));
     expect((screen.getByLabelText('Text') as HTMLInputElement).value).toBe('Text');
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Second' } });
@@ -426,7 +466,9 @@ describe('the Carve step', () => {
     fireEvent.keyDown(svg, { key: 'Delete' });
     await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toEqual(job.carving!.items));
     fireEvent.click(screen.getByRole('button', { name: 'Delete "Welcome"' }));
-    expect((await screen.findByRole('alert')).textContent).toContain('Add text or an SVG to carve.');
+    // An empty board offers the ways to start instead of a warning.
+    expect(await screen.findByRole('group', { name: 'Start your carving' })).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('rotates through the field and handle, snapping unless Shift is held, without re-outlining', async () => {
@@ -478,6 +520,7 @@ describe('the Carve step', () => {
 
   it('keeps the latest outline per item, other items, and moves made while outlining', async () => {
     const job = await open();
+    openPanel('Items');
     type Outline = Awaited<ReturnType<typeof outlineArt>>;
     let finishFirst!: (outline: Outline) => void;
     let finishLatest!: (outline: Outline) => void;
@@ -499,7 +542,7 @@ describe('the Carve step', () => {
     fireEvent.blur(height);
     fireEvent.change(height, { target: { value: '35' } });
     fireEvent.blur(height);
-    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lettering' }));
     await waitFor(async () => expect((await getJob(job.id))!.carving!.items[1].outline.length).toBeGreaterThan(0));
     // This item's completion must not clear the first item's pending work.
     expect(screen.getByText('Outlining…')).toBeTruthy();
@@ -539,6 +582,7 @@ describe('the Carve step', () => {
 
   it('sizes the board by dragging its edges, in 10 mm steps, with the fields following', async () => {
     const job = await open();
+    openPanel('Board and bit');
     const svg = screen.getByTestId('carving-item').closest('svg')!;
     const field = (label: string) =>
       screen.getByLabelText(label, { selector: '#carve-board-' + label[0].toLowerCase() }) as HTMLInputElement;
@@ -583,6 +627,7 @@ describe('the Carve step', () => {
 
   it('moves the artwork on a narrow board instead of sizing the board', async () => {
     const job = await open();
+    openPanel('Board and bit');
     const field = (id: string) => document.getElementById(id) as HTMLInputElement;
     const type = async (id: string, value: string, saved: (job: CamJobV1 | null) => unknown) => {
       fireEvent.change(field(id), { target: { value } });
@@ -609,6 +654,7 @@ describe('the Carve step', () => {
 
   it('warns when the depth is deeper than the V-bit’s cone', async () => {
     await open();
+    openPanel('Board and bit');
     expect(screen.getByText(/get a flat bottom/).textContent).not.toMatch(/cone is only/);
     fireEvent.change(screen.getByLabelText('Deepest (mm)'), { target: { value: '6' } });
     fireEvent.blur(screen.getByLabelText('Deepest (mm)'));
