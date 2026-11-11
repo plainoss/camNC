@@ -221,7 +221,8 @@ import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PartPatternKind } from './partPatternKind';
 import { featureRowParts, selectStudioFeature } from './studioFeatureSelection';
 import { startExtrude } from './studioExtrude';
-import { builtStudioParts, disabledStudioCommands } from './studioParts';
+import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts } from './studioParts';
+import { applyFramed } from './insertFraming';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
 import { FeatureDialog } from './FeatureDialog';
@@ -233,8 +234,9 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { asHole, editable, hasOutline, isBlank, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
+import { asHole, editable, hasOutline, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
 import { useFeaturePreview } from './useFeaturePreview';
+import { SketchProblems } from './SketchProblems';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
 import { StudioFeatureList } from './StudioFeatureList';
 import { detachStudioCopy } from './detachStudioCopy';
@@ -242,11 +244,10 @@ import { StudioProposals } from './StudioProposals';
 import { useAssistantProposal } from './assistant/useAssistantProposal';
 import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
-import { trimCadFolders } from '@wbcnc/cad';
 import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
-import { designSteps, type DesignStep } from '@wbcnc/cad';
+import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnedBy, type SketchTurn } from './sketchOrbit';
@@ -270,7 +271,7 @@ import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { useEditorVariableFields } from './useEditorVariableFields';
-import { featureShownByDefault } from './sketchShown';
+import { useFeatureShown } from './useFeatureShown';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -419,7 +420,7 @@ export function CadEditor({
   const [show3D, setShow3D] = useState(startIn3D === 'part');
   // Opening a design shows every part where it sits, once there's a part to show.
   // A new design opens there too, picking the plane its first part is sketched on, as the reference starts.
-  const startsBlank = startIn3D === true && !faceSketch && doc.parts.length === 1 && isBlank(doc.parts[0]!);
+  const startsBlank = startIn3D === true && !faceSketch && isBlankDesign(doc);
   const [showWorkspace, setShowWorkspace] = useState(
     () => startIn3D === true && (startsBlank || doc.parts.some(candidate => hasOutline(doc, candidate.id)))
   );
@@ -607,7 +608,7 @@ export function CadEditor({
     next => commit(next)
   );
   const variableScope = useEditorVariableFields(doc, documentRef, variableCommit);
-  const blankDesign = studioSession && doc.parts.length === 1 && isBlank(doc.parts[0]!);
+  const blankDesign = studioSession && isBlankDesign(doc);
   const extrusionDepth = useExtrudeDepth(doc, featureDialog?.kind === 'extrude' ? featureDialog.partId : undefined, next => commit(next));
   const studioPreview = useStudioPreview(
     doc,
@@ -620,7 +621,7 @@ export function CadEditor({
       (featureDialog?.kind === 'pattern' ? featureDialog : null)
   );
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
-  const { rollbackStep, shownDocument } = useFeaturePreview({
+  const { rollbackStep, shownDocument, pastRollback, solveFeedback, apartIds } = useFeaturePreview({
     document:
       pointPicker.onPick && transformDialog ? doc : studioPreview.document === doc ? extrusionDepth.document : studioPreview.document,
     enabled: studioSession && showWorkspace,
@@ -630,6 +631,7 @@ export function CadEditor({
     partCutting,
     transformDialog,
     mirrorDialog,
+    checks: { lastCheckedRevision, setCheckEpoch },
   });
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
@@ -1019,7 +1021,7 @@ export function CadEditor({
         if (cancelled || sequence !== solveSequence.current || drag.current || annotationDrag.current) return;
         lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
         setSolving(false);
-        const feedback = sketchFeedback(result);
+        const feedback = sketchFeedback(solveFeedback(result));
         setProblems(feedback.problems);
         setConflictedConstraints(feedback.conflictedConstraintIds);
         setInProgress(feedback.inProgress);
@@ -1046,7 +1048,7 @@ export function CadEditor({
     return () => {
       cancelled = true;
     };
-  }, [doc, session, checkEpoch, sketchOnly, normalizePatternVariableSource]);
+  }, [doc, session, checkEpoch, sketchOnly, normalizePatternVariableSource, solveFeedback]);
 
   useEffect(() => {
     if (!dimension) return;
@@ -3445,7 +3447,7 @@ export function CadEditor({
     if (!keep && featureDialog && featureDialog.kind !== 'pattern') commit(featureDialog.before);
     // Regions picked apart are a part each.
     if (keep && featureDialog?.kind === 'extrude') {
-      const split = splitApartRegions(documentRef.current, featureDialog.partId);
+      const split = splitApartRegions(documentRef.current, featureDialog.partId, apartIds);
       if (split !== documentRef.current) commit(split);
     }
     // A Remove is a cut in the board its sketch is drawn on, so that board is the one selected.
@@ -3863,7 +3865,7 @@ export function CadEditor({
   // The studio's Parts list shows each physical instance, with an eye to show or hide it in the view.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
-  const builtParts = blankDesign ? [] : builtStudioParts(doc);
+  const builtParts = studioSession ? listedStudioParts(doc) : builtStudioParts(doc);
   const isolatePart = usePartIsolation(builtParts, cutSelection.selectedKey, hiddenParts, setHiddenParts);
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
   // An open sketch turned with its parts behind it, about the middle of the view.
@@ -3875,14 +3877,7 @@ export function CadEditor({
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
-  const featureShown = useCallback(
-    (id: string) => {
-      if (id in featureVisibility) return featureVisibility[id]!;
-      // As the design is shown: rolled back to its sketch, a part isn't extruded yet, so its sketch shows.
-      return featureShownByDefault(shownDocument, id);
-    },
-    [featureVisibility, shownDocument]
-  );
+  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback);
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>
@@ -4010,7 +4005,7 @@ export function CadEditor({
             checkedProposal={assistantProposalState}
             selection={part && { partId: part.id, copyId: cutSelection.selectedCopyId }}
             disabled={busy || !!rollbackStep || stepDialogOpen || !!filletDialog}
-            onApply={publish}
+            onApply={next => applyFramed(documentRef.current, next, studioCamera.current, publish, setViewRequest)}
           />
         </StudioToolbar>
       ) : (
@@ -5348,20 +5343,7 @@ export function CadEditor({
         </span>
         <span>{saveStatus ?? 'Draft'}</span>
       </footer>
-      {problems.length > 0 && !acceptanceNotice && (
-        <div className={`cad-problems${inProgress ? ' cad-sketch-progress' : ''}`} role={inProgress ? undefined : 'alert'}>
-          <strong>{inProgress ? 'Sketch in progress' : 'Finish is blocked'}</strong>
-          {inProgress ? (
-            <p>Keep drawing to close the outline. Your sketch is saved as a draft.</p>
-          ) : (
-            <ul>
-              {problems.map((problem, i) => (
-                <li key={i}>{problem}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {!acceptanceNotice && <SketchProblems problems={problems} inProgress={inProgress} />}
     </div>
   );
   return <DesignUnitContext value={lengthUnit}>{content}</DesignUnitContext>;

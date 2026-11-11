@@ -48,7 +48,9 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 ## Iteration and CI failures
 
 - During development, run the changed tests and relevant package lint/type checks first. `pnpm run check-types` type-checks every package with TypeScript 7's native `tsc` in about 12 s, the same check CI runs. Run the local fast suite once the change is ready, plus affected files excluded from it. After rebasing or resolving conflicts, rerun affected checks and `pnpm run check-format` before pushing; a previous green run validates the previous tree.
-- PR CI runs only the quick suites. The browser files and behaviour specs run in the merge queue, so run the ones your change touches locally before queueing, or label the PR `full-ci` to run them on the PR (docs/TESTING.md).
+- Review your diff with a subagent before opening a PR or pushing new commits to one, because every PR push runs CI. Give the reviewer the diff against `main` and the task, not your conclusions, and ask for correctness bugs, missing tests and leftover debug code. Fix what it confirms, rerun the affected checks, and say in the PR which findings you fixed and which you left. Backup pushes to a branch with no open PR run no CI and need no review.
+- PR CI runs only the quick suites, plus the browser test files the PR adds or edits. The other browser files and the behaviour specs run in the merge queue, where a failure ejects the whole batch. So before queueing, run `pnpm vitest run <files>` in `apps/camNC` for the browser files that cover your change (for a `CadEditor.tsx` change, the `CadEditor.<feature>` files of the features you touched) and the specs whose scenarios you changed, and list them in the PR. Label the PR `full-ci` to run everything on the PR instead; the label comes off after one green run, so add it only for CI and test changes or when you need that one run (docs/TESTING.md).
+- Don't queue a PR in the minutes after opening it: wait for its PR CI and the review, and address the findings first.
 - Report only what ran: in PRs and replies, say which checks and tests you ran and which you couldn't. A local pass is not CI, and a test you didn't run is not evidence.
 - Push coherent, validated milestones. Superseded PR commits cancel their CI, so avoid repeated pushes of incomplete fixes that discard useful validation.
 - Before repairing a shared test driver or CI failure, inspect open PRs and current main for an existing fix. Coordinate one shared repair rather than independently patching it into several feature branches.
@@ -60,8 +62,10 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 ## Keeping the merge queue moving
 
 - A blocked queue comes before feature work. When the same test or check ejects PRs from the merge queue, fix it, or claim its `flaky-test` issue, before pushing more features.
-- Put a test or CI fix in its own PR and label it `ci-fix` (or `flaky-test`), or title it `fix(ci)` / `fix(test)`. Mergify then tests it ahead of the queue (`priority_rules` in `.mergify.yml`).
+- Once a test has ejected two batches, skip it first and fix it afterwards. Open a `flaky-test` PR whose only change is `it.skip` with the issue link in a comment, and queue it as soon as it is pushed. Then fix the cause in a second PR that removes the skip. Until the skip merges, each new batch fails on that test, and a skip PR is ready much sooner than a fix.
+- Put a test or CI fix in its own PR and label it `ci-fix` (or `flaky-test`), or title it `fix(ci)` / `fix(test)`. Mergify then tests it ahead of the queue (`priority_rules` in `.mergify.yml`). A PR labelled `ci-fix` or `flaky-test` can be queued as soon as it is pushed, without waiting for its own CI, because the batch runs every check. Queue it right away.
 - Once the fix merges, re-queue the PRs it ejected with `@mergifyio queue`. Merge main into them first only if they conflict.
+- Label a PR `ready` once it is done: local checks pass and review findings are addressed. Mergify queues it when its PR CI is green, so it merges even if your session has stopped. Remove the label to hold it back. A PR that isn't ready when you stop working goes back to draft, so it holds no queue slot or CI.
 
 ## Commit Messages
 
@@ -71,9 +75,11 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 ## Pull Requests
 
 - Title format: `feat/fix/chore/docs(<project_name>) <Title>`
+- Keep stacks at most two PRs deep: squash a deeper chain into one PR, or land its base first. CI runs only on PRs into `main`, so a child PR gets no CI until it is retargeted. When the base merges, retarget the child to `main` the same hour and merge main into it.
 - Open reviewable dependent PRs as soon as their work is ready; distinguish a dependency blocking merge from one blocking review or initial validation. State the dependency and base explicitly, and account for the workflow's target-branch triggers when deciding which checks can run before retargeting.
 - Keep CI and workflow changes out of feature PRs. If a feature needs one, open a separate PR (or an issue) for it, so the change gets its own review and can be reverted alone.
-- When asked to merge, queue the PR in Mergify (see `docs/TESTING.md`): tick "Queue this pull request" in Mergify's comment on the PR, or comment `@mergifyio queue`, then check that the "Mergify Merge Queue" check shows it queued. Don't use GitHub auto-merge. Continue monitoring until it merges or a concrete blocker needs action. After a queue rejection, inspect the reason and current candidate, address it, and requeue when appropriate; a retry of an obsolete candidate does not validate a new one.
+- The `Claude review` workflow comments on a same-repo PR when it opens, is reopened or leaves draft. A collaborator's `@claude review` comment reviews it again after fixes. Address its findings, or reply why not, before queueing.
+- When asked to merge, queue the PR in Mergify (see `docs/TESTING.md`): label it `ready`, tick "Queue this pull request" in Mergify's comment on the PR, or comment `@mergifyio queue`, then check that the "Mergify Merge Queue" check shows it queued. Don't use GitHub auto-merge. Continue monitoring until it merges or a concrete blocker needs action. After a queue rejection, inspect the reason and current candidate, address it, and requeue when appropriate; a retry of an obsolete candidate does not validate a new one.
 - Do not routinely rebase a healthy queued PR just because main advanced; the queue validates the combined candidate. Update the branch when resolving an actual conflict or incorporating a required fix, then validate the changed tree.
 
 ## Code Style
@@ -82,7 +88,8 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - Lint with `pnpm run lint` (oxlint, configured in `.oxlintrc.json`; a whole run takes a few seconds).
 - Do not commit build artifacts or `node_modules` directories.
 - Put a new tool, feature or dialog in its own module rather than growing an existing file. Shared files (the CAD editor component, routes, registries) get only small, surgical edits that wire the new module in.
+- Most open PRs touch `apps/camNC/src/cad/CadEditor.tsx`, so it conflicts the most. Merge main into a PR that edits it right before queueing, and keep the edit to wiring a module in.
 - Other agents edit the same shared files in parallel: re-read a shared file just before you edit it, not from memory of an earlier read.
 - A check that looks removable (a guard, a readiness wait, an odd condition) carries a comment saying what it prevents. Read that comment before changing or removing it, and write one when you add such a check.
-- `scripts/file-size-ratchet.mjs` caps source files at 1000 lines, at commit and in CI. Files that were already longer are listed in `scripts/file-size-ceilings.json` and may only shrink; when one outgrows its cap, move code into a new module (nothing raises a ceiling).
+- `scripts/file-size-ratchet.mjs` caps source files at 1000 lines, at commit and in CI. Files that were already longer are listed in `scripts/file-size-ceilings.json` and may only shrink; when one outgrows its cap, move code into a new module (nothing raises a ceiling). PR CI also fails when a PR makes a listed file longer than it is on main, even below its ceiling, because another PR may lower the ceiling first. A PR that adds lines to a listed file moves at least as many out.
 - After a refactor shrinks a listed file, run `node scripts/file-size-ratchet.mjs --update` to lower its ceiling (or drop it once it fits) and commit the result.

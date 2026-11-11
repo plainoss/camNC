@@ -1,0 +1,67 @@
+---
+import { Icon } from "astro-icon/components";
+import ContentSection from "~/components/content-section.astro";
+
+interface LabsItem {
+  title: string;
+  description: string;
+  image: string;
+  alt: string;
+}
+
+const items: Array<LabsItem> = [
+  {
+    title: "FluidNC controls, built in",
+    description: "Home, jog, probe and run the job from the camera view, with progress drawn on the toolpath.",
+    image: "/labs/fluidnc.jpg",
+    alt: "The machine panel with jog and probe controls next to the camera view",
+  },
+  {
+    title: "CAM for imported STEP models",
+    description: "Lay a model's parts flat, nest them on boards, plan pockets and outlines and simulate the cut.",
+    image: "/labs/step-plan.jpg",
+    alt: "Simulated cut of a STEP shelf's parts on one board",
+  },
+  {
+    title: "Simple CAD and carving",
+    description: "Sketch, extrude and cut parts in the Part Studio, or lay out text and artwork for a V-bit.",
+    image: "/labs/cad.jpg",
+    alt: "A cupboard with shelf pin holes in the Part Studio",
+  },
+  {
+    title: "AI carvings and 3D models",
+    description: "Describe a carving or a part with your own API key. Every proposal is checked and shown for review first.",
+    image: "/labs/carve-ai.jpg",
+    alt: "Generated owl artwork variants on a carving board",
+  },
+];
+---
+
+<ContentSection title="camNC Labs" id="labs">
+  <Fragment slot="eyebrow">
+    <span class="inline-flex w-fit items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-amber-500">
+      <Icon name="mdi:flask-outline" class="size-4" /> Highly experimental
+    </span>
+  </Fragment>
+  <Fragment slot="lead">New tools we are building in the open.</Fragment>
+  <p class="max-w-3xl border-l-2 border-amber-500/60 pl-4 text-offset">
+    These features are highly experimental and have had very little time on real machines. Expect rough edges and
+    missing features, and check every toolpath in Plan and on the camera image before you cut.
+  </p>
+  <ul class="grid w-full max-w-6xl grid-cols-1 gap-6 md:grid-cols-2">
+    {
+      items.map(({ title, description, image, alt }) => (
+        <li class="flex flex-col overflow-hidden rounded-xl border border-default bg-offset text-left shadow-lg">
+          <img src={image} alt={alt} loading="lazy" class="aspect-[16/10] w-full object-cover object-left-top" />
+          <div class="space-y-2 p-6">
+            <span class="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-500">
+              <Icon name="mdi:alert-outline" class="size-3.5" /> Highly experimental
+            </span>
+            <p class="text-lg font-semibold text-default">{title}</p>
+            <p class="text-sm text-offset">{description}</p>
+          </div>
+        </li>
+      ))
+    }
+  </ul>
+</ContentSection>

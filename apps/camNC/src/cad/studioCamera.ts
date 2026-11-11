@@ -9,6 +9,8 @@ export interface StudioCameraState {
   back: Vec;
   up: Vec;
   height: number;
+  /** Width over height of the view, so its width is known too. */
+  aspect?: number;
   key?: string;
   seq?: number;
 }

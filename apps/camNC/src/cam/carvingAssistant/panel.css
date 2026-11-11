@@ -11,7 +11,7 @@
   font-size: 0.875rem;
 }
 
-.carving-assistant :is(.cad-assistant-settings, details) :is(input:not([type='checkbox']), select) {
+.carving-assistant :is(.cad-assistant-settings, details) :is(input:not([type='checkbox'], [type='radio']), select) {
   display: block;
   width: 100%;
   min-height: 2.75rem;
@@ -24,9 +24,15 @@
   font-size: 1rem;
 }
 
-.carving-assistant :is(.cad-assistant-settings, details) input[type='checkbox'] {
+.carving-assistant :is(.cad-assistant-settings, details) :is(input[type='checkbox'], input[type='radio']) {
   display: inline-block;
   margin-inline-end: 0.5rem;
+}
+
+.carving-assistant :is(.cad-assistant-settings, details) label:has(> input[type='radio']) {
+  display: inline-flex;
+  align-items: center;
+  margin-block: 0.25rem;
 }
 
 .carving-assistant .cad-assistant-settings button {

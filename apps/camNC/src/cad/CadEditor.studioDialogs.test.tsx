@@ -6,6 +6,7 @@ import { CadEditor } from './CadEditor';
 import { endCadSession } from '@wbcnc/cad-editor/session';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { settled } from '@/test/settled';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 
@@ -95,8 +96,8 @@ it('keeps an extrude thickness when OK is clicked straight after typing', async 
 });
 
 it('previews a pattern on opening, cancels its changes, and keeps an accepted pattern', async () => {
-  const { latest, toolbar } = await studio();
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
+  const { latest } = await studio();
+  await userEvent.click(await studioCommand(/Pattern/));
   let dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
   expect(within(dialog).queryByRole('checkbox', { name: 'Pattern copies in a row' })).toBeNull();
   await settled();
@@ -104,7 +105,7 @@ it('previews a pattern on opening, cancels its changes, and keeps an accepted pa
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   await settled();
   expect(latest().parts[0]!.pattern).toBeUndefined();
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
+  await userEvent.click(await studioCommand(/Pattern/));
   dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
   await settled();
   expect(vi.mocked(ModelViewport).mock.lastCall![0].instanceIds).toHaveLength(2);

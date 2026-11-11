@@ -38,26 +38,22 @@ export function CarvingAssistant({ job, session }: { job: CamJobV1; session: Car
   return (
     <aside aria-label="Carving assistant" className="carving-assistant space-y-3 border-t pt-4">
       <h3 className="font-medium">Carving assistant</h3>
-      {connection.generationMode === 'text' && (
-        <>
-          <button
-            type="button"
-            className={buttonClass}
-            disabled={session.generating}
-            aria-expanded={settings}
-            onClick={() => setSettings(!settings)}>
-            {connection.credentials ? `Connected · ${connectionLabel(connection.credentials.config)} · Change` : 'Connect an AI provider'}
-          </button>
-          {settings && (
-            <ProviderSettings
-              value={connection.credentials}
-              onSave={value => {
-                connection.setCredentials(value);
-                setSettings(!value);
-              }}
-            />
-          )}
-        </>
+      <button
+        type="button"
+        className={buttonClass}
+        disabled={session.generating}
+        aria-expanded={settings}
+        onClick={() => setSettings(!settings)}>
+        {connection.credentials ? `Connected · ${connectionLabel(connection.credentials.config)} · Change` : 'Connect an AI provider'}
+      </button>
+      {settings && (
+        <ProviderSettings
+          value={connection.credentials}
+          onSave={value => {
+            connection.setCredentials(value);
+            setSettings(!value);
+          }}
+        />
       )}
       {!session.variants.length && (
         <p className="text-sm text-muted-foreground">
@@ -183,7 +179,7 @@ export function CarvingAssistant({ job, session }: { job: CamJobV1; session: Car
             }}
           />
           <p className="text-xs text-muted-foreground">Black and white line art, up to 2 MB. Tracing stays on this device.</p>
-          <fieldset disabled={session.generating} className="flex flex-wrap gap-3">
+          <fieldset disabled={session.generating} className="flex flex-wrap gap-x-4">
             <legend className="text-sm">Artwork generator</legend>
             <label>
               <input
@@ -201,11 +197,29 @@ export function CarvingAssistant({ job, session }: { job: CamJobV1; session: Car
                 checked={connection.generationMode === 'native'}
                 onChange={() => connection.setGenerationMode('native')}
               />{' '}
-              Native image generation
+              {connection.sharedImageModel ? `Image model · ${connection.sharedImageModel}` : 'Image generation'}
             </label>
           </fieldset>
           {connection.generationMode === 'native' && (
-            <NativeSvgSettings value={connection.native} disabled={session.generating} onChange={connection.setNative} />
+            <>
+              <p className="text-xs text-muted-foreground">
+                {connection.sharedImageModel
+                  ? 'Uses your connected key. The image is traced into filled regions on this device.'
+                  : 'Your connection has no image model. Connect an OpenAI key, or use a different image provider.'}
+              </p>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={connection.separateImage}
+                  disabled={session.generating}
+                  onChange={event => connection.setSeparateImage(event.target.checked)}
+                />
+                Use a different image provider
+              </label>
+              {connection.separateImage && (
+                <NativeSvgSettings value={connection.native} disabled={session.generating} onChange={connection.setNative} />
+              )}
+            </>
           )}
           <RunSettings
             value={connection.runSettings}

@@ -30,7 +30,8 @@ export function readAssistantCredentials(storage: Pick<Storage, 'getItem' | 'rem
       ['chat', 'responses'].includes(value.config.protocol) &&
       typeof value.config.tools === 'boolean' &&
       typeof value.config.images === 'boolean' &&
-      (value.config.promptCaching === undefined || typeof value.config.promptCaching === 'boolean')
+      (value.config.promptCaching === undefined || typeof value.config.promptCaching === 'boolean') &&
+      (value.config.imageModel === undefined || typeof value.config.imageModel === 'string')
     )
       return value;
   } catch {
