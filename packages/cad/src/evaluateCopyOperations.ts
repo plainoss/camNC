@@ -136,14 +136,18 @@ export function evaluateCopyOperations(source: CadDocument, initial: EvaluatedCa
       continue;
     }
     const document = stageDocument(source, placements, available);
-    const missingTools = step.tools.filter(reference => !available.has(reference));
+    // Inherited joined slots are stage material, not authored transform targets, so they are absent from available.
+    const material = new Set(
+      document.parts.flatMap(part => [part.id, ...(part.copies ?? []).map(copy => cadPartReference(part.id, copy.id))])
+    );
+    const missingTools = step.tools.filter(reference => !material.has(reference));
     if (missingTools.length)
       diagnostics.push({
         code: 'part-cut-tool-unavailable',
         severity: 'warning',
         message: 'A cut tool is not available at this operation.',
       });
-    const activeStep = { ...step, tools: step.tools.filter(reference => available.has(reference)) };
+    const activeStep = { ...step, tools: step.tools.filter(reference => material.has(reference)) };
     const cut = applyPartCuts({ ...document, partCuts: [activeStep] }, parts, { occupiedTools: true });
     parts = cut.parts;
     diagnostics.push(...cut.diagnostics);

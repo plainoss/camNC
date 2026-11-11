@@ -151,20 +151,30 @@ export function cadPartsToCut(
   stage?: { available?: readonly string[] }
 ): CadPartToCut[] {
   // Copies switched off in the feature list aren't cut.
-  const document = physicalJoinedCopies(activeDesign(given));
+  const active = activeDesign(given),
+    document = physicalJoinedCopies(active);
   const consumed = stage?.available ? new Set<string>() : consumedTools(document);
+  const available = stage?.available && new Set(stage.available);
+  // Inherited joined slots are absent from a stage's authored targets; their material follows the available host copy.
+  if (available)
+    for (const part of document.parts) {
+      const own = active.parts.find(candidate => candidate.id === part.id)?.copies;
+      for (const copy of part.copies ?? [])
+        if (
+          part.addTo &&
+          available.has(part.id) &&
+          !own?.some(candidate => candidate.id === copy.id) &&
+          available.has(`${part.addTo}:${copy.id}`)
+        )
+          available.add(`${part.id}:${copy.id}`);
+    }
   return parts.flatMap(part => {
     const source = document.parts.find(candidate => candidate.id === part.partId);
     // A sketch not yet extruded, a step cutting others, or a tool used up by its cut, isn't a part to cut.
-    if (
-      (source && !isCadBody(document, source)) ||
-      consumed.has(part.partId) ||
-      (stage?.available && !stage.available.includes(part.partId))
-    )
-      return [];
+    if ((source && !isCadBody(document, source)) || consumed.has(part.partId) || (available && !available.has(part.partId))) return [];
     const groups: (CadPartToCut & { mirrored?: boolean })[] = [{ part, names: [part.name] }];
     for (const [index, copy] of (source?.copies ?? []).entries()) {
-      if (stage?.available && !stage.available.includes(`${part.partId}:${copy.id}`)) continue;
+      if (available && !available.has(`${part.partId}:${copy.id}`)) continue;
       const shape = evaluatedPartCopy(part, copy);
       const group = groups.find(
         entry => !!entry.mirrored === !!copy.mirrored && sameCadProfile(entry.part, shape) && sameCadCuts(entry.part.cuts, shape.cuts)
