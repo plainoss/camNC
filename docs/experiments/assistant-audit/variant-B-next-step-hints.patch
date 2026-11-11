@@ -1,0 +1,57 @@
+diff --git a/apps/camNC/src/cad/assistant/loop.ts b/apps/camNC/src/cad/assistant/loop.ts
+index 67877d9..3d67834 100644
+--- a/apps/camNC/src/cad/assistant/loop.ts
++++ b/apps/camNC/src/cad/assistant/loop.ts
+@@ -1,6 +1,7 @@
+ import type { CadDocument } from '@wbcnc/cad';
+ import { assistantContextCharacters, buildAssistantContext } from './context';
+ import { readAssistantReport } from './report';
++import { checkNextStep } from './checkHints';
+ import { choiceSketchesSchema, readChoiceSketches, type AssistantChoiceSketch } from './choiceSketch';
+ import {
+   assistantBudgetStop,
+@@ -363,6 +364,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+                 ok: checked.ok,
+                 report: checked.report,
+                 ...(checked.scriptError && { scriptError: checked.scriptError }),
++                next: checkNextStep(checked),
+               });
+               images = options.config.images ? checked.images : undefined;
+               options.onActivity?.(checked.ok ? `Attempt ${checks} checked. Reviewing the result.` : `Attempt ${checks} needs repair.`);
+diff --git a/apps/camNC/src/cad/assistant/checkHints.ts b/apps/camNC/src/cad/assistant/checkHints.ts
+new file mode 100644
+index 0000000..32a3f4b
+--- /dev/null
++++ b/apps/camNC/src/cad/assistant/checkHints.ts
+@@ -0,0 +1,31 @@
++type Issue = { code?: unknown; message?: unknown; part?: unknown };
++const issues = (value: unknown): Issue[] => (Array.isArray(value) ? (value as Issue[]) : []);
++
++const hints: Record<string, (issue: Issue) => string> = {
++  'parts-collide': issue =>
++    `${String(issue.message ?? 'Two parts overlap.')} If one board should sit in the other, keep the overlap and join them with d.cutParts(receivingPart, { with: [boardThatSitsInIt] }) so the overlap becomes the housing; otherwise move or resize one so they only touch.`,
++  'cut-too-deep': issue =>
++    `${String(issue.part ?? 'A part')}: a pocket is as deep as the board. Make it shallower than the thickness or use depth 'through'. For a joint, overlap the boards and use d.cutParts rather than a hand-drawn pocket.`,
++  'cut-through-edge': issue =>
++    `${String(issue.part ?? 'A part')}: a through cut reaches the edge. Change that part's profile for an open notch, or overlap the boards and use d.cutParts for a joint.`,
++  'expect-failed': issue =>
++    `${String(issue.part ?? 'A part')}: ${String(issue.message ?? 'an expectation failed')}. Fix the geometry to match the request; change the expectation only if the request did.`,
++  'ambiguous-profile': issue => `${String(issue.part ?? 'A part')}: cut shapes in one sketch touch or branch. Keep each cut a separate closed shape that touches nothing else.`,
++  'intersecting-profiles': issue => `${String(issue.part ?? 'A part')}: cut shapes cross or touch. Space them apart, or merge them into one closed outline.`,
++  'disconnected-profile': issue => `${String(issue.part ?? 'A part')}: its outline has separate pieces. Make each piece its own part.`,
++};
++
++/** One short, issue-specific next step for a check result, so a failed check is repaired rather than reported as a proposal. */
++export function checkNextStep(checked: { ok: boolean; report: unknown; scriptError?: string }): string {
++  const report = (checked.report ?? {}) as { errors?: unknown; warnings?: unknown };
++  if (checked.scriptError)
++    return 'The script stopped and nothing was built. Fix the reported call and resend the whole script with check_design. Do not reply with Proposal: until a check passes.';
++  if (checked.ok) {
++    const warnings = [...new Set(issues(report.warnings).map(issue => String(issue.code)))];
++    return warnings.length
++      ? `Check passed with warnings (${warnings.join(', ')}). Fix any that matter for the request; if it then meets the request, reply starting with Proposal: and mention the remaining warnings.`
++      : 'Check passed. Compare the reported sizes, parts and joints with the request; if it meets it, reply starting with Proposal:. Otherwise fix the unmet requirement and check again.';
++  }
++  const steps = [...new Set(issues(report.errors).map(issue => hints[String(issue.code)]?.(issue) ?? `${String(issue.code)}: ${String(issue.message ?? '')}`))];
++  return `Not a valid candidate yet; do not reply with Proposal: until a check passes. Next: ${steps.slice(0, 4).join(' ')}${steps.length > 4 ? ` (+${steps.length - 4} more)` : ''}`;
++}

@@ -1,0 +1,78 @@
+diff --git a/apps/camNC/src/cam/carvingAssistant/generation.ts b/apps/camNC/src/cam/carvingAssistant/generation.ts
+index 0282556..1269896 100644
+--- a/apps/camNC/src/cam/carvingAssistant/generation.ts
++++ b/apps/camNC/src/cam/carvingAssistant/generation.ts
+@@ -9,6 +9,7 @@ import {
+   type AssistantPricing,
+   type AssistantRunUsage,
+ } from '@/cad/assistant/runBudget';
++import { toolGuidance, toolInstructions, type CarvingToolHint } from './live/toolGuidance';
+ 
+ export interface CarvingGenerationConstraints {
+   widthMm: number;
+@@ -41,6 +42,8 @@ export interface CarvingGenerationOptions {
+   previous?: Pick<GeneratedCarvingAsset, 'id' | 'svg' | 'prompt'>;
+   request?: typeof requestAssistant;
+   onUsage?: (usage: AssistantRunUsage) => void;
++  /** The selected V-bit and depth: the model gets its physical limits in mm and viewBox units. */
++  tool?: CarvingToolHint;
+ }
+ 
+ const kMaxSvgCharacters = 48_000;
+@@ -110,8 +113,10 @@ export async function generateCarvingAsset(options: CarvingGenerationOptions): P
+   if (stop) throw new Error(stop);
+   // Callers can hold extra preview/provenance fields on an asset. Only the compact source reference enters model context.
+   const previous = options.previous && { id: options.previous.id, svg: options.previous.svg, prompt: options.previous.prompt };
+-  const content = JSON.stringify({ brief: prompt, constraints, ...(previous && { previous }) });
+-  if (content.length + instructions.length > limits.maxInputCharacters!) throw new Error('The artwork request exceeds the input budget.');
++  const machine = options.tool && toolGuidance(constraints, options.tool);
++  const system = machine ? instructions + toolInstructions : instructions;
++  const content = JSON.stringify({ brief: prompt, constraints, ...(machine && { tool: machine }), ...(previous && { previous }) });
++  if (content.length + system.length > limits.maxInputCharacters!) throw new Error('The artwork request exceeds the input budget.');
+   if (signal.aborted) throw new DOMException('Stopped', 'AbortError');
+ 
+   let answer: AssistantMessage;
+@@ -119,7 +124,7 @@ export async function generateCarvingAsset(options: CarvingGenerationOptions): P
+     answer = await (options.request ?? requestAssistant)({
+       config: options.credentials.config,
+       key: options.credentials.key,
+-      system: instructions,
++      system,
+       messages: [{ role: 'user', text: content }],
+       tools: [tool],
+       signal,
+diff --git a/apps/camNC/src/cam/carvingAssistant/sanitize.ts b/apps/camNC/src/cam/carvingAssistant/sanitize.ts
+index 234130a..3013b81 100644
+--- a/apps/camNC/src/cam/carvingAssistant/sanitize.ts
++++ b/apps/camNC/src/cam/carvingAssistant/sanitize.ts
+@@ -8,7 +8,9 @@ const finiteCoordinates = (value: string) =>
+   );
+ 
+ /** Rebuild a small drawing vocabulary; never insert provider markup into the live DOM. */
+-export function sanitizeCarvingSvg(source: string): string {
++export function sanitizeCarvingSvg(input: string): string {
++  // Models annotate parts with comments. Drop complete comments before the declaration check; they are never copied.
++  const source = input.length > 120_000 ? input : input.replace(/<!--[^]*?-->/g, '');
+   if (source.length > 120_000 || /<!|<\?/.test(source))
+     throw new Error('Artwork must be a small, self-contained SVG without declarations.');
+   const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
+@@ -35,6 +37,10 @@ export function sanitizeCarvingSvg(source: string): string {
+       const { name, value } = attribute;
+       if (name === 'xmlns' && depth === 0 && value === namespace) continue;
+       if (name === 'viewBox' && depth === 0) continue;
++      // The root's width/height (often "80mm") are discarded: the viewBox and the requested size define the drawing.
++      if (depth === 0 && (name === 'width' || name === 'height')) continue;
++      // Rendering hints and labels change no geometry; drop them rather than reject the whole drawing.
++      if (/^(?:id|role|version|shape-rendering|aria-[a-z]+)$/.test(name)) continue;
+       // The viewBox is the sole viewport; external links, styles, filters and animation are rejected, never evaluated.
+       if (geometry.has(name)) {
+         if (
+@@ -47,6 +53,8 @@ export function sanitizeCarvingSvg(source: string): string {
+         )
+           throw new Error(`Invalid artwork coordinate: ${name}.`);
+         if (depth === 0 && (name === 'width' || name === 'height')) continue;
++      // Rendering hints and labels change no geometry; drop them rather than reject the whole drawing.
++      if (/^(?:id|role|version|shape-rendering|aria-[a-z]+)$/.test(name)) continue;
+       } else if (name === 'd' && node.localName === 'path') {
+         if (!/^[MmLlHhVvCcSsQqTtAaZz\s,0-9eE+.-]*$/.test(value) || !finiteCoordinates(value)) throw new Error('Invalid artwork path.');
+         commands += (value.match(/[MmLlHhVvCcSsQqTtAaZz]/g) ?? []).length;

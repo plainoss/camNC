@@ -1,0 +1,135 @@
+diff --git a/apps/camNC/src/cad/assistant/loop.ts b/apps/camNC/src/cad/assistant/loop.ts
+index 67877d9..ceccfe9 100644
+--- a/apps/camNC/src/cad/assistant/loop.ts
++++ b/apps/camNC/src/cad/assistant/loop.ts
+@@ -307,7 +307,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+       continue;
+     }
+     for (const call of answer.calls) {
+-      let text: string, images: AssistantImage[] | undefined;
++      let text: string,
++        images: AssistantImage[] | undefined,
++        isError = false;
+       if (options.signal.aborted) {
+         emit({ role: 'tool', callId: call.id, text: 'Stopped by the user; this tool was not run.' });
+         continue;
+@@ -359,11 +361,15 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+               text = 'Stopped by the user. No proposal was offered.';
+             } else {
+               if (checked.ok) proposal = cadProposal(base, checked.document);
+-              text = JSON.stringify({
+-                ok: checked.ok,
+-                report: checked.report,
+-                ...(checked.scriptError && { scriptError: checked.scriptError }),
+-              });
++              // A stopped script leaves the open design as it was: its unchanged report would only bury the error.
++              text = checked.scriptError
++                ? JSON.stringify({
++                    ok: false,
++                    scriptError: checked.scriptError,
++                    next: 'The script stopped, so nothing was built and the design is unchanged. Fix that line (check the call against the guide; do not invent methods or options) and resend the whole script with check_design.',
++                  })
++                : JSON.stringify({ ok: checked.ok, report: checked.report });
++              isError = !!checked.scriptError;
+               images = options.config.images ? checked.images : undefined;
+               options.onActivity?.(checked.ok ? `Attempt ${checks} checked. Reviewing the result.` : `Attempt ${checks} needs repair.`);
+             }
+@@ -373,8 +379,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+       } catch (error) {
+         if (call.name === 'check_design') proposal = undefined;
+         text = error instanceof Error ? error.message : 'The check failed.';
++        isError = true;
+       }
+-      emit({ role: 'tool', callId: call.id, text, ...(images?.length && { images }) });
++      emit({ role: 'tool', callId: call.id, text, ...(images?.length && { images }), ...(isError && { isError }) });
+     }
+     if (options.signal.aborted) return finish('stopped');
+   }
+diff --git a/apps/camNC/src/cad/assistant/provider.ts b/apps/camNC/src/cad/assistant/provider.ts
+index b34f7c9..003a405 100644
+--- a/apps/camNC/src/cad/assistant/provider.ts
++++ b/apps/camNC/src/cad/assistant/provider.ts
+@@ -42,6 +42,8 @@ export interface AssistantMessage {
+   images?: AssistantImage[];
+   calls?: AssistantToolCall[];
+   callId?: string;
++  /** A failed tool call; Anthropic marks its tool_result with is_error. */
++  isError?: boolean;
+   /** Responses reasoning items must accompany their function calls on the next request. */
+   responseItems?: unknown[];
+   /** Preserve signed Anthropic thinking blocks with their complete tool-call batch. */
+@@ -121,6 +123,7 @@ export function providerPayload({
+                 {
+                   type: 'tool_result',
+                   tool_use_id: message.callId,
++                  ...(message.isError && { is_error: true }),
+                   content: [textBlock(message.text), ...(message.images ?? []).map(anthropicImage)],
+                 },
+               ]
+diff --git a/apps/camNC/src/cad/assistant/sandboxWorker.ts b/apps/camNC/src/cad/assistant/sandboxWorker.ts
+index df6c818..c5739a2 100644
+--- a/apps/camNC/src/cad/assistant/sandboxWorker.ts
++++ b/apps/camNC/src/cad/assistant/sandboxWorker.ts
+@@ -2,20 +2,34 @@ import { initializeCadSolver, parseCadDocument } from '@wbcnc/cad';
+ import { cupboard } from '../../../../../packages/cad-script/src/cupboard';
+ import { editCad, type CadScript } from '../../../../../packages/cad-script/src/edit';
+ 
++/** Lines are kept in place (stripped imports become blank lines), so a stack line maps straight back to the source. */
++const keepLines = (match: string) => '\n'.repeat(match.split('\n').length - 1);
++let scriptUrl = '';
++/** The failing source line from the error's stack frame in the script module, if the error came from there. */
++function located(error: unknown, source: string): string {
++  const stack = error instanceof Error ? (error.stack ?? '') : '';
++  const frame = scriptUrl && stack.split(scriptUrl + ':')[1]?.match(/^(\d+):(\d+)/);
++  if (!frame) return '';
++  const line = Number(frame[1]) - 1;
++  const text = source.split('\n')[line - 1]?.trim();
++  return text ? ` (script line ${line}: ${text.length > 160 ? `${text.slice(0, 160)}…` : text})` : ` (script line ${line})`;
++}
++
+ async function scriptFrom(source: string): Promise<CadScript> {
+   if (typeof source !== 'string' || source.length > 256_000) throw new Error('A script must be JavaScript text of at most 256 KB.');
+   const expression = source
+     .replace(/^\s*import\s*\{([^}]+)\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/, (_line, names: string) => {
+       if (names.split(',').some(name => !['design', 'cupboard'].includes(name.trim())))
+         throw new Error('Only design and cupboard may be imported in a browser script.');
+-      return '';
++      return keepLines(_line);
+     })
+-    .replace(/^\s*export\s*\{\s*cupboard\s*\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/m, '')
+-    .replace(/^\s*export\s+default\s+/m, '')
++    .replace(/^\s*export\s*\{\s*cupboard\s*\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/m, keepLines)
++    .replace(/^\s*export\s+default\s+/m, keepLines)
+     .replace(/;\s*$/, '');
+   // Native module parsing keeps string evaluation disabled by CSP. This module still runs only inside the disposable
+   // opaque worker; importing it never grants application storage, network access, provider keys or an Apply capability.
+   const url = URL.createObjectURL(new Blob([`export default (design, cupboard) => (\n${expression}\n);`], { type: 'text/javascript' }));
++  scriptUrl = url;
+   try {
+     const loaded = await import(/* @vite-ignore */ url);
+     const script = loaded.default((fn: CadScript) => fn, cupboard) as unknown;
+@@ -68,13 +82,21 @@ self.addEventListener('message', async function run(event: MessageEvent) {
+       });
+     }
+     const script = await scriptFrom(event.data.source);
++    let thrown: unknown;
+     const result = await editCad(start, d => {
+-      const returned = script(d) as unknown;
+-      if (returned && typeof returned === 'object' && 'then' in returned) throw new Error('Design scripts must finish synchronously.');
++      try {
++        const returned = script(d) as unknown;
++        if (returned && typeof returned === 'object' && 'then' in returned) throw new Error('Design scripts must finish synchronously.');
++      } catch (error) {
++        thrown = error;
++        throw error;
++      }
+     });
++    if (result.scriptError) result.scriptError += located(thrown, event.data.source);
+     reply(result);
+   } catch (error) {
+-    reply({ failure: error instanceof Error ? error.message : 'The script checker stopped.' });
++    const name = error instanceof Error && error.name !== 'Error' && !error.message.startsWith(error.name) ? `${error.name}: ` : '';
++    reply({ failure: error instanceof Error ? `${name}${error.message}${located(error, event.data.source)}` : 'The script checker stopped.' });
+   } finally {
+     port.close();
+   }

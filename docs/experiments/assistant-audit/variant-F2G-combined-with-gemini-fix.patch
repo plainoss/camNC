@@ -1,0 +1,483 @@
+diff --git a/apps/camNC/src/cad/assistant/context.ts b/apps/camNC/src/cad/assistant/context.ts
+index ed1b014..5ad91fc 100644
+--- a/apps/camNC/src/cad/assistant/context.ts
++++ b/apps/camNC/src/cad/assistant/context.ts
+@@ -4,6 +4,8 @@ export interface AssistantContextOptions {
+   images: boolean;
+   /** Textual payload ceiling, not a token estimate; image bytes are limited separately. */
+   maxCharacters?: number;
++  /** Keep superseded tool batches verbatim while the whole history fits, so the provider's cached prefix stays valid. */
++  compactOnlyOverLimit?: boolean;
+ }
+ 
+ type Batch = { start: number; end: number; message: AssistantMessage };
+@@ -54,6 +56,7 @@ export function buildAssistantContext(messages: readonly AssistantMessage[], opt
+   for (const index of latestReference.values()) retained.add(index);
+   const tailStart = latestCheck >= 0 ? latestCheck : (batches.at(-1)?.start ?? messages.length);
+   for (const batch of batches) if (batch.start >= tailStart) retained.add(batch.start);
++  if (options.compactOnlyOverLimit && assistantContextCharacters(messages) <= limit) for (const batch of batches) retained.add(batch.start);
+ 
+   let latestImages = -1;
+   for (let index = 0; index < messages.length; index++)
+diff --git a/apps/camNC/src/cad/assistant/loop.test.ts b/apps/camNC/src/cad/assistant/loop.test.ts
+index 344064c..9990917 100644
+--- a/apps/camNC/src/cad/assistant/loop.test.ts
++++ b/apps/camNC/src/cad/assistant/loop.test.ts
+@@ -226,13 +226,13 @@ it('uses one final response without execution tools after the last permitted che
+   const options = setup();
+   options.maxChecks = 1;
+   options.request = vi.fn(async request =>
+-    request.tools.length ? answer('check_design', 'good') : { role: 'assistant' as const, text: 'Proposal: checked.' }
++    request.toolChoice !== 'none' ? answer('check_design', 'good') : { role: 'assistant' as const, text: 'Proposal: checked.' }
+   );
+   const result = await runDesignAssistant(options);
+   expect(result.status).toBe('proposal');
+   expect(result.usage.calls).toBe(2);
+   expect(options.check).toHaveBeenCalledTimes(1);
+-  expect(vi.mocked(options.request).mock.calls[1][0].tools).toEqual([]);
++  expect(vi.mocked(options.request).mock.calls[1][0].toolChoice).toBe('none');
+ });
+ 
+ it('reuses an identical script on the same snapshot without spending another check', async () => {
+@@ -398,7 +398,7 @@ it('does not let suggested questions bypass the final response budget', async ()
+   const question = answer('ask_user');
+   question.calls![0].arguments = { question: 'Which thickness?', choices: ['18 mm', '24 mm'] };
+   options.request = vi.fn(async request => {
+-    expect(request.tools).toEqual([]);
++    expect(request.toolChoice).toBe('none');
+     return question;
+   });
+   const result = await runDesignAssistant(options);
+diff --git a/apps/camNC/src/cad/assistant/loop.ts b/apps/camNC/src/cad/assistant/loop.ts
+index 67877d9..991b8ac 100644
+--- a/apps/camNC/src/cad/assistant/loop.ts
++++ b/apps/camNC/src/cad/assistant/loop.ts
+@@ -1,6 +1,8 @@
+ import type { CadDocument } from '@wbcnc/cad';
+ import { assistantContextCharacters, buildAssistantContext } from './context';
+ import { readAssistantReport } from './report';
++import { checkNextStep } from './checkHints';
++import { compactCheckReport } from './compactCheck';
+ import { choiceSketchesSchema, readChoiceSketches, type AssistantChoiceSketch } from './choiceSketch';
+ import {
+   assistantBudgetStop,
+@@ -199,8 +201,17 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+       return finish('exhausted');
+     }
+     const finalizing = checks >= maxChecks || turn === maxTurns - 1;
+-    const tools = finalizing ? [] : assistantTools;
+-    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}${finalizing ? '\nThis is the final response. Do not call tools. Begin with Proposal: only for the latest successful check, otherwise Question: explaining what is needed.' : ''}`;
++    // Same system and tools on every turn keep the provider's prompt cache; the final turn forbids calls with tool_choice.
++    const tools = assistantTools;
++    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}`;
++    const finalNote: AssistantMessage[] = finalizing
++      ? [
++          {
++            role: 'user',
++            text: '[Application: this is the final response. Do not call tools. Begin with Proposal: only for the latest successful check, otherwise Question: explaining what is needed.]',
++          },
++        ]
++      : [];
+     const fixedCharacters = system.length + JSON.stringify(tools).length;
+     const messageCharacters = (limits.maxInputCharacters ?? 120_000) - fixedCharacters;
+     if (messageCharacters < 1) {
+@@ -209,7 +220,10 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+     }
+     let modelMessages: AssistantMessage[];
+     try {
+-      modelMessages = buildAssistantContext(messages, { images: options.config.images, maxCharacters: messageCharacters });
++      modelMessages = [
++        ...buildAssistantContext(messages, { images: options.config.images, maxCharacters: messageCharacters, compactOnlyOverLimit: true }),
++        ...finalNote,
++      ];
+     } catch (error) {
+       stopReason = error instanceof Error ? error.message : 'Context budget exceeded.';
+       return finish('exhausted');
+@@ -240,6 +254,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+         system,
+         messages: modelMessages,
+         tools,
++        ...(finalizing && { toolChoice: 'none' as const }),
+         maxOutputTokens: Math.min(
+           limits.maxOutputTokens ?? 8192,
+           limits.maxTotalTokens === undefined
+@@ -307,7 +322,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+       continue;
+     }
+     for (const call of answer.calls) {
+-      let text: string, images: AssistantImage[] | undefined;
++      let text: string,
++        images: AssistantImage[] | undefined,
++        isError = false;
+       if (options.signal.aborted) {
+         emit({ role: 'tool', callId: call.id, text: 'Stopped by the user; this tool was not run.' });
+         continue;
+@@ -359,11 +376,19 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+               text = 'Stopped by the user. No proposal was offered.';
+             } else {
+               if (checked.ok) proposal = cadProposal(base, checked.document);
+-              text = JSON.stringify({
+-                ok: checked.ok,
+-                report: checked.report,
+-                ...(checked.scriptError && { scriptError: checked.scriptError }),
+-              });
++              // A stopped script leaves the open design as it was: its unchanged report would only bury the error.
++              text = checked.scriptError
++                ? JSON.stringify({
++                    ok: false,
++                    scriptError: checked.scriptError,
++                    next: 'The script stopped, so nothing was built and the design is unchanged. Fix that line (check the call against the guide; do not invent methods or options) and resend the whole script with check_design. Do not reply with Proposal: until a check passes.',
++                  })
++                : JSON.stringify({
++                    ok: checked.ok,
++                    report: compactCheckReport(checked.detailReport ?? checked.report, options.report),
++                    next: checkNextStep(checked),
++                  });
++              isError = !!checked.scriptError;
+               images = options.config.images ? checked.images : undefined;
+               options.onActivity?.(checked.ok ? `Attempt ${checks} checked. Reviewing the result.` : `Attempt ${checks} needs repair.`);
+             }
+@@ -373,8 +398,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+       } catch (error) {
+         if (call.name === 'check_design') proposal = undefined;
+         text = error instanceof Error ? error.message : 'The check failed.';
++        isError = true;
+       }
+-      emit({ role: 'tool', callId: call.id, text, ...(images?.length && { images }) });
++      emit({ role: 'tool', callId: call.id, text, ...(images?.length && { images }), ...(isError && { isError }) });
+     }
+     if (options.signal.aborted) return finish('stopped');
+   }
+diff --git a/apps/camNC/src/cad/assistant/provider.ts b/apps/camNC/src/cad/assistant/provider.ts
+index b34f7c9..5d9adf5 100644
+--- a/apps/camNC/src/cad/assistant/provider.ts
++++ b/apps/camNC/src/cad/assistant/provider.ts
+@@ -21,6 +21,8 @@ export interface AssistantToolCall {
+   id: string;
+   name: string;
+   arguments: Record<string, unknown>;
++  /** Provider data that must be replayed with the call, such as Gemini's extra_content thought signature. */
++  extraContent?: unknown;
+ }
+ /** Totals include cached input and reasoning output; breakdowns are subsets, never additional tokens. */
+ export interface AssistantUsage {
+@@ -42,6 +44,8 @@ export interface AssistantMessage {
+   images?: AssistantImage[];
+   calls?: AssistantToolCall[];
+   callId?: string;
++  /** A failed tool call; Anthropic marks its tool_result with is_error. */
++  isError?: boolean;
+   /** Responses reasoning items must accompany their function calls on the next request. */
+   responseItems?: unknown[];
+   /** Preserve signed Anthropic thinking blocks with their complete tool-call batch. */
+@@ -58,6 +62,8 @@ export interface ProviderRequest {
+   system: string;
+   messages: AssistantMessage[];
+   tools: AssistantTool[];
++  /** 'none' offers the tools (keeping the cached prefix) but forbids calling them. */
++  toolChoice?: 'none';
+   signal: AbortSignal;
+   maxOutputTokens?: number;
+   timeoutMs?: number;
+@@ -102,6 +108,7 @@ export function providerPayload({
+   system,
+   messages,
+   tools,
++  toolChoice,
+   maxOutputTokens = 8192,
+ }: Omit<ProviderRequest, 'key' | 'signal'>): Record<string, unknown> {
+   if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1) throw new Error('Choose a positive output token limit.');
+@@ -121,6 +128,7 @@ export function providerPayload({
+                 {
+                   type: 'tool_result',
+                   tool_use_id: message.callId,
++                  ...(message.isError && { is_error: true }),
+                   content: [textBlock(message.text), ...(message.images ?? []).map(anthropicImage)],
+                 },
+               ]
+@@ -145,6 +153,7 @@ export function providerPayload({
+         input_schema: tool.parameters,
+         ...(config.promptCaching !== false && index === tools.length - 1 && { cache_control: { type: 'ephemeral' } }),
+       })),
++      ...(toolChoice && { tool_choice: { type: toolChoice } }),
+     };
+   }
+   if (config.protocol === 'responses') {
+@@ -194,6 +203,7 @@ export function providerPayload({
+         parameters: tool.parameters,
+         strict: false,
+       })),
++      ...(toolChoice && { tool_choice: toolChoice }),
+     };
+   }
+   const turns = compatibleMessages(messages).flatMap((message): unknown[] => {
+@@ -223,6 +233,7 @@ export function providerPayload({
+             id: call.id,
+             type: 'function',
+             function: { name: call.name, arguments: JSON.stringify(call.arguments) },
++            ...(call.extraContent !== undefined && { extra_content: call.extraContent }),
+           })),
+         }),
+       },
+@@ -236,6 +247,7 @@ export function providerPayload({
+       type: 'function',
+       function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+     })),
++    ...(toolChoice && { tool_choice: toolChoice }),
+   };
+ }
+ 
+@@ -256,7 +268,9 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
+   const interrupted = metadata.completion === 'incomplete' || metadata.completion === 'refused';
+   const data = input as {
+     content?: { type: string; text?: string; id?: string; name?: string; input?: unknown }[];
+-    choices?: { message?: { content?: string; tool_calls?: { id: string; function: { name: string; arguments: string } }[] } }[];
++    choices?: {
++      message?: { content?: string; tool_calls?: { id: string; function: { name: string; arguments: string }; extra_content?: unknown }[] };
++    }[];
+     output?: { type: string; call_id?: string; name?: string; arguments?: string; content?: { text?: string }[] }[];
+   };
+   if (config.kind === 'anthropic') {
+@@ -296,7 +310,12 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
+     role: 'assistant',
+     ...metadata,
+     text: message.content ?? '',
+-    calls: interrupted ? [] : message.tool_calls?.map(call => toolCall(call.id, call.function.name, call.function.arguments)),
++    calls: interrupted
++      ? []
++      : message.tool_calls?.map(call => ({
++          ...toolCall(call.id, call.function.name, call.function.arguments),
++          ...(call.extra_content !== undefined && { extraContent: call.extra_content }),
++        })),
+   };
+ }
+ 
+diff --git a/apps/camNC/src/cad/assistant/sandboxWorker.ts b/apps/camNC/src/cad/assistant/sandboxWorker.ts
+index df6c818..c5739a2 100644
+--- a/apps/camNC/src/cad/assistant/sandboxWorker.ts
++++ b/apps/camNC/src/cad/assistant/sandboxWorker.ts
+@@ -2,20 +2,34 @@ import { initializeCadSolver, parseCadDocument } from '@wbcnc/cad';
+ import { cupboard } from '../../../../../packages/cad-script/src/cupboard';
+ import { editCad, type CadScript } from '../../../../../packages/cad-script/src/edit';
+ 
++/** Lines are kept in place (stripped imports become blank lines), so a stack line maps straight back to the source. */
++const keepLines = (match: string) => '\n'.repeat(match.split('\n').length - 1);
++let scriptUrl = '';
++/** The failing source line from the error's stack frame in the script module, if the error came from there. */
++function located(error: unknown, source: string): string {
++  const stack = error instanceof Error ? (error.stack ?? '') : '';
++  const frame = scriptUrl && stack.split(scriptUrl + ':')[1]?.match(/^(\d+):(\d+)/);
++  if (!frame) return '';
++  const line = Number(frame[1]) - 1;
++  const text = source.split('\n')[line - 1]?.trim();
++  return text ? ` (script line ${line}: ${text.length > 160 ? `${text.slice(0, 160)}…` : text})` : ` (script line ${line})`;
++}
++
+ async function scriptFrom(source: string): Promise<CadScript> {
+   if (typeof source !== 'string' || source.length > 256_000) throw new Error('A script must be JavaScript text of at most 256 KB.');
+   const expression = source
+     .replace(/^\s*import\s*\{([^}]+)\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/, (_line, names: string) => {
+       if (names.split(',').some(name => !['design', 'cupboard'].includes(name.trim())))
+         throw new Error('Only design and cupboard may be imported in a browser script.');
+-      return '';
++      return keepLines(_line);
+     })
+-    .replace(/^\s*export\s*\{\s*cupboard\s*\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/m, '')
+-    .replace(/^\s*export\s+default\s+/m, '')
++    .replace(/^\s*export\s*\{\s*cupboard\s*\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/m, keepLines)
++    .replace(/^\s*export\s+default\s+/m, keepLines)
+     .replace(/;\s*$/, '');
+   // Native module parsing keeps string evaluation disabled by CSP. This module still runs only inside the disposable
+   // opaque worker; importing it never grants application storage, network access, provider keys or an Apply capability.
+   const url = URL.createObjectURL(new Blob([`export default (design, cupboard) => (\n${expression}\n);`], { type: 'text/javascript' }));
++  scriptUrl = url;
+   try {
+     const loaded = await import(/* @vite-ignore */ url);
+     const script = loaded.default((fn: CadScript) => fn, cupboard) as unknown;
+@@ -68,13 +82,21 @@ self.addEventListener('message', async function run(event: MessageEvent) {
+       });
+     }
+     const script = await scriptFrom(event.data.source);
++    let thrown: unknown;
+     const result = await editCad(start, d => {
+-      const returned = script(d) as unknown;
+-      if (returned && typeof returned === 'object' && 'then' in returned) throw new Error('Design scripts must finish synchronously.');
++      try {
++        const returned = script(d) as unknown;
++        if (returned && typeof returned === 'object' && 'then' in returned) throw new Error('Design scripts must finish synchronously.');
++      } catch (error) {
++        thrown = error;
++        throw error;
++      }
+     });
++    if (result.scriptError) result.scriptError += located(thrown, event.data.source);
+     reply(result);
+   } catch (error) {
+-    reply({ failure: error instanceof Error ? error.message : 'The script checker stopped.' });
++    const name = error instanceof Error && error.name !== 'Error' && !error.message.startsWith(error.name) ? `${error.name}: ` : '';
++    reply({ failure: error instanceof Error ? `${name}${error.message}${located(error, event.data.source)}` : 'The script checker stopped.' });
+   } finally {
+     port.close();
+   }
+diff --git a/apps/camNC/src/cad/assistant/scriptCheck.ts b/apps/camNC/src/cad/assistant/scriptCheck.ts
+index 33f0e4f..999c138 100644
+--- a/apps/camNC/src/cad/assistant/scriptCheck.ts
++++ b/apps/camNC/src/cad/assistant/scriptCheck.ts
+@@ -2,6 +2,7 @@ import { parseCadDocument, type CadDocument } from '@wbcnc/cad';
+ import { inspectCadDocument, type CadEditResult } from '@wbcnc/cad-script';
+ import runtime from 'virtual:cad-script-sandbox';
+ import { sandboxFrameHtml } from './sandboxFrame';
++import { structuralWarnings } from './structuralWarnings';
+ 
+ const failed = (document: CadDocument, message: string): CadEditResult => ({
+   ok: false,
+@@ -72,6 +73,7 @@ export function checkScriptInBrowser(
+           // A script can modify globals in its disposable worker. Recheck source with the app's trusted runtime.
+           const trusted = await inspectCadDocument(candidate);
+           trusted.report.warnings.push(...(result.report.warnings ?? []).filter(warning => warning.code === 'close-straight'));
++          trusted.report.warnings.push(...structuralWarnings(trusted.report));
+           finish({ ...trusted, ok: trusted.report.ok });
+         } catch (error) {
+           finish(failed(start, error instanceof Error ? error.message : 'Invalid design result.'));
+diff --git a/apps/camNC/src/cad/assistant/checkHints.ts b/apps/camNC/src/cad/assistant/checkHints.ts
+new file mode 100644
+index 0000000..32a3f4b
+--- /dev/null
++++ b/apps/camNC/src/cad/assistant/checkHints.ts
+@@ -0,0 +1,31 @@
++type Issue = { code?: unknown; message?: unknown; part?: unknown };
++const issues = (value: unknown): Issue[] => (Array.isArray(value) ? (value as Issue[]) : []);
++
++const hints: Record<string, (issue: Issue) => string> = {
++  'parts-collide': issue =>
++    `${String(issue.message ?? 'Two parts overlap.')} If one board should sit in the other, keep the overlap and join them with d.cutParts(receivingPart, { with: [boardThatSitsInIt] }) so the overlap becomes the housing; otherwise move or resize one so they only touch.`,
++  'cut-too-deep': issue =>
++    `${String(issue.part ?? 'A part')}: a pocket is as deep as the board. Make it shallower than the thickness or use depth 'through'. For a joint, overlap the boards and use d.cutParts rather than a hand-drawn pocket.`,
++  'cut-through-edge': issue =>
++    `${String(issue.part ?? 'A part')}: a through cut reaches the edge. Change that part's profile for an open notch, or overlap the boards and use d.cutParts for a joint.`,
++  'expect-failed': issue =>
++    `${String(issue.part ?? 'A part')}: ${String(issue.message ?? 'an expectation failed')}. Fix the geometry to match the request; change the expectation only if the request did.`,
++  'ambiguous-profile': issue => `${String(issue.part ?? 'A part')}: cut shapes in one sketch touch or branch. Keep each cut a separate closed shape that touches nothing else.`,
++  'intersecting-profiles': issue => `${String(issue.part ?? 'A part')}: cut shapes cross or touch. Space them apart, or merge them into one closed outline.`,
++  'disconnected-profile': issue => `${String(issue.part ?? 'A part')}: its outline has separate pieces. Make each piece its own part.`,
++};
++
++/** One short, issue-specific next step for a check result, so a failed check is repaired rather than reported as a proposal. */
++export function checkNextStep(checked: { ok: boolean; report: unknown; scriptError?: string }): string {
++  const report = (checked.report ?? {}) as { errors?: unknown; warnings?: unknown };
++  if (checked.scriptError)
++    return 'The script stopped and nothing was built. Fix the reported call and resend the whole script with check_design. Do not reply with Proposal: until a check passes.';
++  if (checked.ok) {
++    const warnings = [...new Set(issues(report.warnings).map(issue => String(issue.code)))];
++    return warnings.length
++      ? `Check passed with warnings (${warnings.join(', ')}). Fix any that matter for the request; if it then meets the request, reply starting with Proposal: and mention the remaining warnings.`
++      : 'Check passed. Compare the reported sizes, parts and joints with the request; if it meets it, reply starting with Proposal:. Otherwise fix the unmet requirement and check again.';
++  }
++  const steps = [...new Set(issues(report.errors).map(issue => hints[String(issue.code)]?.(issue) ?? `${String(issue.code)}: ${String(issue.message ?? '')}`))];
++  return `Not a valid candidate yet; do not reply with Proposal: until a check passes. Next: ${steps.slice(0, 4).join(' ')}${steps.length > 4 ? ` (+${steps.length - 4} more)` : ''}`;
++}
+diff --git a/apps/camNC/src/cad/assistant/compactCheck.ts b/apps/camNC/src/cad/assistant/compactCheck.ts
+new file mode 100644
+index 0000000..f9defe9
+--- /dev/null
++++ b/apps/camNC/src/cad/assistant/compactCheck.ts
+@@ -0,0 +1,53 @@
++type Data = Record<string, unknown>;
++const record = (value: unknown): Data => (value && typeof value === 'object' && !Array.isArray(value) ? (value as Data) : {});
++const rows = (value: unknown): Data[] => (Array.isArray(value) ? value.map(record) : []);
++
++function brief(part: Data, body?: Data): Data {
++  return {
++    name: part.name,
++    ref: part.ref,
++    thickness: part.thickness,
++    outline: record(part.outline).size,
++    ...(part.holes ? { holes: part.holes } : {}),
++    ...(part.notches ? { notches: part.notches } : {}),
++    ...(rows(part.cuts).length && {
++      cuts: rows(part.cuts).map(cut => ({ ref: cut.ref, depth: cut.through ? 'through' : cut.to, size: cut.size, ...(cut.count ? { count: cut.count } : {}) })),
++    }),
++    ...(body && { at: body.at, size: body.size }),
++  };
++}
++const signature = (part: Data, body?: Data) => JSON.stringify(brief({ ...part, ref: undefined }, body));
++
++/** Check result for the model: verdict, diagnostics and only the parts this script added or changed. */
++export function compactCheckReport(checked: unknown, initial: unknown): Data {
++  const report = record(checked),
++    before = record(initial);
++  const bodies = new Map(rows(record(report.assembly).parts).map(body => [body.name, body]));
++  const oldBodies = new Map(rows(record(before.assembly).parts).map(body => [body.name, body]));
++  const oldParts = new Map(rows(before.parts).map(part => [part.name, part]));
++  const parts = rows(report.parts);
++  const changed = parts.filter(part => {
++    const old = oldParts.get(part.name);
++    return !old || signature(old, oldBodies.get(String(old.name))) !== signature(part, bodies.get(String(part.name)));
++  });
++  const names = new Set(parts.map(part => part.name));
++  const all = [...bodies.values()];
++  const size = all.length
++    ? [0, 1, 2].map(axis => {
++        const at = (body: Data) => (body.at as number[])[axis]!,
++          extent = (body: Data) => at(body) + (body.size as number[])[axis]!;
++        return Math.round((Math.max(...all.map(extent)) - Math.min(...all.map(at))) * 100) / 100;
++      })
++    : undefined;
++  return {
++    ok: report.ok,
++    status: report.status,
++    errors: report.errors,
++    warnings: report.warnings,
++    ...(size && { overallSize: size }),
++    changedParts: changed.map(part => brief(part, bodies.get(String(part.name)))),
++    ...(changed.length < parts.length && { unchangedParts: parts.length - changed.length }),
++    ...([...oldParts.keys()].some(name => !names.has(name)) && { removedParts: [...oldParts.keys()].filter(name => !names.has(name)) }),
++    detail: 'Compact result. Use read_design_report (summary, parts, featureList, assembly, steps) or a part name for full data.',
++  };
++}
+diff --git a/apps/camNC/src/cad/assistant/structuralWarnings.ts b/apps/camNC/src/cad/assistant/structuralWarnings.ts
+new file mode 100644
+index 0000000..f5e8f11
+--- /dev/null
++++ b/apps/camNC/src/cad/assistant/structuralWarnings.ts
+@@ -0,0 +1,40 @@
++import type { CadReport, CadReportIssue } from '@wbcnc/cad-script';
++
++type Body = NonNullable<CadReport['assembly']>['parts'][number];
++const round = (value: number) => Math.round(value);
++const touches = (a: Body, b: Body, tolerance = 0.5) =>
++  [0, 1, 2].every(axis => a.at[axis]! <= b.at[axis]! + b.size[axis]! + tolerance && b.at[axis]! <= a.at[axis]! + a.size[axis]! + tolerance);
++
++/** Rough physical sanity from placed boxes only: a part touching nothing, a tall piece on a small footprint, a thin stick. */
++export function structuralWarnings(report: CadReport): CadReportIssue[] {
++  const bodies = report.assembly?.parts ?? [];
++  if (!bodies.length) return [];
++  const warnings: CadReportIssue[] = [];
++  const low = [0, 1, 2].map(axis => Math.min(...bodies.map(body => body.at[axis]!)));
++  const high = [0, 1, 2].map(axis => Math.max(...bodies.map(body => body.at[axis]! + body.size[axis]!)));
++  if (bodies.length > 1)
++    for (const body of bodies)
++      if (!bodies.some(other => other !== body && touches(body, other)))
++        warnings.push({
++          code: 'floating-part',
++          part: body.name,
++          message: `${body.name} touches no other part, so nothing holds it. Move it onto or into a neighbouring part and join it.`,
++        });
++  const height = high[2]! - low[2]!,
++    footprint = Math.min(high[0]! - low[0]!, high[1]! - low[1]!);
++  if (footprint > 0 && height / footprint > 3)
++    warnings.push({
++      code: 'may-tip',
++      message: `The piece is ${round(height)} mm tall on a ${round(footprint)} mm footprint (${(height / footprint).toFixed(1)}:1). Freestanding, it can tip: widen or deepen the base, or tell the user it must be fixed to a wall.`,
++    });
++  for (const body of bodies) {
++    const across = Math.max(body.size[0]!, body.size[1]!);
++    if (across < 60 && body.size[2]! / across > 20)
++      warnings.push({
++        code: 'slender-part',
++        part: body.name,
++        message: `${body.name} is ${round(body.size[2]!)} mm tall but only ${round(across)} mm across; it may flex or break under load. Thicken it or brace it, or tell the user.`,
++      });
++  }
++  return warnings;
++}

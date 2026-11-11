@@ -1,0 +1,139 @@
+diff --git a/apps/camNC/src/cad/assistant/context.ts b/apps/camNC/src/cad/assistant/context.ts
+index ed1b014..5ad91fc 100644
+--- a/apps/camNC/src/cad/assistant/context.ts
++++ b/apps/camNC/src/cad/assistant/context.ts
+@@ -4,6 +4,8 @@ export interface AssistantContextOptions {
+   images: boolean;
+   /** Textual payload ceiling, not a token estimate; image bytes are limited separately. */
+   maxCharacters?: number;
++  /** Keep superseded tool batches verbatim while the whole history fits, so the provider's cached prefix stays valid. */
++  compactOnlyOverLimit?: boolean;
+ }
+ 
+ type Batch = { start: number; end: number; message: AssistantMessage };
+@@ -54,6 +56,7 @@ export function buildAssistantContext(messages: readonly AssistantMessage[], opt
+   for (const index of latestReference.values()) retained.add(index);
+   const tailStart = latestCheck >= 0 ? latestCheck : (batches.at(-1)?.start ?? messages.length);
+   for (const batch of batches) if (batch.start >= tailStart) retained.add(batch.start);
++  if (options.compactOnlyOverLimit && assistantContextCharacters(messages) <= limit) for (const batch of batches) retained.add(batch.start);
+ 
+   let latestImages = -1;
+   for (let index = 0; index < messages.length; index++)
+diff --git a/apps/camNC/src/cad/assistant/loop.test.ts b/apps/camNC/src/cad/assistant/loop.test.ts
+index 344064c..9990917 100644
+--- a/apps/camNC/src/cad/assistant/loop.test.ts
++++ b/apps/camNC/src/cad/assistant/loop.test.ts
+@@ -226,13 +226,13 @@ it('uses one final response without execution tools after the last permitted che
+   const options = setup();
+   options.maxChecks = 1;
+   options.request = vi.fn(async request =>
+-    request.tools.length ? answer('check_design', 'good') : { role: 'assistant' as const, text: 'Proposal: checked.' }
++    request.toolChoice !== 'none' ? answer('check_design', 'good') : { role: 'assistant' as const, text: 'Proposal: checked.' }
+   );
+   const result = await runDesignAssistant(options);
+   expect(result.status).toBe('proposal');
+   expect(result.usage.calls).toBe(2);
+   expect(options.check).toHaveBeenCalledTimes(1);
+-  expect(vi.mocked(options.request).mock.calls[1][0].tools).toEqual([]);
++  expect(vi.mocked(options.request).mock.calls[1][0].toolChoice).toBe('none');
+ });
+ 
+ it('reuses an identical script on the same snapshot without spending another check', async () => {
+@@ -398,7 +398,7 @@ it('does not let suggested questions bypass the final response budget', async ()
+   const question = answer('ask_user');
+   question.calls![0].arguments = { question: 'Which thickness?', choices: ['18 mm', '24 mm'] };
+   options.request = vi.fn(async request => {
+-    expect(request.tools).toEqual([]);
++    expect(request.toolChoice).toBe('none');
+     return question;
+   });
+   const result = await runDesignAssistant(options);
+diff --git a/apps/camNC/src/cad/assistant/loop.ts b/apps/camNC/src/cad/assistant/loop.ts
+index 67877d9..3fce145 100644
+--- a/apps/camNC/src/cad/assistant/loop.ts
++++ b/apps/camNC/src/cad/assistant/loop.ts
+@@ -199,8 +199,17 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+       return finish('exhausted');
+     }
+     const finalizing = checks >= maxChecks || turn === maxTurns - 1;
+-    const tools = finalizing ? [] : assistantTools;
+-    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}${finalizing ? '\nThis is the final response. Do not call tools. Begin with Proposal: only for the latest successful check, otherwise Question: explaining what is needed.' : ''}`;
++    // Same system and tools on every turn keep the provider's prompt cache; the final turn forbids calls with tool_choice.
++    const tools = assistantTools;
++    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}`;
++    const finalNote: AssistantMessage[] = finalizing
++      ? [
++          {
++            role: 'user',
++            text: '[Application: this is the final response. Do not call tools. Begin with Proposal: only for the latest successful check, otherwise Question: explaining what is needed.]',
++          },
++        ]
++      : [];
+     const fixedCharacters = system.length + JSON.stringify(tools).length;
+     const messageCharacters = (limits.maxInputCharacters ?? 120_000) - fixedCharacters;
+     if (messageCharacters < 1) {
+@@ -209,7 +218,10 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+     }
+     let modelMessages: AssistantMessage[];
+     try {
+-      modelMessages = buildAssistantContext(messages, { images: options.config.images, maxCharacters: messageCharacters });
++      modelMessages = [
++        ...buildAssistantContext(messages, { images: options.config.images, maxCharacters: messageCharacters, compactOnlyOverLimit: true }),
++        ...finalNote,
++      ];
+     } catch (error) {
+       stopReason = error instanceof Error ? error.message : 'Context budget exceeded.';
+       return finish('exhausted');
+@@ -240,6 +252,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
+         system,
+         messages: modelMessages,
+         tools,
++        ...(finalizing && { toolChoice: 'none' as const }),
+         maxOutputTokens: Math.min(
+           limits.maxOutputTokens ?? 8192,
+           limits.maxTotalTokens === undefined
+diff --git a/apps/camNC/src/cad/assistant/provider.ts b/apps/camNC/src/cad/assistant/provider.ts
+index b34f7c9..013e2db 100644
+--- a/apps/camNC/src/cad/assistant/provider.ts
++++ b/apps/camNC/src/cad/assistant/provider.ts
+@@ -58,6 +58,8 @@ export interface ProviderRequest {
+   system: string;
+   messages: AssistantMessage[];
+   tools: AssistantTool[];
++  /** 'none' offers the tools (keeping the cached prefix) but forbids calling them. */
++  toolChoice?: 'none';
+   signal: AbortSignal;
+   maxOutputTokens?: number;
+   timeoutMs?: number;
+@@ -102,6 +104,7 @@ export function providerPayload({
+   system,
+   messages,
+   tools,
++  toolChoice,
+   maxOutputTokens = 8192,
+ }: Omit<ProviderRequest, 'key' | 'signal'>): Record<string, unknown> {
+   if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1) throw new Error('Choose a positive output token limit.');
+@@ -145,6 +148,7 @@ export function providerPayload({
+         input_schema: tool.parameters,
+         ...(config.promptCaching !== false && index === tools.length - 1 && { cache_control: { type: 'ephemeral' } }),
+       })),
++      ...(toolChoice && { tool_choice: { type: toolChoice } }),
+     };
+   }
+   if (config.protocol === 'responses') {
+@@ -194,6 +198,7 @@ export function providerPayload({
+         parameters: tool.parameters,
+         strict: false,
+       })),
++      ...(toolChoice && { tool_choice: toolChoice }),
+     };
+   }
+   const turns = compatibleMessages(messages).flatMap((message): unknown[] => {
+@@ -236,6 +241,7 @@ export function providerPayload({
+       type: 'function',
+       function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+     })),
++    ...(toolChoice && { tool_choice: toolChoice }),
+   };
+ }
+ 
