@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { areaD } from 'clipper2-ts';
-import { cutoutPastBoard, cutoutSilhouette } from './cutout';
+import { cutLineFilter, cutoutPastBoard, cutoutSilhouette } from './cutout';
+import type { SafetyIssue } from './safety';
 import { difference, offset, union, type PathD } from './geom';
 import { simplifyLoop } from './simplifyLoop';
 import { planBoard, type BoardRequest } from './plan';
@@ -213,28 +214,71 @@ describe('a carving cut out of its board', () => {
     expect(plan.release?.map(r => r.kind)).toEqual(['free']);
   });
 
-  it('says once that a cut line past the board edge is the problem, not once per move off the board', () => {
+  /** The board planned with the artwork moved by `dx`, and a cutout `margin` round it. */
+  const shifted = (dx: number, margin: number, holdDown: BoardRequest['holdDown'] = 'fixture-tape') => {
+    const near = letters.map(loop => loop.map(p => ({ x: p.x + dx, y: p.y })));
+    const plan = planBoard(
+      board({
+        holdDown,
+        taped: holdDown === 'fixture-tape',
+        carvings: [{ ...carving, region: near }],
+        cutouts: [{ id: 'cut', name: 'Cutout', outline: cutoutSilhouette(near, 'outline', margin)[0] }],
+      }),
+      {},
+      none
+    );
+    return { plan, all: [...plan.safety, ...(plan.release ?? []).flatMap(r => r.safety)] };
+  };
+  const cutLine = /^Cutout: the cut line runs past the board's edge/;
+
+  it.each(['fixture-tape', 'tabs'] as const)('says once that a cut line past the board edge blocks the job (%s)', holdDown => {
     // The artwork 3 mm inside the board's left edge: the cut line 6 mm round it runs 3 mm past it.
-    const near = letters.map(loop => loop.map(p => ({ x: p.x - 37, y: p.y })));
-    const past = cutoutSilhouette(near, 'outline', 6)[0];
-    for (const holdDown of ['fixture-tape', 'tabs'] as const) {
-      const plan = planBoard(
-        board({
-          holdDown,
-          taped: holdDown === 'fixture-tape',
-          carvings: [{ ...carving, region: near }],
-          cutouts: [{ id: 'cut', name: 'Cutout', outline: past }],
-        }),
-        {},
-        none
-      );
-      const all = [...plan.safety, ...(plan.release ?? []).flatMap(r => r.safety)];
-      expect(all).toEqual([expect.stringMatching(/^Cutout: the cut line runs past the board's edge/)]);
-    }
+    const { plan, all } = shifted(-37, 6, holdDown);
+    expect(all).toEqual([expect.stringMatching(cutLine)]);
+    expect(plan.safety.length).toBeGreaterThan(0);
+  });
+
+  it('blocks a cut line 2 mm past the edge, but not one 0.5 mm past, which the bit cuts round in the air', () => {
+    expect(shifted(-34.5, 6).all).toEqual([]);
+    const two = shifted(-36, 6);
+    expect(two.all).toEqual([expect.stringMatching(cutLine)]);
+    expect(two.plan.safety.length).toBeGreaterThan(0);
+  });
+
+  it('still lists the V-carve leaving the board when the artwork itself overhangs', () => {
+    // The first letter half off the board.
+    const { all } = shifted(-55, 6);
+    expect(all[0]).toMatch(cutLine);
+    expect(all.slice(1).length).toBeGreaterThan(0);
+    expect(all.slice(1).every(line => /leaves the board/.test(line))).toBe(true);
   });
 
   it('reports nothing for a cut line on the board', () => {
     const plan = planBoard(board({ holdDown: 'fixture-tape', taped: true, cutouts: [{ id: 'cut', name: 'Cutout', outline }] }), {}, none);
     expect([...plan.safety, ...(plan.release ?? []).flatMap(r => r.safety)]).toEqual([]);
+  });
+});
+
+describe('cutLineFilter', () => {
+  const line = rect(-3, 10, 50, 40);
+  const issue = (rule: SafetyIssue['rule'], x: number, y = 30): SafetyIssue => ({ rule, move: 0, message: rule, at: { x, y } });
+
+  it('leaves out only moves off the board round a cut line past the edge', () => {
+    const { keep, dropped } = cutLineFilter([{ id: 'cut', name: 'Cutout', outline: line }]);
+    expect(dropped()).toBe(false);
+    // Too deep, right on the line: kept.
+    expect(keep(issue('too-deep', -6), 3)).toBe(true);
+    // Off the board, far from the line (another part, a dowel): kept.
+    expect(keep(issue('outside-board', -6, 80), 3)).toBe(true);
+    expect(dropped()).toBe(false);
+    // Off the board, the bit going round the line: left out.
+    expect(keep(issue('outside-board', -6), 3)).toBe(false);
+    expect(dropped()).toBe(true);
+  });
+
+  it('mirrors the moves of a program run with the board turned over', () => {
+    const { keep } = cutLineFilter([{ id: 'cut', name: 'Cutout', outline: line }], 120);
+    expect(keep(issue('outside-board', -6, 120 - 30), 3)).toBe(false);
+    expect(keep(issue('outside-board', -6, 30), 3)).toBe(true);
   });
 });

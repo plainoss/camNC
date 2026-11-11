@@ -19,7 +19,7 @@ import { maxOf, minOf } from './geom';
 import { holdCheck, holdTimeline } from './hold';
 import type { HoldPoint } from './holdPoints';
 import { readGcode } from './analyze';
-import { checkGcodeSafety, checkProgramSafety, leavesBoard } from './safety';
+import { checkGcodeSafety, checkProgramSafety, type SafetyFilter } from './safety';
 import { progressOver, type OnProgress } from './progress';
 import { DEFAULT_TABS } from './settings';
 import { setupSheet, type SetupSummary } from './setupSummary';
@@ -27,7 +27,7 @@ import { freePartsProgram, kDefaultSkin } from './tabPlan';
 import { tabRemovalProgram, type TabStop } from './tabRemoval';
 import { estimateProgramTime, type ProgramTimeEstimate } from './timing';
 import type { BoardCarving } from './vcarve';
-import { cutoutPart, cutoutPastBoard, type BoardCutout } from './cutout';
+import { cutLineFilter, cutoutPart, cutoutPastBoard, type BoardCutout } from './cutout';
 import {
   DEFAULT_SETTINGS,
   stepdownFor,
@@ -247,6 +247,9 @@ export function planBoard(
   }
   const cam = camBoard(spec, settings, progress.step(sideA));
   progress.done(sideA);
+  // A cut line past the board's edge: the moves round it that leave the board are said once, as that.
+  const pastEdge = (board.cutouts ?? []).filter(c => cutoutPastBoard([c.outline], { w: board.w, h: board.h }));
+  const cutLine = cutLineFilter(pastEdge);
   // Corners relieved for a smaller bit than the board is cut with still come out rounded, and a joint won't close.
   const widest = Math.max(0, ...cam.operations.map(op => op.tool.diameter));
   const warned = new Set<string>();
@@ -269,7 +272,8 @@ export function planBoard(
     board.thickness,
     board.name,
     sideRotation(board, false),
-    progress.step(post)
+    progress.step(post),
+    cutLine.keep
   );
   progress.done(post);
   if (flip) {
@@ -311,7 +315,8 @@ export function planBoard(
     ...(h.moved && { moved: true }),
   }));
   // Skins and tabs are taken care of last: after side B, when there is one, with the board turned over.
-  const release = releasePrograms(flat, board, settings, !!plan.sideB, perPart);
+  const releaseCutLine = cutLineFilter(pastEdge, plan.sideB ? board.h : undefined);
+  const release = releasePrograms(flat, board, settings, !!plan.sideB, perPart, releaseCutLine.keep);
   // Holds in the way of any move of any program: side B and the turned programs find them in the same spots on the wood.
   const clashes = spec.holdPoints?.length
     ? {
@@ -328,7 +333,7 @@ export function planBoard(
       }
     : {};
   plan = { ...plan, ...stability(flat, spec, settings), ...clashes, ...(release.length && { release }) };
-  plan = cutoutsPastEdge(plan, board);
+  if (cutLine.dropped() || releaseCutLine.dropped()) plan = withCutLineProblem(plan, pastEdge);
   progress.done(holds - kHoldCheckShare * work.parts);
   // A skin (or the layer on the tape) holds every part until the end.
   if (board.holdDown === 'skin' || board.holdDown === 'fixture-tape')
@@ -343,23 +348,15 @@ export function planBoard(
 }
 
 /**
- * A cutout whose line runs past the board's edge is one problem, said once and pointing at the cut line, not one per
- * move of the bit round it: its off-board moves are left out (the job stays blocked, and any others come back once the
- * cut line is on the board).
+ * The bit going round a cut line past the board's edge leaves the board: one problem, said once and pointing at the cut
+ * line (its moves off the board were left out). Side B says it too, so it doesn't look fine on its own.
  */
-function cutoutsPastEdge(plan: PlanResult, board: BoardRequest): PlanResult {
-  const past = (board.cutouts ?? []).filter(c => cutoutPastBoard([c.outline], { w: board.w, h: board.h }));
-  if (!past.length) return plan;
-  const on = (safety: string[]) => safety.filter(s => !leavesBoard(s));
-  const names = past.map(c => c.name).join(', ');
+function withCutLineProblem(plan: PlanResult, past: BoardCutout[]): PlanResult {
+  const problem = `${past.map(c => c.name).join(', ')}: the cut line runs past the board's edge, so the piece can't be cut out whole. On the Carve step, move the artwork further onto the board or make the cutout's margin smaller.`;
   return {
     ...plan,
-    safety: [
-      `${names}: the cut line runs past the board's edge, so the piece can't be cut out whole. On the Carve step, move the artwork further onto the board or make the cutout's margin smaller.`,
-      ...on(plan.safety),
-    ],
-    ...(plan.sideB && { sideB: { ...plan.sideB, safety: on(plan.sideB.safety) } }),
-    ...(plan.release && { release: plan.release.map(r => ({ ...r, safety: on(r.safety) })) }),
+    safety: [problem, ...plan.safety],
+    ...(plan.sideB && { sideB: { ...plan.sideB, safety: [problem, ...plan.sideB.safety] } }),
   };
 }
 
@@ -416,7 +413,14 @@ function stability(flat: PartCam, spec: BoardSpec, settings: Partial<CamSettings
  * parts that keep a skin or the layer on the tape, `tabRemovalProgram` for "tabs + guided removal". They follow the
  * outlines' finished paths.
  */
-function releasePrograms(flat: PartCam, board: BoardRequest, settings: Partial<CamSettings>, turned: boolean, perPart: boolean) {
+function releasePrograms(
+  flat: PartCam,
+  board: BoardRequest,
+  settings: Partial<CamSettings>,
+  turned: boolean,
+  perPart: boolean,
+  keep?: SafetyFilter
+) {
   const feed = settings.finishFeed ?? (settings.feed ?? 1800) * (settings.finalFeedFactor ?? 0.5);
   const plungeFeed = settings.plungeFeed ?? 480;
   const finalZ = settings.finalZ ?? -0.3;
@@ -435,7 +439,7 @@ function releasePrograms(flat: PartCam, board: BoardRequest, settings: Partial<C
     if (!cam.operations.length) return;
     const count = cam.operations.filter(o => o.pauseAfter || o.pauseBefore).length;
     const minZ = turned ? flat.stockTop - layer + finalZ : finalZ;
-    const made = releaseProgram(kind, title, note(count), count, cam, board, settings, minZ, rotationDeg);
+    const made = releaseProgram(kind, title, note(count), count, cam, board, settings, minZ, rotationDeg, keep);
     out.push({ ...made, turned, ...more });
   };
   const rotationDeg = sideRotation(board, turned);
@@ -490,7 +494,8 @@ function releaseProgram(
   board: BoardRequest,
   settings: Partial<CamSettings>,
   minZ: number,
-  rotationDeg: number
+  rotationDeg: number,
+  keep: SafetyFilter = () => true
 ): ReleaseProgram {
   const { tool } = cam.operations[0];
   const size: [number, number, number] = [board.w, board.h, board.stockTop];
@@ -522,7 +527,9 @@ function releaseProgram(
       rotationDeg,
       minZ,
       toolRadius: tool.diameter / 2,
-    }).map(i => `${title}: ${i.message}`),
+    })
+      .filter(i => keep(i, tool.diameter / 2))
+      .map(i => `${title}: ${i.message}`),
     turned: false,
   };
 }
@@ -622,7 +629,9 @@ export function summarize(
   partTop = cam.stockTop,
   board?: string,
   rotationDeg = 0,
-  onProgress?: OnProgress
+  onProgress?: OnProgress,
+  /** Issues to keep (all by default). */
+  keep: SafetyFilter = () => true
 ): PlanResult {
   const split = splitByBit(cam);
   // Writing each program's G-code and timing it, then checking it: both about as long as it has points.
@@ -659,7 +668,9 @@ export function summarize(
       rotationDeg,
       minZ: settings.finalZ ?? -0.3,
       toolRadius: p.diameter / 2,
-    }).map(issue => issue.message);
+    })
+      .filter(issue => keep(issue, p.diameter / 2))
+      .map(issue => issue.message);
     progress.done(points[i]);
     return issues;
   });
