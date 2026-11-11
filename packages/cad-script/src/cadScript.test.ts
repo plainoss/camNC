@@ -15,7 +15,7 @@ const plate: CadScript = d => {
 const codes = (issues: { code: string }[]) => issues.map(issue => issue.code);
 
 describe('example parts', () => {
-  it.each(['plate', 'shelf-side', 'tray', 'bracket', 'cupboard'])('%s meets what it expects of itself', async name => {
+  it.each(['plate', 'shelf-side', 'tray', 'bracket', 'cupboard', 'pebble-tray'])('%s meets what it expects of itself', async name => {
     const { default: script } = await import(`../examples/${name}.cad.ts`);
     const result = await editCad(null, script);
     expect(result.report.errors).toEqual([]);
@@ -27,6 +27,7 @@ describe('example parts', () => {
     expect((await readdir(examples)).sort()).toEqual([
       'bracket.cad.ts',
       'cupboard.cad.ts',
+      'pebble-tray.cad.ts',
       'plate.cad.ts',
       'shelf-side.cad.ts',
       'tray.cad.ts',
