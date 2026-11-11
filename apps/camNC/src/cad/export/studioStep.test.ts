@@ -84,6 +84,37 @@ describe('studio STEP export', () => {
     expect(hidden.text).toContain(`PRODUCT('${second!.name}'`);
   });
 
+  it('reports only the exported part’s own trouble', async () => {
+    const document = await load('extrude-sketch-apart');
+    const all = studioStep(document);
+    expect(all.problems.length).toBeGreaterThan(0);
+    const broken = document.parts.find(part => all.problems.some(problem => problem.name === part.name))!;
+    const other = document.parts.find(part => part.id !== broken.id)!;
+    expect(studioStep(document, { only: { partId: other.id } }).problems).toEqual([]);
+    expect(studioStep(document, { only: { partId: broken.id } }).problems).toHaveLength(all.problems.length);
+  });
+
+  it('counts a joined body that can’t be built as trouble of the part it joins', async () => {
+    const source = await load('face-extrusion-bracket');
+    const joined = source.parts.find(part => part.addTo)!;
+    // Its sketch emptied, so the body can't be built.
+    const document = {
+      ...source,
+      parts: source.parts.map(part =>
+        part.id === joined.id ? { ...part, sketch: { ...part.sketch, entities: [], constraints: [] } } : part
+      ),
+    };
+    const only = studioStep(document, { only: { partId: joined.addTo! } });
+    expect(only.problems.map(problem => problem.name)).toContain(joined.name);
+  });
+
+  it('doesn’t report trouble with a hidden part', async () => {
+    const document = await load('extrude-sketch-apart');
+    const broken = studioStep(document).problems;
+    const part = document.parts.find(candidate => broken.some(problem => problem.name === candidate.name))!;
+    expect(studioStep(document, { hidden: new Set([part.id]) }).problems).toEqual([]);
+  });
+
   it('writes the chosen unit', async () => {
     const document = await load('plate');
     expect(studioStep(document, { unit: 'in' }).text).toContain("CONVERSION_BASED_UNIT('INCH'");

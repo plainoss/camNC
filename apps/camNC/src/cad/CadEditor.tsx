@@ -2218,7 +2218,7 @@ export function CadEditor({
         )}
       </div>
       <PartsList
-        folders={doc.folders}
+        document={doc}
         onSketchCopy={onEditFaceSketch && ((partId, copyId, face) => faceEditor.create(face, undefined, { partId, copyId }))}
         onDetachCopy={(partId, copyId) => {
           const result = detachStudioCopy(documentRef.current, partId, copyId);
