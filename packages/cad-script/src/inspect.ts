@@ -1,5 +1,6 @@
 import {
   cadFaceSketches,
+  cadVariableProblems,
   cadVariableScope,
   cadSketchRegions,
   patternMaster,
@@ -345,7 +346,8 @@ export async function inspectCadDocument(
     const handles = shortHandles(all);
     return ids.map(id => handles.get(id) ?? id);
   };
-  for (const d of solved.diagnostics) {
+  // A value that can't follow its variables keeps its last good one, so the design the check solved disagrees with them.
+  for (const d of [...solved.diagnostics, ...cadVariableProblems(input)]) {
     const part = solved.document.parts.find(part => part.id === d.partId);
     const constraints = part && [part.sketch, ...cadFaceSketches(part).map(face => face.sketch)].flatMap(sketch => sketch.constraints);
     const ids =

@@ -2,7 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { parseCadDocument, type CadDocument } from '@wbcnc/cad';
+import { parseCadDocument, sketchToDxf, sketchToSvg, type CadDocument, type CadLengthUnit, type CadPart } from '@wbcnc/cad';
 import { editCad, type CadScript } from './edit';
 import { renderCadSvg } from './render';
 import { fullCadReport, fullReportText } from './fullReport';
@@ -14,8 +14,20 @@ import { renderCadSection, type CadSectionRequest } from './views/section';
 import { reportFlatParts } from './reportGeometry';
 
 function parseArgs(args: string[]) {
-  const options: { file?: string; from?: string; out?: string; svg?: string; full?: boolean; views?: string; section?: CadSectionRequest } =
-    {};
+  const options: {
+    file?: string;
+    from?: string;
+    out?: string;
+    svg?: string;
+    full?: boolean;
+    views?: string;
+    section?: CadSectionRequest;
+    exportSketch?: { sketch: string; file: string; unit?: CadLengthUnit; construction: boolean };
+  } = {};
+  let exportSketch: string | undefined,
+    exportFile: string | undefined,
+    exportUnit: CadLengthUnit | undefined,
+    exportConstruction = false;
   let sectionPart: string | undefined,
     sectionCut: string | undefined,
     sectionAxis: 'x' | 'y' = 'x',
@@ -28,7 +40,14 @@ function parseArgs(args: string[]) {
     else if (flag === '--out') options.out = path.resolve(cwd, args[++i]!);
     else if (flag === '--svg') options.svg = path.resolve(cwd, args[++i]!);
     else if (flag === '--views') options.views = path.resolve(cwd, args[++i]!);
-    else if (flag === '--section-part') sectionPart = args[++i];
+    else if (flag === '--export-sketch') exportSketch = args[++i];
+    else if (flag === '--export') exportFile = path.resolve(cwd, args[++i]!);
+    else if (flag === '--export-construction') exportConstruction = true;
+    else if (flag === '--export-unit') {
+      const unit = args[++i];
+      if (!['mm', 'cm', 'm', 'in', 'ft'].includes(unit!)) throw new Error('--export-unit takes mm, cm, m, in or ft.');
+      exportUnit = unit as CadLengthUnit;
+    } else if (flag === '--section-part') sectionPart = args[++i];
     else if (flag === '--section-cut') sectionCut = args[++i];
     else if (flag === '--section-at') {
       sectionAt = Number(args[++i]);
@@ -45,7 +64,14 @@ function parseArgs(args: string[]) {
     else options.file = path.resolve(cwd, flag);
   }
   if (!options.file && !options.from)
-    throw new Error('Usage: check [design.cad.ts] [--from document.json] [--out document.json] [--svg drawing.svg] [--report full]');
+    throw new Error(
+      'Usage: check [design.cad.ts] [--from document.json] [--out document.json] [--svg drawing.svg] [--export-sketch name --export drawing.dxf|svg] [--report full]'
+    );
+  if (exportSketch || exportFile) {
+    if (!exportSketch || !exportFile || !/\.(dxf|svg)$/i.test(exportFile))
+      throw new Error('A sketch export needs --export-sketch name and --export drawing.dxf or drawing.svg.');
+    options.exportSketch = { sketch: exportSketch, file: exportFile, unit: exportUnit, construction: exportConstruction };
+  }
   if (sectionPart || sectionCut || sectionAt !== undefined) {
     if (!sectionPart || !sectionCut || !options.views)
       throw new Error('A section needs --views directory, --section-part name and --section-cut handle.');
@@ -61,20 +87,41 @@ console.log = console.error.bind(console);
 const options = parseArgs(process.argv.slice(2));
 const start = options.from ? parseCadDocument(JSON.parse(await readFile(options.from, 'utf8'))) : null;
 type Inspected = Awaited<ReturnType<typeof inspectCadDocument>> & { scriptError?: string };
+/** The part whose sketch is named so: by the sketch's own name or ID first, as the feature list names it, then its part's. */
+const sketchPart = (parts: readonly CadPart[], name: string) =>
+  parts.find(p => p.sketchName === name || p.sketch.id === name) ?? parts.find(p => p.name === name || p.id === name);
 const finish = async (ok: boolean, output: object, document?: unknown, svg?: string, inspected?: Inspected) => {
+  // A sketch that isn't there fails the check before anything is written, so --out never outlives a failed run.
+  const exportPart =
+    ok && options.exportSketch && inspected ? sketchPart(inspected.document.parts, options.exportSketch.sketch) : undefined;
+  const exportError = ok && options.exportSketch && !exportPart ? `No sketch named ${options.exportSketch.sketch}.` : undefined;
+  if (exportError) {
+    ok = false;
+    output = { ...output, exportError };
+  }
   // A design that doesn't check out is never written where it could be imported by mistake.
   if (ok && options.out) await writeFile(options.out, `${JSON.stringify(document, null, 1)}\n`);
   else if (!ok && options.out) await rm(options.out, { force: true });
   if (svg && options.svg) await writeFile(options.svg, svg);
   else if (!ok && options.svg) await rm(options.svg, { force: true });
   let drawings: Record<string, string> | undefined;
+  if (options.exportSketch) {
+    await rm(options.exportSketch.file, { force: true });
+    if (exportPart) {
+      const { file, unit, construction } = options.exportSketch;
+      const write = /\.svg$/i.test(file) ? sketchToSvg : sketchToDxf;
+      await writeFile(file, write(exportPart.sketch, { unit, construction }));
+      drawings = { ...drawings, export: file };
+    }
+  }
+
   if (options.views) {
     const files = ['top', 'front', 'right', 'section'].map(name => path.join(options.views!, `${name}.svg`));
     // A rejected revision cannot leave the preceding candidate's views beside its report.
     await Promise.all(files.map(file => rm(file, { force: true })));
     if (ok && inspected) {
       await mkdir(options.views, { recursive: true });
-      drawings = {};
+      drawings = { ...drawings };
       for (const view of renderCadViews(inspected.document, inspected.parts, inspected.evaluation)) {
         const file = path.join(options.views, `${view.name}.svg`);
         await writeFile(file, view.svg);
@@ -95,7 +142,7 @@ const finish = async (ok: boolean, output: object, document?: unknown, svg?: str
       views: !!options.views && ok,
       ...(ok && options.section && { section: options.section }),
     });
-    process.stdout.write(fullReportText(full));
+    process.stdout.write(fullReportText(exportError ? { ...full, ok: false, exportError } : full));
   } else
     print(
       JSON.stringify(

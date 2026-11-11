@@ -2,6 +2,7 @@ import { consumedTools } from './consumedTools';
 import { newCadId } from './document';
 import { isCadBody } from './extrudeSteps';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
+import { numberedCadCopy } from './copyNumbers';
 import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 import { activeDesign } from './suppression';
 import { physicalJoinedCopies } from './physicalJoinedCopies';
@@ -23,7 +24,9 @@ export function addPartCopy(
     document: resolvePartPatterns({
       ...document,
       revision: document.revision + 1,
-      parts: document.parts.map(part => (part.id === partId ? { ...part, copies: [...(part.copies ?? []), copy] } : part)),
+      parts: document.parts.map(part =>
+        part.id === partId ? { ...part, copies: [...(part.copies ?? []), numberedCadCopy(part, copy)] } : part
+      ),
     }),
   };
 }
@@ -180,6 +183,11 @@ export function cadPartsToCut(
         });
       }
     }
-    return groups.map(({ part, names }) => ({ part, names }));
+    // A lone mirrored piece is labelled by the copy's own name, as the parts list numbers it; a group of several keeps
+    // the part's name and lists each piece in `names`.
+    return groups.map(({ part, names, mirrored }) => ({
+      part: mirrored && names.length === 1 ? { ...part, name: `${names[0]} (mirrored)` } : part,
+      names,
+    }));
   });
 }

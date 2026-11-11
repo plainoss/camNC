@@ -31,7 +31,10 @@ Options: `--from <document.json>` edits an existing design, or reports on it if 
 script is given. `--out` writes the document, only if the check passed. Open that
 file in camNC's CAM page to get it as a new job. `--svg` draws
 the parts. A failed check removes any existing `--out` file and any existing `--svg`
-file unless it writes a new SVG for that run. See `examples/` for more.
+file unless it writes a new SVG for that run. `--export-sketch <name> --export
+<drawing.dxf|drawing.svg>` writes one sketch, named as the feature list names it,
+as DXF or SVG at 1:1; add `--export-unit in` (mm, cm, m, in or ft) and
+`--export-construction` to include construction geometry. See `examples/` for more.
 
 ## The full report
 
@@ -204,6 +207,10 @@ change a variable or a dimension, or a step's settings. So:
 - Handles in the report, such as `7b8b`, work with `find` and `sketch` on that same
   revision of the design. `redundant-constraint` names the involved entity handles.
 - A script that stops with an error leaves the design as it was.
+- A variable that can't be worked out (`invalid-variable`) and a value that can't follow
+  its variables (`variable-value`, such as a thickness below 0.1 mm or a finger count that
+  isn't a whole number of at least 2) are errors, and fail the check. The design keeps its
+  last good value meanwhile, so its parts and report disagree with the variable until it's fixed.
 
 ## Changing an open design
 

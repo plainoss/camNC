@@ -1,5 +1,11 @@
 [
   "src/test/routeFiles.test.ts",
+  "src/cad/assemblyModel.copyTransforms.test.ts",
+  "src/cad/studioGeometry.test.ts",
+  "src/cad/studioGeometry.woodworking.test.ts",
+  "src/cad/studioReferenceGeometry.test.ts",
+  "src/cad/studioNormalView.test.ts",
+  "src/cad/partAssemblyCamera.test.ts",
   "src/cad/partEdgeUse.test.ts",
   "src/cad/partEdges.test.ts",
   "src/cad/studioUsedEdgeOwners.test.ts",
@@ -11,6 +17,7 @@
   "src/cad/sectionModel.test.ts",
   "src/cad/studioViewShortcut.test.ts",
   "src/cad/studioCamera.test.ts",
+  "src/cad/insertFraming.test.ts",
   "src/cad/partCornerInference.test.ts",
   "src/cad/extrudeMergeTarget.test.ts",
   "src/cam/planSettings.test.ts",
@@ -29,5 +36,6 @@
   "e2e/spec/session.test.mjs",
   "e2e/spec/settle.test.mjs",
   "e2e/spec/headless.test.mjs",
-  "e2e/spec/studio-model.test.mjs"
+  "e2e/spec/studio-model.test.mjs",
+  "src/cam/model/modelLightRig.test.ts"
 ]

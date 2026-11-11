@@ -6,6 +6,7 @@ import { AssistantDock } from './Dock';
 import { defaultProvider, rememberAssistantCredentials } from './keyStore';
 import { requestAssistant } from './provider';
 import { readConversation, recordAssistantEvent, writeConversation } from './conversationStore';
+import { settled } from '@/test/settled';
 
 vi.mock('./provider', { spy: true });
 afterEach(() => {
@@ -40,7 +41,10 @@ it('shows image-only history and preserves constraints when moving to a text-onl
   expect(screen.getByRole('img', { name: 'reference.png' })).toBeDefined();
   await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'Cut a hole.');
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
-  await screen.findByText('Question: What diameter?');
+  // The whole turn, real CAD context preparation included, before the reply.
+  await settled();
+  expect(requestAssistant).toHaveBeenCalledOnce();
+  expect(screen.getByText('Question: What diameter?')).toBeDefined();
   await userEvent.click(screen.getByText('Usage and limits'));
   expect(screen.getByLabelText('Last turn usage').textContent).toContain('input 123 tokens');
   expect(screen.getByLabelText('Last turn usage').textContent).toContain('cost unknown');
