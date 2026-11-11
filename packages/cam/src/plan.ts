@@ -27,6 +27,7 @@ import { freePartsProgram, kDefaultSkin } from './tabPlan';
 import { tabRemovalProgram, type TabStop } from './tabRemoval';
 import { estimateProgramTime, type ProgramTimeEstimate } from './timing';
 import type { BoardCarving } from './vcarve';
+import { cutoutPart, type BoardCutout } from './cutout';
 import {
   DEFAULT_SETTINGS,
   stepdownFor,
@@ -205,6 +206,8 @@ export interface BoardRequest {
   skin?: number;
   /** Artwork V-carved into side A's top before any part is cut. */
   carvings?: BoardCarving[];
+  /** Pieces cut out along an outline (a carving's silhouette), held like parts. */
+  cutouts?: BoardCutout[];
 }
 
 /** The tab hold check's share of the work of planning a board, per unit of its parts' work. */
@@ -523,7 +526,7 @@ export const turnCam = (cam: PartCam, turn: ReturnType<typeof rotateAboutOrigin>
 });
 
 function boardSpec(board: BoardRequest, source: BoardPartSource): BoardSpec {
-  return {
+  const spec: BoardSpec = {
     ...board,
     // Turned over, the cut-free lap depends on how well the board was realigned: the main program finishes the walls.
     finishWallsAtRelease: !board.flip,
@@ -545,6 +548,9 @@ function boardSpec(board: BoardRequest, source: BoardPartSource): BoardSpec {
       };
     }),
   };
+  for (const cutout of board.cutouts ?? [])
+    spec.parts.push({ id: cutout.id, name: cutout.name, ...cutoutPart(cutout, board.thickness), rotated: false });
+  return spec;
 }
 
 /** Depths of a part's underside measured from the stock's new top (its old bottom), as side B sees it. */
