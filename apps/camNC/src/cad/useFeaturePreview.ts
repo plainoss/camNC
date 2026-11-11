@@ -50,10 +50,12 @@ export function useFeaturePreview({
     () => (blank ? { ...document, parts: [] } : rolledBack ? rolledBackTo(document, rolledBack) : document),
     [document, blank, rolledBack]
   );
-  // The steps below the rollback bar: left out of the view, whatever their eye was set to.
+  // The steps below the bar the user rolled to: left out of the view, whatever their eye was set to. A feature dialog's
+  // own rollback leaves them be: its preview is rolled back, but the sketches after it stay shown to pick from.
+  const rolledByUser = editingStep ? null : rolledBack;
   const pastRollback = useMemo<ReadonlySet<string>>(() => {
-    const steps = rolledBack ? designSteps(document).map(step => step.id) : [];
-    return new Set(steps.slice(steps.indexOf(rolledBack!) + 1));
-  }, [document, rolledBack]);
+    const steps = rolledByUser ? designSteps(document).map(step => step.id) : [];
+    return new Set(steps.slice(steps.indexOf(rolledByUser!) + 1));
+  }, [document, rolledByUser]);
   return { rollbackStep, shownDocument, pastRollback };
 }
