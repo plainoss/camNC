@@ -22,6 +22,14 @@ const area = (points: { x: number; y: number }[]) => Math.abs(polygonArea(points
 const frame = (sketch: CadSketch) =>
   addRectangle(addRectangle(sketch, { x: 20, y: 0, width: 80, height: 70 }), { x: 35, y: 20, width: 50, height: 30 });
 
+/** Lines from each corner of the frame's outline to the nearest corner of its hole. */
+const mitres = [
+  [20, 0, 35, 20],
+  [100, 0, 85, 20],
+  [100, 70, 85, 50],
+  [20, 70, 35, 50],
+] as const;
+
 /** The sketch's solid regions, each group apart split into a part of its own, as a New extrude's OK does. */
 function extrudedApart(sketch: CadSketch): CadPart[] {
   const part: CadPart = { ...createCadPart('Part 1', 18), sketch, regions: solidSketchRegionIds(sketch) };
@@ -211,7 +219,7 @@ describe('the solid regions of a sketch of shapes apart', () => {
         expect(solidSketchRegionIds(sketch)).toHaveLength(cells * cells);
       });
 
-  it('keeps a diamond touching the sides of a square solid', () => {
+  it('cuts a diamond touching the sides of a square out of it', () => {
     let sketch = addRectangle(createCadPart('Part 1', 18).sketch, { x: 0, y: 0, width: 100, height: 100 });
     for (const [x1, y1, x2, y2] of [
       [50, 0, 100, 50],
@@ -220,7 +228,114 @@ describe('the solid regions of a sketch of shapes apart', () => {
       [0, 50, 50, 0],
     ] as const)
       sketch = addLine(sketch, { x1, y1, x2, y2 });
+    const regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE);
+    expect(regions).toHaveLength(5);
+    const solid = solidSketchRegionIds(sketch);
+    expect(solid).toHaveLength(4);
+    expect(area(regions.find(region => !solid.includes(region.id))!.points)).toBe(5000);
+  });
+
+  it('keeps an island touching the edge of a frame’s hole solid', () => {
+    const sketch = addRectangle(frame(createCadPart('Part 1', 18).sketch), { x: 50, y: 20, width: 20, height: 10 });
+    expect(sketchRegions(sketch, CAD_CHORD_TOLERANCE)).toHaveLength(3);
+    const solid = solidSketchRegionIds(sketch);
+    expect(solid).toHaveLength(2);
+    const profile = evaluated({ ...createCadPart('Part 1', 18), sketch, regions: solid });
+    expect(area(profile.outline)).toBe(5600);
+    expect(profile.holes.map(area)).toEqual([1300]);
+  });
+
+  it('keeps the inside of a frame a hole when its mitres were drawn before it', () => {
+    let sketch = createCadPart('Part 1', 18).sketch;
+    for (const [x1, y1, x2, y2] of mitres) sketch = addLine(sketch, { x1, y1, x2, y2 });
+    sketch = frame(sketch);
     expect(sketchRegions(sketch, CAD_CHORD_TOLERANCE)).toHaveLength(5);
-    expect(solidSketchRegionIds(sketch)).toHaveLength(5);
+    expect(solidSketchRegionIds(sketch)).toHaveLength(4);
+    const parts = extrudedApart(sketch).map(evaluated);
+    expect(parts.map(part => area(part.outline))).toEqual([5600]);
+    expect(parts[0]!.holes.map(area)).toEqual([1500]);
+  });
+
+  it('keeps the inside of a frame drawn as four closed pieces a hole', () => {
+    let sketch = createCadPart('Part 1', 18).sketch;
+    for (const corners of [
+      [
+        [20, 0],
+        [100, 0],
+        [85, 20],
+        [35, 20],
+      ],
+      [
+        [100, 0],
+        [100, 70],
+        [85, 50],
+        [85, 20],
+      ],
+      [
+        [100, 70],
+        [20, 70],
+        [35, 50],
+        [85, 50],
+      ],
+      [
+        [20, 70],
+        [20, 0],
+        [35, 20],
+        [35, 50],
+      ],
+    ] as const)
+      corners.forEach(([x1, y1], i) => {
+        const [x2, y2] = corners[(i + 1) % corners.length]!;
+        sketch = addLine(sketch, { x1, y1, x2, y2 });
+      });
+    expect(sketchRegions(sketch, CAD_CHORD_TOLERANCE)).toHaveLength(5);
+    expect(solidSketchRegionIds(sketch)).toHaveLength(4);
+    const parts = extrudedApart(sketch).map(evaluated);
+    expect(parts.map(part => area(part.outline))).toEqual([5600]);
+    expect(parts[0]!.holes.map(area)).toEqual([1500]);
+  });
+
+  /** The median of paired, alternating timings of solid regions against finding the regions, so load favours neither. */
+  function timeAgainstRegions(sketch: CadSketch): number {
+    const timed = (run: () => unknown) => {
+      const start = performance.now();
+      run();
+      return performance.now() - start;
+    };
+    const ratios = Array.from({ length: 5 }, (_, i) => {
+      const reference = () => timed(() => sketchRegions(sketch, CAD_CHORD_TOLERANCE));
+      const work = () => timed(() => solidSketchRegionIds(sketch));
+      const [first, second] = i % 2 ? [reference(), work()] : [work(), reference()];
+      return i % 2 ? second / first : first / second;
+    }).sort((a, b) => a - b);
+    console.info(`solid regions against regions: ${ratios.map(ratio => ratio.toFixed(2)).join(', ')}`);
+    return ratios[2]!;
+  }
+
+  it('takes a few times as long as finding the regions, for a traced outline of thousands of lines and circles', () => {
+    let sketch = createCadPart('Part 1', 18).sketch;
+    const sides = 2000;
+    const corners = Array.from({ length: sides }, (_, i) => {
+      const angle = (2 * Math.PI * i) / sides,
+        radius = 1000 + 20 * Math.sin(37 * angle);
+      return { x: radius * Math.cos(angle), y: radius * Math.sin(angle) };
+    });
+    corners.forEach((a, i) => {
+      const b = corners[(i + 1) % sides]!;
+      sketch = addLine(sketch, { x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+    });
+    for (let i = 0; i < 100; i++) sketch = addCircle(sketch, { x: -300 + (i % 10) * 60, y: -300 + Math.floor(i / 10) * 60, radius: 20 });
+    expect(solidSketchRegionIds(sketch)).toHaveLength(1);
+    expect(timeAgainstRegions(sketch)).toBeLessThan(4);
+  });
+
+  it('takes a few times as long as finding the regions, for a grid of lines with no closed shape', () => {
+    let sketch = createCadPart('Part 1', 18).sketch;
+    for (let i = 0; i <= 40; i++) {
+      sketch = addLine(sketch, { x1: -5, y1: i * 10, x2: 405, y2: i * 10 });
+      sketch = addLine(sketch, { x1: i * 10, y1: -5, x2: i * 10, y2: 405 });
+    }
+    expect(solidSketchRegionIds(sketch)).toHaveLength(1600);
+    expect(timeAgainstRegions(sketch)).toBeLessThan(4);
   });
 });

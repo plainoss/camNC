@@ -337,7 +337,8 @@ export function polygonArea(points: CadPoint[]): number {
   );
 }
 
-function segmentsMeet(a: CadPoint, b: CadPoint, c: CadPoint, d: CadPoint): boolean {
+/** Whether two segments touch or cross, within the geometry tolerance. */
+export function segmentsMeet(a: CadPoint, b: CadPoint, c: CadPoint, d: CadPoint): boolean {
   const eps = CAD_GEOMETRY_TOLERANCE;
   if (
     Math.max(a.x, b.x) + eps < Math.min(c.x, d.x) ||
@@ -375,8 +376,7 @@ export function pointInPolygon(point: CadPoint, polygon: CadPoint[]): boolean {
   return inside;
 }
 
-/** Whether two closed polylines touch or cross anywhere. */
-export function loopsMeet(a: CadPoint[], b: CadPoint[]): boolean {
+function loopsMeet(a: CadPoint[], b: CadPoint[]): boolean {
   for (let i = 0; i < a.length; i++)
     for (let j = 0; j < b.length; j++) {
       if (segmentsMeet(a[i]!, a[(i + 1) % a.length]!, b[j]!, b[(j + 1) % b.length]!)) return true;
