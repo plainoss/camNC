@@ -14,3 +14,9 @@ it('keeps the exact physical-copy identity and displayed name in model context',
   });
   expect(assistantSelection(document, { partId: source.parts[0].id })).toEqual({ partId: source.parts[0].id, name: 'Shelf' });
 });
+
+it('leaves out an empty sketch, so a new studio is talked about as a whole', () => {
+  const document = createPlateDocument();
+  document.parts[0].sketch.entities = [];
+  expect(assistantSelection(document, { partId: document.parts[0].id })).toBeUndefined();
+});
