@@ -2,7 +2,7 @@ import type { CadDocument } from '@wbcnc/cad';
 import type { CadReport } from '@wbcnc/cad-script';
 import type { EvaluatedCadPart } from '@wbcnc/cad';
 import { checkAssistantRequirements, validateAssistantRequirements, type AssistantRequirements } from './requirements';
-import { assistantRecipeCatalog } from './recipeCatalog';
+import { assistantRecipeCatalog, type AssistantRecipeName, type AssistantRecipeParameters } from './recipeCatalog';
 import { createAssistantScriptSession } from './scriptSession';
 import { normalizeAssistantViews } from './designViews';
 import type { CadViewName } from '@wbcnc/cad-script';
@@ -208,10 +208,16 @@ export interface AssistantRunOptions {
   maxChecks?: number;
   maxTurns?: number;
 }
+/** How a proposal was made, so the app can check it again without the model: on a changed design, or with new recipe values. */
+export interface AssistantProposalOrigin {
+  source: string;
+  recipe?: { name: AssistantRecipeName; parameters: AssistantRecipeParameters };
+}
 export interface AssistantRunResult {
   status: 'proposal' | 'question' | 'stopped' | 'exhausted';
   messages: AssistantMessage[];
   proposal?: CadProposal;
+  origin?: AssistantProposalOrigin;
   checks: number;
   usage: AssistantRunUsage;
   stopReason?: string;
@@ -249,6 +255,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
   const cache = new Map<string, AssistantCheck>();
   const scripts = createAssistantScriptSession(base);
   let latestCandidate: AssistantCheck | undefined;
+  const origins = new WeakMap<AssistantCheck, AssistantProposalOrigin>();
   const finalized = new WeakMap<AssistantCheck, AssistantCheck>();
   const acceptanceOf = (checked: AssistantCheck) =>
     Object.keys(requirements).length
@@ -277,6 +284,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     usage: { ...usage },
     ...(stopReason && { stopReason }),
     ...(status === 'proposal' && proposal && { proposal }),
+    ...(status === 'proposal' && proposal && latestCandidate && origins.has(latestCandidate) && { origin: origins.get(latestCandidate) }),
   });
   const emit = (message: AssistantMessage) => {
     messages.push(message);
@@ -498,6 +506,11 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
               const acceptance = acceptanceOf(checked);
               if (checked.ok && acceptance.ok) {
                 latestCandidate = checked;
+                if (script)
+                  origins.set(checked, {
+                    source,
+                    ...(script.recipe && script.parameters && { recipe: { name: script.recipe, parameters: script.parameters } }),
+                  });
                 if (!options.finalize) proposal = cadProposal(base, checked.document);
               }
               text = JSON.stringify({

@@ -29,4 +29,16 @@ describe('typed question answers', () => {
       requirements: { width: 280, minimumWall: 18 },
     });
   });
+
+  it('keeps each valid requirement when another answer cannot be enforced', () => {
+    const fields = readQuestionFields([
+      { name: 'width', label: 'Width', unit: 'mm' },
+      { name: 'holeCount', label: 'Holes', unit: 'mm' },
+      { name: 'pocketCount', label: 'Pockets', unit: 'count' },
+    ]);
+    expect(answerQuestionFields(fields, { width: 300, holeCount: 4.5, pocketCount: 2 })).toEqual({
+      text: 'Width: 300 mm, Holes: 4.5 mm, Pockets: 2',
+      requirements: { width: 300, pocketCount: 2 },
+    });
+  });
 });
