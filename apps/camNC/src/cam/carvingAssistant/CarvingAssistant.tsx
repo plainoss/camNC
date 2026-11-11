@@ -183,7 +183,7 @@ export function CarvingAssistant({ job, session }: { job: CamJobV1; session: Car
             }}
           />
           <p className="text-xs text-muted-foreground">Black and white line art, up to 2 MB. Tracing stays on this device.</p>
-          <fieldset disabled={session.generating} className="flex flex-wrap gap-3">
+          <fieldset disabled={session.generating} className="flex flex-wrap gap-x-4">
             <legend className="text-sm">Artwork generator</legend>
             <label>
               <input
