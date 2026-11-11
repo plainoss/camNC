@@ -12,6 +12,26 @@ import type { SketchEditorInput } from './sketchEditorInput';
 import { sketchPointerDown } from './sketchPointerDown';
 import { sketchPointerMove, sketchPointerEnd } from './sketchPointerMove';
 import { chooseSketchTool, addSketchShape } from './sketchToolActions';
+import { sketchPointAt, sketchContextTarget, solveSketchDrag, startSketchAnnotationDrag } from './sketchCanvasPicking';
+import {
+  placeSketchDimension,
+  applySketchDimensionValue,
+  applySketchDimensionEvent,
+  beginSketchDimension,
+  editSketchDimension,
+  finishSketchSpline,
+} from './sketchDimensionActions';
+import {
+  acceptSketchLinearPattern,
+  acceptSketchCircularPattern,
+  acceptSketchFillet,
+  acceptSketchChamfer,
+  acceptSketchOffset,
+  applySketchConicRho,
+  removeSketchSelection,
+  constrainSketch,
+  sketchContextAction,
+} from './sketchModifyActions';
 import { DesignUnitContext, useDesignUnits } from './designUnits';
 import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
 import { previewSlot } from './slotPreview';
@@ -23,38 +43,26 @@ import {
   type CircularPatternParameters,
 } from './circularPatternParameters';
 import {
-  CAD_GEOMETRY_TOLERANCE,
   withCadLengthUnit,
   addBezier,
   addConic,
   addConstraint,
   addSpline,
   createCadPart,
-  constraintEntityIds,
   dimensionValueError,
   entityPointIds as curvePointIds,
   filletLineCorners,
-  replaceFilletedSketch,
   chamferLineCorners,
   transformSketchEntities,
-  sketchPatternOwner,
   linearPatternSketchEntities,
   circularPatternSketchEntities,
-  patternDeletionNotice,
-  slotDeletionNotice,
   resolveChamferCorners,
   extendSketchCurve,
   mirrorSketchEntities,
   offsetSketch,
-  isSplineTangentHandle,
-  removeEntity,
-  newCadId,
   resolveFilletCorners,
-  setConicRho,
-  setDimensionDriven,
   tessellateCurve,
   updateDimension,
-  applyNewDimension,
   visibleSketchPointIds,
   withDimensionPlacement,
   type CadDimension,
@@ -62,7 +70,6 @@ import {
   type CadDrawnOn,
   type CadSketch,
   type CadSketchSolveStatus,
-  type CadSolveOptions,
   moveFaceSketch,
   removeCadFeature,
   removeCadVariable,
@@ -100,12 +107,10 @@ import {
   type KeyboardEvent,
   type PointerEvent,
 } from 'react';
-import { prepareDimensionCreation, solveCadDocument } from './solveCad';
+import { solveCadDocument } from './solveCad';
 import { acquireCadKeyboard } from '@wbcnc/cad-editor/keyboardOwnership';
 import {
-  amendCadSession,
   acceptCadSession,
-  cadCommandCheckpoint,
   cadSession,
   commitCadSession,
   endCadSession,
@@ -161,7 +166,6 @@ import { CadCopyNames } from './CadCopyNames';
 import { SketchContextMenu } from './SketchContextMenu';
 import {
   createSketchContext,
-  pickSketchContextTarget,
   selectedSketchContextTarget,
   toggleContextConstruction,
   type SketchContext,
@@ -170,16 +174,13 @@ import {
   type SketchContextTarget,
 } from '@wbcnc/cad-editor/sketchContext';
 import { dimensionAnchor } from '@wbcnc/cad-editor/dimensionGeometry';
-import { pickSketchSnap, type CadSnapResult } from '@wbcnc/cad-editor/picking';
-import { drawingClickPoint, type CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
+import { type CadSnapResult } from '@wbcnc/cad-editor/picking';
+import { type CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 import { addDrawingRelations } from '@wbcnc/cad-editor/drawingCommit';
 import { DrawingInferencePreview } from './DrawingInferencePreview';
-import { tangentLineAxis, type InferredLineAxis } from './lineInference';
-import { buildConstraintForSelection } from '@wbcnc/cad-editor/constraintCommands';
+import { type InferredLineAxis } from './lineInference';
 import { cadViewState, saveCadViewState } from '@wbcnc/cad-editor/viewState';
 import { loadShownState, saveShownState } from './shownState';
-import { dragTargets, hasDragMovement } from '@wbcnc/cad-editor/drag';
-import { dragSnapConstraints } from '@wbcnc/cad-editor/dragSnap';
 import { type CadSelectionBox } from './boxSelection';
 import { chainGeometry, type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture } from './editorGestures';
 import { constraintColorNotice, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
@@ -199,7 +200,7 @@ import { ModificationPreview } from './ModificationPreview';
 import { idleModificationWorkflow, transitionModification, type ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import { useSvgPixelScale, SKETCH_APPEARANCE, sketchStrokeColor } from './sketchAppearance';
 import { InlineConstraints } from './inlineConstraints';
-import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
+import { associatedEntityIds } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PartPatternKind } from './partPatternKind';
@@ -246,7 +247,7 @@ import { addUsedPartEdges } from './partEdgeUse';
 import { PartReferenceGeometry } from './PartReferenceGeometry';
 import { faceSketchHost } from './faceSketchHost';
 import { useExtrudeDepth } from './useExtrudeDepth';
-import { bindPartCorners, partCornerInference } from './partCornerInference';
+import { bindPartCorners } from './partCornerInference';
 import { newSketchPart } from './newSketchPart';
 import type { CadConnectorPick } from './PartFeatureDialogs';
 import { StudioFeatureDialog, type StudioFeatureDialogState } from './StudioFeatureDialog';
@@ -876,115 +877,7 @@ export function CadEditor({
   const commit = (next: CadDocument) => publish(commitCadSession(session, resolveExtrudeSteps(trimCadFolders(next))));
   const changeSketch = (next: CadSketch) => part && commit(replacePart(documentRef.current, part.id, p => ({ ...p, sketch: next })));
 
-  const solveDrag = async (moving: DragGesture) => {
-    if (moving.working || (moving.failure && !moving.ended)) return;
-    moving.working = true;
-    const fail = (reason: string) => {
-      moving.failure = `Drag cancelled. ${reason}`;
-      moving.preview = moving.document;
-      documentRef.current = moving.document;
-      setDocument(moving.document);
-      setDrawingCue(null);
-      setSnapCue(null);
-      setMessage(moving.failure);
-    };
-    try {
-      // Keep only the latest pointer intent while the worker is busy.
-      while (drag.current === moving && !moving.failure && moving.solvedRequest < moving.request) {
-        const request = moving.request;
-        const sourcePart = moving.document.parts.find(p => p.id === moving.partId)!;
-        const source = sourcePart.sketch;
-        const options: CadSolveOptions = {};
-        if (moving.radiusEntityId) {
-          const circle = source.entities.find(e => e.id === moving.radiusEntityId);
-          const center = circle?.type === 'circle' ? source.entities.find(e => e.id === circle.centerId) : undefined;
-          if (center?.type === 'point')
-            options.radiusDrag = {
-              entityId: moving.radiusEntityId,
-              radius: Math.max(0.1, Math.hypot(moving.target.x - center.x, moving.target.y - center.y)),
-            };
-        } else
-          options.drag = dragTargets(source, moving.selectedIds, {
-            x: moving.target.x - moving.origin.x,
-            y: moving.target.y - moving.origin.y,
-          });
-        const result = await solveCadDocument({ ...moving.document, parts: [sourcePart] }, options);
-        if (drag.current !== moving) return;
-        moving.solvedRequest = request;
-        const restarted = result.diagnostics.find(diagnostic => diagnostic.code === 'solver-restarted');
-        if (restarted) {
-          fail(restarted.message);
-          break;
-        }
-        if (result.sketches.length && result.sketches.every(s => s.status === 'solved')) {
-          moving.preview = replacePart(moving.document, moving.partId, () => result.document.parts[0]!);
-          documentRef.current = moving.preview;
-          setDocument(moving.preview);
-        }
-      }
-    } catch (error) {
-      if (drag.current === moving) {
-        const reason = error instanceof Error ? error.message : String(error);
-        fail(`${reason} Your sketch is unchanged; try dragging again.`);
-      }
-    } finally {
-      moving.working = false;
-      if (drag.current === moving && moving.ended) {
-        let accepted = moving.preview;
-        let appliedAutomatic = false;
-        if (!moving.failure && moving.snapPointId && moving.dropInference && moving.moved) {
-          const previewPart = accepted.parts.find(part => part.id === moving.partId)!;
-          const proposals = dragSnapConstraints(previewPart.sketch, moving.snapPointId, moving.dropInference, {
-            project: projectPoint,
-            tolerancePx: 1,
-          });
-          if (proposals.length) {
-            let snapped = previewPart.sketch;
-            for (const proposal of proposals) snapped = addConstraint(snapped, proposal);
-            try {
-              const result = await solveCadDocument({ ...accepted, parts: [{ ...previewPart, sketch: snapped }] });
-              if (
-                drag.current === moving &&
-                result.sketches.every(state => state.status === 'solved') &&
-                result.diagnostics.every(
-                  diagnostic => diagnostic.severity !== 'error' || ['open-profile', 'empty-sketch'].includes(diagnostic.code)
-                )
-              ) {
-                accepted = replacePart(accepted, moving.partId, () => result.document.parts[0]!);
-                appliedAutomatic = true;
-              } else if (drag.current === moving) {
-                const restarted = result.diagnostics.find(diagnostic => diagnostic.code === 'solver-restarted');
-                setMessage(
-                  restarted
-                    ? 'Point moved. The solver engine reset, so the automatic constraint was not applied. Try snapping the point again.'
-                    : 'Point moved. The automatic constraint could not be applied; adjust the geometry and try again.'
-                );
-              }
-            } catch (error) {
-              if (drag.current === moving)
-                setMessage(
-                  `Point moved. The automatic constraint was not applied. ${error instanceof Error ? error.message : String(error)}`
-                );
-            }
-          }
-        }
-        if (drag.current === moving) {
-          drag.current = null;
-          if (!moving.failure && (appliedAutomatic || hasDragMovement(moving.document, accepted))) commit(accepted);
-          else {
-            documentRef.current = moving.document;
-            setDocument(moving.document);
-            requestSketchCheck();
-            setMessage(
-              moving.failure ?? 'The current constraints keep this geometry in place. Edit a dimension or remove a constraint to move it.'
-            );
-          }
-          setBusy(false);
-          restoreCanvasKeyboard();
-        }
-      }
-    }
-  };
+  const solveDrag = (moving: DragGesture) => solveSketchDrag(sketchEditorInput(), moving);
 
   useEffect(() => {
     if (finishing.current || drag.current || annotationDrag.current || lastCheckedRevision.current === `${doc.id}:${doc.revision}`) return;
@@ -1064,42 +957,8 @@ export function CadEditor({
     setSelected([]);
     setMessage('Dimension selected. Double-click or press Enter to edit; Delete removes it.');
   };
-  const editDimension = (id: string) => {
-    newDimensionCommand.current = null;
-    setDimensionFlow(previous => idleDimensionWorkflow(previous.mode));
-    setSelectedConstraints([id]);
-    setSelected([]);
-    const constraint = sketch?.constraints.find(c => c.id === id);
-    if (constraint && numeric(constraint) && constraint.driven) {
-      setDimension(null);
-      setMessage('Reference dimensions follow the geometry. Change it to driving from its context menu to edit the value.');
-      svg.current?.focus();
-      return;
-    }
-    setDimension(id);
-    setMessage('Enter a dimension. Enter applies it; Escape cancels.');
-  };
-  const startAnnotationDrag = (id: string, event: PointerEvent<SVGGElement>) => {
-    if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || busy || solving || !sketch) return;
-    const constraint = sketch.constraints.find(c => c.id === id);
-    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-    const position = constraint && numeric(constraint) ? dimensionAnchor(constraint, sketch, markerScale) : null;
-    if (!matrix || !position) return;
-    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-    event.preventDefault();
-    selectDimension(id);
-    annotationDrag.current = {
-      id,
-      document: documentRef.current,
-      screenStart: { x: event.clientX, y: event.clientY },
-      worldStart: { x: point.x, y: -point.y },
-      position,
-      moved: false,
-    };
-    // Keep fast drags/releases outside the canvas owned by this label, including ordinary double-clicks.
-    event.currentTarget.setPointerCapture(event.pointerId);
-    svg.current?.focus();
-  };
+  const editDimension = (id: string) => editSketchDimension(sketchEditorInput(), id);
+  const startAnnotationDrag = (id: string, event: PointerEvent<SVGGElement>) => startSketchAnnotationDrag(sketchEditorInput(), id, event);
   const transformSelectionCenter = (ids: readonly string[]) => {
     const wanted = new Set(
       ids.flatMap(id => {
@@ -1136,108 +995,7 @@ export function CadEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const projectPoint = (point: Point) => projectSketchPoint(point, drawingGroup.current ?? svg.current);
-  const pointAt = (event: { clientX: number; clientY: number; shiftKey?: boolean }): Point => {
-    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-    lastSnap.current = null;
-    lastDrawingHint.current = null;
-    inference.current = null;
-    tangentAxis.current = null;
-    if (!matrix) return cursor;
-    const converted = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-    const raw = { x: converted.x, y: -converted.y };
-    const drawing = [
-      'line',
-      'rectangle',
-      'centerRectangle',
-      'alignedRectangle',
-      'circle',
-      'threePointCircle',
-      'ellipse',
-      'arc',
-      'tangentArc',
-      'centerPointArc',
-      'inscribedPolygon',
-      'circumscribedPolygon',
-      'point',
-      'conic',
-      'spline',
-      'bezier',
-    ].includes(tool);
-    if (!snap || !sketch || (drawing && event.shiftKey)) return raw;
-    const hit = pickSketchSnap(
-      sketch,
-      { x: event.clientX, y: event.clientY },
-      { project: projectPoint, excludePointIds: drag.current?.points, selectedEntityIds: dimensionSelection }
-    );
-    lastSnap.current = hit;
-    let point = hit?.point ?? raw;
-    const lockedAxes: { x?: number; y?: number } = {};
-    if (tool === 'line' && pending[0]) {
-      const anchor = lineContinuation ? chainGeometry(sketch, chain) : null;
-      const start = anchor?.point ?? pending[0];
-      const scale = Math.hypot(matrix.a, matrix.b);
-      const dx = point.x - start.x,
-        dy = point.y - start.y;
-      if (anchor?.curve.type === 'arc') {
-        const length = Math.hypot(anchor.tangent.x, anchor.tangent.y);
-        const unit = { x: anchor.tangent.x / length, y: anchor.tangent.y / length };
-        const along = dx * unit.x + dy * unit.y;
-        const perpendicular = Math.abs(dx * unit.y - dy * unit.x);
-        if (along > 0 && perpendicular * scale <= 8 && Math.atan2(perpendicular, along) <= Math.PI / 30 && (!hit || perpendicular < 1e-7)) {
-          point = { x: start.x + along * unit.x, y: start.y + along * unit.y };
-          inference.current = 'tangent';
-          tangentAxis.current = tangentLineAxis(anchor.tangent, start, raw, scale);
-          if (tangentAxis.current === 'horizontal') {
-            point.y = start.y;
-            lockedAxes.y = start.y;
-          } else if (tangentAxis.current === 'vertical') {
-            point.x = start.x;
-            lockedAxes.x = start.x;
-          } else {
-            lockedAxes.x = point.x;
-            lockedAxes.y = point.y;
-          }
-        }
-      }
-      if (!inference.current && Math.hypot(dx, dy) * scale > 8) {
-        if (Math.abs(dy) * scale <= 8 && (!hit || Math.abs(dy) < 1e-7)) {
-          point = { x: point.x, y: start.y };
-          inference.current = 'horizontal';
-          lockedAxes.y = start.y;
-        } else if (Math.abs(dx) * scale <= 8 && (!hit || Math.abs(dx) < 1e-7)) {
-          point = { x: start.x, y: point.y };
-          inference.current = 'vertical';
-          lockedAxes.x = start.x;
-        }
-      }
-    }
-    if (drawing) {
-      if (hit?.targetPointId)
-        hoveredReferences.current = [hit.targetPointId, ...hoveredReferences.current.filter(id => id !== hit.targetPointId)].slice(0, 4);
-      const startId =
-        lineContinuation && chain
-          ? chain.pointId
-          : pending[0] && sketch.entities.find(e => e.type === 'point' && Math.hypot(e.x - pending[0]!.x, e.y - pending[0]!.y) < 1e-7)?.id;
-      lastDrawingHint.current = drawingClickPoint(sketch, raw, {
-        project: projectPoint,
-        directSnap: hit,
-        lockedAxes,
-        preferredPointIds: hoveredReferences.current,
-        excludePointIds: [...(drag.current?.points ?? []), ...(tool === 'line' && startId && inference.current ? [startId] : [])],
-      });
-      lastDrawingHint.current = partCornerInference(
-        sketchBackdrop?.document,
-        part,
-        partEdges,
-        raw,
-        lastDrawingHint.current,
-        projectPoint,
-        lockedAxes
-      );
-      point = { ...lastDrawingHint.current.point };
-    } else if (!hit) point = { x: Math.round(raw.x), y: Math.round(raw.y) };
-    return point;
-  };
+  const pointAt = (event: { clientX: number; clientY: number; shiftKey?: boolean }) => sketchPointAt(sketchEditorInput(), event);
   const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex: number | readonly number[] = -1) =>
     sketch ? bindPartCorners(sketch, addDrawingRelations(sketch, source, hints, { tool, curvePointIndex }), hints) : source;
   const addShape = (end?: Point) => addSketchShape(sketchEditorInput(), end);
@@ -1247,31 +1005,7 @@ export function CadEditor({
     input?.focus();
     return reason;
   };
-  const applyDimensionValue = (): string | null => {
-    if (!currentDimension || !numeric(currentDimension)) return null;
-    const input = dimensionInput.current;
-    if (!input?.value.trim()) return rejectValue('Enter a dimension value.', input);
-    const parsed = parseCadValue(input.value, { unit: currentDimension.type === 'angle' ? 'deg' : 'mm', variables: variableScope });
-    if ('error' in parsed) return rejectValue(parsed.error, input);
-    const valueError = dimensionValueError(currentDimension, parsed.value);
-    if (valueError) return rejectValue(valueError, input);
-    const command = newDimensionCommand.current;
-    // A newly placed first dimension sizes the whole sketch, keeping what was drawn in proportion.
-    const next = (command?.id === currentDimension.id ? applyNewDimension : updateDimension)(
-      documentRef.current,
-      currentDimension.id,
-      parsed.value,
-      parsed.expression
-    );
-    const amended = command?.id === currentDimension.id ? amendCadSession(session, next, command.checkpoint) : null;
-    if (amended) publish(amended);
-    else commit(next);
-    newDimensionCommand.current = null;
-    setDimension(null);
-    setMessage('Dimension applied. Select geometry or choose a tool.');
-    svg.current?.focus();
-    return null;
-  };
+  const applyDimensionValue = () => applySketchDimensionValue(sketchEditorInput());
   const applyCreationValue = ({ advance = true } = {}): string | null => {
     if (!creationValues || !part || !sketch || creationValues.partId !== part.id) return null;
     const current = creationValueAt(creationValues, sketch);
@@ -1295,21 +1029,7 @@ export function CadEditor({
     svg.current?.focus();
     return null;
   };
-  const finishSpline = (keepTool = false) => {
-    if (!sketch || (tool !== 'spline' && tool !== 'bezier') || pending.length < 2) return;
-    try {
-      let next = (tool === 'spline' ? addSpline : addBezier)(sketch, { points: pending, construction });
-      next = addSnapRelations(next, pendingSnaps.current);
-      const curve = next.entities.find(entity => entity.type === tool && !sketch.entities.some(before => before.id === entity.id));
-      changeSketch(next);
-      chooseTool('select');
-      if (keepTool) setTool(tool);
-      setSelected(curve ? [curve.id] : []);
-      setMessage(`${tool === 'spline' ? 'Spline' : 'Bezier'} created. Drag its visible points to edit the curve.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
-    }
-  };
+  const finishSpline = (keepTool = false) => finishSketchSpline(sketchEditorInput(), keepTool);
   const editPattern = (id: string) => {
     const pattern = sketch?.constraints.find(c => c.id === id);
     if (pattern?.type !== 'linearPattern' && pattern?.type !== 'circularPattern') return;
@@ -1330,71 +1050,8 @@ export function CadEditor({
     setMessage('Slot created. Select more source curves to share its width, or press Escape.');
     svg.current?.focus();
   };
-  const acceptCircularPattern = () => {
-    if (!sketch || !parsedCircular.ok) return setMessage(parsedCircular.ok ? 'Select source geometry.' : parsedCircular.message);
-    const old = patternEditId && sketch.constraints.find(c => c.id === patternEditId),
-      center = old && old.type === 'circularPattern' ? sketch.entities.find(e => e.id === old.centerId) : undefined;
-    if (
-      old &&
-      old.type === 'circularPattern' &&
-      old.countX === parsedCircular.count &&
-      old.angle === parsedCircular.angle &&
-      old.closed === parsedCircular.closed &&
-      center?.type === 'point' &&
-      Math.hypot(center.x - parsedCircular.center.x, center.y - parsedCircular.center.y) < CAD_GEOMETRY_TOLERANCE
-    ) {
-      chooseTool('select');
-      setSelected([]);
-      setSelectedConstraints([old.id]);
-      return;
-    }
-    const result = circularPatternSketchEntities(sketch, {
-      ...parsedCircular,
-      entityIds: selected,
-      patternId: patternEditId ?? patternCommandId.current,
-    });
-    if (!result.ok) return setMessage(result.message);
-    changeSketch(result.sketch);
-    chooseTool('select');
-    setSelected([]);
-    setSelectedConstraints([result.patternId]);
-    if (result.releasedConstraintIds.length)
-      setPatternNotice(`${result.releasedConstraintIds.length} relations on removed instances were released.`);
-    setMessage('Circular pattern applied. Double-click its pattern icon or use Edit pattern to change it.');
-  };
-  const acceptLinearPattern = () => {
-    if (tool === 'circularPattern') return acceptCircularPattern();
-    if (!sketch || !parsedLinear.ok) return setMessage(parsedLinear.ok ? 'Select source geometry.' : parsedLinear.message);
-    const existing = patternEditId && sketch.constraints.find(c => c.id === patternEditId);
-    const same =
-      existing &&
-      existing.type === 'linearPattern' &&
-      existing.countX === parsedLinear.countX &&
-      existing.countY === parsedLinear.countY &&
-      Math.hypot(existing.stepX.x - parsedLinear.stepX.x, existing.stepX.y - parsedLinear.stepX.y) < CAD_GEOMETRY_TOLERANCE &&
-      Math.hypot(existing.stepY.x - parsedLinear.stepY.x, existing.stepY.y - parsedLinear.stepY.y) < CAD_GEOMETRY_TOLERANCE &&
-      JSON.stringify(existing.expressions ?? null) === JSON.stringify(parsedLinear.expressions ?? null);
-    if (same) {
-      const id = existing.id;
-      chooseTool('select');
-      setSelected([]);
-      setSelectedConstraints([id]);
-      return;
-    }
-    const result = linearPatternSketchEntities(sketch, {
-      ...parsedLinear,
-      entityIds: selected,
-      patternId: patternEditId ?? patternCommandId.current,
-    });
-    if (!result.ok) return setMessage(result.message);
-    changeSketch(result.sketch);
-    chooseTool('select');
-    setSelected([]);
-    setSelectedConstraints([result.patternId]);
-    if (result.releasedConstraintIds.length)
-      setPatternNotice(`${result.releasedConstraintIds.length} relations on removed instances were released.`);
-    setMessage('Linear pattern applied. Double-click its pattern icon or use Edit pattern to change it.');
-  };
+  const acceptCircularPattern = () => acceptSketchCircularPattern(sketchEditorInput());
+  const acceptLinearPattern = () => acceptSketchLinearPattern(sketchEditorInput());
   const acceptTransform = () => {
     if (!transformPreview?.ok) return setMessage(transformPreview?.message ?? 'Select geometry to transform.');
     if (transformPreview.changed) changeSketch(transformPreview.sketch);
@@ -1405,165 +1062,12 @@ export function CadEditor({
     if (released) setTransformNotice(`${released} external or directed relations were released by the transform.`);
     setMessage(transformPreview.changed ? 'Transform applied.' : 'Transform closed without changes.');
   };
-  const acceptChamfer = () => {
-    if (!chamferPreview?.ok)
-      return setMessage(
-        chamferPreview?.message ?? (chamferSelection && !chamferSelection.ok ? chamferSelection.message : 'Select corners to chamfer.')
-      );
-    const next = structuredClone(chamferPreview.sketch);
-    chamferPreview.dimensionIds.forEach((id, index) => {
-      const value = parseCadValue(chamferDistances[index]!, { unit: 'mm', variables: variableScope });
-      const dimension = next.constraints.find(c => c.id === id);
-      if (dimension && 'value' in dimension && 'value' in value && value.expression) dimension.expression = value.expression;
-    });
-    changeSketch(next);
-    chooseTool('select');
-    setSelected([]);
-    setSelectedConstraints(chamferPreview.dimensionIds);
-    setMessage('Chamfers created. Double-click either setback dimension to edit the group.');
-  };
-  const acceptFillet = () => {
-    if (!filletPreview?.ok) {
-      setMessage(
-        filletPreview && !filletPreview.ok
-          ? filletPreview.message
-          : filletSelection && !filletSelection.ok
-            ? filletSelection.message
-            : 'Select corners to fillet.'
-      );
-      return;
-    }
-    const radiusId = filletPreview.radiusConstraintId;
-    const parsed = parseCadValue(filletRadius, { unit: 'mm', variables: variableScope });
-    const next =
-      'value' in parsed && parsed.expression
-        ? {
-            ...filletPreview.sketch,
-            constraints: filletPreview.sketch.constraints.map(c => (c.id === radiusId ? { ...c, expression: parsed.expression } : c)),
-          }
-        : filletPreview.sketch;
-    commit(replaceFilletedSketch(documentRef.current, next, filletPreview.arcIds));
-    chooseTool('select');
-    setSelected([]);
-    setSelectedConstraints([radiusId]);
-    setMessage('Fillets created. Double-click the shared radius to edit the group.');
-  };
-  const acceptOffset = (): string | null => {
-    if (modification.phase !== 'offset' || !modification.entityIds.length) return null;
-    if (!offsetPreview?.ok) return rejectValue(offsetPreview?.message ?? 'Select curves to offset.', offsetInput.current);
-    const parsed = parseCadValue(modification.text, { unit: 'mm', variables: variableScope });
-    const next =
-      'value' in parsed && parsed.expression
-        ? {
-            ...offsetPreview.sketch,
-            constraints: offsetPreview.sketch.constraints.map(c =>
-              c.id === offsetPreview.dimensionId ? { ...c, expression: parsed.expression } : c
-            ),
-          }
-        : offsetPreview.sketch;
-    changeSketch(next);
-    setModification(previous => transitionModification(previous, { type: 'complete' }));
-    setSelected([]);
-    setMessage('Offset created. Double-click its dimension to edit; select more curves to offset again.');
-    svg.current?.focus();
-    return null;
-  };
-  const applyConicRho = (): string | null => {
-    if (!sketch || !part || !conicEditing) return null;
-    try {
-      const parsed = parseCadValue(rhoInput.current?.value ?? rho, { unit: 'scalar' });
-      if ('error' in parsed) return rejectValue(`Conic rho: ${parsed.error}`, rhoInput.current);
-      const next = replacePart(documentRef.current, part.id, current => ({
-        ...current,
-        sketch: setConicRho(current.sketch, conicEditing, parsed.value),
-      }));
-      const command = newCurveCommand.current;
-      const amended = command?.id === conicEditing ? amendCadSession(session, next, command.checkpoint) : null;
-      if (amended) publish(amended);
-      else commit(next);
-      const curveId = conicEditing;
-      chooseTool('select');
-      setSelected([curveId]);
-      setMessage('Conic applied. Drag its control point to reshape it.');
-      return null;
-    } catch (error) {
-      return rejectValue(error instanceof Error ? error.message : String(error), rhoInput.current);
-    }
-  };
-  const removeSelected = (entityIds: readonly string[] = selected, constraintIds: readonly string[] = selectedConstraints) => {
-    if (
-      (tool === 'slot' ||
-        tool === 'fillet' ||
-        tool === 'chamfer' ||
-        tool === 'transform' ||
-        tool === 'linearPattern' ||
-        tool === 'circularPattern') &&
-      selected.length
-    ) {
-      chooseTool('select');
-      setSelected([]);
-      return;
-    }
-    if (dimensionFlow.phase !== 'idle') {
-      cancelDimensionEdit();
-      return;
-    }
-    if (!sketch) return;
-    if (!constraintIds.length && entityIds.length && entityIds.every(id => isSplineTangentHandle(sketch, id))) {
-      setMessage('Spline tangent handles cannot be deleted individually. Select the curve to delete it.');
-      return;
-    }
-    if (!constraintIds.length && entityIds.length && entityIds.every(id => sketch.entities.some(e => e.id === id && e.faceEdge))) {
-      setMessage('The edges of the face this part is drawn on stay. Draw onto them so the part follows that face.');
-      return;
-    }
-    let next = sketch;
-    if (constraintIds.length) {
-      constraintIds.forEach(id => {
-        next = removeInlineConstraint(next, id);
-      });
-      setSelectedConstraints([]);
-      setDimension(null);
-    }
-    // Protection belongs to the command's original graph, even if deleting its
-    // parent first leaves a handle point in use by an unselected curve.
-    entityIds
-      .filter(id => !isSplineTangentHandle(sketch, id))
-      .forEach(id => {
-        next = removeEntity(next, id);
-      });
-    const remainingIds = new Set(next.entities.map(entity => entity.id));
-    const missing = (id: string | undefined) => !!id && !remainingIds.has(id);
-    const lostChain = chain && (missing(chain.curveId) || missing(chain.pointId));
-    const lostPendingReference = pendingSnaps.current.some(
-      hint =>
-        hint &&
-        (missing(hint.snap?.targetPointId) ||
-          missing(hint.snap?.entityId) ||
-          missing(hint.snap?.intent?.entityId) ||
-          hint.alignments.some(alignment => missing(alignment.sourcePointId)))
-    );
-    if (lostChain || lostPendingReference) chooseTool('select');
-    if (sketch.entities.some(entity => !remainingIds.has(entity.id))) {
-      setHoveredPoint(null);
-      setSnapCue(null);
-      setDrawingCue(null);
-      hoveredReferences.current = [];
-      lastSnap.current = null;
-      lastDrawingHint.current = null;
-      inference.current = null;
-      tangentAxis.current = null;
-    }
-    const notice = entityIds.length ? (patternDeletionNotice(sketch, next) ?? slotDeletionNotice(sketch, next)) : null;
-    changeSketch(next);
-    if (notice) {
-      setMessage(notice);
-      setPatternNotice(notice);
-    }
-    setSelected([]);
-    setHoveredConstraintEntities([]);
-    svg.current?.focus();
-  };
+  const acceptChamfer = () => acceptSketchChamfer(sketchEditorInput());
+  const acceptFillet = () => acceptSketchFillet(sketchEditorInput());
+  const acceptOffset = () => acceptSketchOffset(sketchEditorInput());
+  const applyConicRho = () => applySketchConicRho(sketchEditorInput());
+  const removeSelected = (entityIds: readonly string[] = selected, constraintIds: readonly string[] = selectedConstraints) =>
+    removeSketchSelection(sketchEditorInput(), entityIds, constraintIds);
   const openContext = (target: SketchContextTarget, position: Point) => {
     if (!sketch || busy || drag.current || annotationDrag.current) return;
     const context = createSketchContext(sketch, target, position, { entityIds: dimensionSelection, constraintIds: selectedConstraints });
@@ -1572,23 +1076,7 @@ export function CadEditor({
     setSelectedConstraints([...context.constraintIds]);
     setContextMenu(context);
   };
-  const contextTarget = (target: Element, position: Point) =>
-    sketch
-      ? target.closest('[data-constraint-id]')
-        ? sketch.constraints.some(
-            c =>
-              (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot') &&
-              c.id === target.closest('[data-constraint-id]')?.getAttribute('data-constraint-id')
-          )
-          ? { kind: 'constraint' as const, id: target.closest('[data-constraint-id]')!.getAttribute('data-constraint-id')! }
-          : ({ kind: 'blank' } as const)
-        : pickSketchContextTarget(sketch, position, {
-            project: projectPoint,
-            selectedEntityIds: dimensionSelection,
-            targetDimensionId: target.closest('[data-dimension]')?.getAttribute('data-dimension') ?? undefined,
-            targetEntityId: target.closest('[data-entity-id]')?.getAttribute('data-entity-id') ?? undefined,
-          })
-      : ({ kind: 'blank' } as const);
+  const contextTarget = (target: Element, position: Point) => sketchContextTarget(sketchEditorInput(), target, position);
   const keyboardContext = () => {
     if (!sketch || !svg.current) return;
     const target = selectedSketchContextTarget(sketch, { entityIds: dimensionSelection, constraintIds: selectedConstraints });
@@ -1601,129 +1089,11 @@ export function CadEditor({
     const bounds = element.getBoundingClientRect();
     openContext(target, { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 });
   };
-  const contextAction = (action: SketchContextAction, context: SketchContext) => {
-    if (!sketch) return;
-    if (action === 'fit') fit();
-    else if (action === 'edit-pattern') {
-      const id =
-        context.target.kind === 'constraint'
-          ? context.target.id
-          : context.entityIds.map(id => sketchPatternOwner(sketch, id)?.id).find(Boolean);
-      if (id) editPattern(id);
-    } else if (action === 'fit-selection') fit(context.entityIds);
-    else if (action === 'clear') {
-      setSelected([]);
-      setSelectedConstraints([]);
-      setHoveredConstraintEntities([]);
-    } else if (action === 'construction') changeSketch(toggleContextConstruction(sketch, context.entityIds));
-    else if (action === 'delete-entities' || action === 'delete-dimensions') removeSelected(context.entityIds, context.constraintIds);
-    else if (context.target.kind === 'dimension') {
-      const id = context.target.id,
-        constraint = sketch.constraints.find(c => c.id === id);
-      if (action === 'edit-dimension') editDimension(id);
-      else if (constraint && numeric(constraint)) {
-        commit(setDimensionDriven(documentRef.current, id, !constraint.driven));
-        setDimension(null);
-        setMessage(constraint.driven ? 'Dimension is driving the geometry.' : 'Reference dimension follows the geometry.');
-      }
-    }
-  };
-  const placeDimension = async (placed: CadDimension) => {
-    if (!part || busy || preparingDimension.current) return;
-    const source = documentRef.current;
-    const snapshot = JSON.stringify(source);
-    preparingDimension.current = true;
-    setBusy(true);
-    try {
-      const result = await prepareDimensionCreation(part, placed);
-      if (!mounted.current) return;
-      if (JSON.stringify(documentRef.current) !== snapshot) {
-        setMessage('The sketch changed while the dimension was checked. Select geometry again.');
-        return;
-      }
-      if (!result.ok) {
-        setMessage(result.message);
-        return;
-      }
-      commit(replacePart(source, part.id, () => result.part));
-      setSelectedConstraints([placed.id]);
-      if (result.driven) {
-        setDimension(null);
-        setMessage('Reference dimension created. Existing constraints already determine this measurement.');
-        svg.current?.focus();
-      } else {
-        newDimensionCommand.current = { id: placed.id, checkpoint: cadCommandCheckpoint(session) };
-        setDimension(placed.id);
-        setMessage('Enter a dimension. Enter applies it; Escape cancels.');
-      }
-    } catch (error) {
-      if (mounted.current) setMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      preparingDimension.current = false;
-      if (mounted.current) setBusy(false);
-    }
-  };
-  const applyDimensionEvent = (event: DimensionWorkflowEvent) => {
-    if (!sketch) return;
-    const transition = transitionDimensionWorkflow(sketch, dimensionFlow, event);
-    setDimensionFlow(transition.state);
-    if (transition.message) setMessage(transition.message);
-    if (transition.effect?.type === 'edit-existing') {
-      editDimension(transition.effect.constraintId);
-      return;
-    }
-    if (transition.effect?.type === 'create') {
-      const placed = transition.effect.constraint;
-      if (!constraintEntityIds(placed).every(id => sketch.entities.some(entity => entity.id === id))) {
-        cancelDimensionEdit();
-        setMessage('The dimension geometry changed. Select geometry again to create a dimension.');
-        return;
-      }
-      void placeDimension(placed);
-    }
-  };
-  const beginDimension = () => {
-    chooseTool('dimension');
-    if (tool === 'dimension' || !sketch) return;
-    const transition = transitionDimensionWorkflow(sketch, idleDimensionWorkflow(dimensionMode), {
-      type: 'begin',
-      entityIds: selected,
-      previewId: newCadId(),
-      pickHints: selectionHints.current,
-    });
-    setDimensionFlow(transition.state);
-    setSelected([]);
-    if (transition.message) setMessage(transition.message);
-    svg.current?.focus();
-  };
-  const constrain = (type: ConstraintTool) => {
-    if (!sketch) return;
-    const references = [...dimensionSelection];
-    // Constraint commands replace drawing/dimension placement just like the other sketch tools.
-    chooseTool('select');
-    setFixMode(false);
-    setSelected(references);
-    if (constraintMode === type) {
-      setConstraintMode(null);
-      setSelected([]);
-      setMessage('Click geometry to select. Drag to move. Shift-click adds to selection.');
-      svg.current?.focus();
-      return;
-    }
-    const result = buildConstraintForSelection(sketch, type, references);
-    if (result.constraint || result.constraints?.length) {
-      changeSketch((result.constraints ?? [result.constraint!]).reduce((next, c) => addConstraint(next, c), sketch));
-      setConstraintMode(null);
-      setMessage(result.message);
-    } else if (result.alreadyApplied) {
-      setConstraintMode(null);
-      setMessage(result.message);
-    } else {
-      setConstraintMode(type);
-      setMessage(result.message);
-      if (!result.needsMore) setSelected([]);
-    }
-  };
+  const contextAction = (action: SketchContextAction, context: SketchContext) => sketchContextAction(sketchEditorInput(), action, context);
+  const placeDimension = (placed: CadDimension) => placeSketchDimension(sketchEditorInput(), placed);
+  const applyDimensionEvent = (event: DimensionWorkflowEvent) => applySketchDimensionEvent(sketchEditorInput(), event);
+  const beginDimension = () => beginSketchDimension(sketchEditorInput());
+  const constrain = (type: ConstraintTool) => constrainSketch(sketchEditorInput(), type);
   const toggleFix = () => {
     if (!sketch) return;
     if (!selected.length) {
@@ -2123,6 +1493,7 @@ export function CadEditor({
   const pointerMove = (event: PointerEvent<SVGSVGElement>) => sketchPointerMove(sketchEditorInput(), event);
   // Built on each call, so the handlers below read this render's values, as they did when they were closures here.
   const sketchEditorInput = (): SketchEditorInput => ({
+    acceptCircularPattern,
     acceptLinearPattern,
     acceptOffset,
     acceptSlot,
@@ -2133,9 +1504,13 @@ export function CadEditor({
     applyDimensionEvent,
     boxGesture,
     busy,
+    cancelDimensionEdit,
     centerArcSweep,
     chain,
+    chamferDistances,
     chamferDrag,
+    chamferPreview,
+    chamferSelection,
     changeSketch,
     chooseTool,
     circularDrag,
@@ -2146,14 +1521,24 @@ export function CadEditor({
     contextPress,
     contextTarget,
     contextualArc,
+    currentDimension,
+    cursor,
     dimensionFlow,
+    dimensionInput,
+    dimensionMode,
     dimensionSelection,
     doc,
     documentRef,
     drag,
     drawingGesture,
     drawingGroup,
+    editDimension,
+    editPattern,
     faceSketch,
+    filletPreview,
+    filletRadius,
+    filletSelection,
+    fit,
     fixGeometry,
     fixMode,
     height,
@@ -2166,28 +1551,41 @@ export function CadEditor({
     lineContinuation,
     markerScale,
     modification,
+    mounted,
     newCurveCommand,
     newDimensionCommand,
+    offsetInput,
+    offsetPreview,
     openContext,
     pan,
     parseCadValue,
+    parsedCircular,
+    parsedLinear,
     part,
+    partEdges,
     patternCommandId,
     patternDrag,
     patternEditId,
     pending,
     pendingSnaps,
     pickedEdges,
+    placeDimension,
     placingDimension,
     pointAt,
     polygonCountGesture,
     polygonSides,
     polygonTool,
+    preparingDimension,
     projectPoint,
+    publish,
     radius,
+    rejectValue,
+    removeSelected,
     requestSketchCheck,
     restoreCanvasKeyboard,
     rho,
+    rhoInput,
+    selectDimension,
     selected,
     selectionHints,
     session,
@@ -2245,6 +1643,7 @@ export function CadEditor({
     slotDrag,
     snap,
     solveDrag,
+    solving,
     splitFirst,
     svg,
     takeEdges,
