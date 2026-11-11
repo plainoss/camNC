@@ -218,20 +218,23 @@ test('Mergify batches retain the required gate, branch protections and explicit 
   const [queue] = config.queue_rules;
   assert(queue.queue_conditions.includes('base = main'));
   assert(queue.queue_conditions.includes('-draft'));
-  assert.equal(queue.branch_protection_injection_mode, 'queue');
+  // GitHub's protections gate the merge; a fix may queue before its own CI ends, because the batch runs every check.
+  assert.equal(queue.branch_protection_injection_mode, 'merge');
   assert.equal(queue.merge_method, 'squash');
   assert(queue.batch_size > 1 && queue.batch_size <= 3);
   assert.equal(queue.max_checks_retries, 0);
   const required = Object.values(parse(read('.github/workflows/ci.yml')).jobs).find(job => job.name === 'Run tests');
   assert(required);
-  for (const conditions of [queue.queue_conditions, queue.merge_conditions]) {
-    assert(conditions.includes(`check-success = ${required.name}`), 'both original PRs and batches must pass their validation gate');
-  }
+  const gate = `check-success = ${required.name}`;
+  assert(queue.merge_conditions.includes(gate), 'batches must pass the validation gate');
+  // Only a labelled test or CI fix may queue before its own CI passes.
+  assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'object'), [{ or: [gate, 'label = ci-fix', 'label = flaky-test'] }]);
+  assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'string').sort(), ['-draft', 'base = main']);
   const { jobs } = parse(read('.github/workflows/ci.yml'));
   const browserChecks = jobs.browser.strategy.matrix.include.map(({ suite }) => `Tests (${suite})`);
   const specChecks = jobs.specs.strategy.matrix.shard.map(shard => `Behaviour specs (${shard})`);
   assert.deepEqual(queue.merge_conditions.filter(condition => !queue.queue_conditions.includes(condition)).sort(),
-    [...browserChecks, ...specChecks].map(name => `check-success = ${name}`).sort(),
+    [required.name, ...browserChecks, ...specChecks].map(name => `check-success = ${name}`).sort(),
     'distinct merge conditions must require all browser/spec checks, preventing direct merge after only light PR CI');
 });
 
