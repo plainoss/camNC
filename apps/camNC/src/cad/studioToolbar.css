@@ -1,0 +1,4 @@
+/* Keep the full search ring visible inside the toolbar's scrolling clip. */
+.cad-editor .cad-studio-toolbar [data-command-highlight='true'] {
+  outline-offset: -2px;
+}
