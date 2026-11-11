@@ -271,7 +271,7 @@ import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { useEditorVariableFields } from './useEditorVariableFields';
-import { featureShownByDefault } from './sketchShown';
+import { useFeatureShown } from './useFeatureShown';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -621,7 +621,7 @@ export function CadEditor({
       (featureDialog?.kind === 'pattern' ? featureDialog : null)
   );
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
-  const { rollbackStep, shownDocument, solveFeedback, apartIds } = useFeaturePreview({
+  const { rollbackStep, shownDocument, pastRollback, solveFeedback, apartIds } = useFeaturePreview({
     document:
       pointPicker.onPick && transformDialog ? doc : studioPreview.document === doc ? extrusionDepth.document : studioPreview.document,
     enabled: studioSession && showWorkspace,
@@ -3877,14 +3877,7 @@ export function CadEditor({
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
-  const featureShown = useCallback(
-    (id: string) => {
-      if (id in featureVisibility) return featureVisibility[id]!;
-      // As the design is shown: rolled back to its sketch, a part isn't extruded yet, so its sketch shows.
-      return featureShownByDefault(shownDocument, id);
-    },
-    [featureVisibility, shownDocument]
-  );
+  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback);
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>

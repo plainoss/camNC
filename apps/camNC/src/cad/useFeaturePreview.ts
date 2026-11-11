@@ -49,6 +49,7 @@ export function useFeaturePreview({
     offerFinalPreview(offersFinal ? { shown: showFinal, toggle: () => setFinalStep(showFinal ? null : editingStep) } : null);
     return () => offerFinalPreview(null);
   }, [offersFinal, showFinal, editingStep]);
+  const rolledBack = rollbackStep && !(offersFinal && showFinal) ? rollbackStep : null;
   const extrudingId = enabled && featureDialog?.kind === 'extrude' ? featureDialog.partId : null;
   // One dialog's split parts keep their ids, so what's hidden, made transparent or picked in the preview is what OK makes.
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- a new dialog starts new ids.
@@ -57,13 +58,16 @@ export function useFeaturePreview({
     () =>
       blank
         ? { ...document, parts: [] }
-        : apartExtrudePreview(
-            rollbackStep && !(offersFinal && showFinal) ? rolledBackTo(document, rollbackStep) : document,
-            extrudingId,
-            apartIds
-          ),
-    [document, blank, rollbackStep, offersFinal, showFinal, extrudingId, apartIds]
+        : apartExtrudePreview(rolledBack ? rolledBackTo(document, rolledBack) : document, extrudingId, apartIds),
+    [document, blank, rolledBack, extrudingId, apartIds]
   );
+  // The steps below the bar the user rolled to: left out of the view, whatever their eye was set to. A feature dialog's
+  // own rollback leaves them be: its preview is rolled back, but the sketches after it stay shown to pick from.
+  const rolledByUser = editingStep ? null : rolledBack;
+  const pastRollback = useMemo<ReadonlySet<string>>(() => {
+    const steps = rolledByUser ? designSteps(document).map(step => step.id) : [];
+    return new Set(steps.slice(steps.indexOf(rolledByUser!) + 1));
+  }, [document, rolledByUser]);
   // Read when a solve ends. Opening or closing the dialog checks the design again, as its problems depend on the dialog.
   const extruding = useRef<string | null>(null);
   const { lastCheckedRevision, setCheckEpoch } = checks;
@@ -74,5 +78,5 @@ export function useFeaturePreview({
     setCheckEpoch(epoch => epoch + 1);
   }, [extrudingId, lastCheckedRevision, setCheckEpoch]);
   const solveFeedback = useCallback((result: CadSolveResult) => withoutApartRegionProblem(result, extruding.current), []);
-  return { rollbackStep, shownDocument, solveFeedback, apartIds };
+  return { rollbackStep, shownDocument, pastRollback, solveFeedback, apartIds };
 }

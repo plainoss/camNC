@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { endCadSession } from '@wbcnc/cad-editor/session';
 import { ModelViewport } from '@/cam/model/ModelViewport';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 
@@ -30,7 +31,7 @@ it('rounds the edges through a part picked in the view, and refuses a top edge',
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
   await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
-  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /^Fillet/ }));
+  await userEvent.click(await studioCommand(/^Fillet/));
   const dialog = await screen.findByRole('dialog', { name: 'Fillet' });
   const click = (a: [number, number, number], b: [number, number, number]) =>
     act(() => props().onSelect(source.parts[0]!.id, 0, { point: a, normal: [1, 0, 0], edge: { a, b } } as never));
