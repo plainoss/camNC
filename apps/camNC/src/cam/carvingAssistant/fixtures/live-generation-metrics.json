@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-10",
+  "allocationUsd": 3,
+  "reservationPerRequestUsd": 0.25,
+  "spendUsd": 0.07182930000000001,
+  "runs": [
+    {
+      "id": "owl-reading",
+      "prompt": "Generate a charming owl reading an open book. Its face, two eyes, wings holding the book and the book pages should be recognizable. No text.",
+      "model": "claude-sonnet-5-5",
+      "constraints": {
+        "widthMm": 80,
+        "heightMm": 80,
+        "detail": "balanced",
+        "minFeatureMm": 0.6
+      },
+      "milliseconds": 26128.050042000003,
+      "usage": {
+        "calls": 1,
+        "checks": 0,
+        "reusedChecks": 0,
+        "inputTokens": 1053,
+        "outputTokens": 3243,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 1049,
+        "reasoningTokens": 2111,
+        "costUsd": 0.0350605
+      },
+      "title": "Owl Reading a Book",
+      "summary": "An owl with ear tufts, large ringed eyes and a small beak, holding an open book with black wings. Body is an outline ring; book pages are white with a black spine and cover."
+    },
+    {
+      "id": "mouse-ball",
+      "prompt": "Generate a cute mouse playing with a ball. Show its rounded ears, curious face, paws reaching toward a separate round ball and curved tail. No text.",
+      "model": "claude-sonnet-5-5",
+      "constraints": {
+        "widthMm": 80,
+        "heightMm": 80,
+        "detail": "balanced",
+        "minFeatureMm": 0.6
+      },
+      "milliseconds": 29399.060375,
+      "usage": {
+        "calls": 1,
+        "checks": 0,
+        "reusedChecks": 0,
+        "inputTokens": 1060,
+        "outputTokens": 3624,
+        "cacheReadTokens": 883,
+        "cacheWriteTokens": 173,
+        "reasoningTokens": 2137,
+        "costUsd": 0.036768800000000004
+      },
+      "title": "Curious Mouse Reaching for a Ball",
+      "summary": "A round-eared mouse with a curious face, whiskers and a curved tail sits reaching its paws toward a separate striped ball."
+    }
+  ]
+}

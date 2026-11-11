@@ -4,6 +4,9 @@ V-carved lettering and SVG artwork on a board, where placement is by eye. A
 carving is its own kind of job with its own Carve step. It hands over to the same
 Plan page and Machine view as every other job.
 
+The [carving assistant](CARVING_ASSISTANT.md) generates illustrations and prepares
+them at a physical size/detail level before offering an undoable artwork proposal.
+
 ## Decisions
 
 - **Own Carve step.** A carving job's rail shows Carve, Plan, Machine. Carve
