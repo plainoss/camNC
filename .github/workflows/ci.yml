@@ -102,9 +102,12 @@ jobs:
       matrix:
         include:
           - suite: headless
-            tasks: test @wbcnc/camNC#test:domain @wbcnc/camNC#test:worker @wbcnc/camNC#test:licenses
+            tasks: test
             args: ''
             filter: --filter=!@wbcnc/camNC --concurrency=1
+            # camNC's headless tasks run in a second turbo run. Naming them as camNC#task ids in the first would put
+            # camNC in its scope (Turborepo 2.8.18+), and that run's `test` would then include camNC's whole suite.
+            app-tasks: test:domain test:worker test:licenses
             performance: pnpm run test:performance
     runs-on: ubuntu-24.04
     container: &browser-container
@@ -156,7 +159,11 @@ jobs:
           MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
           MERGIFY_TEST_JOB_NAME: Tests (${{ startsWith(matrix.suite, 'app-browser-') && 'app-browser' || matrix.suite }})
           NODE_OPTIONS: ${{ matrix.suite == 'headless' && '--test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/junit/node-test.xml' || '' }}
-        run: node scripts/turbo-shared-cache.mjs run ${{ matrix.tasks }} --log-order=stream ${{ matrix.filter }} -- ${{ matrix.args }}
+        run: |
+          node scripts/turbo-shared-cache.mjs run ${{ matrix.tasks }} --log-order=stream ${{ matrix.filter }} -- ${{ matrix.args }}
+          if [ -n "${{ matrix.app-tasks }}" ]; then
+            node scripts/turbo-shared-cache.mjs run ${{ matrix.app-tasks }} --log-order=stream --filter=@wbcnc/camNC --concurrency=1
+          fi
       - name: Upload Cloudflare Workers test results to Mergify
         if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/*/test-results/junit/worker.xml') != ''
         uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29

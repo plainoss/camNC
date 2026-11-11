@@ -134,7 +134,13 @@ test('CI covers every runtime task and every browser shard, without duplicating 
       .filter(task => (tasks.includes(task.task) || tasks.includes(task.taskId)) && task.command !== '<NONEXISTENT>')
       .map(task => task.taskId);
   };
-  const assigned = suites.flatMap(suite => selected(suite.tasks.split(/\s+/), suite.filter.split(/\s+/)));
+  // A suite's app-tasks run in a second turbo run, scoped to camNC (see the Run tests step).
+  const appFilter = '--filter=@wbcnc/camNC';
+  assert(jobs.test.steps.find(step => step.name === 'Run tests').run.includes(`run \${{ matrix.app-tasks }} --log-order=stream ${appFilter}`));
+  const assigned = suites.flatMap(suite => [
+    ...selected(suite.tasks.split(/\s+/), suite.filter.split(/\s+/)),
+    ...(suite['app-tasks'] ? selected(suite['app-tasks'].split(/\s+/), [appFilter]) : []),
+  ]);
   const expected = [
     ...selected(['test'], ['--filter=!@wbcnc/camNC']),
     ...selected(['test:domain', 'test:worker', 'test:licenses', 'test:browser'], ['--filter=@wbcnc/camNC']),
