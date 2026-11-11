@@ -7,6 +7,7 @@ import { CadEditor } from './CadEditor';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { endCadSession } from '@wbcnc/cad-editor/session';
 import saved from '../../../../packages/cad-script/fixtures/designs/shelf-mirror-face.json';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 let sessionId = '';
@@ -42,7 +43,7 @@ it.each([0, 1, 2])('mirrors the cabinet side using shelf %s’s narrow end face 
   // Select the cabinet side without changing the shelf that will supply the plane.
   const sideIndex = props().instanceIds!.indexOf(side.id);
   act(() => props().onSelect(side.id, sideIndex));
-  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /^Mirror/ }));
+  await userEvent.click(await studioCommand(/^Mirror/));
   const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
   const copyId = shelfIndex ? shelf.copies![shelfIndex - 1]!.id : undefined;
   const instance = copyId ? `${shelf.id}/${copyId}` : shelf.id;

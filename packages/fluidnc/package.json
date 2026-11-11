@@ -12,7 +12,8 @@
   "scripts": {
     "test": "vitest",
     "check-types": "tsc --noEmit",
-    "sim": "node scripts/sim.mjs"
+    "sim": "node scripts/sim.mjs",
+    "lint": "oxlint --max-warnings 0"
   },
   "license": "Apache-2.0",
   "dependencies": {

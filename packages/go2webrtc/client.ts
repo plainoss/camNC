@@ -118,7 +118,7 @@ export async function connect(options: ConnectOptions): Promise<{ stream: MediaS
         }
       });
 
-      ws.addEventListener('error', event => {
+      ws.addEventListener('error', () => {
         // The error event itself doesn't provide much detail, unfortunately.
         const errorMessage = 'WebSocket error occurred.';
         reject(new Error(errorMessage));
@@ -133,7 +133,7 @@ export async function connect(options: ConnectOptions): Promise<{ stream: MediaS
 /** Quick and dirty debug print of codec info used by the peer connection. */
 async function pollCodecInfo(pc: RTCPeerConnection): Promise<string | null> {
   function getCodec(stats: RTCStatsReport) {
-    for (let val of stats.values()) {
+    for (const val of stats.values()) {
       if (val.type === 'codec') return val;
     }
     return null;
@@ -233,10 +233,10 @@ async function getOffer(pc: RTCPeerConnection, timeoutMs: number = 5000, debounc
  * @param pc The RTCPeerConnection instance.
  * @param debounceMs The debounce time in milliseconds.
  * @param overallTimeoutMs The maximum time to wait for ICE gathering.
- * @returns A promise that resolves when conditions are met, or rejects on timeout/error.
+ * @returns A promise that resolves when conditions are met, or when the overall timeout passes.
  */
 function waitForDebouncedIce(pc: RTCPeerConnection, debounceMs: number, overallTimeoutMs: number): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
     let overallTimeout: ReturnType<typeof setTimeout> | null = null;
     let hasSeenSrflxOrRelay = false; // Track if we've seen the first relevant candidate

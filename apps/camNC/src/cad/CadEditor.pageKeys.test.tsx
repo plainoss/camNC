@@ -10,6 +10,7 @@ import { ModelViewport } from '@/cam/model/ModelViewport';
 import { runDesignAssistant } from './assistant/loop';
 import { createAssistantUsage } from './assistant/runBudget';
 import { defaultProvider, rememberAssistantCredentials } from './assistant/keyStore';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 vi.mock('./assistant/loop', { spy: true });
@@ -70,7 +71,7 @@ async function deleteBoth(latest: () => CadDocument) {
 }
 
 async function openFillet(source: CadDocument) {
-  await userEvent.click(within(toolbar()).getByRole('button', { name: /^Fillet/ }));
+  await userEvent.click(await studioCommand(/^Fillet/));
   const dialog = await screen.findByRole('dialog', { name: 'Fillet' });
   const a: [number, number, number] = [100, 60, 0];
   const b: [number, number, number] = [100, 60, 18];

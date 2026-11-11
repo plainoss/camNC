@@ -21,4 +21,11 @@ test('invalid estimates cannot drop work and duplicate identities fail instead o
   assert.deepEqual(balancedShards(['a', 'b', 'c'], 2, x => x, () => NaN).flat().sort(), ['a', 'b', 'c']);
   assert.throws(() => balancedShards(['a', 'a'], 2, x => x, () => 1));
   assert.throws(() => balancedShards(['a'], 0, x => x, () => 1));
+  assert.throws(() => balancedShards(['a'], 1, x => x, () => 1, [1, 2]));
+  assert.throws(() => balancedShards(['a'], 1, x => x, () => 1, [-1]));
+});
+
+test('reserved capacity starts a bin with load, so it receives fewer items', () => {
+  assert.deepEqual(balancedShards(['a', 'b', 'c', 'd'], 2, x => x, () => 1, [2]), [['c'], ['a', 'b', 'd']]);
+  assert.deepEqual(balancedShards(['a', 'b'], 2, x => x, () => 1, []), balancedShards(['a', 'b'], 2, x => x, () => 1));
 });

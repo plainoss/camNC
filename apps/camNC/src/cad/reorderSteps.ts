@@ -1,4 +1,4 @@
-import { cadFolderForPart, cadFolderIssue, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { cadFolderForPart, cadFolderIssue, designSteps, type CadDocument, type CadPart } from '@wbcnc/cad';
 import type { DesignStep } from '@wbcnc/cad';
 
 /** The parts a part is built on: drawn on, sketched from, added to or cut into. They come before it. */
@@ -77,4 +77,29 @@ export function reorderedSteps(
     };
   }
   return { error: 'That step can’t go there: a part’s steps move together, and a cut stays with its part.' };
+}
+
+/**
+ * What dropping one step on another would do, shown while it's dragged: the row of the list as it stands that the step
+ * would then sit just before, why it can't go there, or null when it would stay where it is.
+ */
+export function reorderDrop(
+  document: CadDocument,
+  draggedId: string,
+  targetId: string
+): { before: string | null } | { error: string } | null {
+  const steps = designSteps(document);
+  const dragged = steps.find(step => step.id === draggedId);
+  const target = steps.find(step => step.id === targetId);
+  if (!dragged || !target || dragged.id === target.id) return null;
+  const result = reorderedSteps(document, dragged, target);
+  if ('error' in result) return result;
+  const order = designSteps(result.document).map(step => step.id);
+  // A drop that leaves the order as it was isn't a move.
+  if (order.every((id, i) => id === steps[i]?.id)) return null;
+  // The step lands just ahead of the step it's dropped on, or a part's steps ahead of the first of the part dropped on.
+  // Named from the list as it stands, not from what follows the moved run afterwards: a Cut parts step listed after the
+  // moved part moves along with it, and the line would then be drawn at that Cut's row, below where the steps land.
+  if (!partLevel(dragged)) return { before: target.id };
+  return { before: steps.find(step => step.partId === target.partId && partLevel(step))?.id ?? target.id };
 }
