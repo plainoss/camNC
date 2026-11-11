@@ -93,9 +93,10 @@ const finish = async (ok: boolean, output: object, document?: unknown, svg?: str
   // A sketch that isn't there fails the check before anything is written, so --out never outlives a failed run.
   const exportPart =
     ok && options.exportSketch && inspected ? sketchPart(inspected.document.parts, options.exportSketch.sketch) : undefined;
-  if (ok && options.exportSketch && !exportPart) {
+  const exportError = ok && options.exportSketch && !exportPart ? `No sketch named ${options.exportSketch.sketch}.` : undefined;
+  if (exportError) {
     ok = false;
-    output = { ...output, exportError: `No sketch named ${options.exportSketch.sketch}.` };
+    output = { ...output, exportError };
   }
   // A design that doesn't check out is never written where it could be imported by mistake.
   if (ok && options.out) await writeFile(options.out, `${JSON.stringify(document, null, 1)}\n`);
@@ -140,7 +141,7 @@ const finish = async (ok: boolean, output: object, document?: unknown, svg?: str
       views: !!options.views && ok,
       ...(ok && options.section && { section: options.section }),
     });
-    process.stdout.write(fullReportText(full));
+    process.stdout.write(fullReportText(exportError ? { ...full, ok: false, exportError } : full));
   } else
     print(
       JSON.stringify(

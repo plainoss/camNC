@@ -219,6 +219,11 @@ it('fails a sketch export of a missing sketch before writing anything, and prefe
   expect(JSON.parse(missing.stdout)).toMatchObject({ ok: false, exportError: 'No sketch named Nope.' });
   await expect(access(out)).rejects.toMatchObject({ code: 'ENOENT' });
   await expect(access(dxf)).rejects.toMatchObject({ code: 'ENOENT' });
+  // The full report says so too.
+  const full = await run('--report', 'full', '--out', out, '--export-sketch', 'Nope', '--export', dxf);
+  expect(full.code).toBe(1);
+  expect(JSON.parse(full.stdout)).toMatchObject({ ok: false, exportError: 'No sketch named Nope.' });
+  await expect(access(out)).rejects.toMatchObject({ code: 'ENOENT' });
 
   const named = await run('--export-sketch', 'Part 1', '--export', dxf);
   expect(named.code).toBe(0);
