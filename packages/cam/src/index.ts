@@ -118,3 +118,7 @@ export { planBoard, summarize as summarizePlan } from './plan';
 export type { BoardPartSource, BoardRequest, OpSummary, PlanResult, ReleaseProgram } from './plan';
 export { cutoutSilhouette } from './cutout';
 export type { BoardCutout, CutoutShape } from './cutout';
+export { partBrep, brepProblems } from './step/brep';
+export type { Brep } from './step/brep';
+export { writeStep } from './step/writer';
+export type { StepLengthUnit, StepOptions, StepProduct } from './step/writer';
