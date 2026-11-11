@@ -1,6 +1,14 @@
 import type { CarvingGenerationConstraints } from './generation';
 import { smoothTrace } from './smoothTrace';
-import { compareTraceMasks, fillTracePinholes, removeTraceSpecks, traceMaskTopology, type TraceCoverage } from './traceMetrics';
+import {
+  closeTraceGaps,
+  compareTraceMasks,
+  fillTracePinholes,
+  removeTraceSpecks,
+  traceFeatureChanges,
+  traceMaskTopology,
+  type TraceCoverage,
+} from './traceMetrics';
 
 export interface TracedCarvingRaster {
   svg: string;
@@ -161,6 +169,10 @@ export async function traceCarvingPng(
     // Anti-aliased edges leave pixel-sized light gaps where two dark shapes nearly touch. Fill those below the physical
     // threshold; no tool leaves such an island. A pixel that is physically large, as in a small source, stays a counter.
     const pinholes = fillTracePinholes(ink, traceWidth, physicalNoiseAreaPx);
+    // Close light gaps up to two pixels wide where that is below half the physical feature size: shapes that nearly
+    // touch, and the tips of narrowing gaps, which curve fitting closes anyway and which no tool could cut.
+    const featurePx = constraints.minFeatureMm * pixelsPerMm;
+    const closedGapPixels = featurePx >= 2 ? closeTraceGaps(ink, traceWidth) : 0;
     // Give Stop a boundary before bounded polygon union. Subsequent physical preparation applies its own geometry limits.
     await new Promise(resolve => setTimeout(resolve, 0));
     abort(signal);
@@ -184,35 +196,30 @@ export async function traceCarvingPng(
     const checkedPixels = context.getImageData(0, 0, traceWidth, traceHeight).data;
     const checkedMask = Uint8Array.from({ length: ink.length }, (_, i) => (checkedPixels[i * 4] < 128 ? 1 : 0));
     // Rasterizing two curves that nearly touch can leave a sliver or pinhole a few pixels across between them, and a
-    // pinhole that small next to an edge cannot survive curve fitting at this tolerance. Require every feature at least
-    // three tolerances across to be kept, and no such feature to appear, counting the other side down to half that area
-    // so a feature that shrinks or grows slightly across the threshold is not miscounted.
-    const featureAreaPx = Math.max(noiseAreaPx, (3 * tolerancePx) ** 2);
-    const features = (mask: Uint8Array, area: number) => {
-      const copy = mask.slice();
-      removeTraceSpecks(copy, traceWidth, area);
-      fillTracePinholes(copy, traceWidth, area);
-      return traceMaskTopology(copy, traceWidth);
-    };
-    const [sourceLarge, sourceAny] = [features(ink, featureAreaPx), features(ink, featureAreaPx / 2)];
-    const [tracedLarge, tracedAny] = [features(checkedMask, featureAreaPx), features(checkedMask, featureAreaPx / 2)];
+    // pinhole that small next to an edge cannot survive curve fitting at this tolerance. Match every other region by
+    // position. The skip size is capped at the minimum feature area, below which preparation drops islands anyway.
+    const featureAreaPx = Math.max(noiseAreaPx, Math.min(featurePx ** 2, (3 * tolerancePx) ** 2));
     if (
       smooth.components !== topology.components ||
       smooth.holes !== topology.holes ||
-      tracedAny.components < sourceLarge.components ||
-      tracedAny.holes < sourceLarge.holes ||
-      sourceAny.components < tracedLarge.components ||
-      sourceAny.holes < tracedLarge.holes
+      traceFeatureChanges(ink, checkedMask, traceWidth, featureAreaPx)
     )
-      throw new Error('Smooth tracing changed filled components or holes. Use a larger size or finer detail level.');
+      throw new Error(
+        featurePx < 2
+          ? 'Smooth tracing changed filled components or holes. The image has fewer than two pixels across this minimum feature: choose a coarser detail level or a smaller size.'
+          : 'Smooth tracing changed filled components or holes. Use a larger size or finer detail level.'
+      );
     const coverage = compareTraceMasks(ink, checkedMask, traceWidth, Math.ceil(tolerancePx + 2));
-    if (coverage.intersectionOverUnion < 0.96 || coverage.typicalBoundaryErrorPx > tolerancePx + 1.5)
+    if (coverage.intersectionOverUnion < 0.96 || coverage.boundaryErrorPx > tolerancePx + 1.5)
       throw new Error('Smooth tracing exceeded its measured coverage or boundary-error budget. Use a larger source or simpler artwork.');
     const warnings = [
       'Raster tracing converts dark pixels to filled cut regions. Shading, color and anti-aliasing are discarded; compare the original image and traced contours.',
       `Smooth tracing uses ${smooth.curves} cubic curves and ${smooth.lines} lines; ${topology.components} filled components and ${topology.holes} holes remain. Gentle curve joins have aligned tangents; sharp corners and straight edges are retained.`,
-      `Measured raster contour boundary error is ${(coverage.typicalBoundaryErrorPx / pixelsPerMm).toFixed(3)} mm for 99.9% of the outline; coverage overlap ${(coverage.intersectionOverUnion * 100).toFixed(2)}%; enlargement cannot recover image detail. Compare the source and smooth trace.`,
+      `Measured raster contour boundary error is ${(coverage.boundaryErrorPx / pixelsPerMm).toFixed(3)} mm; coverage overlap ${(coverage.intersectionOverUnion * 100).toFixed(2)}%; enlargement cannot recover image detail. Compare the source and smooth trace.`,
       `Removed ${specks.components} isolated dark specks (${specks.pixels} tracing pixels) below the physical noise threshold. Small intended marks can also be removed.`,
+      ...(closedGapPixels
+        ? [`Closed light gaps at most two tracing pixels wide (${closedGapPixels} pixels), below half the minimum feature size.`]
+        : []),
       ...(pinholes.components
         ? [`Filled ${pinholes.components} enclosed light pinholes (${pinholes.pixels} tracing pixels) below the physical noise threshold.`]
         : []),
@@ -239,7 +246,7 @@ export async function traceCarvingPng(
       ),
       traceReport: {
         ...coverage,
-        boundaryErrorMm: coverage.typicalBoundaryErrorPx / pixelsPerMm,
+        boundaryErrorMm: coverage.boundaryErrorPx / pixelsPerMm,
         curves: smooth.curves,
         lines: smooth.lines,
         components: topology.components,

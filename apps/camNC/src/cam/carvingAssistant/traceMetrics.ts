@@ -2,13 +2,7 @@ export interface TraceCoverage {
   intersectionOverUnion: number;
   removedFraction: number;
   addedFraction: number;
-  /** Largest nearest-boundary distance in either direction; Infinity when a boundary has no counterpart in range. */
   boundaryErrorPx: number;
-  /**
-   * Boundary distance that 99.9% of boundary pixels stay within. The tip of a light gap that narrows below a pixel
-   * closes when traced and has no counterpart nearby; topology and coverage still catch any lost feature.
-   */
-  typicalBoundaryErrorPx: number;
 }
 
 /** Exact four-connected pixel topology, including tiny light counters; no polygon simplification is involved. */
@@ -127,7 +121,7 @@ export function compareTraceMasks(source: Uint8Array, result: Uint8Array, width:
   for (let y = -maxRadius; y <= maxRadius; y++)
     for (let x = -maxRadius; x <= maxRadius; x++) offsets.push({ x, y, distance: Math.hypot(x, y) });
   offsets.sort((p, q) => p.distance - q.distance);
-  const distances: number[] = [];
+  let error = 0;
   for (const [from, to] of [
     [a, b],
     [b, a],
@@ -143,14 +137,112 @@ export function compareTraceMasks(source: Uint8Array, result: Uint8Array, width:
           y + offset.y < height &&
           to.marked[(y + offset.y) * width + x + offset.x]
       );
-      distances.push(nearest ? nearest.distance : Infinity);
+      if (!nearest)
+        return {
+          intersectionOverUnion: shared / Math.max(1, original + added),
+          removedFraction: removed / Math.max(1, original),
+          addedFraction: added / Math.max(1, original),
+          boundaryErrorPx: Infinity,
+        };
+      error = Math.max(error, nearest.distance);
     }
-  distances.sort((p, q) => p - q);
   return {
     intersectionOverUnion: shared / Math.max(1, original + added),
     removedFraction: removed / Math.max(1, original),
     addedFraction: added / Math.max(1, original),
-    boundaryErrorPx: distances.length ? distances[distances.length - 1] : 0,
-    typicalBoundaryErrorPx: distances.length ? distances[Math.floor((distances.length - 1) * 0.999)] : 0,
+    boundaryErrorPx: error,
   };
+}
+
+/**
+ * Morphological closing with a 3 × 3 square: fills light gaps at most two pixels wide, including the tip of a light
+ * wedge that narrows below a pixel. Curve fitting cannot follow such a gap, so the source would never match its trace.
+ */
+export function closeTraceGaps(ink: Uint8Array, width: number): number {
+  const height = ink.length / width;
+  const morph = (from: Uint8Array, value: number) => {
+    const to = new Uint8Array(from.length);
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        let hit = false;
+        for (let dy = -1; dy <= 1 && !hit; dy++)
+          for (let dx = -1; dx <= 1 && !hit; dx++) {
+            const nx = x + dx,
+              ny = y + dy;
+            // Outside the grid counts as light for dilation and as dark for erosion, so edges are unchanged.
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) hit = from[ny * width + nx] === value;
+          }
+        to[y * width + x] = hit === (value === 1) ? 1 : 0;
+      }
+    return to;
+  };
+  const closed = morph(morph(ink, 1), 0);
+  let changed = 0;
+  for (let i = 0; i < ink.length; i++)
+    if (closed[i] && !ink[i]) {
+      ink[i] = 1;
+      changed++;
+    }
+  return changed;
+}
+
+/** Four-connected labels of both dark and light regions, with each label's area and whether it touches the border. */
+function labelRegions(mask: Uint8Array, width: number) {
+  const labels = new Int32Array(mask.length).fill(-1),
+    queue = new Uint32Array(mask.length),
+    areas: number[] = [],
+    border: boolean[] = [];
+  for (let first = 0; first < mask.length; first++) {
+    if (labels[first] >= 0) continue;
+    const id = areas.length,
+      value = mask[first];
+    let end = 1,
+      touches = false;
+    queue[0] = first;
+    labels[first] = id;
+    for (let at = 0; at < end; at++) {
+      const i = queue[at];
+      if (i < width || i >= mask.length - width || i % width === 0 || i % width === width - 1) touches = true;
+      for (const next of [i % width ? i - 1 : -1, i % width < width - 1 ? i + 1 : -1, i - width, i + width]) {
+        if (next >= 0 && next < mask.length && mask[next] === value && labels[next] < 0) {
+          labels[next] = id;
+          queue[end++] = next;
+        }
+      }
+    }
+    areas.push(end);
+    border.push(touches);
+  }
+  return { labels, areas, border };
+}
+
+/**
+ * Match filled regions and holes between a source mask and its trace by position, not by count. Every source region
+ * of at least `minAreaPx` (and the open background) must overlap a traced region of the same color, and every such
+ * traced region a source one; a significant region overlapping two significant regions on the other side is a split
+ * or merge. Regions below `minAreaPx` may appear or vanish: curve fitting cannot keep a sliver or pinhole a few pixels
+ * across.
+ */
+export function traceFeatureChanges(source: Uint8Array, traced: Uint8Array, width: number, minAreaPx: number): number {
+  const a = labelRegions(source, width),
+    b = labelRegions(traced, width);
+  const significant = (r: ReturnType<typeof labelRegions>, id: number) => r.border[id] || r.areas[id] >= minAreaPx;
+  const partnersA = a.areas.map(() => new Set<number>()),
+    partnersB = b.areas.map(() => new Set<number>());
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] !== traced[i]) continue;
+    partnersA[a.labels[i]].add(b.labels[i]);
+    partnersB[b.labels[i]].add(a.labels[i]);
+  }
+  let changes = 0;
+  const check = (r: ReturnType<typeof labelRegions>, other: ReturnType<typeof labelRegions>, partners: Set<number>[]) => {
+    partners.forEach((set, id) => {
+      if (!significant(r, id)) return;
+      if (!set.size) changes++;
+      else if ([...set].filter(p => significant(other, p)).length > 1) changes++;
+    });
+  };
+  check(a, b, partnersA);
+  check(b, a, partnersB);
+  return changes;
 }
