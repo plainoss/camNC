@@ -3,7 +3,8 @@ import type { CadProposal } from '@wbcnc/cad-editor/proposal';
 import type { AssistantMessage } from './provider';
 import { assistantQuestion } from './loop';
 import { ReplyOptions } from './ReplyOptions';
-import { WorkSteps, conversationItems } from './WorkSteps';
+import { WorkSteps } from './WorkSteps';
+import { conversationItems } from './stepSummary';
 import type { AssistantRequirements } from './requirements';
 
 const starters = [
@@ -81,12 +82,22 @@ export function Transcript({
       )}
       {items.map((item, index) => {
         if (item.kind === 'work')
-          return <WorkSteps key={index} steps={item.steps} running={running && index === lastWork && lastWork > lastUser} activity={activity} />;
+          return (
+            <WorkSteps key={index} steps={item.steps} running={running && index === lastWork && lastWork > lastUser} activity={activity} />
+          );
         const { message } = item;
         const asked = assistantQuestion(message);
         // The open question is shown once, in the reply card below.
         if (question && message === questionMessage && !message.text && !message.images?.length) return null;
         if (!message.text && !asked && !message.images?.length) return null;
+        // Application events are context for the model. The brief chips already show confirmed requirements.
+        if (message.event && message.text.includes('Confirmed application requirements')) return null;
+        if (message.event)
+          return (
+            <p key={index} className="cad-assistant-event">
+              {message.text.replace(/^Application event \(data\): /, '').split('. ')[0]}
+            </p>
+          );
         return (
           <article key={index} className="cad-assistant-message" data-role={message.role} data-event={message.event || undefined}>
             <strong>{message.event ? 'Design' : message.role === 'user' ? 'You' : 'Assistant'}</strong>
@@ -101,7 +112,12 @@ export function Transcript({
       {workingWithoutSteps && <WorkSteps steps={[]} running activity={activity} />}
       {question && (
         <div ref={replyAnchor}>
-          <ReplyOptions key={questionMessage && messages.indexOf(questionMessage)} question={question} disabled={running || readingImage} onReply={onReply} />
+          <ReplyOptions
+            key={questionMessage && messages.indexOf(questionMessage)}
+            question={question}
+            disabled={running || readingImage}
+            onReply={onReply}
+          />
         </div>
       )}
       {proposal && (

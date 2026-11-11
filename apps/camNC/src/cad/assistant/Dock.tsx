@@ -114,7 +114,6 @@ export function AssistantDock({
       );
   }, [document]);
   const composer = useRef<HTMLTextAreaElement>(null);
-  const attachment = useRef<HTMLInputElement>(null);
   const transcriptEnd = useRef<HTMLDivElement>(null);
   const replyAnchor = useRef<HTMLDivElement>(null);
   const latest = messages.at(-1);
@@ -261,7 +260,10 @@ export function AssistantDock({
   };
   const confirmBrief = (value: AssistantRequirements) => {
     confirmRequirements(document.id, value);
-    recordAssistantEvent(document.id, `Confirmed application requirements: ${JSON.stringify(value)}. These supersede earlier application requirements.`);
+    recordAssistantEvent(
+      document.id,
+      `Confirmed application requirements: ${JSON.stringify(value)}. These supersede earlier application requirements.`
+    );
   };
   const newConversation = () => {
     writeConversation(document.id, []);

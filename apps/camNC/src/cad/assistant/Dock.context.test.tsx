@@ -48,6 +48,8 @@ it('shows image-only history and preserves constraints when moving to a text-onl
   // Real CAD context preparation precedes the mock; its work must not consume the reply query's deadline.
   await providerRequested;
   await screen.findByText('Question: What diameter?');
+  await userEvent.click(screen.getByLabelText('Assistant menu'));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Usage, limits and brief' }));
   await userEvent.click(screen.getByText('Usage and limits'));
   expect(screen.getByLabelText('Last turn usage').textContent).toContain('input 123 tokens');
   expect(screen.getByLabelText('Last turn usage').textContent).toContain('cost unknown');

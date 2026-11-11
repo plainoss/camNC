@@ -23,7 +23,8 @@ steps stay with the source family and are not copied into the detached part.
 
 ## Connection and conversation
 
-Open **Assistant**, then **Connection**. Choose Anthropic, OpenAI or **Other…**,
+Open **Assistant**. Until a provider is connected the dock shows the connection form; later it is under the
+**⋯** menu as **Connection**. Choose Anthropic, OpenAI or **Other…**,
 paste the key and pick a model (Anthropic lists its current models, with the
 recommended one first). **Test and connect** sends one small tool-calling request
 with a 1 × 1 pixel image and no design data. It confirms that the browser can reach
@@ -54,6 +55,20 @@ Suggested replies appear as clickable cards. For visual decisions, the assistant
 can include simple **Illustration** thumbnails alongside the choices. These are
 schematic concepts, not checked CAD previews; custom typed replies remain available.
 
+When a question needs numbers, the assistant can add fields prefilled with its
+proposal, such as width, depth and wall. **Use these values** answers in words.
+Fields named after a requirement (width, thickness, minimum wall and so on) are
+also confirmed as the **Brief**: chips pinned above the conversation. The app
+checks every later proposal against the brief, independently of the generated
+script. A chip's × removes it, and **Edit** opens the full requirements form.
+
+The assistant's work for a turn appears inline as plain steps: which recipe or
+example it used, and each check with its result. A failed check shows the first
+unmet requirement or error, for example the measured wall. While the turn runs,
+the steps are open and show the current activity. Afterwards they fold to a
+single line such as "3 steps · 2 checks". **Details** shows the raw tool inputs
+and results, without image data.
+
 The assistant reads the guide and examples, checks a script on a copy and repairs
 it. Each attempt starts from the original snapshot. Stop cancels provider access
 and terminates a running script. A turn is limited to five checks and twelve model
@@ -65,7 +80,7 @@ publish a candidate.
 
 ## Usage and limits
 
-**Usage and limits** shows the last turn's request/check counts and provider-reported
+**⋯ → Usage, limits and brief** opens **Usage and limits**, which shows the last turn's request/check counts and provider-reported
 input, output and cached tokens. Enter the selected model's prices to calculate
 USD cost. Missing usage or cache prices remain **unknown**, rather than appearing
 as zero. Prices and limits last until the dock closes; verify them after changing
@@ -199,7 +214,7 @@ human review.
 
 `check_design` accepts exactly one of full `source`, a named `recipe` with numeric-mm `parameters`, or an immutable `scriptId`. The tray and cupboard recipes produce ordinary editable parts and variables. A check returns a SHA-256 hash; repairs use `scriptId`, `expectedHash` and bounded exact `oldText`/`newText` patches. Ambiguous patches fail atomically. Handles belong to the original document snapshot and revision; edits and undo cannot revive stale sessions. `read_design` retrieves source only when needed.
 
-Confirmed requirements are explicit application state in the assistant dock. Draft fields are inactive until Confirm. Fixed-tolerance checks independently measure outline size, thickness, blind cuts, count, outer top-pocket wall and supported floor bounds, plus optional assembly dimensions and preservation of existing IDs. Targets must be globally unambiguous or use exact IDs/report handles. Pierced or opposed-pocket floors are refused rather than claiming a thickness guarantee. Appearance, internal webs and strength still need review. Changing requirements invalidates a proposal even after its review dialog opens.
+Confirmed requirements are explicit application state in the assistant dock, shown as the Brief chips. In the full form under **⋯ → Usage, limits and brief**, draft fields are inactive until Confirm. Fixed-tolerance checks independently measure outline size, thickness, blind cuts, count, outer top-pocket wall and supported floor bounds, plus optional assembly dimensions and preservation of existing IDs. Targets must be globally unambiguous or use exact IDs/report handles. Pierced or opposed-pocket floors are refused rather than claiming a thickness guarantee. Appearance, internal webs and strength still need review. Changing requirements invalidates a proposal even after its review dialog opens.
 
 The browser uses geometry-only repair checks, with trusted reinspection after the sandbox. `finalize_design` runs the full toolpath/report check against the exact cached candidate, without rerunning generated JavaScript. A proposal is impossible before that succeeds. Its warnings and costs go back to the model before its final explanation. Repair attempt limits count geometry checks; finalization does not grant another repair attempt. `views: ["top"]` renders and sends only that projection; legacy `true` selects all three. Other projections remain available explicitly.
 

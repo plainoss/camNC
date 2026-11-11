@@ -19,7 +19,7 @@ const chipLabels: Record<keyof AssistantRequirements, (value: unknown) => string
   preserveExistingIds: () => 'Keep existing IDs',
 };
 
-export function briefChipLabel(key: keyof AssistantRequirements, value: unknown) {
+function briefChipLabel(key: keyof AssistantRequirements, value: unknown) {
   return chipLabels[key]?.(value) ?? `${key}: ${value}`;
 }
 

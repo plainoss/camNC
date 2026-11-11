@@ -9,7 +9,8 @@ export interface AssistantSelection {
 
 export function assistantSelection(document: CadDocument, selected?: { partId: string; copyId?: string }): AssistantSelection | undefined {
   const part = document.parts.find(part => part.id === selected?.partId);
-  if (!part) return;
+  // A new studio's first part is an empty sketch: there is nothing to point the assistant at yet.
+  if (!part || !part.sketch.entities.length) return;
   const index = selected?.copyId ? (part.copies?.findIndex(copy => copy.id === selected.copyId) ?? -1) : -1;
   const folder = document.folders?.find(folder => folder.partIds.includes(part.id));
   return {
