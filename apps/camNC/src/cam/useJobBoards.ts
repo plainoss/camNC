@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { withCarving } from './carving';
+import { generatedCarvingProblem } from './carvingAssistant/proposal';
 import {
   boardRequest,
   instancesOf,
@@ -31,6 +32,8 @@ export interface JobBoard {
   board: BoardV1;
   nest: BoardNest;
   request: BoardRequest;
+  /** Generated artwork needs a new physical-size check after relevant edits. */
+  carvingProblem?: string;
 }
 
 export { missingParts, type MissingPart } from './boards';
@@ -59,6 +62,7 @@ export function useJobBoards(job: CamJobV1 | null | undefined, model: ModelImpor
       return {
         board,
         nest,
+        ...(generatedCarvingProblem(job) && { carvingProblem: generatedCarvingProblem(job)! }),
         request: withCarving(boardRequest(board, nest, instances, { skin: plan.skin, holes: plan.holes, leaveOut: plan.leaveOut }), job),
       };
     });
