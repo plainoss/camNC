@@ -40,8 +40,10 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/install-dependencies
       # The build key includes VITE_CLERK_PUBLISHABLE_KEY, so a cached build is only replayed for the same key.
+      # The cache policy may only admit the CI workflow; without the cache the build just takes longer.
       - name: Authenticate remote cache
         if: vars.TURBO_TEAM != ''
+        continue-on-error: true
         uses: vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10 # v1.0.0
         with:
           team: ${{ vars.TURBO_TEAM }}
