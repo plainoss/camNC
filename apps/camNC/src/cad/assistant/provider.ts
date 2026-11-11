@@ -42,6 +42,8 @@ export interface AssistantMessage {
   images?: AssistantImage[];
   calls?: AssistantToolCall[];
   callId?: string;
+  /** A failed tool call; Anthropic marks its tool_result with is_error. */
+  isError?: boolean;
   /** Responses reasoning items must accompany their function calls on the next request. */
   responseItems?: unknown[];
   /** Preserve signed Anthropic thinking blocks with their complete tool-call batch. */
@@ -121,6 +123,7 @@ export function providerPayload({
                 {
                   type: 'tool_result',
                   tool_use_id: message.callId,
+                  ...(message.isError && { is_error: true }),
                   content: [textBlock(message.text), ...(message.images ?? []).map(anthropicImage)],
                 },
               ]
