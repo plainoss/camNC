@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { endCadSession } from '@wbcnc/cad-editor/session';
 import { ModelViewport } from '@/cam/model/ModelViewport';
+import { settled } from '@/test/settled';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 
@@ -23,7 +24,9 @@ async function studio() {
       <CadEditor document={source} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
     </div>
   );
-  await waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
+  // The 3D view is loaded lazily, which the settled signal can't see before its module arrives: wait for its canvas.
+  await waitFor(() => expect(screen.getByTestId('workspace-3d').querySelector('canvas')).not.toBeNull(), { timeout: 20_000 });
+  await settled();
   return {
     latest: () => change.mock.calls.at(-1)?.[0] ?? source,
     toolbar: screen.getByRole('toolbar', { name: 'Part Studio toolbar' }),
@@ -42,10 +45,12 @@ it('opens with the studio toolbar and cancels a new extrude without changing the
   expect(screen.queryByRole('toolbar', { name: 'Sketch toolbar' })).toBeNull();
   await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
-  await waitFor(() => expect(latest().parts[1]).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [] }));
+  await settled();
+  expect(latest().parts[1]).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [] });
   expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(latest().parts).toHaveLength(1));
+  await settled();
+  expect(latest().parts).toHaveLength(1);
 });
 
 it('previews an extrude thickness and restores it when the dialog is cancelled', async () => {
@@ -55,10 +60,12 @@ it('previews an extrude thickness and restores it when the dialog is cancelled',
   await userEvent.clear(thickness);
   await userEvent.type(thickness, '30');
   await userEvent.tab();
-  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(30));
+  await settled();
+  expect(latest().parts[0]!.thickness).toBe(30);
   expect(within(toolbar).getByRole('button', { name: /Done/ })).toHaveProperty('disabled', true);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(18));
+  await settled();
+  expect(latest().parts[0]!.thickness).toBe(18);
   expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull();
 });
 
@@ -69,7 +76,8 @@ it('refuses an unusable extrude thickness and leaves the original thickness on c
   await userEvent.clear(thickness);
   await userEvent.type(thickness, '0');
   await userEvent.tab();
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true));
+  await settled();
+  expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', true);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   expect(latest().parts[0]!.thickness).toBe(18);
 });
@@ -81,7 +89,8 @@ it('keeps an extrude thickness when OK is clicked straight after typing', async 
   await userEvent.clear(thickness);
   await userEvent.type(thickness, '24');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(24));
+  await settled();
+  expect(latest().parts[0]!.thickness).toBe(24);
   expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull();
 });
 
@@ -90,12 +99,15 @@ it('previews a pattern on opening, cancels its changes, and keeps an accepted pa
   await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
   let dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
   expect(within(dialog).queryByRole('checkbox', { name: 'Pattern copies in a row' })).toBeNull();
-  await waitFor(() => expect(vi.mocked(ModelViewport).mock.lastCall![0].instanceIds).toHaveLength(2));
+  await settled();
+  expect(vi.mocked(ModelViewport).mock.lastCall![0].instanceIds).toHaveLength(2);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(latest().parts[0]!.pattern).toBeUndefined());
+  await settled();
+  expect(latest().parts[0]!.pattern).toBeUndefined();
   await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
   dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Plate' });
-  await waitFor(() => expect(vi.mocked(ModelViewport).mock.lastCall![0].instanceIds).toHaveLength(2));
+  await settled();
+  expect(vi.mocked(ModelViewport).mock.lastCall![0].instanceIds).toHaveLength(2);
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   expect(latest().parts[0]!.pattern).toBeDefined();
 });
