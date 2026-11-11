@@ -27,6 +27,12 @@ it('keeps the complete stool seat free of outline seams between opposite-face jo
     if (lines.getY(i) < 1 && lines.getY(i + 1) < 1 && lines.getZ(i) === lines.getZ(i + 1)) frontEdges.push(lines.getZ(i));
   // The seat is 18mm stock at world z432: only its top and bottom rims cross the uninterrupted front edge.
   expect([...new Set(frontEdges)].sort((a, b) => a - b)).toEqual([432, 450]);
+  // The two back-post mortises share their front edge line; the flat top between them has no outline.
+  const bridges = [];
+  for (let i = 0; i < lines.count; i += 2)
+    if (lines.getZ(i) === 450 && lines.getZ(i + 1) === 450 && lines.getY(i) === 326 && lines.getY(i + 1) === 326)
+      if (Math.max(lines.getX(i), lines.getX(i + 1)) > 68 && Math.min(lines.getX(i), lines.getX(i + 1)) < 392) bridges.push(i);
+  expect(bridges).toEqual([]);
   edges.dispose();
   geometry.dispose();
 });

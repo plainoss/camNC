@@ -22,6 +22,26 @@ function shapes(region: Path[]) {
 }
 
 /**
+ * The triangle's corners with every other cap vertex that lies inside one of its edges. Earcut leaves such T-junctions
+ * where hole edges are collinear (mortises in a row), and edge display draws the unmatched long edge as a false line.
+ */
+function conforming(corners: Vector2[], vertices: Vector2[]) {
+  const ring: Vector2[] = [];
+  corners.forEach((from, n) => {
+    const to = corners[(n + 1) % 3]!,
+      dx = to.x - from.x,
+      dy = to.y - from.y,
+      length = dx * dx + dy * dy,
+      inside = vertices
+        .map(v => ({ v, t: ((v.x - from.x) * dx + (v.y - from.y) * dy) / length }))
+        .filter(({ v, t }) => t > 1e-9 && t < 1 - 1e-9 && Math.abs((v.x - from.x) * dy - (v.y - from.y) * dx) ** 2 < 1e-12 * length)
+        .sort((m, o) => m.t - o.t);
+    ring.push(from, ...inside.map(({ v }) => v).filter((v, i, list) => i === 0 || !v.equals(list[i - 1]!)));
+  });
+  return ring;
+}
+
+/**
  * A watertight solid for a part with cuts, without the hidden faces stacked slabs would leave: one cap per height, the
  * bottom, and walls between heights. Each horizontal face is exactly a level, so `extractFeatures` reads it back.
  */
@@ -40,8 +60,17 @@ export function cutPartMesh(features: PartFeatures, underside?: PartFeatures): {
           b = all[j!]!,
           c = all[k!]!,
           counterclockwise = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) > 0,
-          [p, q] = counterclockwise === up ? [b, c] : [c, b];
-        triangle([a.x, a.y, z], [p.x, p.y, z], [q.x, q.y, z]);
+          [p, q] = counterclockwise === up ? [b, c] : [c, b],
+          ring = conforming([a, p, q], all);
+        if (ring.length === 3) triangle([a.x, a.y, z], [p.x, p.y, z], [q.x, q.y, z]);
+        else {
+          // Fan from the centroid: fanning from a corner would leave zero-area triangles along the split edges.
+          const center = [(a.x + p.x + q.x) / 3, (a.y + p.y + q.y) / 3, z] as [number, number, number];
+          ring.forEach((v, n) => {
+            const w = ring[(n + 1) % ring.length]!;
+            triangle(center, [v.x, v.y, z], [w.x, w.y, z]);
+          });
+        }
       }
     }
   };
