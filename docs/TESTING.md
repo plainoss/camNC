@@ -23,6 +23,12 @@ The board browser suite is divided into replacement/auto-fill, dragging, holds, 
 
 The Boards and Plan route tests put `src/test/camWorkerCache.ts` in front of the CAM worker (`wrapCamWorker`). Within a test file, a model with the same bytes is read once and a board with the same request and settings is planned once, so each test opens its new job without reading and planning it again, and picks up the plans the test before it started instead of queueing behind them. The results are the real worker's from that run, so the route assertions still see real CAM output. Pipeline checks that don't need the page go in Node: `src/cam/importedModel.ts` is the worker's import, usable there with `loadStep`, and `src/cam/variedBoards.test.ts` checks holds and plans for every varied-board model, while the route test shows one held and one blocked board.
 
+## Waiting in browser tests
+
+A browser test waits for the app with `await settled()` from `apps/camNC/src/test/settled.ts`, after rendering and after each input, then checks the result directly. It waits on the settled signal the behaviour specs use (`src/lib/settled.ts`, see [Settling](../apps/camNC/e2e/spec/README.md#settling)): solver and CAM worker calls, saves, queries, assistant turns and 3D views not yet drawn, plus elements marked `aria-busy` and closing menus' animations, until none is pending on two frames in a row. After a bounded timeout (10 s by default) it fails naming what is still pending, such as `still pending: render 1`. Mark a test's own react-three-fiber canvas with `{...settledCanvas}` so its first frame counts, and pass a test's own `QueryClient` to `trackQueryClient`. The signal is reset after each test.
+
+Don't add sleeps or one-off polls for readiness. Keep a specific wait only for what the signal can't see, with a comment saying why: a lazily loaded view before its module arrives (wait for its canvas or its props), or a mocked component's props.
+
 ## Scheduling and cache correctness
 
 A pull request runs only the checks, the `headless` entry and the simulator tests, a few minutes in all. The browser shards and the behaviour specs run in the Mergify merge queue, once for a batch of up to three PRs. So run the browser files and scenarios your change touches locally before queueing, or add the `full-ci` label: from the PR's next push, it runs everything there too. A browser failure in the queue drops the PR from its batch, and the other PRs are tested again without it.
