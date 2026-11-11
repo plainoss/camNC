@@ -55,6 +55,12 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - Read the failing assertion and its artifacts before classifying a failure as transient. A local pass does not establish that CI is flaky. Retry failed jobs only on the same candidate when there is evidence of a transient failure; if the same assertion fails again, investigate and repair its cause instead of repeatedly requeuing unchanged code.
 - For asynchronous UI tests, wait for the specific observable readiness condition before acting or asserting. Preserve the expected result; do not replace assertions with fixed sleeps or blanket retries.
 
+## Keeping the merge queue moving
+
+- A blocked queue comes before feature work. When the same test or check ejects PRs from the merge queue, fix it, or claim its `flaky-test` issue, before pushing more features.
+- Put a test or CI fix in its own PR and label it `ci-fix` (or `flaky-test`), or title it `fix(ci)` / `fix(test)`. Mergify then tests it ahead of the queue (`priority_rules` in `.mergify.yml`).
+- Once the fix merges, re-queue the PRs it ejected with `@mergifyio queue`. Merge main into them first only if they conflict.
+
 ## Commit Messages
 
 - Follow the Conventional Commits style (`feat(<project_name>):`, `fix(<project_name>):`, `chore(<project_name>):`, `docs(<project_name>):` etc.).
