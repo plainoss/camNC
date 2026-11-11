@@ -10,6 +10,7 @@ describe('provider defaults from a key alone', () => {
   it('recognises the provider from the key prefix', () => {
     expect(detectKeyProvider(' sk-ant-api03-x ')).toBe('anthropic');
     expect(detectKeyProvider('sk-proj-x')).toBe('openai');
+    expect(detectKeyProvider('AIzaSyX')).toBe('gemini');
     expect(detectKeyProvider('abc')).toBeNull();
   });
 
@@ -23,6 +24,22 @@ describe('provider defaults from a key alone', () => {
     expect(defaultImageModel('openai', ['gpt-image-1', 'gpt-image-2', 'gpt-image-2-mini', 'dall-e-3'])).toBe('gpt-image-2');
     expect(defaultImageModel('openai', ['dall-e-3', 'gpt-6'])).toBe('dall-e-3');
     expect(defaultImageModel('anthropic', ['gpt-image-2'])).toBeUndefined();
+    const gemini = [
+      'gemini-3-pro-preview',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.5-flash-image',
+      'gemini-3.5-flash-preview-tts',
+      'gemini-4-flash-preview',
+      'gemini-embedding-001',
+      'imagen-4.0-generate-001',
+      'imagen-4.0-fast-generate-001',
+      'imagen-4.0-ultra-generate-001',
+    ];
+    expect(defaultTextModel('gemini', gemini)).toBe('gemini-3.5-flash');
+    expect(defaultTextModel('gemini', ['gemini-4-flash-preview', 'gemini-3-pro-preview'])).toBe('gemini-4-flash-preview');
+    expect(defaultImageModel('gemini', gemini)).toBe('imagen-4.0-generate-001');
+    expect(defaultImageModel('gemini', ['gemini-3.5-flash', 'gemini-3.5-flash-image'])).toBe('gemini-3.5-flash-image');
   });
 
   it('lists models with the same key and endpoint, and treats a refusal as no list', async () => {
@@ -37,6 +54,18 @@ describe('provider defaults from a key alone', () => {
         throw new TypeError('Failed to fetch');
       })
     ).toBeNull();
+  });
+
+  it('lists Gemini models by bare ID with a bearer key', async () => {
+    const config = { ...connectionPresets.find(preset => preset.id === 'gemini')!.config, model: '' };
+    const fetcher = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+      json(200, { data: [{ id: 'models/gemini-3.5-flash' }, { id: 'models/imagen-4.0-generate-001' }] })
+    );
+    expect(await listProviderModels(config, 'AIza-x', new AbortController().signal, fetcher)).toEqual([
+      'gemini-3.5-flash',
+      'imagen-4.0-generate-001',
+    ]);
+    expect(String(fetcher.mock.calls[0]![0])).toBe('https://generativelanguage.googleapis.com/v1beta/openai/models');
   });
 
   it('fills blank models during the connection test and falls back to the preset when listing fails', async () => {
@@ -68,7 +97,7 @@ describe('provider defaults from a key alone', () => {
     expect(anthropic.config.imageModel).toBeUndefined();
     await expect(
       testAssistantConnection(
-        { ...connectionPresets[2]!.config, endpoint: 'https://llm.example.com/v1', model: '' },
+        { ...connectionPresets.find(preset => preset.id === 'other')!.config, endpoint: 'https://llm.example.com/v1', model: '' },
         'k',
         new AbortController().signal,
         async () => json(404, {})
