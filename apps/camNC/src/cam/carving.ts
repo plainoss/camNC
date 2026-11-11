@@ -1,4 +1,4 @@
-import { unionPaths, type BoardCarving, type BoardRequest, type LibraryTool } from '@wbcnc/cam';
+import { cutoutSilhouette, unionPaths, type BoardCarving, type BoardRequest, type CutoutShape, type LibraryTool } from '@wbcnc/cam';
 import type { BoardV1 } from './boards';
 import type { CamJobV1 } from './jobDb';
 import { kDefaultPlan, type PlanSettingsV1 } from './planSettings';
@@ -67,7 +67,26 @@ export interface CarvingV1 {
   clearWithFlat: boolean;
   /** Union of every item's placed outline, mm, Y up: what Plan cuts. */
   region: Loop[];
+  /** Cut the carving out of the board along its silhouette, with the job's flat bit, after carving. */
+  cutout?: CarvingCutoutV1;
 }
+
+export interface CarvingCutoutV1 {
+  shape: CutoutShape;
+  /** Wood left round the artwork, mm. */
+  margin: number;
+  /** What holds the piece once it's cut round: tabs, or a thin skin left on the bottom (on tape: cut at the end). */
+  hold: 'tabs' | 'skin';
+  /** Tabs placed on the drawing, board mm; none: Plan picks them. */
+  tabsAt?: { x: number; y: number }[];
+}
+
+/** A new cutout: round the artwork, held by a skin on a taped board (no tab nubs on the sign's edge), else by tabs. */
+export const newCutout = (taped: boolean): CarvingCutoutV1 => ({ shape: 'outline', margin: 6, hold: taped ? 'skin' : 'tabs' });
+
+/** The outlines the carving is cut out along, board frame: one per piece; empty without a cutout. */
+export const cutoutOutline = (carving: Pick<CarvingV1, 'region' | 'cutout'>): Loop[] =>
+  carving.cutout ? cutoutSilhouette(carving.region, carving.cutout.shape, carving.cutout.margin) : [];
 
 /** Rotate about the artwork's centre, then move it onto the board. */
 export function placeItem(item: CarvingItemV1): Loop[] {
@@ -111,10 +130,46 @@ export function boardCarving(carving: CarvingV1, plan: Pick<PlanSettingsV1, 'bit
   };
 }
 
+/** The closest point of a closed loop to `q`, and how far it is. */
+export function closestOnLoop(q: { x: number; y: number }, loop: Loop): { x: number; y: number; d: number } {
+  let best = { x: loop[0].x, y: loop[0].y, d: Infinity };
+  loop.forEach((a, i) => {
+    const b = loop[(i + 1) % loop.length];
+    const dx = b.x - a.x,
+      dy = b.y - a.y,
+      l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((q.x - a.x) * dx + (q.y - a.y) * dy) / l2)) : 0;
+    const p = { x: a.x + t * dx, y: a.y + t * dy };
+    const d = Math.hypot(q.x - p.x, q.y - p.y);
+    if (d < best.d) best = { ...p, d };
+  });
+  return best;
+}
+const distanceToLoop = (q: { x: number; y: number }, loop: Loop) => closestOnLoop(q, loop).d;
+
 /** The board request with the job's carving on it, when the board is the carving's. */
 export function withCarving(request: BoardRequest, job: CamJobV1): BoardRequest {
   if (!job.carving?.region.length) return request;
-  return { ...request, carvings: [boardCarving(job.carving, job.plan ?? kDefaultPlan)] };
+  const carved = { ...request, carvings: [boardCarving(job.carving, job.plan ?? kDefaultPlan)] };
+  const cutout = job.carving.cutout;
+  const outline = cutoutOutline(job.carving);
+  if (!cutout || !outline.length) return carved;
+  // Placed tabs go to the piece they are on.
+  const nearest = (q: { x: number; y: number }) =>
+    outline.reduce((best, loop, i) => (distanceToLoop(q, loop) < distanceToLoop(q, outline[best]) ? i : best), 0);
+  return {
+    ...carved,
+    holdDown: cutout.hold === 'tabs' ? 'tabs' : request.taped ? 'fixture-tape' : 'skin',
+    cutouts: outline.map((loop, i) => {
+      const tabsAt = cutout.hold === 'tabs' ? cutout.tabsAt?.filter(q => nearest(q) === i) : undefined;
+      return {
+        id: `cutout-${i}`,
+        name: outline.length > 1 ? `Cutout ${i + 1}` : 'Cutout',
+        outline: loop,
+        ...(tabsAt?.length && { tabsAt }),
+      };
+    }),
+  };
 }
 
 /** The one board of a carving job, at a fixed size: nothing is nested on it. */
