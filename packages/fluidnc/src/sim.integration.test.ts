@@ -4,6 +4,7 @@
  *   FLUIDNC_SIM_HOST=127.0.0.1:8848 pnpm vitest run sim.integration   # v4
  *   FLUIDNC_SIM_HOST=127.0.0.1:8850 pnpm vitest run sim.integration   # v3 personality
  */
+import { positionWindow, startPauseGap } from '@wbcnc/cam/pauseMarker';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readMachineBounds, readMaxRateXY } from './config';
 import { deleteSdFile, listSdFiles, runSdFile, uploadSdFile } from './files';
@@ -133,6 +134,46 @@ describe.skipIf(!host)('FluidNC simulator', () => {
     await until(() => protocol.status?.state === 'Idle' && protocol.status.job === undefined, 60_000);
     await deleteSdFile(protocol, 'camnc-m0.gcode');
   }, 240_000);
+
+  it('in a large camNC program, the gap after the start M0 lets the SD position tell that M0 from the dwell after M3', async () => {
+    // About 1 MB: without the gap, the position window of the start M0 would reach past the M3 and the dwell.
+    const head = 'G21\nG90\nG0 X0 Y0\n(CAMNC PAUSE start; rpm=15000)\nM0 (MSG Router on, then Resume)\n';
+    const rest = 'M3 S15000\nG4 P3\n' + Array.from({ length: 40 }, (_, i) => `G1 X${(i + 1) / 4} Y0 F1200`).join('\n');
+    const end = '\nM5\nM0 (MSG Program done)\n';
+    const padding = Array.from({ length: 11_000 }, (_, i) => `(padding ${i} ${'-'.repeat(80)})`).join('\n') + '\n';
+    const withoutGap = head.length + rest.length + end.length + padding.length;
+    const gap = startPauseGap(withoutGap, 'M3 S15000\n'.length)
+      .map(l => l + '\n')
+      .join('');
+    const gcode = head + gap + rest + end + padding;
+    const size = gcode.length;
+    const m3End = head.length + gap.length + 'M3 S15000\n'.length;
+    // The machine view's rule for the start pause without knowing the spindle state: the furthest the reader can have
+    // read is short of the end of the M3 line.
+    const beforeM3 = () => (protocol.status!.job!.percent / 100) * size + positionWindow(size) < m3End;
+    expect(size).toBeGreaterThan(1_000_000);
+    // Without the gap the window would reach past the M3 line, so the position could not tell.
+    expect(2 * positionWindow(size)).toBeGreaterThan('M3 S15000\n'.length);
+    expect(gap.length).toBeGreaterThan(0);
+    const held = () => protocol.status?.state === 'Hold' && protocol.status.subState === 0;
+    await uploadSdFile(protocol, host!, 'camnc-gap.gcode', gcode);
+    await runSdFile(protocol, 'camnc-gap.gcode');
+    await until(held, 30_000);
+    expect(beforeM3()).toBe(true);
+    protocol.cycleStart();
+    await until(() => protocol.status?.spindleOn === true, 3_000);
+    protocol.feedHold();
+    await until(held, 10_000);
+    // In the dwell after the M3: not the start pause.
+    expect(beforeM3()).toBe(false);
+    const inDwell = protocol.status!.job!.percent;
+    protocol.cycleStart();
+    // On to the done M0.
+    await until(() => held() && protocol.status!.job!.percent > inDwell, 60_000);
+    protocol.cycleStart();
+    await until(() => protocol.status?.state === 'Idle' && protocol.status.job === undefined, 120_000);
+    await deleteSdFile(protocol, 'camnc-gap.gcode');
+  }, 300_000);
 
   it('rejects in-flight commands on soft reset', async () => {
     const dwell = protocol.send('G4 P3', { timeoutMs: 0 }).catch(e => e);

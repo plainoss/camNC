@@ -1,4 +1,4 @@
-import { pauseMarker } from '@wbcnc/cam/pauseMarker';
+import { kMaxStartPauseGapLines, pauseMarker } from '@wbcnc/cam/pauseMarker';
 import { describe, expect, it } from 'vitest';
 import { type HoldContext, holdHint } from './holdHint';
 import { pauseHint, positionWindow } from './pauseHints';
@@ -69,6 +69,22 @@ describe('holdHint', () => {
         const atM0 = controllerPercent(startEnd, size);
         expect(holdHint(gcode, at(atM0, { spindle: 'off' }))?.marker?.kind).toBe('start');
         expect(holdHint(gcode, at(atM0, { spindle: 'on' }))).toBeNull();
+      });
+
+    // camNC's output has comment lines between the start M0 and its M3, sized so that the position alone tells them
+    // apart; 40 MB is about the largest program the capped gap covers.
+    for (const size of [1_000_000, 20_000_000, 40_000_000])
+      it(`in a ${size / 1e6} MB program with the gap after the start M0, the position alone decides`, () => {
+        const { gcode, startEnd, m3End, travelEnd } = camProgram(size, { gap: true });
+        const window = positionWindow(size);
+        expect(m3End - startEnd).toBeLessThanOrEqual(kMaxStartPauseGapLines * 80 + 10);
+        // At the start M0, the spindle state unknown: as reported, and the furthest the report can be off.
+        for (const reported of [controllerPercent(startEnd, size), ((startEnd + window) / size) * 100])
+          for (const holdRequested of [false, true]) expect(holdHint(gcode, at(reported, { holdRequested }))?.marker?.kind).toBe('start');
+        // After the M3: in the dwell and in the travel at safe Z.
+        for (const byte of [m3End, travelEnd - 'G0 X100 Y100\n'.length, travelEnd])
+          for (const spindle of [undefined, 'on'] as const)
+            expect(holdHint(gcode, at(controllerPercent(byte, size), { spindle, wpos: { z: 23.3 } }))).toBeNull();
       });
   });
 
