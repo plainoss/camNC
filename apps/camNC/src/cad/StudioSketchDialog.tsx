@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { editable } from './editorHelpers';
 import { FeatureDialog } from './FeatureDialog';
 import { fieldsSettled } from './variableFields';
 
@@ -10,7 +11,15 @@ function secondaryInteraction(host: HTMLElement, target = host.ownerDocument.act
   );
 }
 
-/** Keeps sketch confirmation separate from Enter, which belongs to drawing tools and value editors. */
+/** Ctrl/⌘+Enter confirms the sketch, and Shift+E confirms it into a new Extrude; plain Enter belongs to drawing tools and value editors. */
+function confirmIntent(event: KeyboardEvent): 'confirm' | 'extrude' | null {
+  if (event.defaultPrevented || event.altKey || event.repeat || event.isComposing || event.keyCode === 229) return null;
+  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.shiftKey) return 'confirm';
+  // Shift+E is still a letter in a value being typed.
+  if (event.shiftKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 'e' && !editable(event.target)) return 'extrude';
+  return null;
+}
+
 export function StudioSketchDialog({
   editor,
   title,
@@ -22,6 +31,7 @@ export function StudioSketchDialog({
   onShowConstraints,
   canConfirm = () => true,
   onConfirm,
+  onExtrude = onConfirm,
   onCancel,
 }: {
   editor: RefObject<HTMLDivElement | null>;
@@ -34,35 +44,28 @@ export function StudioSketchDialog({
   onShowConstraints: (show: boolean) => void;
   canConfirm?: () => boolean;
   onConfirm: () => void;
+  onExtrude?: () => void;
   onCancel: () => void;
 }) {
   const latest = useRef({ disabled, canConfirm });
   latest.current = { disabled, canConfirm };
   const confirming = useRef(false);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState<'confirm' | 'extrude' | false>(false);
   useEffect(() => {
     if (!ready || checking) return;
     setReady(false);
     confirming.current = false;
     // A new variable may start a sketch check on blur. Wait for that check, but discard a permanently invalid request.
-    if (!disabled && canConfirm() && editor.current && !secondaryInteraction(editor.current)) onConfirm();
-  }, [ready, checking, disabled, canConfirm, onConfirm, editor]);
+    if (!disabled && canConfirm() && editor.current && !secondaryInteraction(editor.current))
+      (ready === 'extrude' ? onExtrude : onConfirm)();
+  }, [ready, checking, disabled, canConfirm, onConfirm, onExtrude, editor]);
   useEffect(() => {
     const host = editor.current;
     if (!host) return;
     let mounted = true;
     const keyDown = (event: KeyboardEvent) => {
-      if (
-        event.defaultPrevented ||
-        event.key !== 'Enter' ||
-        !(event.ctrlKey || event.metaKey) ||
-        event.altKey ||
-        event.shiftKey ||
-        event.repeat ||
-        event.isComposing ||
-        event.keyCode === 229
-      )
-        return;
+      const intent = confirmIntent(event);
+      if (!intent) return;
       // Search and secondary dialogs own their keys; confirming a sketch must not dismiss an unfinished interaction.
       if (secondaryInteraction(host, event.target instanceof Element ? event.target : undefined)) return;
       event.preventDefault();
@@ -74,7 +77,7 @@ export function StudioSketchDialog({
         focused.blur();
       // A pending variable field may become invalid on blur. Recheck after its validation, as the green check does.
       void fieldsSettled().then(() => {
-        if (mounted && host.isConnected) setReady(true);
+        if (mounted && host.isConnected) setReady(intent);
       });
     };
     // Capture also reaches focused sketch fields and the Show constraints checkbox without taking their focus.
