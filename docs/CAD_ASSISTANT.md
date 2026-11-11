@@ -126,10 +126,22 @@ discarding user constraints.
 
 ## Review and acceptance
 
-**Review proposal** opens the checked candidate in a 3D view. Orbit it or switch between
-the original and candidate. The review lists added, changed and removed steps,
-new warnings and lost cuts or joint openings. A successful geometry check does
-not establish that a piece matches a picture or that its joints are strong.
+**Review proposal** opens the checked candidate over the workspace, below the
+toolbar and beside the assistant, so the conversation stays in view. The list on
+the left shows added, changed and removed steps, the cost of the change in lost
+cuts or joint openings, and new warnings. **Before**, **Changes** and **After**
+switch the view; Changes highlights the parts the proposal adds or changes.
+Escape or **Close** keeps the proposal for later. A successful geometry check
+does not establish that a piece matches a picture or that its joints are strong.
+
+A proposal built from a recipe shows **Adjust before applying**: a slider for each
+of the recipe's numbers, such as width, wall or shelves. Moving one rebuilds the
+recipe with that value and runs the same trusted path as an assistant candidate:
+the sandboxed script check, the complete final check and the confirmed brief. No
+model request is made. A value the checks refuse leaves the previous proposal in
+place and says why. When the open design has changed since the proposal was made,
+**Re-check on current design** runs the same script on the current design in the
+same way, so the change need not be asked for again.
 
 Only **Apply as one undo step** changes the open document. A hand edit made after
 the request invalidates the proposal, including when that edit has been undone.

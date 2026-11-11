@@ -10,6 +10,7 @@ import { assistantQuestion, resumeAssistantMessages, runDesignAssistant } from '
 import { BriefChips } from './BriefChips';
 import { Composer } from './Composer';
 import { Transcript } from './Transcript';
+import { bindProposalOrigin } from './recheck';
 import { connectionLabel } from './connectionPresets';
 import type { AssistantRequirements } from './requirements';
 import { checkScriptInBrowser } from './scriptCheck';
@@ -135,8 +136,9 @@ export function AssistantDock({
       controller.current?.abort();
     };
   }, []);
+  const canSend = (reply: string) => !running && !readingImage && !!credentials && (!!reply.trim() || !!images.length);
   const send = async (reply = text) => {
-    if (running || readingImage || !credentials || (!reply.trim() && !images.length)) return;
+    if (!canSend(reply) || !credentials) return;
     const start = structuredClone(document);
     // Read here, not from state: a typed answer confirms requirements in the same click that sends it.
     const brief = readRequirements(document.id);
@@ -233,6 +235,7 @@ export function AssistantDock({
       if (!mounted.current) return;
       if (result.proposal && !abort.signal.aborted) {
         bindProposalRequirements(result.proposal, brief.revision);
+        bindProposalOrigin(result.proposal, result.origin);
         onCheckedProposal(result.proposal);
       }
       setActivity(
@@ -346,6 +349,8 @@ export function AssistantDock({
               composer.current?.focus();
             }}
             onReply={(reply, requirements) => {
+              // Confirm the brief only together with a message that actually goes out.
+              if (!canSend(reply)) return;
               if (requirements && Object.keys(requirements).length)
                 confirmBrief({ ...readRequirements(document.id).requirements, ...requirements });
               void send(reply);
