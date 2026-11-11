@@ -1,0 +1,92 @@
+import { describe, expect, it, vi } from 'vitest';
+import { defaultImageModel, defaultTextModel, detectKeyProvider, listProviderModels, nativeImageFromConnection } from './modelDefaults';
+import { testAssistantConnection } from './connectionTest';
+import { connectionPresets } from './connectionPresets';
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+describe('provider defaults from a key alone', () => {
+  it('recognises the provider from the key prefix', () => {
+    expect(detectKeyProvider(' sk-ant-api03-x ')).toBe('anthropic');
+    expect(detectKeyProvider('sk-proj-x')).toBe('openai');
+    expect(detectKeyProvider('abc')).toBeNull();
+  });
+
+  it("chooses the newest main-line text model and image model from the provider's list", () => {
+    expect(defaultTextModel('anthropic', ['claude-haiku-5-5', 'claude-sonnet-5', 'claude-sonnet-5-5', 'claude-opus-5-5'])).toBe(
+      'claude-sonnet-5-5'
+    );
+    expect(defaultTextModel('openai', ['gpt-5.2', 'gpt-5.2-mini', 'gpt-6', 'gpt-6-nano', 'gpt-image-2', 'gpt-6-realtime', 'o4'])).toBe(
+      'gpt-6'
+    );
+    expect(defaultImageModel('openai', ['gpt-image-1', 'gpt-image-2', 'gpt-image-2-mini', 'dall-e-3'])).toBe('gpt-image-2');
+    expect(defaultImageModel('openai', ['dall-e-3', 'gpt-6'])).toBe('dall-e-3');
+    expect(defaultImageModel('anthropic', ['gpt-image-2'])).toBeUndefined();
+  });
+
+  it('lists models with the same key and endpoint, and treats a refusal as no list', async () => {
+    const config = { ...connectionPresets[1]!.config, model: '' };
+    const fetcher = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => json(200, { data: [{ id: 'gpt-6' }, { id: 7 }] }));
+    expect(await listProviderModels(config, 'sk-x', new AbortController().signal, fetcher)).toEqual(['gpt-6']);
+    expect(String(fetcher.mock.calls[0]![0])).toBe('https://api.openai.com/v1/models');
+    expect((fetcher.mock.calls[0]![1]!.headers as Record<string, string>).authorization).toBe('Bearer sk-x');
+    expect(await listProviderModels(config, 'sk-x', new AbortController().signal, async () => json(403, {}))).toBeNull();
+    expect(
+      await listProviderModels(config, 'sk-x', new AbortController().signal, async () => {
+        throw new TypeError('Failed to fetch');
+      })
+    ).toBeNull();
+  });
+
+  it('fills blank models during the connection test and falls back to the preset when listing fails', async () => {
+    const toolCall = {
+      output: [{ type: 'function_call', call_id: 'c', name: 'connection_check', arguments: '{"ok":true}' }],
+      status: 'completed',
+    };
+    const fetcher = vi.fn(async (url: RequestInfo | URL) =>
+      String(url).endsWith('/models') ? json(200, { data: [{ id: 'gpt-6' }, { id: 'gpt-image-2' }] }) : json(200, toolCall)
+    );
+    const openai = await testAssistantConnection(
+      { ...connectionPresets[1]!.config, model: '' },
+      'sk-x',
+      new AbortController().signal,
+      fetcher
+    );
+    expect(openai.config).toMatchObject({ model: 'gpt-6', imageModel: 'gpt-image-2' });
+    const anthropicCall = {
+      content: [{ type: 'tool_use', id: 't', name: 'connection_check', input: { ok: true } }],
+      stop_reason: 'tool_use',
+    };
+    const anthropic = await testAssistantConnection(
+      { ...connectionPresets[0]!.config, model: '' },
+      'sk-ant-x',
+      new AbortController().signal,
+      async url => (String(url).includes('/models') ? json(500, {}) : json(200, anthropicCall))
+    );
+    expect(anthropic.config.model).toBe('claude-sonnet-5-5');
+    expect(anthropic.config.imageModel).toBeUndefined();
+    await expect(
+      testAssistantConnection(
+        { ...connectionPresets[2]!.config, endpoint: 'https://llm.example.com/v1', model: '' },
+        'k',
+        new AbortController().signal,
+        async () => json(404, {})
+      )
+    ).rejects.toThrow('Enter a model ID under Models');
+  });
+
+  it('hands Carve the same provider and key for images, and nothing for Anthropic', () => {
+    const openai = { key: 'sk-x', config: { ...connectionPresets[1]!.config, model: 'gpt-6', imageModel: 'gpt-image-2' } };
+    expect(nativeImageFromConnection(openai, 'medium')).toEqual({
+      endpoint: 'https://api.openai.com/v1',
+      model: 'gpt-image-2',
+      key: 'sk-x',
+      quality: 'medium',
+    });
+    expect(
+      nativeImageFromConnection({ key: 'sk-ant', config: { ...connectionPresets[0]!.config, model: 'claude-sonnet-5-5' } })
+    ).toBeNull();
+    expect(nativeImageFromConnection(null)).toBeNull();
+  });
+});
