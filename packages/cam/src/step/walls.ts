@@ -32,10 +32,15 @@ export function stackedWalls(
   const key = (wall: { circle?: Circle; ccw: boolean }, ids: number[]) =>
     `${wall.circle ? `${circles.indexOf(wall.circle)}${wall.ccw ? '+' : '-'}` : 'line'}:${ids.join(',')}`;
   let open = new Map<string, Wall>();
+  /**
+   * Where the first half of each whole circle in the slab below starts. A whole circle is cut into two halves from
+   * wherever its path starts, so the path above starts there too. Only the first half's start will do: with an odd
+   * number of points the halves differ in length, and starting at the second's would cut them at other points.
+   */
+  let starts = new Set<number>();
   for (const { low, high, region } of slabs) {
-    const next = new Map<string, Wall>();
-    // A whole circle is cut into two halves from wherever its path starts: start where the slab below's halves did.
-    const starts = new Set([...open.values()].flatMap(wall => (wall.circle ? [wall.top[0]!] : [])));
+    const next = new Map<string, Wall>(),
+      nextStarts = new Set<number>();
     for (const path of region) {
       const ids = path.map(p => vertex(p.x, p.y, low));
       const from = Math.max(
@@ -43,7 +48,10 @@ export function stackedWalls(
         ids.findIndex(id => starts.has(id))
       );
       const turned = from ? [...path.slice(from), ...path.slice(0, from)] : path;
-      for (const run of runsOnCircles(turned, circles)) {
+      const runs = runsOnCircles(turned, circles);
+      const whole = runs.length === 2 && !!runs[0]!.circle && runs[0]!.circle === runs[1]!.circle;
+      if (whole) nextStarts.add(vertex(runs[0]!.points[0]!.x, runs[0]!.points[0]!.y, high));
+      for (const run of runs) {
         const along = run.points,
           bottom = along.map(p => vertex(p.x, p.y, low)),
           top = along.map(p => vertex(p.x, p.y, high));
@@ -62,6 +70,7 @@ export function stackedWalls(
       }
     }
     open = next;
+    starts = nextStarts;
   }
   return walls;
 }
