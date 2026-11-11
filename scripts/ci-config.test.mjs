@@ -209,10 +209,17 @@ test('the Mergify queue runs all validation, PRs run the quick suites and main o
 
 test('Mergify batches retain the required gate, branch protections and explicit merge consent', () => {
   const config = parse(read('.mergify.yml'));
-  assert.equal(config.pull_request_rules, undefined, 'CI success must not automatically request a merge');
+  // CI success alone never queues a PR: the only automatic queueing is for PRs someone labelled `ready`.
+  assert.deepEqual(config.pull_request_rules, [
+    { name: 'queue PRs labelled ready', conditions: ['base = main', 'label = ready'], actions: { queue: null } },
+  ]);
   assert.equal(config.merge_protections_settings?.auto_merge_conditions, undefined);
   assert.equal(config.merge_queue.mode, 'serial', 'speculative batches must include preceding changes');
-  assert(config.merge_queue.max_parallel_checks > 1 && config.merge_queue.max_parallel_checks <= 2);
+  // One batch's 11 jobs plus PR CI fit the 20 concurrent runners; two batches did not.
+  assert.equal(config.merge_queue.max_parallel_checks, 1);
+  // Only a flaky-test fix discards running batches; other CI fixes wait for the running batch.
+  const interrupting = config.priority_rules.filter(rule => rule.allow_checks_interruption);
+  assert.deepEqual(interrupting.map(rule => rule.conditions), [['label = flaky-test']]);
   assert.equal(config.merge_queue.skip_intermediate_results ?? false, false);
   assert.equal(config.queue_rules.length, 1);
   const [queue] = config.queue_rules;

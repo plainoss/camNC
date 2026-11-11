@@ -7,6 +7,12 @@
 //   node scripts/file-size-ratchet.mjs [files...]           check the given files, or every source file when none given
 //   node scripts/file-size-ratchet.mjs --staged [files...]  check the content staged in the git index (pre-commit hook)
 //   node scripts/file-size-ratchet.mjs --update             lower ceilings of files that shrank, drop entries that fit
+//   node scripts/file-size-ratchet.mjs --base <rev>         also fail when a listed file is longer than it is at <rev>
+//
+// PR CI passes `--base` with the PR's base commit. Checking a listed file only against its ceiling races with other
+// PRs: a refactor that shrinks the file lowers its ceiling, and a PR that grew the file within the old headroom then
+// passes its own CI but fails once the queue combines it with that refactor. Comparing with the base instead fails the
+// growing PR in its own CI, whatever happens to the ceiling meanwhile.
 //
 // The pre-commit hook passes `--staged`, so the check reads each file's staged content with `git show :<path>`, which
 // ignores unstaged edits. nano-staged runs the hook's Biome entry concurrently and stages its output only after every
@@ -114,6 +120,24 @@ export function update(sizes, config) {
   return { config: { ...config, ceilings }, errors, changes };
 }
 
+/**
+ * Listed files that grew compared with their size at the base revision. A file the base doesn't have can't have grown.
+ * @param {Map<string, number>} sizes line counts by repo-relative path
+ * @param {Map<string, number>} baseSizes line counts at the base revision, for the listed files it has
+ * @returns {string[]} one message per violation
+ */
+export function checkGrowth(sizes, baseSizes, config, base) {
+  const errors = [];
+  for (const [path, lines] of sizes) {
+    const before = baseSizes.get(path);
+    if (config.ceilings?.[path] !== undefined && before !== undefined && lines > before)
+      errors.push(
+        `${path} has ${lines} lines, ${lines - before} more than at ${base} (files listed in ${CONFIG_FILE} may only shrink). ${splitHint}`
+      );
+  }
+  return errors;
+}
+
 function git(root, args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 }
@@ -150,13 +174,20 @@ export async function formatLikeHook(root, path, text) {
 export async function main(args, { root = resolve(fileURLToPath(import.meta.url), '../..'), cwd = process.cwd() } = {}) {
   const staged = args.includes('--staged');
   const updating = args.includes('--update');
-  const unknown = args.find(arg => arg.startsWith('--') && arg !== '--staged' && arg !== '--update');
+  const baseIndex = args.indexOf('--base');
+  const base = baseIndex === -1 ? undefined : args[baseIndex + 1];
+  if (baseIndex !== -1 && (!base || base.startsWith('--'))) {
+    console.error('--base needs a git revision');
+    return 2;
+  }
+  const rest = baseIndex === -1 ? args : args.filter((_, i) => i !== baseIndex && i !== baseIndex + 1);
+  const unknown = rest.find(arg => arg.startsWith('--') && arg !== '--staged' && arg !== '--update');
   if (unknown) {
     console.error(`Unknown option ${unknown}`);
     return 2;
   }
   const config = loadConfig(root);
-  const given = args
+  const given = rest
     .filter(arg => !arg.startsWith('--'))
     .map(arg => relative(root, isAbsolute(arg) ? arg : resolve(cwd, arg)).replace(/\\/g, '/'));
   const paths = given.length && !updating ? given.filter(path => isCovered(path, config)) : listFiles(root, config);
@@ -186,6 +217,18 @@ export async function main(args, { root = resolve(fileURLToPath(import.meta.url)
   }
 
   const errors = check(sizes, config);
+  if (base) {
+    const baseSizes = new Map();
+    for (const path of Object.keys(config.ceilings ?? {})) {
+      if (!sizes.has(path)) continue;
+      try {
+        baseSizes.set(path, countLines(git(root, ['show', `${base}:${path}`])));
+      } catch {
+        // The base doesn't have the file.
+      }
+    }
+    errors.push(...checkGrowth(sizes, baseSizes, config, base));
+  }
   for (const error of errors) console.error(`file-size-ratchet: ${error}`);
   return errors.length ? 1 : 0;
 }
