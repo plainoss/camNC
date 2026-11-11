@@ -143,7 +143,7 @@ jobs:
         run: mkdir -p apps/camNC/test-results/junit
       # A module that never finishes importing hits no test timeout, so bound the step. Turbo groups logs in CI, which
       # would leave a hung run with no output; stream them to show which files finished.
-      # The Vitest suites report to Mergify themselves; both browser shards report as one suite. In the headless suites,
+      # The Vitest suites report to Mergify themselves; the browser shards report as one suite. In the headless suites,
       # the Cloudflare Workers suites write JUnit reports instead, and so does node --test (camNC's license check),
       # keeping its TAP output. Both are uploaded below.
       - name: Run tests
@@ -206,12 +206,17 @@ jobs:
         include:
           - suite: app-browser-1
             tasks: test:browser
-            args: --shard=1/2
+            args: --shard=1/3
             filter: --filter=@wbcnc/camNC
             performance: ''
           - suite: app-browser-2
             tasks: test:browser
-            args: --shard=2/2
+            args: --shard=2/3
+            filter: --filter=@wbcnc/camNC
+            performance: ''
+          - suite: app-browser-3
+            tasks: test:browser
+            args: --shard=3/3
             filter: --filter=@wbcnc/camNC
             performance: ''
     runs-on: ubuntu-24.04
