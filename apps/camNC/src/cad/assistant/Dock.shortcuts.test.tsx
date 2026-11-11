@@ -9,7 +9,8 @@ import { defaultProvider, rememberAssistantCredentials } from './keyStore';
 import { runDesignAssistant } from './loop';
 import { createAssistantUsage } from './runBudget';
 
-vi.mock('@wbcnc/cad-script', () => ({
+vi.mock('@wbcnc/cad-script', async importOriginal => ({
+  ...(await importOriginal<typeof import('@wbcnc/cad-script')>()),
   inspectCadDocument: vi.fn(async (document: CadDocument) => ({ document, report: {}, parts: [] })),
   compactCadReport: vi.fn(() => ({})),
   renderCadViews: vi.fn(() => []),
@@ -120,7 +121,7 @@ it('keeps the Send CTA colored under late editor button styles and advertises th
     await waitFor(() => expect(style.backgroundColor).toBe('rgb(23, 108, 97)'));
     expect(style.color).toBe('rgb(255, 255, 255)');
     expect(input.getAttribute('aria-keyshortcuts')).toBe('Control+Enter Meta+Enter');
-    expect(screen.getByText('⌘ / Ctrl + Enter to send · Enter for a new line')).toBeDefined();
+    expect(screen.getByText('⌘ / Ctrl + Enter to send')).toBeDefined();
   } finally {
     generic.remove();
   }

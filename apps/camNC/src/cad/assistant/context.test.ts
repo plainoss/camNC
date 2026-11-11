@@ -19,6 +19,20 @@ const batch = (id: string, source: string, images?: AssistantImage[]): Assistant
 ];
 
 describe('bounded assistant provider context', () => {
+  it('retains the current SVG candidate and its views through reports and full finalization', () => {
+    const candidate = batch('svg', '<svg>current</svg>', [image('top')]);
+    candidate[0]!.calls![0]!.name = 'check_svg';
+    const messages: AssistantMessage[] = [
+      ...candidate,
+      { role: 'assistant', text: '', calls: [{ id: 'read', name: 'read_design_report', arguments: {} }] },
+      { role: 'tool', callId: 'read', text: 'details' },
+      { role: 'assistant', text: '', calls: [{ id: 'final', name: 'finalize_design', arguments: {} }] },
+      { role: 'tool', callId: 'final', text: 'complete' },
+    ];
+    const result = buildAssistantContext(messages, { images: true });
+    expect(result).toEqual(messages);
+    expect(result.flatMap(message => message.images ?? []).map(image => image.name)).toEqual(['top']);
+  });
   it('retains earlier suggested questions so short user replies keep their meaning', () => {
     const question: AssistantMessage = {
       role: 'assistant',
