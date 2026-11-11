@@ -97,6 +97,9 @@ export function carvingOutlineSvg(outline: Loop[]): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box.x0} ${-box.y1} ${box.w} ${box.h}"><path fill="black" fill-rule="nonzero" d="${path}"/></svg>`;
 }
 
+// Smooth traces are flattened at 0.015 mm, so a 1024 px generated illustration carved at 300 mm needs about 5000 points.
+const kMaxOutlinePoints = 8000;
+
 /** Prepare a fresh candidate. The caller keeps original source for future size/detail changes. No job is mutated. */
 export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Promise<PreparedCarvingArt> {
   const { art, width, height, detail, carving, board, signal } = options;
@@ -110,7 +113,7 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   if (
     options.sourceOutline &&
     (options.sourceOutline.length > 500 ||
-      options.sourceOutline.reduce((sum, loop) => sum + loop.length, 0) > 4000 ||
+      options.sourceOutline.reduce((sum, loop) => sum + loop.length, 0) > kMaxOutlinePoints ||
       options.sourceOutline.some(
         loop =>
           loop.length < 3 ||
@@ -124,7 +127,7 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   abort(signal);
   const box = bounds(drawn.region);
   if (!Number.isFinite(box.w) || box.w <= 0 || box.h <= 0) throw new Error('Artwork has no dark filled shapes to carve.');
-  if (drawn.region.length > 500 || drawn.region.reduce((sum, loop) => sum + loop.length, 0) > 4000)
+  if (drawn.region.length > 500 || drawn.region.reduce((sum, loop) => sum + loop.length, 0) > kMaxOutlinePoints)
     throw new Error('Artwork is too complex. Request fewer details or simpler filled shapes.');
   const scale = Math.min(width / box.w, height / box.h);
   let outline = drawn.region.map(loop =>
