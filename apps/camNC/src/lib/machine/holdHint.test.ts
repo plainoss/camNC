@@ -10,6 +10,7 @@ const at = (percent: number | undefined, more: Partial<HoldContext> = {}): HoldC
   percent,
   readTo: percent,
   holdRequested: false,
+  positionUnits: 'mm',
   mpos: { z: -5 },
   wpos: { z: 23.3 },
   ...more,
