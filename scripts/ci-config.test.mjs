@@ -511,3 +511,28 @@ test('every CI test run reports its results to Mergify, and fork PRs without the
     if (!file.endsWith('vitest.fast.config.ts')) assert.match(read(file), /'@mergifyio\/vitest'|outputFile: \{ junit: 'test-results\/junit\/worker\.xml' \}/, file);
   }
 });
+
+test('Deploy ships production only from main pushes and previews only same-repository PRs', () => {
+  const workflow = parse(read('.github/workflows/deploy.yml'));
+  assert.deepEqual(workflow.on.push.branches, ['main']);
+  const { deploy, 'setup-smoke': smoke } = workflow.jobs;
+  const evaluate = new Function('github', 'startsWith', `return (${deploy.if});`);
+  const runs = github => evaluate({ repository: 'plainoss/camNC', ...github }, (value, prefix) => value.startsWith(prefix));
+  const pr = (head, repo = 'plainoss/camNC') => ({
+    event_name: 'pull_request',
+    head_ref: head,
+    event: { pull_request: { head: { repo: { full_name: repo } } } },
+  });
+  assert.equal(runs({ event_name: 'push' }), true);
+  assert.equal(runs(pr('feat/x')), true);
+  assert.equal(runs(pr('feat/x', 'someone/camNC')), false, 'fork PRs have no token');
+  assert.equal(runs(pr('mergify/merge-queue/abc')), false, 'queue batches are not previewed');
+  const step = name => deploy.steps.find(candidate => candidate.name === name);
+  assert.equal(step('Deploy production').if, "github.event_name == 'push'");
+  assert.match(step('Deploy production').run, /pnpm run deploy$/);
+  assert.equal(step('Upload preview version').if, "github.event_name == 'pull_request'");
+  assert.match(step('Upload preview version').run, /deploy:preview -- --preview-alias pr-/);
+  assert.equal(smoke.uses, './.github/workflows/setup-smoke.yml');
+  assert.equal(smoke.if, "github.event_name == 'push'");
+  assert('workflow_call' in parse(read('.github/workflows/setup-smoke.yml')).on);
+});

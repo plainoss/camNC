@@ -22,8 +22,15 @@ pnpm dev --filter @wbcnc/camNC   # from the repo root
 
 `wrangler.jsonc` defines the `camnc` Worker (static assets from `dist/`, `/api/*` handled by
 `worker/index.ts`) and a `preview` env (`camnc-preview` Worker, `camnc-preview` D1 database,
-Clerk development keys). Both Workers deploy through Cloudflare Workers Builds, connected to this
-repository (`plainoss/camNC`) in the Cloudflare dashboard (plainoss account):
+Clerk development keys). Both Workers deploy from GitHub Actions (`.github/workflows/deploy.yml`): production on every push
+to `main`, followed by the production setup smoke, and a `camnc-preview` version with the alias
+`pr-<n>` for every pull request from this repository. The workflow needs the `CLOUDFLARE_API_TOKEN`
+secret (Workers Scripts and D1 edit on the plainoss account) and the `CLERK_PUBLISHABLE_KEY_PRODUCTION`
+and `CLERK_PUBLISHABLE_KEY_PREVIEW` repository variables. Disconnect Cloudflare Workers Builds once
+it runs, so each commit deploys once.
+
+Cloudflare Workers Builds, connected to this repository (`plainoss/camNC`) in the Cloudflare
+dashboard (plainoss account), used these settings:
 
 | Setting                                     | `camnc`                                                  | `camnc-preview`           |
 | ------------------------------------------- | -------------------------------------------------------- | ------------------------- |

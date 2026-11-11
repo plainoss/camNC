@@ -1,0 +1,73 @@
+name: Deploy
+
+# Builds and deploys the camnc Workers from GitHub Actions: production on every push to main, and a preview version
+# of camnc-preview on every pull request from this repository. Replaces Cloudflare Workers Builds, whose build
+# minutes the account can run out of. Needs the CLOUDFLARE_API_TOKEN secret (Workers Scripts and D1 edit) and the
+# CLERK_PUBLISHABLE_KEY_PRODUCTION and CLERK_PUBLISHABLE_KEY_PREVIEW variables.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event_name == 'push' && 'camnc' || 'camnc-preview' }}
+    # Fork PRs get no token. Mergify's batch drafts are validated by CI and never previewed.
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+      !startsWith(github.head_ref, 'mergify/merge-queue/'))
+    # Job level: a preview is superseded by the PR's next commit, while production deploys run one after another.
+    concurrency:
+      group: deploy-${{ github.event.pull_request.number || 'production' }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+      # The build key includes VITE_CLERK_PUBLISHABLE_KEY, so a cached build is only replayed for the same key.
+      - name: Authenticate remote cache
+        if: vars.TURBO_TEAM != ''
+        uses: vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10 # v1.0.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+          audience: https://vercel.com/camnc-ci-cache
+          policy: ${{ vars.TURBO_POLICY_ID }}
+      - name: Build
+        run: pnpm turbo run build --filter @wbcnc/camNC
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ github.event_name == 'push' && vars.CLERK_PUBLISHABLE_KEY_PRODUCTION || vars.CLERK_PUBLISHABLE_KEY_PREVIEW }}
+      - name: Deploy production
+        if: github.event_name == 'push'
+        working-directory: apps/camNC
+        run: pnpm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Upload preview version
+        if: github.event_name == 'pull_request'
+        working-directory: apps/camNC
+        run: pnpm run deploy:preview -- --preview-alias pr-${{ github.event.pull_request.number }} | tee "$RUNNER_TEMP/preview.log"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Show the preview URL
+        if: github.event_name == 'pull_request'
+        run: |
+          grep -Eo 'https://pr-[0-9]+-[^ ]+' "$RUNNER_TEMP/preview.log" | head -n 1 | sed 's/^/Preview: /' >> "$GITHUB_STEP_SUMMARY"
+
+  setup-smoke:
+    name: Production setup smoke
+    needs: deploy
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/setup-smoke.yml
