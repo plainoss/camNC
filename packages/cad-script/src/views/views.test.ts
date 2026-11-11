@@ -52,6 +52,13 @@ describe('evaluated assembly drawings', () => {
     }
   });
 
+  it('projects only explicitly selected views while preserving their evaluated bounds and cuts', () => {
+    const all = renderCadViews(result.document, result.parts);
+    expect(renderCadViews(result.document, result.parts, ['right', 'top'])).toEqual([all[2], all[0]]);
+    expect(renderCadViews(result.document, result.parts, false)).toEqual([]);
+    expect(renderCadViews(result.document, result.parts, [])).toEqual([]);
+  });
+
   it('does not emit suppressed folders or their physical copies', () => {
     const source = result.document.parts[0];
     const document = { ...result.document, parts: [{ ...source, suppressed: true as const }] };

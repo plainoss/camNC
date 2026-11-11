@@ -8,7 +8,8 @@ import { defaultProvider, rememberAssistantCredentials } from './keyStore';
 import { runDesignAssistant } from './loop';
 import { createAssistantUsage } from './runBudget';
 
-vi.mock('@wbcnc/cad-script', () => ({
+vi.mock('@wbcnc/cad-script', async importOriginal => ({
+  ...(await importOriginal<typeof import('@wbcnc/cad-script')>()),
   inspectCadDocument: vi.fn(async (document: CadDocument) => ({ document, report: {}, parts: [] })),
   compactCadReport: vi.fn(() => ({})),
   renderCadViews: vi.fn(() => []),
@@ -167,7 +168,8 @@ it('keeps the fresh greeting at the top and the composer visible beside expanded
     await userEvent.click(screen.getByRole('button', { name: /Build a cupboard/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Plywood with dados' })).toHaveProperty('disabled', false));
-    await userEvent.click(screen.getByText('Agent activity'));
+    // Expand the turn's inline steps, the tallest state of the conversation.
+    await userEvent.click(screen.getByText('1 step'));
     await page.viewport(390, 844);
     const send = screen.getByRole('button', { name: 'Send' }).getBoundingClientRect();
     const bounds = panel.getBoundingClientRect();
@@ -212,4 +214,56 @@ it('keeps clarification replies usable while a checked proposal remains availabl
   expect(vi.mocked(runDesignAssistant).mock.calls[1]![0].messages.at(-1)).toEqual({ role: 'user', text: '24 mm' });
   expect(onProposal).not.toHaveBeenCalled();
   expect(source).toEqual(before);
+});
+
+it('confirms typed answers as the brief, sends them in words and lets a chip be removed', async () => {
+  vi.mocked(runDesignAssistant).mockImplementationOnce(async options => {
+    options.onMessage?.({
+      role: 'assistant',
+      text: '',
+      calls: [
+        {
+          id: 'size',
+          name: 'ask_user',
+          arguments: {
+            question: 'What size should the tray be?',
+            choices: ['Use your proposal', 'Help me choose'],
+            fields: [
+              { name: 'width', label: 'Width', unit: 'mm', value: 280 },
+              { name: 'minimumWall', label: 'Wall', unit: 'mm', value: 18 },
+            ],
+          },
+        },
+      ],
+    });
+    options.onMessage?.({ role: 'tool', callId: 'size', text: 'Question shown to the user.' });
+    return { status: 'question', messages: [], checks: 0, usage: createAssistantUsage() };
+  });
+  const document = createPlateDocument();
+  render(
+    <AssistantDock
+      proposal={null}
+      onCheckedProposal={() => {}}
+      onDiscardProposal={() => {}}
+      document={document}
+      onProposal={() => {}}
+      onClose={() => {}}
+    />
+  );
+  await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'A tray please.');
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+  const wall = await screen.findByRole('spinbutton', { name: /^Wall/ });
+  await userEvent.clear(wall);
+  await userEvent.type(wall, '20');
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Use these values' })).toHaveProperty('disabled', false));
+  await userEvent.click(screen.getByRole('button', { name: 'Use these values' }));
+  await waitFor(() => expect(runDesignAssistant).toHaveBeenCalledTimes(2));
+  const second = vi.mocked(runDesignAssistant).mock.calls[1][0];
+  expect(second.messages.at(-1)).toEqual({ role: 'user', text: 'Width: 280 mm, Wall: 20 mm' });
+  expect(second.requirements).toEqual({ width: 280, minimumWall: 20 });
+  const brief = screen.getByRole('region', { name: 'Brief' });
+  expect(within(brief).getByText('Wall ≥ 20 mm')).toBeDefined();
+  await userEvent.click(within(brief).getByRole('button', { name: 'Remove Wall ≥ 20 mm' }));
+  await waitFor(() => expect(within(screen.getByRole('region', { name: 'Brief' })).queryByText('Wall ≥ 20 mm')).toBeNull());
+  expect(screen.getByText('Width 280 mm')).toBeDefined();
 });
