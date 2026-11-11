@@ -213,3 +213,25 @@ export function mirroredPlacement(placement: CadPlacement, plane: { origin: Vec3
   const position = reflect(from).map((value, axis) => tidy(value + plane.origin[axis]!)) as Vec3;
   return { position, rotation: quaternionOf([x!.map(value => -value) as Vec3, y!, z!]) };
 }
+
+/** Carry a joined child's relative frame with a host copy; its local material carries the same reflection. */
+export function joinedCopyPlacement(parent: CadPlacement, child: CadPlacement, copy: CadPlacement, mirrored = false): CadPlacement {
+  const axes: Vec3[] = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+  ];
+  const [x, y, z] = axes.map(axis => rotateVector(parent.rotation, axis)) as [Vec3, Vec3, Vec3];
+  const cofactors = [cross(y, z), cross(z, x), cross(x, y)];
+  const determinant = dot(x, cofactors[0]!);
+  // Saved quaternions can have bounded rounding; invert their actual basis instead of assuming exact unit length.
+  if (!Number.isFinite(determinant) || determinant === 0) throw Error('A joined body has an invalid host frame.');
+  const relative = (v: Vec3): Vec3 => cofactors.map(axis => dot(axis, v) / determinant) as Vec3;
+  const reflect = (v: Vec3): Vec3 => (mirrored ? [-v[0], v[1], v[2]] : v);
+  const offset = relative(child.position.map((value, axis) => value - parent.position[axis]!) as Vec3);
+  const position = placePoint(copy, reflect(offset));
+  const carried = axes.map(axis => rotateVector(copy.rotation, reflect(relative(rotateVector(child.rotation, reflect(axis))))));
+  const rotation = quaternionOf(carried.map(unit) as [Vec3, Vec3, Vec3]);
+  if (![...position, ...rotation].every(Number.isFinite)) throw Error('A joined copy exceeds finite model coordinates.');
+  return { position, rotation };
+}
