@@ -3,11 +3,13 @@
 import { createJob } from '@/cam/jobDb';
 import { wrapCamWorker } from '@/cam/camQueries';
 import { camWorkerCache } from '@/test/camWorkerCache';
+import { trackQueryClient } from '@/lib/settled';
+import { settled } from '@/test/settled';
 // Pointer coordinates and fitted SVG dimensions must use the page's real layout, including the fixed-height status.
 import '@/style.css';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
 import type { ComponentType } from 'react';
 import { afterEach, expect, vi } from 'vitest';
@@ -53,9 +55,11 @@ export const drawing = (board: string) => screen.getByRole('region', { name: `Bo
 export const showAll = () => fireEvent.click(screen.getByRole('button', { name: 'All boards' }));
 /** An item of the Suggest holds menu in the tools. */
 export const holdsMenu = async (name: string) => {
-  // The previous menu exits after its selection saves. Let it restore focus before opening another menu,
-  // or that late focus restoration can dismiss the new menu even though the drawing already shows the saved holds.
-  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull(), { timeout: 10_000 });
+  // The previous menu exits after its selection saves. Let its exit animation end and it restore focus before opening
+  // another menu, or that late focus restoration can dismiss the new menu. Settling includes planning the job's boards,
+  // which takes as long as the first drawing can (see openKinderregal).
+  await settled({ timeout: 60_000 });
+  expect(screen.queryByRole('menu')).toBeNull();
   fireEvent.pointerDown(await screen.findByRole('button', { name: 'Suggest holds' }, { timeout: 10_000 }), { button: 0, ctrlKey: false });
   return (await screen.findByRole('menuitem', { name })) as HTMLElement;
 };
@@ -105,6 +109,8 @@ export async function openKinderregal(client = new QueryClient()) {
   }));
   const job = await createJob(new File([bytes], 'kinderregal-eiche.step'));
   params.jobId = job.id;
+  // Its job reads and saves count as pending for `settled()`.
+  trackQueryClient(client);
   render(
     <QueryClientProvider client={client}>
       <BoardsStep />

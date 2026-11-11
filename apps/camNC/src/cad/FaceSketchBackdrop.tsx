@@ -5,6 +5,7 @@ import { Matrix4 } from 'three';
 import { SketchCamera, type SketchView } from '@/cam/model/ModelViewport';
 import type { FaceSketchScene } from './faceSketchScene';
 import { partSolid } from './partSolid';
+import { settledCanvas } from '@/lib/settledCanvas';
 
 const identity = new Matrix4();
 
@@ -17,7 +18,7 @@ export default function FaceSketchBackdrop({ scene, view }: { scene: FaceSketchS
   useEffect(() => () => solid.geometry?.dispose(), [solid]);
   return (
     <div className="cad-sketch-backdrop" aria-hidden="true">
-      <Canvas orthographic frameloop="demand" dpr={[1, 2]}>
+      <Canvas orthographic frameloop="demand" dpr={[1, 2]} {...settledCanvas}>
         <SketchCamera view={view} model={identity} />
         <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
         <directionalLight position={[300, -500, 800]} intensity={1.8} />
