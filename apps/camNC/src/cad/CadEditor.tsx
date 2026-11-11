@@ -268,6 +268,7 @@ import { StudioFeatureDialog, type StudioFeatureDialogState } from './StudioFeat
 import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
+import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { useEditorVariableFields } from './useEditorVariableFields';
 import { featureShownByDefault } from './sketchShown';
 import './cad.css';
@@ -281,7 +282,6 @@ type ConstraintTool = ConstraintCommandTool;
 type View = { x: number; y: number; w: number; h: number };
 const initialView: View = { x: -35, y: -175, w: 300, h: 210 };
 const numeric = (c: CadConstraint): c is NumericConstraint => 'value' in c;
-
 const FaceSketchBackdrop = lazy(() => import('./FaceSketchBackdrop'));
 const PartView3D = lazy(() => import('./PartView3D'));
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
@@ -845,7 +845,7 @@ export function CadEditor({
       release();
     };
   }, []);
-
+  useEditorDocumentKeys(root);
   useEffect(() => {
     const canvas = svg.current;
     if (!canvas) return;
