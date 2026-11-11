@@ -344,7 +344,7 @@ by the parts that fit them.
 - The report's `steps` say where each face is in words: "Side's top (+x): sketch origin
   at 18, 0, 0, its x along +y, its y along +z, looking +x." Read them to check a part
   sits where you meant before reading anything else.
-- `d.cutParts(target, { with: [tools], clearance: 'fit' })` cuts the tools out of the
+- `d.cutParts(target, { with: [tools], clearance: 0.2 })` cuts the tools out of the
   target wherever they reach in: rebates, dados, grooves and mortises that follow both
   parts. The clearance grows every side of an opening inside the target and deepens a
   blind one; sides that run off the target's edge stay open. Each opening is listed in
