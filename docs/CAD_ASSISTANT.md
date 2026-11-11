@@ -23,14 +23,19 @@ steps stay with the source family and are not copied into the detached part.
 
 ## Connection and conversation
 
-Open **Assistant**, then **Connection**. Enter your provider address, model ID
-and key. Anthropic uses Messages. Compatible providers can use Responses or
-Chat Completions. Choose the protocol the endpoint implements and mark whether
-that model supports tools and images. Tools are required. Image support enables
-reference attachments and sends rendered candidate views back for inspection.
+Open **Assistant**, then **Connection**. Choose Anthropic, OpenAI or **Other…**,
+paste the key and pick a model (Anthropic lists its current models, with the
+recommended one first). **Test and connect** sends one small tool-calling request
+with a 1 × 1 pixel image and no design data. It confirms that the browser can reach
+the provider, that the key and model work and that the model calls tools; if the
+model refuses the image, image support is turned off and the test is repeated
+without it. A failed test saves nothing and says why. **Address and capabilities**
+shows the API address, the API type (Anthropic Messages, OpenAI Responses or Chat
+Completions), image input and prompt caching, and offers **Save without testing**.
+The design assistant and the carving assistant use the same connection.
 
-Requests go from the browser to the selected provider. The key stays in memory
-unless **Remember key on this device** is selected. Remembered keys use their own
+Requests go from the browser to the selected provider. **Remember on this device** is selected by default;
+without it the key stays in memory until the app reloads. Remembered keys use their own
 localStorage entry, outside account settings, server sync and settings backups.
 **Forget key** removes that entry. A provider that refuses browser requests
 produces a connection error; the application does not silently proxy the design
