@@ -5,6 +5,8 @@ import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import type { CadDocument, CadPart } from './types';
 import { trimCadFolders } from './folderModel';
 import { copyOperationPrefix } from './copyTransforms';
+import { partCutLabel, partCutVariableErrors } from './partCutVariables';
+import { cadVariableScope } from './variables';
 
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
@@ -46,6 +48,11 @@ function extrudeDetail(document: CadDocument, part: CadPart) {
   return typed(part.thicknessExpression, part.thickness);
 }
 
+/** A sketch's name in the feature list, and wherever else the sketch is named. */
+export function sketchStepLabel(part: CadPart): string {
+  return part.sketchName ?? `Sketch · ${part.name}`;
+}
+
 /**
  * The design's steps: for each part in turn, its sketch and the thickness it's made to, the sketches and cuts on its
  * faces, and its copies. A step cutting parts out of others comes after the last of the parts it uses.
@@ -54,6 +61,10 @@ export function designSteps(document: CadDocument): DesignStep[] {
   const broken = brokenParts(document);
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
+  const partCutProblems = new Map<string, string>();
+  if (document.partCuts?.length)
+    for (const { stepId, message } of partCutVariableErrors(document, cadVariableScope(document)))
+      if (!partCutProblems.has(stepId)) partCutProblems.set(stepId, message);
   return listedSteps(document).map(step => {
     const own = broken.get(step.partId);
     const part = byId.get(step.partId);
@@ -65,7 +76,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
           : own && `It’s on ${part.name}, which can’t be built.`
         : null;
     const reason = (step.kind === 'sketch' || step.kind === 'extrude') && own ? own : onFace;
-    return reason ? { ...step, broken: reason } : step;
+    // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
+    const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;
+    return reason || values ? { ...step, broken: reason || values } : step;
   });
 }
 
@@ -132,7 +145,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
       {
         id: step.id,
         kind: 'partCut',
-        label: `Cut ${names(document, step.targets)} with ${names(document, step.tools)}`,
+        label: partCutLabel(document, step),
         detail: `clearance ${typed(step.clearanceExpression, step.clearance)}`,
         partId: owner?.id ?? reference,
         ...(owner && reference !== owner.id && { copyId: reference.slice(owner.id.length + 1) }),
@@ -146,7 +159,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
       // A part extruding another's sketch has none of its own.
       ...(part.sketchOf || part.faceProfile
         ? []
-        : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: part.sketchName ?? `Sketch · ${part.name}`, partId: part.id }]),
+        : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: sketchStepLabel(part), partId: part.id }]),
       // A sketch not yet extruded is only its sketch.
       ...(part.extrude === false
         ? []

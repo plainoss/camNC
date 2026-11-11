@@ -24,6 +24,7 @@ import { studioGeometry } from './studioGeometry';
 import { physicalFaceFrame as cadFaceFrame } from './studioGeometryReaders';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
+import { featureShownByDefault } from './sketchShown';
 import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
 import type { CadConnectorPick } from './TransformDialog';
@@ -185,11 +186,7 @@ export default function WorkspaceView({
   const sketchRegions = useMemo(
     () =>
       onPickSketch
-        ? sketchSelectionRegions(
-            profileDocument,
-            featureShown ?? (id => profileDocument.parts.find(p => `${p.id}:sketch` === id)?.extrude === false),
-            selectedId
-          )
+        ? sketchSelectionRegions(profileDocument, featureShown ?? (id => featureShownByDefault(profileDocument, id)), selectedId)
         : [],
     [profileDocument, featureShown, onPickSketch, selectedId]
   );
@@ -274,6 +271,13 @@ export default function WorkspaceView({
       ? [index]
       : []
   );
+  // A hovered row that stands for one copy names that copy, which the viewport's part-wide highlightIds can't tell from
+  // its family. Hovered instances are therefore drawn as picked by index, alongside the selection; highlightIds stays
+  // for part-wide matches such as sketch lines.
+  const hoverIndexes = hoverIds
+    ? model.instances.flatMap((instance, index) => (cadPartReferenceMatches(hoverIds, instance.partId, instance.copyId) ? [index] : []))
+    : [];
+  const pickedIndexes = [...new Set([...(selectedFace ? [] : selectedIndexes), ...hoverIndexes])];
   const selectedFrame = selectedFace && cadFaceFrame(document, selectedFace, assembly);
   const selectedFaceIndex = selectedFace
     ? model.instances.findIndex(instance => instance.partId === selectedFace.partId && instance.copyId === selectedFace.copyId)
@@ -395,7 +399,7 @@ export default function WorkspaceView({
         transparentIds={transparentIds}
         instanceIds={model.instances.map(instanceKey)}
         selectedId={selectedId}
-        selectedIndexes={selectedFace ? [] : selectedIndexes}
+        selectedIndexes={pickedIndexes}
         selectedFace={
           selectedFrame && !('error' in selectedFrame) && selectedFaceIndex >= 0
             ? {

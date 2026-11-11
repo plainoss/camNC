@@ -19,6 +19,7 @@ const ready = async () => {
   await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
 };
 
+// Five complete cabinet re-evaluations (load, Cancel, Keep tools, Save, Undo) take ~24 s locally and ~43 s on CI runners.
 it('keeps the complete cabinet collision footer consistent with consumed membership through Keep tools and Undo', async () => {
   const source = parseCadDocument(structuredClone(cabinet));
   session = source.id;
@@ -68,4 +69,4 @@ it('keeps the complete cabinet collision footer consistent with consumed members
   expect(
     within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Transform/ })
   ).not.toBeDisabled();
-}, 40_000);
+}, 75_000);
