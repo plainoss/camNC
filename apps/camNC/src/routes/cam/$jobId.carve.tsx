@@ -4,7 +4,17 @@ import { CamJobBar } from '@/cam/CamJobBar';
 import { NumberInput } from '@/cam/NumberInput';
 import { CarvingArtFields } from '@/cam/CarvingArtFields';
 import { CarvingCutoutBar, CarvingCutoutLine, CarvingCutoutToggle, kCutoutSelection } from '@/cam/CarvingCutout';
-import { carvingProblem, itemName, kVBits, placeItem, withItems, type CarvingArt, type CarvingItemV1, type CarvingV1 } from '@/cam/carving';
+import {
+  carvingProblem,
+  cutoutOutline,
+  itemName,
+  kVBits,
+  placeItem,
+  withItems,
+  type CarvingArt,
+  type CarvingItemV1,
+  type CarvingV1,
+} from '@/cam/carving';
 import { carvingBounds as bounds, carvingPath as pathOf, centred, freeSpot } from '@/cam/carvingView';
 import { outlineArt } from '@/cam/carvingOutline';
 import { CarvingAssistant } from '@/cam/carvingAssistant/CarvingAssistant';
@@ -18,14 +28,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { BoardV1 } from '@/cam/boards';
 import type { CamJobV1 } from '@/cam/jobDb';
 import { kDefaultPlan } from '@/cam/planSettings';
-import { vConeDepth } from '@wbcnc/cam';
+import { cutoutPastBoard, vConeDepth } from '@wbcnc/cam';
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { Button } from '@wbcnc/ui/components/button';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { cn } from '@wbcnc/ui/lib/utils';
 import { SelectionBar } from '@/cam/boards/SelectionBar';
 import { AlertTriangle, Crosshair, Image, ListOrdered, Redo2, Trash2, Type, Undo2 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/carve')({ component: CarveStep });
 
@@ -455,6 +465,8 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const cone = vConeDepth(carving.vBit);
   const flatBit = (job.plan ?? kDefaultPlan).bit;
   const off = allBox && (allBox.x0 < 0 || allBox.y0 < 0 || allBox.x1 > size.w || allBox.y1 > size.h);
+  // The cut line as drawn (it follows the artwork once dropped): Plan can't cut the piece out whole while it runs off the board.
+  const cutOff = useMemo(() => cutoutPastBoard(cutoutOutline(carving), { w: size.w, h: size.h }), [carving, size.w, size.h]);
   // While resizing, the view holds still around the top left corner; it fits the board again once dropped.
   const frame = resized?.from ?? size;
   const pad = Math.max(frame.w, frame.h) * 0.06;
@@ -901,10 +913,14 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
           <p className="text-xs text-muted-foreground">
             Measure the board&rsquo;s thickness: Z0 is its underside, so a thicker board carves deeper and wider.
           </p>
-          {(problem || off || addError) && (
+          {(problem || off || cutOff || addError) && (
             <p role="alert" className="flex gap-2 text-amber-600">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              {problem ?? addError ?? 'The artwork reaches past the board: move it or make it smaller.'}
+              {problem ??
+                addError ??
+                (off
+                  ? 'The artwork reaches past the board: move it or make it smaller.'
+                  : 'The cut line runs past the board: move the artwork further onto it, or make the cutout margin smaller.')}
             </p>
           )}
         </aside>

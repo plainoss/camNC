@@ -65,6 +65,16 @@ export function cutoutSilhouette(region: PathsD, shape: CutoutShape, margin: num
   return r > 0 ? outer(offset([inner], r)) : [inner];
 }
 
+/**
+ * Whether a cutout's outline (board frame, mm, X0 Y0 at the board's lower left) runs past the board's edge: the piece
+ * would come out cut short there, and the bit's path round it leaves the board.
+ */
+export function cutoutPastBoard(outline: PathsD, size: { w: number; h: number }): boolean {
+  // Rounding in the offsets: a line laid exactly along the edge is on the board.
+  const e = 1e-3;
+  return outline.some(loop => loop.some(p => p.x < -e || p.y < -e || p.x > size.w + e || p.y > size.h + e));
+}
+
 /** A cutout as CAM takes a part: its features, size and lower left corner on the board. */
 export function cutoutPart(
   cutout: BoardCutout,

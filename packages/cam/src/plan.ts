@@ -19,7 +19,7 @@ import { maxOf, minOf } from './geom';
 import { holdCheck, holdTimeline } from './hold';
 import type { HoldPoint } from './holdPoints';
 import { readGcode } from './analyze';
-import { checkGcodeSafety, checkProgramSafety } from './safety';
+import { checkGcodeSafety, checkProgramSafety, leavesBoard } from './safety';
 import { progressOver, type OnProgress } from './progress';
 import { DEFAULT_TABS } from './settings';
 import { setupSheet, type SetupSummary } from './setupSummary';
@@ -27,7 +27,7 @@ import { freePartsProgram, kDefaultSkin } from './tabPlan';
 import { tabRemovalProgram, type TabStop } from './tabRemoval';
 import { estimateProgramTime, type ProgramTimeEstimate } from './timing';
 import type { BoardCarving } from './vcarve';
-import { cutoutPart, type BoardCutout } from './cutout';
+import { cutoutPart, cutoutPastBoard, type BoardCutout } from './cutout';
 import {
   DEFAULT_SETTINGS,
   stepdownFor,
@@ -328,6 +328,7 @@ export function planBoard(
       }
     : {};
   plan = { ...plan, ...stability(flat, spec, settings), ...clashes, ...(release.length && { release }) };
+  plan = cutoutsPastEdge(plan, board);
   progress.done(holds - kHoldCheckShare * work.parts);
   // A skin (or the layer on the tape) holds every part until the end.
   if (board.holdDown === 'skin' || board.holdDown === 'fixture-tape')
@@ -339,6 +340,27 @@ export function planBoard(
     };
   if (!usesTabs(board.holdDown)) return plan;
   return { ...plan, hold: holdCheck(flat, board, holdOptionsOf(spec, settings)), holding, skin: board.skin ?? kDefaultSkin };
+}
+
+/**
+ * A cutout whose line runs past the board's edge is one problem, said once and pointing at the cut line, not one per
+ * move of the bit round it: its off-board moves are left out (the job stays blocked, and any others come back once the
+ * cut line is on the board).
+ */
+function cutoutsPastEdge(plan: PlanResult, board: BoardRequest): PlanResult {
+  const past = (board.cutouts ?? []).filter(c => cutoutPastBoard([c.outline], { w: board.w, h: board.h }));
+  if (!past.length) return plan;
+  const on = (safety: string[]) => safety.filter(s => !leavesBoard(s));
+  const names = past.map(c => c.name).join(', ');
+  return {
+    ...plan,
+    safety: [
+      `${names}: the cut line runs past the board's edge, so the piece can't be cut out whole. On the Carve step, move the artwork further onto the board or make the cutout's margin smaller.`,
+      ...on(plan.safety),
+    ],
+    ...(plan.sideB && { sideB: { ...plan.sideB, safety: on(plan.sideB.safety) } }),
+    ...(plan.release && { release: plan.release.map(r => ({ ...r, safety: on(r.safety) })) }),
+  };
 }
 
 /**

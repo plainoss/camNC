@@ -21,6 +21,11 @@ export interface SafetyLimits {
   maxFeed?: number;
 }
 
+/** The end of an `outside-board` issue's message, after the move's position. */
+const kLeavesBoard = 'leaves the board';
+/** Whether a safety message, with or without a program's title before it, is about a move off the board. */
+export const leavesBoard = (message: string): boolean => message.endsWith(kLeavesBoard);
+
 /** No router this CAM drives cuts wood faster than this. */
 export const kMaxFeed = 9000;
 
@@ -80,7 +85,7 @@ export function checkGcodeSafety(gcode: string, limits: SafetyLimits): SafetyIss
     const y = m.to[0] * sin + m.to[1] * cos;
     const inside = x >= -reach && y >= -reach && x <= limits.size[0] + reach && y <= limits.size[1] + reach;
     if (!inside && lowest < limits.stockTop + clearance)
-      issues.push({ rule: 'outside-board', move: i, message: `move to (${fmt(m.to)}) leaves the board` });
+      issues.push({ rule: 'outside-board', move: i, message: `move to (${fmt(m.to)}) ${kLeavesBoard}` });
     if (m.to[2] < limits.minZ - 1e-3)
       issues.push({ rule: 'too-deep', move: i, message: `move to Z${+m.to[2].toFixed(3)} is below ${limits.minZ}` });
     if (m.spindle) spindleFlagged = false;
