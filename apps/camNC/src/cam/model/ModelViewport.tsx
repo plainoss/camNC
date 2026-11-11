@@ -9,6 +9,7 @@ import { ViewCube } from './ViewCube';
 import { ModelBody } from './ModelBody';
 import { ModelOrbitControls } from './ModelOrbitControls';
 import { kOrbitSurface } from './orbitPicking';
+import { settledCanvas } from '@/lib/settledCanvas';
 import { ModelSectionCap } from './ModelSectionCap';
 import { SectionOffsetHandle, type SectionOffsetControl } from './SectionOffsetHandle';
 import type { SectionCapRange } from '@/cad/sectionModel';
@@ -21,6 +22,7 @@ import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { measurementEntityAt, type ModelMeasurePick } from './measurementPick';
 import { ModelMeasurement, type ModelMeasureWitness } from './ModelMeasurement';
+import { ModelLights } from './ModelLights';
 import { centerAssembled, explodeAssembled, interpolateExplosion, layoutFlat } from './layoutFlat';
 import type { StudioCameraRef } from '@/cad/studioCamera';
 import type { MeasureEntity } from '@/cad/measureGeometry';
@@ -229,6 +231,7 @@ export function FitCamera({
       back: camera.getWorldDirection(new THREE.Vector3()).negate().toArray(),
       up: new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).toArray(),
       height: (camera.top - camera.bottom) / camera.zoom,
+      aspect,
       key: fitKey,
       seq: viewRequest?.seq,
     };
@@ -623,6 +626,7 @@ export function ModelViewport({
   };
   return (
     <Canvas
+      {...settledCanvas}
       // Drawn when something changes, not every frame, so an idle view costs nothing.
       frameloop="demand"
       orthographic={palette === 'studio'}
@@ -638,9 +642,7 @@ export function ModelViewport({
         setHoveredConnector(null);
         onMissed?.();
       }}>
-      <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
-      <directionalLight position={[300, -500, 800]} intensity={1.8} />
-      <directionalLight position={[-400, 300, 200]} intensity={0.4} />
+      <ModelLights />
       {sketchView ? (
         <SketchCamera view={sketchView} model={assembled} />
       ) : (
