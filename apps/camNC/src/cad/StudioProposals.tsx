@@ -6,6 +6,7 @@ import { cadProposal, type CadProposal } from '@wbcnc/cad-editor/proposal';
 import type { CadSession } from '@wbcnc/cad-editor/session';
 import { ProposalReview } from './ProposalReview';
 import { assistantSelection } from './assistant/selection';
+import type { AssistantProposalState } from './assistant/useAssistantProposal';
 import './assistant/dock.css';
 
 const AssistantDock = lazy(() => import('./assistant/Dock').then(module => ({ default: module.AssistantDock })));
@@ -14,18 +15,21 @@ const AssistantDock = lazy(() => import('./assistant/Dock').then(module => ({ de
 export function StudioProposals({
   document,
   session,
+  checkedProposal,
   selection,
   disabled,
   onApply,
 }: {
   document: CadDocument;
   session: CadSession;
+  checkedProposal: AssistantProposalState;
   selection?: { partId: string; copyId?: string };
   disabled?: boolean;
   onApply: (document: CadDocument) => void;
 }) {
   const [assistant, setAssistant] = useState(false);
   const [proposal, setProposal] = useState<CadProposal | null>(null);
+  const assistantProposal = useRef<CadProposal | null>(null);
   const [error, setError] = useState('');
   const [building, setBuilding] = useState(false);
   const tools = useRef<HTMLDivElement>(null);
@@ -184,8 +188,14 @@ export function StudioProposals({
                   key={document.id}
                   document={document}
                   disabled={disabled}
+                  proposal={checkedProposal.proposal}
+                  onCheckedProposal={checkedProposal.receive}
+                  onDiscardProposal={checkedProposal.discard}
                   selection={assistantSelection(document, selection)}
-                  onProposal={setProposal}
+                  onProposal={value => {
+                    assistantProposal.current = value;
+                    setProposal(value);
+                  }}
                   onClose={() => setAssistant(false)}
                 />
               </Suspense>
@@ -196,8 +206,23 @@ export function StudioProposals({
                 session={session}
                 currentDocument={document}
                 disabled={disabled}
-                onApply={onApply}
-                onClose={() => setProposal(null)}
+                onApply={value => {
+                  onApply(value);
+                  if (assistantProposal.current === proposal) checkedProposal.markApplied(proposal);
+                }}
+                onDiscard={
+                  assistantProposal.current === proposal
+                    ? () => {
+                        checkedProposal.discard();
+                        assistantProposal.current = null;
+                        setProposal(null);
+                      }
+                    : undefined
+                }
+                onClose={() => {
+                  assistantProposal.current = null;
+                  setProposal(null);
+                }}
               />
             )}
           </>,
