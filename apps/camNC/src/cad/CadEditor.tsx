@@ -283,7 +283,7 @@ import { StudioFeatureDialog, type StudioFeatureDialogState } from './StudioFeat
 import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
-import { useStudioDocumentKeys } from './useStudioDocumentKeys';
+import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { useEditorVariableFields } from './useEditorVariableFields';
 import { featureShownByDefault } from './sketchShown';
 import './cad.css';
@@ -860,7 +860,7 @@ export function CadEditor({
       release();
     };
   }, []);
-  useStudioDocumentKeys(root, studioSession);
+  useEditorDocumentKeys(root);
   useEffect(() => {
     const canvas = svg.current;
     if (!canvas) return;
