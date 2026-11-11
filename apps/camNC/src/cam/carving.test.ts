@@ -12,6 +12,7 @@ import {
   hasWork,
   kDefaultVBit,
   kVBits,
+  newCutout,
   withCarving,
   type CarvingItemV1,
   type CarvingV1,
@@ -265,5 +266,35 @@ describe('carving items', () => {
     expect(carving.region).toHaveLength(2);
     expect(request.carvings).toEqual([{ ...boardCarving(carving, kDefaultPlan), name: '2 items', region: carving.region }]);
     expect(boardCarving(withItems(carving, [items[0]]), kDefaultPlan).name).toBe('"Hi"');
+  });
+});
+
+describe('a carving cut out of its board', () => {
+  it('plans the silhouette as cutouts, held as asked, with each placed tab on its own piece', async () => {
+    const job = await createCarvingJob();
+    // Two pieces too far apart to join.
+    const items = [item({ x: 40, y: 70 }), item({ id: 'far', x: 220, y: 70 })];
+    const [board] = job.boards!;
+    const request = (cutout: CarvingV1['cutout']) =>
+      withCarving(boardRequest(board, nestBoard(board, [], kDefaultPlan.bit.diameter), []), {
+        ...job,
+        carving: { ...withItems(job.carving!, items), cutout },
+      });
+    expect(request(undefined).cutouts).toBeUndefined();
+    expect(newCutout(true).hold).toBe('skin');
+    expect(newCutout(false).hold).toBe('tabs');
+    const skin = request(newCutout(true));
+    expect(skin.holdDown).toBe(board.taped ? 'fixture-tape' : 'skin');
+    expect(skin.cutouts?.map(c => c.name)).toEqual(['Cutout 1', 'Cutout 2']);
+    const tabs = request({
+      ...newCutout(false),
+      tabsAt: [
+        { x: 24, y: 70 },
+        { x: 236, y: 70 },
+        { x: 236, y: 60 },
+      ],
+    });
+    expect(tabs.holdDown).toBe('tabs');
+    expect(tabs.cutouts?.map(c => c.tabsAt?.length).sort()).toEqual([1, 2]);
   });
 });
