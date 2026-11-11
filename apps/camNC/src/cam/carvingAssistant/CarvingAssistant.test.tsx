@@ -335,7 +335,11 @@ it('uses a separately configured native image key and endpoint, never the design
   describe();
   variants(1);
   fireEvent.click(screen.getByText('More options'));
-  fireEvent.click(screen.getByRole('radio', { name: 'Native image generation' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Image generation' }));
+  // An Anthropic connection has no image model, so a separate provider is the way to images.
+  expect(screen.getByText(/Your connection has no image model/)).toBeDefined();
+  expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', true);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Use a different image provider' }));
   expect(screen.getByLabelText('Image generator API key')).toHaveProperty('value', '');
   expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', true);
   fireEvent.change(screen.getByLabelText('Image generator API address'), { target: { value: 'https://native.example/v1' } });
@@ -354,6 +358,33 @@ it('uses a separately configured native image key and endpoint, never the design
   expect(options.previous).toBeUndefined();
   expect(generateCarvingAsset).not.toHaveBeenCalled();
   expect(Object.values(localStorage).some(value => String(value).includes('separate-native-secret'))).toBe(false);
+});
+
+it("generates images with the connection's own key and image model, without a second form", async () => {
+  rememberAssistantCredentials({
+    key: 'sk-openai-test',
+    config: {
+      kind: 'compatible',
+      protocol: 'responses',
+      endpoint: 'https://api.openai.com/v1',
+      model: 'gpt-x',
+      imageModel: 'gpt-image-x',
+      tools: true,
+      images: true,
+    },
+  });
+  await open();
+  describe();
+  variants(1);
+  fireEvent.click(screen.getByText('More options'));
+  expect(screen.getByRole('radio', { name: 'Image model · gpt-image-x' })).toHaveProperty('checked', true);
+  expect(screen.queryByLabelText('Image generator API key')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+  await waitFor(() => expect(generateNativeRasterAsset).toHaveBeenCalledTimes(1));
+  const [options, native] = vi.mocked(generateNativeRasterAsset).mock.calls[0];
+  expect(native).toMatchObject({ endpoint: 'https://api.openai.com/v1', model: 'gpt-image-x', key: 'sk-openai-test', format: 'png' });
+  expect(options.credentials.key).toBe('sk-openai-test');
+  expect(generateCarvingAsset).not.toHaveBeenCalled();
 });
 
 it('asks one variant at a time when a spending limit is set', async () => {
