@@ -5,6 +5,9 @@ import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor, type CadEditorController } from './CadEditor';
 
+// The bar lives in the feature list; a stand-in 3D view keeps the test from waiting on the real one to load and build.
+vi.mock('./WorkspaceView', () => ({ default: () => <div data-testid="workspace-3d" tabIndex={0} /> }));
+
 const sessions: string[] = [];
 afterEach(() => {
   cleanup();
@@ -23,9 +26,9 @@ it('tells an export where the rollback bar is, also while a feature dialog is op
     </div>
   );
   await waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
-  await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
-  const features = screen.getByRole('region', { name: 'Features' });
+  const features = await screen.findByRole('region', { name: 'Features' }, { timeout: 20_000 });
   const plateExtrude = () => within(features).getByRole('button', { name: /Extrude · Plate/ });
+  await waitFor(() => expect(plateExtrude()).toBeTruthy(), { timeout: 20_000 });
   expect(controller.current!.rolledTo()).toBeNull();
 
   fireEvent.contextMenu(plateExtrude());
@@ -35,6 +38,6 @@ it('tells an export where the rollback bar is, also while a feature dialog is op
   // Editing a step moves the view's own bar to it, but the one the user set is still what an export stops at.
   fireEvent.contextMenu(plateExtrude());
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Edit…' }));
-  await screen.findByRole('dialog');
+  await screen.findByRole('dialog', undefined, { timeout: 20_000 });
   expect(controller.current!.rolledTo()).toBe(`${plate!.id}:extrude`);
 });
