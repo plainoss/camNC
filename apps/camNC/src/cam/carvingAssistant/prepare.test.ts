@@ -221,6 +221,16 @@ describe('restrictive generated SVG vocabulary', () => {
     expect(() => sanitizeCarvingSvg(art.svg)).toThrow();
   });
 
+  it('accepts comments, a root size in mm and labels that change no geometry', () => {
+    const safe = sanitizeCarvingSvg(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="80mm" viewBox="0 0 10 10" role="img" aria-label="Owl" shape-rendering="geometricPrecision"><!-- body --><path id="body" d="M0 0H5V5Z" fill="black"/></svg>'
+    );
+    expect(safe).toContain('d="M0 0H5V5Z"');
+    expect(safe).not.toMatch(/80mm|aria-label|role=|id=|<!--/);
+    expect(() => sanitizeCarvingSvg('<!-- a --><!DOCTYPE svg><svg viewBox="0 0 10 10"/>')).toThrow('declarations');
+    expect(() => sanitizeCarvingSvg('<svg viewBox="0 0 10 10"><rect width="5mm" height="5"/></svg>')).toThrow('coordinate');
+  });
+
   it('rejects document declarations, enormous aspect ratios and shape counts', () => {
     expect(() => sanitizeCarvingSvg('<!DOCTYPE svg><svg viewBox="0 0 10 10"/>')).toThrow();
     expect(() => sanitizeCarvingSvg('<svg viewBox="0 0 100000 1"/>')).toThrow('proportions');

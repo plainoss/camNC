@@ -46,7 +46,7 @@ export type RtcConnectionParams =
 
 export function parseConnectionString(connectionString: string): RtcConnectionParams {
   const url = new URL(connectionString);
-  let params = url.searchParams;
+  const params = url.searchParams;
   switch (url.protocol) {
     case 'webrtc:': {
       const accessToken = params.get('accessToken');
@@ -71,7 +71,7 @@ export function parseConnectionString(connectionString: string): RtcConnectionPa
       }
       throw new Error('missing host or src');
     }
-    case 'webcam:':
+    case 'webcam:': {
       const deviceId = params.get('deviceId');
       const width = params.get('width');
       const height = params.get('height');
@@ -85,6 +85,7 @@ export function parseConnectionString(connectionString: string): RtcConnectionPa
         };
       }
       throw new Error('missing deviceId');
+    }
     case 'https:':
     case 'http:':
       return { type: 'url', url: connectionString };
@@ -125,7 +126,7 @@ function buildWebrtcConnectionUrl({ accessToken }: WebrtcConnectionParams) {
 }
 
 function buildWebcamConnectionUrl({ deviceId, idealWidth, idealHeight }: WebcamConnectionParams) {
-  let params = new URLSearchParams({
+  const params = new URLSearchParams({
     deviceId,
     ...(idealWidth ? { width: idealWidth.toString() } : {}),
     ...(idealHeight ? { height: idealHeight.toString() } : {}),
