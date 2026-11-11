@@ -1,9 +1,9 @@
 import { newCadId } from './document';
 import { copyOperationSourceIssue } from './copyOperationSource';
 import { evaluateCadDocument } from './features';
-import { cadPartReference } from './partReferences';
+import { physicalTargetIssue, physicalTransformMembers } from './physicalTransformTargets';
 import { trimCadFolders } from './folderModel';
-import type { CadCopyTransform, CadDocument } from './types';
+import type { CadCopyTransform, CadDocument, CadPhysicalTarget, CadPhysicalTransform, CadRigidTransformValues } from './types';
 
 /** Fresh ordered documents use current tool material. This explicit conversion opts into ordered cut semantics. */
 export function orderedCadDocument(document: CadDocument): CadDocument {
@@ -40,11 +40,22 @@ export function addCopyTransform(
   copyId: string,
   change: Omit<CadCopyTransform, 'id' | 'partId' | 'copyId'>
 ) {
+  return addPhysicalTransform(document,{kind:'copy',partId,copyId},change);
+}
+
+/** Append a move of an explicit original or copy; creation poses and source-family cut references are not edited. */
+export function addPhysicalTransform(document:CadDocument,target:CadPhysicalTarget,change:CadRigidTransformValues) {
+  const issue=physicalTargetIssue(target);
+  if (issue) throw Error(issue);
   const next = upgradeCadCopyOperations(document),
     result = evaluateCadDocument(next);
-  if (!result.available?.includes(cadPartReference(partId, copyId)) || !result.placements?.[cadPartReference(partId, copyId)])
-    throw Error('This physical copy is not available at this operation.');
-  const move: CadCopyTransform = { id: newCadId(), partId, copyId, ...change };
+  const members=physicalTransformMembers(next,target,new Set(result.available),new Map(Object.entries(result.placements??{})));
+  if ('problem' in members) throw Error(members.problem.message);
+  // Construct target fields ourselves so a runtime caller's movement payload cannot override its explicit selection.
+  const values:CadRigidTransformValues={by:change.by,...(change.byExpressions!==undefined && {byExpressions:change.byExpressions}),
+    ...(change.turn!==undefined && {turn:change.turn}),...(change.suppressed!==undefined && {suppressed:change.suppressed})};
+  const move:CadPhysicalTransform=target.kind==='seed' ?{id:newCadId(),partId:target.partId,seed:true,...values}
+    :{id:newCadId(),partId:target.partId,copyId:target.copyId,...values};
   return {
     id: move.id,
     document: checked({
@@ -61,7 +72,15 @@ export function updateCopyTransform(document: CadDocument, id: string, change: P
   const next = {
     ...document,
     revision: document.revision + 1,
-    copyTransforms: document.copyTransforms?.map(move => (move.id === id ? { ...move, ...change } : move)),
+    copyTransforms: document.copyTransforms?.map((move):CadPhysicalTransform=>{
+      if (move.id!==id) return move;
+      if (move.seed===true) {
+        const {copyId,...values}=change;
+        if (copyId!==undefined) throw Error('An original transform cannot also select a copy target.');
+        return {...move,...values,seed:true};
+      }
+      return {...move,...change};
+    }),
   };
   return checked(next);
 }

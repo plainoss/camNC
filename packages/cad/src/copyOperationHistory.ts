@@ -1,5 +1,6 @@
-import { cadPartReference, cadPartReferenceName } from './partReferences';
-import type { CadDocument } from './types';
+import { cadPartReferenceName } from './partReferences';
+import { physicalTargetReference, physicalTransformTarget } from './physicalTransformTargets';
+import type { CadDocument, CadPhysicalTarget } from './types';
 
 /** Spatial stages are separate from creation/face generators until their history UI adopts this source contract. */
 export interface CadSpatialStep {
@@ -7,6 +8,7 @@ export interface CadSpatialStep {
   kind: 'partCut' | 'copyTransform';
   partId: string;
   copyId?: string;
+  target?:CadPhysicalTarget;
   label: string;
   suppressed: boolean;
   legacy: boolean;
@@ -24,7 +26,8 @@ export function copyOperationSteps(document: CadDocument): CadSpatialStep[] {
           kind: 'copyTransform',
           partId: move.partId,
           copyId: move.copyId,
-          label: `Transform · ${cadPartReferenceName(document, cadPartReference(move.partId, move.copyId)) ?? 'missing copy'}`,
+          target:physicalTransformTarget(move),
+          label: `Transform${move.seed===true ?' original':''} · ${cadPartReferenceName(document,physicalTargetReference(physicalTransformTarget(move))) ?? (move.seed===true ?'missing original':'missing copy')}`,
           suppressed: !!move.suppressed,
           legacy: false,
         },
