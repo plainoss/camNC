@@ -30,6 +30,7 @@ describe('a sketch used by an Extrude', () => {
     ['New', {}],
     ['Add', { addTo: 'board' }],
     ['Remove', { remove: { depth: 'through' } }],
+    ['Hole', { remove: { depth: 'through' }, hole: { diameter: 8 } }],
   ];
   it.each(cases)('hides by default when the Extrude on a face sketch is %s, also after saving and reloading', (_, operation) => {
     const document = design(operation);
@@ -45,5 +46,23 @@ describe('a sketch used by an Extrude', () => {
     expect(featureShownByDefault(design({ extrude: false }), 'face:sketch')).toBe(true);
     expect(featureShownByDefault(design({ remove: { depth: 'through' }, suppressed: true }), 'face:sketch')).toBe(true);
     expect(featureShownByDefault(design({}), 'origin')).toBe(true);
+  });
+
+  it('shows again while its Extrude is suppressed through a folder', () => {
+    const document = design({ remove: { depth: 'through' } });
+    const folded = { ...document, folders: [{ id: 'folder', name: 'Folder 1', partIds: ['face'], suppressed: true as const }] };
+    expect(featureShownByDefault(folded, 'face:sketch')).toBe(true);
+    expect(sketchLinesInModel(folded).map(line => line.partId)).toContain('face');
+  });
+
+  it.each(cases)('hides a sketch kept on its own while another part extrudes it with %s', (_, operation) => {
+    const document = design({ extrude: false });
+    const user: CadPart = { ...createCadPart('Part 3', 10), id: 'user', sketchOf: 'face', ...operation };
+    const shared = { ...document, parts: [...document.parts, user] };
+    expect(featureShownByDefault(shared, 'face:sketch')).toBe(false);
+    expect(sketchLinesInModel(shared)).toEqual([]);
+    // With the extrude that uses it suppressed, the sketch is left on its own again.
+    const suppressed = { ...shared, parts: shared.parts.map(part => (part.id === 'user' ? { ...part, suppressed: true as const } : part)) };
+    expect(featureShownByDefault(suppressed, 'face:sketch')).toBe(true);
   });
 });
