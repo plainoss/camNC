@@ -62,7 +62,7 @@ jobs:
       - name: Upload preview version
         if: github.event_name == 'pull_request'
         working-directory: apps/camNC
-        run: pnpm run deploy:preview -- --preview-alias pr-${{ github.event.pull_request.number }} | tee "$RUNNER_TEMP/preview.log"
+        run: pnpm run deploy:preview --preview-alias pr-${{ github.event.pull_request.number }} | tee "$RUNNER_TEMP/preview.log"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Comment the preview links
