@@ -1,7 +1,7 @@
-import { vConeDepth, type Operation, type LibraryTool } from '@wbcnc/cam';
+import { simplifyLoop, vConeDepth, type Operation, type LibraryTool } from '@wbcnc/cam';
 import type { BoardV1 } from '../boards';
 import type { CarvingArt, CarvingV1 } from '../carving';
-import { outlineArt, simplifyCarvingLoop } from '../carvingOutline';
+import { outlineArt } from '../carvingOutline';
 import { sanitizeCarvingSvg } from './sanitize';
 import { checkCarvingInWorker } from './camCheck';
 import { offset, difference, polyArea } from '../../../../../packages/cam/src/geom';
@@ -167,7 +167,7 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   // Round offsets tessellate every raster corner. Reduce them again within 1/12 of the physical feature threshold,
   // otherwise a compact curved drawing becomes thousands of nearly collinear CAM vertices.
   const opened = offset(offset(outline, -radius), radius)
-    .map(loop => simplifyCarvingLoop(loop, simplifyTolerance))
+    .map(loop => simplifyLoop(loop, simplifyTolerance))
     .filter(loop => loop.length >= 3);
   const closed = offset(offset(outline, radius), -radius);
   const removedLoops = difference(sourceOutline, opened);
