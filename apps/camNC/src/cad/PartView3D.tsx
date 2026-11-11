@@ -22,6 +22,7 @@ import { settledCanvas } from '@/lib/settledCanvas';
 import type { StudioCameraRef } from './studioCamera';
 import type { PartViewSnapshot } from './faceSketchScene';
 import type { FacePlane } from '@/cam/model/faceHighlight';
+import { ModelLights } from '@/cam/model/ModelLights';
 import { PartFaceHighlight } from './PartFaceHighlight';
 import {
   cutRegions,
@@ -262,11 +263,7 @@ export default function PartView3D({
           setFacePicked(null);
           setPickedPlane(null);
         }}>
-        <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
-        <directionalLight position={[300, -500, 800]} intensity={1.8} />
-        <directionalLight position={[-400, 300, 200]} intensity={0.4} />
-        {/* Enough light underneath to work on the underside. */}
-        <directionalLight position={[200, -300, -800]} intensity={1.1} />
+        <ModelLights />
         <FitCamera box={box} fitKey={part.id} cameraState={cameraState} initialDirection={kPartViewDirection} />
         {solid.geometry && (
           <mesh
