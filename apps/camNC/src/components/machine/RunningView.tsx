@@ -1,7 +1,7 @@
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { errorText, isJobOfToolpath, runningJobTitle, stopJob } from '@/lib/machine/jobs';
 import { runningJobName } from '@/lib/machine/jobRecovery';
-import { holdHint } from '@/lib/machine/pauseHints';
+import { holdHint } from '@/lib/machine/holdHint';
 import { useStore } from '@/store/store';
 import { Button } from '@wbcnc/ui/components/button';
 import { toast } from '@wbcnc/ui/components/sonner';
@@ -44,7 +44,22 @@ function HoldExplanation() {
   const ours = !!gcode && !!job && isJobOfToolpath(job.file, gcode);
   const percent = job?.percent;
   const holdRequested = api.holdRequested.value;
-  const hint = useMemo(() => (ours ? holdHint(gcode!, percent, { holdRequested }) : null), [ours, gcode, percent, holdRequested]);
+  const read = api.jobReadTo.value;
+  const readTo = read && read.file === job?.file ? read.percent : undefined;
+  const [mz, wz] = [status?.mpos?.z, status?.wpos?.z];
+  const hint = useMemo(
+    () =>
+      ours
+        ? holdHint(gcode!, {
+            percent,
+            readTo,
+            holdRequested,
+            mpos: mz === undefined ? undefined : { z: mz },
+            wpos: wz === undefined ? undefined : { z: wz },
+          })
+        : null,
+    [ours, gcode, percent, readTo, holdRequested, mz, wz]
+  );
   if (status?.state === 'Door')
     return (
       <p className="text-sm rounded-md bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-100 p-2">

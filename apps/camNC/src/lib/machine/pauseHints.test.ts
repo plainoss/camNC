@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { boardProgram } from './pauseHints.fixture';
-import { holdHint, pauseHint } from './pauseHints';
+import { boardProgram, controllerPercent, largeProgram } from './pauseHints.fixture';
+import { pauseHint, positionWindow } from './pauseHints';
 
 const percentAfter = (gcode: string, text: string) => {
   const bytes = new TextEncoder().encode(gcode);
@@ -41,12 +41,46 @@ describe('pauseHint', () => {
     expect(pauseHint(probe, percentAfter(probe, 'Attach'))?.next).toBe(
       'Next it probes Z (G38). Attach the probe clip and put the plate under the bit, then Resume.'
     );
-    const toolChange = '(T2 D=3.175 CR=0 - ZMIN=-2 - flat end mill)\nG21\nT2 M6\nG0 Z5\n' + 'G1 X1\n'.repeat(500);
-    const hint = pauseHint(toolChange, percentAfter(toolChange, 'T2 M6'));
-    expect(hint?.reason).toBe('The job stopped at a tool change (M6) on line 3.');
+    const toolChange = '(T2 D=3.175 CR=0 - ZMIN=-2 - flat end mill)\nG21\nM0 (MSG Change bit)\nT2 M6\nG0 Z5\n' + 'G1 X1\n'.repeat(500);
+    const hint = pauseHint(toolChange, percentAfter(toolChange, 'Change bit'));
+    expect(hint?.reason).toBe('The job stopped at a program pause (M0) on line 3: “Change bit”.');
     expect(hint?.next).toBe(
       'Tool change to T2 (3.175 mm flat end mill): change the bit, then Resume. Re-zero Z if the program does not probe.'
     );
+  });
+
+  it('FluidNC holds a running file only at M0: never explains an M1, M60 or M6 as the pause', () => {
+    for (const command of ['M1', 'M01', 'M60', 'T2 M6', 'M06 T2']) {
+      const program = `G21\n${command} (MSG Something)\nG0 Z5\n` + 'G1 X1\n'.repeat(500);
+      expect(pauseHint(program, percentAfter(program, 'Something'))).toBeNull();
+    }
+    const m00 = 'G21\nM00 (MSG Something)\nG0 Z5\n' + 'G1 X1\n'.repeat(500);
+    expect(pauseHint(m00, percentAfter(m00, 'Something'))?.line).toBe(2);
+  });
+});
+
+describe('the position window', () => {
+  // Byte positions where the printed percent is closest to a tie, and some in between.
+  const edges = (size: number) =>
+    [1, 2, 3, 9999, 10000, 5000, 1234].flatMap(k => {
+      const tie = ((k + 0.5) * size) / 10000;
+      return [-1, 0, 1].map(d => Math.round(tie) + d).filter(p => p > 0 && p <= size);
+    });
+
+  it('holds at any file size, also where the controller rounds a tie', () => {
+    for (const size of [137, 13_225, 99_991, 2_000_000, 2_000_003, 16_777_259, 64_000_037]) {
+      for (const position of [...edges(size), size, Math.floor(size / 3), Math.floor((size * 7) / 9)]) {
+        const reported = (controllerPercent(position, size) / 100) * size;
+        expect(Math.abs(reported - position)).toBeLessThanOrEqual(positionWindow(size));
+      }
+    }
+  });
+
+  it('finds both M0s of a 2 MB program at their rounding-edge positions', () => {
+    const { gcode, size, startEnd, doneEnd } = largeProgram;
+    expect(new TextEncoder().encode(gcode).length).toBe(size);
+    expect(pauseHint(gcode, controllerPercent(startEnd, size))?.marker).toEqual({ kind: 'start', rpm: 15000 });
+    expect(pauseHint(gcode, controllerPercent(doneEnd, size))?.marker).toEqual({ kind: 'done' });
   });
 });
 
@@ -103,8 +137,8 @@ describe('camNC’s own pauses', () => {
 });
 
 describe('a Pause in the cut of a board program (#792)', () => {
-  // FluidNC's `SD:` percent: the bytes read, two decimals.
-  const sd = (byte: number) => Math.round((10000 * byte) / 13_225) / 100;
+  // The percent FluidNC reports at that byte.
+  const sd = (byte: number) => controllerPercent(byte, 13_225);
   const end = (lines: string[]) => new TextEncoder().encode(lines.join('\n')).length + 1;
 
   it('the program has the reported shape', () => {
@@ -135,13 +169,5 @@ describe('a Pause in the cut of a board program (#792)', () => {
     expect(sd(487)).toBe(3.68);
     expect(pauseHint(boardProgram, sd(487))).toBeNull();
     expect(pauseHint(boardProgram, sd(13_220 - 22))).toBeNull();
-  });
-
-  it('a hold camNC sent never shows a program pause, even exactly at one', () => {
-    expect(holdHint(boardProgram, sd(13_220), { holdRequested: true })).toBeNull();
-    expect(holdHint(boardProgram, sd(477), { holdRequested: true })).toBeNull();
-    expect(holdHint(boardProgram, 88.2, { holdRequested: false })).toBeNull();
-    expect(holdHint(boardProgram, undefined, { holdRequested: false })).toBeNull();
-    expect(holdHint(boardProgram, sd(13_220), { holdRequested: false })?.marker).toEqual({ kind: 'done' });
   });
 });
