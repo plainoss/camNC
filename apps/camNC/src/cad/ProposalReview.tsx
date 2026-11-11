@@ -15,6 +15,7 @@ export function ProposalReview({
   disabled,
   onApply,
   onClose,
+  onDiscard,
 }: {
   proposal: CadProposal;
   session: CadSession;
@@ -22,6 +23,7 @@ export function ProposalReview({
   disabled?: boolean;
   onApply: (document: CadDocument) => void;
   onClose: () => void;
+  onDiscard?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [original, setOriginal] = useState(false);
@@ -45,7 +47,7 @@ export function ProposalReview({
       <header>
         <h2 id="cad-proposal-title">Review design change</h2>
         <button type="button" onClick={() => dialog.current?.close()} autoFocus>
-          Discard
+          {onDiscard ? 'Close' : 'Discard'}
         </button>
       </header>
       <div className="cad-proposal-body">
@@ -109,6 +111,11 @@ export function ProposalReview({
         </aside>
       </div>
       <footer>
+        {onDiscard && (
+          <button type="button" onClick={onDiscard}>
+            Discard proposal
+          </button>
+        )}
         {(refusal || error) && <p role="status">{refusal || error}</p>}
         <button
           type="button"
