@@ -80,8 +80,8 @@ export function reorderedSteps(
 }
 
 /**
- * What dropping one step on another would do, shown while it's dragged: the step it would then sit just before (null
- * at the end of the list), why it can't go there, or null when it would stay where it is.
+ * What dropping one step on another would do, shown while it's dragged: the row of the list as it stands that the step
+ * would then sit just before, why it can't go there, or null when it would stay where it is.
  */
 export function reorderDrop(
   document: CadDocument,
@@ -97,9 +97,9 @@ export function reorderDrop(
   const order = designSteps(result.document).map(step => step.id);
   // A drop that leaves the order as it was isn't a move.
   if (order.every((id, i) => id === steps[i]?.id)) return null;
-  // A part's steps move as one, so the line goes before whatever follows the whole run of them.
-  const moving = new Set(partLevel(dragged) ? steps.filter(step => step.partId === dragged.partId).map(step => step.id) : [dragged.id]);
-  let at = order.findIndex(id => moving.has(id));
-  while (at < order.length && moving.has(order[at]!)) at++;
-  return { before: order[at] ?? null };
+  // The step lands just ahead of the step it's dropped on, or a part's steps ahead of the first of the part dropped on.
+  // Named from the list as it stands, not from what follows the moved run afterwards: a Cut parts step listed after the
+  // moved part moves along with it, and the line would then be drawn at that Cut's row, below where the steps land.
+  if (!partLevel(dragged)) return { before: target.id };
+  return { before: steps.find(step => step.partId === target.partId && partLevel(step))?.id ?? target.id };
 }
