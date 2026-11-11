@@ -4,6 +4,7 @@ import { kCarvingBoard } from '../carving';
 import { kDefaultPlan } from '../planSettings';
 import { readAssistantCredentials, redactAssistantText } from '../../cad/assistant/keyStore';
 import { ProviderSettings } from '../../cad/assistant/ProviderSettings';
+import { connectionLabel } from '../../cad/assistant/connectionPresets';
 import { RunSettings, type AssistantRunSettings } from '../../cad/assistant/RunSettings';
 import { createAssistantUsage, type AssistantRunUsage } from '../../cad/assistant/runBudget';
 import { generateCarvingAsset } from './generation';
@@ -360,7 +361,7 @@ export function CarvingAssistant({
       ) : (
         <>
           <button type="button" className={buttonClass} disabled={running} aria-expanded={settings} onClick={() => setSettings(!settings)}>
-            Provider connection
+            {credentials ? `Connected · ${connectionLabel(credentials.config)} · Change` : 'Connect an AI provider'}
           </button>
           {settings && (
             <ProviderSettings
