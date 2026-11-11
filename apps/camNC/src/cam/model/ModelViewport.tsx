@@ -22,6 +22,7 @@ import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { measurementEntityAt, type ModelMeasurePick } from './measurementPick';
 import { ModelMeasurement, type ModelMeasureWitness } from './ModelMeasurement';
+import { ModelLights } from './ModelLights';
 import { centerAssembled, explodeAssembled, interpolateExplosion, layoutFlat } from './layoutFlat';
 import type { StudioCameraRef } from '@/cad/studioCamera';
 import type { MeasureEntity } from '@/cad/measureGeometry';
@@ -640,9 +641,7 @@ export function ModelViewport({
         setHoveredConnector(null);
         onMissed?.();
       }}>
-      <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
-      <directionalLight position={[300, -500, 800]} intensity={1.8} />
-      <directionalLight position={[-400, 300, 200]} intensity={0.4} />
+      <ModelLights />
       {sketchView ? (
         <SketchCamera view={sketchView} model={assembled} />
       ) : (
