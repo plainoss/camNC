@@ -155,3 +155,77 @@ it('keeps a failed script false when the unchanged starting design passes its ch
   expect(result.code).toBe(1);
   expect(JSON.parse(result.stdout)).toMatchObject({ ok: false, scriptError: expect.stringMatching(/no part/) });
 }, 60_000);
+
+it('exports a saved design’s sketch as DXF or SVG in the unit asked for', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cad-script-export-'));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  const design = path.join(packageDir, 'fixtures/designs/tray.json');
+  const run = (file: string, ...extra: string[]) =>
+    new Promise<string>((resolve, reject) =>
+      execFile(
+        process.execPath,
+        [
+          'node_modules/vite-node/vite-node.mjs',
+          '--config',
+          'vite.config.ts',
+          'src/cli.ts',
+          '--from',
+          design,
+          '--export-sketch',
+          'Tray',
+          '--export',
+          file,
+          ...extra,
+        ],
+        { cwd: packageDir },
+        (error, out) => (error ? reject(error) : resolve(out))
+      )
+    );
+  const dxf = path.join(dir, 'tray.dxf'),
+    svg = path.join(dir, 'tray.svg');
+  expect(JSON.parse(await run(dxf, '--export-unit', 'in')).drawings).toEqual({ export: dxf });
+  const text = await readFile(dxf, 'utf8');
+  expect(text).toMatch(/\$INSUNITS\n70\n1\n/);
+  expect(text).toMatch(/\nENTITIES\n(?:.|\n)*\nLINE\n/);
+  await run(svg);
+  expect(await readFile(svg, 'utf8')).toMatch(/<svg [^>]*width="[\d.]+mm"/);
+}, 60_000);
+
+it('fails a sketch export of a missing sketch before writing anything, and prefers sketch names to part names', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cad-script-export-name-'));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  const source = JSON.parse(await readFile(path.join(packageDir, 'fixtures/designs/extrude-three-profiles.json'), 'utf8'));
+  // Part 2's sketch is named as Part 1 is: the sketch's name wins, and only Part 2 has arcs.
+  source.parts[1].sketchName = 'Part 1';
+  const design = path.join(dir, 'two.json');
+  await writeFile(design, JSON.stringify(source));
+  const run = (...extra: string[]) =>
+    new Promise<{ code: number; stdout: string }>((resolve, reject) =>
+      execFile(
+        process.execPath,
+        ['node_modules/vite-node/vite-node.mjs', '--config', 'vite.config.ts', 'src/cli.ts', '--from', design, ...extra],
+        { cwd: packageDir },
+        (error, stdout) => {
+          const code = error?.code ?? 0;
+          if (typeof code !== 'number') return reject(error);
+          resolve({ code, stdout });
+        }
+      )
+    );
+  const out = path.join(dir, 'out.json'),
+    dxf = path.join(dir, 'a.dxf');
+  const missing = await run('--out', out, '--export-sketch', 'Nope', '--export', dxf);
+  expect(missing.code).toBe(1);
+  expect(JSON.parse(missing.stdout)).toMatchObject({ ok: false, exportError: 'No sketch named Nope.' });
+  await expect(access(out)).rejects.toMatchObject({ code: 'ENOENT' });
+  await expect(access(dxf)).rejects.toMatchObject({ code: 'ENOENT' });
+  // The full report says so too.
+  const full = await run('--report', 'full', '--out', out, '--export-sketch', 'Nope', '--export', dxf);
+  expect(full.code).toBe(1);
+  expect(JSON.parse(full.stdout)).toMatchObject({ ok: false, exportError: 'No sketch named Nope.' });
+  await expect(access(out)).rejects.toMatchObject({ code: 'ENOENT' });
+
+  const named = await run('--export-sketch', 'Part 1', '--export', dxf);
+  expect(named.code).toBe(0);
+  expect(await readFile(dxf, 'utf8')).toMatch(/\n(ARC|CIRCLE)\n/);
+}, 60_000);
