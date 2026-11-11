@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import imagegenOwlUrl from './fixtures/owl-imagegen-line-art.png?url';
+import imagegenReadingOwlUrl from './fixtures/owl-imagegen-reading.png?url';
 import directOwl from './fixtures/owl-reading.svg?raw';
 import { traceCarvingPngFile } from './rasterSource';
 import { prepareCarvingArt } from './prepare';
@@ -43,3 +44,43 @@ it('traces simple imagegen line art and checks it through the same physical carv
     expect(Math.max(result.width, result.height)).toBeGreaterThan(140);
   }
 }, 30_000);
+
+// Low-quality 1024 px generated owl (converted to grayscale). It has anti-aliased pinholes where shapes nearly touch,
+// gap tips narrower than a pixel and enough outline to have exceeded the curve budgets at a sub-pixel tolerance.
+it('traces generated line art with pixel-sized pinholes at every detail level and common sizes', async () => {
+  const blob = await (await fetch(imagegenReadingOwlUrl)).blob();
+  for (const [size, detail, minFeatureMm] of [
+    [60, 'simple', 1],
+    [100, 'simple', 1],
+    [100, 'balanced', 0.6],
+    [150, 'detailed', 0.3],
+    [300, 'balanced', 0.6],
+  ] as const) {
+    const traced = await traceCarvingPngFile(new File([blob], 'owl.png', { type: 'image/png' }), {
+      widthMm: size,
+      heightMm: size,
+      detail,
+      minFeatureMm,
+    });
+    expect(traced.traceReport!.components).toBeGreaterThanOrEqual(8);
+    expect(traced.traceReport!.intersectionOverUnion).toBeGreaterThan(0.97);
+  }
+  const traced = await traceCarvingPngFile(new File([blob], 'owl.png', { type: 'image/png' }), {
+    widthMm: 60,
+    heightMm: 60,
+    detail: 'simple',
+    minFeatureMm: 1,
+  });
+  expect(traced.traceReport!.filledPinholes).toBeGreaterThan(0);
+  const result = await prepareCarvingArt({
+    width: 60,
+    height: 60,
+    detail: 'simple',
+    carving: { items: [], region: [], vBit: kDefaultVBit, maxDepth: 2, clearWithFlat: false },
+    board: carvingBoard({ w: 100, h: 100, thickness: 18 }),
+    sourceOutline: traced.sourceOutline,
+    art: { kind: 'svg', svg: traced.svg, fileName: 'owl.svg' },
+  });
+  expect(result.report.errors).toEqual([]);
+  expect(result.report.camPasses).toBeGreaterThan(0);
+}, 60_000);
