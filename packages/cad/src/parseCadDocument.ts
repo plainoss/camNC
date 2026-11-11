@@ -12,7 +12,8 @@ import { designSteps } from './designSteps';
 import { cadDocumentVersion } from './documentVersion';
 import { validCircularPartPattern } from './circularPartPattern';
 import { constructionShapeIssue } from './constructionShape';
-import { unsupportedFurnitureSource } from './unsupportedFurnitureSource';
+import { partCutReliefIssue } from './partCutRelief';
+import { copyOperationSourceIssue } from './copyOperationSource';
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
 export function parseCadDocument(input: unknown): CadDocument {
@@ -33,8 +34,6 @@ export function parseCadDocument(input: unknown): CadDocument {
     throw new Error('Invalid CAD document');
   const constructionIssue = constructionShapeIssue(d.constructions);
   if (constructionIssue) throw new Error(constructionIssue);
-  const unsupported = unsupportedFurnitureSource(d);
-  if (unsupported) throw new Error(unsupported);
   const ids = new Set<string>([d.id]);
   const addId = (id: unknown, into = ids) => {
     if (typeof id !== 'string' || !id || into.has(id)) throw new Error('CAD IDs must be unique nonempty strings');
@@ -114,8 +113,13 @@ export function parseCadDocument(input: unknown): CadDocument {
       if (!validPartCutSplit(step.split)) throw new Error('Invalid CAD part cut');
       if (step.clearanceExpression !== undefined && typeof step.clearanceExpression !== 'string') throw new Error('Invalid CAD part cut');
       if (step.consumeTools !== undefined && step.consumeTools !== true) throw new Error('Invalid CAD part cut');
+      const reliefIssue = partCutReliefIssue(step.cornerRelief);
+      if (reliefIssue) throw new Error(reliefIssue);
     }
   }
+  const operationIssue = copyOperationSourceIssue(d);
+  if (operationIssue) throw new Error(operationIssue);
+  for (const move of d.copyTransforms ?? []) addId(move.id);
   for (const p of d.parts) {
     if (!p || typeof p !== 'object' || !p.sketch || typeof p.sketch !== 'object') throw new Error('Invalid CAD part');
     addId(p.id);
@@ -520,7 +524,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (folderIssue) throw new Error(folderIssue);
   // The derived version walks feature arrays, so their shapes must be validated before it runs.
   const requiredVersion = cadDocumentVersion(d);
-  if (d.version >= 3 && requiredVersion !== d.version) throw new Error('Invalid CAD document');
+  if ((d.version === 3 || d.version === 5 || d.version === 6) && requiredVersion !== d.version) throw new Error('Invalid CAD document');
   if (d.version < requiredVersion) throw new Error(`These CAD source settings require document version ${requiredVersion}`);
   for (const folder of d.folders ?? []) addId(folder.id);
   for (const plan of d.constructions ?? []) {

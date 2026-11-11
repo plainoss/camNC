@@ -74,7 +74,8 @@
         {
           "item": "Copies of a part",
           "status": "done",
-          "evidence": ["packages/cad/src/copies.test.ts", "apps/camNC/src/cad/CadCopyNames.test.tsx"]
+          "evidence": ["packages/cad/src/copies.test.ts", "apps/camNC/src/cad/CadCopyNames.test.tsx", "packages/cad/src/joinedCopies.quantity.test.ts", "packages/cad-script/src/iteration/joinedCopies.test.ts", "apps/camNC/src/cad/assemblyModel.joinedCopies.test.ts"],
+          "note": "Legacy face-drawn Add bodies accompany direct host copies in machining quantities, assembly and drawings. Known frames and mirrored contours are derived without writing copies into the source. Whole-host Cut parts selections include that joined material while retaining the existing cut-batch and self-cut rules."
         },
         {
           "item": "Linear pattern of parts along a picked edge",
@@ -182,6 +183,12 @@
           "status": "gap",
           "evidence": [],
           "note": "Cut parts subtracts tools from targets; existing bodies cannot be joined or intersected by a Boolean feature."
+        },
+        {
+          "item": "Isolate one physical part or copy and restore previous visibility",
+          "status": "done",
+          "evidence": ["apps/camNC/src/cad/CadEditor.isolateCopy.test.tsx", "apps/camNC/src/cad/CadEditor.studio.test.tsx"],
+          "note": "Shift+I keeps the selected physical instance, including a separately notched or mirrored copy. The next toggle restores prior eye choices; Show all restores the assembly. Missing copy slots do not fall back to their source. These browser checks use Parts selection and the viewport selection callback; they do not exercise pointer picking."
         },
         {
           "item": "Measure assembled vertices, edges and planar faces",

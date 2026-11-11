@@ -507,6 +507,12 @@ export interface CadDocument {
   variables?: CadVariable[];
   /** Steps that cut parts out of other parts, in order. */
   partCuts?: CadPartCut[];
+  /** Exact-copy moves remain source records even when their pattern slot is absent. */
+  copyTransforms?: CadCopyTransform[];
+  /** Version 4: ordered union of part-cut and copy-transform IDs. Generation features retain their existing semantics. */
+  operationOrder?: string[];
+  /** Source-ID prefix evaluated with legacy fixed-tool semantics when upgrading an existing design. */
+  legacyPartCutIds?: string[];
   /** Planes made to sketch on: a base plane or a part's face, moved out along its normal. */
   planes?: CadDatumPlane[];
   /** Named groups over neighbouring source steps. They never replace or regenerate their contents. */
@@ -514,6 +520,23 @@ export interface CadDocument {
   /** Authored facts/assumptions, never stored geometry acceptance or strength claims. */
   constructions?: CadConstruction[];
   parts: CadPart[];
+}
+/** A rigid move of one physical copy, applied to its pose at this operation, after earlier cuts and moves. */
+export interface CadCopyTransform {
+  id: string;
+  partId: string;
+  copyId: string;
+  by: [number, number, number];
+  byExpressions?: [string | null, string | null, string | null];
+  turn?: CadTurn;
+  suppressed?: true;
+}
+/** Derived world poses are separate from source creation placements; evaluating twice must not move a copy twice. */
+export interface CadEvaluation {
+  parts: EvaluatedCadPart[];
+  diagnostics: CadDiagnostic[];
+  placements?: Record<string, CadPlacement>;
+  available?: string[];
 }
 export interface CadFolder {
   id: string;
@@ -553,6 +576,8 @@ export interface CadPartCut {
    */
   clearance: number;
   clearanceExpression?: string;
+  /** Omitted inherits the receiving part; null disables relief for only this step's openings. */
+  cornerRelief?: { diameter: number; diameterExpression?: string } | null;
   /** Alternate cuts along the shared in-plane overlap (its longer axis for parallel extrusions), from its positive world end. */
   split?: 'half' | { fingers: number; fingersExpression?: string };
   /** The tools are used up by a cut-out. Split joints always keep both parts, even when this is saved as true. */
@@ -622,11 +647,9 @@ export interface CadSketchSolveStatus {
   entityStatus?: Record<string, CadEntityFreedom>;
   entityAnalysis?: { elapsedMs: number; probes: number; complete?: boolean; limitedBy?: 'budget' | 'failure' | 'engine-reset' };
 }
-export interface CadSolveResult {
+export interface CadSolveResult extends CadEvaluation {
   document: CadDocument;
   status: 'solved' | 'conflict' | 'invalid';
-  diagnostics: CadDiagnostic[];
-  parts: EvaluatedCadPart[];
   sketches: CadSketchSolveStatus[];
 }
 

@@ -140,14 +140,14 @@ describe('durable construction source and compatibility', () => {
     for (const version of [4, 5]) expect(() => parseCadDocument({ ...document, version, constructions: [plan] })).toThrow();
   });
 
-  it.each(['copyTransforms', 'operationOrder', 'legacyPartCutIds', 'relief-off', 'relief-object'])('does not let construction v6 authorize unsupported upstream semantics: %s', feature => {
+  it.each(['relief-off', 'relief-object'])('keeps a construction plan together with per-step corner relief at floor 6: %s', feature => {
     const { document, plan } = fixture();
-    const input = setCadConstruction(document, plan) as unknown as Record<string, unknown>;
-    if (feature.startsWith('relief')) input.partCuts = [{ id: 'future-cut', tools: [], targets: [], clearance: 0,
-      cornerRelief: feature === 'relief-off' ? null : { diameter: 6 } }];
-    else input[feature] = [];
-    expect(() => parseCadDocument(input)).toThrow('does not yet support');
-    expect(validateCadDocument(input as never).some(d => d.code === 'unsupported-source' && d.severity === 'error')).toBe(true);
+    const input = {
+      ...setCadConstruction(document, plan),
+      partCuts: [{ id: 'relief-cut', tools: [], targets: [], clearance: 0, cornerRelief: feature === 'relief-off' ? null : { diameter: 6 } }],
+    };
+    expect(parseCadDocument(input).version).toBe(6);
+    expect(validateCadDocument(input).filter(d => d.code === 'invalid-document')).toEqual([]);
   });
 
   it('preserves distinct physical mating-hole anchors and reports removal of either referenced mate', () => {

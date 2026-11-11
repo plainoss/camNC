@@ -21,6 +21,7 @@ export * from './usedEdges';
 export * from './upTo';
 export * from './datumPlanes';
 export * from './consumedTools';
+export * from './physicalJoinedCopies';
 export * from './edgeFillets';
 export * from './suppression';
 export * from './extrudeSteps';
@@ -78,3 +79,7 @@ export * from './lengthUnits';
 export * from './replaceFilletedSketch';
 export type * from './constructionTypes';
 export * from './construction';
+
+export * from './copyTransforms';
+export * from './physicalCadView';
+export * from './copyOperationHistory';

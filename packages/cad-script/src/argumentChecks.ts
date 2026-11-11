@@ -72,8 +72,12 @@ function check(method: string, args: unknown[]) {
   } else if (method === 'place') tuple(second, 2, 'place coordinates');
   if (method === 'drawOn' && second !== undefined) options(second, method, ['offset', 'inward']);
   if (method === 'cutParts') {
-    const value = options(second, method, ['with', 'clearance', 'split'], ['with']);
+    const value = options(second, method, ['with', 'clearance', 'split', 'cornerRelief'], ['with']);
     if (value.clearance !== undefined) length(value.clearance, 'cutParts.clearance');
+    if (value.cornerRelief !== undefined && value.cornerRelief !== 'off') {
+      const relief = options(value.cornerRelief, 'cutParts.cornerRelief', ['dogbone'], ['dogbone']);
+      length(relief.dogbone, 'cutParts.cornerRelief.dogbone');
+    }
     if (value.split !== undefined && value.split !== 'half') {
       const split = options(value.split, 'cutParts.split', ['fingers'], ['fingers']);
       length(split.fingers, 'cutParts.split.fingers');

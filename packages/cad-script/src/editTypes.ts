@@ -172,10 +172,17 @@ export interface DesignEdit {
    * rebates and mortises that follow both parts. The clearance grows every side of an opening inside the target and
    * deepens a blind one; a side that runs off the target's edge stays open. With `split`, two parts that cross share the
    * material where they meet instead: `'half'` for a half-lap, `{ fingers: n }` for a finger joint at a corner.
+   * `cornerRelief` relieves the inside corners of this step's openings for a round cutter: `{ dogbone: diameter }` with
+   * the diameter of the bit that will cut them, or `'off'` for square corners. Left out, the target part's own setting applies.
    */
   cutParts(
     targets: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[],
-    options: { with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]; clearance?: Len; split?: 'half' | { fingers: Len } }
+    options: {
+      with: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[];
+      clearance?: Len;
+      split?: 'half' | { fingers: Len };
+      cornerRelief?: 'off' | { dogbone: Len };
+    }
   ): void;
   /** An expression's value now: in mm for a length, or a plain number for a count or ratio. */
   value(expression: Len): number;
