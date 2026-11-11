@@ -77,7 +77,9 @@ export default defineConfig(({ command }) => {
       // These plugin-injected/lazy imports escape the initial crawl. Discovering
       // them during a sketch forces a reload and invalidates in-flight previews.
       include: [
+        'vite-plugin-node-polyfills/shims/buffer',
         'vite-plugin-node-polyfills/shims/global',
+        'vite-plugin-node-polyfills/shims/process',
         '@preact/signals-react/runtime',
         'occt-import-js',
         '@wbcnc/cad > @salusoft89/planegcs',
