@@ -12,11 +12,26 @@ export interface PauseHint {
   marker?: PauseMarker;
 }
 
-const kPause = /\b(M0?0|M0?1|M60|M0?6)\b/i;
-/** How far (bytes) the reported progress may be from the end of the pausing line. FluidNC reads M0 as a sync point. */
-const kMaxDistance = 2048;
+/**
+ * The only command FluidNC holds a running file at. It parses M1 and M60 but never stops for them, and a manual M6
+ * does not hold the file either, so a hint for those would always be wrong.
+ */
+// After a line number too (`N10M0`): only another letter right before the M makes it a different word.
+const kPause = /(?<![A-Z])M0*0(?![\d.])/i;
 /** Lines after the pause that are looked at for what comes next. */
 const kLookAhead = 12;
+
+/**
+ * How far (bytes) the position FluidNC's `SD:` percent stands for can be from the true one in a file of `size` bytes.
+ * FluidNC computes `(float)position * 100.0f / size` and prints two decimals: the printing is off by up to 0.005 % of the
+ * file (5e-5·size bytes), the float maths by under 3e-7·size more. Two bytes cover reading the percent back here.
+ *
+ * FluidNC reads a job one line at a time and does not read on while it waits at an M0, so at a program pause the
+ * position is the byte just after the M0 line. A feed hold leaves the reader wherever planning got to.
+ */
+export function positionWindow(size: number) {
+  return size * 5.03e-5 + 2;
+}
 
 export interface Line {
   code: string;
@@ -26,16 +41,53 @@ export interface Line {
 }
 
 export function splitLines(gcode: string): Line[] {
+  return parsedProgram(gcode).lines;
+}
+
+/** A program split into lines, with what the machine view looks up in it again on every report while held. */
+export interface ParsedProgram {
+  lines: Line[];
+  /** Size in bytes (UTF-8), as FluidNC counts it. */
+  size: number;
+  /** Results computed from the lines, by key: they never change for the same program. */
+  memo: Map<string, unknown>;
+}
+
+let lastProgram: { gcode: string; parsed: ParsedProgram } | null = null;
+
+/**
+ * The program split into lines, kept for the last G-code asked about: the machine view asks again with every status
+ * report while the job is held, and a program can have a million lines.
+ */
+export function parsedProgram(gcode: string): ParsedProgram {
+  if (lastProgram?.gcode === gcode) return lastProgram.parsed;
   const encoder = new TextEncoder();
-  const out: Line[] = [];
+  const size = encoder.encode(gcode).length;
+  // As many bytes as characters: ASCII, as camNC's programs are, so no encoding per line.
+  const ascii = size === gcode.length;
+  const lines: Line[] = [];
   let offset = 0;
   for (const raw of gcode.split('\n')) {
-    offset += encoder.encode(raw).length + 1;
+    offset += (ascii ? raw.length : encoder.encode(raw).length) + 1;
+    if (!raw.includes('(') && !raw.includes(';')) {
+      lines.push({ code: raw.trim(), comment: '', end: offset });
+      continue;
+    }
     const comments = [...raw.matchAll(/\(([^)]*)\)|;(.*)$/g)].map(m => (m[1] ?? m[2] ?? '').trim()).filter(Boolean);
-    out.push({ code: raw.replace(/\(.*?\)|;.*$/g, '').trim(), comment: comments.join(' '), end: offset });
+    lines.push({ code: raw.replace(/\(.*?\)|;.*$/g, '').trim(), comment: comments.join(' '), end: offset });
   }
-  return out;
+  const parsed = { lines, size, memo: new Map<string, unknown>() };
+  lastProgram = { gcode, parsed };
+  return parsed;
 }
+
+/** `compute()` once per program and key. */
+export function memoized<T>(program: ParsedProgram, key: string, compute: () => T): T {
+  if (!program.memo.has(key)) program.memo.set(key, compute());
+  return program.memo.get(key) as T;
+}
+
+export const isPause = (line: Line) => kPause.test(line.code);
 
 /** `(MSG Turn ON 30000RPM)` and `(MSG,Turn …)` are messages to the operator. */
 export function operatorMessage(comment: string) {
@@ -70,33 +122,43 @@ function describeNext(lines: Line[], from: number, gcode: string): string | null
   return null;
 }
 
+/** The hint for the M0 at `index` (0-based) of `lines`. */
+export function explainPause(lines: Line[], index: number, gcode: string): PauseHint {
+  const line = lines[index]!;
+  const message = operatorMessage(line.comment) ?? (line.comment || null);
+  const reason = `The job stopped at a program pause (M0) on line ${index + 1}${message ? `: “${message}”` : ''}.`;
+  const marker = index > 0 ? parsePauseMarker(lines[index - 1]!.comment) : null;
+  return { reason, next: describeNext(lines, index + 1, gcode), line: index + 1, ...(marker && { marker }) };
+}
+
+/** Index of the M0 whose end is the position `percent` stands for, or -1. */
+export function pauseAt(lines: Line[], size: number, percent: number) {
+  const byte = (percent / 100) * size;
+  const window = positionWindow(size);
+  // The first line that ends inside the window (line ends only grow).
+  let lo = 0;
+  let hi = lines.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (lines[mid]!.end < byte - window) lo = mid + 1;
+    else hi = mid;
+  }
+  // Take the pause closest to the position, so that a second pause shortly after (e.g. a tab stop after a short first
+  // operation) is not mistaken for the first one.
+  let best = -1;
+  for (let i = lo; i < lines.length && lines[i]!.end <= byte + window; i++) {
+    if (isPause(lines[i]!) && (best < 0 || Math.abs(lines[i]!.end - byte) <= Math.abs(lines[best]!.end - byte))) best = i;
+  }
+  return best;
+}
+
 /**
- * Find the command the job paused at, given FluidNC's `SD:` percent (share of the file read), and explain it.
- * Returns `null` when no pausing command is near that position, e.g. after a feed hold.
+ * Find the M0 the job paused at, given FluidNC's `SD:` percent (share of the file read), and explain it.
+ * Returns `null` unless the reported position can be the end of an M0 line, e.g. after a feed hold.
  */
 export function pauseHint(gcode: string, percent: number): PauseHint | null {
-  const lines = splitLines(gcode);
-  const total = lines.at(-1)?.end ?? 0;
-  if (!total) return null;
-  const byte = (percent / 100) * total;
-  // The percent is rounded to two decimals; allow for that on large files.
-  const tolerance = Math.max(kMaxDistance, total * 0.0001);
-  // FluidNC reports the position just after the pausing line; take the pause closest to it, so that a second pause
-  // shortly after (e.g. a bit change after a short first operation) is not mistaken for the first one.
-  let best = -1;
-  for (let i = 0; i < lines.length && lines[i]!.end <= byte + tolerance; i++) {
-    if (kPause.test(lines[i]!.code) && (best < 0 || Math.abs(lines[i]!.end - byte) <= Math.abs(lines[best]!.end - byte))) best = i;
-  }
-  if (best < 0 || Math.abs(byte - lines[best]!.end) > tolerance) return null;
-  const line = lines[best]!;
-  const command = line.code
-    .match(kPause)![1]!
-    .toUpperCase()
-    .replace(/^M0(\d)$/, 'M$1');
-  const message = operatorMessage(line.comment) ?? (line.comment || null);
-  const kind = command === 'M6' ? 'tool change (M6)' : command === 'M1' ? 'optional stop (M1)' : `program pause (${command})`;
-  const reason = `The job stopped at a ${kind} on line ${best + 1}${message ? `: “${message}”` : ''}.`;
-  const next = command === 'M6' ? describeNext([line], 0, gcode) : describeNext(lines, best + 1, gcode);
-  const marker = best > 0 ? parsePauseMarker(lines[best - 1]!.comment) : null;
-  return { reason, next, line: best + 1, ...(marker && { marker }) };
+  const { lines, size } = parsedProgram(gcode);
+  if (!size) return null;
+  const index = pauseAt(lines, size, percent);
+  return index < 0 ? null : explainPause(lines, index, gcode);
 }
