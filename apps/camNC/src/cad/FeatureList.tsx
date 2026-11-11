@@ -451,7 +451,8 @@ export function FeatureList({
                   </span>
                 )}
               </button>
-              {onToggleShown && visibilityId(entry) && (
+              {/* Below the rollback bar a step is left out of the view, so there's nothing for an eye to show or hide. */}
+              {onToggleShown && visibilityId(entry) && !(rollbackAt >= 0 && index > rollbackAt) && (
                 <Eye
                   name={label(entry)}
                   shown={shown?.(visibilityId(entry)!) ?? true}
