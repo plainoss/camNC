@@ -155,3 +155,38 @@ it('keeps a failed script false when the unchanged starting design passes its ch
   expect(result.code).toBe(1);
   expect(JSON.parse(result.stdout)).toMatchObject({ ok: false, scriptError: expect.stringMatching(/no part/) });
 }, 60_000);
+
+it('exports a saved design’s sketch as DXF or SVG in the unit asked for', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cad-script-export-'));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  const design = path.join(packageDir, 'fixtures/designs/tray.json');
+  const run = (file: string, ...extra: string[]) =>
+    new Promise<string>((resolve, reject) =>
+      execFile(
+        process.execPath,
+        [
+          'node_modules/vite-node/vite-node.mjs',
+          '--config',
+          'vite.config.ts',
+          'src/cli.ts',
+          '--from',
+          design,
+          '--export-sketch',
+          'Tray',
+          '--export',
+          file,
+          ...extra,
+        ],
+        { cwd: packageDir },
+        (error, out) => (error ? reject(error) : resolve(out))
+      )
+    );
+  const dxf = path.join(dir, 'tray.dxf'),
+    svg = path.join(dir, 'tray.svg');
+  expect(JSON.parse(await run(dxf, '--export-unit', 'in')).drawings).toEqual({ export: dxf });
+  const text = await readFile(dxf, 'utf8');
+  expect(text).toMatch(/\$INSUNITS\n70\n1\n/);
+  expect(text).toMatch(/\nENTITIES\n(?:.|\n)*\nLINE\n/);
+  await run(svg);
+  expect(await readFile(svg, 'utf8')).toMatch(/<svg [^>]*width="[\d.]+mm"/);
+}, 60_000);
