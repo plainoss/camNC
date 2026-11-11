@@ -497,8 +497,8 @@ export type CadLengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
-  /** 2 for face features, 3 for folders, 4 for durable construction intent. Older readers must refuse. */
-  version: 1 | 2 | 3 | 4;
+  /** Minimum supported reader: 2 features, 3 folders, 4 ordered operations, 5 step relief, 6 construction intent. */
+  version: 1 | 2 | 3 | 4 | 5 | 6;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */

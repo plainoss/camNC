@@ -25,7 +25,7 @@ function declaration(folderId: string, member: CadRef, sketchId: string, hole: s
         id: 'bolt',
         kind: 'key-locking-bolt',
         specification: 'M4 headed bolt, washers and prevailing-torque nut',
-        hole: { role: 'key', sketchId, entityIds: [hole] },
+        holes: [{ purpose: 'clearance', role: 'key', sketchId, entityIds: [hole] }],
         lengthVariable: 'boltLength',
         diameter: 4,
         headDiameter: 7,
@@ -70,7 +70,7 @@ it('binds scoped variables and exact mirrored physical copies without alias or i
   expect(result.scriptError).toBeUndefined();
   expect(result.report.errors).toEqual([]);
   const reloaded = parseCadDocument(JSON.parse(JSON.stringify(result.document)));
-  expect(reloaded.version).toBe(4);
+  expect(reloaded.version).toBe(6);
   expect(constructionReferenceIssues(reloaded)).toEqual([]);
   expect(reloaded.constructions).toHaveLength(2);
   for (const [index, plan] of reloaded.constructions!.entries()) {

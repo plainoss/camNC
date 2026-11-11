@@ -21,7 +21,7 @@ export interface CadConstructionHardware {
   kind: 'key-locking-bolt' | 'seat-screw';
   specification: string;
   /** Stable authored geometry; world location/axis are derived again after edits. */
-  hole: { role: string; sketchId: string; entityIds: string[] };
+  holes: { purpose: 'clearance' | 'pilot'; role: string; sketchId: string; entityIds: string[] }[];
   lengthVariableId: string;
   diameter: number;
   headDiameter: number;

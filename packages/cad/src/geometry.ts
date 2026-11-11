@@ -27,6 +27,7 @@ import { withEdgeFillets } from './edgeFillets';
 import { cadFolderIssue } from './folderModel';
 import { cadDocumentVersion } from './documentVersion';
 import { constructionShapeIssue } from './constructionShape';
+import { unsupportedFurnitureSource } from './unsupportedFurnitureSource';
 export { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 /** Absolute chord error, mm; analytic sketch geometry is retained in the source. */
 export const CAD_CHORD_TOLERANCE = 0.01;
@@ -41,13 +42,15 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   };
   addId(document.id);
   if (
-    (document.version !== 1 && document.version !== 2 && document.version !== 3 && document.version !== 4) ||
+    ![1, 2, 3, 4, 5, 6].includes(document.version) ||
     !Number.isSafeInteger(document.revision) ||
     document.revision < 0
   )
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   if (!document.parts.length) diagnostics.push({ code: 'no-parts', message: 'Add a part before preparing a cut.', severity: 'error' });
   const constructionIssue = constructionShapeIssue(document.constructions);
+  const unsupported = unsupportedFurnitureSource(document);
+  if (unsupported) diagnostics.push({ code: 'unsupported-source', message: unsupported, severity: 'error' });
   if (constructionIssue) diagnostics.push({ code: 'invalid-construction', message: constructionIssue, severity: 'error' });
   if (!constructionIssue && document.version < cadDocumentVersion(document))
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });

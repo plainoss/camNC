@@ -12,6 +12,7 @@ import { designSteps } from './designSteps';
 import { cadDocumentVersion } from './documentVersion';
 import { validCircularPartPattern } from './circularPartPattern';
 import { constructionShapeIssue } from './constructionShape';
+import { unsupportedFurnitureSource } from './unsupportedFurnitureSource';
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
 export function parseCadDocument(input: unknown): CadDocument {
@@ -19,7 +20,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
   if (
-    (d.version !== 1 && d.version !== 2 && d.version !== 3 && d.version !== 4) ||
+    ![1, 2, 3, 4, 5, 6].includes(d.version) ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
@@ -32,6 +33,8 @@ export function parseCadDocument(input: unknown): CadDocument {
     throw new Error('Invalid CAD document');
   const constructionIssue = constructionShapeIssue(d.constructions);
   if (constructionIssue) throw new Error(constructionIssue);
+  const unsupported = unsupportedFurnitureSource(d);
+  if (unsupported) throw new Error(unsupported);
   const ids = new Set<string>([d.id]);
   const addId = (id: unknown, into = ids) => {
     if (typeof id !== 'string' || !id || into.has(id)) throw new Error('CAD IDs must be unique nonempty strings');
