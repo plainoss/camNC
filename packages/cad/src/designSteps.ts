@@ -47,6 +47,11 @@ function extrudeDetail(document: CadDocument, part: CadPart) {
   return typed(part.thicknessExpression, part.thickness);
 }
 
+/** A sketch's name in the feature list, and wherever else the sketch is named. */
+export function sketchStepLabel(part: CadPart): string {
+  return part.sketchName ?? `Sketch · ${part.name}`;
+}
+
 /**
  * The design's steps: for each part in turn, its sketch and the thickness it's made to, the sketches and cuts on its
  * faces, and its copies. A step cutting parts out of others comes after the last of the parts it uses.
@@ -153,7 +158,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
       // A part extruding another's sketch has none of its own.
       ...(part.sketchOf || part.faceProfile
         ? []
-        : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: part.sketchName ?? `Sketch · ${part.name}`, partId: part.id }]),
+        : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: sketchStepLabel(part), partId: part.id }]),
       // A sketch not yet extruded is only its sketch.
       ...(part.extrude === false
         ? []
