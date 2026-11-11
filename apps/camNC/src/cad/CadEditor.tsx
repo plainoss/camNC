@@ -620,7 +620,7 @@ export function CadEditor({
       (featureDialog?.kind === 'pattern' ? featureDialog : null)
   );
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
-  const { rollbackStep, shownDocument } = useFeaturePreview({
+  const { rollbackStep, shownDocument, pastRollback } = useFeaturePreview({
     document:
       pointPicker.onPick && transformDialog ? doc : studioPreview.document === doc ? extrusionDepth.document : studioPreview.document,
     enabled: studioSession && showWorkspace,
@@ -3877,11 +3877,11 @@ export function CadEditor({
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
   const featureShown = useCallback(
     (id: string) => {
-      if (id in featureVisibility) return featureVisibility[id]!;
-      // As the design is shown: rolled back to its sketch, a part isn't extruded yet, so its sketch shows.
-      return featureShownByDefault(shownDocument, id);
+      // Below the rollback bar left out, as 3D sketch lines come from `doc`; else as shown: rolled back to its sketch, a sketch shows.
+      if (pastRollback.has(id)) return false;
+      return id in featureVisibility ? featureVisibility[id]! : featureShownByDefault(shownDocument, id);
     },
-    [featureVisibility, shownDocument]
+    [featureVisibility, shownDocument, pastRollback]
   );
   const partsPanel = (
     <>
