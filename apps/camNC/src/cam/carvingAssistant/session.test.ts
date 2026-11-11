@@ -12,8 +12,12 @@ describe('carving assistant session', () => {
     const { target, replace } = initialTarget(job);
     expect(replace).toBe(false);
     const text = job.carving!.items[0];
-    const ys = text.outline.flat().map(p => p.y + text.y);
-    expect(target.y - target.h / 2 >= Math.max(...ys) || target.y + target.h / 2 <= Math.min(...ys)).toBe(true);
+    // Clear of the lettering on either axis: where depends on the font's measured outline.
+    const xs = text.outline.flat().map(p => p.x + text.x),
+      ys = text.outline.flat().map(p => p.y + text.y);
+    const clearX = target.x - target.w / 2 >= Math.max(...xs) || target.x + target.w / 2 <= Math.min(...xs);
+    const clearY = target.y - target.h / 2 >= Math.max(...ys) || target.y + target.h / 2 <= Math.min(...ys);
+    expect(clearX || clearY).toBe(true);
     text.generated = {
       assetId: 'a',
       sourceSvg: '<svg/>',
