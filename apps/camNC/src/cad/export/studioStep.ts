@@ -36,7 +36,10 @@ export function studioStep(
   const products = new Map<string, StepProduct>(),
     // Exporting one part, only its own trouble matters.
     problems: StudioStepResult['problems'] = model.problems
-      .filter(problem => !options.only || problem.partId === options.only.partId)
+      // A body joined to the part is part of it too.
+      .filter(problem => !options.only || owner({ partId: problem.partId, name: problem.name }).partId === options.only.partId)
+      // A hidden part isn't being exported, built or not.
+      .filter(problem => options.only || !options.hidden?.has(problem.partId))
       .map(({ name, message }) => ({ name, message }));
   model.instances.forEach((instance, i) => {
     const belongs = owner(instance),

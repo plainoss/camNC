@@ -98,6 +98,22 @@ it('exports every shown part of the studio from Export…, in the unit picked', 
   expect(text).toContain("CONVERSION_BASED_UNIT('INCH'");
 });
 
+it('names the parts a studio export leaves out, and downloads the rest only when asked again', async () => {
+  const source = design();
+  const broken = { ...createCadPart('Broken', 12), sketch: { id: 'broken-sketch', entities: [], constraints: [] } };
+  const document = { ...source, parts: [...source.parts, broken] };
+  const files = captureDownloads();
+  render(<StudioExportButton design={() => document} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Export parts' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/left out:.*Broken/);
+  expect(files).toEqual([]);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Download without them' }));
+  expect(files.map(file => file.name)).toEqual(['Box.step']);
+  expect(products(await files[0]!.text)).not.toContain('Broken');
+});
+
 it('says why when there is nothing to export', async () => {
   const document = { ...createPlateDocument({ name: 'Empty' }), parts: [] };
   const files = captureDownloads();

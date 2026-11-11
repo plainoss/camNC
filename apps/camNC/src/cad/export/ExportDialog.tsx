@@ -41,6 +41,8 @@ export function ExportDialog({
   const [construction, setConstruction] = useState(false);
   const [polylines, setPolylines] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  /** Parts were left out and the person has been told: the next Download writes the rest. */
+  const [confirmedPartial, setConfirmedPartial] = useState(false);
   const parts = target?.kind === 'parts';
   // Each export starts from its own name and the design's unit; a sketch's format and options carry over.
   useEffect(() => {
@@ -48,6 +50,7 @@ export function ExportDialog({
     setName(target.name);
     setUnit(documentUnit);
     setProblem(null);
+    setConfirmedPartial(false);
     setFormat(format => (target.kind === 'parts' ? 'step' : format === 'step' ? 'dxf' : format));
   }, [target, documentUnit]);
 
@@ -57,8 +60,13 @@ export function ExportDialog({
     if (target.kind === 'parts') {
       const fileName = exportFileName(name, 'step');
       const result = studioStep(target.document, { only: target.only, hidden: target.hidden, unit, fileName });
-      if (!result.parts.length)
-        return setProblem(result.problems.map(({ name, message }) => `${name}: ${message}`).join(' ') || 'There are no parts to export.');
+      const why = result.problems.map(({ name, message }) => `${name}: ${message}`).join(' ');
+      if (!result.parts.length) return setProblem(why || 'There are no parts to export.');
+      // A file missing parts is only written once the person has seen which.
+      if (why && !confirmedPartial) {
+        setConfirmedPartial(true);
+        return setProblem(`These are left out: ${why}`);
+      }
       text = result.text;
     } else
       text =
@@ -144,7 +152,7 @@ export function ExportDialog({
               {problem}
             </p>
           )}
-          <Button type="submit">Download</Button>
+          <Button type="submit">{confirmedPartial ? 'Download without them' : 'Download'}</Button>
         </form>
       </DialogContent>
     </Dialog>
