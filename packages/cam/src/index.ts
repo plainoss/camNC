@@ -116,3 +116,5 @@ export { tabRemovalProgram } from './tabRemoval';
 export type { TabStop } from './tabRemoval';
 export { planBoard, summarize as summarizePlan } from './plan';
 export type { BoardPartSource, BoardRequest, OpSummary, PlanResult, ReleaseProgram } from './plan';
+export { cutoutSilhouette } from './cutout';
+export type { BoardCutout, CutoutShape } from './cutout';
