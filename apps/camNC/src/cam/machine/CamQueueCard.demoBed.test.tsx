@@ -1,4 +1,5 @@
 import { useInitToolpathOffset } from '@/hooks/useInitToolpathOffset';
+import { setDemoModeForTest } from '@/lib/demo/demo-mode';
 import { applyDemoPreset } from '@/lib/demo/demo-preset';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { recoveryPending } from '@/lib/machine/jobRecoveryState';
@@ -82,6 +83,9 @@ function load(size: [number, number], path: [number, number], zero: { x: number;
 const demoZero = () => new DemoFluidnc().wco;
 
 beforeEach(() => {
+  // As on the /demo page, the preset must not be saved: test files share the page's localStorage, so a saved demo
+  // machine host would connect, and lock the setup of, whichever file loads its settings next.
+  setDemoModeForTest(true);
   applyDemoPreset(location.origin, { camera: false });
   // Setup commands wait while the recovery check is pending; a fresh page has none to do. The controller connection
   // is made first, so that its own start of the check doesn't come after this.
@@ -100,6 +104,9 @@ afterEach(() => {
   getCncApi().currentZero.value = null;
   getCncApi().jobStartedAt.value = null;
   useCamMachine.setState(useCamMachine.getInitialState(), true);
+  // Reset while still in demo mode, so a settings save that is still throttled writes no demo machine either.
+  useStore.setState(useStore.getInitialState(), true);
+  setDemoModeForTest(false);
 });
 
 describe('the first board on the demo machine', () => {
