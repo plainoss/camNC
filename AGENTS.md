@@ -4,7 +4,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 
 ## Workflow
 
-- Use **pnpm** (Node `^20.19` or `>=22.12`, see `.nvmrc`) for all package management tasks.
+- Use **pnpm** (Node `>=22.12`, see `.nvmrc`) for all package management tasks.
 - Only in cloud environments: After making changes, run `pnpm run lint`, `pnpm run check-types`, `pnpm run test` and `pnpm run build` from the repo root.
   - These commands execute turborepo tasks across all packages.
 - Formatting is automated — you do **not** need to run the formatter manually:
@@ -24,6 +24,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 
 - Use `pnpm dlx turbo run where <project_name>` to locate a package quickly.
 - Run `pnpm install --filter <project_name>` when adding a package so local tools see it.
+- Dependencies live in pnpm's global virtual store (`virtualStoreType: global`), shared by every worktree, so `pnpm install` in a new worktree takes seconds and its `node_modules` holds only symlinks. A dependency that imports a package it doesn't declare fails to resolve there (in Vite, a Node built-in like `events` is quietly replaced by an empty stub); declare it under `packageExtensions` in `pnpm-workspace.yaml`, or in `.pnpmfile.mjs` for a missing type package shared by many libraries.
 - Use `pnpm create vite@latest <project_name> -- --template react-ts` to start a new React + Vite package.
 - Confirm each package's `package.json` has the correct `name` field (ignore the top-level one).
 

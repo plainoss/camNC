@@ -5,11 +5,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { parse } from 'yaml';
+import { parse, parseAllDocuments } from 'yaml';
 
 const root = new URL('../', import.meta.url);
 const read = file => readFileSync(new URL(file, root), 'utf8');
-const lock = parse(read('pnpm-lock.yaml'));
+// pnpm 11+ writes the pinned pnpm in a first document and the project's dependencies in the last.
+const lock = parseAllDocuments(read('pnpm-lock.yaml')).at(-1).toJS();
 const require = createRequire(import.meta.url);
 
 // Evaluates a workflow `if:` the way Actions would for these tests: `always()` is true, as for a gate after a failed
@@ -282,7 +283,7 @@ test('only the checks job on main saves the pnpm store, and every job restores t
   // A cached path outside the workspace resolves differently in the Playwright container.
   assert(!/^[/~]|\.\./.test(restore.with.path), 'cache a workspace-relative path');
   assert.match(steps.find(step => step.name === 'Keep the pnpm store in the workspace').run,
-    new RegExp(`npm_config_store_dir=\\$GITHUB_WORKSPACE/${restore.with.path}"`));
+    new RegExp(`PNPM_CONFIG_STORE_DIR=\\$GITHUB_WORKSPACE/${restore.with.path}"`));
   assert(read('.gitignore').split('\n').includes(restore.with.path));
   // Both cache steps must see the gzip-only environment of the container, and later steps get zstd back.
   const index = name => steps.findIndex(step => step.name === name);
