@@ -15,7 +15,7 @@ const failed = (document: CadDocument, message: string): CadEditResult => ({
 export function checkScriptInBrowser(
   start: CadDocument,
   source: string,
-  options: { signal?: AbortSignal; timeoutMs?: number } = {}
+  options: { signal?: AbortSignal; timeoutMs?: number; bit?: number } = {}
 ): Promise<CadEditResult> {
   if (options.signal?.aborted) return Promise.resolve(failed(start, 'The script check was stopped.'));
   const timeoutMs = Math.min(60_000, Math.max(100, options.timeoutMs ?? 30_000));
@@ -70,7 +70,7 @@ export function checkScriptInBrowser(
             return;
           }
           // A script can modify globals in its disposable worker. Recheck source with the app's trusted runtime.
-          const trusted = await inspectCadDocument(candidate);
+          const trusted = await inspectCadDocument(candidate, new Map(), { bit: options.bit });
           trusted.report.warnings.push(...(result.report.warnings ?? []).filter(warning => warning.code === 'close-straight'));
           finish({ ...trusted, ok: trusted.report.ok });
         } catch (error) {

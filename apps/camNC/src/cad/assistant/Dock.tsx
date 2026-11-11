@@ -183,7 +183,7 @@ export function AssistantDock({
           if (mounted.current) setActivity(message);
         },
         check: async (source, base, signal, options) => {
-          const checked = await checkScriptInBrowser(base, source, { signal });
+          const checked = await checkScriptInBrowser(base, source, { signal, bit: options?.bit });
           if (signal.aborted) return checked;
           const views =
             checked.ok && credentials.config.images && options?.views

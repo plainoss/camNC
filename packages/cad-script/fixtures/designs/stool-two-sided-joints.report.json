@@ -7,7 +7,43 @@
  "ok": true,
  "status": "solved",
  "errors": [],
- "warnings": [],
+ "warnings": [
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Large left back post cuts in Large seat, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Large seat"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Large right back post cuts in Large seat, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Large seat"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Large front apron cuts in Large left panel, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Large left panel"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Large back apron cuts in Large left panel, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Large left panel"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Back slat 1 cuts in Large left back post, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Large left back post"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Back slat 2 cuts in Large left back post, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Large left back post"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Back slat 3 cuts in Large left back post, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Large left back post"
+  }
+ ],
  "features": [
   {
    "id": "e68505c0-3a77-4ac9-827b-b54f4df98a0c",
@@ -3447,7 +3483,21 @@
      "Large seat: pocket z=6: 4.3mm² left in corners/narrow spots with D=3.175",
      "Large seat: pocket z=6: 4.3mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Large left back post",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     },
+     {
+      "ref": "Large right back post",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {
@@ -3576,7 +3626,21 @@
     "warnings": [
      "Large left panel: pocket z=4: 4.3mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Large front apron",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     },
+     {
+      "ref": "Large back apron",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {
@@ -4266,7 +4330,27 @@
     "warnings": [
      "Large left back post: pocket z=4: 6.5mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Back slat 1",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     },
+     {
+      "ref": "Back slat 2",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     },
+     {
+      "ref": "Back slat 3",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {

@@ -633,6 +633,8 @@ export interface EvaluatedCadCut {
   islands: CadPoint[][];
   /** For a cut another part makes: its opening as a box in the part's sketch coordinates, before any corner bones. */
   opening?: { x0: number; y0: number; x1: number; y1: number };
+  /** The tool's own footprint inside that opening, before clearance: where its corners sit. */
+  tool?: { x0: number; y0: number; x1: number; y1: number };
 }
 export type CadEntityFreedom = 'fully-constrained' | 'underconstrained' | 'unknown';
 export interface CadSketchSolveStatus {

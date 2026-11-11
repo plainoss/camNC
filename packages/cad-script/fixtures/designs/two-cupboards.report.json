@@ -5755,7 +5755,21 @@
      }
     ],
     "warnings": [],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Top",
+      "corners": 1,
+      "unreached": 0,
+      "short": 0
+     },
+     {
+      "ref": "Bottom",
+      "corners": 1,
+      "unreached": 0,
+      "short": 0
+     }
+    ]
    },
    "faces": [
     {
@@ -6975,7 +6989,21 @@
      "Side: pocket z=10: 1.1mm² left in corners/narrow spots with D=3.175",
      "Side: pocket z=6: 1.1mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Top",
+      "corners": 1,
+      "unreached": 0,
+      "short": 0
+     },
+     {
+      "ref": "Bottom",
+      "corners": 1,
+      "unreached": 0,
+      "short": 0
+     }
+    ]
    },
    "faces": [
     {

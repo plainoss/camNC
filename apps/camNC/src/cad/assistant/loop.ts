@@ -52,6 +52,11 @@ export const assistantTools: AssistantTool[] = [
       {
         source: { type: 'string' },
         views: { type: 'boolean', description: 'Inspect candidate views. Required for visual/reference-image requests.' },
+        bit: {
+          type: 'number',
+          description:
+            'Diameter in mm of the flat bit the user cuts with. Toolpaths and joint corner reach are checked with it; omitted, the default 3.175 mm bit.',
+        },
       },
       ['source']
     ),
@@ -77,6 +82,7 @@ For appearance or layout choices, include optional sketches only when useful to 
 For thin requests such as "a stool", ask for sizes and joints or state your proposed choices and ask before building.
 Remember earlier constraints in the conversation. If a request conflicts with them or the design, ask a question.
 Request views:true in check_design when matching a reference image or reviewing appearance. For visual requests inspect the returned cut-aware views, describe what matches and what needs a person's review.
+For CNC joints a square part fits into (mortises, stopped dados, finger slots), use the user's cutter diameter: pass it as bit to check_design and set cornerRelief: { dogbone: diameter } with a fit clearance such as 0.2mm on that cutParts step. Each corner-unreachable warning names a mortise whose corners the bit misses; fix it or name it in the proposal. If the user gave no cutter, say the corners were checked only for the default bit and ask which one they use.
 Treat agreed dimensions and construction as acceptance criteria. Use part.expect for requested finished sizes, thickness and pocket depths; inspect actual reported geometry rather than only script parameters.
 Prefer compact deterministic construction and worked examples over bespoke random or grid searches. Once a checked candidate matches the request and its views have been inspected when needed, offer it; do not redesign it without a specific unmet requirement.
 Your final response must begin with "Proposal:" or "Question:" followed by a nonempty explanation. Summarize verified dimensions, important warnings and lost cuts or joints.
@@ -124,7 +130,7 @@ export interface AssistantRunOptions {
   onUsage?: (usage: AssistantRunUsage) => void;
   examples: Record<string, string>;
   signal: AbortSignal;
-  check(source: string, base: CadDocument, signal: AbortSignal, options?: { views: boolean }): Promise<AssistantCheck>;
+  check(source: string, base: CadDocument, signal: AbortSignal, options?: { views: boolean; bit?: number }): Promise<AssistantCheck>;
   request?: typeof requestAssistant;
   onMessage?: (message: AssistantMessage) => void;
   onActivity?: (message: string) => void;
@@ -343,14 +349,17 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
               throw new Error('check_design needs the whole script in source.');
             source = call.arguments.source;
             const views = options.config.images && (referenceImages || call.arguments.views === true);
-            const cacheKey = `${views}:${source}`;
+            const bit = call.arguments.bit;
+            if (bit !== undefined && !(typeof bit === 'number' && bit >= 0.5 && bit <= 25))
+              throw new Error('check_design bit is a flat bit diameter in mm, from 0.5 to 25.');
+            const cacheKey = `${views}:${bit ?? ''}:${source}`;
             let checked = cache.get(cacheKey);
             if (checked) usage.reusedChecks++;
             else {
               checks++;
               usage.checks = checks;
               options.onActivity?.(`Checking attempt ${checks} of ${maxChecks}…`);
-              checked = await options.check(source, structuredClone(base), runSignal, { views });
+              checked = await options.check(source, structuredClone(base), runSignal, { views, ...(bit !== undefined && { bit }) });
               if (!options.signal.aborted) cache.set(cacheKey, checked);
             }
             latestReport = checked.detailReport ?? checked.report;

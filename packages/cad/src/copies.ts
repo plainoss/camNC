@@ -92,6 +92,7 @@ export function mirrorEvaluatedPart(part: EvaluatedCadPart): EvaluatedCadPart {
         outline: mirrorLoop(cut.outline),
         islands: cut.islands.map(mirrorLoop),
         ...(cut.opening && { opening: { ...cut.opening, x0: -cut.opening.x1, x1: -cut.opening.x0 } }),
+        ...(cut.tool && { tool: { ...cut.tool, x0: -cut.tool.x1, x1: -cut.tool.x0 } }),
       })),
     }),
   };
