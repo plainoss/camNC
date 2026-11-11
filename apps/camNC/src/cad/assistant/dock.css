@@ -169,6 +169,7 @@
 .cad-editor .cad-assistant-toggle svg { display: none; }
 /* Failed imports must not push the toolbar's Done action outside the viewport. */
 .cad-proposal-error { position: absolute; top: 40px; right: 6px; z-index: 10; display: flex; align-items: flex-start; gap: 8px; width: min(420px, calc(100% - 12px)); padding: 8px; border: 1px solid #e0b5ac; background: #fff1ef; white-space: normal; }
+.cad-proposal-notice { border-color: #b9c6d6; background: #f3f6f9; }
 .cad-proposal-error > span { flex: 1; }
 .cad-proposal-error > button { flex: none; min-width: 24px; padding: 0 4px; border: 0; background: none; font-size: 16px; line-height: 1; cursor: pointer; }
 .cad-insert-menu { position: relative; }

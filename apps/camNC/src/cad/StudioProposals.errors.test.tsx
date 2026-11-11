@@ -1,5 +1,5 @@
 import { createCadDocument, createCadPart, createPlateDocument, type CadDocument } from '@wbcnc/cad';
-import { cadSession, endCadSession } from '@wbcnc/cad-editor/session';
+import { cadSession, commitCadSession, endCadSession, undoCadSession } from '@wbcnc/cad-editor/session';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -20,8 +20,9 @@ function setup(source: CadDocument = createPlateDocument({ width: 120, height: 8
   const Component = () => {
     const checkedProposal = useAssistantProposal(session.document);
     return (
-      // A narrow editor puts the banner right under the Insert menu, as in a docked toolbar.
-      <div className="cad-editor" style={{ position: 'relative', width: 320, height: 400 }}>
+      // A narrow editor puts the banner right under the Insert menu, as in a docked toolbar. Like the real
+      // editor, it stops every keydown from reaching window.
+      <div className="cad-editor" style={{ position: 'relative', width: 320, height: 400 }} onKeyDown={event => event.stopPropagation()}>
         <StudioProposals checkedProposal={checkedProposal} document={session.document} session={session} onApply={() => {}} />
       </div>
     );
@@ -30,7 +31,7 @@ function setup(source: CadDocument = createPlateDocument({ width: 120, height: 8
   const input = view.container.querySelector<HTMLInputElement>('input[type="file"]')!;
   const upload = (candidate: CadDocument) =>
     fireEvent.change(input, { target: { files: [new File([JSON.stringify(candidate)], 'candidate.json', { type: 'application/json' })] } });
-  return { source, upload, input };
+  return { source, session, upload, input, refresh: () => view.rerender(<Component />) };
 }
 
 it('explains a file from another design and can be dismissed with its button or Escape', async () => {
@@ -42,7 +43,24 @@ it('explains a file from another design and can be dismissed with its button or 
   expect(screen.queryByRole('alert')).toBeNull();
   upload(createPlateDocument());
   await screen.findByRole('alert', {}, { timeout: 20_000 });
+  // Focus stays inside the editor, whose own handler stops the key from bubbling.
+  screen.getByText('Insert').focus();
   await userEvent.keyboard('{Escape}');
+  expect(screen.queryByRole('alert')).toBeNull();
+}, 30_000);
+
+it('clears the error when the Assistant or Cupboard… is opened', async () => {
+  const { upload } = setup();
+  upload(createPlateDocument());
+  await screen.findByRole('alert', {}, { timeout: 20_000 });
+  await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
+  expect(screen.queryByRole('alert')).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: 'Assistant' }));
+  upload(createPlateDocument());
+  await screen.findByRole('alert', {}, { timeout: 20_000 });
+  await userEvent.click(screen.getByText('Insert'));
+  await userEvent.click(screen.getByRole('button', { name: 'Cupboard…' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('alert')).toBeNull();
 }, 30_000);
 
@@ -73,18 +91,40 @@ it('keeps the open Insert menu above the error banner and clickable', async () =
 it('says nothing would change for a file identical to the open design, without a review', async () => {
   const { source, upload } = setup();
   upload(structuredClone(source));
-  const banner = await screen.findByRole('alert', {}, { timeout: 20_000 });
-  expect(banner.textContent).toContain('This file matches the open design. Reviewing it would change nothing.');
+  const notice = await screen.findByRole('status', {}, { timeout: 20_000 });
+  expect(notice.textContent).toContain('This file matches the open design. Reviewing it would change nothing.');
+  expect(screen.queryByRole('alert')).toBeNull();
   expect(screen.queryByRole('dialog', { name: 'Review design change' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Apply as one undo step' })).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: 'Dismiss message' }));
+  expect(screen.queryByRole('status')).toBeNull();
+}, 30_000);
+
+it('says nothing would change for a file saved before an edit that was undone', async () => {
+  const { source, session, upload, refresh } = setup();
+  commitCadSession(session, { ...source, name: 'Edited' });
+  undoCadSession(session);
+  refresh();
+  expect(session.document.revision).not.toBe(source.revision);
+  upload(structuredClone(source));
+  await screen.findByText(/Reviewing it would change nothing/, {}, { timeout: 20_000 });
+  expect(screen.queryByRole('dialog', { name: 'Review design change' })).toBeNull();
+}, 30_000);
+
+it('says nothing would change when the solved file has no added, changed or removed steps', async () => {
+  const { source, upload } = setup();
+  // Differs from the open design as text, so only the check after solving can catch it.
+  upload({ ...structuredClone(source), name: 'Renamed copy' });
+  await screen.findByText(/Reviewing it would change nothing/, {}, { timeout: 20_000 });
+  expect(screen.queryByRole('dialog', { name: 'Review design change' })).toBeNull();
 }, 30_000);
 
 it('says nothing would change for an untouched new design instead of asking for a profile', async () => {
   const fresh = { ...createCadDocument(), parts: [createCadPart()] };
   const { upload } = setup(fresh);
   upload(structuredClone(fresh));
-  const banner = await screen.findByRole('alert', {}, { timeout: 20_000 });
-  expect(banner.textContent).toContain('Reviewing it would change nothing.');
-  expect(banner.textContent).not.toContain('closed profile');
+  const notice = await screen.findByRole('status', {}, { timeout: 20_000 });
+  expect(notice.textContent).toContain('Reviewing it would change nothing.');
+  expect(screen.queryByText(/closed profile/)).toBeNull();
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Review design change' })).toBeNull());
 }, 30_000);
