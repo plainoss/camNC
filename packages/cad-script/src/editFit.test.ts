@@ -172,3 +172,43 @@ it('fits using bare-number variables as millimetres, as the existing length API 
   expect(next.ok, JSON.stringify(next.report)).toBe(true);
   expect(next.report.parts[0]!.outline).toEqual({ at: [30, 20], size: [300, 120] });
 });
+
+it('keeps expression fits of undimensioned arcs and circles driven by their targets', async () => {
+  const first = await editCad(
+    null,
+    d => {
+      d.variable('w', '100mm');
+      const p = d.newPart('Arch');
+      const arc = p.profile.arc({ at: [50, 0], r: 50, from: 0, to: 180 });
+      const base = p.profile.line([0, 0], [100, 0]);
+      p.profile.fitBounds([arc, base], { w: 'w', h: 100, preserveAspect: true });
+      const hole = d.newPart('Disc');
+      const circle = hole.profile.circle({ at: [0, 0], d: 20 });
+      hole.profile.fitBounds([circle], { w: 'w', h: 'w', at: [5, 5], preserveAspect: true });
+    },
+    fast
+  );
+  expect(first.ok, first.scriptError ?? JSON.stringify(first.report)).toBe(true);
+  expect(first.report.parts[0]!.outline).toEqual({ at: [0, 0], size: [100, 50] });
+  expect(first.report.parts[1]!.outline).toEqual({ at: [5, 5], size: [100, 100] });
+  const next = await editCad(first.document, d => d.variable('w', '200mm'), fast);
+  expect(next.ok, JSON.stringify(next.report)).toBe(true);
+  expect(next.report.parts[0]!.outline).toEqual({ at: [0, 0], size: [200, 100] });
+  expect(next.report.parts[1]!.outline).toEqual({ at: [5, 5], size: [200, 200] });
+  expect(next.report.parts.every(part => part.sketches[0]!.freedom === 0)).toBe(true);
+});
+
+it('rejects expression fits of arcs whose ends both join other curves', async () => {
+  const result = await editCad(
+    null,
+    d => {
+      d.variable('w', '100mm');
+      const p = d.newPart('Lens');
+      const upper = p.profile.arc({ at: [50, 0], r: 50, from: 0, to: 180 });
+      const lower = p.profile.arc({ at: [50, 0], r: 50, from: 180, to: 360 });
+      p.profile.fitBounds([upper, lower], { w: 'w', h: 'w', preserveAspect: true });
+    },
+    fast
+  );
+  expect(result.scriptError).toMatch(/shares both ends with other curves/);
+});

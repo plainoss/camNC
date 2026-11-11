@@ -168,13 +168,38 @@ export function fitSketchBounds(
         ...(typeof expression === 'string' && { expression }),
       });
     }
+  // An arc ties both ends to one circle, so one end keeps a single driver: the coordinate that moves most along the arc there.
+  const usedPoint = (id: string) => id === origin?.id || activeConstraints.some(c => constraintEntityIds(c).includes(id));
+  const ownersOf = (id: string) => before.entities.filter(e => selected.has(e.id) && entityPointIds(e).includes(id));
+  const pointOf = (id: string) => before.entities.find(e => e.id === id) as CadPointEntity;
+  const singleAxis = new Map<string, 0 | 1>(),
+    undriven = new Set<string>();
+  for (const arc of before.entities) {
+    if (arc.type !== 'arc' || !selected.has(arc.id)) continue;
+    const end = [arc.endId, arc.startId].find(
+      id => !singleAxis.has(id) && !usedPoint(id) && ownersOf(id).every(e => e === arc || e.type === 'line')
+    );
+    if (end === undefined) {
+      if ([options.w, options.h, ...at].some(value => typeof value !== 'number'))
+        return fail('This arc shares both ends with other curves, so an expression fit cannot keep driving it. Fit with numeric values.');
+      entityPointIds(arc).forEach(id => undriven.add(id));
+      continue;
+    }
+    const center = pointOf(arc.centerId),
+      p = pointOf(end);
+    singleAxis.set(end, Math.abs(p.y - center.y) >= Math.abs(p.x - center.x) ? 0 : 1);
+  }
   for (const id of transformed) {
     const originally = id === ownOrigin?.id ? origin!.id : id;
-    const used = activeConstraints.some(c => constraintEntityIds(c).includes(originally));
-    const owners = before.entities.filter(e => selected.has(e.id) && entityPointIds(e).includes(originally));
-    if (used || originally === origin?.id || owners.some(e => !['line', 'bezier'].includes(e.type))) continue;
-    const p = before.entities.find(e => e.id === originally) as CadPointEntity;
-    for (const axis of [0, 1] as const) {
+    const owners = ownersOf(originally);
+    if (
+      usedPoint(originally) ||
+      undriven.has(originally) ||
+      owners.some(e => !['line', 'bezier', 'conic', 'circle', 'arc'].includes(e.type))
+    )
+      continue;
+    const p = pointOf(originally);
+    for (const axis of singleAxis.has(originally) ? [singleAxis.get(originally)!] : ([0, 1] as const)) {
       const expression = coordinate(p[axis === 0 ? 'x' : 'y'], axis);
       sketch = addConstraint(sketch, {
         type: axis === 0 ? 'positionX' : 'positionY',
@@ -184,6 +209,18 @@ export function fitSketchBounds(
         ...(typeof expression === 'string' && { expression }),
       });
     }
+  }
+  for (const e of before.entities) {
+    if (e.type !== 'circle' || !selected.has(e.id)) continue;
+    if (activeConstraints.some(c => (c.type === 'radius' || c.type === 'diameter') && c.entityId === e.id)) continue;
+    const expression = scaled(e.radius, 0);
+    sketch = addConstraint(sketch, {
+      type: 'radius',
+      entityId: e.id,
+      label: 'Fit radius',
+      value: measure(expression, 'Fitted radius'),
+      ...(typeof expression === 'string' && { expression }),
+    });
   }
   apply(() => sketch);
   return {
