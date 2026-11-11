@@ -10,6 +10,16 @@ function Probe() {
   scene = useThree(state => state.scene);
   return null;
 }
+// Html's separate DOM root can commit after the scene exists. Wait for its actual
+// witness child within the unchanged 15 s test budget before inspecting overlays.
+const renderedWitness = () =>
+  waitFor(
+    () => {
+      expect(scene).not.toBeNull();
+      return screen.getByTestId('measurement-witness');
+    },
+    { timeout: 10_000 }
+  );
 afterEach(() => {
   cleanup();
   scene = null;
@@ -43,8 +53,7 @@ it('keeps selected faces and witnesses visible without intercepting the next geo
       </Canvas>
     </div>
   );
-  await waitFor(() => expect(scene).not.toBeNull());
-  const witness = await screen.findByTestId('measurement-witness');
+  const witness = await renderedWitness();
   expect(witness).toHaveAttribute('data-start', '-1,0,0.3');
   expect(witness).toHaveAttribute('data-end', '1,0,0.3');
   const hits = new Raycaster(new Vector3(0, 0, 5), new Vector3(0, 0, -1)).intersectObjects(scene!.children, true);
@@ -72,7 +81,7 @@ it('shows a touching-point witness without constructing an undefined zero-length
       </Canvas>
     </div>
   );
-  await screen.findByTestId('measurement-witness');
+  await renderedWitness();
   let renderables = 0;
   scene!.traverse(object => {
     if (object instanceof Mesh) renderables++;
