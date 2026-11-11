@@ -147,6 +147,7 @@ export const cadSavedTasks: readonly CadSavedTask[] = [
     outcomes: [
       'Ask for the intended dimensions and joints, or state the proposed dimensions and joints before building.',
       'If built, the new piece belongs to a folder named for it.',
+      'If built, it comes from a construction pattern with retained joints and a fastened seat, and its measured construction checks pass.',
     ],
     review: ['A person accepts the proposed dimensions and joints before a candidate counts as a completed stool.'],
   },

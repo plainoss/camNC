@@ -26,6 +26,7 @@ import {
   activeDesign,
   physicalJoinedCopies,
 } from '@wbcnc/cad';
+import { checkFurnitureConstruction } from './furnitureJoints';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
 import { isEdgeNotch } from './notch';
@@ -557,6 +558,14 @@ export async function inspectCadDocument(
   const steps = cadStepReport(solved.document, solved.parts).map(step =>
     step.kind === 'drawnOn' && !('error' in step.frame) ? { ...step, frameInWords: frameInWords(step.on, step.frame) } : step
   );
+  // A furniture construction is complete only while its measured joints and hardware still hold on this geometry.
+  for (const plan of solved.document.constructions ?? [])
+    for (const check of checkFurnitureConstruction(solved.document, solved.parts, plan))
+      if (!check.passed)
+        errors.push({
+          code: 'construction-check',
+          message: `${plan.recipe} ${check.id}: ${check.check}${check.actual === undefined ? '' : ` Measured ${round(check.actual)}, needs ${check.expected === undefined ? 'more' : round(check.expected)}.`}`,
+        });
   for (const collision of assembly?.collisions ?? [])
     errors.push({
       code: 'parts-collide',

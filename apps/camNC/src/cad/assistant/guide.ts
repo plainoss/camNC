@@ -18,7 +18,7 @@ export const guideSections: Record<string, string> = {
 };
 
 export const assistantGuide = `CAD script quick reference (plain JavaScript; lengths in mm).
-Use d => { ... } or import { design, cupboard } from '@wbcnc/cad-script'; export default design(d => { ... });
+Use d => { ... } or import { design, cupboard, panelChair, frameStool } from '@wbcnc/cad-script'; export default design(d => { ... });
 Each check starts from the original open design, not the previous checked candidate. Report handles apply only to that revision.
 Edit existing identities: d.part(nameOrHandle), d.existingCopy(nameOrHandle), d.step(handleOrExactLabel).set(settings).
 d.part never creates. d.newPart(name, { thickness: 18 }) explicitly creates; duplicate names fail.
@@ -38,6 +38,9 @@ d.cutParts(a, { with: b, split: 'half' }) makes a half lap; split: { fingers: 5 
 sketch.pattern(items, { count, step: [dx, dy], rows? }) repeats holes/curves; cutting the seed region cuts the pattern. Counts/steps can be expressions.
 d.detachCopy('Shelf 2', 'Cable shelf') makes a separately editable part. Retrieve editing help before detaching mirrored/referenced copies or deleting entities.
 cupboard({ name?, width?, height?, depth?, board?, shelves?, at? })(d) inserts a folder of editable parts/variables; lengths are expression strings, shelves a number, at XYZ mm. Defaults use pin rows.
+panelChair({ name?, width?, depth?, seatWidth?, seatDepth?, height?, seatHeight?, board?, cutter?, fit?, measuredStock?, at? })(d) inserts a demountable sheet-stock chair: shouldered through-tenons held by keys and M4 locking bolts. width must equal seatWidth + 6*board.
+frameStool({ name?, width?, depth?, height?, overhang?, board?, legLayer?, seatBoard?, apronHeight?, footrestHeight?, footrestZ?, cutter?, fit?, measuredStock?, at? })(d) inserts a glued solid-wood stool: laminated legs, shouldered rail tenons, staggered footrests and a plywood seat screwed through tenoned cleats. width/depth are the leg footprint, height the seat top.
+Both save their construction plan; check reports a construction-check error whenever a joint, mortise web or fastener no longer measures sound. Change their options rather than redrawing their joints.
 p.expect({ size: [400, 300], thickness: 18, holes: 1, pockets: 1, depths: [6], freedom: 0 }) checks those facts, not hole diameters/positions.
 Read report cuts, placements, diagnostics and lost-cut/joint costs; a valid check does not prove visual resemblance, joint strength or machining acceptance.
 Use a relevant supplied example for curved shapes rather than searching for geometry. Keep agreed sizes checked with expect; derive coordinates from expressions when dimensions must remain editable.

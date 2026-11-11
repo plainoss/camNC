@@ -7,3 +7,5 @@ export * from './compactReport';
 export * from './views/render';
 export * from './views/section';
 export * from './cupboard';
+export * from './panelChair';
+export * from './frameStool';

@@ -1,6 +1,7 @@
 import type { CadScript, Len, PartCopy, PartEdit } from './editTypes';
 import type { ScriptConstruction } from './constructionApi';
 import { fail } from './editExisting';
+import { placedFrom } from './furnitureOrigin';
 
 export interface PanelChairOptions {
   name?: string;
@@ -16,11 +17,14 @@ export interface PanelChairOptions {
   cutter?: string;
   fit?: string;
   measuredStock?: boolean;
+  /** Assembly origin in mm, so the chair can sit beside existing work. */
+  at?: readonly [number, number, number];
 }
 
 /** Bounded, demountable panel pattern. Ordinary source geometry remains editable. */
 export function panelChair(options: PanelChairOptions = {}): CadScript {
   return root => {
+    const at = placedFrom(options.at);
     const variables: Record<string, string> = {};
     const members: ScriptConstruction['members'] = [];
     const connections: ScriptConstruction['connections'] = [];
@@ -77,7 +81,7 @@ export function panelChair(options: PanelChairOptions = {}): CadScript {
       const sides = ['left', 'right'].map((side, i) => {
         const p = d.newPart(`${side} side`, { thickness: 'board', relief: 'cutter' });
         p.profile.rect({ at: [0, 0], w: 'depth', h: 'height' });
-        p.place({ at: [i ? 'width - 3*board' : '2*board', 0, 0], x: '+y', y: '+z' });
+        p.place(at({ at: [i ? 'width - 3*board' : '2*board', 0, 0], x: '+y', y: '+z' }));
         member(`${side}-side`, p, 'y');
         return p;
       });
@@ -90,7 +94,7 @@ export function panelChair(options: PanelChairOptions = {}): CadScript {
         path.lineTo(['width - 3*board', high]).lineTo(['3*board', high]);
         for (const [a, b] of [...tongues].reverse()) path.lineTo(['3*board', b]).lineTo([0, b]).lineTo([0, a]).lineTo(['3*board', a]);
         path.close({ straight: true });
-        p.place(horizontal ? { at: [0, 0, normal] } : { at: [0, `(${expression(normal)}) + board`, 0], x: '+x', y: '+z' });
+        p.place(at(horizontal ? { at: [0, 0, normal] } : { at: [0, `(${expression(normal)}) + board`, 0], x: '+x', y: '+z' }));
         member(role, p, 'x');
         tongues.forEach(([a, b], index) => {
           const center = `((${expression(a)}) + (${expression(b)}))/2`;
@@ -101,17 +105,19 @@ export function panelChair(options: PanelChairOptions = {}): CadScript {
               h: 'board + 2*fit',
             });
             const keyRole = `${role}-${side}-key-${index + 1}`;
-            const position = horizontal
-              ? {
-                  at: [i ? 'width - 2*board' : '2*board', `(${center}) ${i ? '-' : '+'} board/2`, normal] as const,
-                  x: i ? ('-x' as const) : ('+x' as const),
-                  y: '+z' as const,
-                }
-              : {
-                  at: [i ? 'width - 2*board' : '2*board', normal, `(${center}) ${i ? '+' : '-'} board/2`] as const,
-                  x: i ? ('-x' as const) : ('+x' as const),
-                  y: '+y' as const,
-                };
+            const position = at(
+              horizontal
+                ? {
+                    at: [i ? 'width - 2*board' : '2*board', `(${center}) ${i ? '-' : '+'} board/2`, normal] as const,
+                    x: i ? ('-x' as const) : ('+x' as const),
+                    y: '+z' as const,
+                  }
+                : {
+                    at: [i ? 'width - 2*board' : '2*board', normal, `(${center}) ${i ? '+' : '-'} board/2`] as const,
+                    x: i ? ('-x' as const) : ('+x' as const),
+                    y: '+y' as const,
+                  }
+            );
             let physical: PartEdit | PartCopy;
             if (!key) {
               key = d.newPart('Headed retaining key', { thickness: 'board', relief: 'cutter' });

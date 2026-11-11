@@ -52,6 +52,16 @@ describe('isolated browser design checks', () => {
     },
     45_000
   );
+  it('imports the furniture patterns, whose measured construction checks pass', async () => {
+    const result = await checkScriptInBrowser(
+      createCadDocument(),
+      `import { design, frameStool, panelChair } from '@wbcnc/cad-script';\nexport default design(d => { frameStool()(d); panelChair({ name: 'Chair', at: [500, 0, 0] })(d); });`
+    );
+    expect(result.scriptError).toBeUndefined();
+    expect(result.report.errors).toEqual([]);
+    expect(result.document.constructions?.map(plan => plan.recipe).sort()).toEqual(['frame-stool-glued-v1', 'panel-chair-keyed-v1']);
+  }, 180_000);
+
   it('checks the literal cupboard example returned by the assistant tool', async () => {
     const result = await checkScriptInBrowser(createCadDocument(), cupboardSource);
     expect(result.scriptError).toBeUndefined();
