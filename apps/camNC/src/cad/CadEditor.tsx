@@ -236,6 +236,7 @@ import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
 import { asHole, editable, hasOutline, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
 import { useFeaturePreview } from './useFeaturePreview';
+import { SketchProblems } from './SketchProblems';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
 import { StudioFeatureList } from './StudioFeatureList';
 import { detachStudioCopy } from './detachStudioCopy';
@@ -620,7 +621,7 @@ export function CadEditor({
       (featureDialog?.kind === 'pattern' ? featureDialog : null)
   );
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
-  const { rollbackStep, shownDocument, pastRollback } = useFeaturePreview({
+  const { rollbackStep, shownDocument, pastRollback, solveFeedback, apartIds } = useFeaturePreview({
     document:
       pointPicker.onPick && transformDialog ? doc : studioPreview.document === doc ? extrusionDepth.document : studioPreview.document,
     enabled: studioSession && showWorkspace,
@@ -630,6 +631,7 @@ export function CadEditor({
     partCutting,
     transformDialog,
     mirrorDialog,
+    checks: { lastCheckedRevision, setCheckEpoch },
   });
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
@@ -1019,7 +1021,7 @@ export function CadEditor({
         if (cancelled || sequence !== solveSequence.current || drag.current || annotationDrag.current) return;
         lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
         setSolving(false);
-        const feedback = sketchFeedback(result);
+        const feedback = sketchFeedback(solveFeedback(result));
         setProblems(feedback.problems);
         setConflictedConstraints(feedback.conflictedConstraintIds);
         setInProgress(feedback.inProgress);
@@ -1046,7 +1048,7 @@ export function CadEditor({
     return () => {
       cancelled = true;
     };
-  }, [doc, session, checkEpoch, sketchOnly, normalizePatternVariableSource]);
+  }, [doc, session, checkEpoch, sketchOnly, normalizePatternVariableSource, solveFeedback]);
 
   useEffect(() => {
     if (!dimension) return;
@@ -3445,7 +3447,7 @@ export function CadEditor({
     if (!keep && featureDialog && featureDialog.kind !== 'pattern') commit(featureDialog.before);
     // Regions picked apart are a part each.
     if (keep && featureDialog?.kind === 'extrude') {
-      const split = splitApartRegions(documentRef.current, featureDialog.partId);
+      const split = splitApartRegions(documentRef.current, featureDialog.partId, apartIds);
       if (split !== documentRef.current) commit(split);
     }
     // A Remove is a cut in the board its sketch is drawn on, so that board is the one selected.
@@ -5341,20 +5343,7 @@ export function CadEditor({
         </span>
         <span>{saveStatus ?? 'Draft'}</span>
       </footer>
-      {problems.length > 0 && !acceptanceNotice && (
-        <div className={`cad-problems${inProgress ? ' cad-sketch-progress' : ''}`} role={inProgress ? undefined : 'alert'}>
-          <strong>{inProgress ? 'Sketch in progress' : 'Finish is blocked'}</strong>
-          {inProgress ? (
-            <p>Keep drawing to close the outline. Your sketch is saved as a draft.</p>
-          ) : (
-            <ul>
-              {problems.map((problem, i) => (
-                <li key={i}>{problem}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {!acceptanceNotice && <SketchProblems problems={problems} inProgress={inProgress} />}
     </div>
   );
   return <DesignUnitContext value={lengthUnit}>{content}</DesignUnitContext>;
