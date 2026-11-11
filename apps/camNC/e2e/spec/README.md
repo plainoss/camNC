@@ -40,11 +40,11 @@ the field with the fix.
 
 Every step waits for the app to settle before the runner or a session reads or checks anything. The app's dev and test
 builds report what is still pending through `window.__camncSettled()` (`src/lib/settled.ts`): sketch solver calls, CAM
-worker calls, IndexedDB and draft saves, a loading route, fetching queries, and a frame not yet drawn since the last
-input or change. `settle.mjs` waits until all of these are zero on two frames in a row with the same document revision,
+worker calls, IndexedDB and draft saves, design assistant turns, a loading route, fetching queries, a Part Studio 3D view
+with a frame not yet drawn, and a frame not yet drawn since the last input or change. `settle.mjs` waits until all of these are zero on two frames in a row with the same document revision,
 so a step never needs its own pause or readiness wait. A step still busy after 90 s fails, naming what is pending, for
-example `The app did not settle within 90 s: still pending: worker 1`. Work the signal can't see (the 3D view drawing a
-new camera, the simulated machine) still has its own wait in the adapter.
+example `The app did not settle within 90 s: still pending: worker 1`. Work the signal can't see (the simulated machine)
+still has its own wait in the adapter. Browser tests wait on the same signal with `settled()` (`src/test/settled.ts`).
 
 ## Without a browser
 

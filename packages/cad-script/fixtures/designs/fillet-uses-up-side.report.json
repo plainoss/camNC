@@ -1,0 +1,341 @@
+{
+ "design": {
+  "name": "Fillet using up a side",
+  "revision": 0,
+  "version": 1
+ },
+ "ok": true,
+ "status": "solved",
+ "errors": [],
+ "warnings": [
+  {
+   "code": "fillet-unresolved",
+   "message": "A fillet on Part 1 can’t be made at 2 of its 3 corners: This radius would consume an entire adjacent line. Choose a smaller radius. At [400, 0], [400, 250].",
+   "part": "Part 1",
+   "entities": [
+    "9012",
+    "3f5e"
+   ],
+   "at": [
+    [
+     400,
+     0
+    ],
+    [
+     400,
+     250
+    ]
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "186e952a-eb69-42d5-beb4-da923ded2b96:sketch",
+   "kind": "sketch",
+   "label": "Sketch · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "on": "not placed"
+   },
+   "result": {
+    "sketch": "Part 1 / profile",
+    "freedom": 0,
+    "status": "solved",
+    "regions": 1
+   }
+  },
+  {
+   "id": "186e952a-eb69-42d5-beb4-da923ded2b96:extrude",
+   "kind": "extrude",
+   "label": "Extrude · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "thickness": {
+     "value": 18
+    },
+    "placement": {
+     "position": [
+      0,
+      0,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   },
+   "result": {
+    "thickness": 18,
+    "outline": {
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      400,
+      250
+     ]
+    },
+    "holes": 0,
+    "notches": 0
+   }
+  },
+  {
+   "id": "fillet-r125",
+   "kind": "fillet",
+   "label": "Fillet · Part 1",
+   "part": "Part 1",
+   "settings": {
+    "corners": 3,
+    "radius": {
+     "value": 125
+    }
+   },
+   "result": {
+    "corners": 3,
+    "rounded": 1,
+    "sharp": 2,
+    "problem": "A fillet on Part 1 can’t be made at 2 of its 3 corners: This radius would consume an entire adjacent line. Choose a smaller radius."
+   }
+  }
+ ],
+ "sketches": [
+  {
+   "part": "Part 1",
+   "ref": "profile",
+   "on": "profile",
+   "freedom": 0,
+   "status": "solved",
+   "constraints": {
+    "coincident": 5,
+    "distanceX": 1,
+    "distanceY": 1,
+    "horizontal": 1,
+    "parallel": 2,
+    "perpendicular": 1
+   },
+   "entities": [
+    {
+     "ref": "2efc",
+     "type": "line",
+     "a": [
+      0,
+      0
+     ],
+     "b": [
+      400,
+      0
+     ],
+     "ends": [
+      "5f68",
+      "9012"
+     ]
+    },
+    {
+     "ref": "3d9a",
+     "type": "line",
+     "a": [
+      400,
+      0
+     ],
+     "b": [
+      400,
+      250
+     ],
+     "ends": [
+      "72d1",
+      "3f5e"
+     ]
+    },
+    {
+     "ref": "8c31",
+     "type": "line",
+     "a": [
+      400,
+      250
+     ],
+     "b": [
+      0,
+      250
+     ],
+     "ends": [
+      "6550",
+      "8cdf"
+     ]
+    },
+    {
+     "ref": "c5df",
+     "type": "line",
+     "a": [
+      0,
+      250
+     ],
+     "b": [
+      0,
+      0
+     ],
+     "ends": [
+      "f5df",
+      "406a"
+     ]
+    }
+   ],
+   "regions": [
+    {
+     "ref": "r1",
+     "at": [
+      0,
+      0
+     ],
+     "size": [
+      400,
+      250
+     ],
+     "area": 100000,
+     "islands": 0
+    }
+   ]
+  }
+ ],
+ "bodies": [
+  {
+   "kind": "part",
+   "name": "Part 1",
+   "thickness": 18,
+   "outline": {
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     400,
+     250
+    ]
+   },
+   "holes": 0,
+   "notches": 0,
+   "cuts": [],
+   "cam": {
+    "pockets": 0,
+    "throughHoles": 0
+   },
+   "toolpaths": {
+    "bit": 3.175,
+    "minutes": 10.1,
+    "operations": [
+     {
+      "label": "Outline: rough + final pass",
+      "depth": 18.3,
+      "steps": 12
+     }
+    ],
+    "warnings": [],
+    "blocked": []
+   },
+   "faces": [
+    {
+     "face": "top",
+     "looks": "+z",
+     "origin": [
+      0,
+      0,
+      18
+     ]
+    },
+    {
+     "face": "underside",
+     "looks": "-z",
+     "origin": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 3d9a",
+     "looks": "+x",
+     "origin": [
+      400,
+      0,
+      0
+     ]
+    },
+    {
+     "face": "edge 8c31",
+     "looks": "+y",
+     "origin": [
+      400,
+      250,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "assembly": {
+  "parts": [
+   {
+    "name": "Part 1",
+    "at": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     400,
+     250,
+     18
+    ]
+   }
+  ],
+  "collisions": []
+ },
+ "boards": [
+  {
+   "name": "Board A",
+   "thickness": 18,
+   "sides": 1,
+   "size": [
+    413.4,
+    263.4
+   ],
+   "yield": 0.918,
+   "parts": [
+    {
+     "name": "Part 1",
+     "at": [
+      6.7,
+      6.7
+     ],
+     "size": [
+      400,
+      250
+     ],
+     "rotated": false
+    }
+   ],
+   "holding": [
+    {
+     "name": "Part 1",
+     "how": "placed",
+     "tabs": 4,
+     "anchored": 4,
+     "ok": true
+    }
+   ],
+   "minutes": 10.1,
+   "operations": [
+    {
+     "label": "Outline: rough + final pass",
+     "depth": 18.3,
+     "steps": 12
+    }
+   ],
+   "warnings": [],
+   "blocked": []
+  }
+ ]
+}

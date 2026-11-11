@@ -31,6 +31,7 @@ import { renderAssistantViews } from './designViews';
 import { finalizeBrowserCandidate } from './finalizeCandidate';
 import { checkAssistantSvg } from './svgCheck';
 import { svgAssetsForDocument } from '../svg/svgAssets';
+import { holdPending } from '@/lib/settled';
 
 const examples = {
   cupboard: cupboardExample,
@@ -151,6 +152,7 @@ export function AssistantDock({
     setRunning(true);
     setError('');
     writeConversation(start.id, transcript);
+    const turn = holdPending('assistant');
     try {
       setActivity('Reading the open design…');
       const inspected = await inspectCadDocument(start);
@@ -251,6 +253,7 @@ export function AssistantDock({
         setRunning(false);
         if (abort.signal.aborted) setActivity(stopReason.current);
       }
+      turn();
     }
   };
   const removeRequirement = (key: string) => {
