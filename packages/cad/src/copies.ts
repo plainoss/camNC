@@ -2,6 +2,7 @@ import { consumedTools } from './consumedTools';
 import { newCadId } from './document';
 import { isCadBody } from './extrudeSteps';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
+import { numberedCadCopy } from './copyNumbers';
 import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 import { activeDesign } from './suppression';
 import { physicalJoinedCopies } from './physicalJoinedCopies';
@@ -23,7 +24,9 @@ export function addPartCopy(
     document: resolvePartPatterns({
       ...document,
       revision: document.revision + 1,
-      parts: document.parts.map(part => (part.id === partId ? { ...part, copies: [...(part.copies ?? []), copy] } : part)),
+      parts: document.parts.map(part =>
+        part.id === partId ? { ...part, copies: [...(part.copies ?? []), numberedCadCopy(part, copy)] } : part
+      ),
     }),
   };
 }

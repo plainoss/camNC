@@ -825,7 +825,7 @@ it('extrudes a sketch already used again, as a new part of the regions left, sha
   await waitFor(() => expect(latest().parts).toHaveLength(2));
   const made = latest().parts[1]!;
   expect(made).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [narrow] });
-  expect(within(dialog).getByText('A region of Shelf’s sketch')).toBeDefined();
+  expect(within(dialog).getByText('A region of Sketch · Shelf')).toBeDefined();
   // The regions show in the view, the one picked marked.
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() =>
