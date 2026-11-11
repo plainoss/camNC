@@ -148,6 +148,23 @@ describe('atomic line corner fillets', () => {
     expect(sketch).toEqual(before);
   });
 
+  it('names the corners on every line the radius uses up, and the largest radius that fits all of them', () => {
+    // 100 × 60: the bottom (100) and right (60) sides each carry two corners, so a radius of 50 uses up both.
+    const sketch = createPlateDocument({ width: 100, height: 60 }).parts[0]!.sketch;
+    const at = (x: number, y: number) =>
+      sketch.entities.find(e => e.type === 'point' && !e.construction && Math.abs(e.x - x) < 1e-6 && Math.abs(e.y - y) < 1e-6)!.id;
+    const equivalent = pointEquivalence(sketch.constraints);
+    const corners = [at(0, 0), at(100, 0), at(100, 60)];
+    // In either order, the shorter side found second or first, the limit is the right side's: 60 / 2.
+    for (const order of [corners, [...corners].reverse()]) {
+      const result = filletLineCorners(sketch, { cornerPointIds: order, radius: 50 });
+      if (result.ok) throw new Error('Expected rejection');
+      expect(result.maximumRadius).toBeCloseTo(30, 5);
+      expect(result.maximumRadius).toBeLessThan(30);
+      expect(new Set(result.cornerPointIds)).toEqual(new Set(corners.map(equivalent.canonical)));
+    }
+  });
+
   it('rejects an otherwise fitting fillet that would cut into an unrelated hole', () => {
     let sketch = createPlateDocument().parts[0]!.sketch;
     sketch = addCircle(sketch, { x: 115, y: 5, radius: 2 });

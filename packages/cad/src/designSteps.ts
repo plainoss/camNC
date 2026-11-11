@@ -1,3 +1,4 @@
+import { edgeFilletProblems } from './edgeFillets';
 import { resolveExtrudeSteps } from './extrudeSteps';
 import { cadFaceSketches, faceIsUnderside } from './featureModel';
 import { cadCopyName } from './partPatterns';
@@ -77,7 +78,13 @@ export function designSteps(document: CadDocument): DesignStep[] {
     const reason = (step.kind === 'sketch' || step.kind === 'extrude') && own ? own : onFace;
     // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
     const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;
-    return reason || values ? { ...step, broken: reason || values } : step;
+    // A Fillet step that can't round some of its corners leaves them sharp, and says so on its row. A part that's
+    // switched off, itself or by its folder, isn't made, so neither is its fillet.
+    const sharp =
+      step.kind === 'fillet' && part && !step.suppressed && !part.suppressed && !masked.has(part.id)
+        ? edgeFilletProblems(part).find(problem => problem.filletId === step.id)?.message
+        : undefined;
+    return reason || values || sharp ? { ...step, broken: reason || values || sharp } : step;
   });
 }
 
