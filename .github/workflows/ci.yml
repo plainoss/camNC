@@ -10,6 +10,10 @@ on:
   pull_request:
     branches:
       - main
+  # Mergify's flaky-test detection learns from runs on main, which pushes skip. Run every suite on main twice a weekday.
+  schedule:
+    - cron: '17 5,17 * * 1-5'
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
@@ -147,6 +151,8 @@ jobs:
         timeout-minutes: 20
         env:
           TURBO_CACHE_DIR: .turbo/cache
+          # A replayed cache result runs no tests and reports nothing to Mergify, so scheduled runs execute everything.
+          TURBO_FORCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
           MERGIFY_TEST_JOB_NAME: Tests (${{ startsWith(matrix.suite, 'app-browser-') && 'app-browser' || matrix.suite }})
           NODE_OPTIONS: ${{ matrix.suite == 'headless' && '--test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/junit/node-test.xml' || '' }}
@@ -192,7 +198,7 @@ jobs:
     name: Tests (${{ matrix.suite }})
     # Mergify's batch draft PRs run the browser shards once per batch. Ordinary PRs run the headless suites unless
     # labelled `full-ci`. Same container and steps as test.
-    if: github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci'))
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci')))
     permissions: *turbo-permissions
     strategy:
       fail-fast: false
@@ -217,7 +223,7 @@ jobs:
   specs:
     name: Behaviour specs (${{ matrix.shard }})
     # Like browser, on Mergify batch PRs or PRs labelled `full-ci`.
-    if: github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci'))
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'mergify/merge-queue/') || contains(github.event.pull_request.labels.*.name, 'full-ci')))
     permissions:
       contents: read
       id-token: write
@@ -259,6 +265,8 @@ jobs:
         timeout-minutes: 15
         env:
           TURBO_CACHE_DIR: .turbo/cache
+          # A replayed cache result runs no tests and reports nothing to Mergify, so scheduled runs execute everything.
+          TURBO_FORCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: node scripts/turbo-shared-cache.mjs run spec:cad --filter=@wbcnc/camNC --log-order=stream -- --shard=${{ matrix.shard }}
       - name: Upload behaviour spec results to Mergify
         if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/camNC/test-results/junit/spec-*.xml') != ''
