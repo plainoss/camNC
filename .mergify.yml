@@ -10,7 +10,11 @@ queue_rules:
     queue_conditions:
       - base = main
       - -draft
-      - check-success = Run tests
+      # A test or CI fix enters the queue straight away: the batch runs every check on it anyway.
+      - or:
+          - check-success = Run tests
+          - label = ci-fix
+          - label = flaky-test
     merge_conditions:
       - check-success = Run tests
       # Distinct merge conditions force batch validation after the lighter PR checks.
@@ -21,8 +25,8 @@ queue_rules:
       - check-success = Behaviour specs (2/4)
       - check-success = Behaviour specs (3/4)
       - check-success = Behaviour specs (4/4)
-    # Preserve required reviews/checks from GitHub in addition to the explicit CI gate.
-    branch_protection_injection_mode: queue
+    # Required reviews/checks from GitHub must hold to merge, not to queue, so a fix can queue before its own CI ends.
+    branch_protection_injection_mode: merge
     merge_method: squash
     batch_size: 3
     batch_max_wait_time: 30 seconds

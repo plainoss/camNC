@@ -59,8 +59,8 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 ## Keeping the merge queue moving
 
 - A blocked queue comes before feature work. When the same test or check ejects PRs from the merge queue, fix it, or claim its `flaky-test` issue, before pushing more features.
-- Once a test has ejected two batches, skip it first and fix it afterwards. Open a `flaky-test` PR whose only change is `it.skip` with the issue link in a comment, and queue it as soon as its checks pass. Then fix the cause in a second PR that removes the skip. Until the skip merges, each new batch fails on that test, and a skip PR is ready much sooner than a fix.
-- Put a test or CI fix in its own PR and label it `ci-fix` (or `flaky-test`), or title it `fix(ci)` / `fix(test)`. Mergify then tests it ahead of the queue (`priority_rules` in `.mergify.yml`).
+- Once a test has ejected two batches, skip it first and fix it afterwards. Open a `flaky-test` PR whose only change is `it.skip` with the issue link in a comment, and queue it as soon as it is pushed. Then fix the cause in a second PR that removes the skip. Until the skip merges, each new batch fails on that test, and a skip PR is ready much sooner than a fix.
+- Put a test or CI fix in its own PR and label it `ci-fix` (or `flaky-test`), or title it `fix(ci)` / `fix(test)`. Mergify then tests it ahead of the queue (`priority_rules` in `.mergify.yml`). A PR labelled `ci-fix` or `flaky-test` can be queued as soon as it is pushed, without waiting for its own CI, because the batch runs every check. Queue it right away.
 - Once the fix merges, re-queue the PRs it ejected with `@mergifyio queue`. Merge main into them first only if they conflict.
 
 ## Commit Messages
