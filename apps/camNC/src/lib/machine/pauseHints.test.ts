@@ -36,6 +36,12 @@ describe('pauseHint', () => {
     expect(pauseHint(fusion, 60)).toBeNull();
   });
 
+  it('reads CRLF files like FluidNC: `;M0 (…)` is a comment there too', () => {
+    const crlf = fusion.replaceAll('\n', '\r\n');
+    expect(pauseHint(crlf, percentAfter(crlf, 'Attach probe'))).toBeNull();
+    expect(pauseHint(crlf, percentAfter(crlf, 'Turn ON'))?.line).toBe(6);
+  });
+
   it('explains a probe and a tool change that come next', () => {
     const probe = 'G21\nM0 (MSG Attach probe)\nG38.2 Z-50 F100\n' + 'G1 X1\n'.repeat(500);
     expect(pauseHint(probe, percentAfter(probe, 'Attach'))?.next).toBe(

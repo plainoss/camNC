@@ -67,8 +67,10 @@ export function parsedProgram(gcode: string): ParsedProgram {
   const ascii = size === gcode.length;
   const lines: Line[] = [];
   let offset = 0;
-  for (const raw of gcode.split('\n')) {
-    offset += (ascii ? raw.length : encoder.encode(raw).length) + 1;
+  for (const withCr of gcode.split('\n')) {
+    offset += (ascii ? withCr.length : encoder.encode(withCr).length) + 1;
+    // FluidNC skips the CR of CRLF files, and `.` would not match it: `;M0 (…)` read as an M0.
+    const raw = withCr.replace(/\r$/, '');
     if (!raw.includes('(') && !raw.includes(';')) {
       lines.push({ code: raw.trim(), comment: '', end: offset });
       continue;

@@ -52,6 +52,12 @@ function HoldExplanation() {
   // from before may predate an M3 the job ran since.
   const inHold = api.spindleInHold.value;
   const spindle = status?.spindleOn || inHold ? 'on' : inHold === false ? 'off' : undefined;
+  const start = api.jobStartPos.value;
+  const stillSinceStart =
+    !!start &&
+    start.file === job?.file &&
+    !!status &&
+    (['x', 'y', 'z'] as const).every(axis => Math.abs(status.mpos[axis] - start.mpos[axis]) < 0.01);
   const hint = useMemo(
     () =>
       ours
@@ -62,9 +68,10 @@ function HoldExplanation() {
             mpos: mz === undefined ? undefined : { z: mz },
             wpos: wz === undefined ? undefined : { z: wz },
             spindle,
+            stillSinceStart,
           })
         : null,
-    [ours, gcode, percent, readTo, holdRequested, mz, wz, spindle]
+    [ours, gcode, percent, readTo, holdRequested, mz, wz, spindle, stillSinceStart]
   );
   if (status?.state === 'Door')
     return (

@@ -121,6 +121,12 @@ export class CncApi {
   public readonly spindleInHold = signal<boolean | undefined>(undefined);
   /** The SD percent once camNC's Pause had held the job, see {@link holdRequested}. */
   private pauseHeldAt: number | null = null;
+  /**
+   * Machine position in the first report of a job camNC started in this tab, so that a hold can tell nothing has moved
+   * since. Not known for a job found running (after a reload): it may have moved before.
+   */
+  public readonly jobStartPos = signal<{ file: string; mpos: Position } | null>(null);
+  private awaitingJobStart = false;
   /** When the current SD job was first seen running, for the time estimate. */
   public readonly jobStartedAt = signal<number | null>(null);
   public readonly isConnected = computed(() => this.connection.value === 'connected');
@@ -163,6 +169,8 @@ export class CncApi {
     this.zZeroedAt.value = null;
     this.holdRequested.value = false;
     this.jobReadTo.value = null;
+    this.jobStartPos.value = null;
+    this.awaitingJobStart = false;
     this.lastAlarm.value = loadLastAlarm(host);
     this.host.value = host;
     this.connection.value = 'connecting';
@@ -307,6 +315,10 @@ export class CncApi {
         if (!holding(status.state)) this.spindleInHold.value = undefined;
         else if (status.overridesReported) this.spindleInHold.value = status.spindleOn;
         else if (!holding(this.status.value?.state) || readOn) this.spindleInHold.value = undefined;
+        if (status.job && this.awaitingJobStart) {
+          this.awaitingJobStart = false;
+          this.jobStartPos.value = { file: status.job.file, mpos: status.mpos };
+        }
         // Run after anything but Run means the hold is over. Run after Run can be a report sent just before the controller
         // took the Pause, so it does not.
         const runsAgain = status.state === 'Run' && this.status.value?.state !== 'Run';
@@ -598,8 +610,13 @@ export class CncApi {
     batch(() => {
       this.holdRequested.value = false;
       this.jobReadTo.value = null;
+      this.jobStartPos.value = null;
     });
-    return runSdFile(api, filename);
+    this.awaitingJobStart = true;
+    return runSdFile(api, filename).catch(err => {
+      this.awaitingJobStart = false;
+      throw err;
+    });
   }
 
   async listFiles() {

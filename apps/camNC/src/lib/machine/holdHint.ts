@@ -18,6 +18,8 @@ export interface HoldContext {
    * only from a report sent during this hold, the state while held. `undefined` otherwise.
    */
   spindle?: 'on' | 'off';
+  /** The bit is where it was when camNC started this job. `false` when unknown, e.g. after a reload. */
+  stillSinceStart?: boolean;
 }
 
 /** How close (mm) Z must be to the height the program went to before the pause. */
@@ -35,6 +37,9 @@ const kAtZ = 0.05;
  * - A hold camNC sent is a feed hold, wherever the job is.
  * - Every other M0 also needs the bit where the program put it before that M0: a hold from the machine's button or
  *   another client, with the reader blocked just before the M0 (at the M5, say), reports nearly the same position.
+ *   That holds for M0s without a camNC marker (other posts) too: at or above the last Z before the M0.
+ * - A first M0 with no move before it (Fusion's "Turn ON 15000RPM") has no Z to compare with. It needs the bit not to
+ *   have moved since camNC started the job: then nothing has been cut yet.
  */
 export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
   if (c.percent === undefined) return null;
@@ -62,7 +67,10 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
   const index = pauseAt(lines, size, c.percent);
   if (index < 0) return null;
   const hint = explainPause(lines, index, gcode);
-  if (!hint.marker) return hint;
+  if (!hint.marker) {
+    if (index === first && !lines.slice(0, first).some(movesOrProbes)) return c.stillSinceStart === true ? hint : null;
+    return bitAtOrAbove(lines, index, c) ? hint : null;
+  }
   // Past the start pause's reader position above, the job is past it.
   if (hint.marker.kind === 'start') return null;
   return bitWhereThePauseLeftIt(lines, index, hint.marker.kind === 'done', c) ? hint : null;
@@ -73,6 +81,8 @@ function spindleStartEnd(lines: Line[], index: number) {
   for (let i = index + 1; i < lines.length; i++) if (/(?<![A-Z])M0*[34](?![\d.])/i.test(lines[i]!.code)) return lines[i]!.end;
   return lines.at(-1)!.end;
 }
+/** A line that moves an axis or probes, so that the bit may be anywhere after it. */
+const movesOrProbes = (line: Line) => /\bG0*(?:[0-3]|28|30|38(?:\.\d)?|53)(?![\d.])|[XYZABC]\s*[-+.\d]/i.test(line.code);
 
 /**
  * Whether the bit is where the program sent it before the M0 at `index`: parked at the G53 Z for the done pause, at or
@@ -83,6 +93,13 @@ function bitWhereThePauseLeftIt(lines: Line[], index: number, done: boolean, c: 
   if (!at || at.machine !== done) return false;
   if (done) return c.mpos !== undefined && Math.abs(c.mpos.z - at.z) <= kAtZ;
   return c.wpos !== undefined && c.wpos.z >= at.z - kAtZ;
+}
+
+/** For an M0 of another post: the bit at or above the last Z the program moved to before it, in its coordinates. */
+function bitAtOrAbove(lines: Line[], index: number, c: HoldContext) {
+  const at = zBefore(lines, index);
+  const z = at?.machine ? c.mpos?.z : c.wpos?.z;
+  return !!at && z !== undefined && z >= at.z - kAtZ;
 }
 
 /** The Z the program last moved to before line `index`, and whether in machine coordinates (G53). `null` if unknown. */

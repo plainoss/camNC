@@ -410,6 +410,25 @@ describe('CncApi', () => {
     expect(api.spindleInHold.value).toBeUndefined();
   });
 
+  it('notes where the bit was when a job camNC started first reports, and not for a job found running', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    fake.state = 'Run';
+    fake.job = { file: '/sd/found.gcode', percent: 20 };
+    fake.pushStatus();
+    await until(() => api.jobProgress.value?.file === '/sd/found.gcode');
+    expect(api.jobStartPos.value).toBeNull();
+    fake.state = 'Idle';
+    fake.job = null;
+    fake.pushStatus();
+    await until(() => api.state.value === 'Idle');
+    fake.mpos = { x: 3, y: 4, z: -2 };
+    fake.files.set('job.gcode', new TextEncoder().encode('G21\n'));
+    await api.runFile('job.gcode');
+    await until(() => api.jobStartPos.value !== null);
+    expect(api.jobStartPos.value).toEqual({ file: '/sd/job.gcode', mpos: { x: 3, y: 4, z: -2, extra: undefined } });
+  });
+
   it('keeps the furthest SD position read in the job', async () => {
     const fake = new FakeFluidnc('v4');
     const api = await connected(fake);
