@@ -355,7 +355,10 @@ export function brepProblems(brep: Brep): string[] {
   const uses = brep.edges.map(() => ({ forward: 0, backward: 0 }));
   for (const face of brep.faces)
     for (const loop of face.loops) for (const { edge, forward } of loop) uses[edge]![forward ? 'forward' : 'backward']++;
-  return uses.flatMap((use, edge) =>
-    use.forward === 1 && use.backward === 1 ? [] : [`edge ${edge} used ${use.forward}+${use.backward} times`]
-  );
+  return [
+    ...uses.flatMap((use, edge) =>
+      use.forward === 1 && use.backward === 1 ? [] : [`edge ${edge} used ${use.forward}+${use.backward} times`]
+    ),
+    ...(brep.partialArcs ? [`${brep.partialArcs} arc edges used part way`] : []),
+  ];
 }

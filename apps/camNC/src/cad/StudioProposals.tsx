@@ -9,6 +9,8 @@ import { assistantSelection } from './assistant/selection';
 import { listedStudioParts } from './studioParts';
 import type { AssistantProposalState } from './assistant/useAssistantProposal';
 import './assistant/dock.css';
+import { SvgInsert } from './svg/SvgInsert';
+import { useSvgAssetSession } from './svg/useSvgAssetSession';
 
 const unchangedFile = 'This file matches the open design. Reviewing it would change nothing.';
 
@@ -30,8 +32,11 @@ export function StudioProposals({
   disabled?: boolean;
   onApply: (document: CadDocument) => void;
 }) {
+  useSvgAssetSession(document.id);
   const [assistant, setAssistant] = useState(false);
   const [proposal, setProposal] = useState<CadProposal | null>(null);
+  // A new review, not a re-checked tweak of the same one, starts with fresh sliders.
+  const [reviewKey, setReviewKey] = useState(0);
   const assistantProposal = useRef<CadProposal | null>(null);
   const [error, setError] = useState('');
   // A file that would change nothing is not a failure: say so neutrally, with the same way out.
@@ -82,6 +87,7 @@ export function StudioProposals({
       const comparison = compareCadProposal(next);
       if (!comparison.added.length && !comparison.changed.length && !comparison.removed.length) return setNotice(unchangedFile);
       setProposal(next);
+      setReviewKey(key => key + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to read this design.');
     } finally {
@@ -112,6 +118,7 @@ export function StudioProposals({
       if (!result.ok) throw new Error(result.scriptError ?? result.report.errors.map(error => error.message).join('\n'));
       insert.current?.close();
       setProposal(cadProposal(start, result.document));
+      setReviewKey(key => key + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to build this cupboard.');
     } finally {
@@ -124,6 +131,7 @@ export function StudioProposals({
         <details className="cad-insert-menu">
           <summary>Insert</summary>
           <div>
+            <SvgInsert document={document} disabled={disabled || building} onProposal={setProposal} />
             <button
               type="button"
               disabled={disabled || building}
@@ -241,6 +249,7 @@ export function StudioProposals({
                   onProposal={value => {
                     assistantProposal.current = value;
                     setProposal(value);
+                    setReviewKey(key => key + 1);
                   }}
                   onClose={() => setAssistant(false)}
                 />
@@ -248,6 +257,7 @@ export function StudioProposals({
             )}
             {proposal && (
               <ProposalReview
+                key={reviewKey}
                 proposal={proposal}
                 session={session}
                 currentDocument={document}
@@ -269,6 +279,19 @@ export function StudioProposals({
                   assistantProposal.current = null;
                   setProposal(null);
                 }}
+                onReplace={
+                  assistantProposal.current === proposal
+                    ? next => {
+                        // A tweak re-checked in review becomes the assistant's proposal, kept after closing as before,
+                        // unless the dock has offered a newer one meanwhile.
+                        if (checkedProposal.proposal !== proposal) return false;
+                        assistantProposal.current = next;
+                        checkedProposal.receive(next);
+                        setProposal(next);
+                        return true;
+                      }
+                    : undefined
+                }
               />
             )}
           </>,

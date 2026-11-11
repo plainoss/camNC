@@ -4,7 +4,7 @@ import { intersect as intersectPaths, union as unionPaths } from '../geom';
 import { loadStep } from '../import';
 import type { Mesh, Pt } from '../geom';
 import { arcRuns } from './arcs';
-import { brepProblems, partBrep } from './brep';
+import { brepProblems, partBrep, type Brep } from './brep';
 import { writeStep } from './writer';
 
 /** A circle as the sketch tessellates it, within 0.01 mm. */
@@ -71,6 +71,11 @@ describe('closed path runs', () => {
     expect(runs.filter(run => !run.circle)).toHaveLength(4);
     expect(runs.filter(run => run.circle).every(run => Math.abs(run.circle!.r - 8) < 1e-3)).toBe(true);
   });
+});
+
+it('counts an arc edge a loop only used part of as a problem', () => {
+  const brep: Brep = { points: [], edges: [], faces: [], partialArcs: 2 };
+  expect(brepProblems(brep)).toEqual(['2 arc edges used part way']);
 });
 
 describe('part STEP export', () => {

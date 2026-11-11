@@ -46,7 +46,7 @@ export function buildAssistantContext(messages: readonly AssistantMessage[], opt
     for (const call of batch.message.calls!) {
       // A short reply such as "Yes" only makes sense with its earlier suggested question and choices.
       if (call.name === 'ask_user') retained.add(batch.start);
-      if (call.name === 'check_design') latestCheck = batch.start;
+      if (call.name === 'check_design' || call.name === 'check_svg') latestCheck = batch.start;
       if (call.name === 'cad_script_guide' || call.name === 'cad_script_example')
         latestReference.set(`${call.name}:${String(call.arguments.section ?? call.arguments.name ?? '')}`, batch.start);
     }
