@@ -1,5 +1,5 @@
 import { useDesignUnits } from './designUnits';
-import type { CadFolder, CadPart } from '@wbcnc/cad';
+import { edgeFilletProblems, type CadFolder, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { PartRowMenu } from './PartRowMenu';
 
@@ -47,6 +47,8 @@ export function PartsList({
   const [menu, setMenu] = useState<{ key: string; name: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  // A Fillet step that leaves corners sharp is a problem with the part too, as the check reports it.
+  const problemOf = (part: CadPart) => trouble(part.id) || edgeFilletProblems(part)[0]?.message;
   const renderRow = ({ key, part: p, name }: PartsListRow) => (
     <li key={key}>
       {renaming === key ? (
@@ -82,8 +84,8 @@ export function PartsList({
           onClick={() => onPick(p.id, key === p.id ? undefined : key.slice(p.id.length + 1))}>
           <span aria-hidden="true">▱</span>
           <span>{name}</span>
-          {key === p.id && trouble(p.id) && (
-            <span className="cad-part-trouble" role="img" aria-label={trouble(p.id)!} title={trouble(p.id)!}>
+          {key === p.id && problemOf(p) && (
+            <span className="cad-part-trouble" role="img" aria-label={problemOf(p)!} title={problemOf(p)!}>
               ⚠
             </span>
           )}

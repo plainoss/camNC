@@ -89,3 +89,35 @@ it.each([false, true])('blocks a copy face without persisted placement and permi
   fireEvent.click(screen.getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(save).toHaveBeenCalledWith(candidate));
 });
+
+it('numbers a new mirror after the pattern copies, in the preview and as saved', async () => {
+  const document = createPlateDocument({ width: 100, height: 60 });
+  const part = document.parts[0]!;
+  part.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  part.pattern = { id: 'pattern', axis: 'x', count: 3, spacing: 120 };
+  part.copies = [1, 2].map(k => ({
+    id: `pattern:${k}`,
+    pattern: 'pattern',
+    placement: { position: [120 * k, 0, 0] as [number, number, number], rotation: [0, 0, 0, 1] as [number, number, number, number] },
+  }));
+  const preview = vi.fn<(document: CadDocument | null) => void>();
+  let picked: (on: CadDrawnOn['on']) => void = () => {};
+  const save = vi.fn();
+  render(
+    <MirrorDialog
+      document={document}
+      partId={part.id}
+      pickPlane={callback => {
+        picked = callback;
+      }}
+      onSave={save}
+      onPreview={preview}
+      onCancel={vi.fn()}
+    />
+  );
+  act(() => picked({ plane: 'right' }));
+  await waitFor(() => expect(preview.mock.calls.at(-1)?.[0]?.parts[0]?.copies?.find(copy => !copy.pattern)?.number).toBe(4));
+  fireEvent.click(screen.getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(save).toHaveBeenCalled());
+  expect(save.mock.calls[0]?.[0].parts[0].copies.find((copy: { pattern?: string }) => !copy.pattern).number).toBe(4);
+});

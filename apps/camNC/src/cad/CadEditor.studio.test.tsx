@@ -23,6 +23,7 @@ import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
 import { endCadSession } from '@wbcnc/cad-editor/session';
 import { ModelViewport } from '@/cam/model/ModelViewport';
+import { settled } from '@/test/settled';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 
@@ -36,8 +37,6 @@ const editExtrude = async (part: string) =>
   userEvent.dblClick(
     within(await screen.findByRole('region', { name: 'Features' })).getByRole('button', { name: new RegExp(`Extrude · ${part}`) })
   );
-const settled = () =>
-  waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
 
 async function studio(source = createPlateDocument({ width: 200, height: 100 })) {
   sessions.push(source.id);
@@ -152,7 +151,8 @@ it.each(['sketch', 'extrude', 'undo'])('dismisses Restore when another step star
     await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
     await screen.findByRole('dialog', { name: /^Extrude · / });
   }
-  await waitFor(() => expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull());
+  await settled();
+  expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
 });
 
 it('dismisses Restore while the design is being accepted', async () => {
@@ -674,7 +674,8 @@ it('moves a part with a transform when Copy part is off, as the reference does b
   await userEvent.clear(z);
   await userEvent.type(z, '40');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(latest().parts[0]!.moved).toEqual({ by: [0, 0, 40] }));
+  await settled();
+  expect(latest().parts[0]!.moved).toEqual({ by: [0, 0, 40] });
   expect(latest().parts[0]!.copies).toBeUndefined();
   // It's a step of its own, opened again to change.
   const features = screen.getByRole('region', { name: 'Features' });
@@ -690,7 +691,8 @@ it('moves a part with a transform when Copy part is off, as the reference does b
   await userEvent.clear(z2);
   await userEvent.type(z2, '10');
   await userEvent.click(within(more).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(latest().parts[0]!.moved).toEqual({ by: [0, 0, 50] }));
+  await settled();
+  expect(latest().parts[0]!.moved).toEqual({ by: [0, 0, 50] });
 });
 
 it('copies a part with a transform, and edits the copy from its feature', async () => {
@@ -825,7 +827,7 @@ it('extrudes a sketch already used again, as a new part of the regions left, sha
   await waitFor(() => expect(latest().parts).toHaveLength(2));
   const made = latest().parts[1]!;
   expect(made).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [narrow] });
-  expect(within(dialog).getByText('A region of Shelf’s sketch')).toBeDefined();
+  expect(within(dialog).getByText('A region of Sketch · Shelf')).toBeDefined();
   // The regions show in the view, the one picked marked.
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() =>
@@ -916,11 +918,13 @@ it('sketches on a base plane picked before Sketch or Shift+S, as on one picked a
   await userEvent.click(within(toolbar).getByRole('button', { name: /Sketch/ }));
   const sketch = await screen.findByRole('dialog', { name: /^Sketch · / });
   expect(sketch.textContent).toMatch(/front plane/i);
-  await waitFor(() => expect(latest().parts.at(-1)!.drawnOn).toEqual({ on: { plane: 'front' }, offset: 0 }));
+  await settled();
+  expect(latest().parts.at(-1)!.drawnOn).toEqual({ on: { plane: 'front' }, offset: 0 });
   // Cancelled, the waiting sketch's cross leaves nothing started.
   await userEvent.click(within(sketch).getByRole('button', { name: 'Cancel' }));
   // Shift+S starts a sketch too: on the plane picked, or waiting for one.
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull());
+  await settled();
+  expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull();
   await userEvent.click(
     within(within(screen.getByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' })).getByRole('button', {
       name: /Right/,
@@ -930,12 +934,14 @@ it('sketches on a base plane picked before Sketch or Shift+S, as on one picked a
   const onRight = await screen.findByRole('dialog', { name: /^Sketch · / });
   expect(onRight.textContent).toMatch(/right plane/i);
   await userEvent.click(within(onRight).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull());
+  await settled();
+  expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull();
   screen.getByTestId('workspace-3d').focus();
   await userEvent.keyboard('{Shift>}S{/Shift}');
   expect(await screen.findByRole('dialog', { name: 'Sketch' })).toBeDefined();
   await userEvent.click(within(screen.getByRole('dialog', { name: 'Sketch' })).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
+  await settled();
+  expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull();
 });
 
 it('patterns a part along an edge picked in the view', async () => {
@@ -1389,10 +1395,11 @@ it('keeps a value typed as `#name = value` when the tick is clicked straight aft
   await userEvent.clear(thickness);
   await userEvent.type(thickness, '#board = 19 mm');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull());
+  await settled();
+  expect(screen.queryByRole('dialog', { name: 'Extrude · Plate' })).toBeNull();
   expect(latest().variables?.map(variable => variable.name)).toEqual(['board']);
   // The design takes the thickness once the variable is in it, which can be a solve after the dialog closed.
-  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(19));
+  expect(latest().parts[0]!.thickness).toBe(19);
   expect(latest().parts[0]!.thicknessExpression).toMatch(/board/);
 });
 

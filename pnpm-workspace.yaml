@@ -7,7 +7,7 @@ catalog:
   '@heroui/theme': 2.4.18-beta.7
   '@hookform/devtools': ^4.4.0
   '@hookform/resolvers': ^5.1.1
-  '@mergifyio/vitest': ^2026.11.6
+  '@mergifyio/vitest': ^2026.11.7
   '@preact/signals-react': 3.2.1
   '@preact/signals-react-transform': ^0.5.2
   '@radix-ui/react-alert-dialog': ^1.1.14

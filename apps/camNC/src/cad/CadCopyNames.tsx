@@ -1,4 +1,4 @@
-import { cadCopyName, type CadPart } from '@wbcnc/cad';
+import { cadCopyNumber, type CadPart } from '@wbcnc/cad';
 import './cadThicknessField.css';
 
 /** A name for each of a part's copies, which CAM labels its pieces with. An empty name gives back the numbered one. */
@@ -12,8 +12,9 @@ export function CadCopyNames({ part, onRename }: { part: CadPart; onRename: (cop
           // A new name typed elsewhere, or undone, starts the box afresh.
           key={`${copy.id}:${copy.name ?? ''}`}
           defaultValue={copy.name ?? ''}
-          placeholder={cadCopyName({ name: part.name }, index)}
-          aria-label={`Name of copy ${index + 2}`}
+          // The numbered name it gets back when its own is cleared.
+          placeholder={`${part.name} ${cadCopyNumber(part, index)}`}
+          aria-label={`Name of copy ${cadCopyNumber(part, index)}`}
           spellCheck={false}
           onBlur={event => {
             if (event.target.value.trim() !== (copy.name ?? '')) onRename(copy.id, event.target.value);

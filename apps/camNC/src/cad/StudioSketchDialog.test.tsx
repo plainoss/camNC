@@ -13,6 +13,7 @@ afterEach(() => {
 function setup() {
   const editor = createRef<HTMLDivElement>();
   const confirm = vi.fn();
+  const extrude = vi.fn();
   let finishField!: () => void;
   const field = new Promise<void>(resolve => {
     finishField = resolve;
@@ -31,6 +32,7 @@ function setup() {
         showConstraints
         onShowConstraints={() => {}}
         onConfirm={confirm}
+        onExtrude={extrude}
         onCancel={() => {}}
       />
     </div>
@@ -43,7 +45,7 @@ function setup() {
       await field;
     });
   };
-  return { ...rendered, editor, view, key, confirm, settle };
+  return { ...rendered, editor, view, key, confirm, extrude, settle };
 }
 
 it('confirms once after a field and its resulting sketch check settle', async () => {
@@ -91,4 +93,17 @@ it('discards a queued confirmation if another interaction takes ownership', asyn
   expect(confirm).not.toHaveBeenCalled();
   key();
   await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
+});
+
+it('confirms into an Extrude with Shift+E, but leaves Shift+E to a field being typed in', async () => {
+  const { editor, confirm, extrude, settle } = setup();
+  const field = document.createElement('input');
+  editor.current!.append(field);
+  fireEvent.keyDown(field, { key: 'E', code: 'KeyE', shiftKey: true });
+  fireEvent.keyDown(editor.current!, { key: 'E', code: 'KeyE', shiftKey: true, ctrlKey: true });
+  await settle();
+  expect(extrude).not.toHaveBeenCalled();
+  fireEvent.keyDown(editor.current!, { key: 'E', code: 'KeyE', shiftKey: true });
+  await waitFor(() => expect(extrude).toHaveBeenCalledTimes(1));
+  expect(confirm).not.toHaveBeenCalled();
 });

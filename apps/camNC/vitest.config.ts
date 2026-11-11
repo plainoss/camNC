@@ -55,7 +55,7 @@ export default defineConfig({
     maxWorkers: 4,
     // Worker tests run in workerd, see vitest.worker.config.ts.
     exclude: ['**/node_modules/**', 'worker/**', ...nodeFiles],
-    setupFiles: ['src/test/isolateIndexedDb.ts'],
+    setupFiles: ['src/test/isolateIndexedDb.ts', 'src/test/settledReset.ts'],
     // environment: 'jsdom',
     // opencv tests don't seem to work with jsdom as setup right now.
     browser: {
