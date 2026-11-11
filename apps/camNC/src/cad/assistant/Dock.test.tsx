@@ -32,7 +32,16 @@ afterEach(() => {
 
 function dock() {
   const onProposal = vi.fn();
-  const view = render(<AssistantDock document={createPlateDocument()} onProposal={onProposal} onClose={() => {}} />);
+  const view = render(
+    <AssistantDock
+      proposal={null}
+      onCheckedProposal={() => {}}
+      onDiscardProposal={() => {}}
+      document={createPlateDocument()}
+      onProposal={onProposal}
+      onClose={() => {}}
+    />
+  );
   return { ...view, onProposal };
 }
 
@@ -140,7 +149,14 @@ it('keeps the fresh greeting at the top and the composer visible beside expanded
           containerType: 'inline-size',
           containerName: 'cad-editor',
         }}>
-        <AssistantDock document={createPlateDocument()} onProposal={() => {}} onClose={() => {}} />
+        <AssistantDock
+          proposal={null}
+          onCheckedProposal={() => {}}
+          onDiscardProposal={() => {}}
+          document={createPlateDocument()}
+          onProposal={() => {}}
+          onClose={() => {}}
+        />
       </div>
     );
     const conversation = screen.getByRole('log', { name: 'Conversation' });
@@ -162,3 +178,38 @@ it('keeps the fresh greeting at the top and the composer visible beside expanded
     await page.viewport(original.width, original.height);
   }
 }, 30000);
+
+it('keeps clarification replies usable while a checked proposal remains available', async () => {
+  const source = createPlateDocument(),
+    before = structuredClone(source),
+    onProposal = vi.fn();
+  vi.mocked(runDesignAssistant).mockImplementationOnce(async options => {
+    options.onMessage?.({
+      role: 'assistant',
+      text: 'Choose a new thickness first.',
+      calls: [{ id: 'pending-question', name: 'ask_user', arguments: { question: 'Which thickness?', choices: ['18 mm', '24 mm'] } }],
+    });
+    options.onMessage?.({ role: 'tool', callId: 'pending-question', text: 'Waiting for the user to choose or type a reply.' });
+    return { status: 'question', messages: [], checks: 0, usage: createAssistantUsage() };
+  });
+  render(
+    <AssistantDock
+      document={source}
+      proposal={{ base: source, document: { ...source, name: 'Checked candidate' } }}
+      onCheckedProposal={() => {}}
+      onDiscardProposal={() => {}}
+      onProposal={onProposal}
+      onClose={() => {}}
+    />
+  );
+  await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'Can we use a different thickness?');
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+  const reply = await screen.findByRole('button', { name: '24 mm' });
+  expect(screen.getByRole('status')).toHaveTextContent('Waiting for your reply.');
+  expect(screen.getByRole('button', { name: 'Review proposal' })).toBeDefined();
+  await userEvent.click(reply);
+  await waitFor(() => expect(runDesignAssistant).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(runDesignAssistant).mock.calls[1]![0].messages.at(-1)).toEqual({ role: 'user', text: '24 mm' });
+  expect(onProposal).not.toHaveBeenCalled();
+  expect(source).toEqual(before);
+});
