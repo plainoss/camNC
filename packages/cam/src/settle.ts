@@ -802,7 +802,6 @@ function bestExtra(
  * part stays where it is. Null: no pattern fits.
  */
 function searchPatterns(b: SettleBoard, start: Spots, existing: Fixture[], count: number, mayMove = canSlide(b, start)): Suggested | null {
-  const cw = b.sizes.clampWidth;
   const table = edgeTable(b);
   const startWork = workBox(b, start);
   const floor = offcutFloor(b, start, existing);

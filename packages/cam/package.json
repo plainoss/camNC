@@ -18,7 +18,8 @@
   "scripts": {
     "test": "vitest",
     "test:performance": "vitest run --config vitest.performance.config.ts",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "oxlint --max-warnings 0"
   },
   "license": "Apache-2.0",
   "dependencies": {
