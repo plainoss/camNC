@@ -152,7 +152,7 @@ describe('positioned Extrude Remove', () => {
   });
 
   it.each([6, 'through'] as const)('updates patterned copy intersections after moving the source (%s)', async depth => {
-    let document = setPartPattern(design(depth), 'board', { axis: 'x', count: 2, spacing: 200 });
+    const document = setPartPattern(design(depth), 'board', { axis: 'x', count: 2, spacing: 200 });
     document.parts[0]!.moved = { by: [-200, 0, 0] };
     const solved = await solveCadDocument(document);
     expect(solved.status).toBe('solved');
