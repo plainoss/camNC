@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { carvingBoard, kDefaultVBit, type CarvingArt, type CarvingV1 } from '../carving';
-import { prepareCarvingArt } from './prepare';
+import { kCarvedFractionError, kCarvedFractionWarn, prepareCarvingArt } from './prepare';
 import { sanitizeCarvingSvg } from './sanitize';
 import { maskOutline } from '../carvingOutline';
 import { checkCarvingInWorker } from './camCheck';
@@ -28,6 +28,38 @@ describe('generated carving preparation', () => {
     const reparsed = await prepareCarvingArt({ ...options, art: result.art });
     expect(reparsed.width).toBeCloseTo(result.width, 1);
     expect(reparsed.height).toBeCloseTo(result.height, 1);
+  });
+
+  it('flags drawings that carve most of the envelope away, with the measured share and the limit', async () => {
+    // A black background with a few white details: nearly the whole envelope would be carved.
+    const solid = await prepareCarvingArt({
+      ...options,
+      art: svg('<path fill-rule="evenodd" d="M0 0H100V100H0Z M40 40H60V60H40Z"/>'),
+    });
+    expect(solid.report.carvedFraction).toBeGreaterThan(kCarvedFractionError);
+    expect(solid.report.ok).toBe(false);
+    expect(solid.report.errors.join(' ')).toMatch(/Most of the drawing is carved away \(96%, limit 85%\)/);
+    expect(solid.report.camPasses).toBe(0);
+    // Mostly black, but below the error limit: a warning the user and model can act on.
+    const heavy = await prepareCarvingArt({
+      ...options,
+      art: svg('<path fill-rule="evenodd" d="M0 0H100V100H0Z M20 20H80V80H20Z M30 30H70V70H30Z"/>'),
+    });
+    expect(heavy.report.carvedFraction).toBeGreaterThan(kCarvedFractionWarn);
+    expect(heavy.report.carvedFraction).toBeLessThan(kCarvedFractionError);
+    expect(heavy.report.errors.join(' ')).not.toContain('carved away');
+    expect(heavy.report.warnings.join(' ')).toMatch(/Most of the drawing is carved away \(80%, limit 60%\)/);
+  });
+
+  it('does not flag an ordinary line drawing', async () => {
+    const result = await prepareCarvingArt({
+      ...options,
+      art: svg('<path d="M10 10H90V14H10Z M10 50H90V54H10Z M10 86H90V90H10Z M10 10H14V90H10Z M86 10H90V90H86Z"/>'),
+    });
+    expect(result.report.carvedFraction).toBeGreaterThan(0);
+    expect(result.report.carvedFraction).toBeLessThan(kCarvedFractionWarn);
+    expect([...result.report.errors, ...result.report.warnings].join(' ')).not.toContain('carved away');
+    expect(result.report.ok).toBe(true);
   });
 
   it('removes isolated noise according to physical size, retaining source separately', async () => {
@@ -123,7 +155,8 @@ describe('generated carving preparation', () => {
   it('checks the selected flat clearing tool when enabled', async () => {
     const result = await prepareCarvingArt({
       ...options,
-      art: svg('<rect x="10" y="10" width="80" height="80"/>'),
+      // Half the envelope, so the mostly-carved check leaves the CAM check to run.
+      art: svg('<rect x="10" y="10" width="80" height="40"/>'),
       carving: { ...carving, clearWithFlat: true },
       clearTool: { number: 1, diameter: 3.175, name: 'Flat' },
     });
@@ -132,7 +165,8 @@ describe('generated carving preparation', () => {
   });
 
   it('rejects board overflow and excessive depth without changing source settings', async () => {
-    const art = svg('<rect x="10" y="10" width="80" height="80"/>');
+    // Half the envelope: a solid square would be refused as mostly carved before these checks matter.
+    const art = svg('<rect x="10" y="10" width="80" height="40"/>');
     const tooLarge = await prepareCarvingArt({ ...options, art, board: carvingBoard({ w: 20, h: 20, thickness: 18 }) });
     expect(tooLarge.report.errors.join(' ')).toContain('does not fit');
     const tooDeep = await prepareCarvingArt({ ...options, art, carving: { ...carving, maxDepth: 18 } });
