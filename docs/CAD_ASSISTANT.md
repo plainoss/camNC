@@ -190,25 +190,38 @@ benchmark does not establish quality or savings for other requests. The valid
 candidates have different silhouettes; appearance and construction still need
 human review.
 
-## Separate tool improvements to evaluate
+## Efficient construction and independent acceptance
 
-- **Named recipes with parameters:** check a trusted construction directly without
-  generating its full example source again; preserve editable CAD output and the
-  ordinary proposal review.
-- **Native curves and offsets:** expose the engine's Bézier/spline/ellipse tools
-  to scripts, together with useful curve reports. Expose linked line/arc/circle
-  offsets first; reliable general curve offsets require additional work.
-- **App-owned requirements:** retain confirmed dimensions, floors and identity
-  constraints outside the model's script, so omitting `expect` cannot hide drift.
-- **SVG sketch assets:** import existing vector artwork once and reference an
-  asset handle. Use precise curve conversion, measured bounds, units/transforms,
-  hole handling and explicit unsupported-content errors. The existing carving
-  rasterizer is not a precision sketch importer. Scaling an inner SVG does not
-  give constant wall thickness, and imported curves do not recover design intent.
-- **Bounded script patches and selected views:** repair a saved script by revision
-  instead of resending it, and request only the relevant projections. A separate
-  geometry repair lane could defer toolpath planning, while retaining trusted
-  verification and a complete final check.
+`check_design` accepts exactly one of full `source`, a named `recipe` with numeric-mm `parameters`, or an immutable `scriptId`. The tray and cupboard recipes produce ordinary editable parts and variables. A check returns a SHA-256 hash; repairs use `scriptId`, `expectedHash` and bounded exact `oldText`/`newText` patches. Ambiguous patches fail atomically. Handles belong to the original document snapshot and revision; edits and undo cannot revive stale sessions. `read_design` retrieves source only when needed.
+
+Confirmed requirements are explicit application state in the assistant dock. Draft fields are inactive until Confirm. Fixed-tolerance checks independently measure outline size, thickness, blind cuts, count, outer top-pocket wall and supported floor bounds, plus optional assembly dimensions and preservation of existing IDs. Targets must be globally unambiguous or use exact IDs/report handles. Pierced or opposed-pocket floors are refused rather than claiming a thickness guarantee. Appearance, internal webs and strength still need review. Changing requirements invalidates a proposal even after its review dialog opens.
+
+The browser uses geometry-only repair checks, with trusted reinspection after the sandbox. `finalize_design` runs the full toolpath/report check against the exact cached candidate, without rerunning generated JavaScript. A proposal is impossible before that succeeds. Its warnings and costs go back to the model before its final explanation. Repair attempt limits count geometry checks; finalization does not grant another repair attempt. `views: ["top"]` renders and sends only that projection; legacy `true` selects all three. Other projections remain available explicitly.
+
+Native Bézier, spline and ellipse construction, linked line/arc/circle offsets, and measured fitting are exposed in the script API. Fitting uses curve extrema rather than control-box or chord approximations. Uniform contain fitting does not promise both target dimensions; explicit distortion replaces source coordinate expressions with target-derived drivers. Reports disclose controls, bounds and fitting drivers. General spline/Bézier offsets remain unsupported.
+
+Insert → SVG imports filled vector outlines as editable native sketch geometry through a checked proposal. The assistant's `check_svg` accepts source once or a document-session asset handle. Only summaries and handles are repeated in context. Units, viewBox and affine transforms are resolved; unsupported styling, resources, scripts, clipping and uncertifiable contour topology are rejected explicitly. An inner scaled SVG is not a constant-width offset, and importing artwork does not infer CAD design intent. See the [SVG contract](../packages/cad-script/src/svg/README.md).
+
+## Follow-up live milestone measurements
+
+The same Sonnet 5.5 endpoint, prices and fixed tray brief were used after each milestone, with fresh conversations and normal prefix-cache reuse. Each follow-up row has two runs, so these are exploratory observations, not statistical performance guarantees. All offered tray candidates passed the independent dimensions, 10 mm floor and 18 mm outer-wall contract.
+
+| Milestone                                             | Mean requests | Mean output tokens | Mean seconds | Mean USD |
+| ----------------------------------------------------- | ------------: | -----------------: | -----------: | -------: |
+| Original baseline (3 runs)                            |           6.3 |             11,917 |        103.2 |  0.19569 |
+| Cached guide/editable example (3 runs)                |             3 |              1,646 |         22.0 |  0.02600 |
+| Recipes, script handles, requirements, selected views |             2 |                851 |         17.4 |  0.01946 |
+| Native curves and measured fitting                    |           2.5 |                887 |         18.5 |  0.01812 |
+| Geometry repairs plus mandatory full finalization     |             3 |                719 |         12.9 |  0.02227 |
+| Final SVG-capable toolset                             |           3.5 |                802 |         12.3 |  0.02453 |
+
+Native curves added capability but showed no clear further tray saving because the recipe already covered that shape. Staged checking reduced observed latency while adding a finalization request. The complete toolset's tray cost stayed about 87% below the original baseline; the extra checks and larger tool schema consumed some earlier savings.
+
+A separate specified four-cubic 280 × 190 × 18 mm blank compared native script generation with SVG generation (two runs each). Native scripts averaged 4 requests, 1,149 output tokens, 10.7 seconds and $0.03463. The first SVG pair averaged 4 requests, 1,511 output tokens, 14.3 seconds and $0.02786. It exposed a context bug: SVG views were omitted after report/finalization calls, and one run redundantly checked the same source. After recognizing SVG as current candidate geometry, two fresh SVG runs retained their top views through the final request and averaged 3 requests, 1,319 output tokens, 11.7 seconds and $0.02130. Both described the returned view while preserving manual visual review. SVG reduced input/cost in this small comparison but did not consistently improve output or latency relative to native scripts. Both paths produced editable native geometry and passed independent dimensions. Prefer parametric recipes for familiar construction and reusable SVG assets for existing artwork; do not force SVG as the default generator.
+
+A final live SVG import used the actual new-studio starter (cm display units and an empty Part 1), rather than a document with no parts. It passed independent dimensions and preservation of every existing ID, and completed full verification in 10.3 seconds with four requests and $0.03323, including one repaired naming conflict. The retained empty-starter warning was disclosed for human review. This checks the real startup workflow; it is not an additional tray performance sample.
+
+All experiments combined spent $1.29250 of the authorized $10, including earlier failed/excluded harness trials. Unknown usage would retain its maximum reservation. Live credentials, raw provider artifacts and the temporary experiment bridge are excluded from the repository; ordinary tests use recorded providers and cannot spend API credit.
 
 ## Provider protocol references
 

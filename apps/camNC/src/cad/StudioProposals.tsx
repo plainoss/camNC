@@ -8,6 +8,8 @@ import { ProposalReview } from './ProposalReview';
 import { assistantSelection } from './assistant/selection';
 import type { AssistantProposalState } from './assistant/useAssistantProposal';
 import './assistant/dock.css';
+import { SvgInsert } from './svg/SvgInsert';
+import { useSvgAssetSession } from './svg/useSvgAssetSession';
 
 const AssistantDock = lazy(() => import('./assistant/Dock').then(module => ({ default: module.AssistantDock })));
 
@@ -27,6 +29,7 @@ export function StudioProposals({
   disabled?: boolean;
   onApply: (document: CadDocument) => void;
 }) {
+  useSvgAssetSession(document.id);
   const [assistant, setAssistant] = useState(false);
   const [proposal, setProposal] = useState<CadProposal | null>(null);
   const assistantProposal = useRef<CadProposal | null>(null);
@@ -93,6 +96,7 @@ export function StudioProposals({
         <details className="cad-insert-menu">
           <summary>Insert</summary>
           <div>
+            <SvgInsert document={document} disabled={disabled || building} onProposal={setProposal} />
             <button
               type="button"
               disabled={disabled || building}

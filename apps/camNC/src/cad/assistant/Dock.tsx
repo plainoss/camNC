@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { evaluateCadDocument, type CadDocument } from '@wbcnc/cad';
-import { compactCadReport, inspectCadDocument, renderCadViews } from '@wbcnc/cad-script';
+import { compactCadReport, inspectCadDocument } from '@wbcnc/cad-script';
 import type { CadProposal } from '@wbcnc/cad-editor/proposal';
 import { readAssistantCredentials, redactAssistantText, type AssistantCredentials } from './keyStore';
 import type { AssistantImage, AssistantMessage } from './provider';
@@ -22,6 +22,12 @@ import shelfExample from '../../../../../packages/cad-script/examples/shelf-side
 import pebbleExample from '../../../../../packages/cad-script/examples/pebble-tray.cad.ts?raw';
 import './dock.css';
 import type { AssistantSelection } from './selection';
+import { Requirements } from './RequirementSettings';
+import { readRequirements, confirmRequirements, subscribeRequirements, bindProposalRequirements } from './requirementStore';
+import { renderAssistantViews } from './designViews';
+import { finalizeBrowserCandidate } from './finalizeCandidate';
+import { checkAssistantSvg } from './svgCheck';
+import { svgAssetsForDocument } from '../svg/svgAssets';
 
 const starters = [
   {
@@ -78,6 +84,16 @@ export function AssistantDock({
   const [running, setRunning] = useState(false);
   const [activity, setActivity] = useState('');
   const [error, setError] = useState('');
+  const [confirmed, setConfirmed] = useState(() => readRequirements(document.id));
+  useEffect(
+    () =>
+      subscribeRequirements(document.id, () => {
+        setConfirmed(readRequirements(document.id));
+        onCheckedProposal(null);
+        controller.current?.abort();
+      }),
+    [document.id, onCheckedProposal]
+  );
   const staleProposal = !!proposal && JSON.stringify(document) !== JSON.stringify(proposal.base);
   const controller = useRef<AbortController | null>(null);
   const activeBase = useRef<string | null>(null);
@@ -160,6 +176,11 @@ export function AssistantDock({
         guide: assistantGuide,
         guideSections,
         examples,
+        requirements: confirmed.requirements,
+        svg: {
+          assets: svgAssetsForDocument(start.id).list(),
+          check: (input, signal, options) => checkAssistantSvg(start, input, signal, options.views),
+        },
         limits: runSettings.limits,
         pricing: runSettings.pricing,
         onUsage: value => {
@@ -183,27 +204,48 @@ export function AssistantDock({
           if (mounted.current) setActivity(message);
         },
         check: async (source, base, signal, options) => {
-          const checked = await checkScriptInBrowser(base, source, { signal });
+          const checked = await checkScriptInBrowser(base, source, { signal, toolpaths: false });
           if (signal.aborted) return checked;
           const views =
             checked.ok && credentials.config.images && options?.views
               ? await Promise.all(
-                  renderCadViews(checked.document, checked.parts ?? evaluateCadDocument(checked.document).parts).map(view =>
-                    signal.aborted ? Promise.reject(new DOMException('Stopped', 'AbortError')) : rasterizeAssistantView(view.svg, view.name)
+                  renderAssistantViews(checked.document, checked.parts ?? evaluateCadDocument(checked.document).parts, options?.views).map(
+                    view =>
+                      signal.aborted
+                        ? Promise.reject(new DOMException('Stopped', 'AbortError'))
+                        : rasterizeAssistantView(view.svg, view.name)
                   )
                 )
               : undefined;
           const detailReport = compactCadReport(checked.document, checked.report);
           return {
             ...checked,
+            trustedReport: checked.report,
             detailReport,
             report: summarizeAssistantReport(detailReport, { partId: selection?.partId, partName: selection?.name }),
             images: views,
           };
         },
+        finalize: async (candidate, signal) => {
+          if (!candidate.trustedReport) throw new Error('Missing trusted geometry check.');
+          const checked = await finalizeBrowserCandidate(
+            { ...candidate, report: candidate.trustedReport, parts: candidate.parts ?? [] },
+            signal
+          );
+          const detailReport = compactCadReport(checked.document, checked.report);
+          return {
+            ...checked,
+            trustedReport: checked.report,
+            detailReport,
+            report: summarizeAssistantReport(detailReport, { partId: selection?.partId, partName: selection?.name }),
+          };
+        },
       });
       if (!mounted.current) return;
-      if (result.proposal && !abort.signal.aborted) onCheckedProposal(result.proposal);
+      if (result.proposal && !abort.signal.aborted) {
+        bindProposalRequirements(result.proposal, confirmed.revision);
+        onCheckedProposal(result.proposal);
+      }
       setActivity(
         result.status === 'stopped'
           ? 'Stopped. The design is unchanged.'
@@ -322,7 +364,20 @@ export function AssistantDock({
               : activity}
           </p>
           <ActivityView messages={messages} activity={activity} running={running} />
-          <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />
+          <div className="cad-assistant-options">
+            <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />
+            <Requirements
+              value={confirmed.requirements}
+              disabled={running}
+              onConfirm={value => {
+                confirmRequirements(document.id, value);
+                recordAssistantEvent(
+                  document.id,
+                  `Confirmed application requirements: ${JSON.stringify(value)}. These supersede earlier application requirements.`
+                );
+              }}
+            />
+          </div>
           {error && <p role="alert">{error}</p>}
           <form
             className="cad-assistant-composer"

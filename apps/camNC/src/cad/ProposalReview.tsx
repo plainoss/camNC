@@ -3,6 +3,7 @@ import type { CadDocument } from '@wbcnc/cad';
 import { applyCadProposal, cadProposalRefusal, compareCadProposal, type CadProposal } from '@wbcnc/cad-editor/proposal';
 import type { CadSession } from '@wbcnc/cad-editor/session';
 import './proposal.css';
+import { requirementProposalRefusal, subscribeRequirements } from './assistant/requirementStore';
 
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
 const ignore = () => {};
@@ -28,8 +29,12 @@ export function ProposalReview({
   const dialog = useRef<HTMLDialogElement>(null);
   const [original, setOriginal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [, refreshRequirements] = useState(0);
+  useEffect(() => subscribeRequirements(proposal.base.id, () => refreshRequirements(value => value + 1)), [proposal]);
   const comparison = useMemo(() => compareCadProposal(proposal), [proposal]);
-  const refusal = disabled ? 'Finish or cancel the current edit before applying this design.' : cadProposalRefusal(session, proposal);
+  const refusal = disabled
+    ? 'Finish or cancel the current edit before applying this design.'
+    : (requirementProposalRefusal(proposal) ?? cadProposalRefusal(session, proposal));
   useEffect(() => {
     const element = dialog.current!;
     element.showModal();
@@ -124,6 +129,8 @@ export function ProposalReview({
             // A host feature preview is not a document change, so the snapshot guard alone cannot detect it.
             if (disabled) return;
             try {
+              const changedRequirements = requirementProposalRefusal(proposal);
+              if (changedRequirements) throw new Error(changedRequirements);
               onApply(applyCadProposal(session, proposal));
               dialog.current?.close();
             } catch (cause) {

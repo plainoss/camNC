@@ -9,7 +9,8 @@ import { defaultProvider, rememberAssistantCredentials } from './keyStore';
 import { runDesignAssistant } from './loop';
 import { createAssistantUsage } from './runBudget';
 
-vi.mock('@wbcnc/cad-script', () => ({
+vi.mock('@wbcnc/cad-script', async importOriginal => ({
+  ...(await importOriginal<typeof import('@wbcnc/cad-script')>()),
   inspectCadDocument: vi.fn(async (document: CadDocument) => ({ document, report: {}, parts: [] })),
   compactCadReport: vi.fn(() => ({})),
   renderCadViews: vi.fn(() => []),
