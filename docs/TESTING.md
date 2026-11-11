@@ -78,3 +78,7 @@ The first two-shard CI trial passed all 148 scenarios but still left the slower 
 The initial targets are under one minute for ordinary local feedback and under five minutes for typical PR validation. These are acceptance targets, not guaranteed timings. Measure every browser lane: shortening one does not help the required-check time if another still dominates. More shards must justify their runner-minutes and setup overhead.
 
 The incremental hold-timeline algorithm remains a separate product/safety change. It requires independent invariants and differential checks against the existing implementation, and is not needed to adopt these test boundaries.
+
+## Live assistant runs
+
+The design and carving assistants have opt-in harnesses that send real provider requests and record the results, for measuring a change to a prompt, tool or check. They cost money, so no suite runs them: they need `ASSISTANT_LIVE=1` or `CARVE_LIVE=1` and their own Vitest config. Keys stay in the Node process and every call is booked against a budget (USD 2 by default). See [the harness README](../apps/camNC/src/test/live/README.md).
