@@ -377,7 +377,7 @@ export async function inspectCadDocument(
     ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(part => ({ ...part, cornerRelief: undefined })) }).parts
     : solved.parts;
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
-    const physicalPart = physical.parts.find(candidate => candidate.id === part.id);
+    const physicalPart = physical.parts.find(candidate => candidate.id === part.id) ?? part;
     const evaluated = solved.parts.find(candidate => candidate.partId === part.id);
     const faces = cadFaceSketches(part);
     const statusesOf = statuses.filter(status => status.partId === part.id);
@@ -554,7 +554,7 @@ export async function inspectCadDocument(
     const names = (id: string) =>
       toCut.flatMap(entry => (entry.part.partId === id || entry.part.partId.startsWith(`${id}:copy:`) ? entry.names : []));
     const pieces =
-      part.copies?.length || physicalPart?.copies?.length ? { names: names(part.id), mirrored: names(mirroredPartId(part.id)) } : undefined;
+      part.copies?.length || physicalPart.copies?.length ? { names: names(part.id), mirrored: names(mirroredPartId(part.id)) } : undefined;
     const report: CadReportPart = {
       name: part.name,
       ...(evaluation && { available: !!evaluation.available?.includes(part.id) }),
