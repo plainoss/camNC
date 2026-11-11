@@ -10,6 +10,7 @@ import { assistantQuestion, resumeAssistantMessages, runDesignAssistant } from '
 import { BriefChips } from './BriefChips';
 import { Composer } from './Composer';
 import { Transcript } from './Transcript';
+import { bindProposalOrigin } from './recheck';
 import { connectionLabel } from './connectionPresets';
 import type { AssistantRequirements } from './requirements';
 import { checkScriptInBrowser } from './scriptCheck';
@@ -231,6 +232,7 @@ export function AssistantDock({
       if (!mounted.current) return;
       if (result.proposal && !abort.signal.aborted) {
         bindProposalRequirements(result.proposal, brief.revision);
+        bindProposalOrigin(result.proposal, result.origin);
         onCheckedProposal(result.proposal);
       }
       setActivity(

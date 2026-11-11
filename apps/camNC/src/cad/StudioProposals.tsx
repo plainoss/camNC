@@ -227,6 +227,16 @@ export function StudioProposals({
                   assistantProposal.current = null;
                   setProposal(null);
                 }}
+                onReplace={
+                  assistantProposal.current === proposal
+                    ? next => {
+                        // A tweak re-checked in review becomes the assistant's proposal, kept after closing as before.
+                        assistantProposal.current = next;
+                        checkedProposal.receive(next);
+                        setProposal(next);
+                      }
+                    : undefined
+                }
               />
             )}
           </>,

@@ -18,7 +18,7 @@ describe('proposal preview', () => {
       <ProposalReview proposal={proposal} session={session} currentDocument={base} onApply={onApply} onClose={onClose} />
     );
     await expect.element(screen.getByText('Candidate', { exact: true })).toBeVisible();
-    await screen.getByRole('button', { name: 'Show original design' }).click();
+    await screen.getByRole('radio', { name: 'Before' }).click();
     await expect.element(screen.getByText('Original', { exact: true })).toBeVisible();
     await screen.getByRole('button', { name: 'Apply as one undo step' }).click();
     expect(onApply).toHaveBeenCalledTimes(1);
