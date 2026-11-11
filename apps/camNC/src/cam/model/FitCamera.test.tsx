@@ -49,6 +49,8 @@ it('restores the studio camera after its canvas is replaced, without replaying a
   const request: ViewRequest = { name: 'front', seq: 3 };
   const first = render(<View size={100} fitKey="assembled" viewRequest={request} cameraState={cameraState} />);
   await waitFor(() => expect(cameraState.current?.seq).toBe(3), { timeout: 20000 });
+  // The canvas is 400 × 300, and the reported view says so, so its width can be checked against too.
+  expect(cameraState.current!.aspect).toBeCloseTo(400 / 300, 8);
   seen!.position.set(30, -20000, 125);
   controls!.target.set(15, 25, 35);
   (seen as unknown as THREE.OrthographicCamera).zoom *= 1.7;

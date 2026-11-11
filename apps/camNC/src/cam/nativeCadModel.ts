@@ -16,7 +16,13 @@ export interface NativeCadEntry {
 }
 
 /** Native curves are tessellated once by CAD, then go straight to CAM's polygon feature seam. */
-export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: CamPartInfo; mesh: BodyMesh } {
+export function nativePart(source: EvaluatedCadPart): {
+  entry: NativeCadEntry;
+  info: CamPartInfo;
+  mesh: BodyMesh;
+  /** Side B's features, when it has cuts from below: with `entry.features`, what the mesh and a STEP solid are built from. */
+  below?: PartFeatures;
+} {
   const { features, below, turned, holeSources, offset, size, problem } = profileFeatures(source);
   if (problem) throw new Error(`${source.name}: ${problem}`);
   const outer = features.outlines[0]!;
@@ -51,6 +57,7 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
   };
   const paths = (loops: { x: number; y: number }[][]): Outline2D => loops.map(loop => loop.map(p => [p.x, p.y]));
   return {
+    ...(below && { below }),
     entry: { part, features, ...(turned && { flipped: { x: turned('x'), y: turned('y') } }) },
     info: {
       id: source.partId,

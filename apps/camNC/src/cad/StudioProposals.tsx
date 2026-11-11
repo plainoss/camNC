@@ -6,6 +6,7 @@ import { cadProposal, compareCadProposal, type CadProposal } from '@wbcnc/cad-ed
 import { sameContent, type CadSession } from '@wbcnc/cad-editor/session';
 import { ProposalReview } from './ProposalReview';
 import { assistantSelection } from './assistant/selection';
+import { listedStudioParts } from './studioParts';
 import type { AssistantProposalState } from './assistant/useAssistantProposal';
 import './assistant/dock.css';
 
@@ -104,7 +105,8 @@ export function StudioProposals({
           depth: `${sizes.depth}mm`,
           board: `${sizes.board}mm`,
           shelves: sizes.shelves,
-          at: [start.parts.length ? x + 100 : 0, 0, 0],
+          // A new design's hidden placeholder Part 1 is not a part to keep clear of.
+          at: [listedStudioParts(start).length ? x + 100 : 0, 0, 0],
         })
       );
       if (!result.ok) throw new Error(result.scriptError ?? result.report.errors.map(error => error.message).join('\n'));

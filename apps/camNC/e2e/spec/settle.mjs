@@ -1,22 +1,16 @@
 /**
  * The one readiness rule for spec steps: after a step, nothing is read or checked until the app has settled. The app's
  * dev build reports what is still pending (`src/lib/settled.ts`): solver calls, CAM worker calls, saves, a loading
- * route, fetching queries and a frame not yet drawn since the last input or change.
+ * route, fetching queries, a 3D view not yet drawn and a frame not yet drawn since the last input or change.
  */
+
+import { notSettled } from '../../src/lib/settledReport.mjs';
 
 /** Long enough for a loaded CI runner to finish planning the boards of a job; a step that is still busy then fails. */
 export const SETTLE_TIMEOUT_MS = 90_000;
 
 /** What the app reports now, or null on a page without the signal (or one that is navigating). */
 export const settledSnapshot = page => page.evaluate(() => window.__camncSettled?.() ?? null).catch(() => null);
-
-const describe = snapshot => {
-  if (!snapshot) return 'the page has no settled signal (window.__camncSettled), so it is not the camNC dev server';
-  const busy = Object.entries(snapshot.pending).filter(([, count]) => count > 0);
-  return busy.length
-    ? `still pending: ${busy.map(([kind, count]) => `${kind} ${count}`).join(', ')}`
-    : `the document kept changing (revision ${snapshot.revision})`;
-};
 
 let probes = 0;
 
@@ -45,6 +39,6 @@ export async function waitSettled(page, since = null, timeout = SETTLE_TIMEOUT_M
     );
   } catch (error) {
     if (!/Timeout/i.test(String(error?.message))) throw error;
-    throw new Error(`The app did not settle within ${timeout / 1000} s: ${describe(await settledSnapshot(page))}`);
+    throw notSettled(timeout, await settledSnapshot(page));
   }
 }
