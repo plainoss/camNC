@@ -359,6 +359,25 @@ it('reopens saved artwork at its current size for a local recheck and replaces i
   expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ mode: 'replace', item: expect.objectContaining({ id: item.id }) }));
 });
 
+it('reopens saved artwork on Text SVG when the connection cannot make images, so it can be refined', async () => {
+  const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
+  const item = job.carving!.items[0];
+  item.generated = {
+    assetId: asset.id,
+    sourceSvg: asset.svg,
+    prompt: asset.prompt,
+    summary: asset.summary,
+    detail: 'simple',
+    width: 40,
+    height: 30,
+    checkedFor: 'old-settings',
+  };
+  await open({ job, selectedId: item.id, method: 'default' });
+  await ready();
+  expect(screen.queryByText(/can.t make images/)).toBeNull();
+  expect(screen.getByRole('button', { name: 'Refine picked' })).toBeTruthy();
+});
+
 it('uses a separately configured native image key and endpoint, never the design key', async () => {
   await open({ method: 'default' });
   describe();
@@ -375,6 +394,8 @@ it('uses a separately configured native image key and endpoint, never the design
   fireEvent.change(screen.getByLabelText('Image generator API key'), { target: { value: 'separate-native-secret' } });
   fireEvent.change(screen.getByLabelText('Image output'), { target: { value: 'svg' } });
   fireEvent.click(screen.getByRole('checkbox', { name: 'My model and project support this image output.' }));
+  // A complete provider is enough: the panel no longer asks for one.
+  expect(screen.queryByText(/can.t make images/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
   await waitFor(() => expect(generateNativeSvgAsset).toHaveBeenCalledTimes(1));
   const [options, native] = vi.mocked(generateNativeSvgAsset).mock.calls[0];

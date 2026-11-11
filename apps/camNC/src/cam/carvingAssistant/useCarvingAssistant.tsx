@@ -174,6 +174,16 @@ export function useCarvingAssistant({
   }, [open, picked, pickedVariant?.asset, key, disabled]);
 
   const shared = nativeImageFromConnection(credentials, native.quality);
+  const hasSharedImages = !!shared;
+  const modeChosen = useRef(false);
+  const chooseMode = (mode: 'text' | 'native') => {
+    modeChosen.current = true;
+    setGenerationMode(mode);
+  };
+  // Saved artwork is revised with Text SVG, so reopening it on a connection without images starts there.
+  useEffect(() => {
+    if (open && selected?.generated && !hasSharedImages && !separateImage && !modeChosen.current) setGenerationMode('text');
+  }, [open, selected?.generated, hasSharedImages, separateImage]);
   // Shared images always take the traced PNG route; SVG output needs the explicit opt-in of the separate form.
   // Without an image model on the connection, the separate image provider is the only way to images.
   const useSeparateImage = separateImage || !shared;
@@ -334,14 +344,18 @@ export function useCarvingAssistant({
       credentials,
       setCredentials,
       generationMode,
-      setGenerationMode,
+      setGenerationMode: chooseMode,
       native,
-      setNative,
+      // Details typed into the provider form while it is the only way to images stay in use after reconnecting.
+      setNative: (value: NativeSvgConnection) => {
+        if (!shared) setSeparateImage(true);
+        setNative(value);
+      },
       sharedImageModel: shared?.model,
       separateImage: useSeparateImage,
       setSeparateImage,
       /** Images need a key and model first: the connection has none, and the separate provider isn't filled in. */
-      needsImageProvider: generationMode === 'native' && !credentialsFor(),
+      needsImageProvider: generationMode === 'native' && !shared && !credentialsFor(),
       runSettings,
       setRunSettings,
       usage,
