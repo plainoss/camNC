@@ -11,6 +11,13 @@ import {
 } from './stream-parser';
 
 describe('parseFluidNCLine', () => {
+  it('reads the accessory state that comes with the overrides', () => {
+    const on = parseFluidNCLine('<Hold:0|MPos:1.000,2.000,3.000|FS:0,15000|Ov:100,100,100|A:SF|SD:3.61,/sd/job.gcode>')!;
+    expect(on.accessories).toBe('SF');
+    expect(on.spindle).toBe(15000);
+    expect(parseFluidNCLine('<Hold:0|MPos:1.000,2.000,3.000|FS:0,0|Ov:100,100,100>')!.accessories).toBeUndefined();
+  });
+
   it('parses a simple <Run> frame with extra axes in MPos', () => {
     const line = '<Run|MPos:0.000,0.000,0.000,1.000,1.000|FS:0,0|Pn:P>';
     const parsed = parseFluidNCLine(line)!;
