@@ -556,13 +556,13 @@ describe('part studio', () => {
       const [, middle] = rail.pattern({ axis: 'z', count: 3, spacing: '100mm' });
       const spare = rail.copy({ at: [0, 1000, 0], name: 'Spare rail' });
       d.cutParts(leg, { with: [middle!, spare] });
-      // The copy placed by hand comes first among the rail's copies, so the middle rail is Rail 4.
+      // A copy placed after the pattern doesn't renumber it, so the middle rail stays Rail 3.
       names = [middle!.name, spare.name];
     });
-    expect(names).toEqual(['Rail 4', 'Spare rail']);
+    expect(names).toEqual(['Rail 3', 'Spare rail']);
     // Only the middle rail reaches into the leg; the spare is elsewhere and the others aren't tools.
     const openings = report.steps!.flatMap(step => (step.kind === 'partCut' ? step.cuts : []));
-    expect(openings.map(cut => [cut.target, cut.tool])).toEqual([['Leg', 'Rail 4']]);
+    expect(openings.map(cut => [cut.target, cut.tool])).toEqual([['Leg', 'Rail 3']]);
   });
 
   it('returns no copies from a pattern of one', async () => {
