@@ -4,6 +4,8 @@ export interface AssistantContextOptions {
   images: boolean;
   /** Textual payload ceiling, not a token estimate; image bytes are limited separately. */
   maxCharacters?: number;
+  /** Keep superseded tool batches verbatim while the whole history fits, so the provider's cached prefix stays valid. */
+  compactOnlyOverLimit?: boolean;
 }
 
 type Batch = { start: number; end: number; message: AssistantMessage };
@@ -54,6 +56,7 @@ export function buildAssistantContext(messages: readonly AssistantMessage[], opt
   for (const index of latestReference.values()) retained.add(index);
   const tailStart = latestCheck >= 0 ? latestCheck : (batches.at(-1)?.start ?? messages.length);
   for (const batch of batches) if (batch.start >= tailStart) retained.add(batch.start);
+  if (options.compactOnlyOverLimit && assistantContextCharacters(messages) <= limit) for (const batch of batches) retained.add(batch.start);
 
   let latestImages = -1;
   for (let index = 0; index < messages.length; index++)

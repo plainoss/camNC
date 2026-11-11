@@ -60,6 +60,8 @@ export interface ProviderRequest {
   system: string;
   messages: AssistantMessage[];
   tools: AssistantTool[];
+  /** 'none' offers the tools (keeping the cached prefix) but forbids calling them. */
+  toolChoice?: 'none';
   signal: AbortSignal;
   maxOutputTokens?: number;
   timeoutMs?: number;
@@ -104,6 +106,7 @@ export function providerPayload({
   system,
   messages,
   tools,
+  toolChoice,
   maxOutputTokens = 8192,
 }: Omit<ProviderRequest, 'key' | 'signal'>): Record<string, unknown> {
   if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1) throw new Error('Choose a positive output token limit.');
@@ -148,6 +151,7 @@ export function providerPayload({
         input_schema: tool.parameters,
         ...(config.promptCaching !== false && index === tools.length - 1 && { cache_control: { type: 'ephemeral' } }),
       })),
+      ...(toolChoice && { tool_choice: { type: toolChoice } }),
     };
   }
   if (config.protocol === 'responses') {
@@ -197,6 +201,7 @@ export function providerPayload({
         parameters: tool.parameters,
         strict: false,
       })),
+      ...(toolChoice && { tool_choice: toolChoice }),
     };
   }
   const turns = compatibleMessages(messages).flatMap((message): unknown[] => {
@@ -239,6 +244,7 @@ export function providerPayload({
       type: 'function',
       function: { name: tool.name, description: tool.description, parameters: tool.parameters },
     })),
+    ...(toolChoice && { tool_choice: toolChoice }),
   };
 }
 

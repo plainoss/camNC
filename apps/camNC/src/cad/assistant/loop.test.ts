@@ -226,13 +226,19 @@ it('uses one final response without execution tools after the last permitted che
   const options = setup();
   options.maxChecks = 1;
   options.request = vi.fn(async request =>
-    request.tools.length ? answer('check_design', 'good') : { role: 'assistant' as const, text: 'Proposal: checked.' }
+    request.toolChoice !== 'none' ? answer('check_design', 'good') : { role: 'assistant' as const, text: 'Proposal: checked.' }
   );
   const result = await runDesignAssistant(options);
   expect(result.status).toBe('proposal');
   expect(result.usage.calls).toBe(2);
   expect(options.check).toHaveBeenCalledTimes(1);
-  expect(vi.mocked(options.request).mock.calls[1][0].tools).toEqual([]);
+  const final = vi.mocked(options.request).mock.calls[1][0];
+  const first = vi.mocked(options.request).mock.calls[0][0];
+  // Same system and tools as the first turn keep the cached prefix; tool_choice and a trailing note end the run.
+  expect(final.toolChoice).toBe('none');
+  expect(final.tools).toEqual(first.tools);
+  expect(final.system).toBe(first.system);
+  expect(final.messages.at(-1)?.text).toContain('final response');
 });
 
 it('reuses an identical script on the same snapshot without spending another check', async () => {
@@ -398,7 +404,7 @@ it('does not let suggested questions bypass the final response budget', async ()
   const question = answer('ask_user');
   question.calls![0].arguments = { question: 'Which thickness?', choices: ['18 mm', '24 mm'] };
   options.request = vi.fn(async request => {
-    expect(request.tools).toEqual([]);
+    expect(request.toolChoice).toBe('none');
     return question;
   });
   const result = await runDesignAssistant(options);

@@ -69,6 +69,19 @@ describe('assistant provider protocols', () => {
     expect(JSON.stringify(payload)).toContain('function_call_output');
   });
 
+  it('forbids tool calls with tool_choice while still offering the tools', () => {
+    const chat = { ...config, kind: 'compatible' as const };
+    for (const [provider, choice] of [
+      [config, { type: 'none' }],
+      [chat, 'none'],
+      [{ ...chat, protocol: 'responses' as const }, 'none'],
+    ] as const) {
+      const payload = providerPayload({ config: provider, system: '', messages, tools, toolChoice: 'none' });
+      expect(payload).toMatchObject({ tool_choice: choice, tools: [expect.anything()] });
+      expect(providerPayload({ config: provider, system: '', messages, tools })).not.toHaveProperty('tool_choice');
+    }
+  });
+
   it('requires tool and image capability, validates addresses and refuses malformed calls', () => {
     expect(() => providerPayload({ config: { ...config, tools: false }, system: '', messages, tools })).toThrow(/tools/);
     expect(() => providerPayload({ config: { ...config, images: false }, system: '', messages, tools })).toThrow(/text-only/);
