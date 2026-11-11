@@ -47,7 +47,7 @@ it('patterns an explicitly selected consumed source while retaining its cut and 
   const features = within(screen.getByRole('region', { name: 'Features' }));
   await userEvent.click(features.getByRole('button', { name: /^Extrude · Tool/ }));
   const pattern = await studioCommand(/Pattern/);
-  expect(pattern).not.toBeDisabled();
+  expect(pattern).not.toHaveAttribute('aria-disabled', 'true');
   await userEvent.click(pattern);
   expect(screen.queryAllByRole('alert').map(alert => alert.textContent)).toEqual([]);
   const dialog = await screen.findByRole('dialog', { name: 'Linear pattern · Tool' });

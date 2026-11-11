@@ -46,3 +46,8 @@
 .cad-studio-more-menu {
   z-index: 50;
 }
+/* More holds the open command's place when that command is in its menu. */
+.cad-editor .cad-studio-more[data-active] {
+  background: #dfeaf8;
+  color: #174f8f;
+}

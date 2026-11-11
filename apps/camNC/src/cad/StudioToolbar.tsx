@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
 import { SketchToolGlyph, ToolHint } from './SketchToolbar';
 import { kStudioCommands, type StudioCommand } from './studioCommands';
@@ -45,6 +45,15 @@ export function StudioToolbar({
   const overflow = useToolbarOverflow<HTMLDivElement, HTMLDivElement>(kStudioCommands.length);
   const shown = kStudioCommands.slice(0, overflow.visible);
   const hidden = kStudioCommands.slice(overflow.visible);
+  const activeHidden = hidden.find(command => command.id === active);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const chosen = useRef(false);
+  const moreDescription = useId();
+  // Busy work, or every command fitting again, closes the menu rather than leaving it to reopen afterwards.
+  const closeMore = busy || hidden.length === 0;
+  useEffect(() => {
+    if (closeMore) setMoreOpen(false);
+  }, [closeMore]);
   return (
     <header
       className="cad-toolbar cad-studio-toolbar"
@@ -87,28 +96,49 @@ export function StudioToolbar({
           </ToolHint>
         ))}
         {hidden.length > 0 && (
-          <DropdownMenu modal={false}>
+          <DropdownMenu modal={false} open={moreOpen && !busy} onOpenChange={setMoreOpen}>
             <ToolHint label={`More features: ${hidden.map(command => command.label).join(', ')}`}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   className="cad-studio-command cad-studio-more"
-                  aria-pressed={hidden.some(command => command.id === active) || undefined}>
+                  data-active={activeHidden ? true : undefined}
+                  aria-describedby={activeHidden ? moreDescription : undefined}>
                   More
                   <MoreGlyph />
                 </button>
               </DropdownMenuTrigger>
             </ToolHint>
-            <DropdownMenuContent align="end" className="cad-tool-menu cad-studio-more-menu">
+            {activeHidden && (
+              <span id={moreDescription} hidden>
+                {`${activeHidden.label} is open`}
+              </span>
+            )}
+            <DropdownMenuContent
+              align="end"
+              className="cad-tool-menu cad-studio-more-menu"
+              // Keys typed in the menu are for the menu, not the editor's shortcuts (P, Y, Shift+S...) or its Escape.
+              onKeyDown={event => event.stopPropagation()}
+              onEscapeKeyDown={event => event.stopPropagation()}
+              onCloseAutoFocus={event => {
+                // A chosen command's dialog has already focused its first field: don't pull focus back to More.
+                if (chosen.current) event.preventDefault();
+                chosen.current = false;
+              }}>
               {hidden.map(command => (
-                <ToolHint key={command.id} label={disabled[command.id] ?? command.hint}>
+                <ToolHint key={command.id} label={disabled[command.id] ?? command.hint} side="left">
                   <DropdownMenuItem
                     aria-disabled={disabled[command.id] ? true : undefined}
+                    aria-current={active === command.id ? 'true' : undefined}
                     data-active={active === command.id || undefined}
                     onSelect={event => {
                       // Like its toolbar button, a command that needs something first stays put and keeps its reason.
                       if (disabled[command.id]) event.preventDefault();
-                      else onCommand(command.id);
+                      // The group is inert while busy; a menu opened just before must not start a command either.
+                      else if (!busy) {
+                        chosen.current = true;
+                        onCommand(command.id);
+                      }
                     }}>
                     <StudioCommandGlyph command={command} />
                     <span>{command.label}</span>

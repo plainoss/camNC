@@ -5,7 +5,7 @@ import { endCadSession } from '@wbcnc/cad-editor/session';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import cabinet from '../../../../packages/cad-script/fixtures/designs/cabinet-consumed-cable-chase.json';
-import { studioCommand } from './studioToolbarTesting';
+import { closeStudioMenu, studioCommand } from './studioToolbarTesting';
 
 let session: string | undefined;
 afterEach(() => {
@@ -67,5 +67,6 @@ it('keeps the complete cabinet collision footer consistent with consumed members
   expect(latest().partCuts).toEqual(before.partCuts);
   // Source history remains reachable although the construction tool is no longer physical.
   await userEvent.click(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Extrude · Cable chase/ }));
-  expect(await studioCommand(/Transform/)).not.toBeDisabled();
+  expect(await studioCommand(/Transform/)).not.toHaveAttribute('aria-disabled', 'true');
+  await closeStudioMenu();
 }, 75_000);

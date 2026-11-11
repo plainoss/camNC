@@ -23,7 +23,9 @@ export function useToolbarOverflow<Group extends HTMLElement, Measure extends HT
     const more = boxes[count] ?? 0;
     const style = getComputedStyle(group);
     const gap = Number.parseFloat(style.columnGap) || 0;
-    const available = group.clientWidth - (Number.parseFloat(style.paddingLeft) || 0) - (Number.parseFloat(style.paddingRight) || 0);
+    // The fractional border box, not the rounded clientWidth, so a command a fraction of a pixel too wide doesn't fit.
+    const inset = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'] as const;
+    const available = group.getBoundingClientRect().width - inset.reduce((sum, key) => sum + (Number.parseFloat(style[key]) || 0), 0);
     const total = widths.reduce((sum, width, index) => sum + (index > 0 ? gap : 0) + width, 0);
     if (total <= available) {
       setVisible(count);

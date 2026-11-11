@@ -7,8 +7,7 @@ import './cad.css';
 
 afterEach(cleanup);
 
-function setup(width: number, disabled: Partial<Record<StudioCommand, string>> = {}) {
-  const onCommand = vi.fn();
+function setup(width: number, disabled: Partial<Record<StudioCommand, string>> = {}, onCommand = vi.fn()) {
   const toolbar = (width: number) => (
     <div className="cad-editor" style={{ width }}>
       <StudioToolbar
@@ -87,5 +86,90 @@ describe('studio toolbar overflow', () => {
     fireEvent.click(mirror);
     expect(onCommand).not.toHaveBeenCalled();
     expect(screen.getByRole('menu')).toBeTruthy();
+  });
+
+  it('leaves focus where a command chosen from More put it, as a dialog focusing its first field does', async () => {
+    const field = document.createElement('input');
+    field.setAttribute('aria-label', 'Variable name');
+    document.body.append(field);
+    try {
+      // The command's dialog focuses its field once it has rendered: after the menu unmounted, before the menu's
+      // deferred return of focus to More.
+      setup(
+        700,
+        {},
+        vi.fn(() => queueMicrotask(() => field.focus()))
+      );
+      screen.getByRole('button', { name: /^More/ }).focus();
+      await userEvent.keyboard('{Enter}');
+      const menu = await screen.findByRole('menu');
+      await waitFor(() => expect(menu.contains(document.activeElement)).toBe(true));
+      // Typeahead moves to Variable, then Enter chooses it.
+      await userEvent.keyboard('v');
+      await waitFor(() => expect(document.activeElement).toBe(within(menu).getByRole('menuitem', { name: 'Variable' })));
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(document.activeElement).toBe(field);
+    } finally {
+      field.remove();
+    }
+  });
+
+  it('runs nothing from an open More menu once the studio is busy, and closes it', async () => {
+    const onCommand = vi.fn();
+    const toolbar = (busy: boolean) => (
+      <div className="cad-editor" style={{ width: 700 }}>
+        <StudioToolbar
+          busy={busy}
+          disabled={{}}
+          active={null}
+          canUndo={false}
+          canRedo={false}
+          canFinish={true}
+          onCommand={onCommand}
+          onUndo={() => {}}
+          onRedo={() => {}}
+          onCancel={() => {}}
+          onFinish={() => {}}
+        />
+      </div>
+    );
+    const view = render(toolbar(false));
+    await userEvent.click(await screen.findByRole('button', { name: /^More/ }));
+    const variable = within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Variable' });
+    view.rerender(toolbar(true));
+    fireEvent.click(variable);
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    view.rerender(toolbar(false));
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(onCommand).not.toHaveBeenCalled();
+  });
+
+  it('marks the open command in More and in its menu', async () => {
+    const view = render(
+      <div className="cad-editor" style={{ width: 700 }}>
+        <StudioToolbar
+          busy={false}
+          disabled={{}}
+          active="variable"
+          canUndo={false}
+          canRedo={false}
+          canFinish={true}
+          onCommand={() => {}}
+          onUndo={() => {}}
+          onRedo={() => {}}
+          onCancel={() => {}}
+          onFinish={() => {}}
+        />
+      </div>
+    );
+    const more = await view.findByRole('button', { name: /^More/ });
+    expect(more).not.toHaveAttribute('aria-pressed');
+    expect(more).toHaveAccessibleDescription('Variable is open');
+    await userEvent.click(more);
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Variable' })).toHaveAttribute('aria-current', 'true');
+    expect(within(menu).getByRole('menuitem', { name: 'Plane' })).not.toHaveAttribute('aria-current');
   });
 });

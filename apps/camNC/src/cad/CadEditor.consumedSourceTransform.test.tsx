@@ -76,7 +76,7 @@ it.each([false, true])(
     expect(within(screen.getByRole('list', { name: 'Parts' })).queryByRole('button', { name: 'Tool' })).toBeNull();
     await userEvent.click(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Extrude · Tool/ }));
     const transform = await studioCommand(/Transform/);
-    expect(transform).not.toBeDisabled();
+    expect(transform).not.toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(transform);
     let dialog = await screen.findByRole('dialog', { name: /^Transform/ });
     expect(screen.queryByRole('alert')).toBeNull();

@@ -7,7 +7,7 @@ import { ModelViewport } from '@/cam/model/ModelViewport';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
 import cabinet from '../../../../packages/cad-script/fixtures/designs/task-start-cupboard-three-shelves.json';
-import { studioCommand } from './studioToolbarTesting';
+import { closeStudioMenu, studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', () => ({ ModelViewport: vi.fn(() => null) }));
 const sessions: string[] = [];
@@ -191,7 +191,7 @@ it('keeps both pattern search entries disabled for a sketch without an extrusion
   const before = structuredClone(latest());
   expect(await studioCommand('Pattern')).toHaveAttribute('aria-disabled', 'true');
   // Close the More menu the command may sit in, so typing reaches the tool search.
-  if (screen.queryByRole('menu')) await userEvent.keyboard('{Escape}');
+  await closeStudioMenu();
   const input = await search('circular pattern');
   expect(screen.queryByRole('option', { name: 'Circular pattern' })).toBeNull();
   expect(screen.getByText('No tools found')).toBeVisible();
