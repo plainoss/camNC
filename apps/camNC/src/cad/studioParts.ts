@@ -1,4 +1,5 @@
 import { activeDesign, consumedTools, isCadPart, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { isBlank } from './editorHelpers';
 
 /** Physical parts in the studio: suppressed copies and consumed tools retain source settings but have no visible row. */
 export function builtStudioParts(document: CadDocument): CadPart[] {
@@ -6,6 +7,11 @@ export function builtStudioParts(document: CadDocument): CadPart[] {
     consumed = consumedTools(active);
   // An Extrude Add body is listed under its host part, rather than as another part.
   return active.parts.filter(part => isCadPart(part) && !consumed.has(part.id));
+}
+
+/** The parts the studio's Parts list shows: a new design's untouched placeholder Part 1 is not one yet. */
+export function listedStudioParts(document: CadDocument): CadPart[] {
+  return document.parts.length === 1 && isBlank(document.parts[0]!) ? [] : builtStudioParts(document);
 }
 
 import type { StudioCommand } from './StudioToolbar';

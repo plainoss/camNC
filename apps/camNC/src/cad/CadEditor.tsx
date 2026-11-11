@@ -221,7 +221,8 @@ import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PartPatternKind } from './partPatternKind';
 import { featureRowParts, selectStudioFeature } from './studioFeatureSelection';
 import { startExtrude } from './studioExtrude';
-import { builtStudioParts, disabledStudioCommands } from './studioParts';
+import { builtStudioParts, disabledStudioCommands, listedStudioParts } from './studioParts';
+import { applyFramed } from './insertFraming';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
 import { FeatureDialog } from './FeatureDialog';
@@ -242,11 +243,10 @@ import { StudioProposals } from './StudioProposals';
 import { useAssistantProposal } from './assistant/useAssistantProposal';
 import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
-import { trimCadFolders } from '@wbcnc/cad';
 import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
-import { designSteps, type DesignStep } from '@wbcnc/cad';
+import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnedBy, type SketchTurn } from './sketchOrbit';
@@ -3863,7 +3863,7 @@ export function CadEditor({
   // The studio's Parts list shows each physical instance, with an eye to show or hide it in the view.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
-  const builtParts = blankDesign ? [] : builtStudioParts(doc);
+  const builtParts = studioSession ? listedStudioParts(doc) : builtStudioParts(doc);
   const isolatePart = usePartIsolation(builtParts, cutSelection.selectedKey, hiddenParts, setHiddenParts);
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
   // An open sketch turned with its parts behind it, about the middle of the view.
@@ -4010,7 +4010,7 @@ export function CadEditor({
             checkedProposal={assistantProposalState}
             selection={part && { partId: part.id, copyId: cutSelection.selectedCopyId }}
             disabled={busy || !!rollbackStep || stepDialogOpen || !!filletDialog}
-            onApply={publish}
+            onApply={next => applyFramed(documentRef.current, next, studioCamera.current, publish, setViewRequest)}
           />
         </StudioToolbar>
       ) : (
