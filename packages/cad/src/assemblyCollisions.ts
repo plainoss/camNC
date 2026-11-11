@@ -1,5 +1,6 @@
 import { pointInPolygon } from './geometry';
 import { consumedTools } from './consumedTools';
+import { physicalJoinedCopies } from './physicalJoinedCopies';
 import { isCadBody } from './extrudeSteps';
 import { activeDesign } from './suppression';
 import { evaluatedPartCopy } from './copies';
@@ -154,7 +155,7 @@ function collide(a: Placed, b: Placed): CadAssemblyReport['collisions'][number] 
 /** Where the placed parts sit, and where any two of them would need the same material. Unplaced parts aren't in it. */
 export function assemblyReport(given: CadDocument, parts: readonly EvaluatedCadPart[]): CadAssemblyReport | undefined {
   // Evaluation retains sketch outlines; only active solids and their active copies occupy assembly space.
-  const document = activeDesign(given);
+  const document = physicalJoinedCopies(activeDesign(given));
   // Consumed tool families still evaluate to cut their targets, but occupy no physical assembly space.
   const consumed = consumedTools(document);
   const supports = cadDrawnOnSupports(document);
