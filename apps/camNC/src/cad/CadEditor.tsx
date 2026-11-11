@@ -620,7 +620,7 @@ export function CadEditor({
       (featureDialog?.kind === 'pattern' ? featureDialog : null)
   );
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
-  const { rollbackStep, shownDocument } = useFeaturePreview({
+  const { rollbackStep, shownDocument, solveFeedback } = useFeaturePreview({
     document:
       pointPicker.onPick && transformDialog ? doc : studioPreview.document === doc ? extrusionDepth.document : studioPreview.document,
     enabled: studioSession && showWorkspace,
@@ -1019,7 +1019,7 @@ export function CadEditor({
         if (cancelled || sequence !== solveSequence.current || drag.current || annotationDrag.current) return;
         lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
         setSolving(false);
-        const feedback = sketchFeedback(result);
+        const feedback = sketchFeedback(solveFeedback(result));
         setProblems(feedback.problems);
         setConflictedConstraints(feedback.conflictedConstraintIds);
         setInProgress(feedback.inProgress);
@@ -1046,7 +1046,7 @@ export function CadEditor({
     return () => {
       cancelled = true;
     };
-  }, [doc, session, checkEpoch, sketchOnly, normalizePatternVariableSource]);
+  }, [doc, session, checkEpoch, sketchOnly, normalizePatternVariableSource, solveFeedback]);
 
   useEffect(() => {
     if (!dimension) return;

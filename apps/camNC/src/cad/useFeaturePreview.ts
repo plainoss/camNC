@@ -1,6 +1,7 @@
-import type { CadDocument } from '@wbcnc/cad';
-import { useEffect, useMemo, useState } from 'react';
+import type { CadDocument, CadSolveResult } from '@wbcnc/cad';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { designSteps, rolledBackTo } from '@wbcnc/cad';
+import { apartExtrudePreview, withoutApartRegionProblem } from './apartExtrudePreview';
 import { offerFinalPreview } from './finalPreview';
 
 interface PreviewOptions {
@@ -45,10 +46,17 @@ export function useFeaturePreview({
     offerFinalPreview(offersFinal ? { shown: showFinal, toggle: () => setFinalStep(showFinal ? null : editingStep) } : null);
     return () => offerFinalPreview(null);
   }, [offersFinal, showFinal, editingStep]);
+  const extrudingId = enabled && featureDialog?.kind === 'extrude' ? featureDialog.partId : null;
   const shownDocument = useMemo(
     () =>
-      blank ? { ...document, parts: [] } : rollbackStep && !(offersFinal && showFinal) ? rolledBackTo(document, rollbackStep) : document,
-    [document, blank, rollbackStep, offersFinal, showFinal]
+      blank
+        ? { ...document, parts: [] }
+        : apartExtrudePreview(rollbackStep && !(offersFinal && showFinal) ? rolledBackTo(document, rollbackStep) : document, extrudingId),
+    [document, blank, rollbackStep, offersFinal, showFinal, extrudingId]
   );
-  return { rollbackStep, shownDocument };
+  // Read when a solve ends, so a solve started before the dialog opened or closed reports for the dialog shown then.
+  const extruding = useRef(extrudingId);
+  extruding.current = extrudingId;
+  const solveFeedback = useCallback((result: CadSolveResult) => withoutApartRegionProblem(result, extruding.current), []);
+  return { rollbackStep, shownDocument, solveFeedback };
 }
