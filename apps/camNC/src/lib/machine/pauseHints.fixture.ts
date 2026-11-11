@@ -39,6 +39,17 @@ export const boardProgram = (() => {
  * cut at work Z -6.
  */
 export function camProgram(size: number) {
+  let program = programs.get(size);
+  if (!program) programs.set(size, (program = buildCamProgram(size)));
+  return program;
+}
+
+/** Built once per size and shared, so that tests on the same program also share its parsed lines. */
+const programs = new Map<number, ReturnType<typeof buildCamProgram>>();
+/** 800 different 22-byte moves, newline included: the cut repeats this block. */
+const kMoveBlock = Array.from({ length: 800 }, (_, i) => `G1 X${100 + i}.25 Y${100 + (i % 400)}.5 Z-6\n`).join('');
+
+function buildCamProgram(size: number) {
   const doneEnd = size - 100;
   const header = ['(camNC CAM)', 'G21', 'G90', 'G0 Z23.3'];
   const start = [pauseMarker({ kind: 'start', rpm: 15000 }), 'M0 (MSG Spindle starts at 15000 RPM next. Manual spindle: turn it on now)'];
@@ -49,16 +60,12 @@ export function camProgram(size: number) {
   const spindleOn = ['M3 S15000', 'G4 P3', 'G0 X100 Y100'];
   const cutBytes = doneEnd - bytes(head) - bytes(spindleOn) - bytes(end);
   const moves = Math.floor((cutBytes - 200) / 22);
-  const cut = Array.from({ length: moves }, (_, i) => `G1 X${100 + (i % 800)}.25 Y${100 + (i % 400)}.5 Z-6`);
-  const program = [
-    ...head,
-    ...spindleOn,
-    ...cut,
-    ...comments(4, cutBytes - 22 * moves),
-    ...end,
-    ...comments(2, size - doneEnd - bytes(['M30']) + 1),
-    'M30',
-  ].join('\n');
+  const cut = kMoveBlock.repeat(Math.floor(moves / 800)) + kMoveBlock.slice(0, 22 * (moves % 800));
+  const program =
+    [...head, ...spindleOn].join('\n') +
+    '\n' +
+    cut +
+    [...comments(4, cutBytes - 22 * moves), ...end, ...comments(2, size - doneEnd - bytes(['M30']) + 1), 'M30'].join('\n');
   return {
     gcode: program,
     size,

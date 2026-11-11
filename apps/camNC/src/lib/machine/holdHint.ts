@@ -1,4 +1,4 @@
-import { explainPause, isPause, type Line, type PauseHint, pauseAt, positionWindow, splitLines } from './pauseHints';
+import { explainPause, isPause, type Line, memoized, type PauseHint, parsedProgram, pauseAt, positionWindow } from './pauseHints';
 
 /** What the controller says while the job is in Hold. */
 export interface HoldContext {
@@ -38,11 +38,12 @@ const kAtZ = 0.05;
  */
 export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
   if (c.percent === undefined) return null;
-  const lines = splitLines(gcode);
-  const size = new TextEncoder().encode(gcode).length;
+  // Parsed once per program: this runs with every status report while the job is held.
+  const program = parsedProgram(gcode);
+  const { lines, size } = program;
   if (!size) return null;
-  const first = lines.findIndex(isPause);
-  const start = first >= 0 ? explainPause(lines, first, gcode) : null;
+  const first = memoized(program, 'first pause', () => lines.findIndex(isPause));
+  const start = memoized(program, 'first pause hint', () => (first >= 0 ? explainPause(lines, first, gcode) : null));
   if (start?.marker?.kind === 'start') {
     const readTo = (Math.max(c.readTo ?? c.percent, c.percent) / 100) * size;
     // Within the window: the percent may stand for a byte a little past the M0 even while the reader waits there. On a
@@ -52,7 +53,9 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
     const atStart = readTo <= lines[first]!.end + window && bitWhereThePauseLeftIt(lines, first, false, c);
     // On a file of more than ~100 kB the window also reaches past the M3 and the dwell after the M0, into the travel at
     // safe Z with the spindle on: only the controller's spindle state tells those apart.
-    const spindleNotStarted = c.spindle === 'off' || (c.spindle !== 'on' && readTo + window < spindleStartEnd(lines, first));
+    const spindleNotStarted =
+      c.spindle === 'off' ||
+      (c.spindle !== 'on' && readTo + window < memoized(program, 'first spindle start', () => spindleStartEnd(lines, first)));
     if (atStart && spindleNotStarted) return start;
   }
   if (c.holdRequested) return null;

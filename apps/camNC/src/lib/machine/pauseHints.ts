@@ -41,15 +41,50 @@ export interface Line {
 }
 
 export function splitLines(gcode: string): Line[] {
+  return parsedProgram(gcode).lines;
+}
+
+/** A program split into lines, with what the machine view looks up in it again on every report while held. */
+export interface ParsedProgram {
+  lines: Line[];
+  /** Size in bytes (UTF-8), as FluidNC counts it. */
+  size: number;
+  /** Results computed from the lines, by key: they never change for the same program. */
+  memo: Map<string, unknown>;
+}
+
+let lastProgram: { gcode: string; parsed: ParsedProgram } | null = null;
+
+/**
+ * The program split into lines, kept for the last G-code asked about: the machine view asks again with every status
+ * report while the job is held, and a program can have a million lines.
+ */
+export function parsedProgram(gcode: string): ParsedProgram {
+  if (lastProgram?.gcode === gcode) return lastProgram.parsed;
   const encoder = new TextEncoder();
-  const out: Line[] = [];
+  const size = encoder.encode(gcode).length;
+  // As many bytes as characters: ASCII, as camNC's programs are, so no encoding per line.
+  const ascii = size === gcode.length;
+  const lines: Line[] = [];
   let offset = 0;
   for (const raw of gcode.split('\n')) {
-    offset += encoder.encode(raw).length + 1;
+    offset += (ascii ? raw.length : encoder.encode(raw).length) + 1;
+    if (!raw.includes('(') && !raw.includes(';')) {
+      lines.push({ code: raw.trim(), comment: '', end: offset });
+      continue;
+    }
     const comments = [...raw.matchAll(/\(([^)]*)\)|;(.*)$/g)].map(m => (m[1] ?? m[2] ?? '').trim()).filter(Boolean);
-    out.push({ code: raw.replace(/\(.*?\)|;.*$/g, '').trim(), comment: comments.join(' '), end: offset });
+    lines.push({ code: raw.replace(/\(.*?\)|;.*$/g, '').trim(), comment: comments.join(' '), end: offset });
   }
-  return out;
+  const parsed = { lines, size, memo: new Map<string, unknown>() };
+  lastProgram = { gcode, parsed };
+  return parsed;
+}
+
+/** `compute()` once per program and key. */
+export function memoized<T>(program: ParsedProgram, key: string, compute: () => T): T {
+  if (!program.memo.has(key)) program.memo.set(key, compute());
+  return program.memo.get(key) as T;
 }
 
 export const isPause = (line: Line) => kPause.test(line.code);
@@ -100,13 +135,21 @@ export function explainPause(lines: Line[], index: number, gcode: string): Pause
 export function pauseAt(lines: Line[], size: number, percent: number) {
   const byte = (percent / 100) * size;
   const window = positionWindow(size);
+  // The first line that ends inside the window (line ends only grow).
+  let lo = 0;
+  let hi = lines.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (lines[mid]!.end < byte - window) lo = mid + 1;
+    else hi = mid;
+  }
   // Take the pause closest to the position, so that a second pause shortly after (e.g. a tab stop after a short first
   // operation) is not mistaken for the first one.
   let best = -1;
-  for (let i = 0; i < lines.length && lines[i]!.end <= byte + window; i++) {
+  for (let i = lo; i < lines.length && lines[i]!.end <= byte + window; i++) {
     if (isPause(lines[i]!) && (best < 0 || Math.abs(lines[i]!.end - byte) <= Math.abs(lines[best]!.end - byte))) best = i;
   }
-  return best >= 0 && Math.abs(byte - lines[best]!.end) <= window ? best : -1;
+  return best;
 }
 
 /**
@@ -114,8 +157,7 @@ export function pauseAt(lines: Line[], size: number, percent: number) {
  * Returns `null` unless the reported position can be the end of an M0 line, e.g. after a feed hold.
  */
 export function pauseHint(gcode: string, percent: number): PauseHint | null {
-  const lines = splitLines(gcode);
-  const size = new TextEncoder().encode(gcode).length;
+  const { lines, size } = parsedProgram(gcode);
   if (!size) return null;
   const index = pauseAt(lines, size, percent);
   return index < 0 ? null : explainPause(lines, index, gcode);
