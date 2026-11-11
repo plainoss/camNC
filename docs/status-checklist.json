@@ -539,6 +539,12 @@
           "status": "done",
           "evidence": ["packages/cad-script/src/tasks/tasks.test.ts", "packages/cad-script/src/views/views.test.ts"],
           "note": "Nine trial requests and three whole-piece briefs use independently stated outcomes. Recorded replay keeps failures and human visual review explicit. Top, front, right and named-cut sections use evaluated contours and cuts."
+        },
+        {
+          "item": "Generated carving illustrations with physical size/detail preparation",
+          "status": "partial",
+          "evidence": ["apps/camNC/src/cam/carvingAssistant/generation.test.ts", "apps/camNC/src/cam/carvingAssistant/prepare.test.ts", "apps/camNC/src/cam/carvingAssistant/generatedFixtures.test.ts", "apps/camNC/src/routes/cam/$jobId.carve.assistant.test.tsx"],
+          "note": "One-call artwork generation, local source reuse, physical detail cleanup, CAM worker checks, guarded Apply and Undo. Recorded owl/book and mouse/ball sources exercise real preparation. Material presets need physical calibration; native image-provider quality and charges need live credentials."
         }
       ]
     },

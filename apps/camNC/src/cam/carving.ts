@@ -37,6 +37,23 @@ export interface CarvingItemV1 {
   rotation: number;
   /** Centred on (0, 0), unrotated; drawn again only when art or height changes. */
   outline: Loop[];
+  /** Original generated artwork survives local preparation, save/reopen and later size/detail changes. */
+  generated?: {
+    assetId: string;
+    sourceSvg: string;
+    prompt: string;
+    summary: string;
+    sourceRaster?: { dataUri: string; width: number; height: number };
+    warnings?: string[];
+    detail: 'simple' | 'balanced' | 'detailed';
+    /** Accepted ink size at preparation; `height` matches the item's height then. */
+    width: number;
+    height: number;
+    /** Maximum size the whole source was fitted into, reused when it is rechecked. */
+    envelope?: { width: number; height: number };
+    /** Settings and artwork used by the last accepted suitability check. */
+    checkedFor: string;
+  };
 }
 
 /** A carving job: one board, artwork V-carved into its top. */

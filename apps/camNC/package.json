@@ -78,6 +78,7 @@
     "comlink": "catalog:",
     "drizzle-orm": "^0.44.3",
     "gcode-toolpath": "catalog:",
+    "imagetracerjs": "1.2.6",
     "immer": "catalog:",
     "jotai": "catalog:",
     "konva": "catalog:",
