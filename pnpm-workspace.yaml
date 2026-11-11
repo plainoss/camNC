@@ -93,7 +93,7 @@ catalog:
   three: ^0.178.0
   three-stdlib: ^2.36.0
   ts-node: ^10.9.2
-  turbo: ^2.5.5
+  turbo: ^2.11.10
   tw-animate-css: ^1.3.5
   typescript: 7.0.2
   uuid: ^11.1.0
@@ -107,3 +107,38 @@ catalog:
   yaml: ^2.8.0
   zod: ^3.23.8
   zustand: ^5.0.6
+
+# One virtual store per machine: every worktree's node_modules holds only symlinks into it (AGENTS.md).
+virtualStoreType: global
+publicHoistPattern:
+  - '*@heroui/*'
+# Dependencies that never ran their install scripts under pnpm 10, and don't need to.
+allowBuilds:
+  '@clerk/shared': false
+  '@heroui/shared-utils': false
+  core-js-pure: false
+  esbuild: false
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false
+  simple-git-hooks: false
+  workerd: false
+# Undeclared runtime dependencies that only resolved through a per-project virtual store's hidden hoist directory.
+# Undeclared type packages are added by .pnpmfile.mjs.
+packageExtensions:
+  '@hookform/resolvers':
+    peerDependencies: { zod: '*' }
+  tunnel-rat:
+    peerDependencies: { react: '*' }
+  # Its web build imports the onnxruntime-web runtime's common package directly.
+  '@huggingface/transformers':
+    dependencies: { onnxruntime-common: 1.22.0-dev.20250409-89f8206ba4 }
+  # Browser bundles of these need the npm polyfills for Node's events and buffer.
+  readable-stream:
+    dependencies: { events: '^3.3.0', buffer: '^6.0.3' }
+  gcode-parser:
+    dependencies: { events: '^3.3.0' }
+  stream-browserify:
+    dependencies: { events: '^3.3.0' }
+  safe-buffer:
+    dependencies: { buffer: '^6.0.3' }

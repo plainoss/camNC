@@ -49,7 +49,7 @@ function Eye({ name, shown, onToggle }: { name: string; shown: boolean; onToggle
 
 /** A row of the list: a design variable, a plane made to sketch on, or a step of how the design is built. */
 export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'plane'; id: string } | { kind: 'step'; step: DesignStep };
-export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete' | 'newSketch';
+export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete' | 'newSketch' | 'export';
 
 /** What each row's menu offers, and why an item isn't there for it. */
 function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAction; label: string; disabled?: boolean }[] {
@@ -69,6 +69,7 @@ function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAc
       ? []
       : [{ action: 'suppress' as const, label: entry.step.suppressed ? 'Unsuppress' : 'Suppress' }]),
     { action: 'rollTo', label: 'Roll to here' },
+    ...(kind === 'sketch' || kind === 'faceSketch' ? [{ action: 'export' as const, label: 'Export as DXF/SVG…' }] : []),
     // A step past the bar also takes the design back to its end, as the reference's menu does.
     ...(rolledBack ? [{ action: 'rollToEnd' as const, label: 'Roll to end' }] : []),
     { action: 'delete', label: 'Delete', disabled: kind === 'faceSketch' || kind === 'copy' },
@@ -451,7 +452,8 @@ export function FeatureList({
                   </span>
                 )}
               </button>
-              {onToggleShown && visibilityId(entry) && (
+              {/* Below the rollback bar a step is left out of the view, so there's nothing for an eye to show or hide. */}
+              {onToggleShown && visibilityId(entry) && !(rollbackAt >= 0 && index > rollbackAt) && (
                 <Eye
                   name={label(entry)}
                   shown={shown?.(visibilityId(entry)!) ?? true}

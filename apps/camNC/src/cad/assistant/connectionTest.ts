@@ -1,4 +1,6 @@
 import { AssistantProviderError, requestAssistant, type AssistantImage, type ProviderConfig } from './provider';
+import { connectionPreset } from './connectionPresets';
+import { defaultImageModel, defaultTextModel, listProviderModels } from './modelDefaults';
 
 export interface ConnectionTestResult {
   config: ProviderConfig;
@@ -39,6 +41,22 @@ export async function testAssistantConnection(
   signal: AbortSignal,
   fetcher: typeof fetch = fetch
 ): Promise<ConnectionTestResult> {
+  const notes: string[] = [];
+  // Blank model fields mean "choose for me": the provider's own list decides, so new models need no app update.
+  const provider = connectionPreset(config).id;
+  const wantsImageModel = provider !== 'anthropic' && config.imageModel === undefined;
+  if (!config.model.trim() || wantsImageModel) {
+    const available = await listProviderModels(config, key, signal, fetcher);
+    const fallback = connectionPreset(config).models[0]?.id;
+    const text = config.model.trim() || (available && defaultTextModel(provider, available)) || fallback;
+    if (!text) throw new Error("This provider didn't list its models. Enter a model ID under Models.");
+    const image = wantsImageModel && available ? defaultImageModel(provider, available) : config.imageModel;
+    config = { ...config, model: text, ...(image ? { imageModel: image } : {}) };
+    if (wantsImageModel && !image) {
+      const { imageModel: _none, ...rest } = config;
+      config = rest;
+    }
+  }
   const ask = async (images: boolean) =>
     requestAssistant(
       {
@@ -53,7 +71,6 @@ export async function testAssistantConnection(
       },
       fetcher
     );
-  const notes: string[] = [];
   let images = config.images;
   let reply;
   try {

@@ -220,7 +220,32 @@ function reportEntities(sketch: CadSketch): CadReportEntity[] {
 /** Room around the part on its board, mm: enough for the bit and the tabs. */
 const BOARD_MARGIN = 20;
 
+/**
+ * Planned summaries by everything planning reads, so inspecting a design again (the assistant inspects the open design
+ * and each checked candidate) only plans the parts that changed. Planning one part takes up to a second.
+ */
+const plannedSummaries = new Map<string, CadToolpathSummary>();
+const kPlannedSummaries = 256;
+
 function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof profileFeatures>, cornerRelief?: number): CadToolpathSummary {
+  // `profile` is derived from these fields alone, and the board from them and the profile.
+  const { partId, name, thickness, outline, holes, cuts } = source;
+  const key = JSON.stringify({ partId, name, thickness, outline, holes, cuts, cornerRelief });
+  let summary = plannedSummaries.get(key);
+  if (!summary) {
+    summary = planToolpathSummary(source, profile, cornerRelief);
+    if (plannedSummaries.size >= kPlannedSummaries) plannedSummaries.delete(plannedSummaries.keys().next().value!);
+    plannedSummaries.set(key, summary);
+  }
+  // Each report gets its own copy, so a caller changing one can't change what a later inspection returns.
+  return structuredClone(summary);
+}
+
+function planToolpathSummary(
+  source: EvaluatedCadPart,
+  profile: ReturnType<typeof profileFeatures>,
+  cornerRelief?: number
+): CadToolpathSummary {
   const [w, h] = profile.size;
   const board: BoardRequest = {
     id: 'check',
@@ -352,7 +377,8 @@ export async function inspectCadDocument(
   const physical = physicalJoinedCopies(activeDesign(solved.document));
   // Bones widen a cut past what was drawn, so its opening is measured on the part without them.
   const unrelieved = solved.document.parts.some(part => part.cornerRelief)
-    ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(({ cornerRelief: _, ...part }) => part) }).parts
+    ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(({ cornerRelief: _cornerRelief, ...part }) => part) })
+        .parts
     : solved.parts;
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
     const physicalPart = physical.parts.find(candidate => candidate.id === part.id)!;

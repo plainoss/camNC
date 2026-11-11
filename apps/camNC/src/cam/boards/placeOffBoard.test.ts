@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { nestBoard, reconcileBoards, setAsidePart, type BoardV1, type PartInstance } from '../boards';
-import { placeOffBoard, placeOffBoardNote, tooBigForMachine } from './placeOffBoard';
+import { nestBoard, newBoard, reconcileBoards, setAsidePart, type BoardV1, type PartInstance } from '../boards';
+import { moveOnto, moveRefusedNote, placeOffBoard, placeOffBoardNote, tooBigForMachine } from './placeOffBoard';
 
 const inst = (id: string, w: number, h: number, t: number): PartInstance => ({ id, partId: id, name: id, size: [w, h, t], thickness: t });
 const bit = 6;
@@ -67,5 +67,41 @@ describe('placeOffBoard', () => {
     expect(taker.board.id).not.toBe(board.id);
     expect(taker.nest.unplaced).toEqual([]);
     expect(taker.nest.placements.find(p => p.id === 'Panel')!.rotated).toBe(true);
+  });
+});
+
+describe('moveOnto', () => {
+  const parts = [inst('Side', 560, 900, 18), inst('Shelf', 500, 300, 18), inst('Top', 300, 200, 18)];
+  const board = (items: string[], size: BoardV1['size'] = { fit: true }): BoardV1 => ({
+    ...newBoard([], 18, 'plywood', items, items.join()),
+    size,
+  });
+
+  it('refuses a board full within the machine, and the board it was on keeps it', () => {
+    // Side takes the machine's width: a fitted board with it can't grow to take Shelf too.
+    const full = board(['Side']);
+    expect(nestBoard(full, parts, bit, opts).unplaced).toEqual([]);
+    const res = moveOnto(full, 'Shelf', parts, bit, opts);
+    expect(res).toEqual({ full: 'full and can’t grow within the machine' });
+    expect(moveRefusedNote('Shelf', { ...full, name: 'A' }, 'full and can’t grow within the machine')).toBe(
+      'Shelf doesn’t fit on board A: it’s full and can’t grow within the machine. It stays where it is.'
+    );
+    // A fixed board that is too small, with nothing on it.
+    expect(moveOnto(board([], { fit: false, w: 200, h: 200 }), 'Shelf', parts, bit, opts)).toEqual({ full: 'too small' });
+  });
+
+  it('pins the part onto a board that grows to take it, every part on it still placed', () => {
+    const res = moveOnto(board(['Top']), 'Shelf', parts, bit, opts);
+    if (!('board' in res)) throw new Error(`refused: ${res.full}`);
+    expect(res.board.items).toEqual(['Top', 'Shelf']);
+    expect(res.board.pinned).toEqual(['Shelf']);
+    expect(nestBoard(res.board, parts, bit, opts).unplaced).toEqual([]);
+  });
+
+  it('refuses a move that would push a part already on the board off it', () => {
+    // Room for one of them: Shelf would nest, but Top would come off for it.
+    const fixed = board(['Top'], { fit: false, w: 520, h: 330 });
+    expect(nestBoard(fixed, parts, bit, opts).unplaced).toEqual([]);
+    expect(moveOnto(fixed, 'Shelf', parts, bit, opts)).toEqual({ full: 'full' });
   });
 });

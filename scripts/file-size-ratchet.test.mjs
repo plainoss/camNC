@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { FORMATTED_AT_COMMIT, check, countLines, isCovered, main, update } from './file-size-ratchet.mjs';
+import { FORMATTED_AT_COMMIT, check, checkGrowth, countLines, isCovered, main, update } from './file-size-ratchet.mjs';
 
 const config = { limit: 10, ceilings: { 'apps/a/src/big.ts': 20 } };
 
@@ -138,4 +138,43 @@ test('the files the ratchet formats are the ones the hook formats with Biome', (
     .split(','))
     assert(FORMATTED_AT_COMMIT.test(`x.${ext}`), ext);
   assert(!FORMATTED_AT_COMMIT.test('x.mjs') && !FORMATTED_AT_COMMIT.test('x.js'));
+});
+
+test('--base fails a listed file that grew since the base, even below its ceiling', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'file-size-ratchet-base-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  const write = (path, lines) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), 'x\n'.repeat(lines));
+  };
+  git('init', '-q');
+  git('config', 'user.email', 'test@example.com');
+  git('config', 'user.name', 'test');
+  mkdirSync(join(root, 'scripts'));
+  writeFileSync(join(root, 'scripts/file-size-ceilings.json'), JSON.stringify({ limit: 10, ceilings: { 'apps/a/src/big.ts': 20 } }));
+  write('apps/a/src/big.ts', 15);
+  write('apps/a/src/small.ts', 5);
+  git('add', '.');
+  git('commit', '-qm', 'base');
+  const run = (...args) => main(args, { root, cwd: root });
+  t.mock.method(console, 'error', () => {});
+
+  write('apps/a/src/big.ts', 16);
+  write('apps/a/src/small.ts', 9);
+  assert.equal(await run(), 0, 'without --base only the ceiling counts');
+  assert.equal(await run('--base', 'HEAD'), 1, 'one line more than at the base fails');
+  write('apps/a/src/big.ts', 14);
+  assert.equal(await run('--base', 'HEAD'), 0, 'shrinking passes, and unlisted files may grow within the limit');
+  write('apps/a/src/new.ts', 3);
+  assert.equal(await run('--base', 'HEAD', 'apps/a/src/new.ts'), 0, 'a file the base lacks has not grown');
+  assert.equal(await run('--base'), 2);
+});
+
+test('checkGrowth only reports listed files that the base has', () => {
+  const config = { ceilings: { 'a.ts': 30, 'b.ts': 30 } };
+  const sizes = new Map([['a.ts', 12], ['b.ts', 12], ['c.ts', 12]]);
+  const errors = checkGrowth(sizes, new Map([['a.ts', 10], ['c.ts', 1]]), config, 'main');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /a\.ts has 12 lines, 2 more than at main/);
 });
