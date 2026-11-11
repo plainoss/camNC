@@ -8,7 +8,9 @@ const finiteCoordinates = (value: string) =>
   );
 
 /** Rebuild a small drawing vocabulary; never insert provider markup into the live DOM. */
-export function sanitizeCarvingSvg(source: string): string {
+export function sanitizeCarvingSvg(input: string): string {
+  // Models annotate parts with comments; drop them before the declaration check. Comment nodes are never copied.
+  const source = input.length > 120_000 ? input : input.replace(/<!--[^]*?-->/g, '');
   if (source.length > 120_000 || /<!|<\?/.test(source))
     throw new Error('Artwork must be a small, self-contained SVG without declarations.');
   const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
@@ -35,6 +37,10 @@ export function sanitizeCarvingSvg(source: string): string {
       const { name, value } = attribute;
       if (name === 'xmlns' && depth === 0 && value === namespace) continue;
       if (name === 'viewBox' && depth === 0) continue;
+      // The root's size (often "80mm") is discarded: the viewBox and the requested envelope define the drawing.
+      if (depth === 0 && (name === 'width' || name === 'height')) continue;
+      // Labels and rendering hints change no geometry, so they are dropped instead of rejecting the drawing.
+      if (/^(?:id|role|version|shape-rendering|aria-[a-z-]+)$/.test(name)) continue;
       // The viewBox is the sole viewport; external links, styles, filters and animation are rejected, never evaluated.
       if (geometry.has(name)) {
         if (
@@ -46,7 +52,6 @@ export function sanitizeCarvingSvg(source: string): string {
             .every(v => Number.isFinite(Number(v)) && Math.abs(Number(v)) <= 1e6)
         )
           throw new Error(`Invalid artwork coordinate: ${name}.`);
-        if (depth === 0 && (name === 'width' || name === 'height')) continue;
       } else if (name === 'd' && node.localName === 'path') {
         if (!/^[MmLlHhVvCcSsQqTtAaZz\s,0-9eE+.-]*$/.test(value) || !finiteCoordinates(value)) throw new Error('Invalid artwork path.');
         commands += (value.match(/[MmLlHhVvCcSsQqTtAaZz]/g) ?? []).length;
