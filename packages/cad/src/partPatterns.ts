@@ -12,14 +12,24 @@ const kAxes = { x: 0, y: 1, z: 2 } as const;
 /** The most pieces a pattern makes, counting the part itself. */
 export const CAD_MAX_PART_PATTERN = 200;
 
-/** What a copy is called: its own name, or the part's with a number counting the part as the first. */
-export const cadCopyName = (part: Pick<CadPart, 'name' | 'copies'>, index: number): string =>
+/**
+ * What a copy is called: its own name, or the part's with a number counting the part as the first.
+ * Copies ahead of the pattern's are numbered first, then the pattern's by their place in it, then copies added after the
+ * pattern, so adding a copy never renumbers the ones already there.
+ */
+export const cadCopyName = (part: Pick<CadPart, 'name' | 'copies' | 'pattern'>, index: number): string =>
   part.copies?.[index]?.name ??
   (() => {
-    const copy = part.copies?.[index];
-    const logical = copy?.pattern ? Number(copy.id.slice(copy.pattern.length + 1)) : NaN;
-    const own = part.copies?.filter(copy => !copy.pattern).length ?? 0;
-    return `${part.name} ${Number.isInteger(logical) ? own + logical + 1 : index + 2}`;
+    const copies = part.copies ?? [];
+    const first = copies.findIndex(copy => copy.pattern);
+    const slot = (copy: CadPartCopy | undefined) => (copy?.pattern ? Number(copy.id.slice(copy.pattern.length + 1)) : NaN);
+    const logical = slot(copies[index]);
+    if (first < 0 || index < first) return `${part.name} ${index + 2}`;
+    if (Number.isInteger(logical)) return `${part.name} ${first + logical + 1}`;
+    // After the pattern: past its last slot, even an excluded one, so excluding a slot doesn't rename these.
+    const slots = Math.max((part.pattern?.count ?? 1) - 1, ...copies.map(slot).filter(Number.isInteger));
+    const after = copies.slice(first, index).filter(copy => !copy.pattern).length;
+    return Number.isInteger(slots) ? `${part.name} ${first + slots + after + 2}` : `${part.name} ${index + 2}`;
   })();
 
 /**
@@ -58,7 +68,7 @@ function patternCopies(
 
 /**
  * Lays out every part pattern's copies from where its part now is, so they follow the part, its count and its spacing.
- * A part's other copies stay as they are, ahead of the pattern's.
+ * A part's other copies stay where they are, ahead of the pattern's or, when added once it had copies, after them.
  */
 export function resolvePartPatterns(document: CadDocument): CadDocument {
   let changed = false;
@@ -87,7 +97,21 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
         return { ...rest, placement: { position, rotation: from.rotation } };
       });
     const along = part.pattern?.direction ? cadDirectionVector(document, part.pattern.direction) : (part.pattern?.vector ?? null);
-    const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern, at, along) : [])];
+    // Copies added once the pattern had copies stay after them, so their numbers don't shift the pattern's.
+    const first = part.copies?.findIndex(copy => copy.pattern) ?? -1;
+    const after = new Set(
+      first < 0
+        ? []
+        : part
+            .copies!.slice(first)
+            .filter(copy => !copy.pattern)
+            .map(copy => copy.id)
+    );
+    const copies = [
+      ...own.filter(copy => !after.has(copy.id)),
+      ...(part.pattern ? patternCopies(part, part.pattern, at, along) : []),
+      ...own.filter(copy => after.has(copy.id)),
+    ];
     if (JSON.stringify(copies) === JSON.stringify(part.copies ?? [])) return part;
     changed = true;
     const next: CadPart = { ...part, copies };
