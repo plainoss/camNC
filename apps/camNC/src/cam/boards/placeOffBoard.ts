@@ -11,7 +11,8 @@ import {
   type PartInstance,
 } from '../boards';
 
-const unpinned = (board: BoardV1, itemId: string) => (board.pinned ?? []).filter(i => i !== itemId);
+/** The board's pins without this body. */
+export const unpinned = (board: BoardV1, itemId: string) => (board.pinned ?? []).filter(i => i !== itemId);
 /** The board's layout without this body. */
 const unpositioned = (board: BoardV1, itemId: string) =>
   board.layout && { layout: { ...board.layout, at: Object.fromEntries(Object.entries(board.layout.at).filter(([id]) => id !== itemId)) } };
@@ -23,9 +24,12 @@ export const withoutPart = (board: BoardV1, itemId: string): BoardV1 => ({
   ...unpositioned(board, itemId),
 });
 
-/** A new board for this body alone, split off `from`: its thickness, material and hold settings, the body pinned. */
-const freshBoardFor = (boards: BoardV1[], from: BoardV1, id: string): BoardV1 => ({
-  ...newBoard(boards, from.thickness, from.material, [id]),
+/**
+ * A new board for this body alone, split off `from`: its material and hold settings, the body pinned. Its thickness is
+ * `from`'s, or the body's own when it moves off a board of another thickness.
+ */
+export const freshBoardFor = (boards: BoardV1[], from: BoardV1, id: string, thickness = from.thickness): BoardV1 => ({
+  ...newBoard(boards, thickness, from.material, [id]),
   ...holdSettingsOf(from),
   pinned: [id],
 });
@@ -39,10 +43,11 @@ export function tooBigForMachine(
   id: string,
   instances: PartInstance[],
   bit: number,
-  opts: NestOptions
+  opts: NestOptions,
+  thickness = from.thickness
 ): { margin: number } | null {
   if (!opts.machine || !instances.some(i => i.id === id)) return null;
-  const alone = nestBoard(freshBoardFor([from], from, id), instances, bit, { ...opts, holds: false });
+  const alone = nestBoard(freshBoardFor([from], from, id, thickness), instances, bit, { ...opts, holds: false });
   return alone.unplaced.includes(id) ? { margin: alone.margin } : null;
 }
 
@@ -84,9 +89,18 @@ export function placeOffBoard(
   for (const { board, nest } of boards) {
     if (isCut(board)) continue;
     for (const id of nest.unplaced.filter(id => !needsRepair(board, id))) {
-      const home = notAside(next.find(b => b.id === board.id)!, id);
+      const current = next.find(b => b.id === board.id)!;
+      const home = notAside(current, id);
       const others = next.filter(b => b.id !== board.id && !isCut(b) && b.thickness === board.thickness);
-      const drop = [home, ...others].map(t => dropPart(t, instances, bit, id, anywhere, 0, opts)).find(d => d.at);
+      // A board takes it only with room to spare: a part on it now mustn't come off for it.
+      const keeps = (t: BoardV1, after: BoardV1) => {
+        const off = new Set(nestBoard(after, instances, bit, { ...opts, holds: false }).unplaced);
+        const now = t === home ? current : t;
+        return nestBoard(now, instances, bit, { ...opts, holds: false }).placements.every(p => !off.has(p.id));
+      };
+      const drop = [home, ...others]
+        .map(t => ({ t, d: dropPart(t, instances, bit, id, anywhere, 0, opts) }))
+        .find(({ t, d }) => d.at && keeps(t, d.board))?.d;
       if (!drop) {
         const big = tooBigForMachine(board, id, instances, bit, opts);
         if (big) {

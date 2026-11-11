@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { nestBoard, reconcileBoards, type BoardV1, type PartInstance } from '../boards';
-import { placeOffBoard, placeOffBoardNote } from './placeOffBoard';
+import { nestBoard, reconcileBoards, setAsidePart, type BoardV1, type PartInstance } from '../boards';
+import { placeOffBoard, placeOffBoardNote, tooBigForMachine } from './placeOffBoard';
 
 const inst = (id: string, w: number, h: number, t: number): PartInstance => ({ id, partId: id, name: id, size: [w, h, t], thickness: t });
 const bit = 6;
@@ -49,5 +49,23 @@ describe('placeOffBoard', () => {
     const res = placeOffBoard(nested(reconcileBoards(undefined, parts, 'plywood'), parts), parts, bit, opts);
     expect(res.placed).toEqual(['Bottom']);
     expect(placeOffBoardNote(res, parts, machine)).toBe('Parts off the boards placed.');
+  });
+
+  it('turns a part that fits the machine only turned, and places it on a new board', () => {
+    const parts = [inst('Panel', 950, 560, 18), inst('Shelf', 500, 300, 18)];
+    const [board] = reconcileBoards(undefined, parts, 'plywood');
+    const off = setAsidePart(board, 'Panel', { x: -1000, y: -1000, rotated: false });
+    expect(tooBigForMachine(off, 'Panel', parts, bit, opts)).toBeNull();
+    const before = nested([off], parts);
+    expect(before[0].nest.unplaced).toEqual(['Panel']);
+
+    const res = placeOffBoard(before, parts, bit, opts);
+    expect(res.tooBig).toEqual([]);
+    expect(res.placed).toEqual(['Panel']);
+    expect(res.boards).toHaveLength(2);
+    const taker = nested(res.boards, parts).find(b => b.board.items.includes('Panel'))!;
+    expect(taker.board.id).not.toBe(board.id);
+    expect(taker.nest.unplaced).toEqual([]);
+    expect(taker.nest.placements.find(p => p.id === 'Panel')!.rotated).toBe(true);
   });
 });

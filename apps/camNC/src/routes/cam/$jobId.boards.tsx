@@ -11,7 +11,6 @@ import {
   dropPart,
   flipOf,
   freezeSpacing,
-  holdSettingsOf,
   holdVerdict,
   cutBoardWith,
   isCut,
@@ -41,7 +40,9 @@ import {
   placeOffBoardNote,
   tooBigForMachine,
   tooBigReason,
+  unpinned,
   withoutPart as without,
+  freshBoardFor,
 } from '@/cam/boards/placeOffBoard';
 import { applySetupToAll, prepareGlobalRelayout, restorePhysicalBoardSetup } from '@/cam/boards/globalSetup';
 import { useHoldEditing } from '@/cam/boards/useHoldEditing';
@@ -69,7 +70,7 @@ import { z } from 'zod';
 import { Button } from '@wbcnc/ui/components/button';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/boards')({
   component: BoardsStep,
@@ -390,13 +391,16 @@ function BoardsEditor({
     const inst = byId.get(itemId);
     const from = boards.find(b => b.board.items.includes(itemId))?.board;
     if (!inst || !from) return;
-    const b = newBoard(
+    // A new board wouldn't hold it either: no empty board, the reason instead.
+    const big = tooBigForMachine(from, itemId, instances, plan.bit.diameter, nestOptions, inst.thickness);
+    if (big && machine) return setNote(`${tooBigReason(inst, machine, big.margin)} It stays where it is.`);
+    const b = freshBoardFor(
       boards.map(x => x.board),
-      inst.thickness,
-      from.material,
-      [itemId]
+      from,
+      itemId,
+      inst.thickness
     );
-    saveBoards([...boards.map(({ board }) => without(board, itemId)), { ...b, ...holdSettingsOf(from), pinned: [itemId] }]);
+    saveBoards([...boards.map(({ board }) => without(board, itemId)), b]);
     setSelectedId(b.id);
   };
 
@@ -567,14 +571,29 @@ function BoardsEditor({
   const hasRepair = (board: BoardV1, id: string) =>
     !!board.designIssues?.[id] || (!!job.design && (!byId.has(id) || +byId.get(id)!.thickness.toFixed(1) !== board.thickness));
   // Off the boards: a part that fits no board the machine holds says why, and "Place on boards" is for the others.
-  const offBoard = boards.flatMap(({ board, nest }) =>
-    nest.unplaced
-      .filter(id => !hasRepair(board, id))
-      .map(id => ({ id, big: isCut(board) ? null : tooBigForMachine(board, id, instances, plan.bit.diameter, nestOptions) }))
+  // Each is nested alone on a new board: only again when the boards, parts, bit or machine change.
+  const offBoard = useMemo(
+    () =>
+      boards.flatMap(({ board, nest }) =>
+        nest.unplaced
+          .filter(id => !hasRepair(board, id))
+          .map(id => ({ id, big: isCut(board) ? null : tooBigForMachine(board, id, instances, plan.bit.diameter, nestOptions) }))
+      ),
+    // hasRepair and nestOptions are made each render from job.design, the instances, the bit, hardware and machine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [boards, instances, job.design, plan.bit.diameter, plan.bit.stickout, hardware, machine]
   );
-  const tooBigNotes = offBoard.flatMap(({ id, big }) =>
-    big && machine && byId.has(id) ? [tooBigReason(byId.get(id)!, machine, big.margin)] : []
-  );
+  // One line per reason: copies of a part (same name, same size) say it once.
+  const tooBigNotes = [
+    ...new Map(
+      offBoard.flatMap(({ id, big }) => {
+        const inst = byId.get(id);
+        if (!big || !machine || !inst) return [];
+        const text = tooBigReason(inst, machine, big.margin);
+        return [[text, { id, text }] as const];
+      })
+    ).values(),
+  ];
   const unplacedNames = offBoard.filter(o => !o.big).map(({ id }) => byId.get(id)?.name ?? id);
   const cantHold = sel.retention === 'tabs' ? (planOf(sel)?.holding ?? []).filter(h => h.how === 'unheld').map(h => h.name) : [];
   const verdict = holdVerdict(sel, selNest, hardware, instances);
@@ -615,8 +634,8 @@ function BoardsEditor({
           </Button>
         </p>
       ))}
-      {tooBigNotes.map(text => (
-        <p key={text} role="alert" className="text-xs text-amber-700 dark:text-amber-400">
+      {tooBigNotes.map(({ id, text }) => (
+        <p key={id} role="alert" className="text-xs text-amber-700 dark:text-amber-400">
           {`${text} It won’t be cut.`}
         </p>
       ))}
@@ -849,7 +868,6 @@ function BoardsEditor({
   );
 }
 
-const unpinned = (board: BoardV1, itemId: string) => (board.pinned ?? []).filter(i => i !== itemId);
 function Shell({
   bar,
   message,

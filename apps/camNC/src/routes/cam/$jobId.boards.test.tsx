@@ -8,7 +8,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
 import { describe, expect, it } from 'vitest';
-import { description, drawing, showAll, partIn, openKinderregal } from './boardsTestFixture';
+import { description, drawing, showAll, partIn, openBoard, openKinderregal } from './boardsTestFixture';
 
 describe('CAM boards step', () => {
   it('refuses Start over while a machine job is protected', async () => {
@@ -111,6 +111,13 @@ describe('CAM boards step', () => {
       const big = await screen.findByText(/\(400 × 380 mm\) is too big for the machine: its largest board is 600 × 300 mm/);
       expect(big.textContent).toMatch(/won’t be cut\.$/);
       expect(screen.queryByRole('button', { name: 'Place on boards' })).toBeNull();
+      // Nor does Move to → New board make a board for it.
+      const count = (await getJob(job.id))!.boards!.length;
+      openBoard((await getJob(job.id))!.boards!.find(b => b.thickness === 3)!.name);
+      fireEvent.keyDown(await screen.findByRole('button', { name: /: off the board, won’t be cut/ }), { key: 'Enter' });
+      fireEvent.click(await screen.findByRole('menuitem', { name: /New board/ }));
+      expect(await screen.findByText(/\(400 × 380 mm\) is too big for the machine: .* It stays where it is\.$/)).toBeTruthy();
+      expect((await getJob(job.id))!.boards!.length).toBe(count);
 
       // A part set aside by hand, as well: that one goes back, the back stays, and no board is made for it.
       await waitFor(async () => expect((await getJob(job.id))!.boards!.some(b => b.thickness === 8 && b.layout)).toBe(true));
