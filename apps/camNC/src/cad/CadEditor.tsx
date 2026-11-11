@@ -270,7 +270,7 @@ import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
 import { useEditorVariableFields } from './useEditorVariableFields';
-import { featureShownByDefault } from './sketchShown';
+import { useFeatureShown } from './useFeatureShown';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -3875,14 +3875,7 @@ export function CadEditor({
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
-  const featureShown = useCallback(
-    (id: string) => {
-      // Below the rollback bar left out, as 3D sketch lines come from `doc`; else as shown: rolled back to its sketch, a sketch shows.
-      if (pastRollback.has(id)) return false;
-      return id in featureVisibility ? featureVisibility[id]! : featureShownByDefault(shownDocument, id);
-    },
-    [featureVisibility, shownDocument, pastRollback]
-  );
+  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback);
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>
