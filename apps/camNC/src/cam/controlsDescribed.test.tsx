@@ -234,8 +234,8 @@ describe('CAM controls explain themselves', () => {
   it('sums up the layout: boards with parts, and part area over board area', () => {
     const b = (w: number, h: number, y: number, parts = 1) => ({ nest: { board: { w, h }, yield: y, placements: Array(parts).fill({}) } });
     expect(layoutSummary([b(100, 100, 0.9), b(100, 100, 0.7)])).toBe('2 boards, 80 % yield');
-    // By area, not the mean of the yields; boards without parts don't count.
-    expect(layoutSummary([b(300, 100, 0.9), b(100, 100, 0.5), b(100, 100, 0, 0)])).toBe('2 boards, 80 % yield');
+    // By area, not the mean of the yields; boards without parts are counted apart, so the count matches the tabs.
+    expect(layoutSummary([b(300, 100, 0.9), b(100, 100, 0.5), b(100, 100, 0, 0)])).toBe('2 boards, 80 % yield, 1 empty');
     expect(layoutSummary([b(100, 100, 0.81)])).toBe('1 board, 81 % yield');
     expect(layoutSummary([])).toBe('No part placed yet.');
   });
