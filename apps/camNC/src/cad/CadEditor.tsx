@@ -223,6 +223,7 @@ import { useSvgPixelScale, SKETCH_APPEARANCE, sketchStrokeColor } from './sketch
 import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
+import { studioToolbarActive } from './studioToolbarActive';
 import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PartPatternKind } from './partPatternKind';
 import { selectStudioFeature } from './studioFeatureSelection';
@@ -4002,21 +4003,11 @@ export function CadEditor({
       {studioSession && showWorkspace ? (
         <StudioToolbar
           busy={busy}
-          active={
-            choosingFace
-              ? 'sketch'
-              : partCutting
-                ? 'cutParts'
-                : variableDialog
-                  ? 'variable'
-                  : mirrorDialog
-                    ? 'mirror'
-                    : planeDialog
-                      ? 'plane'
-                      : transformDialog
-                        ? 'transform'
-                        : (featureDialog?.kind ?? null)
-          }
+          searchHighlight={searchHighlight}
+          active={studioToolbarActive(
+            { choosingFace, partCutting, variableDialog, mirrorDialog, planeDialog, transformDialog },
+            featureDialog?.kind
+          )}
           disabled={studioDisabled}
           canUndo={session.past.length > 0}
           canRedo={session.future.length > 0}
@@ -5124,7 +5115,13 @@ export function CadEditor({
           )}
           {palette && searchMode && studioSession && showWorkspace && (
             // In the studio the search is of its commands; in a sketch, of the sketch's tools.
-            <StudioCommandSearch disabled={studioDisabled} workspace={root} onOpenChange={setPalette} onCommand={studioCommand} />
+            <StudioCommandSearch
+              disabled={studioDisabled}
+              workspace={root}
+              onOpenChange={setPalette}
+              onCommand={studioCommand}
+              onHighlight={setSearchHighlight}
+            />
           )}
           {palette && searchMode && !(studioSession && showWorkspace) && (
             <CommandSearch
