@@ -105,7 +105,8 @@ it('inserts the first cupboard into a fresh studio with its untouched empty Part
   expect(evaluateCadDocument(current).parts.filter(part => part.name !== 'Part 1')).toHaveLength(5);
 }, 120_000);
 
-it('inserts two cupboards, keeps one shelf hole through size/count changes, then reopens and undoes', async () => {
+// Skipped while it times out at 240 s on CI and ejects queue batches: https://github.com/plainoss/camNC/issues/759
+it.skip('inserts two cupboards, keeps one shelf hole through size/count changes, then reopens and undoes', async () => {
   const source = createPlateDocument();
   sessions.push(source.id);
   let current = source;
