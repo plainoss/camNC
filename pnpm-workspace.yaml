@@ -130,6 +130,9 @@ packageExtensions:
     peerDependencies: { zod: '*' }
   tunnel-rat:
     peerDependencies: { react: '*' }
+  # Its web build imports the onnxruntime-web runtime's common package directly.
+  '@huggingface/transformers':
+    dependencies: { onnxruntime-common: 1.22.0-dev.20250409-89f8206ba4 }
   # Browser bundles of these need the npm polyfills for Node's events and buffer.
   readable-stream:
     dependencies: { events: '^3.3.0', buffer: '^6.0.3' }
@@ -137,3 +140,5 @@ packageExtensions:
     dependencies: { events: '^3.3.0' }
   stream-browserify:
     dependencies: { events: '^3.3.0' }
+  safe-buffer:
+    dependencies: { buffer: '^6.0.3' }

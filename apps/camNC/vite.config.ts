@@ -60,7 +60,19 @@ export default defineConfig(({ command }) => {
       commonjsOptions: { transformMixedEsModules: true },
     },
     plugins,
-    resolve: { alias: { '@wbcnc/cad-script': fileURLToPath(new URL('../../packages/cad-script/src/browser.ts', import.meta.url)) } },
+    resolve: {
+      alias: {
+        '@wbcnc/cad-script': fileURLToPath(new URL('../../packages/cad-script/src/browser.ts', import.meta.url)),
+        // The polyfill plugin injects these imports into dependencies too, and a dependency in pnpm's global virtual
+        // store can't resolve a package it doesn't declare, so point them at camNC's own copy.
+        ...Object.fromEntries(
+          ['buffer', 'global', 'process'].map(shim => {
+            const id = `vite-plugin-node-polyfills/shims/${shim}`;
+            return [id, fileURLToPath(import.meta.resolve(id))];
+          })
+        ),
+      },
+    },
     optimizeDeps: {
       // These plugin-injected/lazy imports escape the initial crawl. Discovering
       // them during a sketch forces a reload and invalidates in-flight previews.

@@ -480,7 +480,7 @@ catalogs:
       specifier: ^5.0.6
       version: 5.0.6
 
-packageExtensionsChecksum: sha256-D1Yi+dGEl5sg2wZA2nQ0b79lllIHYcm6ZIZzT/SBUgQ=
+packageExtensionsChecksum: sha256-wekk9RF/CtEemp2ZnYNmHn0fVlOtWbFuLlYv32qhP8s=
 
 pnpmfileChecksum: sha256-0bG1GM5HrMKEaowt/UzCnqTuvoTiLbyKqRA81+Ob+DQ=
 
@@ -15138,6 +15138,7 @@ snapshots:
   '@huggingface/transformers@3.6.3':
     dependencies:
       '@huggingface/jinja': 0.5.1
+      onnxruntime-common: 1.22.0-dev.20250409-89f8206ba4
       onnxruntime-node: 1.21.0
       onnxruntime-web: 1.22.0-dev.20250409-89f8206ba4
       sharp: 0.34.3
@@ -22599,9 +22600,13 @@ snapshots:
 
   s.color@0.0.15: {}
 
-  safe-buffer@5.1.2: {}
+  safe-buffer@5.1.2:
+    dependencies:
+      buffer: 6.0.3
 
-  safe-buffer@5.2.1: {}
+  safe-buffer@5.2.1:
+    dependencies:
+      buffer: 6.0.3
 
   safe-regex-test@1.1.0:
     dependencies:
