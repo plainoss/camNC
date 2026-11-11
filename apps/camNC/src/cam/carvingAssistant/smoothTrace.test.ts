@@ -127,8 +127,10 @@ describe('smooth curve approximation and independent validation', () => {
       ink = new Uint8Array(width * width).fill(1);
     for (let y = 0; y < width; y++) ink[y * width + 5] = ink[y * width + 6] = 0;
     for (let y = 0; y < width; y++) ink[y * width + 12] = ink[y * width + 13] = ink[y * width + 14] = 0;
-    expect(closeTraceGaps(ink, width)).toBe(2 * width);
+    // The gap rows touching the grid edge open onto the outside and stay light.
+    expect(closeTraceGaps(ink, width)).toBe(2 * (width - 2));
     expect(ink[3 * width + 5]).toBe(1);
+    expect(ink[5]).toBe(0);
     expect(ink[3 * width + 13]).toBe(0);
   });
 

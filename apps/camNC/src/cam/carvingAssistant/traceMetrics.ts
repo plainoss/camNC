@@ -157,8 +157,9 @@ export function compareTraceMasks(source: Uint8Array, result: Uint8Array, width:
 /**
  * Morphological closing with a 3 × 3 square: fills light gaps at most two pixels wide, including the tip of a light
  * wedge that narrows below a pixel. Curve fitting cannot follow such a gap, so the source would never match its trace.
+ * With `keepFeaturesAreaPx`, nothing is closed when closing would merge or remove a region of at least that area.
  */
-export function closeTraceGaps(ink: Uint8Array, width: number): number {
+export function closeTraceGaps(ink: Uint8Array, width: number, keepFeaturesAreaPx = 0): number {
   const height = ink.length / width;
   const morph = (from: Uint8Array, value: number) => {
     const to = new Uint8Array(from.length);
@@ -169,14 +170,17 @@ export function closeTraceGaps(ink: Uint8Array, width: number): number {
           for (let dx = -1; dx <= 1 && !hit; dx++) {
             const nx = x + dx,
               ny = y + dy;
-            // Outside the grid counts as light for dilation and as dark for erosion, so edges are unchanged.
-            if (nx >= 0 && nx < width && ny >= 0 && ny < height) hit = from[ny * width + nx] === value;
+            // Outside the grid is light, so a light margin along the border is not filled.
+            hit = nx >= 0 && nx < width && ny >= 0 && ny < height ? from[ny * width + nx] === value : value === 0;
           }
         to[y * width + x] = hit === (value === 1) ? 1 : 0;
       }
     return to;
   };
   const closed = morph(morph(ink, 1), 0);
+  for (let i = 0; i < ink.length; i++) closed[i] ||= ink[i];
+  // A wall between two shapes is a feature, unlike the tip of a gap: refuse a closing that merges or removes regions.
+  if (keepFeaturesAreaPx && traceFeatureChanges(ink, closed, width, keepFeaturesAreaPx)) return 0;
   let changed = 0;
   for (let i = 0; i < ink.length; i++)
     if (closed[i] && !ink[i]) {

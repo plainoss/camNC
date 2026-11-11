@@ -169,10 +169,16 @@ export async function traceCarvingPng(
     // Anti-aliased edges leave pixel-sized light gaps where two dark shapes nearly touch. Fill those below the physical
     // threshold; no tool leaves such an island. A pixel that is physically large, as in a small source, stays a counter.
     const pinholes = fillTracePinholes(ink, traceWidth, physicalNoiseAreaPx);
-    // Close light gaps up to two pixels wide where that is below half the physical feature size: shapes that nearly
-    // touch, and the tips of narrowing gaps, which curve fitting closes anyway and which no tool could cut.
+    // Close light gaps up to two pixels wide: the tips of narrowing gaps, which curve fitting closes anyway. Where two
+    // pixels are below half the minimum feature, shapes that nearly touch may merge too; no tool could cut that gap.
+    // Where two pixels are up to a whole feature, such a wall is kept: closing is refused if it changes any region.
     const featurePx = constraints.minFeatureMm * pixelsPerMm;
-    const closedGapPixels = featurePx >= 2 ? closeTraceGaps(ink, traceWidth) : 0;
+    const closedGapPixels =
+      featurePx >= 4
+        ? closeTraceGaps(ink, traceWidth)
+        : featurePx >= 2
+          ? closeTraceGaps(ink, traceWidth, Math.max(noiseAreaPx, featurePx ** 2))
+          : 0;
     // Give Stop a boundary before bounded polygon union. Subsequent physical preparation applies its own geometry limits.
     await new Promise(resolve => setTimeout(resolve, 0));
     abort(signal);
