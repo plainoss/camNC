@@ -1,58 +1,59 @@
 ---
-import GitHubCorner from "./github-corner.astro";
+const githubUrl = "https://github.com/plainoss/camNC";
+const secondary =
+  "inline-flex items-center justify-center rounded-lg border border-white/20 px-5 py-3 text-sm font-semibold text-stone-200 transition hover:border-white/40 hover:bg-white/5 hover:text-white";
 ---
 
-<section class="relative overflow-hidden bg-gradient-to-b from-black via-slate-950 to-slate-900 text-white">
-  <GitHubCorner />
-  <div class="relative mx-auto flex min-h-[70vh] w-full max-w-6xl flex-col items-center gap-12 px-6 py-24 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
-    <div class="flex flex-col items-center gap-6 sm:items-start">
-      <div class="flex items-center gap-3">
-        <div class="size-11 rounded-xl shadow-lg border border-stone-800/80 overflow-hidden flex items-center justify-center bg-stone-900">
-          <img src="/favicon.svg" alt="CamNC logo" class="size-full" />
-        </div>
-        <span class="text-2xl font-bold tracking-tight text-white">
-          Cam<span class="text-amber-500 font-extrabold">NC</span>
-        </span>
+<section class="bed-grid relative overflow-hidden bg-stone-950 text-stone-100">
+  <header class="relative mx-auto flex w-full max-w-6xl items-center justify-between px-6 pt-8">
+    <div class="flex items-center gap-3">
+      <div class="flex size-10 items-center justify-center overflow-hidden rounded-lg border border-stone-800 bg-stone-900">
+        <img src="/favicon.svg" alt="" class="size-full" />
       </div>
-      <span class="rounded-full border border-white/20 px-4 py-1 text-xs uppercase tracking-[0.35em] text-white/70">
-        Live machine view
+      <span class="text-xl font-bold tracking-tight text-white">
+        cam<span class="font-extrabold text-amber-500">NC</span>
       </span>
-      <h1 class="text-balance text-4xl font-semibold sm:text-5xl md:text-6xl">
-        Toolpath visualization on top of a live camera feed
+    </div>
+    <nav class="flex items-center gap-6 text-sm text-stone-400">
+      <a href="#features" class="hidden hover:text-white sm:inline">Features</a>
+      <a href="#labs" class="hidden hover:text-white sm:inline">Labs</a>
+      <a href="#setup" class="hidden hover:text-white sm:inline">Setup</a>
+      <a href={githubUrl} target="_blank" rel="noopener noreferrer" class="hover:text-white">GitHub</a>
+    </nav>
+  </header>
+  <div class="relative mx-auto grid w-full max-w-6xl items-center gap-12 px-6 pb-24 pt-16 lg:grid-cols-[1fr_1.1fr]">
+    <div class="flex flex-col gap-6">
+      <span class="font-mono text-xs uppercase tracking-[0.25em] text-amber-400">Live machine view · FluidNC</span>
+      <h1 class="text-balance text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl">
+        See your toolpath on the real machine bed.
       </h1>
-      <p class="max-w-3xl text-xl text-white/80">
-        CamNC overlays your toolpath on the live camera feed. Visually check stock orientation, offsets, and clearance before the spindle ever turns on.
+      <p class="max-w-xl text-lg text-stone-300">
+        camNC draws the toolpath on a live, corrected camera image of your CNC. Check stock orientation, offsets and clamps
+        before the spindle ever turns on.
       </p>
-      <div class="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+      <div class="flex flex-wrap items-center gap-3">
         <a
           href="https://run.camnc.app/"
-          class="inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white bg-[var(--color-secondary)] shadow-[0_20px_45px_-20px_color-mix(in_srgb,var(--color-secondary)_70%,transparent)] transition hover:brightness-[1.08] hover:text-white focus-visible:outline-none"
+          class="inline-flex items-center justify-center rounded-lg bg-amber-500 px-5 py-3 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 hover:text-stone-950"
         >
           Launch web app
         </a>
-        <a
-          href="https://run.camnc.app/demo"
-          class="inline-flex items-center justify-center rounded-full border border-white/30 px-6 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent"
-        >
-          Explore demo
-        </a>
-        <a
-          href="https://github.com/plainoss/camNC/releases/latest"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center justify-center rounded-full border border-white/30 px-6 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent"
-        >
+        <a href="https://github.com/plainoss/camNC/releases/latest" target="_blank" rel="noopener noreferrer" class={secondary}>
           Download desktop app
         </a>
-        <a
-          href="https://github.com/plainoss/camNC"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center justify-center rounded-full border border-white/30 px-6 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent"
-        >
-          View on GitHub
-        </a>
+        <a href={githubUrl} target="_blank" rel="noopener noreferrer" class={secondary}>View on GitHub</a>
       </div>
+      <p class="max-w-xl border-l-2 border-amber-500/60 pl-4 text-sm text-stone-400">
+        New and highly experimental: machine control, CAM for STEP models, simple CAD and AI-generated carvings.
+        <a href="#labs" class="text-amber-400 underline-offset-4 hover:underline">See camNC Labs</a>
+      </p>
     </div>
-
+    <figure class="overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl shadow-black/50">
+      <img
+        src="/hero-top-view.jpg"
+        alt="camNC's corrected top view of a machine bed with a toolpath drawn on the stock"
+        class="block w-full"
+      />
+    </figure>
+  </div>
 </section>
