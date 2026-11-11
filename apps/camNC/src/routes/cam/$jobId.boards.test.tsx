@@ -146,6 +146,44 @@ describe('CAM boards step', () => {
     }
   }, 90000);
 
+  it('Move to takes a part onto a board that grows, and offers a full board only with why it can’t', async () => {
+    const client = new QueryClient();
+    const job = await openKinderregal(client);
+    fireEvent.keyDown(partIn('A', 'Part 2'), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: /New board/ }));
+    await screen.findByRole('region', { name: 'Board C drawing' });
+
+    // Board C is fitted to its parts: it grows to take another.
+    fireEvent.keyDown(partIn('A', 'Part 1a'), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Board C' }));
+    await waitFor(() => expect(within(drawing('C')).getByText('Part 1a')).toBeTruthy());
+    await waitFor(async () => {
+      const c = (await getJob(job.id))!.boards!.find(b => b.name === 'C')!;
+      expect(c.items).toHaveLength(2);
+      expect(c.layout?.at && Object.keys(c.layout.at)).toHaveLength(2);
+    });
+
+    // Now a fixed size, a mm wider than its parts need: full, so the menu says why and moving there does nothing.
+    const saved = (await getJob(job.id))!;
+    const c = saved.boards!.find(b => b.name === 'C')!;
+    const [w, h] = [c.layout!.w + 1, c.layout!.h];
+    const fixed = await saveJob({
+      ...saved,
+      boards: saved.boards!.map(b => (b.id === c.id ? { ...b, size: { fit: false as const, w, h } } : b)),
+    });
+    act(() => client.setQueryData(['cam', 'job', job.id], fixed));
+    await screen.findByRole('group', { name: `Board C, ${w} by ${h} mm, with 2 parts` });
+    fireEvent.keyDown(partIn('A', 'left'), { key: 'Enter' });
+    const full = await screen.findByRole('menuitem', { name: /^Board C/ });
+    expect(full.textContent).toBe('Board Cfull');
+    expect(full.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(full);
+    expect(within(drawing('A')).getByText('left')).toBeTruthy();
+    const after = (await getJob(job.id))!.boards!;
+    expect(after.find(b => b.name === 'A')!.items).toContain('part-0#0');
+    expect(after.find(b => b.name === 'C')!.items).toHaveLength(2);
+  }, 90_000);
+
   it('auto-fill keeps parts moved by hand, and Undo restores the boards exactly', async () => {
     const job = await openKinderregal();
 
