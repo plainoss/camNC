@@ -47,10 +47,12 @@ jobs:
           cross=$(gh pr view "$PR_NUMBER" -R "$GITHUB_REPOSITORY" --json isCrossRepository -q .isCrossRepository)
           echo "same_repo=$([ "$cross" = false ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
+      # Default ref: the PR's merge commit on pull_request, main on comments.
+      # The review reads the PR's changes with gh, so no PR head is checked out
+      # in the comment-triggered (secret-holding) context.
       - if: steps.source.outputs.same_repo == 'true'
         uses: actions/checkout@v7
         with:
-          ref: refs/pull/${{ env.PR_NUMBER }}/head
           fetch-depth: 1
           persist-credentials: false
 
