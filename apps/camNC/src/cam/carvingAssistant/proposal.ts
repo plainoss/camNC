@@ -143,7 +143,14 @@ function clearPlacement(job: CamJobV1, item: CarvingItemV1): { x: number; y: num
 export function createCarvingProposal(
   job: CamJobV1,
   prepared: Prepared,
-  options: { mode: 'add' | 'replace'; targetId?: string; asset: CarvingSourceAsset; detail: 'simple' | 'balanced' | 'detailed' }
+  options: {
+    mode: 'add' | 'replace';
+    targetId?: string;
+    asset: CarvingSourceAsset;
+    detail: 'simple' | 'balanced' | 'detailed';
+    /** Where the artwork's centre goes on the board (mm, Y up). Without it, an addition takes the nearest clear spot. */
+    at?: { x: number; y: number };
+  }
 ): CarvingProposal {
   const board = job.boards?.[0];
   if (!job.carving || !board || board.size.fit) throw new Error('Open a carving with a fixed board first.');
@@ -154,8 +161,8 @@ export function createCarvingProposal(
     id: target?.id ?? crypto.randomUUID(),
     art: structuredClone(prepared.art),
     height: prepared.height,
-    x: target?.x ?? board.size.w / 2,
-    y: target?.y ?? board.size.h / 2,
+    x: options.at?.x ?? target?.x ?? board.size.w / 2,
+    y: options.at?.y ?? target?.y ?? board.size.h / 2,
     rotation: target?.rotation ?? 0,
     outline: structuredClone(prepared.outline),
     generated: {
@@ -172,9 +179,8 @@ export function createCarvingProposal(
       checkedFor: '',
     },
   };
-  if (options.mode === 'add') Object.assign(item, clearPlacement(job, item));
-  if (!itemFits(job, item))
-    throw new Error('The prepared artwork does not fit at this placement. Reduce its size or move the selected item.');
+  if (options.mode === 'add' && !options.at) Object.assign(item, clearPlacement(job, item));
+  if (!itemFits(job, item)) throw new Error('The artwork does not fit on the board here. Move the dashed box or make it smaller.');
   const placed = carvingBounds(placeItem(item))!;
   if (
     job.carving.items.some(other => {
@@ -183,7 +189,7 @@ export function createCarvingProposal(
       return box && placed.x0 < box.x1 && placed.x1 > box.x0 && placed.y0 < box.y1 && placed.y1 > box.y0;
     })
   )
-    throw new Error('The artwork overlaps another item. Move the selected item or reduce its size before replacing it.');
+    throw new Error('The artwork overlaps another item. Move the dashed box to a clear spot or make it smaller.');
   item.generated!.checkedFor = carvingSuitabilityKey(job, item);
   return { jobId: job.id, base: carvingProposalBase(job), mode: options.mode, item, report: structuredClone(prepared.report) };
 }
