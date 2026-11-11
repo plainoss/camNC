@@ -39,10 +39,8 @@ function open(source: CadDocument, change: (document: CadDocument) => void = () 
   return settled();
 }
 
-it('says in the Fillet dialog, as it previews, that a radius uses up a side, and won’t keep it', async () => {
-  const source = design(250, 30);
-  const change = vi.fn<(document: CadDocument) => void>();
-  await open(source, change);
+it('says in the Fillet dialog, as it previews, that a radius uses up a side', async () => {
+  await open(design(250, 30));
   const features = screen.getByRole('region', { name: 'Features' });
   await userEvent.dblClick(within(features).getByRole('button', { name: /^Fillet · Part 1/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Fillet' });
@@ -51,14 +49,30 @@ it('says in the Fillet dialog, as it previews, that a radius uses up a side, and
   await userEvent.clear(radius);
   await userEvent.type(radius, '125');
   await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toBe(message));
-  const ok = within(dialog).getByRole('button', { name: 'OK' });
-  expect(ok).toHaveProperty('disabled', true);
-  expect(ok.getAttribute('aria-description')).toBe(message);
+  // A step with an error can still be kept: OK stays usable, and the step is marked once it's kept.
+  expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', false);
   // A radius every corner can take is fine again.
   await userEvent.clear(radius);
   await userEvent.type(radius, '124');
   await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
-  expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', false);
+}, 30_000);
+
+it('keeps a fillet whose radius uses up a side, and marks its row', async () => {
+  const change = vi.fn<(document: CadDocument) => void>();
+  await open(design(250, 30), change);
+  const features = screen.getByRole('region', { name: 'Features' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /^Fillet · Part 1/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Fillet' });
+  const radius = within(dialog).getByRole('textbox', { name: 'Radius' });
+  await userEvent.clear(radius);
+  await userEvent.type(radius, '125');
+  await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toBe(message));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Fillet' })).toBeNull());
+  await waitFor(() => expect(change.mock.calls.at(-1)?.[0].parts[0]!.fillets).toMatchObject([{ id: 'fillet', radius: 125 }]));
+  await settled();
+  const step = within(features).getByRole('button', { name: /^Fillet · Part 1/ });
+  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(message);
 }, 30_000);
 
 it('marks the Fillet row and the part when the sketch shrinks under its radius', async () => {

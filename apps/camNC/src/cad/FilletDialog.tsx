@@ -125,7 +125,8 @@ export function FilletDialog({
     };
   }, [document, radiusText, variables, owner, picked, featureId, fillet, parseCadValue]);
   useDialogPreview(candidate, onPreview);
-  // Corners the radius can't take are left sharp where it's made: say so as it's previewed, rather than keep it silently.
+  // Corners the radius can't take are left sharp where it's made: say so as it's previewed. It can still be kept, marked
+  // as broken on its row, as a step with an error can be.
   const owned = candidate?.parts.find(part => part.id === owner);
   const refusal = (owned && edgeFilletProblems(owned).find(problem => problem.filletId === featureId)?.message) ?? null;
   const save = () => {
@@ -144,7 +145,7 @@ export function FilletDialog({
       : `${part?.name ?? 'Part'} edge ${index + 1}`;
   };
   return (
-    <FeatureDialog title="Fillet" okDisabled={!picked.length || !!refusal} okReason={refusal} onOk={save} onCancel={onCancel}>
+    <FeatureDialog title="Fillet" okDisabled={!picked.length} onOk={save} onCancel={onCancel}>
       <div className="cad-feature-selection" data-active="">
         <small>Edges to round</small>
         <span>{picked.length ? `${picked.length} ${picked.length === 1 ? 'edge' : 'edges'} of ${name}` : 'Click edges of a part'}</span>

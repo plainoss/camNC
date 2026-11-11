@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPlateDocument, parseCadDocument } from './document';
+import { addCircle, createPlateDocument, parseCadDocument } from './document';
 import { evaluateCadPart, polygonArea, CAD_CHORD_TOLERANCE } from './geometry';
 import { sketchRegions } from './sketchRegions';
 import { cadVariableUses, setCadVariable } from './variables';
@@ -94,6 +94,64 @@ describe('a Fillet step whose radius uses up a side', () => {
       entityIds: corners,
     });
     expect(Math.abs(polygonArea(made.part!.outline))).toBeCloseTo(400 * 250, 3);
+  });
+
+  it('leaves the same corners sharp in whatever order they were picked', () => {
+    const { part, corners } = rounded(250, 125);
+    const area = (order: string[]) => {
+      const made = evaluateCadPart({ ...part, fillets: [{ id: 'f', corners: order, radius: 125 }] });
+      expect(new Set(made.diagnostics.find(d => d.code === 'fillet-unresolved')!.entityIds)).toEqual(new Set([corners[1], corners[2]]));
+      return Math.abs(polygonArea(made.part!.outline));
+    };
+    const picked = area(corners);
+    expect(area([...corners].reverse())).toBeCloseTo(picked, 6);
+    expect(area([corners[1]!, corners[0]!, corners[2]!])).toBeCloseTo(picked, 6);
+    expect(area([corners[2]!, corners[0]!, corners[1]!])).toBeCloseTo(picked, 6);
+  });
+
+  it('leaves sharp every corner on a side used up, even where leaving out one pair would let the other corner round', () => {
+    // 400 × 300 at r 210: each corner could take it alone, but the bottom (420 of 400) and right side (420 of 300) are both used up.
+    const { part, corners } = rounded(300, 210);
+    for (const order of [corners, [...corners].reverse(), [corners[1]!, corners[2]!, corners[0]!]]) {
+      const made = evaluateCadPart({ ...part, fillets: [{ id: 'f', corners: order, radius: 210 }] });
+      expect(new Set(made.diagnostics.find(d => d.code === 'fillet-unresolved')!.entityIds)).toEqual(new Set(corners));
+      expect(Math.abs(polygonArea(made.part!.outline))).toBeCloseTo(400 * 300, 3);
+    }
+  });
+
+  it('rounds the corners still there when one is gone, and lists every reason, the radius first', () => {
+    const { part, corners } = rounded(250, 30);
+    const fillets = (radius: number) => [{ id: 'f', corners: [...corners, 'gone'], radius }];
+    const small = evaluateCadPart({ ...part, fillets: fillets(30) });
+    expect(small.diagnostics.find(d => d.code === 'fillet-unresolved')).toMatchObject({
+      message: 'A fillet on Part 1 can’t be made at 1 of its 4 corners: a corner is gone.',
+      entityIds: ['gone'],
+    });
+    expect(Math.abs(polygonArea(small.part!.outline))).toBeCloseTo(400 * 250 - 3 * 30 ** 2 * (1 - Math.PI / 4), -1);
+    const big = evaluateCadPart({ ...part, fillets: fillets(125) });
+    expect(big.diagnostics.find(d => d.code === 'fillet-unresolved')!.message).toBe(
+      'A fillet on Part 1 can’t be made at 3 of its 4 corners: This radius would consume an entire adjacent line. Choose a smaller radius. A corner is gone.'
+    );
+  });
+
+  it('leaves every corner sharp when the rounding would cross other geometry', () => {
+    const { part, corners } = rounded(250, 30);
+    // A hole by the top right corner, across where its arc of 30 would pass.
+    const sketch = addCircle(part.sketch, { x: 392, y: 242, radius: 4 });
+    const made = evaluateCadPart({ ...part, sketch });
+    expect(made.diagnostics.find(d => d.code === 'fillet-unresolved')).toMatchObject({
+      message: 'A fillet on Part 1 can’t be made: This radius would make the fillet cross, touch, or disconnect other profile geometry.',
+      entityIds: corners,
+    });
+    expect(Math.abs(polygonArea(made.part!.outline))).toBeCloseTo(400 * 250, 3);
+  });
+
+  it('isn’t marked on a part that’s switched off, itself or by its folder', () => {
+    const { document, part } = rounded(250, 125);
+    const off = { ...document, parts: [{ ...part, suppressed: true as const }] };
+    expect(designSteps(off).find(step => step.id === 'f')?.broken).toBeUndefined();
+    const folded = { ...document, folders: [{ id: 'folder', name: 'Folder', partIds: [part.id], suppressed: true as const }] };
+    expect(designSteps(folded).find(step => step.id === 'f')?.broken).toBeUndefined();
   });
 
   it('isn’t marked when it fits, or when it’s switched off', () => {

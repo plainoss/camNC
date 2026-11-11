@@ -12,16 +12,15 @@ export interface CadEdgeFilletProblem {
   corners: string[];
 }
 
-// Parts are replaced, never changed in place, so a part's problems hold for as long as it's around. The feature list,
-// Parts list and dialogs each ask for them on every render.
-const knownProblems = new WeakMap<CadPart, CadEdgeFilletProblem[]>();
+type EdgeFilletsMade = { part: CadPart; diagnostics: CadDiagnostic[]; problems: CadEdgeFilletProblem[] };
+
+// Each part is made once, however many ask: the evaluation, the feature list, the Parts list and the Fillet dialog. The
+// cache assumes a changed part is a new object, as the editor replaces parts rather than mutating them in place.
+const made = new WeakMap<CadPart, EdgeFilletsMade>();
 
 /** The Fillet steps of a part that can't round all their corners, for their rows, the Parts list and the dialog. */
 export function edgeFilletProblems(part: CadPart): CadEdgeFilletProblem[] {
-  if (!part.fillets?.length) return [];
-  let problems = knownProblems.get(part);
-  if (!problems) knownProblems.set(part, (problems = withEdgeFillets(part).problems));
-  return problems;
+  return part.fillets?.length ? withEdgeFillets(part).problems : [];
 }
 
 /**
@@ -30,7 +29,9 @@ export function edgeFilletProblems(part: CadPart): CadEdgeFilletProblem[] {
  * its other corners are still rounded. All the corners on a side the radius would use up are left sharp, so which stay
  * rounded doesn't depend on the order they were picked in.
  */
-export function withEdgeFillets(part: CadPart): { part: CadPart; diagnostics: CadDiagnostic[]; problems: CadEdgeFilletProblem[] } {
+export function withEdgeFillets(part: CadPart): EdgeFilletsMade {
+  const known = made.get(part);
+  if (known) return known;
   let sketch = part.sketch;
   const diagnostics: CadDiagnostic[] = [];
   const problems: CadEdgeFilletProblem[] = [];
@@ -39,14 +40,24 @@ export function withEdgeFillets(part: CadPart): { part: CadPart; diagnostics: Ca
     const exists = (id: string) => sketch.entities.some(entity => entity.id === id);
     let corners = fillet.corners.filter(exists);
     const sharp = fillet.corners.filter(id => !exists(id));
-    let reason = sharp.length ? 'its corner is gone.' : undefined;
+    // Every distinct reason a corner was refused, the radius being too big first, as that's the one to change.
+    const reasons: { text: string; limit: boolean }[] = [];
+    if (sharp.length)
+      reasons.push({
+        text:
+          sharp.length === fillet.corners.length
+            ? `its ${sharp.length === 1 ? 'corner is' : 'corners are'} gone.`
+            : `${sharp.length === 1 ? 'a corner is' : `${sharp.length} corners are`} gone.`,
+        limit: false,
+      });
     while (corners.length) {
       const result = filletLineCorners(sketch, { cornerPointIds: corners, radius: fillet.radius });
       if (result.ok) {
         sketch = result.sketch;
         break;
       }
-      reason ??= result.message;
+      if (!reasons.some(reason => reason.text === result.message))
+        reasons.push({ text: result.message, limit: result.maximumRadius !== undefined });
       // The corners it names can't take the radius, and the rest are tried again without them. A refusal that names
       // none of them, such as one about the whole profile, leaves them all sharp.
       const equivalent = pointEquivalence(sketch.constraints);
@@ -57,7 +68,10 @@ export function withEdgeFillets(part: CadPart): { part: CadPart; diagnostics: Ca
     }
     if (!sharp.length) continue;
     const some = sharp.length < fillet.corners.length ? ` at ${sharp.length} of its ${fillet.corners.length} corners` : '';
-    const message = `A fillet on ${part.name} can’t be made${some}: ${reason}`;
+    const why = [...reasons.filter(reason => reason.limit), ...reasons.filter(reason => !reason.limit)]
+      .map(({ text }, i) => (i ? text[0]!.toUpperCase() + text.slice(1) : text))
+      .join(' ');
+    const message = `A fillet on ${part.name} can’t be made${some}: ${why}`;
     problems.push({ filletId: fillet.id, message, corners: sharp });
     const points = part.sketch.entities.flatMap(entity => (entity.type === 'point' && sharp.includes(entity.id) ? [entity] : []));
     diagnostics.push({
@@ -90,7 +104,9 @@ export function withEdgeFillets(part: CadPart): { part: CadPart; diagnostics: Ca
     if (part.regions) next.regions = remap(part.regions);
     if (part.addedRegions) next.addedRegions = remap(part.addedRegions);
   }
-  return { part: next, diagnostics, problems };
+  const result = { part: next, diagnostics, problems };
+  made.set(part, result);
+  return result;
 }
 
 /** A part without one of its Fillet steps. */
