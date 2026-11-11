@@ -63,7 +63,14 @@ export async function createAdapter(page, url) {
       if (!box) throw new Error('The workspace canvas has no visible bounds');
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     } else if (verb === 'studiotool') {
-      await page.getByRole('toolbar', { name: 'Part Studio toolbar', exact: true }).getByRole('button', { name: rest, exact: true }).click();
+      // A command that doesn't fit the toolbar's width is in its More menu.
+      const features = page.getByRole('toolbar', { name: 'Part Studio toolbar', exact: true }).getByRole('group', { name: 'Part Studio features', exact: true });
+      const button = features.getByRole('button', { name: rest, exact: true });
+      if (await button.count()) await button.click();
+      else {
+        await features.getByRole('button', { name: 'More', exact: true }).click();
+        await page.getByRole('menu').getByRole('menuitem', { name: rest, exact: true }).click();
+      }
     } else if (verb === 'selectpart') {
       const rows = page.getByRole('list', { name: 'Parts', exact: true }).getByRole('listitem').filter({ has: page.getByText(rest, { exact: true }) });
       if (await rows.count() !== 1) throw new Error(`Part name must identify one rendered row: ${rest}`);

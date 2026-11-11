@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { CadEditor } from './CadEditor';
 import { settled } from '@/test/settled';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 const sessions: string[] = [];
@@ -42,7 +43,7 @@ async function studio(document = plate()) {
   return { document, change, latest };
 }
 async function transform() {
-  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Transform/ }));
+  await userEvent.click(await studioCommand(/Transform/));
   return screen.findByRole('dialog', { name: /^Transform/ });
 }
 async function typeX(dialog: HTMLElement, value: string) {
