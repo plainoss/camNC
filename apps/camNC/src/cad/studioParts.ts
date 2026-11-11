@@ -11,8 +11,11 @@ export function builtStudioParts(document: CadDocument): CadPart[] {
 
 /** The parts the studio's Parts list shows: a new design's untouched placeholder Part 1 is not one yet. */
 export function listedStudioParts(document: CadDocument): CadPart[] {
-  return document.parts.length === 1 && isBlank(document.parts[0]!) ? [] : builtStudioParts(document);
+  return isBlankDesign(document) ? [] : builtStudioParts(document);
 }
+
+/** A new design, untouched: its only part is the placeholder sketch with nothing drawn yet. */
+export const isBlankDesign = (document: CadDocument) => document.parts.length === 1 && isBlank(document.parts[0]!);
 
 import type { StudioCommand } from './StudioToolbar';
 
