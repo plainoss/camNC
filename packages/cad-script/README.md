@@ -190,6 +190,10 @@ change a variable or a dimension, or a step's settings. So:
 - Handles in the report, such as `7b8b`, work with `find` and `sketch` on that same
   revision of the design. `redundant-constraint` names the involved entity handles.
 - A script that stops with an error leaves the design as it was.
+- A variable that can't be worked out (`invalid-variable`) and a value that can't follow
+  its variables (`variable-value`, such as a thickness below 0.1 mm or a finger count that
+  isn't a whole number of at least 2) are errors, and fail the check. The design keeps its
+  last good value meanwhile, so its parts and report disagree with the variable until it's fixed.
 
 ## Changing an open design
 
