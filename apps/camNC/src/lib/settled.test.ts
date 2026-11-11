@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { noteDocumentChange, settledSnapshot, trackCalls, trackPending } from './settled';
+import { noteDocumentChange, settledSnapshot, trackCalls, trackPending, trackProbe } from './settled';
 
 const frames = (count: number) =>
   new Promise<void>(resolve => {
@@ -50,5 +50,21 @@ describe('settled signal', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
     expect(settledSnapshot().pending.frame).toBe(1);
     expect((await settled()).pending.frame).toBe(0);
+  });
+
+  it('counts what a probe reports, and a change in it as a change still to be drawn', async () => {
+    await settled();
+    let views = 1;
+    trackProbe('render', () => views);
+    try {
+      expect(settledSnapshot().pending.render).toBe(1);
+      await frames(3);
+      expect(settledSnapshot().pending).toMatchObject({ render: 1, frame: 0 });
+      views = 0;
+      expect(settledSnapshot().pending).toMatchObject({ render: 0, frame: 1 });
+      expect((await settled()).pending.frame).toBe(0);
+    } finally {
+      trackProbe('render', () => 0);
+    }
   });
 });
