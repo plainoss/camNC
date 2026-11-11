@@ -2,6 +2,7 @@ import { useDesignUnits } from './designUnits';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   newCadId,
+  numberedCadCopy,
   mateMove,
   unmovedPick,
   cadDirectionVector,
@@ -157,7 +158,8 @@ export function TransformDialog({
               ? candidate
               : {
                   ...candidate,
-                  copies: [...(candidate.copies ?? []), { id: newCopyId }],
+                  // The next free number, so the part's other copies keep theirs.
+                  copies: [...(candidate.copies ?? []), numberedCadCopy(candidate, { id: newCopyId })],
                 }
           ),
         },

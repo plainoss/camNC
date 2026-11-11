@@ -6,13 +6,20 @@ import { TransformDialog, type CadConnectorPick } from './PartFeatureDialogs';
 
 afterEach(cleanup);
 
-function setup(pattern = false) {
+function setup(pattern = false, count = 2) {
   const document = createPlateDocument({ width: 200, height: 100 });
   const part = document.parts[0]!;
   part.drawnOn = { on: { plane: 'top' }, offset: 0 };
   if (pattern) {
-    part.pattern = { id: 'pattern', axis: 'z', count: 2, spacing: 300 };
-    part.copies = [{ id: 'pattern:1', pattern: 'pattern', placement: { position: [0, 0, 300], rotation: [0, 0, 0, 1] } }];
+    part.pattern = { id: 'pattern', axis: 'z', count, spacing: 300 };
+    part.copies = Array.from({ length: count - 1 }, (_, i) => ({
+      id: `pattern:${i + 1}`,
+      pattern: 'pattern',
+      placement: {
+        position: [0, 0, 300 * (i + 1)] as [number, number, number],
+        rotation: [0, 0, 0, 1] as [number, number, number, number],
+      },
+    }));
   }
   const preview = vi.fn<(document: CadDocument | null) => void>();
   const save = vi.fn();
@@ -207,4 +214,14 @@ it('previews bare cm moves on an already moved part and stores explicit units fo
   await waitFor(() => expect(preview.mock.calls.at(-1)?.[0]?.parts[0]?.moved).toMatchObject({ by: [120, 0, 0] }));
   const moved = preview.mock.calls.at(-1)![0]!.parts[0]!.moved!;
   expect('by' in moved && parseCadValue(moved.byExpressions![0]!)).toMatchObject({ value: 120 });
+});
+
+it('numbers a new copy after the pattern copies, in the preview and as saved', async () => {
+  const { latest, save } = setup(true, 3);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Copy part' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'X' }), { target: { value: '10' } });
+  await waitFor(() => expect(latest()?.parts[0]?.copies?.find(copy => !copy.pattern)?.number).toBe(4));
+  fireEvent.click(screen.getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(save).toHaveBeenCalled());
+  expect(save.mock.calls[0]?.[0].parts[0].copies.find((copy: { pattern?: string }) => !copy.pattern).number).toBe(4);
 });
