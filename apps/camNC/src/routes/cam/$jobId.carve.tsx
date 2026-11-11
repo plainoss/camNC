@@ -8,6 +8,9 @@ import { carvingProblem, itemName, kVBits, placeItem, withItems, type CarvingArt
 import { carvingBounds as bounds, carvingPath as pathOf, centred, freeSpot } from '@/cam/carvingView';
 import { outlineArt } from '@/cam/carvingOutline';
 import { CarvingAssistant } from '@/cam/carvingAssistant/CarvingAssistant';
+import { CarvingAssistantBoardLayer } from '@/cam/carvingAssistant/BoardLayer';
+import { CarvingAssistantPromptBar } from '@/cam/carvingAssistant/PromptBar';
+import { useCarvingAssistant } from '@/cam/carvingAssistant/useCarvingAssistant';
 import { applyCarvingProposal, generatedCarvingProblem, type CarvingProposal } from '@/cam/carvingAssistant/proposal';
 import { CarvingInlineText as InlineText } from '@/cam/CarvingInlineText';
 import { camKeys, useCamJob, useSaveCamJob } from '@/cam/camQueries';
@@ -76,7 +79,6 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const replaceId = useRef<string | null>(null);
   // The browser's file chooser can take a moment to appear, so the SVG button shows it is opening until the chooser closes.
   const [choosing, setChoosing] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(false);
   useEffect(() => {
     if (!choosing) return;
     const input = svgInput.current;
@@ -153,6 +155,12 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     });
     setSelectedId(proposal.item.id);
   };
+  const assistant = useCarvingAssistant({
+    job,
+    selectedId,
+    disabled: outlining || !!dragged || !!resized || !!inlineId,
+    onApply: applyAssistant,
+  });
   const updateItem = (id: string, change: Partial<CarvingItemV1>) => {
     record();
     commitItem(id, change);
@@ -602,6 +610,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                   </text>
                 </g>
               )}
+              {assistant.open && <CarvingAssistantBoardLayer session={assistant} height={size.h} />}
             </g>
             {editing && editing.id === inlineId && editing.art.kind === 'text' && !dragged && (
               <InlineText
@@ -664,6 +673,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               XY zero · lower left
             </text>
           </svg>
+          {assistant.open && <CarvingAssistantPromptBar session={assistant} />}
           {editing &&
             !dragged &&
             editing.id !== inlineId &&
@@ -765,7 +775,15 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               <Button variant="outline" size="sm" aria-busy={choosing} onClick={() => chooseSvg(null)}>
                 {choosing ? <LoadingSpinner className="size-4" aria-label="Opening file chooser" /> : <Image />} SVG
               </Button>
-              <Button variant="outline" size="sm" aria-expanded={assistantOpen} onClick={() => setAssistantOpen(open => !open)}>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-expanded={assistant.open}
+                onClick={() => {
+                  // The lettering's bar would cover the box; generated artwork stays selected to be reworked.
+                  if (!assistant.open && !selected?.generated) select(null);
+                  assistant.setOpen(!assistant.open);
+                }}>
                 Assistant
               </Button>
             </div>
@@ -797,14 +815,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               />
             </div>
           </div>
-          {assistantOpen && (
-            <CarvingAssistant
-              job={job}
-              selectedId={selectedId}
-              disabled={outlining || !!dragged || !!resized || !!inlineId}
-              onApply={applyAssistant}
-            />
-          )}
+          {assistant.open && <CarvingAssistant job={job} session={assistant} />}
           <ul aria-label="Items" className="grid gap-1">
             {carving.items.map(item => (
               <li key={item.id} className={cn('flex items-center rounded-md', selectedId === item.id && 'bg-muted')}>
