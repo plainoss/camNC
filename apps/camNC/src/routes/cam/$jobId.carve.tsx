@@ -3,6 +3,7 @@ import { CamPage } from '@/cam/CamPage';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { NumberInput } from '@/cam/NumberInput';
 import { CarvingArtFields } from '@/cam/CarvingArtFields';
+import { CarvingCutoutBar, CarvingCutoutLine, CarvingCutoutToggle, kCutoutSelection } from '@/cam/CarvingCutout';
 import { carvingProblem, itemName, kVBits, placeItem, withItems, type CarvingArt, type CarvingItemV1, type CarvingV1 } from '@/cam/carving';
 import { carvingBounds as bounds, carvingPath as pathOf, centred, freeSpot } from '@/cam/carvingView';
 import { outlineArt } from '@/cam/carvingOutline';
@@ -288,7 +289,10 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
         e.preventDefault();
-        deleteItem(selectedId);
+        if (selectedId === kCutoutSelection) {
+          saveCarving({ ...carving, cutout: undefined });
+          select(null);
+        } else deleteItem(selectedId);
       }
     };
     window.addEventListener('keydown', keydown);
@@ -526,6 +530,14 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
             )}
             {/* While the board's bottom edge is dragged, the items stay with its top edge (`setBoard`). */}
             <g transform={`translate(0 ${saved.h - size.h})`}>
+              <CarvingCutoutLine
+                carving={carving}
+                size={size}
+                selected={selectedId === kCutoutSelection}
+                onSelect={() => select(kCutoutSelection)}
+                onChange={cutout => saveCarving({ ...carving, cutout })}
+                toMm={toMm}
+              />
               {/* Each item's box takes a click anywhere inside it, not only on its ink; under all the ink, so ink still picks its own item. */}
               {carving.items.map(item => {
                 const shownItem = dragged?.id === item.id ? dragged : item;
@@ -715,6 +727,25 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 </SelectionBar>
               );
             })()}
+          {selectedId === kCutoutSelection &&
+            carving.cutout &&
+            !resized &&
+            (() => {
+              // Above the cut line.
+              const at = allBox && toView({ x: (allBox.x0 + allBox.x1) / 2, y: allBox.y1 + carving.cutout.margin + 4 });
+              return (
+                at && (
+                  <CarvingCutoutBar
+                    carving={{ ...carving, cutout: carving.cutout }}
+                    at={at}
+                    onChange={cutout => {
+                      saveCarving({ ...carving, cutout });
+                      if (!cutout) select(null);
+                    }}
+                  />
+                )
+              );
+            })()}
           <div className="absolute top-3 right-3 flex gap-1 rounded-md border bg-background/90 p-0.5 shadow-sm">
             <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!undo} onClick={undo} className={kToolButton}>
               <Undo2 className="size-[18px]" />
@@ -844,6 +875,16 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               <span className="block text-xs text-muted-foreground">Otherwise the V-bit clears them: one bit, slower.</span>
             </span>
           </label>
+          <hr />
+          <CarvingCutoutToggle
+            carving={carving}
+            taped={board?.taped !== false}
+            bitName={flatBit.name ?? `⌀${flatBit.diameter} flat bit`}
+            onChange={cutout => {
+              saveCarving({ ...carving, cutout });
+              select(cutout ? kCutoutSelection : null);
+            }}
+          />
           <hr />
           <h3 className="font-medium">Board</h3>
           <div className="grid grid-cols-3 gap-2">
