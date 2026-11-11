@@ -136,6 +136,41 @@ describe('part STEP export', () => {
   });
 });
 
+describe('part STEP walls through a pocket depth', () => {
+  // A panel with filleted corners, two through holes and a pocket in the middle that touches none of them.
+  const thickness = 18;
+  const source = {
+    thickness,
+    outline: rounded(0, 0, 400, 300, 25),
+    holes: [circle(60, 60, 5), circle(340, 240, 17.5)],
+    cuts: [{ id: 'pocket', from: 0, to: 6, through: false, outline: rect(150, 100, 250, 200), islands: [] }] as SidedCut[],
+  };
+
+  it('writes each wall, fillet and hole as one face from top to bottom', async () => {
+    const { features, below } = profileFeatures(source);
+    const brep = partBrep(features, below);
+    expect(brepProblems(brep)).toEqual([]);
+    const step = writeStep([{ name: 'Panel', solids: [{ brep }] }], { timestamp: '2026-11-11T00:00:00' });
+    // Top, bottom, four outer walls, the pocket floor and its four walls; four fillets and each hole as two half cylinders.
+    expect(count(step, 'PLANE')).toBe(11);
+    expect(count(step, 'CYLINDRICAL_SURFACE')).toBe(8);
+    expect(count(step, 'ADVANCED_FACE')).toBe(19);
+    const sides = brep.faces.filter(face => face.surface.kind === 'cylinder' || face.surface.normal[2] === 0);
+    const heights = (face: (typeof brep.faces)[number]) =>
+      face.loops.flat().flatMap(({ edge }) => [brep.edges[edge]!.start, brep.edges[edge]!.end].map(v => brep.points[v]![2]));
+    // Outer walls, fillets and holes run from the bottom to the top; the pocket's walls stop at its floor.
+    const outer = sides.filter(face => Math.min(...heights(face)) === 0);
+    expect(outer).toHaveLength(12);
+    expect(outer.every(face => Math.max(...heights(face)) === thickness)).toBe(true);
+    expect(sides.filter(face => Math.min(...heights(face)) === thickness - 6)).toHaveLength(4);
+    // No vertex is left over at the pocket floor's height on the outer walls.
+    expect(brep.points.filter(p => p[2] === thickness - 6)).toHaveLength(4);
+    const { bodies } = await loadStep(new TextEncoder().encode(step));
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]!.mesh.faceRanges).toHaveLength(19);
+  });
+});
+
 describe('part STEP export with random cuts', () => {
   /** Small seeded generator, so a failing case can be replayed by its seed. */
   const random = (seed: number) => () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
