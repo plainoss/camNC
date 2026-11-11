@@ -88,6 +88,7 @@ vi.mock('@/cad/CadEditor', () => ({
         return true;
       },
       prepareDocument: () => (state.prepared === undefined ? current.current : state.prepared),
+      rolledTo: () => null,
       finish: async () => {
         state.finishRequests();
         if (state.editorBlocked) {

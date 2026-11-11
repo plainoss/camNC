@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { addPartCopy, createCadPart, createPlateDocument, type CadDocument } from '@wbcnc/cad';
+import { addPartCopy, createCadDocument, createCadPart, createPlateDocument, designSteps, type CadDocument } from '@wbcnc/cad';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PartsList } from '../PartsList';
@@ -122,5 +122,55 @@ it('says why when there is nothing to export', async () => {
   const dialog = screen.getByRole('dialog', { name: 'Export parts' });
   await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
   expect(within(dialog).getByRole('alert').textContent).toMatch(/no parts/i);
+  expect(files).toEqual([]);
+});
+
+it('exports what the view shows after Roll to here, and says that what is past the bar is left out', async () => {
+  const document = design();
+  const [plate, shelf] = document.parts;
+  // The bar just after the plate's Extrude: its copy and the shelf come later.
+  const rolledTo = designSteps(document).find(step => step.kind === 'extrude' && step.partId === plate!.id)!.id;
+  const files = captureDownloads();
+  render(<StudioExportButton design={() => document} rolledTo={() => rolledTo} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Export parts' });
+  expect(within(dialog).getByText(/rollback bar/)).toBeTruthy();
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+  expect(files.map(file => file.name)).toEqual(['Box.step']);
+  expect(products(await files[0]!.text)).toEqual([plate!.name]);
+  cleanup();
+
+  // A rolled-back part's own row refuses, rather than writing what the view leaves out.
+  render(
+    <PartsList
+      rows={[{ key: shelf!.id, part: shelf!, name: shelf!.name }]}
+      document={document}
+      rolledTo={rolledTo}
+      hidden={false}
+      studio
+      selectedKey={undefined}
+      hiddenParts={new Set()}
+      onToggleHidden={() => undefined}
+      trouble={() => null}
+      onPick={() => undefined}
+      onRename={() => undefined}
+    />
+  );
+  fireEvent.contextMenu(screen.getByRole('button', { name: /^Shelf/ }), { clientX: 10, clientY: 10 });
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Export…' }));
+  const row = screen.getByRole('dialog', { name: 'Export parts' });
+  await userEvent.click(within(row).getByRole('button', { name: 'Download' }));
+  expect(within(row).getByRole('alert').textContent).toMatch(/past the rollback bar/);
+  expect(files).toHaveLength(1);
+});
+
+it('says a new design has no parts to export, not that its placeholder sketch needs fixing', async () => {
+  const document = { ...createCadDocument('New'), parts: [createCadPart()] };
+  const files = captureDownloads();
+  render(<StudioExportButton design={() => document} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Export parts' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+  expect(within(dialog).getByRole('alert').textContent).toBe('There are no parts to export.');
   expect(files).toEqual([]);
 });

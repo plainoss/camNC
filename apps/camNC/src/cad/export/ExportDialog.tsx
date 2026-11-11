@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { sketchToDxf, sketchToSvg, type CadDocument, type CadLengthUnit, type CadSketch } from '@wbcnc/cad';
+import { sketchExportCurves, sketchToDxf, sketchToSvg, type CadDocument, type CadLengthUnit, type CadSketch } from '@wbcnc/cad';
 import { Button } from '@wbcnc/ui/components/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@wbcnc/ui/components/dialog';
 import { downloadText, exportFileName } from './downloadText';
@@ -15,6 +15,8 @@ export type ExportTarget =
       /** One part or copy; the whole studio, shown parts only, without it. */
       only?: { partId: string; copyId?: string };
       hidden?: ReadonlySet<string>;
+      /** The document is the design at the view's rollback bar, so what's past it is left out. */
+      rolledBack?: boolean;
     };
 
 type Format = 'dxf' | 'svg' | 'step';
@@ -44,6 +46,7 @@ export function ExportDialog({
   /** Parts were left out and the person has been told: the next Download writes the rest. */
   const [confirmedPartial, setConfirmedPartial] = useState(false);
   const parts = target?.kind === 'parts';
+  const empty = target?.kind === 'sketch' ? emptySketchReason(target.sketch, construction) : null;
   // Each export starts from its own name and the design's unit; a sketch's format and options carry over.
   useEffect(() => {
     if (!target) return;
@@ -61,14 +64,20 @@ export function ExportDialog({
       const fileName = exportFileName(name, 'step');
       const result = studioStep(target.document, { only: target.only, hidden: target.hidden, unit, fileName });
       const why = result.problems.map(({ name, message }) => `${name}: ${message}`).join(' ');
-      if (!result.parts.length) return setProblem(why || 'There are no parts to export.');
+      if (!result.parts.length)
+        return setProblem(
+          target.only && target.rolledBack
+            ? 'This part is past the rollback bar, so the view leaves it out. Roll to end to export it.'
+            : why || 'There are no parts to export.'
+        );
       // A file missing parts is only written once the person has seen which.
       if (why && !confirmedPartial) {
         setConfirmedPartial(true);
         return setProblem(`These are left out: ${why}`);
       }
       text = result.text;
-    } else
+    } else if (empty) return;
+    else
       text =
         format === 'dxf'
           ? sketchToDxf(target.sketch, { unit, construction, splinesAsPolylines: polylines })
@@ -85,9 +94,11 @@ export function ExportDialog({
           <DialogDescription>
             {!parts
               ? 'Download the sketch’s curves at full size, in its own plane.'
-              : target.only
-                ? 'Download this part as a solid, where it is in the studio.'
-                : 'Download every shown part as a solid, where it is in the studio.'}
+              : `${
+                  target.only
+                    ? 'Download this part as a solid, where it is in the studio.'
+                    : 'Download every shown part as a solid, where it is in the studio.'
+                }${target.rolledBack ? ' As the view, it stops at the rollback bar: what’s past it is left out.' : ''}`}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -147,14 +158,24 @@ export function ExportDialog({
               Export splines as polylines
             </label>
           )}
-          {problem && (
+          {(problem ?? empty) && (
             <p role="alert" className="text-sm text-destructive">
-              {problem}
+              {problem ?? empty}
             </p>
           )}
-          <Button type="submit">{confirmedPartial ? 'Download without them' : 'Download'}</Button>
+          <Button type="submit" disabled={!!empty}>
+            {confirmedPartial ? 'Download without them' : 'Download'}
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
   );
+}
+
+/** Why a sketch export would write a blank file, or null when it has curves to write. */
+function emptySketchReason(sketch: CadSketch, construction: boolean): string | null {
+  if (sketchExportCurves(sketch, construction).length) return null;
+  return sketchExportCurves(sketch, true).length
+    ? 'Every curve in this sketch is construction geometry. Turn on Include construction geometry to export it.'
+    : 'This sketch has no curves to export. Draw some in it first.';
 }

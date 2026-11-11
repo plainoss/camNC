@@ -597,7 +597,7 @@ export function CadEditor({
       (featureDialog?.kind === 'pattern' ? featureDialog : null)
   );
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
-  const { rollbackStep, shownDocument, pastRollback, solveFeedback, apartIds } = useFeaturePreview({
+  const { rollbackStep, rolledByUser, shownDocument, pastRollback, solveFeedback, apartIds } = useFeaturePreview({
     document:
       pointPicker.onPick && transformDialog ? doc : studioPreview.document === doc ? extrusionDepth.document : studioPreview.document,
     enabled: studioSession && showWorkspace,
@@ -1719,6 +1719,7 @@ export function CadEditor({
   useImperativeHandle(controller, () => ({
     finish,
     prepareDocument,
+    rolledTo: () => rolledByUser,
     updateSettings: settings => {
       const prepared = settings.lengthUnit === documentRef.current.lengthUnit ? documentRef.current : prepareDocument();
       if (!prepared) return false;
@@ -2219,6 +2220,7 @@ export function CadEditor({
       </div>
       <PartsList
         document={doc}
+        rolledTo={rolledByUser}
         onSketchCopy={onEditFaceSketch && ((partId, copyId, face) => faceEditor.create(face, undefined, { partId, copyId }))}
         onDetachCopy={(partId, copyId) => {
           const result = detachStudioCopy(documentRef.current, partId, copyId);

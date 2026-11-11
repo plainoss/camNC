@@ -78,5 +78,5 @@ export function useFeaturePreview({
     setCheckEpoch(epoch => epoch + 1);
   }, [extrudingId, lastCheckedRevision, setCheckEpoch]);
   const solveFeedback = useCallback((result: CadSolveResult) => withoutApartRegionProblem(result, extruding.current), []);
-  return { rollbackStep, shownDocument, pastRollback, solveFeedback, apartIds };
+  return { rollbackStep, rolledByUser, shownDocument, pastRollback, solveFeedback, apartIds };
 }

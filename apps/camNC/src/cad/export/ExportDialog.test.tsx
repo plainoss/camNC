@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
+import { createCadPart, createPlateDocument, type CadDocument } from '@wbcnc/cad';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { StudioFeatureList } from '../StudioFeatureList';
@@ -84,4 +84,45 @@ it('offers export only on sketch rows', async () => {
   fireEvent.contextMenu(screen.getByRole('button', { name: /^Extrude · / }), { clientX: 10, clientY: 10 });
   expect(screen.getByRole('menuitem', { name: 'Roll to here' })).toBeTruthy();
   expect(screen.queryByRole('menuitem', { name: 'Export as DXF/SVG…' })).toBeNull();
+});
+
+it('refuses a sketch export with only construction curves, and downloads nothing', async () => {
+  const plate = createPlateDocument({ width: 120, height: 80, thickness: 18 });
+  // Every curve made construction, as Q does.
+  const [part] = plate.parts;
+  const sketch = { ...part!.sketch, entities: part!.sketch.entities.map(entity => ({ ...entity, construction: true })) };
+  setup({ ...plate, parts: [{ ...part!, sketch }] });
+  const files = captureDownloads();
+  fireEvent.contextMenu(screen.getByRole('button', { name: /^Sketch · / }), { clientX: 10, clientY: 10 });
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Export as DXF/SVG…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Export sketch' });
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/Include construction geometry/);
+  for (const format of ['svg', 'dxf']) {
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Format' }), format);
+    expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Download' }).disabled).toBe(true);
+    // Enter in the name field submits the form too, and writes nothing.
+    fireEvent.submit(within(dialog).getByRole('textbox', { name: 'File name' }).closest('form')!);
+  }
+  expect(files).toEqual([]);
+  expect(screen.getByRole('dialog', { name: 'Export sketch' })).toBeTruthy();
+  // With construction geometry included there is something to write again.
+  await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Include construction geometry' }));
+  expect(within(dialog).queryByRole('alert')).toBeNull();
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+  expect(files).toHaveLength(1);
+});
+
+it('refuses to export an empty sketch', async () => {
+  const document = createPlateDocument();
+  // A sketch started on Top, with nothing drawn in it yet.
+  const empty = { ...createCadPart('Empty'), drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
+  setup({ ...document, parts: [...document.parts, empty] });
+  const files = captureDownloads();
+  fireEvent.contextMenu(screen.getAllByRole('button', { name: /^Sketch · / }).at(-1)!, { clientX: 10, clientY: 10 });
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Export as DXF/SVG…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Export sketch' });
+  expect(within(dialog).getByRole<HTMLInputElement>('textbox', { name: 'File name' }).value).toBe('Sketch · Empty');
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/no curves to export/);
+  expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Download' }).disabled).toBe(true);
+  expect(files).toEqual([]);
 });

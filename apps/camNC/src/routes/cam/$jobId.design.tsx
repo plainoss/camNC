@@ -333,7 +333,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
               onClick={saveToFile}>
               <Download /> Save to file
             </Button>
-            <StudioExportButton design={currentDesign} />
+            <StudioExportButton design={currentDesign} rolledTo={() => editor.current?.rolledTo() ?? null} />
           </>
         }
       />
