@@ -1,10 +1,21 @@
-import { createCadDocument, createCadFolder, createPlateDocument, parseCadDocument, type CadDocument } from '@wbcnc/cad';
+import {
+  createCadDocument,
+  createCadFolder,
+  createPlateDocument,
+  edgeFilletProblems,
+  evaluateCadPart,
+  parseCadDocument,
+  polygonArea,
+  type CadDocument,
+  type CadPart,
+} from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
 import { designSteps } from '@wbcnc/cad';
 import { reorderDrop, reorderedSteps } from './reorderSteps';
 
 const plate = (name: string) => ({ ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name });
 const step = (document: CadDocument, id: string) => designSteps(document).find(candidate => candidate.id === id)!;
+const rounded = (name: string, ids: string[]) => ({ ...plate(name), fillets: ids.map(id => ({ id, corners: [], radius: 5 })) });
 
 describe('reordering steps', () => {
   it('moves a part’s steps together, ahead of the part dropped on', () => {
@@ -72,7 +83,6 @@ describe('where a dragged step would land', () => {
 });
 
 describe('reordering fillets', () => {
-  const rounded = (name: string, ids: string[]) => ({ ...plate(name), fillets: ids.map(id => ({ id, corners: [], radius: 5 })) });
   const cupboard = () => {
     const [top, back, shelf] = [plate('Top'), rounded('Back', ['round']), plate('Shelf')];
     return { top, back, shelf, document: { ...createCadDocument(), parts: [top, back, shelf] } as CadDocument };
@@ -139,5 +149,77 @@ describe('reordering fillets', () => {
     expect(reorderDrop(document, 'early', `${top.id}:sketch`)).toEqual({
       error: 'Sketch on the top · Back is on Back’s faces, so it stays with Back’s steps.',
     });
+  });
+
+  it('draws the line where a step that goes last lands, not at the row it’s dropped on', () => {
+    const back = { ...rounded('Back', ['first', 'second']), copies: [{ id: 'one' }, { id: 'two' }] };
+    const faces = ['early', 'late'].map(id => ({
+      type: 'sketch' as const,
+      id,
+      on: 'top' as const,
+      sketch: { ...back.sketch, id: `${id}-sketch` },
+    }));
+    const document: CadDocument = { ...createCadDocument(), parts: [{ ...back, features: faces }] };
+    // A face sketch dropped on the second fillet goes last of the face steps, just ahead of the first fillet.
+    expect(reorderDrop(document, 'early', 'second')).toEqual({ before: 'first' });
+    expect(reorderDrop(document, 'early', 'two')).toEqual({ before: 'first' });
+    // A fillet dropped on the second copy goes last of the fillets, just ahead of the first copy.
+    expect(reorderDrop(document, 'first', 'two')).toEqual({ before: 'one' });
+  });
+
+  it('names the Transform a face sketch follows', () => {
+    const back: CadPart = { ...rounded('Back', ['round']), moved: { by: [10, 0, 0] } };
+    const face = { type: 'sketch' as const, id: 'face', on: 'top' as const, sketch: { ...back.sketch, id: 'face-sketch' } };
+    const document: CadDocument = { ...createCadDocument(), parts: [{ ...back, features: [face] }] };
+    expect(reorderDrop(document, 'face', `${back.id}:extrude`)).toEqual({
+      error: 'Sketch on the top · Back is on Back’s faces, so it comes after Transform · Back.',
+    });
+    expect(reorderDrop(document, 'round', 'face')).toEqual({
+      error: 'Fillet · Back rounds Back’s outline, so it moves only among its fillets.',
+    });
+  });
+
+  it('swaps which of two fillets on the same corner rounds it', () => {
+    const part = plate('Back');
+    const corner = part.sketch.entities.find(entity => entity.type === 'point' && entity.x === 100 && entity.y === 50)!.id;
+    const filleted = {
+      ...part,
+      fillets: [
+        { id: 'small', corners: [corner], radius: 5 },
+        { id: 'large', corners: [corner], radius: 20 },
+      ],
+    };
+    const document: CadDocument = { ...createCadDocument(), parts: [filleted] };
+    const area = (made: CadPart) => Math.abs(polygonArea(evaluateCadPart(made).part!.outline));
+    const cornerArea = (radius: number) => 5000 - radius * radius * (1 - Math.PI / 4);
+    expect(area(filleted)).toBeCloseTo(cornerArea(5), 0);
+    expect(edgeFilletProblems(filleted).map(problem => problem.filletId)).toEqual(['large']);
+    const swapped = reorderedSteps(document, step(document, 'large'), step(document, 'small'));
+    if ('error' in swapped) throw new Error(swapped.error);
+    const reordered = swapped.document.parts[0]!;
+    expect(area(reordered)).toBeCloseTo(cornerArea(20), 0);
+    expect(edgeFilletProblems(reordered).map(problem => problem.filletId)).toEqual(['small']);
+  });
+});
+
+describe('reordering around a Remove', () => {
+  it('keeps a part after the bodies its Remove picked', () => {
+    const [board, other] = [plate('Board'), plate('Other')];
+    const pocket = { ...plate('Pocket'), remove: { depth: 6, targets: [board.id] } };
+    const document: CadDocument = { ...createCadDocument(), parts: [board, other, pocket] };
+    expect(reorderDrop(document, `${pocket.id}:extrude`, `${board.id}:sketch`)).toEqual({
+      error: 'Pocket is built on Board, so it comes after it.',
+    });
+  });
+
+  it('won’t take a body past a plane Remove that cuts every body before it', () => {
+    const [board, shelf] = [rounded('Board', ['round']), plate('Shelf')];
+    const pocket = { ...plate('Pocket'), drawnOn: { on: { plane: 'top' as const }, offset: 0 }, remove: { depth: 6 } };
+    const document: CadDocument = { ...createCadDocument(), parts: [board, pocket, shelf] };
+    const why = 'Extrude · Pocket cuts Board, so Board comes before it.';
+    expect(reorderDrop(document, 'round', `${shelf.id}:sketch`)).toEqual({ error: why });
+    expect(reorderDrop(document, `${pocket.id}:extrude`, `${board.id}:sketch`)).toEqual({ error: why });
+    // A body moved ahead of it is cut too, which is a move the Remove can take.
+    expect(reorderDrop(document, `${shelf.id}:extrude`, `${pocket.id}:sketch`)).toEqual({ before: `${pocket.id}:sketch` });
   });
 });

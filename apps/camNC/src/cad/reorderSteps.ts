@@ -1,10 +1,33 @@
-import { cadFolderForPart, cadFolderIssue, designSteps, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { cadFolderForPart, cadFolderIssue, designSteps, isCadBody, type CadDocument, type CadPart } from '@wbcnc/cad';
 import type { DesignStep } from '@wbcnc/cad';
 
 /** The parts a part is built on: drawn on, sketched from, added to or cut into. They come before it. */
 function builtOn(part: CadPart): string[] {
   const on = part.drawnOn?.on;
-  return [...(on && !('plane' in on) ? [on.partId] : []), ...(part.sketchOf ? [part.sketchOf] : []), ...(part.addTo ? [part.addTo] : [])];
+  return [
+    ...(on && !('plane' in on) ? [on.partId] : []),
+    ...(part.sketchOf ? [part.sketchOf] : []),
+    ...(part.addTo ? [part.addTo] : []),
+    ...(part.remove?.targets ?? []),
+  ];
+}
+
+/**
+ * Why a new part order would lose a cut: an Extrude → Remove with no picked scope cuts every body made before it (see
+ * removalTargets), so a body taken from before it to after it would silently stop being cut.
+ */
+function lostRemoval(document: CadDocument, parts: CadPart[]): string | null {
+  const before = new Map(document.parts.map((part, i) => [part.id, i]));
+  const after = new Map(parts.map((part, i) => [part.id, i]));
+  const label = (part: CadPart) => designSteps(document).find(step => step.id === `${part.id}:extrude`)?.label ?? part.name;
+  for (const remover of document.parts) {
+    const on = remover.drawnOn?.on;
+    if (!remover.remove || remover.remove.targets || (on && 'partId' in on)) continue;
+    for (const body of document.parts)
+      if (isCadBody(document, body) && before.get(body.id)! < before.get(remover.id)! && after.get(body.id)! > after.get(remover.id)!)
+        return `${label(remover)} cuts ${body.name}, so ${body.name} comes before it.`;
+  }
+  return null;
 }
 
 const partLevel = (step: DesignStep) =>
@@ -43,6 +66,8 @@ export function reorderedSteps(
       for (const base of builtOn(part))
         if ((index.get(base) ?? -1) > index.get(part.id)!)
           return { error: `${part.name} is built on ${name(base)}, so it comes after it.` };
+    const lost = lostRemoval(document, parts);
+    if (lost) return { error: lost };
     const next = {
       ...document,
       revision: document.revision + 1,
@@ -58,7 +83,10 @@ export function reorderedSteps(
     return issue ? { error: issue } : { document: next };
   }
   const part = document.parts.find(candidate => candidate.id === dragged.partId)!;
-  const extrude = designSteps(document).find(step => step.id === `${part.id}:extrude`)?.label ?? `Extrude · ${part.name}`;
+  const own = designSteps(document).filter(step => step.partId === part.id);
+  const extrude = own.find(step => step.kind === 'extrude')?.label ?? `Extrude · ${part.name}`;
+  // Face steps follow the part as it's made and placed: its sketch, extrude and Transform, whichever is last.
+  const made = own.filter(step => step.kind === 'sketch' || step.kind === 'extrude' || (step.kind as string) === 'move').at(-1);
   if (featureLevel(dragged)) {
     if (dragged.partId !== target.partId)
       return { error: `${dragged.label} is on ${part.name}’s faces, so it stays with ${part.name}’s steps.` };
@@ -66,7 +94,7 @@ export function reorderedSteps(
     // Dropped on a later step of its part, a fillet, copy or pattern, it goes last of the part's sketches and cuts.
     if (target.kind === 'fillet' || target.kind === 'copy' || target.kind === 'pattern')
       return movedFeature(document, part, dragged.id, null);
-    return { error: `${dragged.label} is on ${part.name}’s faces, so it comes after ${extrude}.` };
+    return { error: `${dragged.label} is on ${part.name}’s faces, so it comes after ${made?.label ?? extrude}.` };
   }
   if (dragged.kind === 'fillet') {
     if (target.kind === 'fillet') return movedFillet(document, part, dragged.id, target.id);
@@ -74,7 +102,7 @@ export function reorderedSteps(
     if (target.kind === 'copy' || target.kind === 'pattern') return movedFillet(document, part, dragged.id, null);
     if (target.kind === 'sketch' || target.kind === 'extrude')
       return { error: `${dragged.label} rounds the edges ${extrude} makes, so it comes after it.` };
-    return { error: `${dragged.label} rounds ${part.name}’s edges, so it stays with its fillets, after ${target.label}.` };
+    return { error: `${dragged.label} rounds ${part.name}’s outline, so it moves only among its fillets.` };
   }
   return { error: 'That step can’t go there: a part’s steps move together.' };
 }
@@ -138,10 +166,14 @@ export function reorderDrop(
   const order = designSteps(result.document).map(step => step.id);
   // A drop that leaves the order as it was isn't a move.
   if (order.every((id, i) => id === steps[i]?.id)) return null;
-  // Within its part the step lands just ahead of the step it's dropped on; on another part, the part's steps land ahead
-  // of the first of that part's. Named from the list as it stands, not from what follows the moved run afterwards: a Cut
-  // parts step listed after the moved part moves along with it, and the line would then be drawn at that Cut's row,
-  // below where the steps land.
-  if (dragged.partId === target.partId) return { before: target.id };
+  // Within its part the step lands just ahead of the step that follows it once moved: the one it's dropped on, or, when
+  // it goes last of its sketches and cuts or its fillets, the step after those. On another part, the part's steps land
+  // ahead of the first of that part's. Named from the list as it stands, not from what follows the moved run afterwards:
+  // a Cut parts step listed after the moved part moves along with it, and the line would then be drawn at that Cut's
+  // row, below where the steps land.
+  if (dragged.partId === target.partId) {
+    const next = order[order.indexOf(dragged.id) + 1];
+    return { before: next && steps.some(step => step.id === next) ? next : target.id };
+  }
   return { before: steps.find(step => step.partId === target.partId && partLevel(step))?.id ?? target.id };
 }
