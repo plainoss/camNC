@@ -69,14 +69,15 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
   if (index < 0) return null;
   const hint = explainPause(lines, index, gcode);
   if (!hint.marker) {
-    if (index === first && !lines.slice(0, first).some(movesOrProbes)) {
+    if (index === first && !memoized(program, 'moves before first pause', () => lines.slice(0, first).some(movesOrProbes))) {
       // FluidNC cannot read past the M0 without Resume. While the furthest it can have read (the reported position plus
       // the window) is short of the first move after it, the bit has not moved; that survives a reload. On a file so
       // large that the window reaches that move, only the bit not having moved since camNC started the job tells.
       // Fusion's M0 comes before its M3: a spindle the controller reports running means the job is past it.
       if (c.spindle === 'on') return null;
       const readTo = (Math.max(c.readTo ?? c.percent, c.percent) / 100) * size;
-      const unmoved = readTo + positionWindow(size) <= beforeFirstMoveAfter(lines, first);
+      const firstMove = memoized(program, 'first move after first pause', () => beforeFirstMoveAfter(lines, first));
+      const unmoved = readTo + positionWindow(size) <= firstMove;
       return unmoved || c.stillSinceStart === true ? hint : null;
     }
     return bitAtOrAbove(lines, index, c) ? hint : null;
@@ -117,6 +118,16 @@ function bitAtOrAbove(lines: Line[], index: number, c: HoldContext) {
  * Z move yet, an offset, homing or probe since (G10, G28, G30, G38, G92), or relative moves (G91) at that point.
  */
 function zBefore(lines: Line[], index: number) {
+  // It reads the whole program up to the M0, and the machine view asks with every report while held.
+  let memo = zBeforeMemo.get(lines);
+  if (!memo) zBeforeMemo.set(lines, (memo = new Map()));
+  if (!memo.has(index)) memo.set(index, readZBefore(lines, index));
+  return memo.get(index)!;
+}
+
+const zBeforeMemo = new WeakMap<Line[], Map<number, { z: number; machine: boolean } | null>>();
+
+function readZBefore(lines: Line[], index: number) {
   let relative = false;
   let last: { z: number; machine: boolean } | null = null;
   for (let i = 0; i < index; i++) {
