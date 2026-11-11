@@ -1,4 +1,4 @@
-import { cadCornerSources, cadFaceFrame } from '@wbcnc/cad';
+import { cadCornerSources, cadFaceFrame, physicalJoinedCopies, type CadDocument } from '@wbcnc/cad';
 import { studioGeometry } from './studioGeometry';
 import { assemblyModel, instanceKey, type AssemblyModel } from './assemblyModel';
 
@@ -58,4 +58,13 @@ export function physicalCornerSources(...[document, frame, except, source]: Para
       physical.delete(key);
   }
   return physical;
+}
+
+/** Whether one physical instance is reflected, including an Add body's copy inherited from a mirrored host copy. */
+export function physicalCopyMirrored(document: CadDocument, partId: string, copyId?: string) {
+  if (!copyId) return false;
+  // Legacy documents keep inherited Add-body copies out of their source, so derive them to find a mirrored host copy.
+  const geometry = studioGeometry(document);
+  const view = geometry.parts ? geometry.document : physicalJoinedCopies(document);
+  return !!view.parts.find(part => part.id === partId)?.copies?.find(copy => copy.id === copyId)?.mirrored;
 }

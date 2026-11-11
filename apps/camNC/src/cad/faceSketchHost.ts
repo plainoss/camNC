@@ -3,7 +3,7 @@ import { hasOutline } from './editorHelpers';
 import { faceSketchScene, partViewSnapshot, type FaceSketchScene, type PartViewSnapshot } from './faceSketchScene';
 import type { StudioCameraRef } from './studioCamera';
 import { assemblyModel } from './assemblyModel';
-import { studioGeometry } from './studioGeometry';
+import { physicalCopyMirrored } from './studioGeometryReaders';
 import { partCameraFromAssembly } from './partAssemblyCamera';
 
 /** All routed face-editor entry points must transfer the visible camera, including editing an existing sketch. */
@@ -27,10 +27,7 @@ export function faceSketchHost(context: {
     if (!camera || !bounds?.height) return;
     // Include the visible row placement of parts not yet attached to an assembly plane.
     const placement = assemblyModel(document).placements.get(copyId ? `${partId}/${copyId}` : partId);
-    const copy = studioGeometry(document)
-      .document.parts.find(part => part.id === partId)
-      ?.copies?.find(copy => copy.id === copyId);
-    const local = placement ? partCameraFromAssembly(camera, placement, copy?.mirrored) : camera;
+    const local = placement ? partCameraFromAssembly(camera, placement, physicalCopyMirrored(document, partId, copyId)) : camera;
     context.partCamera.current = { ...local, key: partId, seq: undefined };
     return { cameraState: context.partCamera, aspect: bounds.width / bounds.height };
   };

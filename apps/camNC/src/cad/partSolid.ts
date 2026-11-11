@@ -12,6 +12,26 @@ import { modelGeometry } from '@/cam/model/modelGeometry';
 import { nativePart } from '@/cam/nativeCadModel';
 import { studioGeometry } from './studioGeometry';
 
+const drafts = new WeakMap<CadDocument, WeakMap<CadPart, CadDocument>>();
+
+/** The document with `part` in place of its saved version; the same document when they agree, so its evaluation is reused. */
+function documentWithDraft(document: CadDocument, part: CadPart): CadDocument {
+  const saved = document.parts.find(candidate => candidate.id === part.id);
+  // Callers often pass an equal copy of the saved part; re-evaluating the whole ordered design for it would be wasted.
+  if (saved === part || (saved && JSON.stringify(saved) === JSON.stringify(part))) return document;
+  const byPart = drafts.get(document) ?? new WeakMap<CadPart, CadDocument>();
+  drafts.set(document, byPart);
+  let draft = byPart.get(part);
+  if (!draft) {
+    draft = {
+      ...document,
+      parts: saved ? document.parts.map(candidate => (candidate.id === part.id ? part : candidate)) : [...document.parts, part],
+    };
+    byPart.set(part, draft);
+  }
+  return draft;
+}
+
 /**
  * The part as it'll be cut, or why it can't be shown. Uses the same mesh CAM reads back. Other parts of `document` cut
  * out of it are cut here too.
@@ -21,7 +41,9 @@ export function partSolid(
   document?: CadDocument,
   copyId?: string
 ): { geometry?: THREE.BufferGeometry; origin?: [number, number]; problem?: string } {
-  const geometry = document && studioGeometry(document);
+  // A drag preview passes a draft of the part, or one not saved yet: evaluate the document with that draft in it.
+  const withDraft = document?.operationOrder !== undefined ? documentWithDraft(document, part) : document;
+  const geometry = withDraft && studioGeometry(withDraft);
   if (geometry?.parts) {
     const source = geometry.document.parts.find(source => source.id === part.id);
     const material = geometry.parts.find(shape => shape.partId === part.id);
