@@ -280,7 +280,6 @@ export function AssistantDock({
   const menuItem = (label: string, action: () => void) => (
     <button
       type="button"
-      role="menuitem"
       disabled={running}
       onClick={event => {
         event.currentTarget.closest('details')?.removeAttribute('open');
@@ -300,7 +299,8 @@ export function AssistantDock({
         )}
         <details className="cad-assistant-menu">
           <summary aria-label="Assistant menu">⋯</summary>
-          <div role="menu">
+          {/* A disclosure of buttons, not an ARIA menu: it has no menu keyboard model, and toolbars own role="menu". */}
+          <div>
             {menuItem('New conversation', newConversation)}
             {menuItem(credentials ? `Connection · ${connectionLabel(credentials.config)}` : 'Connection', () => setView('connection'))}
             {menuItem('Usage, limits and brief', () => setView('settings'))}
