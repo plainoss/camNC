@@ -63,7 +63,14 @@ jobs:
           github_token: ${{ github.token }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-plugins-official.git'
           plugins: 'code-review@claude-plugins-official'
-          prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ env.PR_NUMBER }}'
+          # The plugin stops when Claude already commented, which would make an
+          # "@claude review" re-run a no-op. It also reads CLAUDE.md, which this repo names AGENTS.md.
+          prompt: |
+            /code-review:code-review --comment ${{ github.repository }}/pull/${{ env.PR_NUMBER }}
+
+            Overrides for this repository:
+            - In step 1, skip the "Claude has already commented" check. Earlier review comments never stop this review; this may be a re-review after fixes, so review the current diff and do not repeat findings that earlier comments already raised and that are still unchanged.
+            - Treat every AGENTS.md file as a CLAUDE.md file.
           claude_args: |
             --model sonnet
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*)"
