@@ -4,8 +4,8 @@ import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
 import { faceExtrudeProblem, resolveFaceProfiles } from './faceExtrude';
 import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
-import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
-import { regionGroups } from './regionProfile';
+import { CAD_CHORD_TOLERANCE, evaluateCadPart, pointInPolygon, polygonArea } from './geometry';
+import { areaPoint, regionGroups } from './regionProfile';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart, CadSketch } from './types';
 
@@ -375,9 +375,14 @@ export function newExtrudeOf(document: CadDocument, part: CadPart, name: string)
 
 /**
  * A New extrude of regions that lie apart makes a part of each group of them that touch, as the first is: the first
- * group stays with the extrude, and each other is a part of its own of the same sketch, as thick.
+ * group stays with the extrude, and each other is a part of its own of the same sketch, as thick. `id` names the part
+ * made of each group after the first, by its index, so a preview of the split and the split itself make the same parts.
  */
-export function splitApartRegions(document: CadDocument, partId: string): CadDocument {
+export function splitApartRegions(
+  document: CadDocument,
+  partId: string,
+  id: (groupIndex: number) => string = () => newCadId()
+): CadDocument {
   const part = document.parts.find(candidate => candidate.id === partId);
   if (!part?.regions || part.regions.length < 2 || part.addTo || part.remove) return document;
   const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).filter(region => part.regions!.includes(region.id));
@@ -387,7 +392,7 @@ export function splitApartRegions(document: CadDocument, partId: string): CadDoc
   const made = groups.slice(1).map((group, index): CadPart => {
     const next: CadPart = {
       ...part,
-      id: newCadId(),
+      id: id(index + 1),
       name: `Part ${document.parts.length + index + 1}`,
       sketchOf: owner,
       regions: group.regionIds,
@@ -400,4 +405,21 @@ export function splitApartRegions(document: CadDocument, partId: string): CadDoc
     candidate.id === partId ? [{ ...candidate, regions: groups[0]!.regionIds }, ...made] : [candidate]
   );
   return { ...document, revision: document.revision + 1, parts };
+}
+
+/**
+ * A sketch's regions that are solid when it's extruded as shapes apart: those inside no other's outline, or inside an
+ * even number of them, as an island in a hole is. A region inside another's outline is a hole of it, such as the inside
+ * of a frame or a circle in a panel. Each region is placed by a point of its own area, outside its holes, so a frame
+ * whose hole covers the middle of its outline is still solid.
+ */
+export function solidSketchRegionIds(sketch: CadSketch): string[] {
+  const regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE);
+  return regions
+    .filter(region => {
+      const inside = areaPoint(region);
+      const depth = inside ? regions.filter(other => other !== region && pointInPolygon(inside, other.points)).length : 0;
+      return depth % 2 === 0;
+    })
+    .map(region => region.id);
 }
