@@ -121,7 +121,7 @@ test('the required check rejects a failed, cancelled or skipped dependency', () 
   assert.notEqual(run({ ...light, SIM_RESULT: 'skipped' }).status, 0);
 });
 
-test('CI covers every runtime task and both browser shards, without duplicating other tests', () => {
+test('CI covers every runtime task and every browser shard, without duplicating other tests', () => {
   const { jobs } = parse(read('.github/workflows/ci.yml'));
   const suites = [...jobs.test.strategy.matrix.include, ...jobs.browser.strategy.matrix.include];
   const selected = (tasks, filters) => {
@@ -137,10 +137,11 @@ test('CI covers every runtime task and both browser shards, without duplicating 
   const expected = [
     ...selected(['test'], ['--filter=!@wbcnc/camNC']),
     ...selected(['test:domain', 'test:worker', 'test:licenses', 'test:browser'], ['--filter=@wbcnc/camNC']),
-    '@wbcnc/camNC#test:browser',
+    // One browser shard runs test:browser in the plan above; each further shard runs it again.
+    ...Array(suites.filter(suite => suite.tasks === 'test:browser').length - 1).fill('@wbcnc/camNC#test:browser'),
   ];
   assert.deepEqual(assigned.sort(), expected.sort());
-  assert.deepEqual(suites.filter(suite => suite.tasks === 'test:browser').map(suite => suite.args).sort(), ['--shard=1/2', '--shard=2/2']);
+  assert.deepEqual(suites.filter(suite => suite.tasks === 'test:browser').map(suite => suite.args).sort(), ['--shard=1/3', '--shard=2/3', '--shard=3/3']);
   // Both gates run serially in one job, after its functional tests, and never through turbo's cache.
   assert.deepEqual(suites.map(suite => suite.performance).filter(Boolean), ['pnpm run test:performance']);
   const scripts = JSON.parse(read('package.json')).scripts;
@@ -194,6 +195,16 @@ test('the Mergify queue runs all validation, PRs run the quick suites and main o
   // The queue validated the commit that lands on main, so main only warms caches through the checks job.
   const onMain = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], { event_name: 'push' }));
   assert.deepEqual(onMain, ['checks']);
+  for (const [job, step] of [['test', 'Run tests'], ['specs', 'Run sketch behaviour specs']]) {
+    assert.match(workflow.jobs[job].steps.find(entry => entry.name === step).env.TURBO_FORCE, /schedule/, `${step} must not replay cached results on scheduled runs`);
+  }
+  // Scheduled and manual runs on main run every suite, so Mergify's flaky-test detection sees the tests on main.
+  assert(workflow.on.schedule?.length, 'main must run the full suites on a schedule');
+  for (const event_name of ['schedule', 'workflow_dispatch']) {
+    for (const [id, job] of Object.entries(workflow.jobs)) {
+      assert(runs(job, { event_name, head_ref: '', event: {} }), `${id} must run on ${event_name}`);
+    }
+  }
 });
 
 test('Mergify batches retain the required gate, branch protections and explicit merge consent', () => {

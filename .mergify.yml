@@ -16,6 +16,7 @@ queue_rules:
       # Distinct merge conditions force batch validation after the lighter PR checks.
       - check-success = Tests (app-browser-1)
       - check-success = Tests (app-browser-2)
+      - check-success = Tests (app-browser-3)
       - check-success = Behaviour specs (1/4)
       - check-success = Behaviour specs (2/4)
       - check-success = Behaviour specs (3/4)
@@ -27,3 +28,15 @@ queue_rules:
     batch_max_wait_time: 30 seconds
     # Failed batches are bisected; do not hide failures with automatic CI retries.
     max_checks_retries: 0
+
+# Fixes for failing tests and CI jump the queue: a red test ejects every batch it lands in, so it is fixed first.
+priority_rules:
+  - name: unblock-queue
+    conditions:
+      - or:
+          - label = flaky-test
+          - label = ci-fix
+          - title ~= ^fix\((ci|test)\)
+    priority: high
+    # Batches running without the fix are likely to fail on the same test, so test the fix first.
+    allow_checks_interruption: true

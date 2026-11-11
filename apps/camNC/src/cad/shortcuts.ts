@@ -63,5 +63,14 @@ export const sketchShortcuts: ShortcutSection[] = [
 
 /** Confirmation keeps the open studio sketch; standalone sketch editors keep their own Finish action. */
 export const studioSketchShortcuts: ShortcutSection[] = sketchShortcuts.map(section =>
-  section.title === 'Sketch' ? { ...section, items: [{ label: 'Confirm sketch', key: 'Ctrl/⌘+Enter' }, ...section.items] } : section
+  section.title === 'Sketch'
+    ? {
+        ...section,
+        items: [
+          { label: 'Confirm sketch', key: 'Ctrl/⌘+Enter' },
+          { label: 'Confirm sketch and extrude it', key: 'Shift+E' },
+          ...section.items,
+        ],
+      }
+    : section
 );

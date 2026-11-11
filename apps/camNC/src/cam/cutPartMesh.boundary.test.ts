@@ -75,6 +75,38 @@ describe('the boundary of a part with curved cut outlines', () => {
     geometry.dispose();
   });
 
+  it('keeps the top flat between mortises whose edges are collinear', () => {
+    const outline = [
+        { x: 70, y: 0 },
+        { x: 460, y: 0 },
+        { x: 460, y: 360 },
+        { x: 0, y: 360 },
+        { x: 0, y: 70 },
+      ],
+      cuts = [pocket('left', rect(50, 326, 18, 28), 12), pocket('right', rect(392, 326, 18, 28), 12)],
+      { positions, indices } = cutPartMesh(featuresFromCuts({ thickness: 18, outline, holes: [], cuts }).features);
+    expectClosedBoundary(positions);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(Float32Array.from(positions), 3));
+    geometry.setIndex(new BufferAttribute(indices, 1));
+    const edges = new EdgesGeometry(geometry, 20),
+      lines = edges.getAttribute('position');
+    // Only the mortise rims lie on their shared line; nothing bridges the flat top between them.
+    const bridges = [];
+    for (let i = 0; i < lines.count; i += 2)
+      if (
+        lines.getZ(i) === 18 &&
+        lines.getY(i) === 326 &&
+        lines.getY(i + 1) === 326 &&
+        Math.max(lines.getX(i), lines.getX(i + 1)) > 68 &&
+        Math.min(lines.getX(i), lines.getX(i + 1)) < 392
+      )
+        bridges.push([lines.getX(i), lines.getX(i + 1)]);
+    expect(bridges).toEqual([]);
+    edges.dispose();
+    geometry.dispose();
+  });
+
   it('keeps a circular island wall above the surrounding pocket floor', () => {
     const profile: FlatProfile = {
       thickness: 18,

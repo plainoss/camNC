@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   addPartCut,
   addRectangle,
+  cadVariableProblems,
   createCadDocument,
   createCadPart,
   evaluateCadDocument,
@@ -89,3 +90,14 @@ it.each([false, true, 0, -1, 'off', {}, { diameter: 0 }, { diameter: Infinity },
     expect(evaluateCadDocument(input as CadDocument).diagnostics).toContainEqual(expect.objectContaining({ severity: 'error' }));
   }
 );
+
+it('says on the joined parts when a step diameter variable gives no usable cutter', () => {
+  const original = source().document;
+  let document: CadDocument = { ...original, variables: [{ id: 'cutter', name: 'cutter', expression: '6 mm' }] };
+  document = updatePartCut(document, document.partCuts![0]!.id, { cornerRelief: { diameter: 6, diameterExpression: 'cutter' } });
+  const changed = setCadVariable(document, { id: 'cutter', name: 'cutter', expression: '0 mm' });
+  if ('error' in changed) throw new Error(changed.error);
+  const problems = cadVariableProblems(changed.document).filter(problem => problem.message.startsWith('Cutter diameter cutter'));
+  expect(problems.length).toBeGreaterThan(0);
+  expect(problems[0]!.message).toMatch(/= 0 mm in Cut .*: a cutter diameter must be greater than zero\./);
+});
