@@ -43,6 +43,8 @@ import {
   unpinned,
   withoutPart as without,
   freshBoardFor,
+  moveOnto,
+  moveRefusedNote,
 } from '@/cam/boards/placeOffBoard';
 import { applySetupToAll, prepareGlobalRelayout, restorePhysicalBoardSetup } from '@/cam/boards/globalSetup';
 import { useHoldEditing } from '@/cam/boards/useHoldEditing';
@@ -354,18 +356,13 @@ function BoardsEditor({
       setNote(`${inst.name} is ${+inst.thickness.toFixed(1)} mm thick, board ${target.name} is ${target.thickness} mm.`);
       return false;
     }
-    // Moved by hand: pinned to the target board, so auto-fill leaves it there.
-    saveBoards(
-      boards.map(({ board }) =>
-        board.id === boardId
-          ? {
-              ...without(board, itemId),
-              items: [...board.items.filter(i => i !== itemId), itemId],
-              pinned: [...unpinned(board, itemId), itemId],
-            }
-          : without(board, itemId)
-      )
-    );
+    // Moved by hand: pinned to the target board, so auto-fill leaves it there. Onto a full board it stays put.
+    const moved = moveOnto(target, itemId, instances, plan.bit.diameter, nestOptions);
+    if ('full' in moved) {
+      setNote(moveRefusedNote(inst.name, target, moved.full));
+      return false;
+    }
+    saveBoards(boards.map(({ board }) => (board.id === boardId ? moved.board : without(board, itemId))));
     setSelectedId(boardId);
     return true;
   };
@@ -545,6 +542,10 @@ function BoardsEditor({
         .filter(b => (b.board.id !== board.id || board.setAside?.[id]) && b.board.thickness === board.thickness)
         .map(b => b.board),
       onMoveTo: target => (target === 'new' ? toNewBoard(id) : void move(id, target)),
+      noRoom: target => {
+        const moved = moveOnto(target, id, instances, plan.bit.diameter, nestOptions);
+        return 'full' in moved ? moved.full : undefined;
+      },
       pinned: !!board.pinned?.includes(id),
       onUnpin: () => unpin(id),
       onTabsReset: board.tabsAt?.[id]

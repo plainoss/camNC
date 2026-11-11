@@ -35,9 +35,9 @@
     "vitest": "catalog:",
     "yaml": "catalog:"
   },
-  "packageManager": "pnpm@10.13.1",
+  "packageManager": "pnpm@12.19.0",
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=22.12.0"
   },
   "pnpm": {},
   "simple-git-hooks": {
