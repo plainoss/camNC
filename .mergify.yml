@@ -16,6 +16,7 @@ queue_rules:
       # Distinct merge conditions force batch validation after the lighter PR checks.
       - check-success = Tests (app-browser-1)
       - check-success = Tests (app-browser-2)
+      - check-success = Tests (app-browser-3)
       - check-success = Behaviour specs (1/4)
       - check-success = Behaviour specs (2/4)
       - check-success = Behaviour specs (3/4)
