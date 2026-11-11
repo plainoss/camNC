@@ -68,7 +68,9 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
         frameTop: 'height - seatBoard',
         cleatWidth: '60mm',
         cleatDrop: '10mm',
-        screwLength: '40mm',
+        pilotDepth: '12mm',
+        // 11 mm of thread in the seat, 1 mm short of the pilot floor, whatever the cleat stock.
+        screwLength: 'board + cleatDrop + pilotDepth',
       }))
         variables[name] = d.variable(name, expression);
       const v = (expression: string) => d.value(expression);
@@ -86,7 +88,7 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
           v('footrestHeight - 2*shoulder') >= 20 &&
           v('min(width; depth) - 2*leg') >= 150 &&
           v('footrestZ') >= 150 &&
-          v('footrestZ + footrestHeight + 80mm') <= v('frameTop - apronHeight - 40mm') &&
+          v('footrestZ + 2*footrestHeight + 30mm') <= v('frameTop - apronHeight - 40mm') &&
           v('cutter') > 0 &&
           v('cutter') < 4.5 &&
           v('fit') >= 0 &&
@@ -202,14 +204,14 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
           const clearance = p.profile.circle({ at: [x, y], d: 5.5 });
           // Underside sketches reverse local X.
           const pilot = pilots.circle({ at: [`-(${x})`, y], d: 3.5 });
-          seat.cut(pilots.regionAt(-d.value(x), d.value(y)), { depth: 12 });
+          seat.cut(pilots.regionAt(-d.value(x), d.value(y)), { depth: 'pilotDepth' });
           const id = `${role}-screw-${k + 1}`;
           screws.push(id);
           hardware.push({
             id,
             kind: 'seat-screw',
             specification:
-              'Purchased 5 × 40 mm pan-head wood screw with a 12 mm OD × 1 mm washer, driven from below through the cleat into a 3.5 mm blind pilot. Do not cut hardware from board stock.',
+              'Purchased 5 mm pan-head wood screw of the screwLength, with a 12 mm OD × 1 mm washer, driven from below through the cleat into a 3.5 mm blind pilot. Do not cut hardware from board stock.',
             holes: [
               { purpose: 'clearance', role, sketchId: p.profile.id, entityIds: [clearance.id] },
               { purpose: 'pilot', role: 'seat', sketchId: pilots.id, entityIds: [pilot.id] },

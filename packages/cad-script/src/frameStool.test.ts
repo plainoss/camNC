@@ -105,8 +105,35 @@ describe('frame stool pattern', () => {
     expect(assess(foldered).passed).toBe(false);
   }, 120_000);
 
+  it('refuses a rail whose shoulder stops short of the leg', () => {
+    const gapped = structuredClone(reloaded);
+    const apron = gapped.parts.find(p => p.name === 'Front apron')!;
+    apron.placement!.position[0] += 5;
+    delete apron.placement!.positionExpressions;
+    const failures = failing(gapped, plan).filter(c => c.id.endsWith('front-apron-front-left'));
+    expect(failures.some(c => c.check.includes('shoulders meet the receiver face'))).toBe(true);
+  });
+
+  it('refuses a plan that leaves out its joints', () => {
+    const partial = structuredClone(plan);
+    partial.connections = partial.connections.filter(c => c.kind === 'seat-attachment');
+    const failures = failing(reloaded, partial);
+    expect(failures.some(c => c.check.includes('tenoned at both ends'))).toBe(true);
+    expect(failures.some(c => c.check.includes('lamination is bonded'))).toBe(true);
+  });
+
+  it('keeps every allowed rail stock sound', async () => {
+    for (const board of ['16mm', '22mm']) {
+      const thick = await editCad(null, frameStool({ board }));
+      expect(thick.report.errors).toEqual([]);
+    }
+  }, 180_000);
+
   it('refuses layouts that cannot hold the pattern', async () => {
     expect((await editCad(null, frameStool({ legLayer: '25mm' }))).scriptError).toContain('frame-stool pattern needs');
+    expect((await editCad(null, frameStool({ footrestHeight: '150mm', footrestZ: '290mm' }))).scriptError).toContain(
+      'frame-stool pattern needs'
+    );
     expect((await editCad(null, frameStool({ width: '320mm', depth: '320mm', height: '700mm' }))).scriptError).toContain(
       'half the seat height'
     );

@@ -259,13 +259,12 @@ export function assessCadTask(
       'Dimensions and joints are stated for acceptance.',
       /\d+\s*(?:mm|cm|inch)/i.test(response) && /joint|tenon|mortise|housing|lap/i.test(response)
     );
-    const folder = document.folders?.find(folder => /stool/i.test(folder.name));
-    check('The stool is in a named folder.', !!folder);
+    const folders = document.folders?.filter(folder => /stool/i.test(folder.name)) ?? [];
+    check('The stool is in a named folder.', folders.length > 0);
     // Joint words are not construction: a built stool needs a saved pattern whose measured checks all pass.
     check(
       'A built stool has a retained construction pattern with measured joints and a fastened seat.',
-      !!folder &&
-        !!document.constructions?.some(plan => plan.folderId === folder.id) &&
+      !!document.constructions?.some(plan => folders.some(folder => plan.folderId === folder.id)) &&
         !report.errors.some(error => error.code === 'construction-check')
     );
   } else if (task.id === 'shelf-description' || task.id === 'shelf-picture') {

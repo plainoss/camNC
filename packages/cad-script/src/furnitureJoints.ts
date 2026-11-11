@@ -105,10 +105,11 @@ export function checkFurnitureJoints(
           tenoned.world
         )
       );
-      const engagement = world.high[entry]! - world.low[entry]!;
+      // Add back the clip's shrink so a tenon designed exactly at the minimum measures at it.
+      const engagement = world.high[entry]! - world.low[entry]! + 2 * kTolerance;
       // Half the receiving depth, up to the pattern minimum: a thin apron holds a cleat by half its thickness.
       const needed = Math.min(kMinimumEngagement, (receiving.high[entry]! - receiving.low[entry]!) / 2);
-      record('The tenon engages its receivers by the pattern minimum.', engagement >= needed - 2 * kTolerance, engagement, needed);
+      record('The tenon engages its receivers by the pattern minimum.', engagement >= needed - kTolerance, engagement, needed);
       // The in-plane axis across the entry direction carries the shoulders.
       const along = Math.abs(tenoned.world([1, 0, 0])[entry]! - tenoned.world([0, 0, 0])[entry]!) > 0.5 ? 0 : 1;
       const across = 1 - along;
@@ -121,6 +122,18 @@ export function checkFurnitureJoints(
         kMinimumShoulder
       );
       const outward = tenoned.high[entry]! > receiving.high[entry]! + kTolerance;
+      // The shoulders must be material right at the receiver face, not stop short of it with a gap.
+      const face: FurniturePoint = [0, 1, 2].map(i =>
+        i === entry ? (outward ? receiving.high[i]! + 0.5 : receiving.low[i]! - 0.5) : (world.low[i]! + world.high[i]!) / 2
+      ) as FurniturePoint;
+      const atFace = tenoned.local(face);
+      const bearing = [(body.low[across]! + tenonLocal.low[across]!) / 2, (tenonLocal.high[across]! + body.high[across]!) / 2].every(n => {
+        const p = [...atFace] as FurniturePoint;
+        p[across] = n;
+        p[2] = tenoned.shape.thickness / 2;
+        return furnitureMaterial(tenoned.shape, p);
+      });
+      record('Both shoulders meet the receiver face.', bearing);
       const walls = [0, 1, 2].flatMap(i =>
         i !== entry
           ? [world.low[i]! - receiving.low[i]!, receiving.high[i]! - world.high[i]!]
@@ -151,7 +164,15 @@ export function checkFurnitureJoints(
       const ids = new Set(connection.hardwareIds);
       record(
         'The seat is fastened through each cleat by at least two purchased screws.',
-        connection.hardwareIds.length >= 2 && plan.hardware.filter(h => ids.has(h.id) && h.kind === 'seat-screw').length === ids.size
+        connection.hardwareIds.length >= 2 &&
+          plan.hardware.filter(h => ids.has(h.id) && h.kind === 'seat-screw' && h.holes.every(hole => connection.roles.includes(hole.role)))
+            .length === ids.size
+      );
+    } else if (connection.kind === 'keyed-through-tenon') {
+      const ids = new Set(plan.hardware.map(h => h.id));
+      record(
+        'Each keyed tenon is locked by purchased hardware.',
+        connection.hardwareIds.length > 0 && connection.hardwareIds.every(id => ids.has(id))
       );
     }
   }
@@ -190,6 +211,27 @@ export function checkFurnitureJoints(
           expected: kMinimumWeb,
         });
       }
+  }
+  // A plan is only as complete as its connections: every member joins the structure, and each frame rail or cleat
+  // is tenoned at both ends.
+  const connected = new Set(plan.connections.flatMap(c => c.roles));
+  for (const member of plan.members)
+    checks.push({ connectionId: member.role, check: 'The member is joined by a listed connection.', passed: connected.has(member.role) });
+  if (plan.recipe === 'frame-stool-glued-v1') {
+    const legs = new Set(plan.materials.filter(m => m.grain === 'profile-y' && m.kind === 'solid-wood').flatMap(m => m.roles));
+    const tenoned = new Map<string, number>();
+    for (const c of plan.connections)
+      if (c.kind === 'glued-shouldered-tenon') tenoned.set(c.roles.at(-1)!, (tenoned.get(c.roles.at(-1)!) ?? 0) + 1);
+    for (const role of plan.materials.filter(m => m.kind === 'solid-wood').flatMap(m => m.roles))
+      checks.push(
+        legs.has(role)
+          ? {
+              connectionId: role,
+              check: 'The leg lamination is bonded to its partner.',
+              passed: plan.connections.some(c => c.kind === 'glued-lamination' && c.roles.includes(role)),
+            }
+          : { connectionId: role, check: 'The rail is tenoned at both ends.', passed: (tenoned.get(role) ?? 0) >= 2 }
+      );
   }
   const attached = new Set(plan.connections.filter(c => c.kind === 'seat-attachment').flatMap(c => c.roles));
   if (plan.recipe === 'frame-stool-glued-v1')
