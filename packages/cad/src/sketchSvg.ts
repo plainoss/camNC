@@ -5,6 +5,7 @@ import {
   formatExportNumber,
   sketchExportCurves,
   type SketchExportCurve,
+  type SketchExportEntity,
   type SketchExportOptions,
 } from './sketchExport';
 import type { CadLengthUnit, CadPoint, CadSketch } from './types';
@@ -23,6 +24,46 @@ const svgSize: Record<CadLengthUnit, { unit: string; factor: number }> = {
   ft: { unit: 'in', factor: 12 },
 };
 const tau = 2 * Math.PI;
+/** Stroke width in mm. */
+const STROKE = 0.25;
+
+/** A curve's extent in sketch mm: exact for lines, circles, arcs and ellipses; splines within 0.001 mm. */
+function curveBounds(entity: SketchExportEntity, points: ReadonlyMap<string, CadPoint>) {
+  const extent = (list: CadPoint[]) => ({
+    minX: Math.min(...list.map(p => p.x)),
+    minY: Math.min(...list.map(p => p.y)),
+    maxX: Math.max(...list.map(p => p.x)),
+    maxY: Math.max(...list.map(p => p.y)),
+  });
+  if (entity.type === 'line') return extent([points.get(entity.startId)!, points.get(entity.endId)!]);
+  if (entity.type === 'circle' || entity.type === 'arc') {
+    const c = points.get(entity.centerId)!,
+      r = entity.radius;
+    const on = (angle: number) => ({ x: c.x + r * Math.cos(angle), y: c.y + r * Math.sin(angle) });
+    if (entity.type === 'circle') return extent([on(0), on(Math.PI / 2), on(Math.PI), on((3 * Math.PI) / 2)]);
+    const sweep = (((entity.endAngle - entity.startAngle) % tau) + tau) % tau || tau;
+    const quarters = [0, 1, 2, 3, 4, 5, 6, 7]
+      .map(k => (k * Math.PI) / 2)
+      .filter(angle => {
+        const along = (((angle - entity.startAngle) % tau) + tau) % tau;
+        return along <= sweep;
+      });
+    return extent([on(entity.startAngle), on(entity.startAngle + sweep), ...quarters.map(on)]);
+  }
+  if (entity.type === 'ellipse') {
+    const c = points.get(entity.centerId)!,
+      f = points.get(entity.focusId)!;
+    const focal = Math.hypot(f.x - c.x, f.y - c.y),
+      a = Math.hypot(focal, entity.radius),
+      b = entity.radius;
+    const angle = focal ? Math.atan2(f.y - c.y, f.x - c.x) : 0;
+    const hx = Math.hypot(a * Math.cos(angle), b * Math.sin(angle)),
+      hy = Math.hypot(a * Math.sin(angle), b * Math.cos(angle));
+    return { minX: c.x - hx, maxX: c.x + hx, minY: c.y - hy, maxY: c.y + hy };
+  }
+  const box = extent(tessellateCurve(entity, points, 0.001));
+  return { minX: box.minX - 0.001, minY: box.minY - 0.001, maxX: box.maxX + 0.001, maxY: box.maxY + 0.001 };
+}
 
 /**
  * The sketch as an SVG at 1:1 in `unit`. SVG's y points down, so y is negated and the sketch origin stays at (0, 0).
@@ -39,18 +80,24 @@ export function sketchToSvg(sketch: CadSketch, options: SketchSvgOptions = {}): 
 
   const n = (value: number) => formatExportNumber(value, 6);
   const at = (p: CadPoint) => `${n(p.x * scale)} ${n(-p.y * scale)}`;
-  let minX = Infinity,
-    minY = Infinity,
-    maxX = -Infinity,
-    maxY = -Infinity;
-  for (const { entity } of curves)
-    for (const p of tessellateCurve(entity, points, Math.max(tolerance, 0.1))) {
-      minX = Math.min(minX, p.x * scale);
-      maxX = Math.max(maxX, p.x * scale);
-      minY = Math.min(minY, -p.y * scale);
-      maxY = Math.max(maxY, -p.y * scale);
-    }
-  if (!curves.length) minX = minY = maxX = maxY = 0;
+  // The curves' own extremes, then half the stroke, so nothing drawn is clipped at the edge.
+  const box = curves.reduce(
+    (all, { entity }) => {
+      const b = curveBounds(entity, points);
+      return {
+        minX: Math.min(all.minX, b.minX),
+        minY: Math.min(all.minY, b.minY),
+        maxX: Math.max(all.maxX, b.maxX),
+        maxY: Math.max(all.maxY, b.maxY),
+      };
+    },
+    { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+  );
+  const pad = STROKE / 2;
+  // In the file's unit, with y flipped.
+  const [minX, maxX, minY, maxY] = curves.length
+    ? [(box.minX - pad) * scale, (box.maxX + pad) * scale, -(box.maxY + pad) * scale, -(box.minY - pad) * scale]
+    : [0, 0, 0, 0];
   const width = maxX - minX,
     height = maxY - minY;
 
@@ -110,7 +157,7 @@ export function sketchToSvg(sketch: CadSketch, options: SketchSvgOptions = {}): 
 
   const group = (id: string, style: string, chosen: SketchExportCurve[]) =>
     chosen.length ? `  <g id="${id}" ${style}>\n${chosen.map(curve => `    <path d="${pathData(curve)}"/>`).join('\n')}\n  </g>\n` : '';
-  const stroke = `fill="none" stroke="#000" stroke-width="${n(0.25 * scale)}"`;
+  const stroke = `fill="none" stroke="#000" stroke-width="${n(STROKE * scale)}"`;
   const size = svgSize[unit];
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +

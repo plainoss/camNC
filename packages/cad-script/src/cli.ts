@@ -2,7 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { parseCadDocument, sketchToDxf, sketchToSvg, type CadDocument, type CadLengthUnit } from '@wbcnc/cad';
+import { parseCadDocument, sketchToDxf, sketchToSvg, type CadDocument, type CadLengthUnit, type CadPart } from '@wbcnc/cad';
 import { editCad, type CadScript } from './edit';
 import { renderCadSvg } from './render';
 import { fullCadReport, fullReportText } from './fullReport';
@@ -86,7 +86,17 @@ console.log = console.error.bind(console);
 const options = parseArgs(process.argv.slice(2));
 const start = options.from ? parseCadDocument(JSON.parse(await readFile(options.from, 'utf8'))) : null;
 type Inspected = Awaited<ReturnType<typeof inspectCadDocument>> & { scriptError?: string };
+/** The part whose sketch is named so: by the sketch's own name or ID first, as the feature list names it, then its part's. */
+const sketchPart = (parts: readonly CadPart[], name: string) =>
+  parts.find(p => p.sketchName === name || p.sketch.id === name) ?? parts.find(p => p.name === name || p.id === name);
 const finish = async (ok: boolean, output: object, document?: unknown, svg?: string, inspected?: Inspected) => {
+  // A sketch that isn't there fails the check before anything is written, so --out never outlives a failed run.
+  const exportPart =
+    ok && options.exportSketch && inspected ? sketchPart(inspected.document.parts, options.exportSketch.sketch) : undefined;
+  if (ok && options.exportSketch && !exportPart) {
+    ok = false;
+    output = { ...output, exportError: `No sketch named ${options.exportSketch.sketch}.` };
+  }
   // A design that doesn't check out is never written where it could be imported by mistake.
   if (ok && options.out) await writeFile(options.out, `${JSON.stringify(document, null, 1)}\n`);
   else if (!ok && options.out) await rm(options.out, { force: true });
@@ -94,18 +104,15 @@ const finish = async (ok: boolean, output: object, document?: unknown, svg?: str
   else if (!ok && options.svg) await rm(options.svg, { force: true });
   let drawings: Record<string, string> | undefined;
   if (options.exportSketch) {
-    const { sketch: name, file, unit, construction } = options.exportSketch;
-    await rm(file, { force: true });
-    // Named as the feature list names it: the sketch's own name, else its part's, or by ID.
-    const part =
-      ok && inspected?.document.parts.find(p => p.sketchName === name || p.sketch.id === name || p.name === name || p.id === name);
-    if (ok && !part) throw new Error(`No sketch named ${name}.`);
-    if (part) {
+    await rm(options.exportSketch.file, { force: true });
+    if (exportPart) {
+      const { file, unit, construction } = options.exportSketch;
       const write = /\.svg$/i.test(file) ? sketchToSvg : sketchToDxf;
-      await writeFile(file, write(part.sketch, { unit, construction }));
+      await writeFile(file, write(exportPart.sketch, { unit, construction }));
       drawings = { ...drawings, export: file };
     }
   }
+
   if (options.views) {
     const files = ['top', 'front', 'right', 'section'].map(name => path.join(options.views!, `${name}.svg`));
     // A rejected revision cannot leave the preceding candidate's views beside its report.

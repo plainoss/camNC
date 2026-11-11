@@ -195,11 +195,20 @@ describe('sketch SVG export', () => {
       .map(Number);
     expect(Number(width)).toBeCloseTo(w!, 6);
     expect(Number(height)).toBeCloseTo(h!, 6);
-    expect(minX).toBeCloseTo(0, 1);
+    // Half the 0.25 mm stroke past the leftmost curves, at x = 0 (a spline adds its 0.001 mm).
+    expect(minX).toBeCloseTo(-0.125, 2);
     // The closed spline is the highest curve; y is flipped, so it sets the top.
     expect(minY).toBeLessThan(-250);
     expect(sketchToSvg(sketch, { unit: 'in' })).toMatch(/width="[\d.]+in"/);
     expect(sketchToSvg(sketch, { unit: 'm' })).toMatch(/width="[\d.]+cm"/);
+  });
+
+  it('frames curves by their exact extremes, padded by half the stroke', () => {
+    const lone = addCircle({ id: 's', entities: [], constraints: [] }, { x: 0, y: 0, radius: 10 });
+    expect(sketchToSvg(lone)).toContain('viewBox="-10.125 -10.125 20.25 20.25"');
+    // A quarter arc from 0° to 90° reaches x = 10 and y = 10, and no further.
+    const quarter = addArc({ id: 's', entities: [], constraints: [] }, { cx: 0, cy: 0, radius: 10, startAngle: 0, endAngle: Math.PI / 2 });
+    expect(sketchToSvg(quarter)).toContain('viewBox="-0.125 -10.125 10.25 10.25"');
   });
 
   it('draws lines, circles and arcs exactly, with the sweep flipped for SVG', () => {
