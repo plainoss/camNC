@@ -47,11 +47,14 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
   }, [shown]);
   const applyLabel = session.applied ? 'Applied' : session.replace.on ? 'Replace on board' : 'Add to board';
   return (
-    <aside aria-label="AI artwork" className="carving-assistant flex flex-col gap-4">
+    <div className="carving-assistant flex flex-1 flex-col gap-4">
       <CarvePanelHeader title="AI artwork" icon={<Sparkles className="size-4 text-violet-500" />} onClose={onClose} />
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-violet-500 p-2 text-xs text-muted-foreground">
         <span className="min-w-0 flex-1" title="Drag the box on the board to move it, or its corner to resize it.">
           Dashed box on the board
+          <span className="block">
+            {job.carving?.vBit.name} · deepest {job.carving?.maxDepth} mm
+          </span>
         </span>
         <span className="flex items-center gap-1">
           {(['w', 'h'] as const).map((side, i) => (
@@ -86,13 +89,20 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           </button>
         </div>
       ) : (
-        <ProviderSettings
-          value={connection.credentials}
-          onSave={value => {
-            connection.setCredentials(value);
-            setSettings(!value);
-          }}
-        />
+        <div className="grid gap-1">
+          <ProviderSettings
+            value={connection.credentials}
+            onSave={value => {
+              connection.setCredentials(value);
+              setSettings(!value);
+            }}
+          />
+          {connection.credentials && (
+            <Button variant="ghost" size="sm" className="justify-self-start" onClick={() => setSettings(false)}>
+              Keep the current connection
+            </Button>
+          )}
+        </div>
       )}
       {connection.credentials && !connection.sharedImageModel && !connection.separateImage && (
         <p className="text-xs text-amber-700 dark:text-amber-300">
@@ -125,7 +135,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
               event.preventDefault();
               // Confirming an IME composition must not send a half-typed brief.
               if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-              event.currentTarget.form?.requestSubmit();
+              if (request.canGenerate) event.currentTarget.form?.requestSubmit();
             }}
           />
           {!request.prompt.trim() && (
@@ -258,8 +268,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           )}
           {!!prepared.operations.length && <Toolpaths prepared={prepared} />}
           <p className="text-xs text-muted-foreground">
-            {job.carving?.vBit.name} · deepest {job.carving?.maxDepth} mm. Check the cut in Plan afterwards; the checks don&rsquo;t judge
-            the subject or the wood.
+            Check the cut in Plan afterwards; the checks don&rsquo;t judge the subject or the wood.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button className="flex-1" disabled={!session.canApply} onClick={session.apply}>
@@ -329,7 +338,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           )}
         </div>
       </details>
-    </aside>
+    </div>
   );
 }
 

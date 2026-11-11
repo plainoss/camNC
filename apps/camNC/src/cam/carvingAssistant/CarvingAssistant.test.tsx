@@ -94,7 +94,9 @@ function Harness({
       <svg viewBox="0 0 300 140">
         <CarvingAssistantBoardLayer session={session} height={140} />
       </svg>
-      <CarvingAssistant job={job} session={session} onClose={() => session.setOpen(false)} />
+      <aside aria-label="AI artwork">
+        <CarvingAssistant job={job} session={session} onClose={() => session.setOpen(false)} />
+      </aside>
     </>
   );
 }

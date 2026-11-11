@@ -3,7 +3,16 @@ import { CamPage } from '@/cam/CamPage';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { CarvingArtFields } from '@/cam/CarvingArtFields';
 import { CarvingCutoutBar, CarvingCutoutLine, kCutoutSelection } from '@/cam/CarvingCutout';
-import { carvingProblem, itemName, placeItem, withItems, type CarvingArt, type CarvingItemV1, type CarvingV1 } from '@/cam/carving';
+import {
+  carvingProblem,
+  itemName,
+  kEmptyCarving,
+  placeItem,
+  withItems,
+  type CarvingArt,
+  type CarvingItemV1,
+  type CarvingV1,
+} from '@/cam/carving';
 import { carvingBounds as bounds, carvingPath as pathOf, centred, freeSpot } from '@/cam/carvingView';
 import { outlineArt } from '@/cam/carvingOutline';
 import { CarvingAssistant } from '@/cam/carvingAssistant/CarvingAssistant';
@@ -101,7 +110,11 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     mounted.current = true;
     return () => {
       mounted.current = false;
+      // Its Undo belongs to this editor's history, which leaving the step discards.
+      dismissAdded();
     };
+    // dismissAdded only reads a ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Undo and Redo step through the carving and its board as they were before each edit, as on the Boards step.
@@ -110,8 +123,15 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const history = useRef<Snapshot[]>([]);
   const future = useRef<Snapshot[]>([]);
   const [, setHistorySize] = useState(0);
+  // The "Artwork added" toast offers Undo for that one edit, so any later edit or undo takes the toast away.
+  const addedToast = useRef<string | number | null>(null);
+  const dismissAdded = () => {
+    if (addedToast.current !== null) toast.dismiss(addedToast.current);
+    addedToast.current = null;
+  };
   /** Called right before an edit is saved: the job as it is then is what Undo brings back. */
   const record = () => {
+    dismissAdded();
     const { carving, boards } = latest();
     history.current = [...history.current.slice(-(kUndoSteps - 1)), { carving, boards }];
     future.current = [];
@@ -120,6 +140,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const travel = (from: { current: Snapshot[] }, to: { current: Snapshot[] }) => {
     const back = from.current.at(-1);
     if (!back) return;
+    dismissAdded();
     from.current = from.current.slice(0, -1);
     const { carving: was, boards } = latest();
     to.current = [...to.current, { carving: was, boards }];
@@ -158,8 +179,15 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     setSelectedId(proposal.item.id);
     // Done: the board gets its room back, with the new artwork selected and one step to take it back.
     assistant.setOpen(false);
-    toast(proposal.mode === 'replace' ? 'Artwork replaced' : 'Artwork added', {
-      action: { label: 'Undo', onClick: () => undoLatest.current?.() },
+    const entry = history.current.at(-1);
+    addedToast.current = toast(proposal.mode === 'replace' ? 'Artwork replaced' : 'Artwork added', {
+      action: {
+        label: 'Undo',
+        // Only while this edit is still the latest: never another edit's, nor after leaving the step.
+        onClick: () => {
+          if (mounted.current && history.current.at(-1) === entry) undoLatest.current?.();
+        },
+      },
     });
   };
   const assistant = useCarvingAssistant({
@@ -463,6 +491,11 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const flatBitName = flatBit.name ?? `⌀${flatBit.diameter} flat bit`;
   // One side panel at a time, opened from the board's toolbar; the assistant keeps its own open state for its session.
   const shownPanel: CarvePanel | null = assistant.open ? 'assistant' : panel;
+  const panelRef = useRef<HTMLElement>(null);
+  // On a phone the panel opens below the board, out of sight: bring it into view when it appears.
+  useEffect(() => {
+    if (shownPanel && window.matchMedia('(max-width: 767px)').matches) panelRef.current?.scrollIntoView({ block: 'start' });
+  }, [shownPanel]);
   const togglePanel = (next: CarvePanel) => {
     const closing = next === shownPanel;
     if (next === 'assistant' && !closing) {
@@ -782,12 +815,12 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
           {!carving.items.length && !assistant.open && (
             <CarveEmptyStart onText={addText} onFile={() => chooseSvg(null)} onAssistant={() => togglePanel('assistant')} />
           )}
-          {((carving.items.length > 0 && problem) || off || addError) && (
+          {((problem && problem !== kEmptyCarving) || off || addError) && (
             <p
               role="alert"
               className="absolute bottom-3 left-16 z-10 flex max-w-md gap-2 rounded-md border bg-background/95 px-3 py-2 text-sm text-amber-600 shadow-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              {(carving.items.length > 0 && problem) || addError || 'The artwork reaches past the board: move it or make it smaller.'}
+              {(problem !== kEmptyCarving && problem) || addError || 'The artwork reaches past the board: move it or make it smaller.'}
             </p>
           )}
           <div className="sr-only">
@@ -820,7 +853,8 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         </div>
         {shownPanel && (
           <aside
-            aria-label="Carve panel"
+            ref={panelRef}
+            aria-label={kPanelNames[shownPanel]}
             className="flex w-full shrink-0 flex-col gap-4 overflow-auto border-t p-4 text-sm md:w-80 md:border-t-0 md:border-l">
             {shownPanel === 'assistant' && <CarvingAssistant job={job} session={assistant} onClose={() => togglePanel('assistant')} />}
             {shownPanel === 'items' && (
@@ -855,6 +889,8 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
 /** As the Boards step's tool buttons (`HoldTools`). */
 const kToolButton =
   'flex size-8 items-center justify-center rounded-md text-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-35';
+
+const kPanelNames: Record<CarvePanel, string> = { items: 'Items', settings: 'Board and bit', assistant: 'AI artwork' };
 
 const rotationOf = (degrees: number) => ((degrees % 360) + 360) % 360;
 

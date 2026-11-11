@@ -84,7 +84,7 @@ describe('the Carve step', () => {
     expect(screen.queryByRole('complementary')).toBeNull();
     const tool = (name: string) => within(screen.getByRole('group', { name: 'Carve tools' })).getByRole('button', { name });
     fireEvent.click(tool('Items'));
-    expect(within(screen.getByRole('complementary', { name: 'Carve panel' })).getByText(/Nothing on the board yet/)).toBeTruthy();
+    expect(within(screen.getByRole('complementary', { name: 'Items' })).getByText(/Nothing on the board yet/)).toBeTruthy();
     expect(tool('Items').getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(tool('Board and bit'));
     expect(screen.queryByText(/Nothing on the board yet/)).toBeNull();

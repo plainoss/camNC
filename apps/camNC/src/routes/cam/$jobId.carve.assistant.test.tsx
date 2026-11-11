@@ -27,6 +27,16 @@ vi.mock('@tanstack/react-router', () => ({
     </a>
   ),
 }));
+const toasts = vi.hoisted(() => ({ shown: [] as { message: string; undo: () => void }[], dismissed: [] as unknown[] }));
+vi.mock('@wbcnc/ui/components/sonner', () => ({
+  toast: Object.assign(
+    (message: string, options: { action: { onClick: () => void } }) => {
+      toasts.shown.push({ message, undo: options.action.onClick });
+      return toasts.shown.length;
+    },
+    { dismiss: (id: unknown) => toasts.dismissed.push(id), error: vi.fn() }
+  ),
+}));
 vi.mock('@/components/page-header', () => ({ PageHeader: () => null }));
 vi.mock('@/cam/CamJobBar', () => ({ CamJobBar: ({ actions }: { actions: ReactNode }) => <header>{actions}</header> }));
 vi.mock('@/cam/carvingAssistant/generation', () => ({ generateCarvingAsset: vi.fn() }));
@@ -61,6 +71,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  toasts.shown.length = 0;
+  toasts.dismissed.length = 0;
   rememberAssistantCredentials(null);
 });
 
@@ -124,6 +136,36 @@ async function apply(jobId: string) {
   fireEvent.click(screen.getByRole('button', { name: kApply }));
   await waitFor(async () => expect((await getJob(jobId))!.carving!.items).toHaveLength(2));
 }
+
+it('selects the added artwork and offers Undo for that one edit, until anything else is edited', async () => {
+  const { job } = await open();
+  const before = structuredClone(job.carving!);
+  await generate();
+  await apply(job.id);
+  const added = (await getJob(job.id))!.carving!.items[1];
+  expect(toasts.shown.map(t => t.message)).toEqual(['Artwork added']);
+  // The new artwork stays selected on the board, ready to move or resize.
+  openPanel('Items');
+  expect(
+    within(screen.getByRole('list', { name: 'Items' }))
+      .getByRole('button', { name: 'Assistant artwork.svg' })
+      .getAttribute('aria-pressed')
+  ).toBe('true');
+  act(() => toasts.shown[0].undo());
+  await waitFor(async () => expect((await getJob(job.id))!.carving).toEqual(before));
+  expect(toasts.dismissed).toEqual([1]);
+
+  // After another edit, the toast's Undo no longer reaches back past it.
+  fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
+  await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toHaveLength(2));
+  fireEvent.click(screen.getByRole('button', { name: 'Delete "Welcome"' }));
+  await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toHaveLength(1));
+  const afterDelete = (await getJob(job.id))!.carving!;
+  expect(afterDelete.items[0].id).toBe(added.id);
+  act(() => toasts.shown[0].undo());
+  await new Promise(resolve => setTimeout(resolve, 50));
+  expect((await getJob(job.id))!.carving).toEqual(afterDelete);
+}, 30_000);
 
 it('prepares real owl geometry and CAM without saving, then applies as one reversible edit and reopens its original source locally', async () => {
   const { job } = await open();
