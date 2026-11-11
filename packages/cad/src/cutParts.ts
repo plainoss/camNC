@@ -2,6 +2,9 @@ import { applyExtrudeRemovals } from './extrudeRemoval';
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
 import { validPartCutSplit } from './partCutSplit';
+import { joinedCutReferences } from './joinedCutReferences';
+import { physicalJoinedCopies } from './physicalJoinedCopies';
+import { activeDesign } from './suppression';
 import { resolvePartCutTargets } from './partCutTargetSelection';
 import { cadPartReferenceOwner } from './partReferences';
 import { evaluatedPartCopy, mirrorEvaluatedPart, sameCadCuts } from './copies';
@@ -241,9 +244,10 @@ function toolOutlineCut(
  * cut where it reaches in is left out with a warning rather than cut as a block.
  */
 export function applyPartCuts(
-  document: CadDocument,
+  given: CadDocument,
   parts: readonly EvaluatedCadPart[]
 ): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
+  const document = physicalJoinedCopies(activeDesign(given));
   const diagnostics: CadDiagnostic[] = [];
   const byId = new Map(parts.map(part => [part.partId, part]));
   const sources = new Map(document.parts.map(part => [part.id, part]));
@@ -360,7 +364,11 @@ export function applyPartCuts(
       warn('Invalid split in a "cut parts" step: fingers must be an integer of at least 2.');
       continue;
     }
-    const selection = resolvePartCutTargets(document, step.targets);
+    const targetReferences = joinedCutReferences(document, step.targets);
+    const selection = resolvePartCutTargets(
+      document,
+      targetReferences.map(item => item.reference)
+    );
     for (const reference of selection.missing) {
       refused = true;
       const owner = cadPartReferenceOwner(document, reference);
@@ -372,7 +380,8 @@ export function applyPartCuts(
       );
     }
     // Exact-copy split joints need their own reciprocal-cut semantics; accepting them would promise an unsupported mode.
-    if (step.split && selection.targets.some(target => target.copyId !== undefined)) {
+    // The authored scope decides support: a derived child family must not hide an explicit copy restriction.
+    if (step.split && resolvePartCutTargets(document, step.targets).targets.some(target => target.copyId !== undefined)) {
       warn(
         'Split joints on a single target copy are not supported. Choose Cut out or target the source family.',
         'part-cut-copy-target-split'
@@ -382,7 +391,7 @@ export function applyPartCuts(
     // A tool `<partId>:<copyId>` cuts with that one copy; a copy that's gone is said once, not once per target.
     const goneCopies = new Set<string>();
     for (const { part: intoSource, copyId: targetCopyId } of selection.targets)
-      for (const toolId of step.tools) {
+      for (const { reference: toolId, origin: toolOrigin } of joinedCutReferences(document, step.tools)) {
         const targetId = intoSource.id;
         const [partId, copyId] = toolId.split(/:(.*)/s) as [string, string?];
         // Source-family self cuts were already refused. An exact target must not bypass that owner guard.
@@ -398,6 +407,14 @@ export function applyPartCuts(
         }
         for (const target of targets.get(targetId) ?? []) {
           if (targetCopyId !== undefined && target.key !== targetCopyId) continue;
+          // Derived host components retain the raw selection's owner. Otherwise a host selected on both
+          // sides would start cutting itself, or an explicit child-copy selection could enable every sibling.
+          if (
+            !targetReferences.some(
+              ({ reference, origin }) => origin !== toolOrigin && (reference === targetId || reference === `${targetId}:${target.key}`)
+            )
+          )
+            continue;
           const original = before.get(targetId)!;
           const into = target.mirrored ? mirrorEvaluatedPart(original) : original,
             intoAt = target.at;
@@ -584,15 +601,23 @@ export function applyPartCuts(
  * One evaluated part with the cuts other parts make in it, for views that evaluate a part on its own. The tools are
  * evaluated as they are in `document`.
  */
-export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): EvaluatedCadPart {
+export function withPartCuts(given: CadDocument, part: EvaluatedCadPart): EvaluatedCadPart {
+  const document = physicalJoinedCopies(activeDesign(given));
   const steps = (document.partCuts ?? []).filter(
     step =>
-      step.targets.some(id => cadPartReferenceOwner(document, id)?.id === part.partId) ||
-      (step.split && step.tools.some(id => id.split(':')[0] === part.partId))
+      joinedCutReferences(document, step.targets).some(({ reference }) => cadPartReferenceOwner(document, reference)?.id === part.partId) ||
+      (step.split &&
+        joinedCutReferences(document, step.tools).some(({ reference }) => cadPartReferenceOwner(document, reference)?.id === part.partId))
   );
   if (!steps.length && !document.parts.some(candidate => candidate.remove)) return part;
   const toolIds = [
-    ...new Set(steps.flatMap(step => [...step.targets, ...step.tools].map(id => cadPartReferenceOwner(document, id)?.id))),
+    ...new Set(
+      steps.flatMap(step =>
+        joinedCutReferences(document, [...step.targets, ...step.tools]).map(
+          ({ reference }) => cadPartReferenceOwner(document, reference)?.id
+        )
+      )
+    ),
   ].filter(id => id !== part.partId);
   const tools = toolIds.flatMap(id => {
     const source = document.parts.find(candidate => candidate.id === id);
