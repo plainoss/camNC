@@ -27,6 +27,9 @@ export function liveVitestConfig({
   );
   return defineConfig({
     ...config,
+    // Own dependency cache: `define` is part of Vite's optimizer hash, so sharing the default cache would make the
+    // next normal run re-optimize its dependencies mid-run and reload test pages.
+    cacheDir: `node_modules/.vite/live-${name}`,
     define: { __LIVE_ENV__: JSON.stringify({ ...settings, [`${prefix}_OUT`]: outDir }) },
     test: {
       ...config.test,
