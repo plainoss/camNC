@@ -1,5 +1,7 @@
 import { applyExtrudeRemovals } from './extrudeRemoval';
 import { relieveLoopCorners } from './cornerRelief';
+import { effectivePartCutRelief, partCutReliefIssue } from './partCutRelief';
+import { cadDocumentVersion } from './documentVersion';
 import { newCadId } from './document';
 import { validPartCutSplit } from './partCutSplit';
 import { resolvePartCutTargets } from './partCutTargetSelection';
@@ -330,8 +332,9 @@ export function applyPartCuts(
         // The clearance deepens it too, so the tool doesn't bottom out. Reaching within it of the far face cuts through.
         const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
           through = reach >= t - kSquare;
-        const relief = intoSource.cornerRelief
-          ? relieveLoopCorners(outline, true, intoSource.cornerRelief.diameter, into.outline)
+        const setting = effectivePartCutRelief(step, intoSource);
+        const relief = setting
+          ? relieveLoopCorners(outline, true, setting.diameter, into.outline)
           : { points: outline, skipped: [] };
         if (relief.skipped.length)
           warn(
@@ -608,9 +611,12 @@ export function addPartCut(
   tools: string[],
   targets: string[],
   clearance: { value: number; expression?: string },
-  split?: CadPartCut['split']
+  split?: CadPartCut['split'],
+  cornerRelief?: CadPartCut['cornerRelief']
 ): { document: CadDocument; id: string } {
   if (!validPartCutSplit(split)) throw new Error('Invalid CAD part cut');
+  const reliefIssue = partCutReliefIssue(cornerRelief);
+  if (reliefIssue) throw new Error(reliefIssue);
   const step: CadPartCut = {
     id: newCadId(),
     tools,
@@ -618,14 +624,18 @@ export function addPartCut(
     clearance: clearance.value,
     ...(split !== undefined && { split }),
     ...(clearance.expression && { clearanceExpression: clearance.expression }),
+    ...(cornerRelief !== undefined && { cornerRelief }),
   };
-  return { id: step.id, document: { ...document, revision: document.revision + 1, partCuts: [...(document.partCuts ?? []), step] } };
+  const next = { ...document, revision: document.revision + 1, partCuts: [...(document.partCuts ?? []), step] };
+  return { id: step.id, document: { ...next, version: cadDocumentVersion(next) } };
 }
 
 /** Changes a step's parts or clearance. A clearance given without an expression drops the step's old one. */
 export function updatePartCut(document: CadDocument, id: string, change: Partial<Omit<CadPartCut, 'id'>>): CadDocument {
   if (!validPartCutSplit(change.split)) throw new Error('Invalid CAD part cut');
-  return {
+  const reliefIssue = partCutReliefIssue(change.cornerRelief);
+  if (reliefIssue) throw new Error(reliefIssue);
+  const documentWithChange = {
     ...document,
     revision: document.revision + 1,
     partCuts: (document.partCuts ?? []).map(step => {
@@ -635,9 +645,11 @@ export function updatePartCut(document: CadDocument, id: string, change: Partial
       if (Object.hasOwn(change, 'split') && change.split === undefined) delete next.split;
       // Kept is the default, so it's only stored when the tools are used up.
       if (Object.hasOwn(change, 'consumeTools') && !change.consumeTools) delete next.consumeTools;
+      if (Object.hasOwn(change, 'cornerRelief') && change.cornerRelief === undefined) delete next.cornerRelief;
       return next;
     }),
   };
+  return { ...documentWithChange, version: cadDocumentVersion(documentWithChange) };
 }
 
 export function removePartCut(document: CadDocument, id: string): CadDocument {
@@ -647,5 +659,5 @@ export function removePartCut(document: CadDocument, id: string): CadDocument {
     partCuts: (document.partCuts ?? []).filter(step => step.id !== id),
   };
   if (!next.partCuts!.length) delete next.partCuts;
-  return next;
+  return { ...next, version: cadDocumentVersion(next) };
 }

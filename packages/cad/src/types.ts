@@ -496,7 +496,7 @@ export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
   /** 2 for face features, 3 for folders, so older builds refuse instead of losing source settings. */
-  version: 1 | 2 | 3;
+  version: 1 | 2 | 3 | 5;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */
@@ -549,6 +549,8 @@ export interface CadPartCut {
    */
   clearance: number;
   clearanceExpression?: string;
+  /** Omitted inherits the receiving part; null disables relief for only this step's openings. */
+  cornerRelief?: { diameter: number; diameterExpression?: string } | null;
   /** Alternate cuts along the shared in-plane overlap (its longer axis for parallel extrusions), from its positive world end. */
   split?: 'half' | { fingers: number; fingersExpression?: string };
   /** The tools are used up by a cut-out. Split joints always keep both parts, even when this is saved as true. */

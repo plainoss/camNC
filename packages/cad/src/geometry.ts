@@ -26,12 +26,16 @@ import { regionProfile } from './regionProfile';
 import { withEdgeFillets } from './edgeFillets';
 import { cadFolderIssue } from './folderModel';
 import { cadDocumentVersion } from './documentVersion';
+import { partCutReliefIssue } from './partCutRelief';
+import { unsupportedCadSourceIssue } from './unsupportedCadSource';
 export { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 /** Absolute chord error, mm; analytic sketch geometry is retained in the source. */
 export const CAD_CHORD_TOLERANCE = 0.01;
 
 export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   const diagnostics: CadDiagnostic[] = [];
+  const unsupported = unsupportedCadSourceIssue(document);
+  if (unsupported) return [{ code: 'invalid-document', message: unsupported, severity: 'error' }];
   const ids = new Set<string>();
   const addId = (id: string, partId?: string) => {
     if (!id || ids.has(id))
@@ -40,7 +44,7 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   };
   addId(document.id);
   if (
-    (document.version !== 1 && document.version !== 2 && document.version !== 3) ||
+    (document.version !== 1 && document.version !== 2 && document.version !== 3 && document.version !== 5) ||
     !Number.isSafeInteger(document.revision) ||
     document.revision < 0
   )
@@ -49,8 +53,12 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   if (document.version < cadDocumentVersion(document))
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   const folderIssue = cadFolderIssue(document);
-  if (folderIssue || (document.version !== 3 && document.folders?.length))
+  if (folderIssue || (document.version < 3 && document.folders?.length))
     diagnostics.push({ code: 'invalid-folder', message: folderIssue ?? 'Folders require document version 3.', severity: 'error' });
+  for (const step of document.partCuts ?? []) {
+    const issue = partCutReliefIssue(step.cornerRelief);
+    if (issue) diagnostics.push({ code: 'invalid-part-cut-relief', message: issue, severity: 'error' });
+  }
   for (const folder of document.folders ?? []) addId(folder.id);
   for (const owner of document.parts) {
     addId(owner.id, owner.id);

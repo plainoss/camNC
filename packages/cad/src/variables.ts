@@ -1,6 +1,7 @@
 import { resolveDatumPlanes } from './datumPlanes';
 import { dimensionValueError } from './dimensionValues';
 import { newCadId } from './document';
+import { partCutReliefOutcome } from './partCutRelief';
 import type {
   CadConstraint,
   CadCut,
@@ -405,6 +406,9 @@ export function applyCadVariables(document: CadDocument): CadDocument {
   const partCuts = document.partCuts?.map(step => {
     const outcome = clearanceOutcome(step, scope);
     let next = outcome && 'value' in outcome && outcome.value !== step.clearance ? { ...step, clearance: outcome.value } : step;
+    const relief = partCutReliefOutcome(step, scope);
+    if (step.cornerRelief && relief && 'value' in relief && relief.value !== step.cornerRelief.diameter)
+      next = { ...next, cornerRelief: { ...step.cornerRelief, diameter: relief.value } };
     const fingers = fingersOutcome(step, scope);
     if (typeof step.split === 'object' && fingers && 'value' in fingers && fingers.value !== step.split.fingers)
       next = { ...next, split: { ...step.split, fingers: fingers.value } };
@@ -523,6 +527,9 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
       }
   }
   for (const step of document.partCuts ?? []) {
+    const relief = partCutReliefOutcome(step, scope);
+    if (relief && 'error' in relief)
+      problems.push({ code: 'variable-value', severity: 'error', message: `Cut parts corner relief ${step.cornerRelief!.diameterExpression}: ${relief.error}` });
     const outcome = clearanceOutcome(step, scope);
     if (outcome && 'error' in outcome)
       problems.push({
@@ -565,6 +572,9 @@ function mapExpressions(document: CadDocument, edit: (expression: string) => str
     partCuts: document.partCuts?.map(step => ({
       ...step,
       ...(step.clearanceExpression && { clearanceExpression: edit(step.clearanceExpression) }),
+      ...(step.cornerRelief?.diameterExpression && {
+        cornerRelief: { ...step.cornerRelief, diameterExpression: edit(step.cornerRelief.diameterExpression) },
+      }),
       ...(typeof step.split === 'object' &&
         step.split.fingersExpression && {
           split: { ...step.split, fingersExpression: edit(step.split.fingersExpression) },
