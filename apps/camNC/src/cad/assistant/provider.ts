@@ -23,6 +23,8 @@ export interface AssistantToolCall {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  /** Provider data that must be replayed with the call, such as Gemini's extra_content thought signature. */
+  extraContent?: unknown;
 }
 /** Totals include cached input and reasoning output; breakdowns are subsets, never additional tokens. */
 export interface AssistantUsage {
@@ -225,6 +227,7 @@ export function providerPayload({
             id: call.id,
             type: 'function',
             function: { name: call.name, arguments: JSON.stringify(call.arguments) },
+            ...(call.extraContent !== undefined && { extra_content: call.extraContent }),
           })),
         }),
       },
@@ -258,7 +261,9 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
   const interrupted = metadata.completion === 'incomplete' || metadata.completion === 'refused';
   const data = input as {
     content?: { type: string; text?: string; id?: string; name?: string; input?: unknown }[];
-    choices?: { message?: { content?: string; tool_calls?: { id: string; function: { name: string; arguments: string } }[] } }[];
+    choices?: {
+      message?: { content?: string; tool_calls?: { id: string; function: { name: string; arguments: string }; extra_content?: unknown }[] };
+    }[];
     output?: { type: string; call_id?: string; name?: string; arguments?: string; content?: { text?: string }[] }[];
   };
   if (config.kind === 'anthropic') {
@@ -298,7 +303,12 @@ export function parseProviderMessage(config: ProviderConfig, input: unknown): As
     role: 'assistant',
     ...metadata,
     text: message.content ?? '',
-    calls: interrupted ? [] : message.tool_calls?.map(call => toolCall(call.id, call.function.name, call.function.arguments)),
+    calls: interrupted
+      ? []
+      : message.tool_calls?.map(call => ({
+          ...toolCall(call.id, call.function.name, call.function.arguments),
+          ...(call.extra_content !== undefined && { extraContent: call.extra_content }),
+        })),
   };
 }
 

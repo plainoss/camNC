@@ -6,7 +6,7 @@ import { geometryTolerances } from './accuracy';
 import { openPocketRegion, type PartFeatures } from './features';
 import { dowelOperations, partRect, type DowelSpec } from './flip';
 import { toGcode } from './gcode';
-import { boardToPart, kDefaultSkin, planTabs, type PartHolding } from './tabPlan';
+import { boardToPart, kDefaultSkin, planTabs } from './tabPlan';
 import type { Vec3 } from './geom';
 import type { BottomLayer, HoldOptions } from './hold';
 import { holdBox, holdClashes, holdHeight, type HoldPoint } from './holdPoints';
@@ -433,7 +433,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
         },
       }),
     };
-    let cam = camPart(part.features, requested, context);
+    const cam = camPart(part.features, requested, context);
     // The usual allowance fits the required gap; more can push the roughing path into a neighbor.
     if (
       (requested.leaveStock ?? 0) > (DEFAULT_SETTINGS.leaveStock ?? 0) &&
