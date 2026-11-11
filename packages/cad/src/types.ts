@@ -409,7 +409,8 @@ export interface CadPartCopy {
   name?: string;
   /**
    * The number in its name, given when it's added so later copies and pattern changes don't renumber it. Copies saved
-   * without one are numbered by their order.
+   * without one are numbered by their order. A copy with its own name still holds its number, so clearing the name gives
+   * back the same one.
    */
   number?: number;
   /** The part pattern that made it, which places it and keeps it in step with the count. */
