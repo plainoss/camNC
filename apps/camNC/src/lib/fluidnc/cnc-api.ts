@@ -113,6 +113,12 @@ export class CncApi {
   public readonly holdRequested = signal(false);
   /** The furthest the controller has read the running SD file (FluidNC reads forward only), for the start pause. */
   public readonly jobReadTo = signal<{ file: string; percent: number } | null>(null);
+  /**
+   * The spindle state from a report sent during the current hold (Hold or Door), so known to be the state while held;
+   * `undefined` until such a report, which FluidNC sends every few reports. {@link MachineStatus.spindleOn} alone may be
+   * from before the hold, e.g. from before an M3 the job ran since.
+   */
+  public readonly spindleInHold = signal<boolean | undefined>(undefined);
   /** The SD percent once camNC's Pause had held the job, see {@link holdRequested}. */
   private pauseHeldAt: number | null = null;
   /** When the current SD job was first seen running, for the time estimate. */
@@ -295,6 +301,12 @@ export class CncApi {
         const read = this.jobReadTo.value;
         if (status.job && (read?.file !== status.job.file || status.job.percent > read.percent)) this.jobReadTo.value = { ...status.job };
         else if (!status.job && status.state !== 'Hold') this.jobReadTo.value = null;
+        // A new hold, or the job read on (it ran in between, the Run report missed): what was known is from before.
+        const holding = (state: string | undefined) => state === 'Hold' || state === 'Door';
+        const readOn = !!status.job && read?.file === status.job.file && status.job.percent > read.percent;
+        if (!holding(status.state)) this.spindleInHold.value = undefined;
+        else if (status.overridesReported) this.spindleInHold.value = status.spindleOn;
+        else if (!holding(this.status.value?.state) || readOn) this.spindleInHold.value = undefined;
         // Run after anything but Run means the hold is over. Run after Run can be a report sent just before the controller
         // took the Pause, so it does not.
         const runsAgain = status.state === 'Run' && this.status.value?.state !== 'Run';

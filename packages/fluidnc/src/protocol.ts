@@ -74,6 +74,11 @@ export interface MachineStatus extends ParsedStatus {
    * with those, every few reports and right after a change. `undefined` until such a report.
    */
   spindleOn?: boolean;
+  /**
+   * This very report carried the overrides and so the accessory state: {@link spindleOn} is the spindle state when it
+   * was sent. FluidNC computes A from the spindle's current state at report time (Report.cpp, `spindle->get_state()`).
+   */
+  overridesReported?: boolean;
 }
 
 export type ConsoleLineKind = 'sent' | 'ok' | 'error' | 'alarm' | 'msg' | 'reset' | 'data';
@@ -426,6 +431,7 @@ export class FluidncProtocol {
       workKnown: !!(parsed.wco || parsed.wpos || prev?.workKnown),
       overrides: parsed.overrides ?? prev?.overrides,
       spindleOn: parsed.overrides ? /[SC]/.test(parsed.accessories ?? '') : prev?.spindleOn,
+      overridesReported: !!parsed.overrides,
     };
     this.status = status;
     this.events.emit('status', status);

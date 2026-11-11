@@ -31,6 +31,7 @@ it('P6 does not show loaded-program pause guidance for another camNC SD executio
     jobStartedAt: signal(1),
     holdRequested: signal(false),
     jobReadTo: signal(null),
+    spindleInHold: signal(undefined),
     lastMessage: signal(null),
     overrides: signal({ feed: 100, rapid: 100, spindle: 100 }),
   } as unknown as typeof h.api;

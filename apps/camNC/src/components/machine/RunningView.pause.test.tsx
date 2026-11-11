@@ -2,7 +2,7 @@ import { FakeFluidnc } from '@wbcnc/fluidnc/testing';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CncApi } from '@/lib/fluidnc/cnc-api';
-import { boardProgram, controllerPercent } from '@/lib/machine/pauseHints.fixture';
+import { boardProgram, camProgram, controllerPercent } from '@/lib/machine/pauseHints.fixture';
 import { useStore } from '@/store/store';
 import { RunningView } from './RunningView';
 const h = vi.hoisted(() => ({ api: null as unknown as import('@/lib/fluidnc/cnc-api').CncApi }));
@@ -116,6 +116,44 @@ describe('the hold card, from the controller through CncApi', () => {
     fake.spindleSpeed = 0;
     await report('Hold:0', 477, -6.7);
     await until(() => h.api.status.value?.spindleOn === false);
+    view.rerender(<RunningView />);
+    expect(card()).toMatch(/Ready to start/);
+  });
+
+  it('in a 1 MB program, a spindle reported off only before the hold does not show the start pause', async () => {
+    const { gcode, size, startEnd, travelEnd } = camProgram(1_000_000);
+    useStore.getState().updateToolpath(gcode, 'Board A');
+    const frame = (state: string, byte: number, ov: string) =>
+      `<${state}|MPos:10.000,10.000,-6.700|FS:0,15000|WCO:0.000,0.000,-30.000${ov}|SD:${controllerPercent(byte, size).toFixed(2)},${file}>`;
+    const emit = async (line: string, done: () => boolean) => {
+      fake.emit([line]);
+      await until(done);
+      view?.rerender(<RunningView />);
+    };
+    view = render(<RunningView />);
+    // Off as reported before the M3 ran, then held in the travel after it with no report of the spindle since.
+    await emit(frame('Run', startEnd, '|Ov:100,100,100'), () => h.api.status.value?.spindleOn === false);
+    await emit(frame('Hold:0', travelEnd, ''), () => h.api.state.value === 'Hold');
+    expect(h.api.spindleInHold.value).toBeUndefined();
+    expect(card()).toContain(generic);
+    // The next report with the accessories says it runs.
+    await emit(frame('Hold:0', travelEnd, '|Ov:100,100,100|A:S'), () => h.api.spindleInHold.value === true);
+    expect(card()).toContain(generic);
+  });
+
+  it('in a 1 MB program held at the start M0, the start pause shows once a report during the hold says the spindle is off', async () => {
+    const { gcode, size, startEnd } = camProgram(1_000_000);
+    useStore.getState().updateToolpath(gcode, 'Board A');
+    const frame = (ov: string) =>
+      `<Hold:0|MPos:10.000,10.000,-6.700|FS:0,0|WCO:0.000,0.000,-30.000${ov}|SD:${controllerPercent(startEnd, size).toFixed(2)},${file}>`;
+    view = render(<RunningView />);
+    fake.emit([frame('')]);
+    await until(() => h.api.state.value === 'Hold' && h.api.jobProgress.value?.file === file);
+    view.rerender(<RunningView />);
+    // The window of a file this size reaches past the M3: no proof from the position alone.
+    expect(card()).toContain(generic);
+    fake.emit([frame('|Ov:100,100,100')]);
+    await until(() => h.api.spindleInHold.value === false);
     view.rerender(<RunningView />);
     expect(card()).toMatch(/Ready to start/);
   });

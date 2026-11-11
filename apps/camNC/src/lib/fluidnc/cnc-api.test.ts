@@ -391,6 +391,25 @@ describe('CncApi', () => {
     expect(api.jobReadTo.value).toEqual({ file: '/sd/job.gcode', percent: 0 });
   });
 
+  it('knows the spindle state of a hold only from a report sent during it', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    const frame = async (state: string, percent: number, ov: string, done: () => boolean) => {
+      fake.emit([`<${state}|MPos:0.000,0.000,0.000|FS:0,0${ov}|SD:${percent.toFixed(2)},/sd/job.gcode>`]);
+      await until(done);
+    };
+    await frame('Run', 3, '|Ov:100,100,100', () => api.status.value?.spindleOn === false && api.state.value === 'Run');
+    await frame('Hold:0', 3.2, '', () => api.state.value === 'Hold');
+    expect(api.spindleInHold.value).toBeUndefined();
+    await frame('Hold:0', 3.2, '|Ov:100,100,100', () => api.spindleInHold.value === false);
+    // Read on while still in Hold: it ran in between, so the off is from before.
+    await frame('Hold:0', 4, '', () => api.jobProgress.value?.percent === 4);
+    expect(api.spindleInHold.value).toBeUndefined();
+    await frame('Hold:0', 4, '|Ov:100,100,100|A:S', () => api.spindleInHold.value === true);
+    await frame('Run', 4.5, '', () => api.state.value === 'Run');
+    expect(api.spindleInHold.value).toBeUndefined();
+  });
+
   it('keeps the furthest SD position read in the job', async () => {
     const fake = new FakeFluidnc('v4');
     const api = await connected(fake);

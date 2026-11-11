@@ -94,7 +94,7 @@ describe.skipIf(!host)('FluidNC simulator', () => {
     const head = 'G21\nG90\nG0 X0 Y0\n(CAMNC PAUSE start; rpm=15000)\nM0 (MSG Router on, then Resume)\n';
     // M3 right after the start M0, as camNC writes it: the spindle state tells the two apart (no spindle is configured, so
     // this is the state FluidNC keeps for a router switched by hand).
-    const gcode = head + 'M3 S15000\n' + moves.join('\n') + '\nM5\nM0 (MSG Program done)\n';
+    const gcode = head + 'M3 S15000\nG4 P3\n' + moves.join('\n') + '\nM5\nM0 (MSG Program done)\n';
     const sd = (end: number) => Math.round((10000 * end) / gcode.length) / 100;
     const held = () => protocol.status?.state === 'Hold' && protocol.status.subState === 0;
     await uploadSdFile(protocol, host!, 'camnc-m0.gcode', gcode);
@@ -105,6 +105,17 @@ describe.skipIf(!host)('FluidNC simulator', () => {
     expect(protocol.status!.job?.percent).toBe(sd(head.length));
     await until(() => protocol.status?.spindleOn !== undefined, 10_000);
     expect(protocol.status!.spindleOn).toBe(false);
+    protocol.cycleStart();
+    // The M3 is reported at once, not with the periodic override report: well within the 3 s dwell after it.
+    const resumedAt = Date.now();
+    await until(() => protocol.status?.spindleOn === true, 3_000);
+    expect(Date.now() - resumedAt).toBeLessThan(1_500);
+    // Held during the dwell, right after the M3: the reader is a line past the start M0, and the spindle shows running.
+    protocol.feedHold();
+    await until(held, 10_000);
+    expect(Date.now() - resumedAt).toBeLessThan(3_000);
+    expect(protocol.status!.job?.percent).toBe(sd(head.length + 'M3 S15000\nG4 P3\n'.length));
+    expect(protocol.status!.spindleOn).toBe(true);
     protocol.cycleStart();
     await until(() => protocol.status?.state === 'Run' && (protocol.status.job?.percent ?? 0) > 30, 30_000);
     protocol.feedHold();

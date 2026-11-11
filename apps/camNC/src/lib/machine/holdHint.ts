@@ -12,8 +12,10 @@ export interface HoldContext {
   /** `undefined` while the work offset is not known yet. */
   wpos: { z: number } | undefined;
   /**
-   * The spindle as the controller reports its state (A:S or A:C), which it reports again right after any change; not
-   * the FS speed, which a disabled spindle can keep. `undefined` when it has not said yet.
+   * The spindle as the controller reports its state (A:S or A:C), not the FS speed, which a disabled spindle can keep.
+   * `on` from any report: FluidNC reports a spindle change right away (GCode.cpp `gc_ovr_changed()` after
+   * `spindle->setState`, which makes the next report carry Ov and A), so it only errs towards the generic card. `off`
+   * only from a report sent during this hold, the state while held. `undefined` otherwise.
    */
   spindle?: 'on' | 'off';
 }

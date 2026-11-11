@@ -48,7 +48,10 @@ function HoldExplanation() {
   const readTo = read && read.file === job?.file ? read.percent : undefined;
   // Until the controller reports the work offset, WPos is just MPos: no work Z to go by.
   const [mz, wz] = [status?.mpos?.z, status?.workKnown ? status.wpos?.z : undefined];
-  const spindle = status?.spindleOn === undefined ? undefined : status.spindleOn ? 'on' : 'off';
+  // Running, as last reported, rules the start pause out. Off counts only from a report sent during this hold: one
+  // from before may predate an M3 the job ran since.
+  const inHold = api.spindleInHold.value;
+  const spindle = status?.spindleOn || inHold ? 'on' : inHold === false ? 'off' : undefined;
   const hint = useMemo(
     () =>
       ours
