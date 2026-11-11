@@ -352,7 +352,8 @@ export async function inspectCadDocument(
   const physical = physicalJoinedCopies(activeDesign(solved.document));
   // Bones widen a cut past what was drawn, so its opening is measured on the part without them.
   const unrelieved = solved.document.parts.some(part => part.cornerRelief)
-    ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(({ cornerRelief: _, ...part }) => part) }).parts
+    ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(({ cornerRelief: _cornerRelief, ...part }) => part) })
+        .parts
     : solved.parts;
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
     const physicalPart = physical.parts.find(candidate => candidate.id === part.id)!;

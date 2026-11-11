@@ -270,7 +270,7 @@ function buildSlot(
         }
       }
       for (let j = 0; j < built.length; j++) {
-        const { spec, support, normal, side } = built[j]!,
+        const { spec, normal, side } = built[j]!,
           source = steps[j]!.curve;
         if (distance(spec.start.point, spec.end.point) <= tolerance)
           return { ok: false as const, message: 'The slot width consumes an entire path segment.' };

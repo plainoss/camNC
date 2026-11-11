@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCircle, addConstraint, addLine, createCadDocument, createCadPart } from './document';
+import { addCircle, addLine, createCadPart } from './document';
 import { dimensionAnnotationAngleWitness, resolveDimensionPlacement, withDimensionPlacement } from './dimensionPlacement';
 import { dimensionAngleWitness } from './dimensions';
 import type { CadDimension, CadPoint } from './types';
