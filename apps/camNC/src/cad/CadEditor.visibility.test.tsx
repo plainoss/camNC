@@ -119,7 +119,9 @@ it.each([
   await userEvent.click(screen.getByRole('menuitem', { name: 'Roll to here' }));
   await waitFor(() => expect(row(/Sketch · Face/).className).toContain('cad-feature-rolled-back'));
   await waitFor(() => expect(lines()).not.toContain('face'));
-  expect(within(row(/Sketch · Face/)).queryByRole('button', { name: 'Hide' })).toBeNull();
+  // Rolled back, the row has no eye at all: it couldn't show the sketch.
+  expect(within(row(/Sketch · Face/)).queryByRole('button', { name: /^(Hide|Show)$/ })).toBeNull();
+  expect(within(row(/Sketch · Plate/)).getByRole('button', { name: 'Show' })).toBeDefined();
   // Back at the end, the usual rules: shown until an Extrude uses it.
   fireEvent.contextMenu(within(row(/Sketch · Face/)).getByRole('button', { name: /Sketch · Face/ }));
   await userEvent.click(screen.getByRole('menuitem', { name: 'Roll to end' }));
