@@ -284,6 +284,7 @@ import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
 import { useEditorVariableFields } from './useEditorVariableFields';
+import { featureShownByDefault } from './sketchShown';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -3911,8 +3912,7 @@ export function CadEditor({
     (id: string) => {
       if (id in featureVisibility) return featureVisibility[id]!;
       // As the design is shown: rolled back to its sketch, a part isn't extruded yet, so its sketch shows.
-      const sketched = id.endsWith(':sketch') && shownDocument.parts.find(candidate => `${candidate.id}:sketch` === id);
-      return !sketched || !isCadPart(sketched);
+      return featureShownByDefault(shownDocument, id);
     },
     [featureVisibility, shownDocument]
   );
