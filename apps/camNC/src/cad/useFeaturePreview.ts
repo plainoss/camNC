@@ -39,7 +39,9 @@ export function useFeaturePreview({
       (transformDialog?.move ? `${transformDialog.partId}:move` : null) ??
       mirrorDialog?.copyId);
   const editingStep = enabled && candidate && ids.includes(candidate) ? candidate : null;
-  const rollbackStep = enabled ? (editingStep ?? (rolledTo && ids.includes(rolledTo) ? rolledTo : null)) : null;
+  // Where the user put the bar, whatever dialog is open: what an export of the shown design stops at.
+  const userRollback = enabled && rolledTo && ids.includes(rolledTo) ? rolledTo : null;
+  const rollbackStep = enabled ? (editingStep ?? userRollback) : null;
   // Tie Final to the edited step so switching dialogs never renders a later feature with a stale Final toggle.
   const [finalStep, setFinalStep] = useState<string | null>(null);
   const showFinal = !!editingStep && finalStep === editingStep;
@@ -78,5 +80,5 @@ export function useFeaturePreview({
     setCheckEpoch(epoch => epoch + 1);
   }, [extrudingId, lastCheckedRevision, setCheckEpoch]);
   const solveFeedback = useCallback((result: CadSolveResult) => withoutApartRegionProblem(result, extruding.current), []);
-  return { rollbackStep, rolledByUser, shownDocument, pastRollback, solveFeedback, apartIds };
+  return { rollbackStep, userRollback, shownDocument, pastRollback, solveFeedback, apartIds };
 }

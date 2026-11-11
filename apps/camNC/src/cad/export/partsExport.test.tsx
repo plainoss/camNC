@@ -164,6 +164,61 @@ it('exports what the view shows after Roll to here, and says that what is past t
   expect(files).toHaveLength(1);
 });
 
+it('blames the bar only for what it leaves out', async () => {
+  const plateDocument = createPlateDocument({ name: 'Box', width: 120, height: 80, thickness: 18 });
+  // A part that can't be built, before the plate: a loose point is no outline, but more than a new design's blank sketch.
+  const broken = {
+    ...createCadPart('Broken', 12),
+    sketch: { id: 'broken-sketch', entities: [{ id: 'loose', type: 'point' as const, x: 5, y: 5 }], constraints: [] },
+  };
+  const document = { ...plateDocument, parts: [broken, ...plateDocument.parts] };
+  const steps = designSteps(document);
+  const step = (kind: string, partId: string) => steps.find(candidate => candidate.kind === kind && candidate.partId === partId)!.id;
+  const files = captureDownloads();
+  const exportRow = async (rolledTo: string) => {
+    render(
+      <PartsList
+        rows={[{ key: broken.id, part: broken, name: broken.name }]}
+        document={document}
+        rolledTo={rolledTo}
+        hidden={false}
+        studio
+        selectedKey={undefined}
+        hiddenParts={new Set()}
+        onToggleHidden={() => undefined}
+        trouble={() => null}
+        onPick={() => undefined}
+        onRename={() => undefined}
+      />
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: /^Broken/ }), { clientX: 10, clientY: 10 });
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Export…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Export parts' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+    const text = within(dialog).getByRole('alert').textContent;
+    cleanup();
+    return text;
+  };
+  // Before the bar, a broken part says what's wrong with it, not that the bar left it out.
+  expect(await exportRow(step('extrude', broken.id))).toMatch(/^Broken: Its sketch needs fixing first/);
+  // A bar at the last step is no rollback at all.
+  expect(await exportRow(steps.at(-1)!.id)).toMatch(/^Broken: /);
+
+  // Rolled back to before any Extrude, the whole design's export says the bar is why there is nothing.
+  render(<StudioExportButton design={() => document} rolledTo={() => step('sketch', broken.id)} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Export parts' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/before the rollback bar/);
+  expect(files).toEqual([]);
+  cleanup();
+
+  // At its last step, the bar isn't mentioned.
+  render(<StudioExportButton design={() => document} rolledTo={() => steps.at(-1)!.id} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+  expect(within(screen.getByRole('dialog', { name: 'Export parts' })).queryByText(/rollback bar/)).toBeNull();
+});
+
 it('says a new design has no parts to export, not that its placeholder sketch needs fixing', async () => {
   const document = { ...createCadDocument('New'), parts: [createCadPart()] };
   const files = captureDownloads();

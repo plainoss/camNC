@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { sketchExportCurves, sketchToDxf, sketchToSvg, type CadDocument, type CadLengthUnit, type CadSketch } from '@wbcnc/cad';
 import { Button } from '@wbcnc/ui/components/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@wbcnc/ui/components/dialog';
@@ -17,6 +17,8 @@ export type ExportTarget =
       hidden?: ReadonlySet<string>;
       /** The document is the design at the view's rollback bar, so what's past it is left out. */
       rolledBack?: boolean;
+      /** The bar leaves out what's being exported: the one part, or every part of the design. */
+      leftOutByRollback?: boolean;
     };
 
 type Format = 'dxf' | 'svg' | 'step';
@@ -47,6 +49,7 @@ export function ExportDialog({
   const [confirmedPartial, setConfirmedPartial] = useState(false);
   const parts = target?.kind === 'parts';
   const empty = target?.kind === 'sketch' ? emptySketchReason(target.sketch, construction) : null;
+  const problemId = useId();
   // Each export starts from its own name and the design's unit; a sketch's format and options carry over.
   useEffect(() => {
     if (!target) return;
@@ -66,9 +69,11 @@ export function ExportDialog({
       const why = result.problems.map(({ name, message }) => `${name}: ${message}`).join(' ');
       if (!result.parts.length)
         return setProblem(
-          target.only && target.rolledBack
-            ? 'This part is past the rollback bar, so the view leaves it out. Roll to end to export it.'
-            : why || 'There are no parts to export.'
+          !target.leftOutByRollback
+            ? why || 'There are no parts to export.'
+            : target.only
+              ? 'This part is past the rollback bar, so the view leaves it out. Roll to end to export it.'
+              : 'No part is built before the rollback bar, so there are none to export. Roll to end to export them.'
         );
       // A file missing parts is only written once the person has seen which.
       if (why && !confirmedPartial) {
@@ -98,7 +103,7 @@ export function ExportDialog({
                   target.only
                     ? 'Download this part as a solid, where it is in the studio.'
                     : 'Download every shown part as a solid, where it is in the studio.'
-                }${target.rolledBack ? ' As the view, it stops at the rollback bar: what’s past it is left out.' : ''}`}
+                }${target.rolledBack ? ' Like the view, it stops at the rollback bar: what’s past it is left out.' : ''}`}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -159,11 +164,11 @@ export function ExportDialog({
             </label>
           )}
           {(problem ?? empty) && (
-            <p role="alert" className="text-sm text-destructive">
+            <p id={problemId} role="alert" className="text-sm text-destructive">
               {problem ?? empty}
             </p>
           )}
-          <Button type="submit" disabled={!!empty}>
+          <Button type="submit" disabled={!!empty} aria-describedby={(problem ?? empty) ? problemId : undefined}>
             {confirmedPartial ? 'Download without them' : 'Download'}
           </Button>
         </form>

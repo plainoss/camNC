@@ -97,6 +97,10 @@ it('refuses a sketch export with only construction curves, and downloads nothing
   await userEvent.click(screen.getByRole('menuitem', { name: 'Export as DXF/SVG…' }));
   const dialog = screen.getByRole('dialog', { name: 'Export sketch' });
   expect(within(dialog).getByRole('alert').textContent).toMatch(/Include construction geometry/);
+  // The disabled Download names its reason.
+  expect(within(dialog).getByRole('button', { name: 'Download' }).getAttribute('aria-describedby')).toBe(
+    within(dialog).getByRole('alert').id
+  );
   for (const format of ['svg', 'dxf']) {
     await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Format' }), format);
     expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Download' }).disabled).toBe(true);
