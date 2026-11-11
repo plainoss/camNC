@@ -32,3 +32,15 @@ it('does not run the editor shortcut of a key typed in the More menu', async () 
   expect(screen.queryByRole('dialog', { name: /^Sketch/ })).toBeNull();
   expect(screen.getByRole('menu')).toBeTruthy();
 });
+
+it('does not hand the editor a key pressed on the page while the More menu is open', async () => {
+  const features = await studio();
+  await userEvent.click(within(features).getByRole('button', { name: /^More/ }));
+  const menu = await screen.findByRole('menu');
+  // Focus slipping to the page would otherwise send the key to the editor's shortcuts.
+  (document.activeElement as HTMLElement | null)?.blur();
+  expect(document.activeElement).toBe(document.body);
+  await userEvent.keyboard('{Shift>}S{/Shift}');
+  expect(screen.queryByRole('dialog', { name: /^Sketch/ })).toBeNull();
+  expect(menu.isConnected).toBe(true);
+});
