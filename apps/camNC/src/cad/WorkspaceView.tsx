@@ -272,10 +272,13 @@ export default function WorkspaceView({
       ? [index]
       : []
   );
-  // A hovered Cut on one copy names that copy, which the viewport's part-wide highlight can't tell from its family.
+  // A hovered row that stands for one copy names that copy, which the viewport's part-wide highlightIds can't tell from
+  // its family. Hovered instances are therefore drawn as picked by index, alongside the selection; highlightIds stays
+  // for part-wide matches such as sketch lines.
   const hoverIndexes = hoverIds
     ? model.instances.flatMap((instance, index) => (cadPartReferenceMatches(hoverIds, instance.partId, instance.copyId) ? [index] : []))
     : [];
+  const pickedIndexes = [...new Set([...(selectedFace ? [] : selectedIndexes), ...hoverIndexes])];
   const selectedFrame = selectedFace && cadFaceFrame(document, selectedFace);
   const selectedFaceIndex = selectedFace
     ? model.instances.findIndex(instance => instance.partId === selectedFace.partId && instance.copyId === selectedFace.copyId)
@@ -397,7 +400,7 @@ export default function WorkspaceView({
         transparentIds={transparentIds}
         instanceIds={model.instances.map(instanceKey)}
         selectedId={selectedId}
-        selectedIndexes={[...new Set([...(selectedFace ? [] : selectedIndexes), ...hoverIndexes])]}
+        selectedIndexes={pickedIndexes}
         selectedFace={
           selectedFrame && !('error' in selectedFrame) && selectedFaceIndex >= 0
             ? {
