@@ -51,7 +51,7 @@
 .cad-proposal-body > aside section[data-kind='added'] li { color: #0f6b5e; }
 .cad-proposal-body > aside section[data-kind='changed'] li { color: #8a5a00; }
 .cad-proposal-body > aside section[data-kind='removed'] li { color: #a33232; text-decoration: line-through; }
-.cad-proposal-review > footer { position: absolute; left: calc(50% + 150px); bottom: 14px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 324px); flex-wrap: wrap; gap: 10px; padding: 8px 10px; border: 1.5px solid #14917f; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px #0002; }
+.cad-editor > .cad-proposal-review > footer { position: absolute; left: calc(50% + 150px); bottom: 14px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 324px); flex-wrap: wrap; gap: 10px; padding: 8px 10px; border: 1.5px solid #14917f; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px #0002; }
 .cad-proposal-review > footer p { margin: 0; font-size: 12px; color: #8a5a00; }
 .cad-proposal-modes { display: inline-flex; border: 1px solid #b9c6d6; border-radius: 8px; overflow: hidden; }
 .cad-proposal-review .cad-proposal-modes button { border: 0; border-radius: 0; min-height: 28px; padding: 4px 10px; }
@@ -59,10 +59,10 @@
 .cad-proposal-summary { font-size: 12px; color: #5b6475; }
 .cad-proposal-spacer { flex: 1; min-width: 8px; }
 .cad-proposal-review .cad-proposal-apply:not(:disabled) { background: #176c61; border-color: #176c61; color: #fff; font-weight: 600; }
-.cad-proposal-tweaks { position: absolute; top: 52px; right: 10px; width: 230px; display: grid; gap: 8px; padding: 10px; border: 1px solid #d7e0ed; border-radius: 10px; background: #fff; box-shadow: 0 6px 18px #0001; font-size: 12px; }
+.cad-editor .cad-proposal-tweaks { position: absolute; top: 52px; right: 10px; width: 230px; display: grid; gap: 8px; padding: 10px; border: 1px solid #d7e0ed; border-radius: 10px; background: #fff; box-shadow: 0 6px 18px #0001; font-size: 12px; }
 .cad-proposal-tweaks h3 { margin: 0; font-size: 13px; }
 .cad-proposal-tweaks label { display: grid; gap: 2px; }
 .cad-proposal-tweaks label > span { display: flex; justify-content: space-between; }
 .cad-proposal-tweaks input[type='range'] { width: 100%; accent-color: #27756b; }
 .cad-proposal-tweaks [role='status'] { margin: 0; color: #5b6475; }
-@media (max-width: 700px) { .cad-proposal-review > footer { position: static; transform: none; width: auto; margin: 0; } .cad-proposal-tweaks { position: static; width: auto; } }
+@media (max-width: 700px) { .cad-editor > .cad-proposal-review > footer { position: static; transform: none; width: auto; max-width: none; margin: 0; } .cad-editor .cad-proposal-tweaks { position: static; width: auto; } }
