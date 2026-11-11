@@ -105,4 +105,5 @@ it('carries legacy joined material through a complete cabinet, edits, reload, ph
     expect(JSON.stringify(document)).toBe(before);
     document = result.document;
   }
-});
+  // The whole cabinet workflow solves and plans several times; it takes ~25 s under a loaded parallel run.
+}, 60_000);
