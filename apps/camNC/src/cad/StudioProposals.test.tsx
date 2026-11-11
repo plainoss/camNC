@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { StudioProposals } from './StudioProposals';
+import { useAssistantProposal } from './assistant/useAssistantProposal';
 
 function width(document: CadDocument) {
   const outline = evaluateCadDocument(document).parts[0]!.outline;
@@ -26,12 +27,21 @@ function setup() {
   const session = cadSession(source);
   const onApply = vi.fn<(document: CadDocument) => void>();
   let disabled = false;
-  const component = () => (
-    <div className="cad-editor">
-      <StudioProposals document={session.document} session={session} disabled={disabled} onApply={onApply} />
-    </div>
-  );
-  const view = render(component());
+  const Component = () => {
+    const checkedProposal = useAssistantProposal(session.document);
+    return (
+      <div className="cad-editor">
+        <StudioProposals
+          checkedProposal={checkedProposal}
+          document={session.document}
+          session={session}
+          disabled={disabled}
+          onApply={onApply}
+        />
+      </div>
+    );
+  };
+  const view = render(<Component />);
   const input = view.container.querySelector<HTMLInputElement>('input[type="file"]')!;
   const upload = (candidate: CadDocument) =>
     fireEvent.change(input, { target: { files: [new File([JSON.stringify(candidate)], 'candidate.json', { type: 'application/json' })] } });
@@ -41,10 +51,10 @@ function setup() {
     onApply,
     input,
     upload,
-    refresh: () => view.rerender(component()),
+    refresh: () => view.rerender(<Component />),
     setDisabled: (value: boolean) => {
       disabled = value;
-      view.rerender(component());
+      view.rerender(<Component />);
     },
   };
 }

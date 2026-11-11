@@ -20,6 +20,8 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
+      // The curve-tracing worker must not trigger a dependency reload during a browser test.
+      'imagetracerjs',
       'vite-plugin-node-polyfills/shims/buffer',
       'vite-plugin-node-polyfills/shims/global',
       'vite-plugin-node-polyfills/shims/process',
