@@ -5,7 +5,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "oxlint --max-warnings 0"
   },
   "keywords": [],
   "author": "",

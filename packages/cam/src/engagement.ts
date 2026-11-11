@@ -1,17 +1,5 @@
-import {
-  clipLines,
-  difference,
-  intersect,
-  offset,
-  pathLength,
-  polyArea,
-  union,
-  unionMany,
-  type PathD,
-  type PathsD,
-  type Vec3,
-} from './geom';
-import { StockModel, sweptCapsule } from './stock';
+import type { Vec3 } from './geom';
+import { StockModel } from './stock';
 import type { Pass, Tool } from './toolpaths';
 import type { MotionRole } from './motion';
 import { parsedPostNumber } from './postValidation';
