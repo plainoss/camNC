@@ -45,10 +45,15 @@ export function useFeaturePreview({
     offerFinalPreview(offersFinal ? { shown: showFinal, toggle: () => setFinalStep(showFinal ? null : editingStep) } : null);
     return () => offerFinalPreview(null);
   }, [offersFinal, showFinal, editingStep]);
+  const rolledBack = rollbackStep && !(offersFinal && showFinal) ? rollbackStep : null;
   const shownDocument = useMemo(
-    () =>
-      blank ? { ...document, parts: [] } : rollbackStep && !(offersFinal && showFinal) ? rolledBackTo(document, rollbackStep) : document,
-    [document, blank, rollbackStep, offersFinal, showFinal]
+    () => (blank ? { ...document, parts: [] } : rolledBack ? rolledBackTo(document, rolledBack) : document),
+    [document, blank, rolledBack]
   );
-  return { rollbackStep, shownDocument };
+  // The steps below the rollback bar: left out of the view, whatever their eye was set to.
+  const pastRollback = useMemo<ReadonlySet<string>>(() => {
+    const steps = rolledBack ? designSteps(document).map(step => step.id) : [];
+    return new Set(steps.slice(steps.indexOf(rolledBack!) + 1));
+  }, [document, rolledBack]);
+  return { rollbackStep, shownDocument, pastRollback };
 }
