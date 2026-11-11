@@ -532,6 +532,10 @@ test('Deploy ships production only from main pushes and previews only same-repos
   assert.match(step('Deploy production').run, /pnpm run deploy$/);
   assert.equal(step('Upload preview version').if, "github.event_name == 'pull_request'");
   assert.match(step('Upload preview version').run, /deploy:preview -- --preview-alias pr-/);
+  const comment = step('Comment the preview links');
+  assert.equal(comment.if, "github.event_name == 'pull_request'");
+  assert.match(comment.run, /camnc-preview -->[\s\S]*PATCH/, 'one preview comment, edited on every upload');
+  assert.equal(deploy.permissions['pull-requests'], 'write');
   assert.equal(smoke.uses, './.github/workflows/setup-smoke.yml');
   assert.equal(smoke.if, "github.event_name == 'push'");
   assert('workflow_call' in parse(read('.github/workflows/setup-smoke.yml')).on);
