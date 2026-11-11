@@ -1,7 +1,8 @@
-import { areaD, simplifyPathsD, type PathD, type PathsD } from 'clipper2-ts';
+import { areaD, type PathD, type PathsD } from 'clipper2-ts';
 import { profileFeatures } from './cutFeatures';
 import type { PartFeatures } from './features';
 import { offset, union } from './geom';
+import { simplifyLoop } from './simplifyLoop';
 
 /**
  * A piece cut out of the board along a closed outline (board frame, mm): a carved sign cut to its silhouette. It is
@@ -39,7 +40,12 @@ const biggest = (paths: PathsD) => [...paths].sort((a, b) => areaD(b) - areaD(a)
 export function cutoutSilhouette(region: PathsD, shape: CutoutShape, margin: number, cornerRadius = 6): PathsD {
   if (!region.length) return [];
   if (shape === 'outline') {
-    const grown = outer(offset(simplifyPathsD(outer(region), kTraceTolerance, true), margin + kTraceTolerance));
+    const grown = outer(
+      offset(
+        outer(region).map(loop => simplifyLoop(loop, kTraceTolerance)),
+        margin + kTraceTolerance
+      )
+    );
     for (let bridge = 0; bridge <= kMaxBridge; bridge += 4) {
       const closed = bridge ? outer(offset(offset(grown, bridge), -bridge)) : outer(union(grown, []));
       if (closed.length <= 1) return closed;
