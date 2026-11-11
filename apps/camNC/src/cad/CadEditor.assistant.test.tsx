@@ -47,6 +47,7 @@ function recorded() {
       text: '',
       calls: [{ id: 'check-1', name: 'check_design', arguments: { source: 'd => { d.part("Plate").thickness(24); }' } }],
     },
+    { role: 'assistant', text: '', calls: [{ id: 'finalize-1', name: 'finalize_design', arguments: {} }] },
     { role: 'assistant', text: 'Proposal: the plate is 24 mm thick, with its original outline and IDs.' },
   ];
   vi.mocked(requestAssistant).mockImplementation(async () => replies.shift()!);
@@ -83,6 +84,7 @@ it('checks a recorded model proposal, previews it, applies it once and undoes th
   await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Make the plate 24 mm thick.');
   await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
   const preview = await within(dock).findByRole('button', { name: 'Review proposal' }, { timeout: 45_000 });
+  expect(readConversation(source.id).some(message => message.role === 'tool' && message.text.includes('"stage":"complete"'))).toBe(true);
   expect(latest().parts[0]!.thickness).toBe(18);
   await userEvent.click(preview);
   const review = await screen.findByRole('dialog', { name: 'Review design change' });
