@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addArc,
   addCircle,
   addLine,
   addRectangle,
@@ -97,14 +98,33 @@ describe('the solid regions of a sketch of shapes apart', () => {
     expect(parts[0]!.holes.map(area)).toEqual([1500]);
   });
 
-  it('keeps the inside of a frame cut across once a hole', () => {
-    const sketch = addLine(frame(createCadPart('Part 1', 18).sketch), { x1: 60, y1: 0, x2: 60, y2: 20 });
-    expect(sketchRegions(sketch, CAD_CHORD_TOLERANCE)).toHaveLength(2);
-    const solid = solidSketchRegionIds(sketch);
-    expect(solid).toHaveLength(1);
-    const profile = evaluated({ ...createCadPart('Part 1', 18), sketch, regions: solid });
-    expect(area(profile.outline)).toBe(5600);
-    expect(profile.holes.map(area)).toEqual([1500]);
+  it('keeps the inside of a frame cut across twice a hole', () => {
+    let sketch = frame(createCadPart('Part 1', 18).sketch);
+    sketch = addLine(sketch, { x1: 60, y1: 0, x2: 60, y2: 20 });
+    sketch = addLine(sketch, { x1: 60, y1: 50, x2: 60, y2: 70 });
+    expect(sketchRegions(sketch, CAD_CHORD_TOLERANCE)).toHaveLength(3);
+    expect(solidSketchRegionIds(sketch)).toHaveLength(2);
+    const parts = extrudedApart(sketch).map(evaluated);
+    expect(parts.map(part => area(part.outline))).toEqual([5600]);
+    expect(parts[0]!.holes.map(area)).toEqual([1500]);
+  });
+
+  it('keeps a ring of arcs cut into pieces around its hole', () => {
+    let sketch = createCadPart('Part 1', 18).sketch;
+    for (const radius of [40, 20])
+      for (const [startAngle, endAngle] of [
+        [0, Math.PI],
+        [Math.PI, 2 * Math.PI],
+      ] as const)
+        sketch = addArc(sketch, { cx: 0, cy: 0, radius, startAngle, endAngle });
+    sketch = addLine(sketch, { x1: 20, y1: 0, x2: 40, y2: 0 });
+    sketch = addLine(sketch, { x1: -40, y1: 0, x2: -20, y2: 0 });
+    expect(sketchRegions(sketch, CAD_CHORD_TOLERANCE)).toHaveLength(3);
+    expect(solidSketchRegionIds(sketch)).toHaveLength(2);
+    const parts = extrudedApart(sketch).map(evaluated);
+    expect(parts).toHaveLength(1);
+    expect(parts[0]!.holes).toHaveLength(1);
+    expect(area(parts[0]!.holes[0]!)).toBeCloseTo(Math.PI * 400, -1);
   });
 
   it('keeps every piece of an overlapping pair solid', () => {
@@ -144,5 +164,63 @@ describe('the solid regions of a sketch of shapes apart', () => {
     const profile = evaluated({ ...createCadPart('Part 1', 18), sketch, regions: solid });
     expect(area(profile.outline)).toBe(20000);
     expect(profile.holes.map(area)).toEqual([4200]);
+  });
+
+  it('keeps every piece of three overlapping circles solid', () => {
+    let sketch = createCadPart('Part 1', 18).sketch;
+    for (const [x, y] of [
+      [0, 0],
+      [30, 0],
+      [15, 25],
+    ] as const)
+      sketch = addCircle(sketch, { x, y, radius: 30 });
+    const regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE);
+    expect(regions).toHaveLength(7);
+    expect(solidSketchRegionIds(sketch)).toHaveLength(7);
+    const parts = extrudedApart(sketch).map(evaluated);
+    expect(parts).toHaveLength(1);
+    expect(parts[0]!.holes).toEqual([]);
+  });
+
+  it('keeps every piece of three overlapping rectangles solid', () => {
+    let sketch = createCadPart('Part 1', 18).sketch;
+    for (const [x, y] of [
+      [0, 0],
+      [30, 20],
+      [15, 30],
+    ] as const)
+      sketch = addRectangle(sketch, { x, y, width: 60, height: 40 });
+    const regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE);
+    expect(regions.length).toBeGreaterThan(4);
+    expect(solidSketchRegionIds(sketch)).toHaveLength(regions.length);
+    const parts = extrudedApart(sketch).map(evaluated);
+    expect(parts).toHaveLength(1);
+    expect(parts[0]!.holes).toEqual([]);
+  });
+
+  for (const cells of [3, 4, 5])
+    for (const overhang of [0, 5])
+      it(`keeps every cell of a ${cells} × ${cells} grid of lines solid${overhang ? ', its lines running on past it' : ''}`, () => {
+        let sketch = createCadPart('Part 1', 18).sketch;
+        const size = cells * 10;
+        for (let i = 0; i <= cells; i++) {
+          sketch = addLine(sketch, { x1: -overhang, y1: i * 10, x2: size + overhang, y2: i * 10 });
+          sketch = addLine(sketch, { x1: i * 10, y1: -overhang, x2: i * 10, y2: size + overhang });
+        }
+        expect(sketchRegions(sketch, CAD_CHORD_TOLERANCE)).toHaveLength(cells * cells);
+        expect(solidSketchRegionIds(sketch)).toHaveLength(cells * cells);
+      });
+
+  it('keeps a diamond touching the sides of a square solid', () => {
+    let sketch = addRectangle(createCadPart('Part 1', 18).sketch, { x: 0, y: 0, width: 100, height: 100 });
+    for (const [x1, y1, x2, y2] of [
+      [50, 0, 100, 50],
+      [100, 50, 50, 100],
+      [50, 100, 0, 50],
+      [0, 50, 50, 0],
+    ] as const)
+      sketch = addLine(sketch, { x1, y1, x2, y2 });
+    expect(sketchRegions(sketch, CAD_CHORD_TOLERANCE)).toHaveLength(5);
+    expect(solidSketchRegionIds(sketch)).toHaveLength(5);
   });
 });

@@ -375,7 +375,8 @@ export function pointInPolygon(point: CadPoint, polygon: CadPoint[]): boolean {
   return inside;
 }
 
-function loopsMeet(a: CadPoint[], b: CadPoint[]): boolean {
+/** Whether two closed polylines touch or cross anywhere. */
+export function loopsMeet(a: CadPoint[], b: CadPoint[]): boolean {
   for (let i = 0; i < a.length; i++)
     for (let j = 0; j < b.length; j++) {
       if (segmentsMeet(a[i]!, a[(i + 1) % a.length]!, b[j]!, b[(j + 1) % b.length]!)) return true;
