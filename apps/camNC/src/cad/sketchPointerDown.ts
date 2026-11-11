@@ -26,7 +26,7 @@ import { pointsOf } from './fitSketchView';
 import type { SketchEditorInput } from './sketchEditorInput';
 
 // The sketch canvas pointer-down handler, split out of CadEditor. It reads the editor through SketchEditorInput.
-export function sketchPointerDown(input: SketchEditorInput, event: PointerEvent<SVGSVGElement>) {
+export function sketchPointerDown(editor: SketchEditorInput, event: PointerEvent<SVGSVGElement>) {
   const {
     acceptLinearPattern,
     acceptOffset,
@@ -98,7 +98,7 @@ export function sketchPointerDown(input: SketchEditorInput, event: PointerEvent<
     transformSelectionCenter,
     usingEdges,
     view,
-  } = input;
+  } = editor;
   if (busy) return;
   svg.current?.focus();
   if (event.button === 1 || event.button === 2) {

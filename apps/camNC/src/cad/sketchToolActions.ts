@@ -31,7 +31,7 @@ import { beginModification, idleModificationWorkflow, modificationSourceIds } fr
 import type { SketchEditorInput } from './sketchEditorInput';
 
 // Choosing a sketch tool and adding the drawn shape, split out of CadEditor. They read the editor through SketchEditorInput.
-export function chooseSketchTool(input: SketchEditorInput, next: Tool) {
+export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
   const {
     boxGesture,
     chain,
@@ -95,7 +95,7 @@ export function chooseSketchTool(input: SketchEditorInput, next: Tool) {
     tool,
     transformDrag,
     transformSelectionCenter,
-  } = input;
+  } = editor;
   slotDrag.current = null;
   // Choosing any tool, Select included, ends Use.
   setUsingEdges(false);
@@ -267,7 +267,7 @@ export function chooseSketchTool(input: SketchEditorInput, next: Tool) {
   svg.current?.focus();
 }
 
-export function addSketchShape(input: SketchEditorInput, end?: Point) {
+export function addSketchShape(editor: SketchEditorInput, end?: Point) {
   const {
     addSnapRelations,
     centerArcSweep,
@@ -309,7 +309,7 @@ export function addSketchShape(input: SketchEditorInput, end?: Point) {
     tool,
     variableScope,
     width,
-  } = input;
+  } = editor;
   if (!sketch || !pending[0]) return;
   const anchor = lineContinuation ? chainGeometry(sketch, chain) : null;
   const start = anchor?.point ?? pending[0];

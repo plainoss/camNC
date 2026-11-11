@@ -16,7 +16,7 @@ import { drawingMatrix, edgeOn, straightOn, turnedBy } from './sketchOrbit';
 import type { SketchEditorInput } from './sketchEditorInput';
 
 // The sketch canvas pointer-move and pointer-up handlers, split out of CadEditor. They read the editor through SketchEditorInput.
-export function sketchPointerMove(input: SketchEditorInput, event: PointerEvent<SVGSVGElement>) {
+export function sketchPointerMove(editor: SketchEditorInput, event: PointerEvent<SVGSVGElement>) {
   const {
     annotationDrag,
     boxGesture,
@@ -72,7 +72,7 @@ export function sketchPointerMove(input: SketchEditorInput, event: PointerEvent<
     svg,
     tool,
     transformDrag,
-  } = input;
+  } = editor;
   if (slotDrag.current) {
     const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
     if (!matrix) return;
@@ -353,7 +353,7 @@ export function sketchPointerMove(input: SketchEditorInput, event: PointerEvent<
   void solveDrag(moving);
 }
 
-export function sketchPointerEnd(input: SketchEditorInput, cancel = false, event?: PointerEvent<SVGSVGElement>) {
+export function sketchPointerEnd(editor: SketchEditorInput, cancel = false, event?: PointerEvent<SVGSVGElement>) {
   const {
     addShape,
     annotationDrag,
@@ -398,7 +398,7 @@ export function sketchPointerEnd(input: SketchEditorInput, cancel = false, event
     svg,
     tool,
     transformDrag,
-  } = input;
+  } = editor;
   if (slotDrag.current) {
     if (cancel) setSlotWidth(slotDrag.current.width);
     slotDrag.current = null;
