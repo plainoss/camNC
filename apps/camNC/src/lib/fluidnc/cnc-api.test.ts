@@ -301,6 +301,47 @@ describe('CncApi', () => {
     api.connect(fake.host);
     await until(() => api.connection.value === 'unreachable');
   });
+
+  it('knows a hold is the Pause camNC sent until the job runs again, not a program pause after it', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    fake.state = 'Run';
+    fake.job = { file: '/sd/job.gcode', percent: 88.2 };
+    fake.pushStatus();
+    await until(() => api.state.value === 'Run');
+    api.feedHold();
+    expect(api.holdRequested.value).toBe(true);
+    // A report sent before the controller took the Pause does not end it.
+    fake.state = 'Run';
+    fake.pushStatus();
+    await until(() => fake.realtime.includes(Realtime.feedHold));
+    fake.state = 'Hold:0';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Hold');
+    expect(api.holdRequested.value).toBe(true);
+    await api.resume();
+    fake.pushStatus();
+    await until(() => api.state.value === 'Run');
+    expect(api.holdRequested.value).toBe(false);
+    // The program's own M0 is a Hold camNC did not send.
+    fake.state = 'Hold:0';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Hold');
+    expect(api.holdRequested.value).toBe(false);
+  });
+
+  it('forgets the Pause once the job ends', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    fake.state = 'Run';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Run');
+    api.feedHold();
+    fake.state = 'Idle';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Idle');
+    expect(api.holdRequested.value).toBe(false);
+  });
 });
 
 describe('overrideSteps', () => {

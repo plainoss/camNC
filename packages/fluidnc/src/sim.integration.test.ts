@@ -87,6 +87,32 @@ describe.skipIf(!host)('FluidNC simulator', () => {
     await deleteSdFile(protocol, 'camnc-it.gcode');
   }, 90_000);
 
+  it('at an M0 reports the SD position just after it, and a feed hold in the cut somewhere else', async () => {
+    const moves = Array.from({ length: 200 }, (_, i) => `G1 X${(i % 2) * 40} Y${i % 50} F3000`);
+    const head = 'G21\nG90\nG0 X0 Y0\n(CAMNC PAUSE start; rpm=15000)\nM0 (MSG Router on, then Resume)\n';
+    const gcode = head + moves.join('\n') + '\nM0 (MSG Program done)\n';
+    const sd = (end: number) => Math.round((10000 * end) / gcode.length) / 100;
+    await uploadSdFile(protocol, host!, 'camnc-m0.gcode', gcode);
+    statuses.length = 0;
+    await runSdFile(protocol, 'camnc-m0.gcode');
+    await until(() => protocol.status?.state === 'Hold' && protocol.status.subState === 0);
+    // Reading stopped at the M0 itself, not lines ahead like the planner reads in the cut.
+    expect(protocol.status!.job?.percent).toBe(sd(head.length));
+    protocol.cycleStart();
+    await until(() => (protocol.status?.job?.percent ?? 0) > 30 && protocol.status?.state === 'Run');
+    protocol.feedHold();
+    await until(() => protocol.status?.state === 'Hold' && protocol.status.subState === 0);
+    const held = protocol.status!.job!.percent;
+    expect(held).not.toBe(sd(head.length));
+    expect(held).not.toBe(sd(gcode.length));
+    protocol.cycleStart();
+    await until(() => protocol.status?.state === 'Hold' && protocol.status.subState === 0 && protocol.status.job!.percent > held, 60_000);
+    expect(protocol.status!.job?.percent).toBe(sd(gcode.length));
+    protocol.cycleStart();
+    await until(() => protocol.status?.state === 'Idle' && protocol.status.job === undefined, 60_000);
+    await deleteSdFile(protocol, 'camnc-m0.gcode');
+  }, 120_000);
+
   it('rejects in-flight commands on soft reset', async () => {
     const dwell = protocol.send('G4 P3', { timeoutMs: 0 }).catch(e => e);
     await new Promise(resolve => setTimeout(resolve, 100));

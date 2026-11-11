@@ -105,6 +105,11 @@ export class CncApi {
   public readonly homed = signal(false);
   /** When Z zero was last set from camNC (probe or "Zero Z"), for the pre-job checklist. */
   public readonly zZeroedAt = signal<number | null>(null);
+  /**
+   * camNC sent the feed hold (Pause, Stop) the controller is in or going into. FluidNC reports a program pause (M0) as
+   * the same Hold, so this is what tells the user's Pause apart from one. Cleared once the job runs again or ends.
+   */
+  public readonly holdRequested = signal(false);
   /** When the current SD job was first seen running, for the time estimate. */
   public readonly jobStartedAt = signal<number | null>(null);
   public readonly isConnected = computed(() => this.connection.value === 'connected');
@@ -145,6 +150,7 @@ export class CncApi {
     this.disconnect();
     this.homed.value = false;
     this.zZeroedAt.value = null;
+    this.holdRequested.value = false;
     this.lastAlarm.value = loadLastAlarm(host);
     this.host.value = host;
     this.connection.value = 'connecting';
@@ -280,6 +286,10 @@ export class CncApi {
         // 4.x drops the SD field while in Hold, so only a finished job (not Hold) clears the start time.
         if (status.job && this.jobStartedAt.value === null) this.jobStartedAt.value = Date.now();
         if (!status.job && status.state !== 'Hold') this.jobStartedAt.value = null;
+        // Only Run after a hold: a report sent just before the controller took the Pause still says Run.
+        const was = this.status.value?.state;
+        const runsAgain = status.state === 'Run' && (was === 'Hold' || was === 'Door');
+        if (runsAgain || status.state === 'Idle' || status.state === 'Alarm') this.holdRequested.value = false;
         this.status.value = status;
         if (status.state !== 'Alarm' && this.alarm.value) this.alarm.value = null;
         const lastAlarm = this.lastAlarm.value;
@@ -384,6 +394,7 @@ export class CncApi {
 
   feedHold() {
     this.api.feedHold();
+    this.holdRequested.value = true;
   }
 
   /** Cycle start. FluidNC ignores it while a hold is still decelerating, so wait for Hold:0 first. */

@@ -13,8 +13,14 @@ export interface PauseHint {
 }
 
 const kPause = /\b(M0?0|M0?1|M60|M0?6)\b/i;
-/** How far (bytes) the reported progress may be from the end of the pausing line. FluidNC reads M0 as a sync point. */
-const kMaxDistance = 2048;
+/**
+ * FluidNC reads a job one line at a time and does not read on while it waits at an M0, so at a program pause its `SD:`
+ * percent is the byte just after the pausing line. It reports two decimals, so that position is known to within half a
+ * hundredth of a percent of the file. A feed hold leaves the reader wherever planning got to, usually lines away.
+ */
+const kPercentRounding = 0.005;
+/** For the float the controller computes the percent in. */
+const kSlackBytes = 1;
 /** Lines after the pause that are looked at for what comes next. */
 const kLookAhead = 12;
 
@@ -71,16 +77,25 @@ function describeNext(lines: Line[], from: number, gcode: string): string | null
 }
 
 /**
+ * What to explain while the job is in Hold: the program pause the controller stopped at, or `null` for the generic
+ * Hold card. A hold camNC sent itself (Pause, Stop) is a feed hold wherever the job is, so it never gets a program
+ * pause's steps: near the start or end of the cut those say to switch the router on or off, or that the program is done.
+ */
+export function holdHint(gcode: string, percent: number | undefined, { holdRequested }: { holdRequested: boolean }) {
+  if (holdRequested || percent === undefined) return null;
+  return pauseHint(gcode, percent);
+}
+
+/**
  * Find the command the job paused at, given FluidNC's `SD:` percent (share of the file read), and explain it.
- * Returns `null` when no pausing command is near that position, e.g. after a feed hold.
+ * Returns `null` unless the reported position is the end of a pausing line, e.g. after a feed hold.
  */
 export function pauseHint(gcode: string, percent: number): PauseHint | null {
   const lines = splitLines(gcode);
-  const total = lines.at(-1)?.end ?? 0;
+  const total = new TextEncoder().encode(gcode).length;
   if (!total) return null;
   const byte = (percent / 100) * total;
-  // The percent is rounded to two decimals; allow for that on large files.
-  const tolerance = Math.max(kMaxDistance, total * 0.0001);
+  const tolerance = (total * kPercentRounding) / 100 + kSlackBytes;
   // FluidNC reports the position just after the pausing line; take the pause closest to it, so that a second pause
   // shortly after (e.g. a bit change after a short first operation) is not mistaken for the first one.
   let best = -1;

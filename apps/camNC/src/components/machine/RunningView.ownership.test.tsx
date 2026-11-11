@@ -13,7 +13,7 @@ vi.mock('@/lib/machine/jobs', () => ({
   stopJob: vi.fn(),
   errorText: String,
 }));
-vi.mock('@/lib/machine/pauseHints', () => ({ pauseHint: h.hint }));
+vi.mock('@/lib/machine/pauseHints', () => ({ holdHint: h.hint }));
 vi.mock('./controls', () => ({ PositionLine: () => null, OverridesPanel: () => null }));
 vi.mock('./AlarmCard', () => ({ AlarmCard: () => null }));
 vi.mock('./PauseSteps', () => ({ PauseSteps: () => <p>Wrong loaded program guidance</p> }));
@@ -29,6 +29,7 @@ it('P6 does not show loaded-program pause guidance for another camNC SD executio
     state: signal('Hold'),
     jobProgress: signal({ file: '/sd/camnc-11111111-1111-1111-1111-111111111111.gcode', percent: 20 }),
     jobStartedAt: signal(1),
+    holdRequested: signal(false),
     lastMessage: signal(null),
     overrides: signal({ feed: 100, rapid: 100, spindle: 100 }),
   } as unknown as typeof h.api;
