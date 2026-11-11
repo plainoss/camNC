@@ -5,6 +5,7 @@ import { cleanup, act, fireEvent, render, screen, waitFor } from '@testing-libra
 import { Box2, Vector2 } from 'three';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BoardsStep, drawing, holdsMenu, suggestHolds, openBoard, clientOf, openKinderregal } from './boardsTestFixture';
+import { settled } from '@/test/settled';
 
 describe('CAM boards.holds step', () => {
   it('places a clamp with the tool: a click on its own preview counts, parts make room, and the status says so', async () => {
@@ -105,27 +106,29 @@ describe('CAM boards.holds step', () => {
     const fewer = () => holdsMenu('One clamp fewer');
     const more_ = () => holdsMenu('One clamp more');
     const closeMenu = () => fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
-    // Saved isn't shown yet: the menu waits until the drawing has the holds, so the update can't close it under us.
-    const shown = (count: number) =>
-      waitFor(() => expect(drawing('A').querySelectorAll('[data-hold]')).toHaveLength(count), { timeout: 10_000 });
+    // Saved is shown too once settled: the next menu opens on a drawing with the holds, so the update can't close it.
+    const shown = (count: number) => expect(drawing('A').querySelectorAll('[data-hold]')).toHaveLength(count);
     // Nothing to nudge until there are holds.
     expect(isOff(await fewer())).toBe(true);
     expect(isOff(screen.getByRole('menuitem', { name: 'One clamp more' }))).toBe(true);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Suggest holds' }));
-    await waitFor(async () => expect((await saved()).fixtures?.length).toBeGreaterThanOrEqual(3), { timeout: 10_000 });
+    await settled({ timeout: 60_000 });
+    expect((await saved()).fixtures?.length).toBeGreaterThanOrEqual(3);
     const before = (await saved()).fixtures!;
-    await shown(before.length);
+    shown(before.length);
     fireEvent.click(await more_());
-    await waitFor(async () => expect((await saved()).fixtures).toHaveLength(before.length + 1), { timeout: 10_000 });
+    await settled({ timeout: 60_000 });
+    expect((await saved()).fixtures).toHaveLength(before.length + 1);
     expect((await saved()).fixtures!.slice(0, before.length)).toEqual(before);
     // Fewer takes that one back, or a clamp the rest do without: what stays, stays where it was.
     const more = (await saved()).fixtures!;
-    await shown(more.length);
+    shown(more.length);
     const item = await fewer();
     expect(isOff(item)).toBe(more.length <= 3);
     if (isOff(item)) closeMenu();
     else fireEvent.click(item);
-    await waitFor(async () => expect((await saved()).fixtures).toHaveLength(more.length - 1), { timeout: 10_000 });
+    await settled({ timeout: 60_000 });
+    expect((await saved()).fixtures).toHaveLength(more.length - 1);
     for (const f of (await saved()).fixtures!) expect(more).toContainEqual(f);
   }, 90_000);
 
