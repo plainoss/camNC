@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCircle,
   createCadFolder,
+  createCadPart,
   createPlateDocument,
   parseCadDocument,
   setCadVariable,
@@ -142,9 +143,19 @@ describe('durable construction source and compatibility', () => {
 
   it.each(['relief-off', 'relief-object'])('keeps a construction plan together with per-step corner relief at floor 6: %s', feature => {
     const { document, plan } = fixture();
+    const planned = setCadConstruction(document, plan);
     const input = {
-      ...setCadConstruction(document, plan),
-      partCuts: [{ id: 'relief-cut', tools: [], targets: [], clearance: 0, cornerRelief: feature === 'relief-off' ? null : { diameter: 6 } }],
+      ...planned,
+      parts: [...planned.parts, { ...createCadPart('Tool', 6), id: 'relief-tool' }],
+      partCuts: [
+        {
+          id: 'relief-cut',
+          tools: ['relief-tool'],
+          targets: [planned.parts[0]!.id],
+          clearance: 0,
+          cornerRelief: feature === 'relief-off' ? null : { diameter: 6 },
+        },
+      ],
     };
     expect(parseCadDocument(input).version).toBe(6);
     expect(validateCadDocument(input).filter(d => d.code === 'invalid-document')).toEqual([]);
@@ -156,22 +167,29 @@ describe('durable construction source and compatibility', () => {
     plan.hardware[0]!.holes.push({ ...plan.hardware[0]!.holes[0]!, purpose: 'pilot', role: 'seat' });
     const declared = setCadConstruction(document, plan);
     const reloaded = parseCadDocument(JSON.parse(JSON.stringify(declared)));
-    expect(reloaded.constructions![0]!.hardware[0]!.holes.map(a => [a.purpose, a.role])).toEqual([['clearance', 'key'], ['pilot', 'seat']]);
+    expect(reloaded.constructions![0]!.hardware[0]!.holes.map(a => [a.purpose, a.role])).toEqual([
+      ['clearance', 'key'],
+      ['pilot', 'seat'],
+    ]);
     expect(constructionReferenceIssues(reloaded)).toEqual([]);
     reloaded.constructions![0]!.hardware[0]!.holes[1]!.sketchId = 'removed-pilot-sketch';
     expect(constructionReferenceIssues(parseCadDocument(reloaded)).some(d => d.message.includes('(pilot)'))).toBe(true);
   });
 
-  it.each(['empty', 'too-many', 'duplicate', 'duplicate-entity', 'purpose-array', 'purpose-object'])('rejects malformed hardware anchors: %s', mutation => {
-    const { document, plan } = fixture();
-    const item = plan.hardware[0]!;
-    if (mutation === 'empty') item.holes = [];
-    if (mutation === 'too-many') item.holes = Array(5).fill(item.holes[0]);
-    if (mutation === 'duplicate') item.holes.push({ ...item.holes[0]!, purpose: 'pilot' });
-    if (mutation === 'duplicate-entity') item.holes[0]!.entityIds.push(item.holes[0]!.entityIds[0]!);
-    if (mutation.startsWith('purpose')) (item.holes[0] as unknown as Record<string, unknown>).purpose = mutation === 'purpose-array' ? ['clearance'] : { toString: null };
-    expect(() => parseCadDocument({ ...document, version: 6, constructions: [plan] })).toThrow('Invalid CAD construction plans');
-  });
+  it.each(['empty', 'too-many', 'duplicate', 'duplicate-entity', 'purpose-array', 'purpose-object'])(
+    'rejects malformed hardware anchors: %s',
+    mutation => {
+      const { document, plan } = fixture();
+      const item = plan.hardware[0]!;
+      if (mutation === 'empty') item.holes = [];
+      if (mutation === 'too-many') item.holes = Array(5).fill(item.holes[0]);
+      if (mutation === 'duplicate') item.holes.push({ ...item.holes[0]!, purpose: 'pilot' });
+      if (mutation === 'duplicate-entity') item.holes[0]!.entityIds.push(item.holes[0]!.entityIds[0]!);
+      if (mutation.startsWith('purpose'))
+        (item.holes[0] as unknown as Record<string, unknown>).purpose = mutation === 'purpose-array' ? ['clearance'] : { toString: null };
+      expect(() => parseCadDocument({ ...document, version: 6, constructions: [plan] })).toThrow('Invalid CAD construction plans');
+    }
+  );
 
   it.each([
     ['recipe', 'panel-chair-keyed-v1'],

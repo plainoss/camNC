@@ -75,9 +75,21 @@ export function constructionShapeIssue(input: unknown): string | undefined {
     if (
       !list(plan.hardware, 512, h => {
         if (!object(h, ['id', 'kind', 'specification', 'holes', 'lengthVariableId', ...dimensionKeys, 'installation'])) return false;
-        if (!list(h.holes, 4, anchor => object(anchor, ['purpose', 'role', 'sketchId', 'entityIds']) &&
-          oneOf(anchor.purpose, ['clearance', 'pilot']) && text(anchor.role) && text(anchor.sketchId) &&
-          list(anchor.entityIds, 16, item => text(item), 1) && new Set(anchor.entityIds as string[]).size === (anchor.entityIds as string[]).length, 1)) return false;
+        if (
+          !list(
+            h.holes,
+            4,
+            anchor =>
+              object(anchor, ['purpose', 'role', 'sketchId', 'entityIds']) &&
+              oneOf(anchor.purpose, ['clearance', 'pilot']) &&
+              text(anchor.role) &&
+              text(anchor.sketchId) &&
+              list(anchor.entityIds, 16, item => text(item), 1) &&
+              new Set(anchor.entityIds as string[]).size === (anchor.entityIds as string[]).length,
+            1
+          )
+        )
+          return false;
         const anchors = h.holes as { role: string; sketchId: string; entityIds: string[] }[];
         if (new Set(anchors.map(a => JSON.stringify([a.role, a.sketchId, [...a.entityIds].sort()]))).size !== anchors.length) return false;
         return (

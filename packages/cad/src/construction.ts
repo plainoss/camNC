@@ -58,18 +58,19 @@ export function constructionReferenceIssues(document: CadDocument): CadDiagnosti
     for (const hardware of plan.hardware) {
       if (!variables.has(hardware.lengthVariableId)) missing(`hardware length ${hardware.id}`);
       for (const anchor of hardware.holes) {
-      const member = members.get(anchor.role);
-      const part = document.parts.find(p => p.id === member?.partId);
-      const sketches = part
-        ? [
-            part.sketch,
-            ...(part.features ?? []).flatMap(f =>
-              f.type === 'sketch' && (f.copyId === undefined || f.copyId === member?.copyId) ? [f.sketch] : []
-            ),
-          ]
-        : [];
-      const sketch = sketches.find(s => s.id === anchor.sketchId);
-      if (!sketch || anchor.entityIds.some(id => !sketch.entities.some(e => e.id === id))) missing(`hardware hole ${hardware.id} (${anchor.purpose})`);
+        const member = members.get(anchor.role);
+        const part = document.parts.find(p => p.id === member?.partId);
+        const sketches = part
+          ? [
+              part.sketch,
+              ...(part.features ?? []).flatMap(f =>
+                f.type === 'sketch' && (f.copyId === undefined || f.copyId === member?.copyId) ? [f.sketch] : []
+              ),
+            ]
+          : [];
+        const sketch = sketches.find(s => s.id === anchor.sketchId);
+        if (!sketch || anchor.entityIds.some(id => !sketch.entities.some(e => e.id === id)))
+          missing(`hardware hole ${hardware.id} (${anchor.purpose})`);
       }
     }
     for (const connection of plan.connections) {
