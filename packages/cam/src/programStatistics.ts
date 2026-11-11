@@ -41,7 +41,10 @@ export function programStatistics(program: string, tinySegmentThresholdMm = 0.1)
   let position: (number | undefined)[] = [undefined, undefined, undefined];
   for (const raw of program.split(/\r?\n/)) {
     result.maximumLineBytes = Math.max(result.maximumLineBytes, encoder.encode(raw).length);
-    const line = raw.replace(/\([^()]*\)/g, '').trim();
+    const line = raw
+      .replace(/\([^()]*\)/g, '')
+      .replace(/;.*$/, '')
+      .trim();
     if (!line) continue;
     result.executableBlocks++;
     const words = [...line.matchAll(/([A-Z])(-?(?:\d+(?:\.\d*)?|\.\d+))/g)].map(match => [match[1], Number(match[2])] as const);
