@@ -68,7 +68,8 @@ export function replaceExtrudeProfile(
   if (reference === targetId && 'sketch' in selection) {
     if (selection.region) return withRegionToggled(document, targetId, selection.region);
     const entireSketch = wholeSketch(target);
-    if (JSON.stringify(entireSketch.regions) === JSON.stringify(target.regions)) return document;
+    const same = (a?: string[], b?: string[]) => a === b || (!!a && !!b && a.length === b.length && a.every(id => b.includes(id)));
+    if (same(entireSketch.regions, target.regions)) return document;
     return { ...document, revision: document.revision + 1, parts: document.parts.map(p => (p.id === targetId ? entireSketch : p)) };
   }
   if (reference === targetId) throw new Error('Choose a face of another part.');

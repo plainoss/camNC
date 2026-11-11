@@ -4,6 +4,8 @@ import {
   entityPointIds as curvePointIds,
   evaluateCadPart,
   isCadPart,
+  pointInPolygon,
+  regionInteriorPoint,
   sketchRegions,
   type CadDocument,
   type CadEntity,
@@ -66,9 +68,10 @@ export function extrudedSketch(document: CadDocument, sketch: CadPart, pickAll: 
   const face = on && 'partId' in on ? on.partId : null;
   const onto = face && document.parts.find(candidate => candidate.id === face);
   if (onto && isCadPart(onto) && !(on && 'partId' in on && on.copyId)) made.addTo = extrudeMergeTarget(document, made, onto.id);
-  const regions = sketchRegions(made.sketch, CAD_CHORD_TOLERANCE);
-  if (pickAll && !made.regions && regions.length > 1 && evaluateCadPart(made).diagnostics.some(d => d.severity === 'error'))
-    made.regions = regions.map(region => region.id);
+  if (pickAll && !made.regions && evaluateCadPart(made).diagnostics.some(d => d.severity === 'error')) {
+    const solid = solidRegionIds(made);
+    if (solid.length > 1) made.regions = solid;
+  }
   return made;
 }
 
@@ -81,12 +84,26 @@ export function asHole(part: CadPart): CadPart {
 
 /**
  * An extrude of all of its sketch, as a first extrude is: as one outline, or, when the sketch isn't one, such as closed
- * shapes apart, each of its regions, each group apart becoming a part of its own on OK. A Remove cuts the whole sketch.
+ * shapes apart, each of its solid regions, each group apart becoming a part of its own on OK. A region inside a hole
+ * of another, such as a circle in a rectangle, stays a hole; one inside that again is solid. A Remove cuts the whole
+ * sketch, and Add and Thin keep it whole too: neither makes parts of shapes apart.
  */
 export function wholeSketch(extrude: CadPart): CadPart {
   const whole = { ...extrude };
   delete whole.regions;
-  if (whole.remove || evaluateCadPart(whole).part) return whole;
-  const regions = sketchRegions(whole.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
-  return regions.length ? { ...whole, regions } : whole;
+  if (whole.remove || whole.addTo || whole.thin || evaluateCadPart(whole).part) return whole;
+  const solid = solidRegionIds(whole);
+  return solid.length ? { ...whole, regions: solid } : whole;
+}
+
+/** A sketch's regions that are solid: not inside a hole of another, or inside one again, as an island in it. */
+function solidRegionIds(part: CadPart): string[] {
+  const regions = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE);
+  return regions
+    .filter(region => {
+      const inside = regionInteriorPoint(region.points);
+      const depth = inside ? regions.filter(other => other !== region && pointInPolygon(inside, other.points)).length : 0;
+      return depth % 2 === 0;
+    })
+    .map(region => region.id);
 }
