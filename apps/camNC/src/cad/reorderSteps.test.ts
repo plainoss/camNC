@@ -53,6 +53,16 @@ describe('where a dragged step would land', () => {
     expect(reorderDrop(document, `${a.id}:extrude`, `${b.id}:sketch`)).toBeNull();
   });
 
+  it('lands a part used by a Cut parts step ahead of the part dropped on, not at the cut that moves along with it', () => {
+    const [side, back, shelf] = [plate('Side'), plate('Back'), plate('Shelf')];
+    const document: CadDocument = {
+      ...createCadDocument(),
+      parts: [side, back, shelf],
+      partCuts: [{ id: 'joint', tools: [shelf.id], targets: [side.id], clearance: 0 }],
+    };
+    expect(reorderDrop(document, `${shelf.id}:extrude`, `${back.id}:extrude`)).toEqual({ before: `${back.id}:sketch` });
+  });
+
   it('says why a step can’t go where it’s dragged', () => {
     const a = plate('A');
     const b = { ...plate('B'), drawnOn: { on: { partId: a.id, face: 'top' as const }, offset: 0 } };

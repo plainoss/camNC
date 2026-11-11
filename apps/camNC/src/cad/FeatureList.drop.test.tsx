@@ -63,6 +63,29 @@ describe('dragging a step in the feature list', () => {
     expect(document.querySelector('.cad-feature-drop-before')).toBeNull();
   });
 
+  it('draws the line where a part used by a Cut parts step lands, and drops it there', () => {
+    const [side, back, shelf] = [plate('Side'), plate('Back'), plate('Shelf')];
+    const { commits, row, drag, button } = setup({
+      ...createCadDocument(),
+      parts: [side, back, shelf],
+      partCuts: [{ id: 'joint', tools: [shelf.id], targets: [side.id], clearance: 0 }],
+    });
+    const rows = () => [...document.querySelectorAll('.cad-studio-features li button')].map(item => item.textContent ?? '');
+    const at = (name: string) => rows().findIndex(text => text.includes(name));
+    expect(at('Cut Side with Shelf')).toBeGreaterThan(at('Extrude · Shelf'));
+    drag(button('Extrude · Shelf'), 'dragstart');
+    // The cut is listed after the last part it uses, so it follows Shelf up, but the line stays above Back's sketch.
+    for (const onto of ['Extrude · Back', 'Sketch · Back']) {
+      expect(drag(row(onto), 'dragover').defaultPrevented).toBe(true);
+      expect([...document.querySelectorAll('.cad-feature-drop-before')]).toEqual([row('Sketch · Back')]);
+    }
+    drag(row('Sketch · Back'), 'drop');
+    expect(commits.mock.calls.at(-1)![0].parts.map(part => part.name)).toEqual(['Side', 'Shelf', 'Back']);
+    // Shelf's steps sit where the line was, just above Back's sketch, with the cut that follows them.
+    expect(at('Extrude · Shelf')).toBeLessThan(at('Sketch · Back'));
+    expect(at('Cut Side with Shelf')).toBe(at('Sketch · Back') - 1);
+  });
+
   it('marks a row the step can’t go to with the reason, and refuses the drop', () => {
     const a = plate('A');
     const b = { ...plate('B'), drawnOn: { on: { partId: a.id, face: 'top' as const }, offset: 0 } };
