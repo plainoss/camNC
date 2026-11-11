@@ -36,6 +36,7 @@ import { openAtMachine } from '@/cam/machine/openAtMachine';
 import { downloadDesignFile } from '@/cam/designFile';
 import { StudioExportButton } from '@/cad/export/StudioExportButton';
 import { Download } from 'lucide-react';
+import { useSvgAssetSession } from '@/cad/svg/useSvgAssetSession';
 
 const designContextSchema = z.object({
   returnTo: z.enum(['boards', 'plan', 'machine']).optional(),
@@ -90,6 +91,8 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     }
     return session;
   });
+  // The Studio toolbar unmounts while editing a sketch; the document still owns its imported source.
+  useSvgAssetSession(session.document.id);
   // The editor joins the recovered session using its durable checkpoint, so it does not acknowledge unsaved work.
   const [editorDocument, setEditorDocument] = useState(initialJob.design!.draft);
   const [editorEpoch, setEditorEpoch] = useState(0);

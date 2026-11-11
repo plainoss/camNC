@@ -26,6 +26,8 @@ d.variable('board', '18mm') adds/updates a variable. Expressions such as 'width 
 Create a whole piece in d.folder('Stool', scoped => { ... }); edit with d.existingFolder(nameOrHandle, scoped => { ... }). Scoped names/expressions refer to that folder; folders cannot nest.
 Geometry: const p = d.newPart('Plate', { thickness: 'board' }); p.profile.rect({ at: [0, 0], w: 400, h: 300 });
 p.profile.circle({ at: [30, 30], d: 8 }) makes a profile hole. Sketch coordinates are local, Y up. Rectangles/circles are constrained.
+Native curves: sketch.bezier({points:[[0,0],[40,80],[100,0]]}), sketch.spline({points:[[0,0],[50,30],[100,0]],closed:false}), sketch.ellipse({at:[50,40],rx:50,ry:40,angle:0}). Coordinates and radii may be length expressions. Retrieve geometry help for endpoint references and curve limitations.
+sketch.offset(items,{distance:'wall',wholeLoop:true}) links supported line/circle/arc loops; other curve types are refused. sketch.fitBounds(items,{w:'width',h:'height',at:[0,0],preserveAspect:true}) measures actual curve extrema and contains within the box; preserveAspect:false explicitly distorts supported curves. Fitting replaces source coordinate expressions with target-derived drivers; inspect returned replacedExpressions. Never claim a uniform fit fills both dimensions when aspect ratios differ.
 const top = p.sketchOn('top'); top.circle({ at: [100, 80], d: 20 }); p.cut(top.regionAt(100, 80), { depth: 6 });
 depth: 'through' makes a hole; through cuts cannot reach the part edge. Change the profile for open notches. Underside sketches reverse local X.
 const s = d.existingCopy('Shelf 2'); const face = s.sketchOn('top'); face.circle({ at: [100, 80], d: 60 }); s.cut(face.regionAt(100, 80), { depth: 'through' }); changes only that physical copy.
