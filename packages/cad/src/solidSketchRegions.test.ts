@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addCircle,
+  addLine,
   addRectangle,
   CAD_CHORD_TOLERANCE,
   createCadDocument,
@@ -71,6 +72,25 @@ describe('the solid regions of a sketch of shapes apart', () => {
   it('keeps an island inside a hole solid', () => {
     const sketch = addRectangle(frame(createCadPart('Part 1', 18).sketch), { x: 50, y: 30, width: 20, height: 10 });
     expect(solidSketchRegionIds(sketch)).toHaveLength(2);
-    expect(extrudedApart(sketch).map(evaluated)).toHaveLength(2);
+    const parts = extrudedApart(sketch).map(evaluated);
+    expect(parts.map(part => area(part.outline))).toEqual([5600, 200]);
+    expect(parts.map(part => part.holes.map(area))).toEqual([[1500], []]);
+  });
+
+  // #724: a hole bounded only by other regions, as the inside of a frame cut into mitred pieces is, should stay a hole.
+  it('extrudes a frame cut into mitred pieces solid, its inside too, for now', () => {
+    let sketch = frame(createCadPart('Part 1', 18).sketch);
+    for (const [x1, y1, x2, y2] of [
+      [20, 0, 35, 20],
+      [100, 0, 85, 20],
+      [100, 70, 85, 50],
+      [20, 70, 35, 50],
+    ] as const)
+      sketch = addLine(sketch, { x1, y1, x2, y2 });
+    expect(sketchRegions(sketch, CAD_CHORD_TOLERANCE)).toHaveLength(5);
+    expect(solidSketchRegionIds(sketch)).toHaveLength(5);
+    const parts = extrudedApart(sketch).map(evaluated);
+    expect(parts.map(part => area(part.outline))).toEqual([5600]);
+    expect(parts[0]!.holes).toEqual([]);
   });
 });

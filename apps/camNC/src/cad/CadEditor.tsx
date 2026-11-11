@@ -242,11 +242,10 @@ import { StudioProposals } from './StudioProposals';
 import { useAssistantProposal } from './assistant/useAssistantProposal';
 import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
-import { trimCadFolders } from '@wbcnc/cad';
 import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
-import { designSteps, type DesignStep } from '@wbcnc/cad';
+import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, edgeOn, normalTurn, straightOn, turnedBy, type SketchTurn } from './sketchOrbit';
@@ -620,7 +619,7 @@ export function CadEditor({
       (featureDialog?.kind === 'pattern' ? featureDialog : null)
   );
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
-  const { rollbackStep, shownDocument, solveFeedback } = useFeaturePreview({
+  const { rollbackStep, shownDocument, solveFeedback, apartIds } = useFeaturePreview({
     document:
       pointPicker.onPick && transformDialog ? doc : studioPreview.document === doc ? extrusionDepth.document : studioPreview.document,
     enabled: studioSession && showWorkspace,
@@ -630,6 +629,7 @@ export function CadEditor({
     partCutting,
     transformDialog,
     mirrorDialog,
+    checks: { lastCheckedRevision, setCheckEpoch },
   });
   documentRef.current = doc;
   const callbacks = useRef({ onDraftChange, onFinish, onCancel, onFinishBlocked });
@@ -3445,7 +3445,7 @@ export function CadEditor({
     if (!keep && featureDialog && featureDialog.kind !== 'pattern') commit(featureDialog.before);
     // Regions picked apart are a part each.
     if (keep && featureDialog?.kind === 'extrude') {
-      const split = splitApartRegions(documentRef.current, featureDialog.partId);
+      const split = splitApartRegions(documentRef.current, featureDialog.partId, apartIds);
       if (split !== documentRef.current) commit(split);
     }
     // A Remove is a cut in the board its sketch is drawn on, so that board is the one selected.

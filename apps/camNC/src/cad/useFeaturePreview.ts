@@ -1,7 +1,7 @@
 import type { CadDocument, CadSolveResult } from '@wbcnc/cad';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { designSteps, rolledBackTo } from '@wbcnc/cad';
-import { apartExtrudePreview, withoutApartRegionProblem } from './apartExtrudePreview';
+import { apartExtrudePreview, apartPartIds, withoutApartRegionProblem } from './apartExtrudePreview';
 import { offerFinalPreview } from './finalPreview';
 
 interface PreviewOptions {
@@ -13,6 +13,8 @@ interface PreviewOptions {
   partCutting: { id?: string } | null;
   transformDialog: { partId: string; copyId?: string; move?: boolean } | null;
   mirrorDialog: { copyId?: string } | null;
+  /** The editor's sketch check, run again when an extrude dialog opens or closes: its problems depend on it. */
+  checks: { lastCheckedRevision: RefObject<string>; setCheckEpoch: (next: (epoch: number) => number) => void };
 }
 
 /** Every feature dialog shares the same rollback and explicit Final preview behavior. */
@@ -25,6 +27,7 @@ export function useFeaturePreview({
   partCutting,
   transformDialog,
   mirrorDialog,
+  checks,
 }: PreviewOptions) {
   const ids = designSteps(document).map(step => step.id);
   const candidate = featureDialog
@@ -47,16 +50,29 @@ export function useFeaturePreview({
     return () => offerFinalPreview(null);
   }, [offersFinal, showFinal, editingStep]);
   const extrudingId = enabled && featureDialog?.kind === 'extrude' ? featureDialog.partId : null;
+  // One dialog's split parts keep their ids, so what's hidden, made transparent or picked in the preview is what OK makes.
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- a new dialog starts new ids.
+  const apartIds = useMemo(() => apartPartIds(), [featureDialog]);
   const shownDocument = useMemo(
     () =>
       blank
         ? { ...document, parts: [] }
-        : apartExtrudePreview(rollbackStep && !(offersFinal && showFinal) ? rolledBackTo(document, rollbackStep) : document, extrudingId),
-    [document, blank, rollbackStep, offersFinal, showFinal, extrudingId]
+        : apartExtrudePreview(
+            rollbackStep && !(offersFinal && showFinal) ? rolledBackTo(document, rollbackStep) : document,
+            extrudingId,
+            apartIds
+          ),
+    [document, blank, rollbackStep, offersFinal, showFinal, extrudingId, apartIds]
   );
-  // Read when a solve ends, so a solve started before the dialog opened or closed reports for the dialog shown then.
-  const extruding = useRef(extrudingId);
-  extruding.current = extrudingId;
+  // Read when a solve ends. Opening or closing the dialog checks the design again, as its problems depend on the dialog.
+  const extruding = useRef<string | null>(null);
+  const { lastCheckedRevision, setCheckEpoch } = checks;
+  useEffect(() => {
+    if (extruding.current === extrudingId) return;
+    extruding.current = extrudingId;
+    lastCheckedRevision.current = '';
+    setCheckEpoch(epoch => epoch + 1);
+  }, [extrudingId, lastCheckedRevision, setCheckEpoch]);
   const solveFeedback = useCallback((result: CadSolveResult) => withoutApartRegionProblem(result, extruding.current), []);
-  return { rollbackStep, shownDocument, solveFeedback };
+  return { rollbackStep, shownDocument, solveFeedback, apartIds };
 }

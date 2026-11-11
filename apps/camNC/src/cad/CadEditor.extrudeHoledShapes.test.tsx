@@ -1,14 +1,22 @@
 import { addRectangle, createCadDocument, createCadPart, evaluateCadPart, polygonArea, type CadDocument, type CadSketch } from '@wbcnc/cad';
 import { endCadSession } from '@wbcnc/cad-editor/session';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
+import { ModelViewport } from '@/cam/model/ModelViewport';
 import { CadEditor } from './CadEditor';
+import { saveShownState } from './shownState';
+
+vi.mock('@/cam/model/ModelViewport', { spy: true });
+const viewport = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
 
 const sessions: string[] = [];
 afterEach(() => {
   cleanup();
-  sessions.splice(0).forEach(endCadSession);
+  sessions.splice(0).forEach(id => {
+    endCadSession(id);
+    saveShownState(id, { hiddenParts: [], featureVisibility: {} });
+  });
 });
 
 const settled = () =>
@@ -57,6 +65,8 @@ it('extrudes a rectangle and a frame beside it with Shift+E, each a part, the fr
   await waitFor(() => expect(latest().parts[0]!.regions).toHaveLength(2));
   expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', false);
   await expectNoProblems();
+  // The view shows the two parts OK makes.
+  await waitFor(() => expect(viewport().instanceIds).toHaveLength(2));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Part 1' })).toBeNull());
   await waitFor(() => expect(latest().parts).toHaveLength(2));
@@ -74,4 +84,27 @@ it('says nothing is blocked while it extrudes two rectangles apart with Shift+E'
   await waitFor(() => expect(latest().parts[0]!.regions).toHaveLength(2));
   expect(within(dialog).getByRole('button', { name: 'OK' })).toHaveProperty('disabled', false);
   await expectNoProblems();
+}, 40_000);
+
+it('keeps a part hidden in the preview of shapes apart hidden once OK makes it', async () => {
+  const { dialog, latest } = await extrudeFromSketch(sketch =>
+    addRectangle(addRectangle(sketch, { x: 0, y: 0, width: 60, height: 40 }), { x: 100, y: 0, width: 60, height: 40 })
+  );
+  await waitFor(() => expect(viewport().instanceIds).toHaveLength(2));
+  const [first, made] = viewport().instanceIds!;
+  expect(first).toBe(latest().parts[0]!.id);
+  // A change during the dialog keeps the preview's parts, under the same ids.
+  const depth = within(dialog).getByRole('textbox', { name: 'Thickness' });
+  await userEvent.fill(depth, '25');
+  await userEvent.tab();
+  await waitFor(() => expect(latest().parts[0]!.thickness).toBe(25));
+  expect(viewport().instanceIds).toEqual([first, made]);
+  viewport().onHover?.(made!, 1);
+  fireEvent.keyDown(screen.getByTestId('workspace-3d'), { key: 'y', code: 'KeyY' });
+  await waitFor(() => expect(viewport().instanceIds).toEqual([first]));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Part 1' })).toBeNull());
+  await waitFor(() => expect(latest().parts.map(part => part.id)).toEqual([first, made]));
+  await settled();
+  expect(viewport().instanceIds).toEqual([first]);
 }, 40_000);
