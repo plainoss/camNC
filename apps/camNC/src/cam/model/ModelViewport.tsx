@@ -9,6 +9,7 @@ import { ViewCube } from './ViewCube';
 import { ModelBody } from './ModelBody';
 import { ModelOrbitControls } from './ModelOrbitControls';
 import { kOrbitSurface } from './orbitPicking';
+import { settledCanvas } from '@/lib/settledCanvas';
 import { ModelSectionCap } from './ModelSectionCap';
 import { SectionOffsetHandle, type SectionOffsetControl } from './SectionOffsetHandle';
 import type { SectionCapRange } from '@/cad/sectionModel';
@@ -623,6 +624,7 @@ export function ModelViewport({
   };
   return (
     <Canvas
+      {...settledCanvas}
       // Drawn when something changes, not every frame, so an idle view costs nothing.
       frameloop="demand"
       orthographic={palette === 'studio'}

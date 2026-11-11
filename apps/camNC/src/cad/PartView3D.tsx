@@ -18,6 +18,7 @@ import { FitCamera } from '@/cam/model/ModelViewport';
 import { ModelOrbitControls } from '@/cam/model/ModelOrbitControls';
 import { kOrbitSurface } from '@/cam/model/orbitPicking';
 import { partSolid } from './partSolid';
+import { settledCanvas } from '@/lib/settledCanvas';
 import type { StudioCameraRef } from './studioCamera';
 import type { PartViewSnapshot } from './faceSketchScene';
 import type { FacePlane } from '@/cam/model/faceHighlight';
@@ -252,6 +253,7 @@ export default function PartView3D({
       tabIndex={-1}
       onPointerDown={() => frame.current?.focus({ preventScroll: true })}>
       <Canvas
+        {...settledCanvas}
         orthographic
         camera={{ fov: 30 }}
         dpr={[1, 2]}
