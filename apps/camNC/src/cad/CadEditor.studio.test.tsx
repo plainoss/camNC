@@ -18,7 +18,7 @@ import {
 } from '@wbcnc/cad';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
 import { endCadSession } from '@wbcnc/cad-editor/session';
@@ -27,6 +27,13 @@ import { settled } from '@/test/settled';
 import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
+
+// The editor's lazy views and the solver's worker and WASM load once per file. Loaded here, that one-time cost doesn't
+// count against the first test's time limit, which it otherwise runs out of on a busy machine.
+beforeAll(async () => {
+  await Promise.all([import('./WorkspaceView'), import('./SketchBackdrop'), import('./PartView3D'), import('./FaceSketchBackdrop')]);
+  await solveCadDocument(createPlateDocument({ width: 200, height: 100 }));
+}, 60_000);
 
 const sessions: string[] = [];
 afterEach(() => {
