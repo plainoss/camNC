@@ -8,7 +8,7 @@ export interface CadSpatialStep {
   kind: 'partCut' | 'copyTransform';
   partId: string;
   copyId?: string;
-  target?:CadPhysicalTarget;
+  target?: CadPhysicalTarget;
   label: string;
   suppressed: boolean;
   legacy: boolean;
@@ -26,8 +26,8 @@ export function copyOperationSteps(document: CadDocument): CadSpatialStep[] {
           kind: 'copyTransform',
           partId: move.partId,
           copyId: move.copyId,
-          target:physicalTransformTarget(move),
-          label: `Transform${move.seed===true ?' original':''} · ${cadPartReferenceName(document,physicalTargetReference(physicalTransformTarget(move))) ?? (move.seed===true ?'missing original':'missing copy')}`,
+          target: physicalTransformTarget(move),
+          label: `Transform${move.seed === true ? ' original' : ''} · ${cadPartReferenceName(document, physicalTargetReference(physicalTransformTarget(move))) ?? (move.seed === true ? 'missing original' : 'missing copy')}`,
           suppressed: !!move.suppressed,
           legacy: false,
         },

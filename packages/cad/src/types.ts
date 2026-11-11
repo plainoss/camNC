@@ -518,7 +518,7 @@ export interface CadDocument {
   parts: CadPart[];
 }
 /** A physical target is explicit; omitting copyId never turns a family reference into a seed selection. */
-export type CadPhysicalTarget={kind:'seed';partId:string}|{kind:'copy';partId:string;copyId:string};
+export type CadPhysicalTarget = { kind: 'seed'; partId: string } | { kind: 'copy'; partId: string; copyId: string };
 export interface CadRigidTransformValues {
   by: [number, number, number];
   byExpressions?: [string | null, string | null, string | null];
@@ -527,22 +527,22 @@ export interface CadRigidTransformValues {
 }
 /** The old flat saved-copy record remains unchanged. */
 export interface CadCopyTransform extends CadRigidTransformValues {
-  id:string;
-  partId:string;
-  copyId:string;
-  seed?:never;
+  id: string;
+  partId: string;
+  copyId: string;
+  seed?: never;
 }
 /**
  * An independent root's original physical instance, after generation and any earlier spatial operations.
  * Experimental V4 copy-only readers require copyId and explicitly refuse this mutually exclusive seed variant.
  */
 export interface CadSeedTransform extends CadRigidTransformValues {
-  id:string;
-  partId:string;
-  seed:true;
-  copyId?:never;
+  id: string;
+  partId: string;
+  seed: true;
+  copyId?: never;
 }
-export type CadPhysicalTransform=CadCopyTransform|CadSeedTransform;
+export type CadPhysicalTransform = CadCopyTransform | CadSeedTransform;
 /** Derived world poses are separate from source creation placements; evaluating twice must not move a copy twice. */
 export interface CadEvaluation {
   parts: EvaluatedCadPart[];

@@ -2,7 +2,7 @@ import { parseCadValue, type CadValueScope } from './valueExpressions';
 import type { CadPhysicalTransform } from './types';
 
 /** Resolve typed values without changing operation identities or source creation placements. */
-export function copyTransformValue<T extends CadPhysicalTransform>(move:T, scope: CadValueScope): { move:T } | { error: string } {
+export function copyTransformValue<T extends CadPhysicalTransform>(move: T, scope: CadValueScope): { move: T } | { error: string } {
   const by = [...move.by] as T['by'];
   for (let axis = 0; axis < 3; axis++) {
     const expression = move.byExpressions?.[axis];
@@ -20,13 +20,11 @@ export function copyTransformValue<T extends CadPhysicalTransform>(move:T, scope
   return { move: turn === move.turn && by.every((value, axis) => value === move.by[axis]) ? move : { ...move, by, ...(turn && { turn }) } };
 }
 
-export function editCopyTransformExpressions<T extends CadPhysicalTransform>(move:T, edit: (expression: string) => string):T {
+export function editCopyTransformExpressions<T extends CadPhysicalTransform>(move: T, edit: (expression: string) => string): T {
   return {
     ...move,
     ...(move.byExpressions && {
-      byExpressions: move.byExpressions.map(expression =>
-        expression === null ? null : edit(expression)
-      ) as T['byExpressions'],
+      byExpressions: move.byExpressions.map(expression => (expression === null ? null : edit(expression))) as T['byExpressions'],
     }),
     ...(move.turn?.degreesExpression && { turn: { ...move.turn, degreesExpression: edit(move.turn.degreesExpression) } }),
   };

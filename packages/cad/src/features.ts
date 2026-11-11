@@ -419,7 +419,7 @@ export function evaluateCadDocument(given: CadDocument, options: { through?: str
   const document = activeDesign(given.parts.some(part => part.remove && !isSpatialRemoval(part)) ? resolveExtrudeSteps(given) : given);
   // A mask may omit cut records while their saved order slots remain. Validate the raw operation source,
   // then evaluate the active cuts below; never mistake a valid masked stream for a dangling saved order.
-  const diagnostics = validateCadDocument(given.operationOrder===undefined ?document:{...document,partCuts:given.partCuts});
+  const diagnostics = validateCadDocument(given.operationOrder === undefined ? document : { ...document, partCuts: given.partCuts });
   if (diagnostics.some(d => d.severity === 'error')) return { parts: [], diagnostics };
   const parts: EvaluatedCadPart[] = [];
   for (const part of document.parts) {
