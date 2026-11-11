@@ -1,3 +1,4 @@
+import { gcodeWords, hasWord, type Word } from './gcodeWords';
 import { explainPause, isPause, type Line, memoized, type PauseHint, parsedProgram, pauseAt, positionWindow } from './pauseHints';
 
 /** What the controller says while the job is in Hold. */
@@ -20,6 +21,8 @@ export interface HoldContext {
   spindle?: 'on' | 'off';
   /** The bit is where it was when camNC started this job. `false` when unknown, e.g. after a reload. */
   stillSinceStart?: boolean;
+  /** Units of the reported positions (FluidNC's `$Report/Inches`), `undefined` when not known. */
+  positionUnits?: 'mm' | 'inch';
 }
 
 /** How close (mm) Z must be to the height the program went to before the pause. */
@@ -68,13 +71,14 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
   const index = pauseAt(lines, size, c.percent);
   if (index < 0) return null;
   const hint = explainPause(lines, index, gcode);
+  // A spindle reported running is past every pause camNC or a post writes after M5 (a tool change: lift, M5, M0): held in
+  // the lift just before it, the bit can already be at that height. The done card needs the park height instead.
+  if (c.spindle === 'on' && hint.marker?.kind !== 'done') return null;
   if (!hint.marker) {
     if (index === first && !memoized(program, 'moves before first pause', () => lines.slice(0, first).some(movesOrProbes))) {
       // FluidNC cannot read past the M0 without Resume. While the furthest it can have read (the reported position plus
       // the window) is short of the first move after it, the bit has not moved; that survives a reload. On a file so
       // large that the window reaches that move, only the bit not having moved since camNC started the job tells.
-      // Fusion's M0 comes before its M3: a spindle the controller reports running means the job is past it.
-      if (c.spindle === 'on') return null;
       const readTo = (Math.max(c.readTo ?? c.percent, c.percent) / 100) * size;
       const firstMove = memoized(program, 'first move after first pause', () => beforeFirstMoveAfter(lines, first));
       const unmoved = readTo + positionWindow(size) <= firstMove;
@@ -89,11 +93,36 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
 
 /** End byte of the first spindle start (M3/M4) after line `index`, or the end of the file. */
 function spindleStartEnd(lines: Line[], index: number) {
-  for (let i = index + 1; i < lines.length; i++) if (/(?<![A-Z])M0*[34](?![\d.])/i.test(lines[i]!.code)) return lines[i]!.end;
+  for (let i = index + 1; i < lines.length; i++) {
+    const words = gcodeWords(lines[i]!.code);
+    if (words && hasWord(words, 'M', 3, 4)) return lines[i]!.end;
+  }
   return lines.at(-1)!.end;
 }
-/** A line that moves an axis or probes, so that the bit may be anywhere after it. */
-const movesOrProbes = (line: Line) => /\bG0*(?:[0-3]|28|30|38(?:\.\d)?|53)(?![\d.])|[XYZABC]\s*[-+.\d]/i.test(line.code);
+
+/** A line that moves an axis or probes, so that the bit may be anywhere after it. Unreadable lines count too. */
+const movesOrProbes = (line: Line) => {
+  const words = gcodeWords(line.code);
+  if (!words) return true;
+  return hasWord(words, 'G', 0, 1, 2, 3, 28, 30, 38.2, 38.3, 38.4, 38.5, 53) || words.some(w => 'XYZABC'.includes(w.letter));
+};
+
+/** 1 inch in mm. */
+const kMmPerInch = 25.4;
+
+/** The bit's Z in the units of the program's last Z move before the pause, if the units are known for sure. */
+function reportedZ(at: ZBefore, c: HoldContext) {
+  const z = at.machine ? c.mpos?.z : c.wpos?.z;
+  if (z === undefined) return undefined;
+  // FluidNC reports positions in mm unless `$Report/Inches` is set, which shows in the report's decimals (see the
+  // stream parser). Against reports of unknown units, only an mm program is compared, as mm.
+  const reported = c.positionUnits ?? (at.units === 'mm' ? 'mm' : undefined);
+  if (!reported) return undefined;
+  return reported === at.units ? z : reported === 'inch' ? z * kMmPerInch : z / kMmPerInch;
+}
+
+/** {@link kAtZ} in the program's units. */
+const atZ = (at: ZBefore) => (at.units === 'mm' ? kAtZ : kAtZ / kMmPerInch);
 
 /**
  * Whether the bit is where the program sent it before the M0 at `index`: parked at the G53 Z for the done pause, at or
@@ -102,20 +131,29 @@ const movesOrProbes = (line: Line) => /\bG0*(?:[0-3]|28|30|38(?:\.\d)?|53)(?![\d
 function bitWhereThePauseLeftIt(lines: Line[], index: number, done: boolean, c: HoldContext) {
   const at = zBefore(lines, index);
   if (!at || at.machine !== done) return false;
-  if (done) return c.mpos !== undefined && Math.abs(c.mpos.z - at.z) <= kAtZ;
-  return c.wpos !== undefined && c.wpos.z >= at.z - kAtZ;
+  const z = reportedZ(at, c);
+  if (z === undefined) return false;
+  return done ? Math.abs(z - at.z) <= atZ(at) : z >= at.z - atZ(at);
 }
 
 /** For an M0 of another post: the bit at or above the last Z the program moved to before it, in its coordinates. */
 function bitAtOrAbove(lines: Line[], index: number, c: HoldContext) {
   const at = zBefore(lines, index);
-  const z = at?.machine ? c.mpos?.z : c.wpos?.z;
-  return !!at && z !== undefined && z >= at.z - kAtZ;
+  const z = at ? reportedZ(at, c) : undefined;
+  return !!at && z !== undefined && z >= at.z - atZ(at);
+}
+
+interface ZBefore {
+  z: number;
+  /** G53: machine coordinates. */
+  machine: boolean;
+  units: 'mm' | 'inch';
 }
 
 /**
- * The Z the program last moved to before line `index`, and whether in machine coordinates (G53). `null` if unknown: no
- * Z move yet, an offset, homing or probe since (G10, G28, G30, G38, G92), or relative moves (G91) at that point.
+ * The Z the program last moved to before line `index`, in which coordinates and units. `null` if unknown: no Z move
+ * yet, no units (G20/G21) set, or since then an offset, homing, probe, tool length offset or coordinate system change
+ * (G10, G28, G30, G38, G43, G49, G54–G59.3, G92), or relative moves (G91) at that point.
  */
 function zBefore(lines: Line[], index: number) {
   // It reads the whole program up to the M0, and the machine view asks with every report while held.
@@ -125,27 +163,39 @@ function zBefore(lines: Line[], index: number) {
   return memo.get(index)!;
 }
 
-const zBeforeMemo = new WeakMap<Line[], Map<number, { z: number; machine: boolean } | null>>();
+const zBeforeMemo = new WeakMap<Line[], Map<number, ZBefore | null>>();
+/** G codes after which the Z of an earlier move no longer says where the bit is in the current coordinates. */
+// biome-ignore format: a list of G codes
+const kZFrameChanges = [10, 28, 28.1, 30, 30.1, 38.2, 38.3, 38.4, 38.5, 43, 43.1, 49, 54, 55, 56, 57, 58, 59, 59.1, 59.2, 59.3, 92, 92.1, 92.2, 92.3];
 
-function readZBefore(lines: Line[], index: number) {
+function readZBefore(lines: Line[], index: number): ZBefore | null {
   let relative = false;
+  let units: 'mm' | 'inch' | undefined;
   let last: { z: number; machine: boolean } | null = null;
   for (let i = 0; i < index; i++) {
-    const code = lines[i]!.code.toUpperCase();
-    // G90.1/G91.1 only set the arc centre mode.
-    if (/\bG0*90(?![\d.])/.test(code)) relative = false;
-    if (/\bG0*91(?![\d.])/.test(code)) relative = true;
-    if (/\bG0*(?:10|28|30|38(?:\.\d)?|92(?:\.\d)?)(?![\d.])/.test(code)) {
+    const words: Word[] | null = gcodeWords(lines[i]!.code);
+    // FluidNC rejects such a line; what it would have done is unknown.
+    if (!words) {
       last = null;
       continue;
     }
-    const z = code.match(/Z\s*([-+]?(?:\d+\.?\d*|\.\d+))/);
+    // G90.1/G91.1 only set the arc centre mode: G90 and G91 exactly.
+    if (hasWord(words, 'G', 90)) relative = false;
+    if (hasWord(words, 'G', 91)) relative = true;
+    if (hasWord(words, 'G', 21)) units = 'mm';
+    if (hasWord(words, 'G', 20)) units = 'inch';
+    // Their Z (G43.1 Z…, G10 L20 Z…, G92 Z…) is not a move either.
+    if (hasWord(words, 'G', ...kZFrameChanges)) {
+      last = null;
+      continue;
+    }
+    const z = words.find(w => w.letter === 'Z');
     if (!z) continue;
-    const machine = /\bG0*53(?![\d.])/.test(code);
+    const machine = hasWord(words, 'G', 53);
     // A relative Z move leaves the height unknown; G53 is in machine coordinates either way.
-    last = relative && !machine ? null : { z: Number(z[1]), machine };
+    last = relative && !machine ? null : { z: z.value, machine };
   }
-  return relative ? null : last;
+  return relative || !last || !units ? null : { ...last, units };
 }
 
 /** End byte of the line before the first move or probe after line `index`: the reader there has not moved the bit. */

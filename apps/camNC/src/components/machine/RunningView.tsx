@@ -52,6 +52,7 @@ function HoldExplanation() {
   // from before may predate an M3 the job ran since.
   const inHold = api.spindleInHold.value;
   const spindle = status?.spindleOn || inHold ? 'on' : inHold === false ? 'off' : undefined;
+  const positionUnits = status?.positionUnits;
   const start = api.jobStartPos.value;
   const stillSinceStart =
     !!start &&
@@ -69,9 +70,10 @@ function HoldExplanation() {
             wpos: wz === undefined ? undefined : { z: wz },
             spindle,
             stillSinceStart,
+            positionUnits,
           })
         : null,
-    [ours, gcode, percent, readTo, holdRequested, mz, wz, spindle, stillSinceStart]
+    [ours, gcode, percent, readTo, holdRequested, mz, wz, spindle, stillSinceStart, positionUnits]
   );
   if (status?.state === 'Door')
     return (

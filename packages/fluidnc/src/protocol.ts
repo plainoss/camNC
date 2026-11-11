@@ -429,6 +429,7 @@ export class FluidncProtocol {
       wpos,
       wco,
       workKnown: !!(parsed.wco || parsed.wpos || prev?.workKnown),
+      positionUnits: parsed.positionUnits ?? prev?.positionUnits,
       overrides: parsed.overrides ?? prev?.overrides,
       spindleOn: parsed.overrides ? /[SC]/.test(parsed.accessories ?? '') : prev?.spindleOn,
       overridesReported: !!parsed.overrides,

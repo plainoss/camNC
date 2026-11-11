@@ -77,6 +77,55 @@ describe('a Fusion program’s M0s, which have no camNC marker', () => {
       expect(holdHint(program, at(percent, { wpos: undefined }))).toBeNull();
       expect(holdHint(program, at(percent, { holdRequested: true }))).toBeNull();
     });
+
+    it('held in the last of the lift with the spindle still reported running, it is not the tool change', () => {
+      const percent = after(program, 'M0 (MSG Change to T2)');
+      for (const z of [10.95, 10.98, 11]) {
+        expect(holdHint(program, at(percent, { wpos: { z }, spindle: 'on' }))).toBeNull();
+        // Once the M5 has run the controller reports it off: the real stop.
+        expect(holdHint(program, at(percent, { wpos: { z }, spindle: 'off' }))?.next).toMatch(/^Tool change to T2/);
+      }
+    });
+  });
+
+  describe('units, offsets and words', () => {
+    const big = 'G1 X1\n'.repeat(500);
+    const program = (prefix: string) => `${prefix}\nM0 (MSG Check)\n` + big;
+    const hint = (gcode: string, more: Partial<HoldContext> = {}) => holdHint(gcode, at(after(gcode, 'Check'), more));
+
+    it('compares an inch program (G20) with reports in mm after converting, and not with reports of unknown units', () => {
+      const inch = program('G20\nG90\nG0 Z0.6\nG1 X1 F30');
+      expect(hint(inch, { positionUnits: 'mm', wpos: { z: 15.24 } })?.reason).toContain('Check');
+      expect(hint(inch, { positionUnits: 'mm', wpos: { z: 0.6 } })).toBeNull();
+      expect(hint(inch, { positionUnits: 'inch', wpos: { z: 0.6 } })?.reason).toContain('Check');
+      expect(hint(inch, { positionUnits: undefined, wpos: { z: 15.24 } })).toBeNull();
+    });
+
+    it('converts reports in inches ($Report/Inches) for an mm program', () => {
+      const mm = program('G21\nG90\nG0 Z11\nG1 X1 F300');
+      expect(hint(mm, { positionUnits: 'inch', wpos: { z: 11 / 25.4 } })?.reason).toContain('Check');
+      expect(hint(mm, { positionUnits: 'inch', wpos: { z: 0.3 } })).toBeNull();
+      // Unknown report units with an mm program: taken as mm, FluidNC's default.
+      expect(hint(mm, { positionUnits: undefined, wpos: { z: 11 } })?.reason).toContain('Check');
+      // No units in the program: what Z11 means is not known.
+      expect(hint(program('G90\nG0 Z11\nG1 X1 F300'), { wpos: { z: 50 } })).toBeNull();
+    });
+
+    it('a tool length offset or another coordinate system after the Z move leaves the height unknown', () => {
+      for (const between of ['G43.1 Z5', 'G43 H1', 'G49', 'G54', 'G55', 'G59.1', 'G92 Z0', 'G92.1'])
+        expect(hint(program(`G21\nG90\nG0 Z11\nG1 X1 F300\n${between}`), { wpos: { z: 50 } })).toBeNull();
+      // G43.1's Z is not a move to that height.
+      expect(hint(program('G21\nG90\nG43.1 Z30'), { wpos: { z: 50 } })).toBeNull();
+    });
+
+    it('reads words written without spaces', () => {
+      expect(hint(program('G21G90\nG0Z11\nG1X1F300'), { wpos: { z: 11 } })?.reason).toContain('Check');
+      expect(hint(program('G21\nG0G91Z5\nG90'), { wpos: { z: 50 } })).toBeNull();
+      expect(hint(program('G21\nG90\nG0G53Z-5'), { mpos: { z: -5 } })?.reason).toContain('Check');
+      expect(hint(program('G21\nG90\nG0G53Z-5'), { mpos: { z: -20 } })).toBeNull();
+      const n = 'G21\nG90\nG0 Z11\nN10M0 (MSG Check)\n' + big;
+      expect(holdHint(n, at(after(n, 'Check'), { wpos: { z: 11 } }))?.line).toBe(4);
+    });
   });
 
   it('falls back to the generic card when the Z before the M0 cannot be told', () => {

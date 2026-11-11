@@ -1,4 +1,5 @@
 import { parsePauseMarker, type PauseMarker } from '@wbcnc/cam/pauseMarker';
+import { gcodeWords, hasWord } from './gcodeWords';
 
 /** Why a job is paused and what Resume will do, from the uploaded G-code and FluidNC's SD progress. */
 export interface PauseHint {
@@ -12,12 +13,6 @@ export interface PauseHint {
   marker?: PauseMarker;
 }
 
-/**
- * The only command FluidNC holds a running file at. It parses M1 and M60 but never stops for them, and a manual M6
- * does not hold the file either, so a hint for those would always be wrong.
- */
-// After a line number too (`N10M0`): only another letter right before the M makes it a different word.
-const kPause = /(?<![A-Z])M0*0(?![\d.])/i;
 /** Lines after the pause that are looked at for what comes next. */
 const kLookAhead = 12;
 
@@ -89,7 +84,15 @@ export function memoized<T>(program: ParsedProgram, key: string, compute: () => 
   return program.memo.get(key) as T;
 }
 
-export const isPause = (line: Line) => kPause.test(line.code);
+/**
+ * M0 is the only command FluidNC holds a running file at. It parses M1 and M60 but never stops for them, and a manual
+ * M6 does not hold the file either, so a hint for those would always be wrong.
+ */
+export const isPause = (line: Line) => {
+  // Also after a line number or with other words, spaced or not (`N10M0`): M0, M00, not M0.5.
+  const words = gcodeWords(line.code);
+  return !!words && hasWord(words, 'M', 0);
+};
 
 /** `(MSG Turn ON 30000RPM)` and `(MSG,Turn …)` are messages to the operator. */
 export function operatorMessage(comment: string) {
