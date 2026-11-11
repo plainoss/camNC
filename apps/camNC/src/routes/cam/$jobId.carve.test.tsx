@@ -108,7 +108,7 @@ describe('the Carve step', () => {
     const job = await open();
     const input = screen.getByLabelText('SVG file') as HTMLInputElement;
     const click = vi.spyOn(input, 'click').mockImplementation(() => {});
-    const svgButton = screen.getByRole('button', { name: 'Image or SVG' });
+    const svgButton = screen.getByRole('button', { name: 'Open SVG' });
     fireEvent.click(svgButton);
     expect(click).toHaveBeenCalledTimes(1);
     // The button shows the chooser is opening until it closes.

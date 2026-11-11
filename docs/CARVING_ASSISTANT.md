@@ -1,7 +1,7 @@
 # Illustrations for carving
 
 A new carving starts with an empty board, which offers three ways to start:
-**Add lettering**, **Open an image or SVG** and **Describe it to AI**. The same
+**Add lettering**, **Open an SVG file** and **Describe it to AI**. The same
 three are on the toolbar at the board's left edge, with **Items** and **Board and
 bit** under them. Each opens one side panel; clicking it again, or the panel's
 close button, gives the board its room back.

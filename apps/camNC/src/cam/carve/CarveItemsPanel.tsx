@@ -45,7 +45,7 @@ export function CarveItemsPanel({
           ))}
         </ul>
       ) : (
-        <p className="text-muted-foreground">Nothing on the board yet. Add lettering, an image or AI artwork from the toolbar.</p>
+        <p className="text-muted-foreground">Nothing on the board yet. Add lettering, an SVG file or AI artwork from the toolbar.</p>
       )}
       {items.length > 0 && !selectedId && <p className="text-xs text-muted-foreground">Select an item to edit it on the board.</p>}
     </>

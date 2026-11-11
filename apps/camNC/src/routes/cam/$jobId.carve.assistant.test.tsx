@@ -162,8 +162,10 @@ it('selects the added artwork and offers Undo for that one edit, until anything 
   await waitFor(async () => expect((await getJob(job.id))!.carving!.items).toHaveLength(1));
   const afterDelete = (await getJob(job.id))!.carving!;
   expect(afterDelete.items[0].id).toBe(added.id);
+  // Its Undo, clicked anyway, leaves the delete in place: an undo there would have offered Redo at once.
   act(() => toasts.shown[0].undo());
-  await new Promise(resolve => setTimeout(resolve, 50));
+  expect(screen.getByRole('button', { name: 'Redo' })).toHaveProperty('disabled', true);
+  expect(screen.getByRole('button', { name: 'Undo' })).toHaveProperty('disabled', false);
   expect((await getJob(job.id))!.carving).toEqual(afterDelete);
 }, 30_000);
 
@@ -224,6 +226,8 @@ it('invalidates accepted suitability and a pending proposal after tool and board
   expect(screen.getByText(/Generated artwork changed size, placement or cutting settings/)).toBeTruthy();
   // Back in the assistant, it prepares again for the new tool and board by itself, running CAM in a worker.
   openPanel('AI artwork');
+  // What it had checked is for the old bit and board, so nothing can be applied until it has prepared again.
+  expect(screen.getByRole('button', { name: /^(Applied|Add to board|Replace on board)$/ })).toHaveProperty('disabled', true);
   await waitFor(() => expect(screen.getByRole('button', { name: kApply })).toHaveProperty('disabled', false), { timeout: 20_000 });
   fireEvent.click(screen.getByRole('button', { name: kApply }));
   await waitFor(() => expect(screen.getByRole('link', { name: /Next: Plan/ }).hasAttribute('disabled')).toBe(false));

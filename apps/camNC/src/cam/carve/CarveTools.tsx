@@ -61,7 +61,7 @@ export function CarveToolbar({
       <Tool label="Lettering" onClick={onText}>
         <Type className="size-[19px]" />
       </Tool>
-      <Tool label="Image or SVG" busy={choosing} onClick={onFile}>
+      <Tool label="Open SVG" busy={choosing} onClick={onFile}>
         {choosing ? <LoadingSpinner className="size-4" aria-label="Opening file chooser" /> : <Image className="size-[19px]" />}
       </Tool>
       <Tool
@@ -96,7 +96,7 @@ export function CarveEmptyStart({ onText, onFile, onAssistant }: { onText: () =>
             <Type /> Add lettering
           </Button>
           <Button variant="outline" size="sm" onClick={onFile}>
-            <Image /> Open an image or SVG
+            <Image /> Open an SVG file
           </Button>
           <Button variant="outline" size="sm" className="border-violet-500 text-violet-700 dark:text-violet-300" onClick={onAssistant}>
             <Sparkles /> Describe it to AI
