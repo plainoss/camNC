@@ -81,7 +81,8 @@ it.each([
   ['left', [1, 0, 0], [0, 0, 1]],
   ['right', [-1, 0, 0], [0, 0, 1]],
   ['top', [0, 0, -1], [0, 1, 0]],
-  ['bottom', [0, 0, 1], [0, 1, 0]],
+  // Turned over the X axis, so +X stays to the right and the view cube's label reads upright.
+  ['bottom', [0, 0, 1], [0, -1, 0]],
   ['iso', new THREE.Vector3(-0.2, 0.75, -1).normalize().toArray(), [0, 0, 1]],
 ] as const)('refits from %s on a new sequence and orbits around the model centre', async (name, direction, up) => {
   const view = render(<View size={100} fitKey="assembled" viewRequest={{ name: 'iso', seq: 1 }} />);
@@ -105,6 +106,14 @@ it.each([
         const projected = new THREE.Vector3(x, y, z).project(seen!);
         expect(Math.max(Math.abs(projected.x), Math.abs(projected.y), Math.abs(projected.z))).toBeLessThan(1);
       }
+});
+
+it.each(['top', 'bottom'] as const)('keeps +X to the right looking from the %s', async name => {
+  render(<View size={100} fitKey="assembled" viewRequest={{ name, seq: 1 }} />);
+  await waitFor(() => expect(controls?.target.toArray()).toEqual([50, 50, 50]));
+  seen!.updateMatrixWorld();
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(seen!.quaternion);
+  expect(right.distanceTo(new THREE.Vector3(1, 0, 0))).toBeLessThan(1e-10);
 });
 
 it('does not move for the same sequence, even with a different request object, direction or box', async () => {

@@ -21,6 +21,7 @@ import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
 import { measurementEntityAt, type ModelMeasurePick } from './measurementPick';
 import { ModelMeasurement, type ModelMeasureWitness } from './ModelMeasurement';
+import { ModelLights } from './ModelLights';
 import { centerAssembled, explodeAssembled, interpolateExplosion, layoutFlat } from './layoutFlat';
 import type { StudioCameraRef } from '@/cad/studioCamera';
 import type { MeasureEntity } from '@/cad/measureGeometry';
@@ -278,7 +279,8 @@ export function FitCamera({
     if (name === 'normal') camera.up.set(...(viewRequest?.up ?? [0, 1, 0]));
     else if (name !== 'fit') {
       const vertical = Math.abs(direction.z) > 1 - 1e-10;
-      camera.up.set(0, vertical ? 1 : 0, vertical ? 0 : 1);
+      // From below, the model turns over its X axis: +X stays to the right and the view cube's label reads upright.
+      camera.up.set(0, vertical ? Math.sign(direction.z) : 0, vertical ? 0 : 1);
     }
     if (viewRequest) {
       // Fit every corner in the requested camera frame, including its depth toward the camera.
@@ -638,9 +640,7 @@ export function ModelViewport({
         setHoveredConnector(null);
         onMissed?.();
       }}>
-      <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
-      <directionalLight position={[300, -500, 800]} intensity={1.8} />
-      <directionalLight position={[-400, 300, 200]} intensity={0.4} />
+      <ModelLights />
       {sketchView ? (
         <SketchCamera view={sketchView} model={assembled} />
       ) : (

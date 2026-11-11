@@ -3,6 +3,7 @@ import { Edges } from '@react-three/drei';
 import { useEffect, useMemo } from 'react';
 import { Matrix4 } from 'three';
 import { SketchCamera, type SketchView } from '@/cam/model/ModelViewport';
+import { ModelLights } from '@/cam/model/ModelLights';
 import type { FaceSketchScene } from './faceSketchScene';
 import { partSolid } from './partSolid';
 
@@ -19,10 +20,7 @@ export default function FaceSketchBackdrop({ scene, view }: { scene: FaceSketchS
     <div className="cad-sketch-backdrop" aria-hidden="true">
       <Canvas orthographic frameloop="demand" dpr={[1, 2]}>
         <SketchCamera view={view} model={identity} />
-        <hemisphereLight args={['#ffffff', '#8a8178', 1.4]} position={[0, 0, 1]} />
-        <directionalLight position={[300, -500, 800]} intensity={1.8} />
-        <directionalLight position={[-400, 300, 200]} intensity={0.4} />
-        <directionalLight position={[200, -300, -800]} intensity={1.1} />
+        <ModelLights />
         {solid.geometry && (
           <mesh geometry={solid.geometry} position={[solid.origin![0], solid.origin![1], 0]}>
             <meshStandardMaterial vertexColors color="#c9a477" roughness={0.8} />
