@@ -231,6 +231,7 @@ export function FitCamera({
       back: camera.getWorldDirection(new THREE.Vector3()).negate().toArray(),
       up: new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).toArray(),
       height: (camera.top - camera.bottom) / camera.zoom,
+      aspect,
       key: fitKey,
       seq: viewRequest?.seq,
     };
