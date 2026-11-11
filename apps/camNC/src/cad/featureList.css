@@ -274,14 +274,31 @@
 .cad-studio-features > ol > li.cad-feature-drop-before {
   box-shadow: inset 0 2px 0 #2f80ed;
 }
-/** A row the dragged step can't go to has a red line, and says why under it. */
+/**
+ * A row the dragged step can't go to has a red line, and says why in a tip under it. The tip floats over the rows below
+ * and lets the drag pass through it, so no row moves under the pointer while it's shown.
+ */
 .cad-studio-features > ol > li.cad-feature-drop-refused {
+  position: relative;
   box-shadow: inset 0 2px 0 #d64545;
 }
 .cad-feature-drop-reason {
-  flex-basis: 100%;
-  padding: 2px 8px 4px;
+  position: absolute;
+  inset-inline: 8px;
+  top: 100%;
+  z-index: 2;
+  pointer-events: none;
+  padding: 3px 8px 4px;
+  border: 1px solid #e3b4b4;
+  border-radius: 4px;
+  background: #fff6f6;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
   color: #b23434;
   font-size: 11px;
   line-height: 1.3;
+}
+/** In the lower half of the list as scrolled, the list would clip a tip under the row, so it's shown above. */
+.cad-feature-drop-reason.cad-feature-drop-reason-above {
+  top: auto;
+  bottom: 100%;
 }
