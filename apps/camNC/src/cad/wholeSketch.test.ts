@@ -1,5 +1,6 @@
 import {
   addCircle,
+  addLine,
   addRectangle,
   CAD_CHORD_TOLERANCE,
   createCadDocument,
@@ -45,4 +46,23 @@ it('picks a frame with its hole beside a rectangle, as an extrude of a finished 
   const area = (points: { x: number; y: number }[]) => Math.abs(polygonArea(points));
   expect(parts.map(p => area(p.outline))).toEqual([3000, 5600]);
   expect(parts.map(p => p.holes.map(area))).toEqual([[], [1500]]);
+});
+
+it('keeps the inside of a frame cut into mitred pieces a hole', () => {
+  const part = createCadPart('Frame', 18);
+  part.sketch = addRectangle(part.sketch, { x: 20, y: 0, width: 80, height: 70 });
+  part.sketch = addRectangle(part.sketch, { x: 35, y: 20, width: 50, height: 30 });
+  for (const [x1, y1, x2, y2] of [
+    [20, 0, 35, 20],
+    [100, 0, 85, 20],
+    [100, 70, 85, 50],
+    [20, 70, 35, 50],
+  ] as const)
+    part.sketch = addLine(part.sketch, { x1, y1, x2, y2 });
+  const whole = wholeSketch(part);
+  expect(whole.regions).toHaveLength(4);
+  const parts = splitApartRegions({ ...createCadDocument(), parts: [whole] }, whole.id).parts.map(p => evaluateCadPart(p).part!);
+  const area = (points: { x: number; y: number }[]) => Math.abs(polygonArea(points));
+  expect(parts.map(p => area(p.outline))).toEqual([5600]);
+  expect(parts.map(p => p.holes.map(area))).toEqual([[1500]]);
 });
