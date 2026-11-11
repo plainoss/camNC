@@ -3,8 +3,12 @@ import { rememberAssistantCredentials, setAssistantCredentials, type AssistantCr
 import { providerUrl, type ProviderConfig } from './provider';
 import { connectionPreset, connectionPresets, type ConnectionPresetId } from './connectionPresets';
 import { testAssistantConnection } from './connectionTest';
+import { detectKeyProvider } from './modelDefaults';
 
-/** Key first: a preset fills the address, protocol and capabilities, and a test request confirms them before saving. */
+/**
+ * Key only: the key's prefix picks the provider, the provider's model list picks the text and image models, and a test
+ * request confirms them before saving. Models, address and capabilities stay available as optional overrides.
+ */
 export function ProviderSettings({
   value,
   onSave,
@@ -17,7 +21,9 @@ export function ProviderSettings({
   const initial = connectionPreset(value?.config);
   const [presetId, setPresetId] = useState<ConnectionPresetId>(initial.id);
   const preset = connectionPresets.find(item => item.id === presetId)!;
-  const [config, setConfig] = useState<ProviderConfig>(value?.config ?? { ...initial.config, model: initial.models[0]?.id ?? '' });
+  // A blank model means automatic: the connection test chooses from the provider's own list.
+  const [config, setConfig] = useState<ProviderConfig>(value?.config ?? { ...initial.config, model: '' });
+  const picked = useRef(!!value);
   const [key, setKey] = useState(value?.key ?? '');
   // Reloading should not ask for the key again; unticking keeps it for this app session only.
   const [remember, setRemember] = useState(true);
@@ -27,21 +33,26 @@ export function ProviderSettings({
   const [notes, setNotes] = useState<string[]>([]);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
-  const listed = preset.models.some(model => model.id === config.model);
+  const listed = !config.model || preset.models.some(model => model.id === config.model);
+  const [customModel, setCustomModel] = useState(!listed);
   const choosePreset = (id: ConnectionPresetId) => {
     const next = connectionPresets.find(item => item.id === id)!;
     setPresetId(id);
-    setConfig({ ...next.config, model: next.models[0]?.id ?? '' });
+    setConfig({ ...next.config, model: '' });
+    setCustomModel(false);
     setAdvanced(id === 'other');
     setError('');
     setNotes([]);
   };
-  const validate = () => {
+  const validate = (requireModel: boolean) => {
     providerUrl(config);
     if (!key.trim()) throw new Error('Enter your API key.');
-    if (!config.model.trim()) throw new Error('Enter the model ID from your provider.');
+    if (requireModel && !config.model.trim() && !preset.models[0]) throw new Error('Enter the model ID from your provider.');
     if (!config.tools) throw new Error('The assistants need a model that supports tools.');
-    return { key: key.trim(), config: { ...config, model: config.model.trim() } };
+    const model = config.model.trim() || (requireModel ? preset.models[0]!.id : '');
+    const imageModel = config.imageModel?.trim();
+    const { imageModel: _image, ...rest } = config;
+    return { key: key.trim(), config: { ...rest, model, ...(imageModel && { imageModel }) } };
   };
   const save = (next: AssistantCredentials) => {
     setAssistantCredentials(next, remember);
@@ -56,7 +67,7 @@ export function ProviderSettings({
         if (testing) return;
         let next: AssistantCredentials;
         try {
-          next = validate();
+          next = validate(false);
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : 'Unable to save this connection.');
           return;
@@ -83,20 +94,7 @@ export function ProviderSettings({
       <div className="cad-assistant-connection-intro">
         <span className="cad-assistant-eyebrow">ONE CONNECTION FOR EVERY ASSISTANT</span>
         <h3>Connect an AI provider</h3>
-        <p>Paste your key. Address, tool and image support are filled in and checked for you.</p>
-      </div>
-      <div className="cad-assistant-presets" role="radiogroup" aria-label="Provider">
-        {connectionPresets.map(item => (
-          <button
-            type="button"
-            role="radio"
-            key={item.id}
-            aria-checked={presetId === item.id}
-            disabled={testing}
-            onClick={() => choosePreset(item.id)}>
-            {item.label}
-          </button>
-        ))}
+        <p>Paste your key. The provider, models, address and capabilities are chosen and checked for you.</p>
       </div>
       <label>
         API key
@@ -106,36 +104,69 @@ export function ProviderSettings({
           placeholder={preset.keyPlaceholder}
           value={key}
           disabled={testing}
-          onChange={event => setKey(event.target.value)}
+          onChange={event => {
+            setKey(event.target.value);
+            // Until a provider is picked by hand, the key's prefix chooses it.
+            const detected = detectKeyProvider(event.target.value);
+            if (!picked.current && detected && detected !== presetId) choosePreset(detected);
+          }}
         />
       </label>
-      {preset.models.length ? (
-        <label>
-          Model
-          <select
-            value={listed ? config.model : ''}
+      <div className="cad-assistant-presets" role="radiogroup" aria-label="Provider">
+        {connectionPresets.map(item => (
+          <button
+            type="button"
+            role="radio"
+            key={item.id}
+            aria-checked={presetId === item.id}
             disabled={testing}
-            onChange={event => setConfig({ ...config, model: event.target.value })}>
-            {preset.models.map(model => (
-              <option key={model.id} value={model.id}>
-                {model.label}
-              </option>
-            ))}
-            <option value="">Another model ID…</option>
-          </select>
-        </label>
-      ) : null}
-      {(!preset.models.length || !listed) && (
-        <label>
-          Model ID
-          <input
-            value={config.model}
-            disabled={testing}
-            placeholder={preset.id === 'openai' ? 'The model ID from your OpenAI project' : 'Model ID'}
-            onChange={event => setConfig({ ...config, model: event.target.value })}
-          />
-        </label>
-      )}
+            onClick={() => {
+              picked.current = true;
+              choosePreset(item.id);
+            }}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <details className="cad-assistant-advanced">
+        <summary>Models (optional)</summary>
+        <fieldset disabled={testing}>
+          <label>
+            Design model
+            <select
+              value={customModel ? 'custom' : config.model}
+              onChange={event => {
+                const custom = event.target.value === 'custom';
+                setCustomModel(custom);
+                if (!custom) setConfig({ ...config, model: event.target.value });
+              }}>
+              <option value="">Automatic (recommended)</option>
+              {preset.models.map(model => (
+                <option key={model.id} value={model.id}>
+                  {model.label}
+                </option>
+              ))}
+              <option value="custom">Another model ID…</option>
+            </select>
+          </label>
+          {customModel && (
+            <label>
+              Model ID
+              <input value={config.model} placeholder="Model ID" onChange={event => setConfig({ ...config, model: event.target.value })} />
+            </label>
+          )}
+          {config.kind !== 'anthropic' && (
+            <label>
+              Image model, for Carve
+              <input
+                value={config.imageModel ?? ''}
+                placeholder="Automatic"
+                onChange={event => setConfig({ ...config, imageModel: event.target.value || undefined })}
+              />
+            </label>
+          )}
+        </fieldset>
+      </details>
       <label className="cad-assistant-check">
         <input type="checkbox" checked={remember} disabled={testing} onChange={event => setRemember(event.target.checked)} />
         Remember on this device
@@ -181,7 +212,7 @@ export function ProviderSettings({
             type="button"
             onClick={() => {
               try {
-                save(validate());
+                save(validate(true));
               } catch (cause) {
                 setError(cause instanceof Error ? cause.message : 'Unable to save this connection.');
               }

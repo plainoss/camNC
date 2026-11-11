@@ -11,6 +11,8 @@ export interface ProviderConfig {
   images: boolean;
   /** Anthropic prompt caching is on by default; disable for endpoints that do not implement it. */
   promptCaching?: boolean;
+  /** Image generation model on the same endpoint and key, for Carve; absent when the provider has none. */
+  imageModel?: string;
 }
 export interface AssistantImage {
   name: string;
