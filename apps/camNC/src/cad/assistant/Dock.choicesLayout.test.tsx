@@ -73,7 +73,14 @@ it('keeps the question, both illustrated choices and Send visible on desktop and
         containerType: 'inline-size',
         containerName: 'cad-editor',
       }}>
-      <AssistantDock document={source} onProposal={() => {}} onClose={() => {}} />
+      <AssistantDock
+        proposal={null}
+        onCheckedProposal={() => {}}
+        onDiscardProposal={() => {}}
+        document={source}
+        onProposal={() => {}}
+        onClose={() => {}}
+      />
     </div>
   );
   const panel = screen.getByRole('complementary', { name: 'Design assistant' });
