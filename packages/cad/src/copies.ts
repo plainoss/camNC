@@ -176,8 +176,9 @@ export function cadPartsToCut(
       if (group) group.names.push(name);
       else {
         const id = groups.some(entry => entry.part.partId === shape.partId) ? `${shape.partId}:copy:${copy.id}` : shape.partId;
+        // A mirrored piece is labelled by the copy's own name, as the parts list numbers it.
         groups.push({
-          part: { ...shape, partId: id, name: copy.mirrored ? `${part.name} (mirrored)` : part.name },
+          part: { ...shape, partId: id, name: copy.mirrored ? `${name} (mirrored)` : part.name },
           names: [name],
           mirrored: !!copy.mirrored,
         });
