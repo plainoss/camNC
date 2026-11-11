@@ -1,5 +1,6 @@
+import { Html } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { WebGLRenderer } from 'three';
 import { afterEach, expect, it } from 'vitest';
 import { holdPending, resetSettled, settledSnapshot, trackPending } from '@/lib/settled';
@@ -70,4 +71,25 @@ it('counts a shown 3D view as pending until it has drawn, and a hidden one not a
   expect(settledState().pending.render).toBe(1);
   await settled();
   expect(renderer!.info.render.frame).toBeGreaterThan(0);
+});
+
+it('counts a 3D view’s Html overlay as pending until its separate root has filled it', async () => {
+  render(
+    <div style={{ width: 200, height: 100 }}>
+      <Canvas {...settledCanvas}>
+        <Html>
+          <span data-testid="overlay" />
+        </Html>
+      </Canvas>
+    </div>
+  );
+  await settled();
+  expect(screen.getByTestId('overlay')).toBeInTheDocument();
+  // The view between Html adding its element and its root committing, which a loaded browser can stretch past the
+  // two animation frames that follow the canvas's first draw.
+  const overlay = document.querySelector('[data-settled-canvas]')!.appendChild(document.createElement('div'));
+  expect(settledState().pending.render).toBe(1);
+  await expect(settled({ timeout: 100 })).rejects.toThrow('still pending: render 1');
+  overlay.appendChild(document.createElement('div'));
+  await settled();
 });
