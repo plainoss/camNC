@@ -1,7 +1,8 @@
 import type { PathsD } from 'clipper2-ts';
 import type { PartFeatures } from '../features';
 import { difference, intersect, union, type Pt, type Vec3 } from '../geom';
-import { ON_CIRCLE, pathCircles, runsOnCircles, type Circle } from './arcs';
+import { ON_CIRCLE, pathCircles, type Circle } from './arcs';
+import { stackedWalls, withoutSeams, withUsedPoints } from './walls';
 
 /** A closed solid as faces bounded by shared edges, in the part's local frame (mm, z up). */
 export interface Brep {
@@ -79,8 +80,9 @@ function shapes(region: PathsD) {
 
 /**
  * The part as a B-rep, built the way its mesh is (`cutPartMesh`): one face per height and side, the bottom, and walls
- * between heights. Wall runs that follow a circle become one cylindrical face with arc edges; everything else is
- * planar, so curves other than arcs stay within the sketch's chord tolerance.
+ * between heights, one face for as many heights as its outline stays the same. Wall runs that follow a circle become
+ * one cylindrical face with arc edges; everything else is planar, so curves other than arcs stay within the sketch's
+ * chord tolerance.
  */
 export function partBrep(features: PartFeatures, underside?: PartFeatures | null): Brep {
   const exact = buildBrep(features, underside, true);
@@ -149,28 +151,23 @@ function buildBrep(features: PartFeatures, underside: PartFeatures | null | unde
     cap(difference(over, under), z, false);
   });
   const circles = !arcs ? [] : pathCircles(slabs.flatMap(slab => slab.region));
-  for (const { low, high, region } of slabs) {
-    // Paths run with the material on their left, so each wall faces outward to the right.
-    for (const path of region)
-      for (const run of runsOnCircles(path, circles)) {
-        const along = run.points;
-        if (!run.circle) {
-          const [p, q] = along as [Pt, Pt];
-          const dx = q.x - p.x,
-            dy = q.y - p.y,
-            length = Math.hypot(dx, dy);
-          drafts.push({
-            surface: { kind: 'plane', origin: [p.x, p.y, low], normal: [dy / length, -dx / length, 0] },
-            loops: [[vertex(p.x, p.y, low), vertex(q.x, q.y, low), vertex(q.x, q.y, high), vertex(p.x, p.y, high)]],
-          });
-          continue;
-        }
-        const bottom = along.map(p => vertex(p.x, p.y, low)),
-          top = along.map(p => vertex(p.x, p.y, high));
-        chains.push({ vertices: bottom, circle: run.circle, z: low }, { vertices: top, circle: run.circle, z: high });
-        // A counterclockwise run has the material on its left, inside the circle: the face looks away from the axis.
-        drafts.push({ surface: { kind: 'cylinder', circle: run.circle, outward: run.ccw }, loops: [[...bottom, ...[...top].reverse()]] });
-      }
+  const seams = new Set<number>();
+  for (const { circle, ccw, along, low, high, bottom, top, first, last } of stackedWalls(slabs, circles, vertex)) {
+    for (const v of [...first, ...last]) seams.add(v);
+    // Along the bottom, up the last side, back along the top and down the first side, past the heights in between.
+    const loop = [...bottom, ...last, ...[...top].reverse(), ...[...first].reverse()];
+    if (!circle) {
+      // Paths run with the material on their left, so each wall faces outward to the right.
+      const [p, q] = along as [Pt, Pt];
+      const dx = q.x - p.x,
+        dy = q.y - p.y,
+        length = Math.hypot(dx, dy);
+      drafts.push({ surface: { kind: 'plane', origin: [p.x, p.y, low], normal: [dy / length, -dx / length, 0] }, loops: [loop] });
+      continue;
+    }
+    chains.push({ vertices: bottom, circle, z: low }, { vertices: top, circle, z: high });
+    // A counterclockwise run has the material on its left, inside the circle: the face looks away from the axis.
+    drafts.push({ surface: { kind: 'cylinder', circle, outward: ccw }, loops: [loop] });
   }
 
   const level = new Map<number, number[]>();
@@ -183,7 +180,8 @@ function buildBrep(features: PartFeatures, underside: PartFeatures | null | unde
   // A wall whose two ends merged into one vertex has nothing left.
   for (let i = drafts.length - 1; i >= 0; i--) if (!drafts[i]!.loops.length) drafts.splice(i, 1);
   for (const chain of chains) chain.vertices = withoutSpikes(conform(chain.vertices, points, false, circles, level), false);
-  return withEdges(drafts, chains, points);
+  withoutSeams(drafts, chains, points, seams);
+  return withUsedPoints(withEdges(drafts, chains, points));
 }
 
 /**
