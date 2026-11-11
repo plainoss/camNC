@@ -532,6 +532,7 @@ test('Deploy ships production only from main pushes and previews only same-repos
   assert.match(step('Deploy production').run, /pnpm run deploy$/);
   assert.equal(step('Upload preview version').if, "github.event_name == 'pull_request'");
   assert.match(step('Upload preview version').run, /deploy:preview --preview-alias pr-/);
+  assert.match(step('Upload preview version').run, /set -o pipefail/, 'a failed upload must not pass on tee');
   const comment = step('Comment the preview links');
   assert.equal(comment.if, "github.event_name == 'pull_request'");
   assert.match(comment.run, /camnc-preview -->[\s\S]*PATCH/, 'one preview comment, edited on every upload');
