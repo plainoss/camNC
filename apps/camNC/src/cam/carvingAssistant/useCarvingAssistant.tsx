@@ -184,6 +184,10 @@ export function useCarvingAssistant({
   useEffect(() => {
     if (open && selected?.generated && !hasSharedImages && !separateImage && !modeChosen.current) setGenerationMode('text');
   }, [open, selected?.generated, hasSharedImages, separateImage]);
+  // Connecting a key with an image model switches to images, unless the person already chose a method.
+  useEffect(() => {
+    if (hasSharedImages && !modeChosen.current) setGenerationMode('native');
+  }, [hasSharedImages]);
   // Shared images always take the traced PNG route; SVG output needs the explicit opt-in of the separate form.
   // Without an image model on the connection, the separate image provider is the only way to images.
   const useSeparateImage = separateImage || !shared;
@@ -346,9 +350,10 @@ export function useCarvingAssistant({
       generationMode,
       setGenerationMode: chooseMode,
       native,
-      // Details typed into the provider form while it is the only way to images stay in use after reconnecting.
+      // A complete provider entered while it is the only way to images stays in use after reconnecting.
       setNative: (value: NativeSvgConnection) => {
-        if (!shared) setSeparateImage(true);
+        // Only a complete provider sticks, so a half-filled form never blocks a later key with its own image model.
+        if (!shared && value.key.trim() && value.model.trim() && value.supportsSvg) setSeparateImage(true);
         setNative(value);
       },
       sharedImageModel: shared?.model,
