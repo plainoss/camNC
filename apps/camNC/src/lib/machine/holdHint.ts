@@ -9,6 +9,7 @@ export interface HoldContext {
   /** camNC sent the feed hold (Pause, Stop). */
   holdRequested: boolean;
   mpos: { z: number } | undefined;
+  /** `undefined` while the work offset is not known yet. */
   wpos: { z: number } | undefined;
 }
 
@@ -20,8 +21,8 @@ const kAtZ = 0.05;
  * unsure it is `null`: the generic card is right in the middle of a cut, a pause's steps are not.
  *
  * - The start pause, before the spindle runs, has its own signal: the reader cannot pass the first M0 without Resume,
- *   so while it has read no further, the job has not started cutting, whoever held it. Missing that card would let a
- *   router switched by hand stay off when the cut begins.
+ *   so while it has read no further and the bit is at the safe Z before it, the job has not started cutting, whoever
+ *   held it. Missing that card would let a router switched by hand stay off when the cut begins.
  * - A hold camNC sent is a feed hold, wherever the job is.
  * - Every other M0 also needs the bit where the program put it before that M0: a hold from the machine's button or
  *   another client, with the reader blocked just before the M0 (at the M5, say), reports nearly the same position.
@@ -35,8 +36,10 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
   const start = first >= 0 ? explainPause(lines, first, gcode) : null;
   if (start?.marker?.kind === 'start') {
     const readTo = (Math.max(c.readTo ?? c.percent, c.percent) / 100) * size;
-    // Within the window: the percent may stand for a byte a little past the M0 even while the reader waits there.
-    if (readTo <= lines[first]!.end + positionWindow(size)) return start;
+    // Within the window: the percent may stand for a byte a little past the M0 even while the reader waits there. On a
+    // file of many MB that window reaches into the first cut, so the bit must also be at the safe Z it went to first,
+    // where it always is at the real start pause.
+    if (readTo <= lines[first]!.end + positionWindow(size) && bitWhereThePauseLeftIt(lines, first, false, c)) return start;
   }
   if (c.holdRequested) return null;
   const index = pauseAt(lines, size, c.percent);

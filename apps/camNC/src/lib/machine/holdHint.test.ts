@@ -1,8 +1,8 @@
 import { pauseMarker } from '@wbcnc/cam/pauseMarker';
 import { describe, expect, it } from 'vitest';
 import { type HoldContext, holdHint } from './holdHint';
-import { pauseHint } from './pauseHints';
-import { boardProgram, controllerPercent, largeProgram } from './pauseHints.fixture';
+import { pauseHint, positionWindow } from './pauseHints';
+import { boardProgram, camProgram, controllerPercent, largeProgram } from './pauseHints.fixture';
 
 const sd = (byte: number) => controllerPercent(byte, 13_225);
 /** Hold:0 at `percent`, read no further, held by someone else, bit parked. */
@@ -31,17 +31,29 @@ describe('holdHint', () => {
   });
 
   describe('the start pause, before the spindle runs', () => {
-    it('shows while the reader is not past it, whoever held the job', () => {
+    it('shows while the reader is not past it and the bit is at the safe Z before it, whoever held the job', () => {
       for (const holdRequested of [false, true]) {
-        // At the M0, and paused during the Z lift before it.
         expect(holdHint(boardProgram, at(sd(477), { holdRequested }))?.marker).toEqual({ kind: 'start', rpm: 15000 });
-        expect(holdHint(boardProgram, at(sd(200), { holdRequested, wpos: { z: 4 } }))?.marker?.kind).toBe('start');
+        expect(holdHint(boardProgram, at(sd(200), { holdRequested, wpos: { z: 23.28 } }))?.marker?.kind).toBe('start');
+        // Paused during the Z lift before it: the start card shows once the lift ends at the M0.
+        expect(holdHint(boardProgram, at(sd(200), { holdRequested, wpos: { z: 4 } }))).toBeNull();
       }
     });
 
-    it('does not show once the reader went past it', () => {
+    it('does not show once the reader went past it, or without a work Z to go by', () => {
       expect(holdHint(boardProgram, at(sd(477), { readTo: sd(487) }))).toBeNull();
       expect(holdHint(boardProgram, at(sd(487)))).toBeNull();
+      expect(holdHint(boardProgram, at(sd(477), { wpos: undefined }))).toBeNull();
+    });
+
+    it('in a 20 MB program, does not show with the reader in the first cut, inside the position window', () => {
+      const { gcode, size, startEnd } = camProgram(20_000_000);
+      const percent = controllerPercent(startEnd + 390, size);
+      expect((percent / 100) * size).toBeLessThanOrEqual(startEnd + positionWindow(size));
+      for (const holdRequested of [false, true]) {
+        expect(holdHint(gcode, at(percent, { holdRequested, mpos: { z: -36 }, wpos: { z: -6 } }))).toBeNull();
+        expect(holdHint(gcode, at(percent, { holdRequested }))?.marker?.kind).toBe('start');
+      }
     });
   });
 

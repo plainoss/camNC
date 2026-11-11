@@ -354,6 +354,27 @@ describe('CncApi', () => {
     expect(api.holdRequested.value).toBe(false);
   });
 
+  it('forgets the Pause once the controller reads on past where it held, though the Run report was missed', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    const hold = async (state: string, percent: number) => {
+      fake.state = state;
+      fake.job = { file: '/sd/job.gcode', percent };
+      fake.pushStatus();
+      await until(() => api.status.value?.state === state.split(':')[0] && api.jobProgress.value?.percent === percent);
+    };
+    await hold('Run', 40);
+    api.feedHold();
+    // Still reading into the planner while it slows down: not past the hold yet.
+    await hold('Hold:1', 40.5);
+    await hold('Hold:0', 41);
+    await hold('Hold:0', 41);
+    expect(api.holdRequested.value).toBe(true);
+    // Resumed elsewhere, ran on and held again (an M0) between two reports.
+    await hold('Hold:0', 63.2);
+    expect(api.holdRequested.value).toBe(false);
+  });
+
   it('a feed hold sent while Idle is not a Pause, and a new job starts with none', async () => {
     const fake = new FakeFluidnc('v4');
     const api = await connected(fake);

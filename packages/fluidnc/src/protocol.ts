@@ -67,6 +67,8 @@ export interface MachineStatus extends ParsedStatus {
   mpos: Position;
   wpos: Position;
   wco: Position;
+  /** The controller has reported WCO or WPos since connecting. Until then `wco` is zero and `wpos` is just `mpos`. */
+  workKnown?: boolean;
 }
 
 export type ConsoleLineKind = 'sent' | 'ok' | 'error' | 'alarm' | 'msg' | 'reset' | 'data';
@@ -416,6 +418,7 @@ export class FluidncProtocol {
       mpos,
       wpos,
       wco,
+      workKnown: !!(parsed.wco || parsed.wpos || prev?.workKnown),
       overrides: parsed.overrides ?? prev?.overrides,
     };
     this.status = status;

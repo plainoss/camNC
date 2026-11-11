@@ -80,7 +80,8 @@ describe('the hold card, from the controller through CncApi', () => {
     await report('Run', 300, -20);
     await pause();
     await report('Hold:0', 300, -20);
-    expect(card()).toMatch(/Ready to start/);
+    // Below the safe Z the start card would not be about the bit's position yet.
+    expect(card()).toContain(generic);
     fireEvent.click(screen.getByRole('button', { name: /Resume/ }));
     await until(() => !h.api.holdRequested.value);
     // No Run report: the controller lifts on and stops at the start M0.

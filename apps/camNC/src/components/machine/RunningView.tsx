@@ -46,7 +46,8 @@ function HoldExplanation() {
   const holdRequested = api.holdRequested.value;
   const read = api.jobReadTo.value;
   const readTo = read && read.file === job?.file ? read.percent : undefined;
-  const [mz, wz] = [status?.mpos?.z, status?.wpos?.z];
+  // Until the controller reports the work offset, WPos is just MPos: no work Z to go by.
+  const [mz, wz] = [status?.mpos?.z, status?.workKnown ? status.wpos?.z : undefined];
   const hint = useMemo(
     () =>
       ours

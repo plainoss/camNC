@@ -73,6 +73,22 @@ describe.each(['v3-81', 'v4'] as const)('FluidncProtocol on %s', variant => {
     const last = statuses.at(-1)!;
     expect(last.wpos).toEqual({ x: 10, y: 0, z: 0 });
     expect(last.overrides).toEqual({ feed: 100, rapid: 100, spindle: 100 });
+    expect(last.workKnown).toBe(true);
+  });
+
+  it('says when WPos is only MPos because no WCO has been reported yet', async () => {
+    const fake = new FakeFluidnc(variant);
+    const protocol = await connect(fake);
+    const statuses: MachineStatus[] = [];
+    protocol.on('status', s => statuses.push(s));
+    fake.emit(['<Hold:0|MPos:1.000,2.000,-5.000|FS:0,0|SD:50.00,/sd/job.gcode>']);
+    await until(() => statuses.length > 0);
+    expect(statuses[0]!.workKnown).toBe(false);
+    expect(statuses[0]!.wpos.z).toBe(-5);
+    fake.pushStatus();
+    fake.emit(['<Hold:0|MPos:1.000,2.000,-5.000|FS:0,0|SD:50.00,/sd/job.gcode>']);
+    await until(() => statuses.length > 2);
+    expect(statuses[2]!.workKnown).toBe(true);
   });
 
   it('sends realtime bytes outside the queue', async () => {
