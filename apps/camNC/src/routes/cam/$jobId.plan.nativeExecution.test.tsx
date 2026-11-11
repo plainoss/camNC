@@ -10,7 +10,9 @@ import { createDesignJob, getJob, saveJob } from '@/cam/jobDb';
 import { newBoard } from '@/cam/boards';
 import { kDefaultPlan } from '@/cam/planSettings';
 import { usePlanLayout } from '@/cam/plan/planLayoutStore';
+import { trackQueryClient } from '@/lib/settled';
 import { useStore } from '@/store/store';
+import { settled } from '@/test/settled';
 import { Route } from './$jobId.plan';
 import { Route as BoardsRoute } from './$jobId.boards';
 
@@ -148,17 +150,24 @@ it('adds a part to a partly-cut native sheet only after the real Boards Start ov
   document.parts.push(added);
   const changed = await acceptDesign(await saveDesignDraft(cut, document), document);
   state.jobId = changed.id;
+  const client = new QueryClient();
+  // Its job reads and saves count as pending for `settled()`, with the IndexedDB writes behind them.
+  trackQueryClient(client);
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <Boards />
     </QueryClientProvider>
   );
   const startOver = await screen.findByRole('button', { name: 'Start over' }, { timeout: 30_000 });
-  await waitFor(async () => expect((await getJob(changed.id))!.boards![0]!.items).toContain(`${added.id}#0`));
+  // The boards derived on the first visit are saved; a loaded runner can take longer than a poll's default second.
+  await settled({ timeout: 30_000 });
+  expect((await getJob(changed.id))!.boards![0]!.items).toContain(`${added.id}#0`);
   expect((await getJob(changed.id))!.boards![0]!.cut).toEqual(board.cut);
   expect(state.requests[0]!.parts.some(part => part.partId === added.id)).toBe(false);
   fireEvent.click(startOver);
-  await waitFor(async () => expect((await getJob(changed.id))!.boards![0]!.cut).toBeUndefined());
+  // Start over's save has reached IndexedDB once nothing is pending.
+  await settled({ timeout: 30_000 });
+  expect((await getJob(changed.id))!.boards![0]!.cut).toBeUndefined();
   await waitFor(() => expect(state.requests[0]?.parts.some(part => part.partId === added.id)).toBe(true), { timeout: 30_000 });
   const saved = (await getJob(changed.id))!;
   expect(saved.boards![0]!.layout!.at[instanceId]).toEqual(board.layout.at[instanceId]);

@@ -1,12 +1,14 @@
 import { setAsidePart } from '@/cam/boards';
 import { useCamMachine } from '@/cam/machine/camMachine';
+import { useStore } from '@/store/store';
+import { Box2, Vector2 } from 'three';
 import { getJob, saveJob } from '@/cam/jobDb';
 
 import { QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
 import { describe, expect, it } from 'vitest';
-import { description, drawing, showAll, partIn, openKinderregal } from './boardsTestFixture';
+import { description, drawing, showAll, partIn, openBoard, openKinderregal } from './boardsTestFixture';
 
 describe('CAM boards step', () => {
   it('refuses Start over while a machine job is protected', async () => {
@@ -95,6 +97,53 @@ describe('CAM boards step', () => {
     expect(await screen.findByText(/Not placed: .*already-cut boards/)).toBeTruthy();
     expect(screen.queryByText('Parts off the boards placed.')).toBeNull();
     expect((await getJob(job.id))!.boards!.find(b => b.id === board.id)).toEqual(edited.boards!.find(b => b.id === board.id));
+  }, 90000);
+
+  it('makes no board for a part too big for the machine, and says which part and why', async () => {
+    // Machine bounds for this test only: the store saves them to localStorage, which other test files read as they start.
+    const storage = useStore.persist.getOptions().storage;
+    useStore.persist.setOptions({ storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } });
+    useStore.setState({ machineBounds: new Box2(new Vector2(0, 0), new Vector2(600, 300)) });
+    try {
+      const client = new QueryClient();
+      const job = await openKinderregal(client);
+      // The back (400 × 380) fits no board on a 600 × 300 machine: it says so, with no button that can't help.
+      const big = await screen.findByText(/\(400 × 380 mm\) is too big for the machine: its largest board is 600 × 300 mm/);
+      expect(big.textContent).toMatch(/won’t be cut\.$/);
+      expect(screen.queryByRole('button', { name: 'Place on boards' })).toBeNull();
+      // Nor does Move to → New board make a board for it.
+      const count = (await getJob(job.id))!.boards!.length;
+      openBoard((await getJob(job.id))!.boards!.find(b => b.thickness === 3)!.name);
+      fireEvent.keyDown(await screen.findByRole('button', { name: /: off the board, won’t be cut/ }), { key: 'Enter' });
+      fireEvent.click(await screen.findByRole('menuitem', { name: /New board/ }));
+      expect(await screen.findByText(/\(400 × 380 mm\) is too big for the machine: .* It stays where it is\.$/)).toBeTruthy();
+      expect((await getJob(job.id))!.boards!.length).toBe(count);
+
+      // A part set aside by hand, as well: that one goes back, the back stays, and no board is made for it.
+      await waitFor(async () => expect((await getJob(job.id))!.boards!.some(b => b.thickness === 8 && b.layout)).toBe(true));
+      const original = (await getJob(job.id))!;
+      const board = original.boards!.find(b => b.thickness === 8 && b.layout)!;
+      const id = board.items[0];
+      const edited = await saveJob({
+        ...original,
+        boards: original.boards!.map(b => (b.id === board.id ? setAsidePart(b, id, { x: -1000, y: -1000, rotated: false }) : b)),
+      });
+      act(() => client.setQueryData(['cam', 'job', job.id], edited));
+      fireEvent.click(await screen.findByRole('button', { name: 'Place on boards' }));
+      const name = original.parts.find(p => p.id === id.split('#')[0])!.name;
+      const note = await screen.findByText(/^Placed on boards: /);
+      expect(note.textContent).toMatch(new RegExp(`^Placed on boards: ${name}\\. .+ \\(400 × 380 mm\\) is too big for the machine`));
+      expect(screen.queryByText('Parts off the boards placed.')).toBeNull();
+      await waitFor(async () => expect((await getJob(job.id))!.boards!.find(b => b.id === board.id)!.setAside).toBeUndefined());
+      expect((await getJob(job.id))!.boards!.map(b => b.id)).toEqual(original.boards!.map(b => b.id));
+      // The back's board is empty: the summary counts it apart, so the boards add up to the tabs.
+      const summary = screen.getByRole('status', { name: 'Layout result' }).textContent!;
+      const [, used, empty] = summary.match(/^(\d+) boards?, \d+ % yield, (\d+) empty$/)!;
+      expect(+used + +empty).toBe(original.boards!.length);
+    } finally {
+      useStore.setState({ machineBounds: null });
+      useStore.persist.setOptions({ storage });
+    }
   }, 90000);
 
   it('auto-fill keeps parts moved by hand, and Undo restores the boards exactly', async () => {

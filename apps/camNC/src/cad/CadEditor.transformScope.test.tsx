@@ -7,6 +7,7 @@ import { ModelViewport } from '@/cam/model/ModelViewport';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
 import tray from '../../../../packages/cad-script/fixtures/designs/divided-tray.json';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 const sessions: string[] = [];
@@ -15,7 +16,6 @@ afterEach(() => {
   sessions.splice(0).forEach(endCadSession);
 });
 const viewport = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
-const toolbar = () => within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' }));
 
 async function studio(source: CadDocument) {
   // Normalize placements before mounting so the editor's initial solver result cannot masquerade as a tool edit.
@@ -47,7 +47,7 @@ it.each(['viewport', 'Parts list'])('refuses to widen a patterned tray divider p
   expect(copyRow()).toHaveAttribute('aria-pressed', 'true');
   const before = structuredClone(latest());
   const instances = [...viewport().instanceIds!];
-  await userEvent.click(toolbar().getByRole('button', { name: /Transform/ }));
+  await userEvent.click(await studioCommand(/Transform/));
   expect(screen.queryByRole('dialog', { name: /^Transform/ })).toBeNull();
   expect(screen.getByRole('alert').textContent).toContain('Select the source part in Parts to transform its whole family.');
   expect(copyRow()).toHaveAttribute('aria-pressed', 'true');
@@ -57,7 +57,7 @@ it.each(['viewport', 'Parts list'])('refuses to widen a patterned tray divider p
 
   // Explicit family selection permits the established source-before-pattern operation.
   await userEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: 'Divider' }));
-  await userEvent.click(toolbar().getByRole('button', { name: /Transform/ }));
+  await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   expect(screen.queryByRole('alert')).toBeNull();
   const x = within(dialog).getByRole('textbox', { name: 'X' });
@@ -88,7 +88,7 @@ it('keeps a disappeared pattern copy from becoming a source transform', async ()
   await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull());
   const before = structuredClone(latest());
   const calls = change.mock.calls.length;
-  await userEvent.click(toolbar().getByRole('button', { name: /Transform/ }));
+  await userEvent.click(await studioCommand(/Transform/));
   expect(screen.queryByRole('dialog', { name: /^Transform/ })).toBeNull();
   expect(screen.getByRole('alert').textContent).toContain('Select the source part in Parts to transform its whole family.');
   expect(change).toHaveBeenCalledTimes(calls);
@@ -102,7 +102,7 @@ it.each([false, true])('refuses a new family transform from a selected standalon
   part.copies = [{ id: 'copy', name: 'Selected copy', offset: { position: [300, 0, 0], rotation: [0, 0, 0, 1] }, mirrored }];
   const { change } = await studio(resolvePartPatterns(source));
   await userEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: 'Selected copy' }));
-  await userEvent.click(toolbar().getByRole('button', { name: /Transform/ }));
+  await userEvent.click(await studioCommand(/Transform/));
   expect(screen.queryByRole('dialog', { name: /^Transform/ })).toBeNull();
   expect(screen.getByRole('alert').textContent).toContain('Transforming only the selected copy is not supported.');
   expect(change).not.toHaveBeenCalled();

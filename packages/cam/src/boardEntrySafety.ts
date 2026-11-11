@@ -1,5 +1,5 @@
-import { clipLines, distPointSeg, offset, pathLength, union, type PathsD, type Pt, type Vec3 } from './geom';
-import type { Operation, PartCam } from './toolpaths';
+import { distPointSeg, type PathsD, type Pt, type Vec3 } from './geom';
+import type { Operation } from './toolpaths';
 
 const cross = (a: Pt, b: Pt, c: Pt) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 
