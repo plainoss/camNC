@@ -3,7 +3,16 @@ import { useRef, useState, type DragEvent } from 'react';
 /** What dropping the dragged step on a row would do: the step it then goes before (null at the end), or why it can't. */
 export type StepDropCheck = (stepId: string, ontoId: string) => { before: string | null } | { error: string } | null;
 /** The row a step is dragged over, and what dropping it there would do. */
-export type StepDrop = { stepId: string; onto: string; before?: string | null; error?: string };
+export type StepDrop = { stepId: string; onto: string; before?: string | null; error?: string; above?: boolean };
+
+/** A row in the lower half of the list as scrolled has its refusal tip shown above it, where the list won't clip it. */
+function inLowerHalf(row: Element): boolean {
+  const list = row.closest('ol') ?? row.parentElement;
+  if (!list) return false;
+  const box = row.getBoundingClientRect();
+  const view = list.getBoundingClientRect();
+  return box.top + box.height / 2 > view.top + view.height / 2;
+}
 
 /**
  * Follows a step dragged in the feature list, so the list can draw a line where it would land, or mark the row it
@@ -45,7 +54,14 @@ export function useStepDrop(check?: StepDropCheck) {
       if (!next) {
         // Unchecked, a step goes just before the one it's dropped on.
         const result = check ? check(stepId, ontoId) : stepId === ontoId ? null : { before: ontoId };
-        next = { stepId, onto: ontoId, ...(result && ('error' in result ? { error: result.error } : { before: result.before })) };
+        next = {
+          stepId,
+          onto: ontoId,
+          ...(result &&
+            ('error' in result
+              ? { error: result.error, above: event.currentTarget instanceof Element && inLowerHalf(event.currentTarget) }
+              : { before: result.before })),
+        };
         show(next);
       }
       if (next.before !== undefined) {

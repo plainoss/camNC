@@ -461,7 +461,7 @@ export function FeatureList({
                 />
               )}
               {step && stepDrop.drop?.error && stepDrop.drop.onto === step.id && (
-                <span className="cad-feature-drop-reason" role="status">
+                <span className={`cad-feature-drop-reason${stepDrop.drop.above ? ' cad-feature-drop-reason-above' : ''}`} role="status">
                   {stepDrop.drop.error}
                 </span>
               )}
