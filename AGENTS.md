@@ -53,6 +53,7 @@ This repository is a pnpm/Turborepo workspace using TypeScript and React.
 - Before repairing a shared test driver or CI failure, inspect open PRs and current main for an existing fix. Coordinate one shared repair rather than independently patching it into several feature branches.
 - Claim a shared failure before fixing it: comment on its open `flaky-test` issue (CI files one when a test fails and then passes on the same code), or open one if there is none, with the `flaky-test` label and a title CI would give it, so later flakes land on it: `Flaky test: ` and then the spec (`sketch/machine/edit-after-cut-keeps-boards`) or `file > describe > test`, and link your PR there. If someone already claimed it, wait for their fix or help on their PR.
 - Read the failing assertion and its artifacts before classifying a failure as transient. A local pass does not establish that CI is flaky. Retry failed jobs only on the same candidate when there is evidence of a transient failure; if the same assertion fails again, investigate and repair its cause instead of repeatedly requeuing unchanged code.
+- Browser tests wait for the app with `await settled()` (`apps/camNC/src/test/settled.ts`), not sleeps or one-off polls; see "Waiting in browser tests" in `docs/TESTING.md`.
 - For asynchronous UI tests, wait for the specific observable readiness condition before acting or asserting. Preserve the expected result; do not replace assertions with fixed sleeps or blanket retries.
 
 ## Commit Messages
