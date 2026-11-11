@@ -27,7 +27,16 @@ it('shows image-only history and preserves constraints when moving to a text-onl
     expect(request.messages[1].text).toContain('selected provider is text-only');
     return { role: 'assistant', text: 'Question: What diameter?', usage: { inputTokens: 123, outputTokens: 12 } };
   });
-  render(<AssistantDock document={document} onProposal={() => {}} onClose={() => {}} />);
+  render(
+    <AssistantDock
+      proposal={null}
+      onCheckedProposal={() => {}}
+      onDiscardProposal={() => {}}
+      document={document}
+      onProposal={() => {}}
+      onClose={() => {}}
+    />
+  );
   expect(screen.getByRole('img', { name: 'reference.png' })).toBeDefined();
   await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'Cut a hole.');
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
@@ -42,7 +51,16 @@ it('subscribes to external proposal outcomes without erasing earlier constraints
   const document = createPlateDocument();
   rememberAssistantCredentials({ config: { ...defaultProvider, model: 'recorded' }, key: 'recorded-key' });
   writeConversation(document.id, [{ role: 'user', text: 'Keep the back 6 mm.' }]);
-  render(<AssistantDock document={document} onProposal={() => {}} onClose={() => {}} />);
+  render(
+    <AssistantDock
+      proposal={null}
+      onCheckedProposal={() => {}}
+      onDiscardProposal={() => {}}
+      document={document}
+      onProposal={() => {}}
+      onClose={() => {}}
+    />
+  );
   recordAssistantEvent(document.id, 'The user discarded the proposal review.', 'discarded');
   await waitFor(() => expect(within(screen.getByRole('log')).getByText(/discarded the proposal/)).toBeDefined());
   expect(screen.getByText('Keep the back 6 mm.')).toBeDefined();

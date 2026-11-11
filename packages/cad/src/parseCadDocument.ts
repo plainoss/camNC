@@ -13,6 +13,7 @@ import { cadDocumentVersion } from './documentVersion';
 import { validCircularPartPattern } from './circularPartPattern';
 import { partCutReliefIssue } from './partCutRelief';
 import { unsupportedCadSourceIssue } from './unsupportedCadSource';
+import { copyOperationSourceIssue } from './copyOperationSource';
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
 export function parseCadDocument(input: unknown): CadDocument {
@@ -22,7 +23,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   const unsupported = unsupportedCadSourceIssue(d);
   if (unsupported) throw new Error(unsupported);
   if (
-    (d.version !== 1 && d.version !== 2 && d.version !== 3 && d.version !== 5) ||
+    (d.version !== 1 && d.version !== 2 && d.version !== 3 && d.version !== 4 && d.version !== 5) ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
@@ -116,6 +117,9 @@ export function parseCadDocument(input: unknown): CadDocument {
       if (reliefIssue) throw new Error(reliefIssue);
     }
   }
+  const operationIssue = copyOperationSourceIssue(d);
+  if (operationIssue) throw new Error(operationIssue);
+  for (const move of d.copyTransforms ?? []) addId(move.id);
   for (const p of d.parts) {
     if (!p || typeof p !== 'object' || !p.sketch || typeof p.sketch !== 'object') throw new Error('Invalid CAD part');
     addId(p.id);

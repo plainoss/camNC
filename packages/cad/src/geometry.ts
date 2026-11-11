@@ -28,6 +28,7 @@ import { cadFolderIssue } from './folderModel';
 import { cadDocumentVersion } from './documentVersion';
 import { partCutReliefIssue } from './partCutRelief';
 import { unsupportedCadSourceIssue } from './unsupportedCadSource';
+import { copyOperationSourceIssue } from './copyOperationSource';
 export { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 /** Absolute chord error, mm; analytic sketch geometry is retained in the source. */
 export const CAD_CHORD_TOLERANCE = 0.01;
@@ -43,11 +44,10 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
     ids.add(id);
   };
   addId(document.id);
-  if (
-    (document.version !== 1 && document.version !== 2 && document.version !== 3 && document.version !== 5) ||
-    !Number.isSafeInteger(document.revision) ||
-    document.revision < 0
-  )
+  const operationIssue = copyOperationSourceIssue(document);
+  if (operationIssue) diagnostics.push({ code: 'invalid-copy-operations', message: operationIssue, severity: 'error' });
+  for (const move of document.copyTransforms ?? []) addId(move.id, move.partId);
+  if (![1, 2, 3, 4, 5].includes(document.version) || !Number.isSafeInteger(document.revision) || document.revision < 0)
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   if (!document.parts.length) diagnostics.push({ code: 'no-parts', message: 'Add a part before preparing a cut.', severity: 'error' });
   if (document.version < cadDocumentVersion(document))

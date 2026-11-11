@@ -52,7 +52,7 @@ it('keeps legacy inheritance but applies Off and Dogbone only to their own openi
 
 it('resolves, renames and tracks a step diameter variable without changing clearance or source relief', () => {
   const original = source().document;
-  let document = { ...original, variables: [{ id: 'cutter', name: 'cutter', expression: '6 mm' }] };
+  let document: CadDocument = { ...original, variables: [{ id: 'cutter', name: 'cutter', expression: '6 mm' }] };
   document = updatePartCut(document, document.partCuts![0]!.id, { cornerRelief: { diameter: 6, diameterExpression: 'cutter' } });
   const changed = setCadVariable(document, { id: 'cutter', name: 'selectedCutter', expression: '8 mm' });
   if ('error' in changed) throw new Error(changed.error);
@@ -62,7 +62,7 @@ it('resolves, renames and tracks a step diameter variable without changing clear
   expect(parseCadDocument(JSON.parse(JSON.stringify(changed.document))).version).toBe(5);
 });
 
-it.each(['operationOrder', 'copyTransforms', 'legacyPartCutIds', 'constructions'])('refuses unsupported %s even combined with its own relief', key => {
+it.each(['constructions'])('refuses unsupported %s even combined with its own relief', key => {
   const document = source().document;
   const relieved = updatePartCut(document, document.partCuts![0]!.id, { cornerRelief: null });
   const combined = { ...relieved, [key]: [] };
