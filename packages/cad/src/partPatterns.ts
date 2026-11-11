@@ -6,31 +6,14 @@ import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { mirroredPlacement, turnAbout } from './placement';
 import { cadDirectionVector } from './directions';
 import { circularPartPatternStep } from './circularPartPattern';
+import { numberedCadCopy } from './copyNumbers';
 import type { CadDocument, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
 
 const kAxes = { x: 0, y: 1, z: 2 } as const;
 /** The most pieces a pattern makes, counting the part itself. */
 export const CAD_MAX_PART_PATTERN = 200;
 
-/**
- * What a copy is called: its own name, or the part's with a number counting the part as the first.
- * Copies ahead of the pattern's are numbered first, then the pattern's by their place in it, then copies added after the
- * pattern, so adding a copy never renumbers the ones already there.
- */
-export const cadCopyName = (part: Pick<CadPart, 'name' | 'copies' | 'pattern'>, index: number): string =>
-  part.copies?.[index]?.name ??
-  (() => {
-    const copies = part.copies ?? [];
-    const first = copies.findIndex(copy => copy.pattern);
-    const slot = (copy: CadPartCopy | undefined) => (copy?.pattern ? Number(copy.id.slice(copy.pattern.length + 1)) : NaN);
-    const logical = slot(copies[index]);
-    if (first < 0 || index < first) return `${part.name} ${index + 2}`;
-    if (Number.isInteger(logical)) return `${part.name} ${first + logical + 1}`;
-    // After the pattern: past its last slot, even an excluded one, so excluding a slot doesn't rename these.
-    const slots = Math.max((part.pattern?.count ?? 1) - 1, ...copies.map(slot).filter(Number.isInteger));
-    const after = copies.slice(first, index).filter(copy => !copy.pattern).length;
-    return Number.isInteger(slots) ? `${part.name} ${first + slots + after + 2}` : `${part.name} ${index + 2}`;
-  })();
+export { cadCopyName, cadCopyNumber, nextCadCopyNumber, numberedCadCopy } from './copyNumbers';
 
 /**
  * A pattern's copies, laid out from where the part sits, which for an unplaced part others are drawn on is the origin.
@@ -68,7 +51,7 @@ function patternCopies(
 
 /**
  * Lays out every part pattern's copies from where its part now is, so they follow the part, its count and its spacing.
- * A part's other copies stay where they are, ahead of the pattern's or, when added once it had copies, after them.
+ * A part's other copies stay as they are, ahead of the pattern's.
  */
 export function resolvePartPatterns(document: CadDocument): CadDocument {
   let changed = false;
@@ -97,21 +80,7 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
         return { ...rest, placement: { position, rotation: from.rotation } };
       });
     const along = part.pattern?.direction ? cadDirectionVector(document, part.pattern.direction) : (part.pattern?.vector ?? null);
-    // Copies added once the pattern had copies stay after them, so their numbers don't shift the pattern's.
-    const first = part.copies?.findIndex(copy => copy.pattern) ?? -1;
-    const after = new Set(
-      first < 0
-        ? []
-        : part
-            .copies!.slice(first)
-            .filter(copy => !copy.pattern)
-            .map(copy => copy.id)
-    );
-    const copies = [
-      ...own.filter(copy => !after.has(copy.id)),
-      ...(part.pattern ? patternCopies(part, part.pattern, at, along) : []),
-      ...own.filter(copy => after.has(copy.id)),
-    ];
+    const copies = [...own, ...(part.pattern ? patternCopies(part, part.pattern, at, along) : [])];
     if (JSON.stringify(copies) === JSON.stringify(part.copies ?? [])) return part;
     changed = true;
     const next: CadPart = { ...part, copies };
@@ -218,7 +187,9 @@ export function addPartMirror(
   const next = {
     ...document,
     revision: document.revision + 1,
-    parts: document.parts.map(part => (part.id === partId ? { ...part, copies: [...(part.copies ?? []), copy] } : part)),
+    parts: document.parts.map(part =>
+      part.id === partId ? { ...part, copies: [...(part.copies ?? []), numberedCadCopy(part, copy)] } : part
+    ),
   };
   return { document: resolvePartPatterns(next), id };
 }
