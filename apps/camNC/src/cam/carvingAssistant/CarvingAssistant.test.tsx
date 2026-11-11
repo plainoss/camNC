@@ -6,7 +6,6 @@ import { defaultProvider, rememberAssistantCredentials } from '../../cad/assista
 import { createAssistantUsage } from '../../cad/assistant/runBudget';
 import { CarvingAssistant } from './CarvingAssistant';
 import { CarvingAssistantBoardLayer } from './BoardLayer';
-import { CarvingAssistantPromptBar } from './PromptBar';
 import { useCarvingAssistant } from './useCarvingAssistant';
 import { generateCarvingAsset } from './generation';
 import { prepareCarvingArt, type PreparedCarvingArt } from './prepare';
@@ -76,7 +75,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** The three places the route puts the assistant: on the board, under it, and in the side panel. */
+/** The two places the route puts the assistant: the box on the board, and its side panel. */
 function Harness({
   job,
   selectedId,
@@ -95,23 +94,22 @@ function Harness({
       <svg viewBox="0 0 300 140">
         <CarvingAssistantBoardLayer session={session} height={140} />
       </svg>
-      <CarvingAssistantPromptBar session={session} />
-      <CarvingAssistant job={job} session={session} />
+      <CarvingAssistant job={job} session={session} onClose={() => session.setOpen(false)} />
     </>
   );
 }
 
 async function open(options: { job?: CamJobV1; selectedId?: string | null } = {}) {
-  const job = options.job ?? (await createCarvingJob());
+  const job = options.job ?? (await createCarvingJob(undefined, { lettering: 'Welcome' }));
   const onApply = vi.fn();
   const view = render(<Harness job={job} selectedId={options.selectedId ?? null} onApply={onApply} />);
-  await screen.findByRole('complementary', { name: 'Carving assistant' });
+  await screen.findByRole('complementary', { name: 'AI artwork' });
   return { job, onApply, ...view };
 }
-const describe = (text = asset.prompt) => fireEvent.change(screen.getByLabelText('Artwork description'), { target: { value: text } });
+const describe = (text = asset.prompt) => fireEvent.change(screen.getByLabelText('What should it show?'), { target: { value: text } });
 const variants = (n: number) => fireEvent.change(screen.getByLabelText('Variants'), { target: { value: String(n) } });
 const ready = () => screen.findByText(/^Ready ·/, {}, { timeout: 5_000 });
-const applyButton = () => screen.getByRole('button', { name: 'Apply artwork' }) as HTMLButtonElement;
+const applyButton = () => screen.getByRole('button', { name: /^(Add to|Replace on) board$/ }) as HTMLButtonElement;
 
 it('generates four different variants, previews the first on the board inside the box, and applies only on request', async () => {
   const { job, onApply } = await open();
@@ -137,6 +135,20 @@ it('generates four different variants, previews the first on the board inside th
   expect(proposal.mode).toBe('add');
   // The saved prompt is the user's words, not the variant brief.
   expect(proposal.item.generated?.prompt).toBe(asset.prompt);
+});
+
+it('starts from an idea, sends on Enter, and says when the connection cannot make images', async () => {
+  await open();
+  // The connected Anthropic-style key has no image model, so the vector route is used and the panel says so.
+  expect(screen.getByText(/can.t make images, so artwork is drawn as vectors/)).toBeTruthy();
+  fireEvent.click(within(screen.getByLabelText('Ideas')).getByRole('button', { name: 'Owl' }));
+  expect(screen.getByLabelText('What should it show?')).toHaveProperty('value', 'An owl reading a book');
+  expect(screen.queryByLabelText('Ideas')).toBeNull();
+  fireEvent.click(screen.getByRole('radio', { name: 'Bold shapes' }));
+  variants(1);
+  fireEvent.keyDown(screen.getByLabelText('What should it show?'), { key: 'Enter' });
+  await waitFor(() => expect(generateCarvingAsset).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(generateCarvingAsset).mock.calls[0][0].prompt).toMatch(/bold/i);
 });
 
 it('starts the box clear of existing artwork', async () => {
@@ -165,7 +177,7 @@ it('re-prepares by itself when the size or detail changes, without asking the pr
   fireEvent.blur(height);
   await waitFor(() => expect(prepareCarvingArt).toHaveBeenCalledTimes(2));
   expect(vi.mocked(prepareCarvingArt).mock.calls[1][0]).toMatchObject({ height: 40, art: { svg: asset.svg } });
-  fireEvent.change(screen.getByLabelText('Detail'), { target: { value: '2' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Detailed' }));
   await waitFor(() => expect(prepareCarvingArt).toHaveBeenCalledTimes(3));
   expect(vi.mocked(prepareCarvingArt).mock.calls[2][0]).toMatchObject({ detail: 'detailed' });
   expect(generateCarvingAsset).toHaveBeenCalledTimes(1);
@@ -194,7 +206,7 @@ it('circles thin spots on the board and blocks Apply only for real problems', as
     ...candidate(),
     report: { ...candidate().report, ok: false, errors: ['No usable cut remains.'] },
   });
-  fireEvent.change(screen.getByLabelText('Detail'), { target: { value: '0' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Simple' }));
   await screen.findByText('No usable cut remains.');
   expect(applyButton().disabled).toBe(true);
 });
@@ -291,7 +303,7 @@ it('does not generate on IME Enter and redacts provider errors', async () => {
   await open();
   describe();
   variants(1);
-  fireEvent.keyDown(screen.getByLabelText('Artwork description'), { key: 'Enter', isComposing: true });
+  fireEvent.keyDown(screen.getByLabelText('What should it show?'), { key: 'Enter', isComposing: true });
   expect(generateCarvingAsset).not.toHaveBeenCalled();
   vi.mocked(generateCarvingAsset).mockRejectedValueOnce(new Error('Provider rejected recorded-key'));
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
@@ -299,7 +311,7 @@ it('does not generate on IME Enter and redacts provider errors', async () => {
 });
 
 it('reopens saved artwork at its current size for a local recheck and replaces it in place', async () => {
-  const job = await createCarvingJob();
+  const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
   const item = job.carving!.items[0];
   item.height = 15;
   item.generated = {
@@ -314,7 +326,7 @@ it('reopens saved artwork at its current size for a local recheck and replaces i
   };
   rememberAssistantCredentials(null);
   const { onApply } = await open({ job, selectedId: item.id });
-  expect(screen.getByLabelText('Artwork description')).toHaveProperty('value', asset.prompt);
+  expect(screen.getByLabelText('What should it show?')).toHaveProperty('value', asset.prompt);
   expect(screen.getByRole('checkbox', { name: /^Replace/ })).toHaveProperty('checked', true);
   await ready();
   expect(generateCarvingAsset).not.toHaveBeenCalled();
@@ -334,7 +346,7 @@ it('uses a separately configured native image key and endpoint, never the design
   await open();
   describe();
   variants(1);
-  fireEvent.click(screen.getByText('More options'));
+  fireEvent.click(screen.getByText('Advanced'));
   fireEvent.click(screen.getByRole('radio', { name: 'Image generation' }));
   // An Anthropic connection has no image model, so a separate provider is the way to images.
   expect(screen.getByText(/Your connection has no image model/)).toBeDefined();
@@ -376,7 +388,7 @@ it("generates images with the connection's own key and image model, without a se
   await open();
   describe();
   variants(1);
-  fireEvent.click(screen.getByText('More options'));
+  fireEvent.click(screen.getByText('Advanced'));
   expect(screen.getByRole('radio', { name: 'Image model · gpt-image-x' })).toHaveProperty('checked', true);
   expect(screen.queryByLabelText('Image generator API key')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
@@ -399,7 +411,7 @@ it('asks one variant at a time when a spending limit is set', async () => {
   await open();
   describe();
   variants(2);
-  fireEvent.click(screen.getByText('More options'));
+  fireEvent.click(screen.getByText('Advanced'));
   fireEvent.click(screen.getByText('Usage and limits'));
   fireEvent.change(screen.getByLabelText('USD limit (optional)'), { target: { value: '0.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
@@ -431,7 +443,7 @@ it('traces a local PNG without a provider, keeps its original and prepares it at
   const { file, dataUri } = pngFile();
   fireEvent.change(screen.getByLabelText('PNG image to trace'), { target: { files: [file] } });
   await ready();
-  expect(screen.getByLabelText('Artwork description')).toHaveProperty('value', 'Line art from tiny-owl');
+  expect(screen.getByLabelText('What should it show?')).toHaveProperty('value', 'Line art from tiny-owl');
   expect(prepareCarvingArt).toHaveBeenCalledTimes(1);
   expect(vi.mocked(prepareCarvingArt).mock.calls[0][0].sourceOutline).toBeDefined();
   fireEvent.click(applyButton());

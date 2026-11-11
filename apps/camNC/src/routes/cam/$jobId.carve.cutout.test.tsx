@@ -22,7 +22,7 @@ const CarveStep = (Route as unknown as { options: { component: ComponentType } }
 afterEach(cleanup);
 
 async function open(taped = true) {
-  const created = await createCarvingJob();
+  const created = await createCarvingJob(undefined, { lettering: 'Welcome' });
   const job = { ...created, boards: created.boards!.map(b => ({ ...b, taped })) };
   await saveJob(job);
   params.jobId = job.id;
@@ -32,6 +32,8 @@ async function open(taped = true) {
     </QueryClientProvider>
   );
   await screen.findByTestId('carving-item');
+  // Cutting out is set in the Board and bit panel.
+  fireEvent.click(screen.getByRole('button', { name: 'Board and bit' }));
   return job;
 }
 
