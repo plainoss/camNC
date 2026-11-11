@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react';
-import { sketchToDxf, sketchToSvg, type CadLengthUnit, type CadSketch } from '@wbcnc/cad';
+import { sketchToDxf, sketchToSvg, type CadDocument, type CadLengthUnit, type CadSketch } from '@wbcnc/cad';
 import { Button } from '@wbcnc/ui/components/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@wbcnc/ui/components/dialog';
 import { downloadText, exportFileName } from './downloadText';
+import { studioStep } from './studioStep';
 
 /** What's being exported, and the name the file starts with. */
-export type ExportTarget = { kind: 'sketch'; name: string; sketch: CadSketch };
+export type ExportTarget =
+  | { kind: 'sketch'; name: string; sketch: CadSketch }
+  | {
+      kind: 'parts';
+      name: string;
+      document: CadDocument;
+      /** One part or copy; the whole studio, shown parts only, without it. */
+      only?: { partId: string; copyId?: string };
+      hidden?: ReadonlySet<string>;
+    };
 
-type Format = 'dxf' | 'svg';
+type Format = 'dxf' | 'svg' | 'step';
 const formats: Record<Format, { label: string; type: string }> = {
   dxf: { label: 'DXF', type: 'application/dxf' },
   svg: { label: 'SVG', type: 'image/svg+xml' },
+  step: { label: 'STEP', type: 'model/step' },
 };
 
 /** The one Export dialog: file name, format, unit and the options that format has, then Download. */
@@ -29,28 +40,47 @@ export function ExportDialog({
   const [unit, setUnit] = useState<CadLengthUnit>(documentUnit);
   const [construction, setConstruction] = useState(false);
   const [polylines, setPolylines] = useState(false);
-  // Each export starts from its own name and the design's unit; the format and options carry over.
+  const [problem, setProblem] = useState<string | null>(null);
+  const parts = target?.kind === 'parts';
+  // Each export starts from its own name and the design's unit; a sketch's format and options carry over.
   useEffect(() => {
     if (!target) return;
     setName(target.name);
     setUnit(documentUnit);
+    setProblem(null);
+    setFormat(format => (target.kind === 'parts' ? 'step' : format === 'step' ? 'dxf' : format));
   }, [target, documentUnit]);
 
   const download = () => {
     if (!target) return;
-    const text =
-      format === 'dxf'
-        ? sketchToDxf(target.sketch, { unit, construction, splinesAsPolylines: polylines })
-        : sketchToSvg(target.sketch, { unit, construction });
+    let text: string;
+    if (target.kind === 'parts') {
+      const fileName = exportFileName(name, 'step');
+      const result = studioStep(target.document, { only: target.only, hidden: target.hidden, unit, fileName });
+      if (!result.parts.length)
+        return setProblem(result.problems.map(({ name, message }) => `${name}: ${message}`).join(' ') || 'There are no parts to export.');
+      text = result.text;
+    } else
+      text =
+        format === 'dxf'
+          ? sketchToDxf(target.sketch, { unit, construction, splinesAsPolylines: polylines })
+          : sketchToSvg(target.sketch, { unit, construction });
     downloadText(text, exportFileName(name, format), formats[format].type);
     onClose();
   };
+  const offered = (parts ? ['step'] : ['dxf', 'svg']) as Format[];
   return (
     <Dialog open={!!target} onOpenChange={open => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Export sketch</DialogTitle>
-          <DialogDescription>Download the sketch’s curves at full size, in its own plane.</DialogDescription>
+          <DialogTitle>{parts ? 'Export parts' : 'Export sketch'}</DialogTitle>
+          <DialogDescription>
+            {!parts
+              ? 'Download the sketch’s curves at full size, in its own plane.'
+              : target.only
+                ? 'Download this part as a solid, where it is in the studio.'
+                : 'Download every shown part as a solid, where it is in the studio.'}
+          </DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-4"
@@ -77,9 +107,9 @@ export function ExportDialog({
               className="rounded border bg-background px-2 py-1"
               value={format}
               onChange={event => setFormat(event.target.value as Format)}>
-              {Object.entries(formats).map(([value, { label }]) => (
+              {offered.map(value => (
                 <option key={value} value={value}>
-                  {label}
+                  {formats[value].label}
                 </option>
               ))}
             </select>
@@ -97,15 +127,22 @@ export function ExportDialog({
               <option value="ft">Feet (ft)</option>
             </select>
           </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={construction} onChange={event => setConstruction(event.target.checked)} />
-            Include construction geometry
-          </label>
+          {!parts && (
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={construction} onChange={event => setConstruction(event.target.checked)} />
+              Include construction geometry
+            </label>
+          )}
           {format === 'dxf' && (
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={polylines} onChange={event => setPolylines(event.target.checked)} />
               Export splines as polylines
             </label>
+          )}
+          {problem && (
+            <p role="alert" className="text-sm text-destructive">
+              {problem}
+            </p>
           )}
           <Button type="submit">Download</Button>
         </form>

@@ -34,7 +34,10 @@ export function studioStep(
     return { partId: part?.id ?? instance.partId, copyId: instance.copyId };
   };
   const products = new Map<string, StepProduct>(),
-    problems: StudioStepResult['problems'] = model.problems.map(({ name, message }) => ({ name, message }));
+    // Exporting one part, only its own trouble matters.
+    problems: StudioStepResult['problems'] = model.problems
+      .filter(problem => !options.only || problem.partId === options.only.partId)
+      .map(({ name, message }) => ({ name, message }));
   model.instances.forEach((instance, i) => {
     const belongs = owner(instance),
       key = instanceKey(belongs);

@@ -84,6 +84,16 @@ describe('studio STEP export', () => {
     expect(hidden.text).toContain(`PRODUCT('${second!.name}'`);
   });
 
+  it('reports only the exported part’s own trouble', async () => {
+    const document = await load('extrude-sketch-apart');
+    const all = studioStep(document);
+    expect(all.problems.length).toBeGreaterThan(0);
+    const broken = document.parts.find(part => all.problems.some(problem => problem.name === part.name))!;
+    const other = document.parts.find(part => part.id !== broken.id)!;
+    expect(studioStep(document, { only: { partId: other.id } }).problems).toEqual([]);
+    expect(studioStep(document, { only: { partId: broken.id } }).problems).toHaveLength(all.problems.length);
+  });
+
   it('writes the chosen unit', async () => {
     const document = await load('plate');
     expect(studioStep(document, { unit: 'in' }).text).toContain("CONVERSION_BASED_UNIT('INCH'");

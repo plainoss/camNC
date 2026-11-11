@@ -34,6 +34,7 @@ import { CadEditor, type CadEditorController } from '@/cad/CadEditor';
 import { acknowledgeCadSession, cadSession, endCadSession, replaceCadSession, syncCadSession } from '@wbcnc/cad-editor/session';
 import { openAtMachine } from '@/cam/machine/openAtMachine';
 import { downloadDesignFile } from '@/cam/designFile';
+import { StudioExportButton } from '@/cad/export/StudioExportButton';
 import { Download } from 'lucide-react';
 
 const designContextSchema = z.object({
@@ -220,12 +221,13 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     }
   };
   /** The design as it is on screen, open values included, so a file shows exactly what was being edited. */
-  const saveToFile = () => {
+  /** The whole design as edited so far. A face editor holds one sketch, so it needs the rest of the design around it. */
+  const currentDesign = () => {
     const prepared = editor.current?.prepareDocument();
-    // A face editor holds one sketch, so the file needs the rest of the design around it.
-    if (!prepared) downloadDesignFile(session.document);
-    else downloadDesignFile(faceEdit ? withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, prepared) : prepared);
+    if (!prepared) return session.document;
+    return faceEdit ? withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, prepared) : prepared;
   };
+  const saveToFile = () => downloadDesignFile(currentDesign());
   const restoreSaved = async () => {
     if (recoveryInProgress.current) return;
     recoveryInProgress.current = true;
@@ -328,6 +330,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
               onClick={saveToFile}>
               <Download /> Save to file
             </Button>
+            <StudioExportButton design={currentDesign} />
           </>
         }
       />
