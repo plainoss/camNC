@@ -176,12 +176,9 @@
     .cad-proposal-error { top: 74px; }
   }
 }
-.cad-editor .cad-assistant-presets,
-.carving-assistant .cad-assistant-presets { display: flex; gap: 6px; margin: 12px 0 4px; }
-.cad-editor .cad-assistant-dock .cad-assistant-presets button,
-.carving-assistant .cad-assistant-presets button { flex: 1; min-height: 34px; }
+.cad-editor .cad-assistant-presets { display: flex; gap: 6px; margin: 12px 0 4px; }
+.cad-editor .cad-assistant-dock .cad-assistant-presets button { flex: 1; min-height: 34px; }
 .cad-editor .cad-assistant-dock .cad-assistant-presets button[aria-checked='true'] { background: #e7efeb; border-color: #27756b; color: #244f44; }
-.carving-assistant .cad-assistant-presets button[aria-checked='true'] { border-color: var(--primary); font-weight: 600; }
 .cad-editor .cad-assistant-advanced { margin: 6px 0; border-top: 1px solid #e0e5e1; padding-top: 6px; }
 .cad-editor .cad-assistant-advanced summary { cursor: pointer; color: #52696a; font-size: 12px; font-weight: 550; }
 .cad-editor .cad-assistant-advanced fieldset { border: 0; margin: 0; padding: 0; }
