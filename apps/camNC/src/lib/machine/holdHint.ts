@@ -21,7 +21,7 @@ export interface HoldContext {
   spindle?: 'on' | 'off';
   /** The bit is where it was when camNC started this job. `false` when unknown, e.g. after a reload. */
   stillSinceStart?: boolean;
-  /** Units of the reported positions (FluidNC's `$Report/Inches`), `undefined` when not known. */
+  /** Units of the reported positions (FluidNC's `$Report/Inches`), `undefined` when not known: then no Z is compared. */
   positionUnits?: 'mm' | 'inch';
 }
 
@@ -84,6 +84,9 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
       const unmoved = readTo + positionWindow(size) <= firstMove;
       return unmoved || c.stillSinceStart === true ? hint : null;
     }
+    // A post's tool change or other stop comes after its M5, so the spindle must be known to have stopped: 'off' from a
+    // report sent during this hold. Unknown (after a reload or reconnect in the hold) is the generic card until one comes.
+    if (c.spindle !== 'off') return null;
     return bitAtOrAbove(lines, index, c) ? hint : null;
   }
   // Past the start pause's reader position above, the job is past it.
@@ -115,8 +118,8 @@ function reportedZ(at: ZBefore, c: HoldContext) {
   const z = at.machine ? c.mpos?.z : c.wpos?.z;
   if (z === undefined) return undefined;
   // FluidNC reports positions in mm unless `$Report/Inches` is set, which shows in the report's decimals (see the
-  // stream parser). Against reports of unknown units, only an mm program is compared, as mm.
-  const reported = c.positionUnits ?? (at.units === 'mm' ? 'mm' : undefined);
+  // stream parser). Unknown (other firmware, or before `$I` answered): nothing is compared.
+  const reported = c.positionUnits;
   if (!reported) return undefined;
   return reported === at.units ? z : reported === 'inch' ? z * kMmPerInch : z / kMmPerInch;
 }
@@ -171,7 +174,7 @@ const kZFrameChanges = [10, 28, 28.1, 30, 30.1, 38.2, 38.3, 38.4, 38.5, 43, 43.1
 function readZBefore(lines: Line[], index: number): ZBefore | null {
   let relative = false;
   let units: 'mm' | 'inch' | undefined;
-  let last: { z: number; machine: boolean } | null = null;
+  let last: ZBefore | null = null;
   for (let i = 0; i < index; i++) {
     const words: Word[] | null = gcodeWords(lines[i]!.code);
     // FluidNC rejects such a line; what it would have done is unknown.
@@ -193,9 +196,10 @@ function readZBefore(lines: Line[], index: number): ZBefore | null {
     if (!z) continue;
     const machine = hasWord(words, 'G', 53);
     // A relative Z move leaves the height unknown; G53 is in machine coordinates either way.
-    last = relative && !machine ? null : { z: z.value, machine };
+    // The units in force at the move, not at the M0 (G20 / G0 Z0.6 / G21 / M0 is 0.6 inch). None set: unknown.
+    last = (relative && !machine) || !units ? null : { z: z.value, machine, units };
   }
-  return relative || !last || !units ? null : { ...last, units };
+  return relative ? null : last;
 }
 
 /** End byte of the line before the first move or probe after line `index`: the reader there has not moved the bit. */

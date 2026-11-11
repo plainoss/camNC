@@ -13,9 +13,12 @@ const at = (percent: number, more: Partial<HoldContext> = {}): HoldContext => ({
   percent,
   readTo: percent,
   holdRequested: false,
+  positionUnits: 'mm',
   mpos: { z: -20 },
   wpos: { z: 11 },
   stillSinceStart: false,
+  // Off, as reported during the hold: what the hints of a post's M0 after its M5 need.
+  spindle: 'off',
   ...more,
 });
 
@@ -76,6 +79,8 @@ describe('a Fusion program’s M0s, which have no camNC marker', () => {
       }
       expect(holdHint(program, at(percent, { wpos: undefined }))).toBeNull();
       expect(holdHint(program, at(percent, { holdRequested: true }))).toBeNull();
+      // No report of the spindle during the hold yet (after a reload or reconnect): the generic card until one comes.
+      expect(holdHint(program, at(percent, { spindle: undefined }))).toBeNull();
     });
 
     it('held in the last of the lift with the spindle still reported running, it is not the tool change', () => {
@@ -93,6 +98,15 @@ describe('a Fusion program’s M0s, which have no camNC marker', () => {
     const program = (prefix: string) => `${prefix}\nM0 (MSG Check)\n` + big;
     const hint = (gcode: string, more: Partial<HoldContext> = {}) => holdHint(gcode, at(after(gcode, 'Check'), more));
 
+    it('takes a Z move in the units in force at that move, not at the M0', () => {
+      const mixed = program('G20\nG90\nG0 Z0.6\nG21\nG1 X1 F300');
+      // Z0.6 inch is 15.24 mm, not 0.6 mm.
+      expect(hint(mixed, { positionUnits: 'mm', wpos: { z: 0.55 } })).toBeNull();
+      expect(hint(mixed, { positionUnits: 'mm', wpos: { z: 15.24 } })?.reason).toContain('Check');
+      // A Z move before any units are set stays unknown, whatever comes after.
+      expect(hint(program('G90\nG0 Z11\nG21\nG1 X1 F300'), { positionUnits: 'mm', wpos: { z: 50 } })).toBeNull();
+    });
+
     it('compares an inch program (G20) with reports in mm after converting, and not with reports of unknown units', () => {
       const inch = program('G20\nG90\nG0 Z0.6\nG1 X1 F30');
       expect(hint(inch, { positionUnits: 'mm', wpos: { z: 15.24 } })?.reason).toContain('Check');
@@ -105,8 +119,8 @@ describe('a Fusion program’s M0s, which have no camNC marker', () => {
       const mm = program('G21\nG90\nG0 Z11\nG1 X1 F300');
       expect(hint(mm, { positionUnits: 'inch', wpos: { z: 11 / 25.4 } })?.reason).toContain('Check');
       expect(hint(mm, { positionUnits: 'inch', wpos: { z: 0.3 } })).toBeNull();
-      // Unknown report units with an mm program: taken as mm, FluidNC's default.
-      expect(hint(mm, { positionUnits: undefined, wpos: { z: 11 } })?.reason).toContain('Check');
+      // Unknown report units (other firmware, or before `$I` answered): nothing compared, not even an mm program.
+      expect(hint(mm, { positionUnits: undefined, wpos: { z: 11 } })).toBeNull();
       // No units in the program: what Z11 means is not known.
       expect(hint(program('G90\nG0 Z11\nG1 X1 F300'), { wpos: { z: 50 } })).toBeNull();
     });
