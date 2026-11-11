@@ -1,3 +1,17 @@
+import {
+  initialView,
+  numeric,
+  type ConstraintTool,
+  type DimensionMode,
+  type NumericConstraint,
+  type Point,
+  type Tool,
+  type View,
+} from './cadEditorShared';
+import type { SketchEditorInput } from './sketchEditorInput';
+import { sketchPointerDown } from './sketchPointerDown';
+import { sketchPointerMove, sketchPointerEnd } from './sketchPointerMove';
+import { chooseSketchTool, addSketchShape } from './sketchToolActions';
 import { DesignUnitContext, useDesignUnits } from './designUnits';
 import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
 import { previewSlot } from './slotPreview';
@@ -11,20 +25,9 @@ import {
 import {
   CAD_GEOMETRY_TOLERANCE,
   withCadLengthUnit,
-  addArc,
-  addInscribedPolygon,
-  addCircumscribedPolygon,
-  addCenterPointArc,
-  centerPointArcFromPoints,
   addBezier,
-  addCircle,
-  addThreePointCircle,
-  addEllipse,
   addConic,
   addConstraint,
-  addLine,
-  addPoint,
-  addAlignedRectangle,
   addSpline,
   createCadPart,
   constraintEntityIds,
@@ -33,25 +36,19 @@ import {
   filletLineCorners,
   replaceFilletedSketch,
   chamferLineCorners,
-  splitSketchCurve,
   transformSketchEntities,
   sketchPatternOwner,
   linearPatternSketchEntities,
   circularPatternSketchEntities,
   patternDeletionNotice,
   slotDeletionNotice,
-  isClosedSketchCurve,
-  evaluateCurvePoint,
   resolveChamferCorners,
   extendSketchCurve,
   mirrorSketchEntities,
   offsetSketch,
-  insertCurveControlPoint,
   isSplineTangentHandle,
-  isOwnedSplineHandle,
   removeEntity,
   newCadId,
-  pointEquivalence,
   resolveFilletCorners,
   setConicRho,
   setDimensionDriven,
@@ -60,12 +57,9 @@ import {
   applyNewDimension,
   visibleSketchPointIds,
   withDimensionPlacement,
-  type CadConstraint,
   type CadDimension,
-  type CadDimensionMode,
   type CadDocument,
   type CadDrawnOn,
-  type CadEntity,
   type CadSketch,
   type CadSketchSolveStatus,
   type CadSolveOptions,
@@ -126,8 +120,8 @@ import {
   type DimensionWorkflow,
   type DimensionWorkflowEvent,
 } from '@wbcnc/cad-editor/dimensionWorkflow';
-import { idleDrawingGesture, transitionDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
-import { advanceCreationValue, beginCreationValues, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
+import { idleDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
+import { advanceCreationValue, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
 import {
   SketchChamferForm,
@@ -170,33 +164,29 @@ import {
   pickSketchContextTarget,
   selectedSketchContextTarget,
   toggleContextConstruction,
-  transitionSketchContextPress,
   type SketchContext,
   type SketchContextAction,
   type SketchContextPress,
   type SketchContextTarget,
 } from '@wbcnc/cad-editor/sketchContext';
 import { dimensionAnchor } from '@wbcnc/cad-editor/dimensionGeometry';
-import { tangentArcFrom, threePointArc } from '@wbcnc/cad-editor/geometry';
-import { trimSketchCurveAt } from '@wbcnc/cad-editor/trimCurves';
-import { pickBezierControlPolygon, pickSketchPoint, pickSketchSnap, type CadSnapResult } from '@wbcnc/cad-editor/picking';
+import { pickSketchSnap, type CadSnapResult } from '@wbcnc/cad-editor/picking';
 import { drawingClickPoint, type CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
-import { addDrawingRelations, drawnSelection, withSizeExpressions } from '@wbcnc/cad-editor/drawingCommit';
-import { createRectangle, isRectangleTool, rectanglePrompt } from '@wbcnc/cad-editor/rectangleTool';
+import { addDrawingRelations } from '@wbcnc/cad-editor/drawingCommit';
 import { DrawingInferencePreview } from './DrawingInferencePreview';
 import { tangentLineAxis, type InferredLineAxis } from './lineInference';
-import { buildConstraintForSelection, constraintPrompt, type ConstraintCommandTool } from '@wbcnc/cad-editor/constraintCommands';
+import { buildConstraintForSelection } from '@wbcnc/cad-editor/constraintCommands';
 import { cadViewState, saveCadViewState } from '@wbcnc/cad-editor/viewState';
 import { loadShownState, saveShownState } from './shownState';
 import { dragTargets, hasDragMovement } from '@wbcnc/cad-editor/drag';
-import { dragSnapConstraints, inferDragPoint } from '@wbcnc/cad-editor/dragSnap';
-import { boxSelectSketch, type CadSelectionBox } from './boxSelection';
+import { dragSnapConstraints } from '@wbcnc/cad-editor/dragSnap';
+import { type CadSelectionBox } from './boxSelection';
 import { chainGeometry, type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture } from './editorGestures';
 import { constraintColorNotice, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
-import { cutRegionAt, cutRegions, topRegions, withRegionDepth, type CutRegion } from './cutRegions';
+import { withRegionDepth, type CutRegion } from './cutRegions';
 import { CutOverlay } from './CutOverlay';
 import { PartFeatureList } from './PartFeatureList';
 import { RegionDepthField } from './RegionDepthField';
@@ -206,13 +196,7 @@ import { SketchRegion } from './SketchRegion';
 import { SketchToolPreview } from './SketchToolPreview';
 import { ModificationControls } from './ModificationControls';
 import { ModificationPreview } from './ModificationPreview';
-import {
-  beginModification,
-  idleModificationWorkflow,
-  modificationSourceIds,
-  transitionModification,
-  type ModificationWorkflow,
-} from '@wbcnc/cad-editor/modificationWorkflow';
+import { idleModificationWorkflow, transitionModification, type ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import { useSvgPixelScale, SKETCH_APPEARANCE, sketchStrokeColor } from './sketchAppearance';
 import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/inlineConstraintLayout';
@@ -234,7 +218,7 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { asHole, editable, hasOutline, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
+import { asHole, editable, hasOutline, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
 import { useFeaturePreview } from './useFeaturePreview';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
 import { StudioFeatureList } from './StudioFeatureList';
@@ -249,7 +233,7 @@ import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
-import { drawingMatrix, edgeOn, normalTurn, straightOn, turnedBy, type SketchTurn } from './sketchOrbit';
+import { drawingMatrix, normalTurn, straightOn, type SketchTurn } from './sketchOrbit';
 import { captureSketchCamera, carriedSketchCamera, type StudioCameraState } from './studioCamera';
 import { studioViewShortcut } from './studioViewShortcut';
 import { sketchBackdropView } from './sketchBackdropView';
@@ -273,15 +257,6 @@ import { useEditorVariableFields } from './useEditorVariableFields';
 import { featureShownByDefault } from './sketchShown';
 import './cad.css';
 
-type Point = { x: number; y: number };
-type SketchPoint = Extract<CadEntity, { type: 'point' }>;
-type NumericConstraint = Extract<CadConstraint, { value: number }>;
-type Tool = SketchTool;
-type DimensionMode = CadDimensionMode;
-type ConstraintTool = ConstraintCommandTool;
-type View = { x: number; y: number; w: number; h: number };
-const initialView: View = { x: -35, y: -175, w: 300, h: 210 };
-const numeric = (c: CadConstraint): c is NumericConstraint => 'value' in c;
 const FaceSketchBackdrop = lazy(() => import('./FaceSketchBackdrop'));
 const PartView3D = lazy(() => import('./PartView3D'));
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
@@ -1135,177 +1110,7 @@ export function CadEditor({
       ys = points.flatMap(e => (e.type === 'point' ? [e.y] : []));
     return xs.length ? { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 } : { x: 0, y: 0 };
   };
-  const chooseTool = (next: Tool) => {
-    slotDrag.current = null;
-    // Choosing any tool, Select included, ends Use.
-    setUsingEdges(false);
-    if (next === 'slot') {
-      setSlotWidth(lengthText(10));
-      setSlotChain(false);
-      setSharedSlotWidth(undefined);
-    }
-    circularDrag.current = null;
-    patternDrag.current = null;
-    setPatternEditId(null);
-    setPatternNotice('');
-    if (next === 'circularPattern') {
-      setCircularParameters(initialCircularPatternParameters());
-      patternCommandId.current = newCadId();
-    }
-    if (next === 'linearPattern') {
-      setLinearParameters(initialLinearPatternParameters(lengthUnit));
-      patternCommandId.current = newCadId();
-    }
-
-    setContextMenu(null);
-    transformDrag.current = null;
-    setTransformNotice('');
-    if (next === 'transform') setTransformParameters(initialTransformParameters(transformSelectionCenter(selected), lengthUnit));
-    contextPress.current = { phase: 'idle' };
-    setCreationValues(null);
-    drawingGesture.current = idleDrawingGesture();
-    setConstraintMode(null);
-    setFixMode(false);
-    setDimension(null);
-    setPalette(false);
-    setFilletEditing(false);
-    setSplitFirst(null);
-    setSplitNotice('');
-    chamferDrag.current = null;
-    setConicEditing(null);
-    setModification(idleModificationWorkflow());
-    setHoveredModifyCurve(null);
-    setModifyTarget(null);
-    newCurveCommand.current = null;
-    boxGesture.current = null;
-    setSelectionBox(null);
-    tangentAxis.current = null;
-    hoveredReferences.current = [];
-    lastDrawingHint.current = null;
-    setDrawingCue(null);
-    setSnapCue(null);
-    newDimensionCommand.current = null;
-    setSelectedConstraints([]);
-    setHoveredConstraintEntities([]);
-    setDimensionFlow(previous => idleDimensionWorkflow(previous.mode));
-    if (next === 'line' && tool === 'arc' && contextualArc && lineContinuation && chain) {
-      setTool('line');
-      setContextualArc(false);
-      setMessage('Click the next line endpoint, or press A to continue with an arc.');
-      svg.current?.focus();
-      return;
-    }
-    if (next === 'arc' && tool === 'line' && pending[0]) {
-      const anchor = sketch && chainGeometry(sketch, chain);
-      const start = anchor?.point ?? pending[0];
-      setTool('arc');
-      setContextualArc(true);
-      setPending([{ x: start.x, y: start.y }]);
-      setConstraintMode(null);
-      setDimension(null);
-      setPalette(false);
-      setMessage('From the current endpoint: click the arc end, then a point on the arc.');
-      svg.current?.focus();
-      return;
-    }
-    if (next === 'tangentArc' && tool === 'tangentArc') {
-      setTool('line');
-      setMessage('Click the next line endpoint, or press Shift+A to continue with a tangent arc.');
-      svg.current?.focus();
-      return;
-    }
-    if (next === tool && next !== 'select') next = 'select';
-    if (sketch && (next === 'offset' || next === 'mirror' || next === 'extend')) {
-      const started = beginModification(sketch, next, selected);
-      setModification(started.phase === 'offset' ? { ...started, text: lengthText(Number(started.text)) } : started);
-      setSelected(modificationSourceIds(sketch, selected, next));
-    }
-    if (next === 'tangentArc') {
-      const anchor = sketch && chainGeometry(sketch, chain);
-      if (!anchor || !lineContinuation) {
-        setTool(next);
-        setPending([]);
-        setChain(null);
-        setLineContinuation(false);
-        setMessage('Click an endpoint of a line or arc, then click the tangent arc end.');
-        svg.current?.focus();
-        return;
-      }
-      setTool(next);
-      setConstraintMode(null);
-      setDimension(null);
-      setPalette(false);
-      setPending([{ x: anchor.point.x, y: anchor.point.y }]);
-      setMessage('Click the end of the tangent arc. The line tool resumes automatically.');
-      svg.current?.focus();
-      return;
-    }
-    setTool(next);
-    setContextualArc(false);
-    setConstraintMode(null);
-    setChain(null);
-    pendingSnaps.current = [];
-    setPending([]);
-    setLineContinuation(false);
-    setPalette(false);
-    setDimension(null);
-    setMessage(
-      next === 'offset'
-        ? 'Select curves to offset. Type a distance or press Enter to edit; click to place. Shift-click adds curves.'
-        : next === 'mirror'
-          ? selected.length
-            ? 'Select the mirror line.'
-            : 'Select entities, then choose Mirror line.'
-          : next === 'extend'
-            ? 'Select near the end to extend, then click its new end or a boundary.'
-            : next === 'select'
-              ? 'Click geometry to select. Drag to move. Shift-click adds to selection.'
-              : isRectangleTool(next)
-                ? rectanglePrompt(next)
-                : next === 'inscribedPolygon' || next === 'circumscribedPolygon'
-                  ? 'Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.'
-                  : next === 'alignedRectangle'
-                    ? 'Click the first edge start and end, then the perpendicular extent.'
-                    : next === 'ellipse'
-                      ? 'Click the center, then the first axis radius, then the second axis radius.'
-                      : next === 'threePointCircle'
-                        ? 'Click three points along the circle circumference.'
-                        : next === 'circle'
-                          ? 'Click or drag from the center to a point on the circle. Or enter a radius below.'
-                          : next === 'centerPointArc'
-                            ? 'Click the arc center, start, then end. Move around the center to choose its sweep.'
-                            : next === 'arc'
-                              ? 'Click the start, end, then a point on the arc.'
-                              : next === 'point'
-                                ? 'Click to place a sketch point. Snap to endpoints, midpoints or curves, or place it freely.'
-                                : next === 'line'
-                                  ? 'Click or drag from start to end. Lines continue from the last endpoint; Escape ends the chain.'
-                                  : next === 'slot'
-                                    ? 'Select source curves, set the slot diameter, then click empty space or press Enter. Select more paths to share the same width.'
-                                    : next === 'circularPattern'
-                                      ? 'Select geometry, then set instances, center and sweep. Drag the center or sweep handle; Enter or click empty space applies.'
-                                      : next === 'linearPattern'
-                                        ? 'Select geometry, then set instance counts, spacing and directions. Enter or click empty space applies; Escape cancels.'
-                                        : next === 'transform'
-                                          ? 'Select geometry, then drag the manipulator or enter translation, rotation and scale. Enter or click empty space applies; Escape cancels.'
-                                          : next === 'split'
-                                            ? 'Click a curve to split it. Closed curves require two distinct split points.'
-                                            : next === 'trim'
-                                              ? 'Click an interval to trim between intersections or placed points.'
-                                              : next === 'chamfer'
-                                                ? 'Select a shared corner or two adjacent lines, then enter both setback distances.'
-                                                : next === 'fillet'
-                                                  ? 'Select shared corner points or pairs of adjacent lines. Enter chooses the shared radius; Escape cancels.'
-                                                  : next === 'conic'
-                                                    ? 'Click the start, end, then control point. Enter rho to shape the conic.'
-                                                    : next === 'spline' || next === 'bezier'
-                                                      ? `Click ${next === 'spline' ? 'fit' : 'control'} points. Double-click the last point or press Enter to finish.`
-                                                      : next === 'curveControlPoint'
-                                                        ? 'Click an open spline or a segment of a Bezier control polygon to add a point while preserving its shape.'
-                                                        : 'Select a line, circle, point pair or existing dimension.'
-    );
-    svg.current?.focus();
-  };
+  const chooseTool = (next: Tool) => chooseSketchTool(sketchEditorInput(), next);
   const navigateHistory = (redo = false) => {
     chooseTool('select');
     setSelected([]);
@@ -1433,179 +1238,7 @@ export function CadEditor({
   };
   const addSnapRelations = (source: CadSketch, hints: (CadDrawingInference | null)[], curvePointIndex: number | readonly number[] = -1) =>
     sketch ? bindPartCorners(sketch, addDrawingRelations(sketch, source, hints, { tool, curvePointIndex }), hints) : source;
-  const addShape = (end?: Point) => {
-    if (!sketch || !pending[0]) return;
-    const anchor = lineContinuation ? chainGeometry(sketch, chain) : null;
-    const start = anchor?.point ?? pending[0];
-    let next = sketch;
-    const sizeExpressions: Record<string, string | undefined> = {};
-    let continued: ChainAnchor | null = null;
-    let actualEnd = end;
-    if (polygonTool && pending[1]) {
-      try {
-        next = (tool === 'inscribedPolygon' ? addInscribedPolygon : addCircumscribedPolygon)(sketch, {
-          center: start,
-          point: pending[1],
-          sides: Number(polygonSides),
-          construction,
-        });
-      } catch (error) {
-        return setMessage(error instanceof Error ? error.message : String(error));
-      }
-    } else if (isRectangleTool(tool)) {
-      const rectangle = createRectangle(sketch, { tool, start, end, width, height, variables: variableScope, lengthUnit, construction });
-      if (rectangle.error !== undefined) return setMessage(rectangle.error);
-      next = rectangle.sketch;
-      Object.assign(sizeExpressions, rectangle.sizeExpressions);
-    } else if (tool === 'alignedRectangle' && pending[1] && end) {
-      try {
-        next = addAlignedRectangle(sketch, { start, end: pending[1], through: end, construction });
-      } catch (error) {
-        return setMessage(error instanceof Error ? error.message : String(error));
-      }
-    } else if (tool === 'ellipse' && pending[1] && end) {
-      try {
-        next = addEllipse(sketch, { center: start, axis: pending[1], through: end, construction });
-      } catch (error) {
-        return setMessage(error instanceof Error ? error.message : String(error));
-      }
-    } else if (tool === 'threePointCircle' && pending[1] && end) {
-      try {
-        next = addThreePointCircle(sketch, { points: [start, pending[1], end], construction });
-      } catch (error) {
-        return setMessage(error instanceof Error ? error.message : String(error));
-      }
-    } else if (tool === 'circle') {
-      const radiusValue = end ? null : parseCadValue(radius, { unit: 'mm', variables: variableScope });
-      if (radiusValue && 'error' in radiusValue) return setMessage(`Circle radius: ${radiusValue.error}`);
-      const r = end ? Math.hypot(end.x - start.x, end.y - start.y) : radiusValue!.value;
-      if (!Number.isFinite(r) || r < 0.1) return setMessage('Radius must be greater than zero.');
-      next = addCircle(sketch, { ...start, radius: r, construction, dimensioned: end === undefined });
-      if (!end && radiusValue?.expression) sizeExpressions.Diameter = `2*(${radiusValue.expression})`;
-    } else if (tool === 'line' && end) {
-      if (Math.hypot(end.x - start.x, end.y - start.y) < 0.1) return;
-      next = addLine(sketch, { x1: start.x, y1: start.y, x2: end.x, y2: end.y, construction });
-      const line = next.entities.at(-1);
-      if (line?.type === 'line') {
-        continued = { pointId: line.endId, curveId: line.id };
-        if (inference.current === 'horizontal' || inference.current === 'vertical')
-          next = addConstraint(next, { type: inference.current, entityId: line.id });
-        else if (inference.current === 'tangent' && anchor) {
-          next = addConstraint(next, { type: 'tangent', entityAId: anchor.curve.id, entityBId: line.id });
-          if (tangentAxis.current) next = addConstraint(next, { type: tangentAxis.current, entityId: line.id });
-        }
-      }
-    } else if (tool === 'tangentArc' && anchor && end) {
-      const arc = tangentArcFrom(anchor.point, anchor.tangent, end);
-      if (!arc) return setMessage('Choose an arc endpoint away from its tangent line.');
-      next = addArc(sketch, { ...arc, construction });
-      const created = next.entities.at(-1);
-      if (created?.type === 'arc') {
-        next = addConstraint(next, { type: 'tangent', entityAId: anchor.curve.id, entityBId: created.id });
-        const endId = pointEquivalence(next.constraints).equivalent(created.startId, anchor.point.id) ? created.endId : created.startId;
-        continued = { pointId: endId, curveId: created.id };
-      }
-      setTool('line');
-      setMessage('Click the next line endpoint, or Shift+A for another tangent arc.');
-    } else if (tool === 'conic' && pending[1] && end) {
-      try {
-        const parsedRho = parseCadValue(rho, { unit: 'scalar' });
-        if ('error' in parsedRho) return setMessage(`Conic rho: ${parsedRho.error}`);
-        next = addConic(sketch, { start, end: pending[1], control: end, rho: parsedRho.value, construction });
-      } catch (error) {
-        return setMessage(error instanceof Error ? error.message : String(error));
-      }
-    } else if (tool === 'centerPointArc' && pending[1] && end) {
-      try {
-        next = addCenterPointArc(sketch, {
-          center: start,
-          start: pending[1],
-          end,
-          sweepIntent: centerArcSweep.current?.sweep,
-          construction,
-        });
-      } catch (error) {
-        return setMessage(error instanceof Error ? error.message : String(error));
-      }
-    } else if (tool === 'arc' && pending[1] && end) {
-      const arc = threePointArc(start, pending[1], end);
-      if (!arc || arc.radius < 0.1) return setMessage('Three points on the arc must not lie on one straight line.');
-      next = addArc(sketch, { ...arc, construction });
-      if (contextualArc) {
-        const created = next.entities.at(-1);
-        const gestureEnd = pending[1];
-        if (created?.type === 'arc') {
-          const point = next.entities.find(
-            (e): e is SketchPoint =>
-              e.type === 'point' &&
-              [created.startId, created.endId].includes(e.id) &&
-              Math.hypot(e.x - gestureEnd.x, e.y - gestureEnd.y) < 1e-7
-          );
-          if (point) continued = { pointId: point.id, curveId: created.id };
-          actualEnd = gestureEnd;
-        }
-      }
-    } else return;
-    next = withSizeExpressions(sketch, next, sizeExpressions);
-    const hints = polygonTool
-      ? pendingSnaps.current.slice(0, 2)
-      : end
-        ? [...pendingSnaps.current, lastDrawingHint.current]
-        : pendingSnaps.current;
-    if (tool === 'centerPointArc' && end && pending[1] && hints[2]) {
-      const arc = centerPointArcFromPoints(start, pending[1], end, centerArcSweep.current?.sweep);
-      if (arc) {
-        const angle = Math.atan2(end.y - start.y, end.x - start.x);
-        const projected = { x: arc.cx + arc.radius * Math.cos(angle), y: arc.cy + arc.radius * Math.sin(angle) };
-        // A radial projection must not attach the endpoint to an off-circle snap target.
-        hints[2] =
-          Math.hypot(projected.x - hints[2].point.x, projected.y - hints[2].point.y) > CAD_GEOMETRY_TOLERANCE
-            ? null
-            : { ...hints[2], point: projected };
-      }
-    }
-    next = addSnapRelations(
-      next,
-      hints,
-      tool === 'threePointCircle' ? [0, 1, 2] : end && (tool === 'circle' || tool === 'arc') ? hints.length - 1 : -1
-    );
-    changeSketch(next);
-    drawingGesture.current = idleDrawingGesture();
-    if (tool === 'conic') {
-      const curve = next.entities.find(entity => entity.type === 'conic' && !sketch.entities.some(before => before.id === entity.id));
-      if (curve?.type === 'conic') {
-        newCurveCommand.current = { id: curve.id, checkpoint: cadCommandCheckpoint(session) };
-        setConicEditing(curve.id);
-        setRho(String(curve.rho));
-      }
-    }
-    if (polygonTool) setMessage('Click the center, set the construction circle, then choose 3–50 sides and click or press Enter.');
-    if (tool === 'threePointCircle') setMessage('Click three points along the circle circumference.');
-    if (tool === 'centerPointArc') setMessage('Click the arc center, start, then end. Move around the center to choose its sweep.');
-    if (tool === 'alignedRectangle') setMessage('Click the first edge start and end, then the perpendicular extent.');
-    setDrawingCue(null);
-    setSnapCue(null);
-    setChain(continued);
-    setPending(continued && actualEnd ? [actualEnd] : []);
-    setLineContinuation(!!continued);
-    pendingSnaps.current = [];
-    const added = next.entities.filter(e => !sketch.entities.some(before => before.id === e.id) && e.type !== 'point');
-    setCreationValues(
-      end && part
-        ? beginCreationValues(
-            tool,
-            part.id,
-            next,
-            added.map(entity => entity.id),
-            end
-          )
-        : null
-    );
-    setSelected(drawnSelection(sketch, next, tool));
-    // Passive measured values leave shortcuts live; numeric typing turns them into drivers.
-    setDimension(null);
-    svg.current?.focus();
-  };
+  const addShape = (end?: Point) => addSketchShape(sketchEditorInput(), end);
   const currentDimension = dimensionDraft?.id === dimension ? dimensionDraft : sketch?.constraints.find(c => c.id === dimension);
   const rejectValue = (reason: string, input?: HTMLInputElement | null) => {
     setMessage(reason);
@@ -2484,857 +2117,145 @@ export function CadEditor({
       }
     }
   };
-  const pointerDown = (event: PointerEvent<SVGSVGElement>) => {
-    if (busy) return;
-    svg.current?.focus();
-    if (event.button === 1 || event.button === 2) {
-      event.preventDefault();
-      if (event.button === 2)
-        contextPress.current = transitionSketchContextPress(contextPress.current, {
-          type: 'press',
-          pointerId: event.pointerId,
-          position: { x: event.clientX, y: event.clientY },
-          target: contextTarget(event.target as Element, { x: event.clientX, y: event.clientY }),
-        }).state;
-      pan.current = { x: event.clientX, y: event.clientY, view, turn: event.button === 2 && sketchBackdrop ? sketchTurn : undefined };
-      event.currentTarget.setPointerCapture(event.pointerId);
-      return;
-    }
-    if (event.button !== 0 || !sketch) return;
-    // Seen edge-on, a click can't say where on the plane it is.
-    if (sketchBackdrop && edgeOn(sketchTurn)) return;
-    // A part's edge behind the sketch is picked to use in it, as the reference's Use takes it.
-    const edgeKey = (event.target as Element).closest('[data-part-edge]')?.getAttribute('data-part-edge');
-    // Use is on: an edge clicked goes straight in, and a click anywhere else draws nothing.
-    if (usingEdges) {
-      if (edgeKey) takeEdges([edgeKey]);
-      return;
-    }
-    if (edgeKey && tool === 'select') {
-      setPickedEdges(picked =>
-        picked.includes(edgeKey) ? picked.filter(key => key !== edgeKey) : event.shiftKey ? [...picked, edgeKey] : [edgeKey]
-      );
-      return;
-    }
-    if (pickedEdges.length) setPickedEdges([]);
-    setCreationValues(null);
-    setRegionField(null);
-    if (conicEditing) {
-      setConicEditing(null);
-      newCurveCommand.current = null;
-    }
-    const p = pointAt(event);
-    const target = event.target as Element;
-    if (target.closest('[data-dimension]')) return;
-    if (target.closest('[data-constraint-id]')) return;
-    if (!event.shiftKey) setSelectedConstraints([]);
-    const directEntityId = target.closest('[data-entity-id]')?.getAttribute('data-entity-id') ?? undefined;
-    const pointHit = pickSketchPoint(
-      sketch,
-      { x: event.clientX, y: event.clientY },
-      { project: projectPoint, selectedEntityIds: dimensionSelection, preferredPointId: directEntityId }
-    );
-    const curveHit = pointHit
-      ? null
-      : pickSketchSnap(
-          sketch,
-          { x: event.clientX, y: event.clientY },
-          { project: projectPoint, includeMidpoints: false, selectedEntityIds: dimensionSelection, preferredCurveId: directEntityId }
-        );
-    const id = pointHit?.targetPointId ?? curveHit?.entityId;
-    if (modification.phase !== 'idle') {
-      // The command may remove the clicked endpoint. Keep the browser's later mousedown
-      // from assigning focus to that disappearing target instead of the sketch canvas.
-      event.preventDefault();
-      const hit = pickSketchSnap(
-        sketch,
-        { x: event.clientX, y: event.clientY },
-        { project: projectPoint, pointRadiusPx: -1, includeMidpoints: false }
-      );
-      const curveId = hit?.entityId;
-      if (modification.phase === 'offset') {
-        if (!modification.entityIds.length || event.shiftKey) {
-          if (!curveId) return setMessage('Select a line, circle or arc to offset.');
-          const next = modification.entityIds.includes(curveId)
-            ? modification.entityIds.filter(id => id !== curveId)
-            : modificationSourceIds(sketch, [...modification.entityIds, curveId], 'offset');
-          setModification(previous => transitionModification(previous, { type: 'sources', entityIds: next }));
-          setSelected(next);
-        } else {
-          event.preventDefault();
-          acceptOffset();
-        }
-      } else if (modification.phase === 'mirror') {
-        if (modification.picking === 'entities' || event.shiftKey) {
-          const pickedId = curveId ?? pointHit?.targetPointId;
-          if (!pickedId) return;
-          const next = modification.entityIds.includes(pickedId)
-            ? modification.entityIds.filter(id => id !== pickedId)
-            : modificationSourceIds(sketch, [...modification.entityIds, pickedId], 'mirror');
-          setModification(previous => transitionModification(previous, { type: 'sources', entityIds: next }));
-          setSelected(next);
-          setMessage('Add entities, then press Enter or choose Mirror line.');
-        } else if (curveId) {
-          const result = mirrorSketchEntities(sketch, { entityIds: modification.entityIds, axisId: curveId });
-          if (!result.ok) return setMessage(result.message);
-          changeSketch(result.sketch);
-          setModification(previous => transitionModification(previous, { type: 'complete' }));
-          setSelected([]);
-          setHoveredModifyCurve(null);
-          setMessage('Mirrored geometry created. Select entities to mirror again.');
-        }
-      } else if (!modification.entityId) {
-        const curve = sketch.entities.find(entity => entity.id === curveId);
-        if (!curve || (curve.type !== 'line' && curve.type !== 'arc')) return setMessage('Select near an endpoint of a line or arc.');
-        const points = pointsOf(sketch),
-          start = points.get(curve.startId)!,
-          end = points.get(curve.endId)!;
-        const endName = Math.hypot(p.x - start.x, p.y - start.y) <= Math.hypot(p.x - end.x, p.y - end.y) ? 'start' : 'end';
-        setModification(previous => transitionModification(previous, { type: 'extendPick', entityId: curve.id, end: endName }));
-        setSelected([curve.id]);
-        setModifyTarget(null);
-        setMessage('Click the new endpoint or a boundary. Escape cancels this extension.');
-      } else {
-        const result = extendSketchCurve(sketch, {
-          entityId: modification.entityId,
-          end: modification.end!,
-          target: p,
-          boundaryId: curveId !== modification.entityId ? curveId : undefined,
-        });
-        if (!result.ok) return setMessage(result.message);
-        changeSketch(result.sketch);
-        setModification(previous => transitionModification(previous, { type: 'complete' }));
-        setSelected([]);
-        setModifyTarget(null);
-        setMessage(
-          result.kind === 'delete'
-            ? 'Curve removed by crossing its opposite endpoint. Undo restores it.'
-            : 'Curve extended. Select another endpoint.'
-        );
-      }
-      return;
-    }
-    if (tool === 'fillet' || tool === 'chamfer') {
-      if (id) {
-        setSelected(previous => (previous.includes(id) ? previous.filter(existing => existing !== id) : [...previous, id]));
-        setFilletEditing(false);
-      }
-      return;
-    }
-    if (tool === 'curveControlPoint') {
-      const polygon = pickBezierControlPolygon(sketch, { x: event.clientX, y: event.clientY }, { project: projectPoint, curveRadiusPx: 8 });
-      if (polygon?.kind === 'vertex') return setMessage('Choose a segment of the Bezier control polygon, away from its vertices.');
-      const hit =
-        polygon ??
-        pickSketchSnap(
-          sketch,
-          { x: event.clientX, y: event.clientY },
-          { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
-        );
-      const curve = sketch.entities.find(entity => entity.id === hit?.entityId);
-      if (!curve || (curve.type !== 'spline' && curve.type !== 'bezier'))
-        return setMessage('Choose an open spline or a Bezier control-polygon segment.');
-      try {
-        changeSketch(insertCurveControlPoint(sketch, curve.id, hit?.parameter ?? 0.5));
-        chooseTool('select');
-        setSelected([curve.id]);
-        setMessage('Control point added. Drag its handle to reshape the curve.');
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : String(error));
-      }
-      return;
-    }
-    if (tool === 'tangentArc' && !pending.length) {
-      const point = pointHit?.targetPointId && sketch.entities.find(entity => entity.id === pointHit.targetPointId);
-      if (!point || point.type !== 'point') return setMessage('Choose an existing endpoint of a line or arc.');
-      const equivalent = pointEquivalence(sketch.constraints);
-      const candidates = sketch.entities.filter(
-        entity =>
-          (entity.type === 'line' || entity.type === 'arc') &&
-          [entity.startId, entity.endId].some(id => equivalent.equivalent(id, point.id))
-      );
-      const curve = candidates.find(candidate => selected.includes(candidate.id)) ?? (candidates.length === 1 ? candidates[0] : undefined);
-      if (!curve) return setMessage('Choose an unambiguous line or arc endpoint, or preselect its curve.');
-      if (curve.type !== 'line' && curve.type !== 'arc') return;
-      const pointId = equivalent.equivalent(curve.startId, point.id) ? curve.startId : curve.endId;
-      setChain({ pointId, curveId: curve.id });
-      setPending([{ x: point.x, y: point.y }]);
-      pendingSnaps.current = [];
-      setLineContinuation(true);
-      setMessage('Click the tangent arc end.');
-      return;
-    }
-    if (fixMode) {
-      if (id) fixGeometry([id]);
-      return;
-    }
-    if (constraintMode) {
-      if (!id) return;
-      const next = selected.includes(id) ? selected : [...selected, id];
-      const axisIds =
-        constraintMode === 'symmetric' && sketch.entities.some(e => e.id === next[0] && e.type === 'line') ? next.slice(0, 1) : [];
-      const result = buildConstraintForSelection(sketch, constraintMode, next);
-      if (result.constraint || result.constraints?.length) {
-        changeSketch((result.constraints ?? [result.constraint!]).reduce((next, c) => addConstraint(next, c), sketch));
-        setSelected(constraintMode === 'symmetric' ? axisIds : []);
-        setMessage(
-          `${result.message} ${constraintMode === 'symmetric' ? 'Select the next pair relative to this symmetry line.' : constraintPrompt(constraintMode)}`
-        );
-      } else if (result.alreadyApplied) {
-        setSelected(constraintMode === 'symmetric' ? axisIds : []);
-        setMessage(result.message);
-      } else {
-        setSelected(result.needsMore ? next : constraintMode === 'symmetric' ? axisIds : [id]);
-        setMessage(result.message);
-      }
-      return;
-    }
-    if (tool === 'point') {
-      let next = addPoint(sketch, { ...p, construction });
-      next = addSnapRelations(next, [lastDrawingHint.current]);
-      changeSketch(next);
-      const added = next.entities.find(e => e.type === 'point' && !sketch.entities.some(before => before.id === e.id));
-      setSelected(added ? [added.id] : pointHit?.targetPointId ? [pointHit.targetPointId] : []);
-      svg.current?.focus();
-      return;
-    }
-    if (tool === 'slot') {
-      const hit = pickSketchSnap(
-        sketch,
-        { x: event.clientX, y: event.clientY },
-        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
-      );
-      const sourceId =
-        directEntityId && sketch.entities.some(e => e.id === directEntityId && e.type !== 'point') ? directEntityId : hit?.entityId;
-      if (sourceId)
-        setSelected(previous => (previous.includes(sourceId) ? previous.filter(id => id !== sourceId) : [...previous, sourceId]));
-      else if (selected.length) acceptSlot();
-      return;
-    }
-    if (tool === 'linearPattern' || tool === 'circularPattern') {
-      const hit = pickSketchSnap(
-        sketch,
-        { x: event.clientX, y: event.clientY },
-        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
-      );
-      const sourceId =
-        directEntityId && sketch.entities.some(e => e.id === directEntityId) ? directEntityId : (hit?.entityId ?? pointHit?.targetPointId);
-      if (sourceId) {
-        if (!patternEditId)
-          setSelected(previous => (previous.includes(sourceId) ? previous.filter(id => id !== sourceId) : [...previous, sourceId]));
-      } else if (selected.length) acceptLinearPattern();
-      return;
-    }
-    if (tool === 'transform') {
-      const hit = pickSketchSnap(
-        sketch,
-        { x: event.clientX, y: event.clientY },
-        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
-      );
-      const selectedId =
-        directEntityId && sketch.entities.some(e => e.id === directEntityId) ? directEntityId : (hit?.entityId ?? pointHit?.targetPointId);
-      if (selectedId) {
-        const next = selected.includes(selectedId) ? selected.filter(id => id !== selectedId) : [...selected, selectedId];
-        if (!selected.length) setTransformParameters(initialTransformParameters(transformSelectionCenter(next), lengthUnit));
-        setSelected(next);
-      } else if (selected.length) acceptTransform();
-      return;
-    }
-    if (tool === 'split') {
-      const hit = pickSketchSnap(
-        sketch,
-        { x: event.clientX, y: event.clientY },
-        { project: projectPoint, pointRadiusPx: -1, curveRadiusPx: 8, includeMidpoints: false }
-      );
-      const curve = sketch.entities.find(e => e.id === hit?.entityId);
-      if (!curve || curve.type === 'point' || isOwnedSplineHandle(curve) || hit?.parameter === undefined)
-        return setMessage('Select a sketch curve, away from its endpoints or tangent handles.');
-      const tau = Math.PI * 2;
-      const wrap = (angle: number) => ((angle % tau) + tau) % tau;
-      const parameter =
-        curve.type === 'circle'
-          ? wrap(hit.parameter) / tau
-          : curve.type === 'arc'
-            ? wrap(hit.parameter - curve.startAngle) / (wrap(curve.endAngle - curve.startAngle) || tau)
-            : hit.parameter;
-      if (isClosedSketchCurve(curve) && splitFirst?.entityId !== curve.id) {
-        const points = new Map(sketch.entities.filter(e => e.type === 'point').map(e => [e.id, e]));
-        setSplitFirst({ entityId: curve.id, parameter, point: evaluateCurvePoint(curve, points, parameter) });
-        setMessage('Choose a second distinct point on the same closed curve. Escape cancels both split points.');
-        return;
-      }
-      const result = splitSketchCurve(sketch, curve.id, isClosedSketchCurve(curve) ? [splitFirst!.parameter, parameter] : [parameter]);
-      if (!result.ok) return setMessage(result.message);
-      changeSketch(result.sketch);
-      setSplitFirst(null);
-      setSelected([]);
-      const notice =
-        result.releasedConstraintIds.length || result.releasedFixedPointIds.length
-          ? `Released relations: ${result.releasedConstraintIds.length}; released fixed control points: ${result.releasedFixedPointIds.length}. The exact pieces are independently editable.`
-          : '';
-      setSplitNotice(notice);
-      setMessage(
-        notice ? 'Curve split. Review the released relations shown above.' : 'Curve split. Click another curve to split, or press Escape.'
-      );
-      return;
-    }
-    if (tool === 'trim') {
-      // Trimming may replace the clicked circle or delete its interval before mousedown.
-      event.preventDefault();
-      if (id) {
-        const entity = sketch.entities.find(entity => entity.id === id);
-        if (entity && isOwnedSplineHandle(entity))
-          return setMessage('Spline tangent handles cannot be trimmed. Edit their constraints or reshape the spline.');
-        if (sketchPatternOwner(sketch, id)) return setMessage('Remove the pattern relation before trimming its finite geometry.');
-        const trimmed = trimSketchCurveAt(sketch, id, p);
-        if (trimmed) changeSketch(trimmed);
-        else setMessage('Trim supports line, circle and arc intervals. Select other curves and press Delete to remove them.');
-      }
-      return;
-    }
-    if (tool === 'dimension') {
-      if (id) {
-        const position = curveHit?.point ?? pointHit?.point ?? p;
-        setCursor(position);
-        applyDimensionEvent({ type: 'pick', entityId: id, previewId: newCadId(), additive: event.shiftKey, position });
-      } else {
-        const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-        if (!matrix) return;
-        const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-        // Placement opens the input during pointerdown; suppress the following native mousedown focus.
-        event.preventDefault();
-        applyDimensionEvent({ type: 'place', position: { x: raw.x, y: -raw.y } });
-      }
-      return;
-    }
-    if (tool === 'select') {
-      // The canvas owns keyboard focus throughout selection and geometry drags.
-      event.preventDefault();
-      if (!id) {
-        if (tool === 'select') {
-          const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-          if (matrix) {
-            const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-            const start = { x: raw.x, y: -raw.y };
-            boxGesture.current = {
-              start,
-              end: start,
-              screenStart: { x: event.clientX, y: event.clientY },
-              selected: [...selected],
-              additive: event.shiftKey,
-              moved: false,
-            };
-            event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
-          }
-        }
-        if (!event.shiftKey) setSelected([]);
-        setDimension(null);
-        return;
-      }
-      const next = event.shiftKey
-        ? selected.includes(id)
-          ? selected.filter(existing => existing !== id)
-          : [...selected, id]
-        : selected.includes(id)
-          ? selected
-          : [id];
-      selectionHints.current[id] = { ...(curveHit?.point ?? pointHit?.point ?? p) };
-      setSelected(next);
-      setDimension(null);
-      const entity = sketch.entities.find(e => e.id === id);
-      if (entity && !event.shiftKey) {
-        const radiusEntityId =
-          next.length === 1 &&
-          entity.type === 'circle' &&
-          !sketch.constraints.some(c => (c.type === 'radius' || c.type === 'diameter') && !c.driven && c.entityId === entity.id)
-            ? entity.id
-            : undefined;
-        const targets = dragTargets(sketch, next, { x: 0, y: 0 });
-        if (!radiusEntityId && !targets.length) {
-          setMessage('The selected points are fixed. Unfix them or edit the dimensions to move this geometry.');
-          return;
-        }
-        drag.current = {
-          origin: p,
-          target: p,
-          document: doc,
-          preview: doc,
-          partId: part!.id,
-          selectedIds: next,
-          points: radiusEntityId && entity.type === 'circle' ? [entity.centerId] : targets.map(t => t.pointId),
-          radiusEntityId,
-          moved: false,
-          request: 0,
-          solvedRequest: 0,
-          working: false,
-          ended: false,
-          snapPointId: entity.type === 'point' && next.length === 1 ? entity.id : undefined,
-        };
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }
-      return;
-    }
-    if (tool === 'spline' || tool === 'bezier') {
-      const last = pending.at(-1);
-      if (!last || Math.hypot(last.x - p.x, last.y - p.y) > 1e-7) {
-        setPending([...pending, p]);
-        pendingSnaps.current.push(lastDrawingHint.current);
-      }
-    } else if (!pending.length) {
-      setPending([p]);
-      centerArcSweep.current = null;
-      pendingSnaps.current = [lastDrawingHint.current];
-      setLineContinuation(false);
-      const gesture = transitionDrawingGesture(drawingGesture.current, {
-        type: 'press',
-        tool,
-        pointerId: event.pointerId,
-        position: { x: event.clientX, y: event.clientY },
-        canStart: true,
-      });
-      drawingGesture.current = gesture.state;
-      if (gesture.state.phase === 'pressed') {
-        setCursor(p);
-        event.preventDefault();
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }
-      if (tool === 'arc') setMessage('Click the arc end, then move to shape the arc.');
-    } else if (
-      (tool === 'arc' ||
-        tool === 'conic' ||
-        tool === 'ellipse' ||
-        tool === 'threePointCircle' ||
-        tool === 'alignedRectangle' ||
-        tool === 'centerPointArc' ||
-        polygonTool) &&
-      pending.length === 1
-    ) {
-      if (
-        (tool === 'ellipse' || tool === 'threePointCircle' || tool === 'alignedRectangle' || tool === 'centerPointArc' || polygonTool) &&
-        Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) < 0.1
-      )
-        return;
-      if (polygonTool) {
-        event.preventDefault();
-        polygonCountGesture.current = { sides: Number(polygonSides), radius: Math.hypot(p.x - pending[0]!.x, p.y - pending[0]!.y) };
-      }
-      setPending([...pending, p]);
-      if (tool === 'centerPointArc') centerArcSweep.current = { last: Math.atan2(p.y - pending[0]!.y, p.x - pending[0]!.x), sweep: 0 };
-      pendingSnaps.current.push(lastDrawingHint.current);
-      setMessage(
-        polygonTool
-          ? 'Enter the number of sides, or move toward/away from the center to adjust it. Click or press Enter to finish.'
-          : tool === 'centerPointArc'
-            ? 'Move clockwise or counterclockwise around the center, then click the arc end.'
-            : tool === 'alignedRectangle'
-              ? 'Click to set the perpendicular extent of the rectangle.'
-              : tool === 'threePointCircle'
-                ? 'Click the third point on the circle circumference.'
-                : tool === 'ellipse'
-                  ? 'Click to set the second axis radius, perpendicular to the first.'
-                  : tool === 'arc'
-                    ? 'Move to shape the arc, then click a point on it.'
-                    : 'Click the conic control point.'
-      );
-    } else {
-      // Rho opens during this pointerdown. Suppress the browser's following mousedown
-      // focus so the new input keeps ownership after the complete click sequence.
-      if (tool === 'conic') event.preventDefault();
-      addShape(p);
-    }
-  };
-  const pointerMove = (event: PointerEvent<SVGSVGElement>) => {
-    if (slotDrag.current) {
-      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-      if (!matrix) return;
-      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
-        center = slotDrag.current.center;
-      setSlotWidth(lengthText(Math.round(2 * Math.hypot(raw.x - center.x, -raw.y - center.y) * 1e6) / 1e6));
-      return;
-    }
-    if (circularDrag.current) {
-      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-      if (!matrix) return;
-      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
-        point = { x: raw.x, y: -raw.y },
-        gesture = circularDrag.current,
-        parsed = parseCircularPatternParameters(gesture.parameters, lengthUnit);
-      if (!parsed.ok) return;
-      const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
-      if (gesture.kind === 'center')
-        setCircularParameters({
-          ...gesture.parameters,
-          centerX: lengthText(parsed.center.x + point.x - gesture.start.x),
-          centerY: lengthText(parsed.center.y + point.y - gesture.start.y),
-        });
-      else {
-        const a = Math.atan2(point.y - parsed.center.y, point.x - parsed.center.x);
-        gesture.sweep += Math.atan2(Math.sin(a - gesture.last), Math.cos(a - gesture.last));
-        gesture.last = a;
-        setCircularParameters({
-          ...gesture.parameters,
-          closed: false,
-          angle: text(Math.max(-359.999999, Math.min(359.999999, (gesture.sweep * 180) / Math.PI))),
-        });
-      }
-      return;
-    }
-    if (patternDrag.current) {
-      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-      if (!matrix) return;
-      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
-        { index, anchor, parameters } = patternDrag.current;
-      const x = raw.x - anchor.x,
-        y = -raw.y - anchor.y,
-        spacing = lengthText(Math.round(Math.hypot(x, y) * 1e6) / 1e6),
-        angle = String(Math.round(((Math.atan2(y, x) * 180) / Math.PI) * 1e6) / 1e6);
-      setLinearParameters({
-        ...parameters,
-        ...(index === 0 ? { spacingX: spacing, angleX: angle } : { spacingY: spacing, angleY: angle }),
-      });
-      return;
-    }
-
-    if (transformDrag.current) {
-      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-      if (!matrix) return;
-      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-      let point = { x: raw.x, y: -raw.y };
-      const { kind, start, parameters } = transformDrag.current,
-        parsed = parseTransformParameters(parameters, lengthUnit);
-      if (!parsed.ok) return;
-      const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
-      const center = { x: parsed.pivot.x + parsed.translation.x, y: parsed.pivot.y + parsed.translation.y };
-      if (kind === 'translate')
-        setTransformParameters({
-          ...parameters,
-          dx: lengthText(parsed.translation.x + point.x - start.x),
-          dy: lengthText(parsed.translation.y + point.y - start.y),
-        });
-      if (kind === 'rotate') {
-        const delta = Math.atan2(point.y - center.y, point.x - center.x) - Math.atan2(start.y - center.y, start.x - center.x);
-        setTransformParameters({ ...parameters, angle: text(parsed.angle + (delta * 180) / Math.PI) });
-      }
-      if (kind === 'scale') {
-        const initial = Math.hypot(start.x - center.x, start.y - center.y);
-        if (initial > CAD_GEOMETRY_TOLERANCE)
-          setTransformParameters({
-            ...parameters,
-            scale: text(Math.max(0.001, (parsed.scale * Math.hypot(point.x - center.x, point.y - center.y)) / initial)),
-          });
-      }
-      if (kind === 'pivot') {
-        const snap = pickSketchPoint(shownSketch!, { x: event.clientX, y: event.clientY }, { project: projectPoint });
-        if (snap) point = snap.point;
-        const r = (parsed.angle * Math.PI) / 180,
-          worldDx = point.x - start.x,
-          worldDy = point.y - start.y;
-        const x = parsed.pivot.x + (Math.cos(r) * worldDx + Math.sin(r) * worldDy) / parsed.scale,
-          y = parsed.pivot.y + (-Math.sin(r) * worldDx + Math.cos(r) * worldDy) / parsed.scale;
-        const dx = parsed.pivot.x - x,
-          dy = parsed.pivot.y - y,
-          c = parsed.scale * Math.cos(r),
-          s = parsed.scale * Math.sin(r);
-        setTransformParameters({
-          ...parameters,
-          pivotX: lengthText(x),
-          pivotY: lengthText(y),
-          dx: lengthText(parsed.translation.x + (1 - c) * dx + s * dy),
-          dy: lengthText(parsed.translation.y - s * dx + (1 - c) * dy),
-        });
-      }
-      return;
-    }
-
-    if (chamferDrag.current) {
-      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-      if (!matrix) return;
-      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-      const { side, origin, direction } = chamferDrag.current;
-      const distance = Math.max(0.001, (point.x - origin.x) * direction.x + (-point.y - origin.y) * direction.y);
-      setChamferDistances(previous =>
-        previous.map((value, index) => (index === side ? lengthText(Math.round(distance * 1000) / 1000) : value))
-      );
-      return;
-    }
-
-    contextPress.current = transitionSketchContextPress(contextPress.current, {
-      type: 'move',
-      pointerId: event.pointerId,
-      position: { x: event.clientX, y: event.clientY },
-    }).state;
-    drawingGesture.current = transitionDrawingGesture(drawingGesture.current, {
-      type: 'move',
-      pointerId: event.pointerId,
-      position: { x: event.clientX, y: event.clientY },
-    }).state;
-    const annotation = annotationDrag.current;
-    if (annotation) {
-      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-      if (
-        !matrix ||
-        (!annotation.moved && Math.hypot(event.clientX - annotation.screenStart.x, event.clientY - annotation.screenStart.y) < 3)
-      )
-        return;
-      annotation.moved = true;
-      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-      const labelPosition = {
-        x: annotation.position.x + point.x - annotation.worldStart.x,
-        y: annotation.position.y - point.y - annotation.worldStart.y,
-      };
-      const next = {
-        ...annotation.document,
-        parts: annotation.document.parts.map(p => ({
-          ...p,
-          sketch: {
-            ...p.sketch,
-            constraints: p.sketch.constraints.map(c =>
-              c.id === annotation.id && numeric(c) ? withDimensionPlacement(p.sketch, c, labelPosition) : c
-            ),
-          },
-        })),
-      };
-      documentRef.current = next;
-      setDocument(next);
-      return;
-    }
-    const box = boxGesture.current;
-    if (box) {
-      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-      if (!matrix) return;
-      const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-      box.end = { x: raw.x, y: -raw.y };
-      box.additive ||= event.shiftKey;
-      box.moved ||= Math.hypot(event.clientX - box.screenStart.x, event.clientY - box.screenStart.y) >= 3;
-      if (box.moved) setSelectionBox({ start: box.start, end: box.end });
-      setSnapCue(null);
-      setDrawingCue(null);
-      setHoveredPoint(null);
-      return;
-    }
-    let p = pointAt(event);
-    if (sketch && modification.phase !== 'idle') {
-      const hit = pickSketchSnap(
-        sketch,
-        { x: event.clientX, y: event.clientY },
-        { project: projectPoint, pointRadiusPx: -1, includeMidpoints: false }
-      );
-      setHoveredModifyCurve(hit?.entityId ?? null);
-      if (modification.phase === 'extend' && modification.entityId) setModifyTarget(p);
-    }
-    if (placingDimension) {
-      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-      if (matrix) {
-        const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-        p = { x: raw.x, y: -raw.y };
-        if (sketch) setDimensionFlow(transitionDimensionWorkflow(sketch, dimensionFlow, { type: 'hover', position: p }).state);
-      }
-    }
-    const movingPoint = drag.current;
-    let drop: CadDrawingInference | null = null;
-    if (movingPoint?.snapPointId) {
-      const source = movingPoint.document.parts.find(part => part.id === movingPoint.partId)!.sketch;
-      const point = source.entities.find(entity => entity.id === movingPoint.snapPointId)!;
-      const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-      if (point.type === 'point' && matrix) {
-        const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-        drop = inferDragPoint(
-          source,
-          point.id,
-          { x: point.x + raw.x - movingPoint.origin.x, y: point.y - raw.y - movingPoint.origin.y },
-          { project: projectPoint, excludePointIds: movingPoint.points, enabled: snap && !event.shiftKey }
-        );
-        movingPoint.dropInference = drop;
-        p = { x: movingPoint.origin.x + drop.point.x - point.x, y: movingPoint.origin.y + drop.point.y - point.y };
-      }
-    }
-    if (tool === 'centerPointArc' && pending.length === 2 && centerArcSweep.current) {
-      const center = pending[0]!;
-      if (Math.hypot(p.x - center.x, p.y - center.y) > 1e-6) {
-        const angle = Math.atan2(p.y - center.y, p.x - center.x),
-          previous = centerArcSweep.current;
-        previous.sweep += Math.atan2(Math.sin(angle - previous.last), Math.cos(angle - previous.last));
-        previous.last = angle;
-      }
-    }
-    if (polygonTool && pending.length === 2 && polygonCountGesture.current) {
-      const anchor = polygonCountGesture.current,
-        center = pending[0]!;
-      if (Number.isInteger(anchor.sides))
-        setPolygonSides(
-          String(
-            Math.max(
-              3,
-              Math.min(50, Math.round(anchor.sides + ((Math.hypot(p.x - center.x, p.y - center.y) - anchor.radius) * markerScale) / 12))
-            )
-          )
-        );
-    }
-    setCursor(drop?.point ?? p);
-    setDrawingCue(movingPoint?.snapPointId ? (snap && !event.shiftKey ? drop : null) : lastDrawingHint.current);
-    const pointHit = sketch
-      ? pickSketchPoint(
-          sketch,
-          { x: event.clientX, y: event.clientY },
-          { project: projectPoint, excludePointIds: drag.current?.points, selectedEntityIds: dimensionSelection }
-        )
-      : null;
-    setHoveredPoint(pointHit?.targetPointId ?? null);
-    setSnapCue(
-      snap && !(movingPoint?.snapPointId && event.shiftKey)
-        ? drop?.snap
-          ? { point: drop.point, label: snapLabels[drop.snap.kind] }
-          : inference.current
-            ? { point: p, label: inference.current }
-            : lastSnap.current
-              ? { point: lastSnap.current.point, label: snapLabels[lastSnap.current.kind] }
-              : null
-        : null
-    );
-    if (pan.current?.turn && (contextPress.current.phase !== 'pressed' || contextPress.current.moved))
-      setSketchTurn(turnedBy(pan.current.turn, event.clientX - pan.current.x, event.clientY - pan.current.y));
-    else if (pan.current && (contextPress.current.phase !== 'pressed' || contextPress.current.moved)) {
-      const v = pan.current;
-      // Its own size, which a turned drawing's box isn't.
-      const width = svg.current!.clientWidth,
-        height = svg.current!.clientHeight;
-      // A turned drawing moves along its own axes, so the move on screen is taken back through its turn.
-      let dx = event.clientX - v.x,
-        dy = event.clientY - v.y;
-      if (sketchBackdrop && sketchTurn !== straightOn) {
-        if (edgeOn(sketchTurn)) return;
-        const [a, b, c, d] = drawingMatrix(sketchTurn),
-          det = a * d - b * c;
-        [dx, dy] = [(d * dx - c * dy) / det, (a * dy - b * dx) / det];
-      }
-      setView({
-        ...v.view,
-        x: v.view.x - (dx * v.view.w) / width,
-        y: v.view.y - (dy * v.view.h) / height,
-      });
-    }
-    const moving = drag.current;
-    if (!moving || moving.ended || moving.failure) return;
-    const dx = p.x - moving.origin.x,
-      dy = p.y - moving.origin.y;
-    if (!moving.moved && Math.hypot(dx, dy) < 0.25) return;
-    moving.moved = true;
-    moving.target = p;
-    moving.request++;
-    void solveDrag(moving);
-  };
-  const pointerEnd = (cancel = false, event?: PointerEvent<SVGSVGElement>) => {
-    if (slotDrag.current) {
-      if (cancel) setSlotWidth(slotDrag.current.width);
-      slotDrag.current = null;
-      return;
-    }
-    if (circularDrag.current) {
-      if (cancel) setCircularParameters(circularDrag.current.parameters);
-      circularDrag.current = null;
-      return;
-    }
-    if (patternDrag.current) {
-      if (cancel) setLinearParameters(patternDrag.current.parameters);
-      patternDrag.current = null;
-      return;
-    }
-
-    if (transformDrag.current) {
-      if (cancel) setTransformParameters(transformDrag.current.parameters);
-      transformDrag.current = null;
-      return;
-    }
-
-    if (chamferDrag.current) {
-      if (cancel) setChamferDistances(chamferDrag.current.previous);
-      chamferDrag.current = null;
-      return;
-    }
-
-    pan.current = null;
-    if (contextPress.current.phase === 'pressed') {
-      const context = transitionSketchContextPress(
-        contextPress.current,
-        cancel || !event
-          ? { type: 'cancel' }
-          : { type: 'release', pointerId: event.pointerId, position: { x: event.clientX, y: event.clientY } }
-      );
-      contextPress.current = context.state;
-      if (context.open) openContext(context.open.target, context.open.position);
-      return;
-    }
-    if (drawingGesture.current.phase === 'pressed') {
-      const gesture = transitionDrawingGesture(
-        drawingGesture.current,
-        cancel || !event
-          ? { type: 'cancel' }
-          : { type: 'release', pointerId: event.pointerId, position: { x: event.clientX, y: event.clientY } }
-      );
-      drawingGesture.current = gesture.state;
-      if (gesture.effect === 'cancel') {
-        setPending([]);
-        pendingSnaps.current = [];
-        setLineContinuation(false);
-        setDrawingCue(null);
-        setSnapCue(null);
-      } else if (gesture.effect === 'complete' && event) {
-        const end = pointAt(event);
-        setCursor(end);
-        addShape(end);
-      }
-      return;
-    }
-    const box = boxGesture.current;
-    if (box) {
-      boxGesture.current = null;
-      setSelectionBox(null);
-      if (cancel) setSelected(box.selected);
-      else if (box.moved && sketch) {
-        const result = boxSelectSketch(sketch, box, {
-          visiblePointIds: visibleSketchPointIds(sketch, selected),
-          curveTolerance: 0.25 / markerScale,
-        });
-        setSelected(box.additive ? [...new Set([...box.selected, ...result.entityIds])] : result.entityIds);
-        if (!box.additive) setSelectedConstraints([]);
-      } else if (!cancel && !box.moved && !box.additive && tool === 'select' && !faceSketch && part) {
-        const entry = cutRegionAt(topRegions(cutRegions(part)), box.start);
-        if (entry) setRegionField({ entry, anchor: box.start });
-      }
-      return;
-    }
-    const annotation = annotationDrag.current;
-    if (annotation) {
-      annotationDrag.current = null;
-      if (cancel) {
-        documentRef.current = annotation.document;
-        setDocument(annotation.document);
-      } else if (annotation.moved) commit(documentRef.current);
-      if (cancel || !annotation.moved) requestSketchCheck();
-      svg.current?.focus();
-      return;
-    }
-    const moving = drag.current;
-    if (!moving) return;
-    // Pointer capture is lost after a normal release; it must not cancel the finishing solve.
-    if (moving.ended) return;
-    if (cancel) {
-      drag.current = null;
-      setDocument(moving.document);
-      documentRef.current = moving.document;
-      setBusy(false);
-      requestSketchCheck();
-    } else if (moving.moved) {
-      moving.ended = true;
-      setBusy(true);
-      void solveDrag(moving);
-    } else {
-      drag.current = null;
-      requestSketchCheck();
-      restoreCanvasKeyboard();
-    }
-  };
+  const pointerDown = (event: PointerEvent<SVGSVGElement>) => sketchPointerDown(sketchEditorInput(), event);
+  const pointerMove = (event: PointerEvent<SVGSVGElement>) => sketchPointerMove(sketchEditorInput(), event);
+  // Built on each call, so the handlers below read this render's values, as they did when they were closures here.
+  const sketchEditorInput = (): SketchEditorInput => ({
+    acceptLinearPattern,
+    acceptOffset,
+    acceptSlot,
+    acceptTransform,
+    addShape,
+    addSnapRelations,
+    annotationDrag,
+    applyDimensionEvent,
+    boxGesture,
+    busy,
+    centerArcSweep,
+    chain,
+    chamferDrag,
+    changeSketch,
+    chooseTool,
+    circularDrag,
+    commit,
+    conicEditing,
+    constraintMode,
+    construction,
+    contextPress,
+    contextTarget,
+    contextualArc,
+    dimensionFlow,
+    dimensionSelection,
+    doc,
+    documentRef,
+    drag,
+    drawingGesture,
+    drawingGroup,
+    faceSketch,
+    fixGeometry,
+    fixMode,
+    height,
+    hoveredReferences,
+    inference,
+    lastDrawingHint,
+    lastSnap,
+    lengthText,
+    lengthUnit,
+    lineContinuation,
+    markerScale,
+    modification,
+    newCurveCommand,
+    newDimensionCommand,
+    openContext,
+    pan,
+    parseCadValue,
+    part,
+    patternCommandId,
+    patternDrag,
+    patternEditId,
+    pending,
+    pendingSnaps,
+    pickedEdges,
+    placingDimension,
+    pointAt,
+    polygonCountGesture,
+    polygonSides,
+    polygonTool,
+    projectPoint,
+    radius,
+    requestSketchCheck,
+    restoreCanvasKeyboard,
+    rho,
+    selected,
+    selectionHints,
+    session,
+    setBusy,
+    setChain,
+    setChamferDistances,
+    setCircularParameters,
+    setConicEditing,
+    setConstraintMode,
+    setContextMenu,
+    setContextualArc,
+    setCreationValues,
+    setCursor,
+    setDimension,
+    setDimensionFlow,
+    setDocument,
+    setDrawingCue,
+    setFilletEditing,
+    setFixMode,
+    setHoveredConstraintEntities,
+    setHoveredModifyCurve,
+    setHoveredPoint,
+    setLineContinuation,
+    setLinearParameters,
+    setMessage,
+    setModification,
+    setModifyTarget,
+    setPalette,
+    setPatternEditId,
+    setPatternNotice,
+    setPending,
+    setPickedEdges,
+    setPolygonSides,
+    setRegionField,
+    setRho,
+    setSelected,
+    setSelectedConstraints,
+    setSelectionBox,
+    setSharedSlotWidth,
+    setSketchTurn,
+    setSlotChain,
+    setSlotWidth,
+    setSnapCue,
+    setSplitFirst,
+    setSplitNotice,
+    setTool,
+    setTransformNotice,
+    setTransformParameters,
+    setUsingEdges,
+    setView,
+    shownSketch,
+    sketch,
+    sketchBackdrop,
+    sketchTurn,
+    slotDrag,
+    snap,
+    solveDrag,
+    splitFirst,
+    svg,
+    takeEdges,
+    tangentAxis,
+    tool,
+    transformDrag,
+    transformSelectionCenter,
+    usingEdges,
+    variableScope,
+    view,
+    width,
+  });
+  const pointerEnd = (cancel = false, event?: PointerEvent<SVGSVGElement>) => sketchPointerEnd(sketchEditorInput(), cancel, event);
   const pendingFinishReason = sketchPendingFinishReason({
     tool,
     selected: selected.length,
