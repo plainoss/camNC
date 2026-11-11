@@ -236,6 +236,7 @@ import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
 import { asHole, editable, hasOutline, isSingleLine, replacePart, snapLabels, withoutExtrude } from './editorHelpers';
 import { useFeaturePreview } from './useFeaturePreview';
+import { SketchProblems } from './SketchProblems';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
 import { StudioFeatureList } from './StudioFeatureList';
 import { detachStudioCopy } from './detachStudioCopy';
@@ -5349,20 +5350,7 @@ export function CadEditor({
         </span>
         <span>{saveStatus ?? 'Draft'}</span>
       </footer>
-      {problems.length > 0 && !acceptanceNotice && (
-        <div className={`cad-problems${inProgress ? ' cad-sketch-progress' : ''}`} role={inProgress ? undefined : 'alert'}>
-          <strong>{inProgress ? 'Sketch in progress' : 'Finish is blocked'}</strong>
-          {inProgress ? (
-            <p>Keep drawing to close the outline. Your sketch is saved as a draft.</p>
-          ) : (
-            <ul>
-              {problems.map((problem, i) => (
-                <li key={i}>{problem}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {!acceptanceNotice && <SketchProblems problems={problems} inProgress={inProgress} />}
     </div>
   );
   return <DesignUnitContext value={lengthUnit}>{content}</DesignUnitContext>;
