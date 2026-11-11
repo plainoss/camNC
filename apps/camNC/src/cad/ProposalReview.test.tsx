@@ -4,7 +4,12 @@ import { cadSession, commitCadSession, endCadSession, undoCadSession } from '@wb
 import { render } from 'vitest-browser-react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProposalReview } from './ProposalReview';
+import { bindProposalOrigin } from './assistant/recheck';
 
+vi.mock('./assistant/recheck', async original => ({
+  ...(await original<typeof import('./assistant/recheck')>()),
+  recheckAssistantCandidate: vi.fn(() => new Promise(() => {})),
+}));
 vi.mock('./WorkspaceView', () => ({ default: ({ document }: { document: { name: string } }) => <div>{document.name}</div> }));
 
 describe('proposal preview', () => {
@@ -58,6 +63,32 @@ describe('proposal preview', () => {
     await expect.element(screen.getByRole('button', { name: 'Apply as one undo step' })).toBeDisabled();
     await expect.element(screen.getByText(/The design has changed/)).toBeVisible();
     expect(session.document.name).toBe('Hand edit');
+    endCadSession(base.id);
+  });
+
+  it('keeps Apply disabled while a slider re-check is running', async () => {
+    const base = createPlateDocument();
+    const session = cadSession(base);
+    const proposal = cadProposal(base, { ...base, name: 'Candidate' });
+    const parameters = { width: 600, height: 720, depth: 300, board: 18, shelves: 3, folderName: 'Cupboard', at: [0, 0, 0] };
+    bindProposalOrigin(proposal, { source: 'recipe', recipe: { name: 'cupboard', parameters } });
+    const screen = render(
+      <ProposalReview
+        proposal={proposal}
+        session={session}
+        currentDocument={base}
+        onApply={() => {}}
+        onClose={() => {}}
+        onReplace={() => {}}
+      />
+    );
+    const apply = screen.getByRole('button', { name: 'Apply as one undo step' });
+    await expect.element(apply).toBeEnabled();
+    const width = screen.getByRole('slider', { name: /Width/ }).element() as HTMLInputElement;
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    set.call(width, '700');
+    width.dispatchEvent(new Event('input', { bubbles: true }));
+    await expect.element(apply).toBeDisabled();
     endCadSession(base.id);
   });
 });

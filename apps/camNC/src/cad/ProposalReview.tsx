@@ -42,6 +42,7 @@ export function ProposalReview({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<Mode>('changes');
+  const [rechecking, setRechecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, refreshRequirements] = useState(0);
   useEffect(() => subscribeRequirements(proposal.base.id, () => refreshRequirements(value => value + 1)), [proposal]);
@@ -135,7 +136,15 @@ export function ProposalReview({
               highlightIds={mode === 'changes' && highlighted.length ? highlighted : undefined}
             />
           </Suspense>
-          {onReplace && <ProposalTweaks proposal={proposal} currentDocument={currentDocument} stale={stale} onReplace={onReplace} />}
+          {onReplace && (
+            <ProposalTweaks
+              proposal={proposal}
+              currentDocument={currentDocument}
+              stale={stale}
+              onReplace={onReplace}
+              onBusy={setRechecking}
+            />
+          )}
         </div>
       </div>
       <footer>
@@ -160,10 +169,10 @@ export function ProposalReview({
         <button
           type="button"
           className="cad-proposal-apply"
-          disabled={!!refusal || comparison.errors.length > 0}
+          disabled={!!refusal || rechecking || comparison.errors.length > 0}
           onClick={() => {
             // A host feature preview is not a document change, so the snapshot guard alone cannot detect it.
-            if (disabled) return;
+            if (disabled || rechecking) return;
             try {
               const changedRequirements = requirementProposalRefusal(proposal);
               if (changedRequirements) throw new Error(changedRequirements);

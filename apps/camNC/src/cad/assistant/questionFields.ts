@@ -53,18 +53,20 @@ export function answerQuestionFields(
   values: Record<string, number | undefined>
 ): { text: string; requirements: AssistantRequirements } {
   const parts: string[] = [];
-  const requirements: Record<string, number> = {};
+  const checked: Record<string, number> = {};
   for (const field of fields) {
     const value = values[field.name];
     if (value === undefined || !Number.isFinite(value)) continue;
     parts.push(`${field.label}: ${value}${field.unit === 'mm' ? ' mm' : ''}`);
-    if (requirementFieldNames.includes(field.name)) requirements[field.name] = field.unit === 'count' ? Math.round(value) : value;
+    if (!requirementFieldNames.includes(field.name)) continue;
+    // A count named field must be a count, a length a length; otherwise it only answers in words.
+    if ((field.unit === 'count') !== (counts as readonly string[]).includes(field.name)) continue;
+    // Each value is checked on its own, so one out-of-range answer doesn't drop the others.
+    try {
+      Object.assign(checked, validateAssistantRequirements({ [field.name]: value }));
+    } catch {
+      // Still part of the answer in words; just not enforced.
+    }
   }
-  let checked: AssistantRequirements = {};
-  try {
-    checked = validateAssistantRequirements(requirements);
-  } catch {
-    // An out-of-range value still answers the question in words; it just isn't enforced.
-  }
-  return { text: parts.join(', '), requirements: checked };
+  return { text: parts.join(', '), requirements: checked as AssistantRequirements };
 }

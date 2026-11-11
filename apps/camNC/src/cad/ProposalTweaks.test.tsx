@@ -45,3 +45,21 @@ it('offers a re-check on the current design for a stale script proposal and repo
   expect(vi.mocked(recheckAssistantCandidate).mock.calls[0]![0]).toEqual(current);
   expect(onReplace).not.toHaveBeenCalled();
 });
+
+it('reports busy from the slider move until the re-check ends, and puts a refused value back', async () => {
+  const base = createPlateDocument();
+  const proposal = cadProposal(base, { ...base, name: 'Candidate' });
+  bindProposalOrigin(proposal, { source: 'recipe source', recipe: { name: 'cupboard', parameters } });
+  let refuse!: (error: Error) => void;
+  vi.mocked(recheckAssistantCandidate).mockReturnValue(new Promise((_, reject) => (refuse = reject)));
+  const onBusy = vi.fn();
+  render(<ProposalTweaks proposal={proposal} currentDocument={base} stale={false} onReplace={vi.fn()} onBusy={onBusy} />);
+  const width = screen.getByRole('slider', { name: /Width/ });
+  fireEvent.change(width, { target: { value: '800' } });
+  expect(onBusy).toHaveBeenLastCalledWith(true);
+  await waitFor(() => expect(recheckAssistantCandidate).toHaveBeenCalled());
+  refuse(new Error('Width 800 mm breaks the brief.'));
+  await screen.findByText('Width 800 mm breaks the brief.');
+  expect(onBusy).toHaveBeenLastCalledWith(false);
+  expect(width).toHaveProperty('value', '600');
+});

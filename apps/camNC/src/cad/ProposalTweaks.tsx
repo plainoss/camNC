@@ -24,11 +24,14 @@ export function ProposalTweaks({
   currentDocument,
   stale,
   onReplace,
+  onBusy,
 }: {
   proposal: CadProposal;
   currentDocument: CadDocument;
   stale: boolean;
   onReplace: (proposal: CadProposal) => void;
+  /** True from a slider move until its re-check ends: Apply must not take the old design while the slider shows another. */
+  onBusy?: (busy: boolean) => void;
 }) {
   const origin = proposalOrigin(proposal);
   const tweakable = tweakableParameters(origin);
@@ -43,7 +46,10 @@ export function ProposalTweaks({
     () => () => {
       controller.current?.abort();
       clearTimeout(timer.current);
+      onBusy?.(false);
     },
+    // onBusy is the review's state setter; it never changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
   if (!origin) return null;
@@ -52,6 +58,7 @@ export function ProposalTweaks({
     const abort = new AbortController();
     controller.current = abort;
     setChecking(true);
+    onBusy?.(true);
     setMessage('');
     void recheckAssistantCandidate(base, origin, abort.signal, parameters && { ...origin.recipe!.parameters, ...parameters })
       .then(next => {
@@ -60,10 +67,15 @@ export function ProposalTweaks({
         onReplace(next);
       })
       .catch(cause => {
-        if (!abort.signal.aborted) setMessage(cause instanceof Error ? cause.message : 'The check failed.');
+        if (abort.signal.aborted) return;
+        setMessage(cause instanceof Error ? cause.message : 'The check failed.');
+        // The proposal is unchanged, so the sliders go back to what it was built with.
+        setValues(Object.fromEntries(tweakable));
       })
       .finally(() => {
-        if (controller.current === abort) setChecking(false);
+        if (controller.current !== abort) return;
+        setChecking(false);
+        onBusy?.(false);
       });
   };
   if (!tweakable.length && !stale) return null;
@@ -102,6 +114,7 @@ export function ProposalTweaks({
               onChange={event => {
                 const next = { ...values, [name]: Number(event.target.value) };
                 setValues(next);
+                onBusy?.(true);
                 clearTimeout(timer.current);
                 timer.current = setTimeout(() => run(proposal.base, next), kRecheckDelayMs);
               }}
