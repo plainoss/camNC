@@ -5,6 +5,7 @@ import { joinedCutReferences } from './joinedCutReferences';
 import { resolvePartCutTargets } from './partCutTargetSelection';
 import { evaluatedPartCopy } from './copies';
 import { physicalJoinedCopies } from './physicalJoinedCopies';
+import { activeDesign } from './suppression';
 import type { CadCircularPartPattern, CadDocument, CadPartPattern, CadPlacement, EvaluatedCadPart } from './types';
 
 /** What one step of a design refers to, and what that came to, in words and numbers rather than pictures. */
@@ -84,7 +85,8 @@ const roundedFrame = (frame: CadFaceFrame | { error: string }): CadFaceFrame | {
 export function cadStepReport(document: CadDocument, parts: readonly EvaluatedCadPart[]): CadStepReportEntry[] {
   const report: CadStepReportEntry[] = [];
   // Physical names/slots include inherited Add material without adding synthetic authoring steps to the report.
-  const physical = physicalJoinedCopies(document);
+  // Suppressed host copies have no physical material, so they must not give a joined body an inherited copy.
+  const physical = physicalJoinedCopies(activeDesign(document));
   const byId = new Map(physical.parts.map(part => [part.id, part]));
   const authoredById = new Map(document.parts.map(part => [part.id, part]));
   for (const part of document.parts) {
