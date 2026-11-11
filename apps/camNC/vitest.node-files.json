@@ -11,6 +11,7 @@
   "src/cad/sectionModel.test.ts",
   "src/cad/studioViewShortcut.test.ts",
   "src/cad/studioCamera.test.ts",
+  "src/cad/insertFraming.test.ts",
   "src/cad/partCornerInference.test.ts",
   "src/cad/extrudeMergeTarget.test.ts",
   "src/cam/planSettings.test.ts",
