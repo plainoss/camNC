@@ -208,7 +208,11 @@ it(
     expect(await screen.findByRole('button', { name: 'Length: 100 mm' })).toBeVisible();
 
     await userEvent.click(screen.getByRole('button', { name: 'Exploded' }));
-    fireEvent.change(screen.getByRole('slider', { name: 'Explosion amount' }), { target: { value: '37' } });
+    const partial = await screen.findByRole('slider', { name: 'Explosion amount' });
+    // Playback passes every percent on its way out. Setting the value it already shows fires no change, so
+    // the scrub would be skipped and playback would keep going. Mid-playback scrubbing is in useExplodedView.test.
+    await waitFor(() => expect(partial).toHaveValue('100'), { timeout: 10_000 });
+    fireEvent.change(partial, { target: { value: '37' } });
     expect(props().view).toBe('exploded');
     expect(props().explosionProgress).toBe(0.37);
     await userEvent.click(screen.getByRole('button', { name: 'Measure' }));
