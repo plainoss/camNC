@@ -105,6 +105,22 @@ export class CncApi {
   public readonly homed = signal(false);
   /** When Z zero was last set from camNC (probe or "Zero Z"), for the pre-job checklist. */
   public readonly zZeroedAt = signal<number | null>(null);
+  /**
+   * camNC sent the feed hold (Pause, Stop) the controller is in or going into. FluidNC reports a program pause (M0) as
+   * the same Hold, so this is what tells the user's Pause apart from one. Cleared by Resume, when a job starts, and once
+   * the job runs again or ends.
+   */
+  public readonly holdRequested = signal(false);
+  /** The furthest the controller has read the running SD file (FluidNC reads forward only), for the start pause. */
+  public readonly jobReadTo = signal<{ file: string; percent: number } | null>(null);
+  /**
+   * The spindle state from a report sent during the current hold (Hold or Door), so known to be the state while held;
+   * `undefined` until such a report, which FluidNC sends every few reports. {@link MachineStatus.spindleOn} alone may be
+   * from before the hold, e.g. from before an M3 the job ran since.
+   */
+  public readonly spindleInHold = signal<boolean | undefined>(undefined);
+  /** The SD percent once camNC's Pause had held the job, see {@link holdRequested}. */
+  private pauseHeldAt: number | null = null;
   /** When the current SD job was first seen running, for the time estimate. */
   public readonly jobStartedAt = signal<number | null>(null);
   public readonly isConnected = computed(() => this.connection.value === 'connected');
@@ -145,6 +161,8 @@ export class CncApi {
     this.disconnect();
     this.homed.value = false;
     this.zZeroedAt.value = null;
+    this.holdRequested.value = false;
+    this.jobReadTo.value = null;
     this.lastAlarm.value = loadLastAlarm(host);
     this.host.value = host;
     this.connection.value = 'connecting';
@@ -280,6 +298,26 @@ export class CncApi {
         // 4.x drops the SD field while in Hold, so only a finished job (not Hold) clears the start time.
         if (status.job && this.jobStartedAt.value === null) this.jobStartedAt.value = Date.now();
         if (!status.job && status.state !== 'Hold') this.jobStartedAt.value = null;
+        const read = this.jobReadTo.value;
+        if (status.job && (read?.file !== status.job.file || status.job.percent > read.percent)) this.jobReadTo.value = { ...status.job };
+        else if (!status.job && status.state !== 'Hold') this.jobReadTo.value = null;
+        // A new hold, or the job read on (it ran in between, the Run report missed): what was known is from before.
+        const holding = (state: string | undefined) => state === 'Hold' || state === 'Door';
+        const readOn = !!status.job && read?.file === status.job.file && status.job.percent > read.percent;
+        if (!holding(status.state)) this.spindleInHold.value = undefined;
+        else if (status.overridesReported) this.spindleInHold.value = status.spindleOn;
+        else if (!holding(this.status.value?.state) || readOn) this.spindleInHold.value = undefined;
+        // Run after anything but Run means the hold is over. Run after Run can be a report sent just before the controller
+        // took the Pause, so it does not.
+        const runsAgain = status.state === 'Run' && this.status.value?.state !== 'Run';
+        if (runsAgain || status.state === 'Idle' || status.state === 'Alarm') this.holdRequested.value = false;
+        // Reading on past where the Pause held the file also means the job ran again, if the Run report was missed. Taken
+        // once the hold is complete (Hold:0): while it slows down, the controller still reads lines into the planner.
+        if (this.holdRequested.value && status.job) {
+          if (this.pauseHeldAt === null) {
+            if (status.state === 'Hold' && status.subState === 0) this.pauseHeldAt = status.job.percent;
+          } else if (status.job.percent > this.pauseHeldAt) this.holdRequested.value = false;
+        }
         this.status.value = status;
         if (status.state !== 'Alarm' && this.alarm.value) this.alarm.value = null;
         const lastAlarm = this.lastAlarm.value;
@@ -384,6 +422,11 @@ export class CncApi {
 
   feedHold() {
     this.api.feedHold();
+    // Only something moving takes a feed hold: one sent while Idle (or already in Hold) must not mark the next M0 as ours.
+    if (['Run', 'Jog', 'Home'].includes(this.state.value ?? '')) {
+      this.holdRequested.value = true;
+      this.pauseHeldAt = null;
+    }
   }
 
   /** Cycle start. FluidNC ignores it while a hold is still decelerating, so wait for Hold:0 first. */
@@ -396,6 +439,8 @@ export class CncApi {
       );
     }
     api.cycleStart();
+    // The Pause is over even if the Run report that says so is missed; the next Hold may be the program's M0.
+    this.holdRequested.value = false;
   }
 
   softReset() {
@@ -548,7 +593,13 @@ export class CncApi {
   }
 
   async runFile(filename: string) {
-    return runSdFile(this.api, filename);
+    const api = this.api;
+    // A new job: no Pause of ours yet, nothing of it read.
+    batch(() => {
+      this.holdRequested.value = false;
+      this.jobReadTo.value = null;
+    });
+    return runSdFile(api, filename);
   }
 
   async listFiles() {
