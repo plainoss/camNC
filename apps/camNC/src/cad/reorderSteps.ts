@@ -9,11 +9,14 @@ function builtOn(part: CadPart): string[] {
 
 const partLevel = (step: DesignStep) =>
   step.kind === 'sketch' || step.kind === 'extrude' || (step.kind as string) === 'move' || step.kind === 'copy' || step.kind === 'pattern';
+const featureLevel = (step: DesignStep) => step.kind === 'faceSketch' || step.kind === 'cut';
+/** Steps that move their whole part when dropped on another part: its own, and the fillets that round it. */
+const movesPart = (step: DesignStep) => partLevel(step) || step.kind === 'fillet';
 
 /**
  * A step dragged to just before another in the feature list, as the reference reorders: a part's steps move together,
- * ahead of the part dropped on, and a face sketch or cut moves among its own part's. A step can't go ahead of what it's
- * built on, nor behind what's built on it; that says why instead.
+ * its fillets with them, ahead of the part dropped on; a face sketch or cut moves among its own part's, and a fillet
+ * among its part's fillets. A step can't go ahead of what it's built on, nor behind what's built on it; that says why.
  */
 export function reorderedSteps(
   document: CadDocument,
@@ -21,8 +24,11 @@ export function reorderedSteps(
   target: DesignStep
 ): { document: CadDocument } | { error: string } {
   const name = (id: string) => document.parts.find(part => part.id === id)?.name ?? 'a part';
-  if (partLevel(dragged) && partLevel(target)) {
-    if (dragged.partId === target.partId) return { document };
+  // A Cut parts step's row follows the last of the parts it uses, so it's no part's place to drop on.
+  if (target.kind === 'partCut') return { error: 'A Cut parts step comes after the parts it uses, so steps can’t be dropped on it.' };
+  // A part's sketch, extrude, transform and copies keep their places among its own steps.
+  if (partLevel(dragged) && dragged.partId === target.partId) return { document };
+  if (movesPart(dragged) && dragged.partId !== target.partId) {
     const sourceFolder = cadFolderForPart(document, dragged.partId);
     const targetFolder = cadFolderForPart(document, target.partId);
     // Moving one member out, or inserting into the middle, would split a saved contiguous group.
@@ -51,32 +57,67 @@ export function reorderedSteps(
     const issue = cadFolderIssue(next);
     return issue ? { error: issue } : { document: next };
   }
-  const featureLevel = (step: DesignStep) => step.kind === 'faceSketch' || step.kind === 'cut';
-  if (featureLevel(dragged) && featureLevel(target) && dragged.partId === target.partId) {
-    const part = document.parts.find(candidate => candidate.id === dragged.partId)!;
-    const features = part.features ?? [];
-    const moving = features.find(feature => feature.id === dragged.id);
-    if (!moving || dragged.id === target.id) return { document };
-    const rest = features.filter(feature => feature !== moving);
-    const at = rest.findIndex(feature => feature.id === target.id);
-    if (at < 0) return { document };
-    const next = [...rest.slice(0, at), moving, ...rest.slice(at)];
-    const sketchAt = new Map(next.flatMap((feature, i) => (feature.type === 'sketch' ? [[feature.sketch.id, i] as const] : [])));
-    const cutAt = new Map(next.flatMap((feature, i) => (feature.type === 'cut' ? [[feature.id, i] as const] : [])));
-    for (const [i, feature] of next.entries()) {
-      if (feature.type === 'cut' && (sketchAt.get(feature.sketchId) ?? -1) > i) return { error: 'A cut comes after the sketch it cuts.' };
-      if (feature.type === 'sketch' && typeof feature.on === 'object' && (cutAt.get(feature.on.floorOf) ?? -1) > i)
-        return { error: 'A sketch on a pocket’s floor comes after the cut that makes the floor.' };
-    }
-    return {
-      document: {
-        ...document,
-        revision: document.revision + 1,
-        parts: document.parts.map(candidate => (candidate.id === part.id ? { ...candidate, features: next } : candidate)),
-      },
-    };
+  const part = document.parts.find(candidate => candidate.id === dragged.partId)!;
+  const extrude = designSteps(document).find(step => step.id === `${part.id}:extrude`)?.label ?? `Extrude · ${part.name}`;
+  if (featureLevel(dragged)) {
+    if (dragged.partId !== target.partId)
+      return { error: `${dragged.label} is on ${part.name}’s faces, so it stays with ${part.name}’s steps.` };
+    if (featureLevel(target)) return movedFeature(document, part, dragged.id, target.id);
+    // Dropped on a later step of its part, a fillet, copy or pattern, it goes last of the part's sketches and cuts.
+    if (target.kind === 'fillet' || target.kind === 'copy' || target.kind === 'pattern')
+      return movedFeature(document, part, dragged.id, null);
+    return { error: `${dragged.label} is on ${part.name}’s faces, so it comes after ${extrude}.` };
   }
-  return { error: 'That step can’t go there: a part’s steps move together, and a cut stays with its part.' };
+  if (dragged.kind === 'fillet') {
+    if (target.kind === 'fillet') return movedFillet(document, part, dragged.id, target.id);
+    // Copies and patterns copy the rounded part, so a fillet dropped on one goes last of the part's fillets.
+    if (target.kind === 'copy' || target.kind === 'pattern') return movedFillet(document, part, dragged.id, null);
+    if (target.kind === 'sketch' || target.kind === 'extrude')
+      return { error: `${dragged.label} rounds the edges ${extrude} makes, so it comes after it.` };
+    return { error: `${dragged.label} rounds ${part.name}’s edges, so it stays with its fillets, after ${target.label}.` };
+  }
+  return { error: 'That step can’t go there: a part’s steps move together.' };
+}
+
+const withPart = (document: CadDocument, part: CadPart): CadDocument => ({
+  ...document,
+  revision: document.revision + 1,
+  parts: document.parts.map(candidate => (candidate.id === part.id ? part : candidate)),
+});
+
+/** A part's face sketch or cut moved to just before another, or last with null, as long as it stays after its sketch. */
+function movedFeature(
+  document: CadDocument,
+  part: CadPart,
+  id: string,
+  beforeId: string | null
+): { document: CadDocument } | { error: string } {
+  const features = part.features ?? [];
+  const moving = features.find(feature => feature.id === id);
+  if (!moving || id === beforeId) return { document };
+  const rest = features.filter(feature => feature !== moving);
+  const at = beforeId === null ? rest.length : rest.findIndex(feature => feature.id === beforeId);
+  if (at < 0) return { document };
+  const next = [...rest.slice(0, at), moving, ...rest.slice(at)];
+  const sketchAt = new Map(next.flatMap((feature, i) => (feature.type === 'sketch' ? [[feature.sketch.id, i] as const] : [])));
+  const cutAt = new Map(next.flatMap((feature, i) => (feature.type === 'cut' ? [[feature.id, i] as const] : [])));
+  for (const [i, feature] of next.entries()) {
+    if (feature.type === 'cut' && (sketchAt.get(feature.sketchId) ?? -1) > i) return { error: 'A cut comes after the sketch it cuts.' };
+    if (feature.type === 'sketch' && typeof feature.on === 'object' && (cutAt.get(feature.on.floorOf) ?? -1) > i)
+      return { error: 'A sketch on a pocket’s floor comes after the cut that makes the floor.' };
+  }
+  return { document: withPart(document, { ...part, features: next }) };
+}
+
+/** A part's fillet moved to just before another, or last with null: they round its corners in that order. */
+function movedFillet(document: CadDocument, part: CadPart, id: string, beforeId: string | null): { document: CadDocument } {
+  const fillets = part.fillets ?? [];
+  const moving = fillets.find(fillet => fillet.id === id);
+  if (!moving || id === beforeId) return { document };
+  const rest = fillets.filter(fillet => fillet !== moving);
+  const at = beforeId === null ? rest.length : rest.findIndex(fillet => fillet.id === beforeId);
+  if (at < 0) return { document };
+  return { document: withPart(document, { ...part, fillets: [...rest.slice(0, at), moving, ...rest.slice(at)] }) };
 }
 
 /**
@@ -97,9 +138,10 @@ export function reorderDrop(
   const order = designSteps(result.document).map(step => step.id);
   // A drop that leaves the order as it was isn't a move.
   if (order.every((id, i) => id === steps[i]?.id)) return null;
-  // The step lands just ahead of the step it's dropped on, or a part's steps ahead of the first of the part dropped on.
-  // Named from the list as it stands, not from what follows the moved run afterwards: a Cut parts step listed after the
-  // moved part moves along with it, and the line would then be drawn at that Cut's row, below where the steps land.
-  if (!partLevel(dragged)) return { before: target.id };
+  // Within its part the step lands just ahead of the step it's dropped on; on another part, the part's steps land ahead
+  // of the first of that part's. Named from the list as it stands, not from what follows the moved run afterwards: a Cut
+  // parts step listed after the moved part moves along with it, and the line would then be drawn at that Cut's row,
+  // below where the steps land.
+  if (dragged.partId === target.partId) return { before: target.id };
   return { before: steps.find(step => step.partId === target.partId && partLevel(step))?.id ?? target.id };
 }
