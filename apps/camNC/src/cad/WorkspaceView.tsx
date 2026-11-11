@@ -23,6 +23,7 @@ import { useExplodedView } from '@/cam/model/useExplodedView';
 import { assemblyModel, instanceKey } from './assemblyModel';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
+import { featureShownByDefault } from './sketchShown';
 import { sketchSelectionRegions } from './profileSelection';
 import type { StudioCameraRef } from './studioCamera';
 import type { CadConnectorPick } from './TransformDialog';
@@ -183,11 +184,7 @@ export default function WorkspaceView({
   const sketchRegions = useMemo(
     () =>
       onPickSketch
-        ? sketchSelectionRegions(
-            profileDocument,
-            featureShown ?? (id => profileDocument.parts.find(p => `${p.id}:sketch` === id)?.extrude === false),
-            selectedId
-          )
+        ? sketchSelectionRegions(profileDocument, featureShown ?? (id => featureShownByDefault(profileDocument, id)), selectedId)
         : [],
     [profileDocument, featureShown, onPickSketch, selectedId]
   );
