@@ -68,10 +68,14 @@ self.addEventListener('message', async function run(event: MessageEvent) {
       });
     }
     const script = await scriptFrom(event.data.source);
-    const result = await editCad(start, d => {
-      const returned = script(d) as unknown;
-      if (returned && typeof returned === 'object' && 'then' in returned) throw new Error('Design scripts must finish synchronously.');
-    });
+    const result = await editCad(
+      start,
+      d => {
+        const returned = script(d) as unknown;
+        if (returned && typeof returned === 'object' && 'then' in returned) throw new Error('Design scripts must finish synchronously.');
+      },
+      { toolpaths: event.data.toolpaths !== false }
+    );
     reply(result);
   } catch (error) {
     reply({ failure: error instanceof Error ? error.message : 'The script checker stopped.' });
