@@ -31,12 +31,21 @@
   stroke-linejoin: round;
   stroke-linecap: round;
 }
-.cad-studio-more-menu [data-slot='dropdown-menu-item'][data-active] {
+/*
+ * Matched by role: each item is also its hint's tooltip trigger, whose data-slot replaces the menu item's. The glyph
+ * takes the item's colour here too, over the menu's muted icon colour.
+ */
+.cad-studio-more-menu [role='menuitem'][data-active] {
   background: #dfeaf8;
   color: #174f8f;
 }
-.cad-studio-more-menu [data-slot='dropdown-menu-item'][aria-disabled='true'] {
+.cad-studio-more-menu [role='menuitem'][aria-disabled='true'] {
   color: #9aa7b6;
+  cursor: default;
+}
+.cad-studio-more-menu [role='menuitem'][data-active] svg,
+.cad-studio-more-menu [role='menuitem'][aria-disabled='true'] svg {
+  color: inherit;
 }
 /* Only the feature commands give up room: a squeezed search button would hand it back once commands move to More. */
 .cad-studio-toolbar > .cad-search-trigger {
