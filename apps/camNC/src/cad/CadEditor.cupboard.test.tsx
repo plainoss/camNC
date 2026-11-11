@@ -127,7 +127,7 @@ it('inserts two cupboards, keeps one shelf hole through size/count changes, then
     await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), message);
     await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(requestAssistant).toHaveBeenCalledTimes(callNumber * 3), { timeout: 60_000 });
-    const preview = await within(dock).findByRole('button', { name: 'Preview proposal' }, { timeout: 60_000 });
+    const preview = await within(dock).findByRole('button', { name: 'Review proposal' }, { timeout: 60_000 });
     await waitFor(() => expect(preview).toHaveProperty('disabled', false));
     await userEvent.click(preview);
     const review = await screen.findByRole('dialog', { name: 'Review design change' });

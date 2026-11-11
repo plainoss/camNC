@@ -184,6 +184,12 @@
           "note": "Cut parts subtracts tools from targets; existing bodies cannot be joined or intersected by a Boolean feature."
         },
         {
+          "item": "Isolate one physical part or copy and restore previous visibility",
+          "status": "done",
+          "evidence": ["apps/camNC/src/cad/CadEditor.isolateCopy.test.tsx", "apps/camNC/src/cad/CadEditor.studio.test.tsx"],
+          "note": "Shift+I keeps the selected physical instance, including a separately notched or mirrored copy. The next toggle restores prior eye choices; Show all restores the assembly. Missing copy slots do not fall back to their source. These browser checks use Parts selection and the viewport selection callback; they do not exercise pointer picking."
+        },
+        {
           "item": "Measure assembled vertices, edges and planar faces",
           "status": "partial",
           "evidence": [

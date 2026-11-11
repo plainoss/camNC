@@ -53,12 +53,18 @@ export function AssistantDock({
   selection,
   disabled,
   onProposal,
+  proposal,
+  onCheckedProposal,
+  onDiscardProposal,
   onClose,
 }: {
   document: CadDocument;
   selection?: AssistantSelection;
   disabled?: boolean;
   onProposal: (proposal: CadProposal) => void;
+  proposal: CadProposal | null;
+  onCheckedProposal: (proposal: CadProposal | null) => void;
+  onDiscardProposal: () => void;
   onClose: () => void;
 }) {
   const [credentials, setCredentials] = useState<AssistantCredentials | null>(() => readAssistantCredentials());
@@ -72,7 +78,7 @@ export function AssistantDock({
   const [running, setRunning] = useState(false);
   const [activity, setActivity] = useState('');
   const [error, setError] = useState('');
-  const [proposal, setProposal] = useState<CadProposal | null>(null);
+  const staleProposal = !!proposal && JSON.stringify(document) !== JSON.stringify(proposal.base);
   const controller = useRef<AbortController | null>(null);
   const activeBase = useRef<string | null>(null);
   const stopReason = useRef('Stopped. The design is unchanged.');
@@ -83,9 +89,12 @@ export function AssistantDock({
       subscribeConversation(document.id, () => {
         const next = readConversation(document.id);
         setMessages(next);
-        if (next.at(-1)?.proposalOutcome) setProposal(null);
+        if (next.at(-1)?.proposalOutcome) {
+          onCheckedProposal(null);
+          setActivity(next.at(-1)?.proposalOutcome === 'applied' ? 'Proposal applied.' : 'Proposal discarded. The design is unchanged.');
+        }
       }),
-    [document.id]
+    [document.id, onCheckedProposal]
   );
   useEffect(() => {
     const snapshot = JSON.stringify(document);
@@ -138,7 +147,6 @@ export function AssistantDock({
     setMessages(transcript);
     setRunning(true);
     setError('');
-    setProposal(null);
     writeConversation(start.id, transcript);
     try {
       setActivity('Reading the open design…');
@@ -195,7 +203,7 @@ export function AssistantDock({
         },
       });
       if (!mounted.current) return;
-      if (result.proposal && !abort.signal.aborted) setProposal(result.proposal);
+      if (result.proposal && !abort.signal.aborted) onCheckedProposal(result.proposal);
       setActivity(
         result.status === 'stopped'
           ? 'Stopped. The design is unchanged.'
@@ -282,7 +290,7 @@ export function AssistantDock({
                   ))}
                 </article>
               ))}
-            {question && !proposal && (
+            {question && (
               <div ref={replyAnchor}>
                 <ReplyOptions question={question} disabled={running || readingImage} onReply={choice => void send(choice)} />
               </div>
@@ -294,29 +302,24 @@ export function AssistantDock({
             <div className="cad-assistant-proposal">
               <strong>Checked design proposal</strong>
               <p>Review the changes, lost cuts and warnings before applying.</p>
-              {JSON.stringify(document) !== JSON.stringify(proposal.base) && (
-                <p>The design has changed. Ask again against the current design.</p>
+              {staleProposal && (
+                <p>The design has changed. You can review this proposal, but it cannot be applied. Ask again to check a new proposal.</p>
               )}
-              <button
-                type="button"
-                className="cad-assistant-primary"
-                disabled={disabled || JSON.stringify(document) !== JSON.stringify(proposal.base)}
-                onClick={() => onProposal(proposal)}>
-                Preview proposal
+              <button type="button" className="cad-assistant-primary" disabled={disabled || running} onClick={() => onProposal(proposal)}>
+                Review proposal
               </button>
               {disabled && <p>Complete the current edit before reviewing this proposal.</p>}
-              <button
-                type="button"
-                onClick={() => {
-                  recordAssistantEvent(document.id, 'The user discarded the checked proposal. It was not applied.', 'discarded');
-                  setProposal(null);
-                }}>
+              <button type="button" onClick={onDiscardProposal}>
                 Discard proposal
               </button>
             </div>
           )}
           <p className="cad-assistant-status" data-running={running} role="status">
-            {activity}
+            {proposal && !running && (staleProposal || !question)
+              ? staleProposal
+                ? 'Proposal out of date. It cannot be applied; ask again to check a new proposal.'
+                : 'Checked proposal ready to review.'
+              : activity}
           </p>
           <ActivityView messages={messages} activity={activity} running={running} />
           <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />
@@ -418,7 +421,6 @@ export function AssistantDock({
             disabled={running}
             onClick={() => {
               writeConversation(document.id, []);
-              setProposal(null);
               setActivity('');
               setUsage(null);
               setText('');
