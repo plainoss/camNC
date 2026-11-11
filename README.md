@@ -208,8 +208,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together
 
 ## Development
 
-Requirements: Node.js (see [`.nvmrc`](.nvmrc), `^20.19` or `>=22.12`) and pnpm (version pinned in `package.json`,
-e.g. via `corepack enable`).
+Requirements: Node.js (see [`.nvmrc`](.nvmrc), `>=22.12`) and pnpm (version pinned in `package.json`, e.g. via
+`corepack enable`). pnpm 12 ships no standalone macOS binary, so a pnpm 10 install can't switch to it: use corepack or
+`npm install -g pnpm@<pinned version>`.
 
 ```bash
 pnpm install
