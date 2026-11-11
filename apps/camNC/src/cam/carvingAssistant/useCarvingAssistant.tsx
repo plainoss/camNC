@@ -47,10 +47,9 @@ export function useCarvingAssistant({
   const selected = job.carving?.items.find(item => item.id === selectedId);
   const [open, setOpen] = useState(false);
   const [credentials, setCredentials] = useState<AssistantCredentials | null>(readAssistantCredentials);
-  // With an image model on the shared connection, image generation is the default: it traces into smoother art.
-  const [generationMode, setGenerationMode] = useState<'text' | 'native'>(() =>
-    nativeImageFromConnection(readAssistantCredentials()) ? 'native' : 'text'
-  );
+  // Image generation is the default: traced images carve smoother than drawn vectors. A connection without an image
+  // model needs a separate image provider for it; text SVG stays one click away.
+  const [generationMode, setGenerationMode] = useState<'text' | 'native'>('native');
   // A separate image provider is an override; normally the connection's own key and image model are used.
   const [separateImage, setSeparateImage] = useState(false);
   const [native, setNative] = useState<NativeSvgConnection>({
@@ -175,17 +174,25 @@ export function useCarvingAssistant({
   }, [open, picked, pickedVariant?.asset, key, disabled]);
 
   const shared = nativeImageFromConnection(credentials, native.quality);
+  const hasSharedImages = !!shared;
   const modeChosen = useRef(false);
   const chooseMode = (mode: 'text' | 'native') => {
     modeChosen.current = true;
     setGenerationMode(mode);
   };
-  // Connecting a key with an image model switches to images, unless the person already chose a generator.
+  // Saved artwork is revised with Text SVG, so reopening it on a connection without images starts there.
   useEffect(() => {
-    if (shared?.model && !modeChosen.current) setGenerationMode('native');
-  }, [shared?.model]);
+    if (open && selected?.generated && !hasSharedImages && !separateImage && !modeChosen.current) setGenerationMode('text');
+  }, [open, selected?.generated, hasSharedImages, separateImage]);
+  // Connecting a key with an image model switches to images, unless the person already chose a method.
+  useEffect(() => {
+    if (hasSharedImages && !modeChosen.current) setGenerationMode('native');
+  }, [hasSharedImages]);
   // Shared images always take the traced PNG route; SVG output needs the explicit opt-in of the separate form.
-  const nativeConfig: NativeSvgConnection = !separateImage && shared ? { ...native, ...shared, supportsSvg: true, format: 'png' } : native;
+  // Without an image model on the connection, the separate image provider is the only way to images.
+  const useSeparateImage = separateImage || !shared;
+  const nativeConfig: NativeSvgConnection =
+    !useSeparateImage && shared ? { ...native, ...shared, supportsSvg: true, format: 'png' } : native;
   const credentialsFor = (): AssistantCredentials | null =>
     generationMode === 'native'
       ? nativeConfig.key.trim() && nativeConfig.model.trim() && nativeConfig.supportsSvg
@@ -343,10 +350,17 @@ export function useCarvingAssistant({
       generationMode,
       setGenerationMode: chooseMode,
       native,
-      setNative,
+      // A complete provider entered while it is the only way to images stays in use after reconnecting.
+      setNative: (value: NativeSvgConnection) => {
+        // Only a complete provider sticks, so a half-filled form never blocks a later key with its own image model.
+        if (!shared && value.key.trim() && value.model.trim() && value.supportsSvg) setSeparateImage(true);
+        setNative(value);
+      },
       sharedImageModel: shared?.model,
-      separateImage,
+      separateImage: useSeparateImage,
       setSeparateImage,
+      /** Images need a key and model first: the connection has none, and the separate provider isn't filled in. */
+      needsImageProvider: generationMode === 'native' && !shared && !credentialsFor(),
       runSettings,
       setRunSettings,
       usage,
