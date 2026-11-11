@@ -194,6 +194,16 @@ test('the Mergify queue runs all validation, PRs run the quick suites and main o
   // The queue validated the commit that lands on main, so main only warms caches through the checks job.
   const onMain = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], { event_name: 'push' }));
   assert.deepEqual(onMain, ['checks']);
+  for (const [job, step] of [['test', 'Run tests'], ['specs', 'Run sketch behaviour specs']]) {
+    assert.match(workflow.jobs[job].steps.find(entry => entry.name === step).env.TURBO_FORCE, /schedule/, `${step} must not replay cached results on scheduled runs`);
+  }
+  // Scheduled and manual runs on main run every suite, so Mergify's flaky-test detection sees the tests on main.
+  assert(workflow.on.schedule?.length, 'main must run the full suites on a schedule');
+  for (const event_name of ['schedule', 'workflow_dispatch']) {
+    for (const [id, job] of Object.entries(workflow.jobs)) {
+      assert(runs(job, { event_name, head_ref: '', event: {} }), `${id} must run on ${event_name}`);
+    }
+  }
 });
 
 test('Mergify batches retain the required gate, branch protections and explicit merge consent', () => {
