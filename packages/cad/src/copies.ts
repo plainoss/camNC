@@ -4,6 +4,7 @@ import { isCadBody } from './extrudeSteps';
 import { cadCopyName, resolvePartPatterns } from './partPatterns';
 import type { CadDocument, CadPartCopy, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 import { activeDesign } from './suppression';
+import { physicalJoinedCopies } from './physicalJoinedCopies';
 
 /** Adds another of a part, laid out with the unplaced parts until it's placed. */
 export function addPartCopy(
@@ -150,8 +151,13 @@ export function cadPartsToCut(
   stage?: { available?: readonly string[] }
 ): CadPartToCut[] {
   // Copies switched off in the feature list aren't cut.
+<<<<<<< HEAD
   const document = activeDesign(given);
   const consumed = stage?.available ? new Set<string>() : consumedTools(document);
+=======
+  const document = physicalJoinedCopies(activeDesign(given));
+  const consumed = consumedTools(document);
+>>>>>>> 346bcfcf51c8d7439e0581f9b3840ddc5d4af851
   return parts.flatMap(part => {
     const source = document.parts.find(candidate => candidate.id === part.partId);
     // A sketch not yet extruded, a step cutting others, or a tool used up by its cut, isn't a part to cut.

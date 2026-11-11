@@ -1,11 +1,12 @@
 import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import '../../style.css';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AssistantDock } from './Dock';
 import { defaultProvider, rememberAssistantCredentials } from './keyStore';
 import { runDesignAssistant } from './loop';
+import { createAssistantUsage } from './runBudget';
 
 vi.mock('@wbcnc/cad-script', () => ({
   inspectCadDocument: vi.fn(async (document: CadDocument) => ({ document, report: {}, parts: [] })),
@@ -20,7 +21,7 @@ vi.mock('./loop', async importOriginal => ({
 beforeEach(() => {
   vi.mocked(runDesignAssistant).mockReset();
   rememberAssistantCredentials({ config: { ...defaultProvider, model: 'recorded', images: true }, key: 'recorded-key' });
-  vi.mocked(runDesignAssistant).mockResolvedValue({ status: 'question', messages: [], checks: 0 });
+  vi.mocked(runDesignAssistant).mockResolvedValue({ status: 'question', messages: [], checks: 0, usage: createAssistantUsage() });
 });
 afterEach(() => {
   cleanup();
@@ -53,7 +54,7 @@ it('sends the exact suggested reply and removes answered choices during the next
       calls: [{ id: 'ask-1', name: 'ask_user', arguments: { question: 'Which thickness?', choices: ['18 mm', '24 mm'] } }],
     });
     options.onMessage?.({ role: 'tool', callId: 'ask-1', text: 'Waiting for the user to choose or type a reply.' });
-    return { status: 'question', messages: [], checks: 0 };
+    return { status: 'question', messages: [], checks: 0, usage: createAssistantUsage() };
   });
   let finish: (() => void) | undefined;
   vi.mocked(runDesignAssistant).mockImplementationOnce(
@@ -61,7 +62,7 @@ it('sends the exact suggested reply and removes answered choices during the next
       new Promise(resolve => {
         finish = () => {
           options.onMessage?.({ role: 'assistant', text: 'Question: how wide should it be?' });
-          resolve({ status: 'question', messages: [], checks: 0 });
+          resolve({ status: 'question', messages: [], checks: 0, usage: createAssistantUsage() });
         };
       })
   );
@@ -69,7 +70,8 @@ it('sends the exact suggested reply and removes answered choices during the next
   await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'Help me choose a thickness.');
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
   const reply = await screen.findByRole('button', { name: '24 mm' });
-  expect(screen.getByText('Which thickness?')).toBeDefined();
+  expect(screen.getAllByText('Which thickness?')).toHaveLength(1);
+  expect(within(screen.getByRole('group', { name: 'Suggested replies' })).getByText('Which thickness?')).toBeDefined();
   await waitFor(() => expect(reply).toHaveProperty('disabled', false));
   await userEvent.click(reply);
   await waitFor(() => expect(runDesignAssistant).toHaveBeenCalledTimes(2));
@@ -124,7 +126,7 @@ it('keeps the fresh greeting at the top and the composer visible beside expanded
       ],
     });
     options.onMessage?.({ role: 'tool', callId: 'question-layout', text: 'Waiting for your reply.' });
-    return { status: 'question', messages: [], checks: 0 };
+    return { status: 'question', messages: [], checks: 0, usage: createAssistantUsage() };
   });
   try {
     render(

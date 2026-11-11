@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { isJoinedBody, joinedCopyPlacement, type CadDocument, type CadPlacement } from '@wbcnc/cad';
+=======
+import { cadDrawnOnSupports, effectivePlacement, isJoinedBody, joinedCopyPlacement, type CadDocument, type CadPlacement } from '@wbcnc/cad';
+>>>>>>> 346bcfcf51c8d7439e0581f9b3840ddc5d4af851
 import type { AssemblyInstance } from './assemblyModel';
 
 interface Piece {
@@ -13,6 +17,10 @@ export function assemblyDisplayPlacements(document: CadDocument, source: CadDocu
   const instanceKey = ({ partId, copyId }: Pick<AssemblyInstance, 'partId' | 'copyId'>) => (copyId ? `${partId}/${copyId}` : partId);
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const byKey = new Map(pieces.map(piece => [instanceKey(piece.instance), piece]));
+<<<<<<< HEAD
+=======
+  const supports = cadDrawnOnSupports(document);
+>>>>>>> 346bcfcf51c8d7439e0581f9b3840ddc5d4af851
   const placements = new Map<string, CadPlacement>();
   let cursor = start;
   const place = (piece: Piece): CadPlacement => {
@@ -31,12 +39,23 @@ export function assemblyDisplayPlacements(document: CadDocument, source: CadDocu
       const parent = byId.get(part.addTo!),
         host = byKey.get(instanceKey({ partId: part.addTo!, copyId }));
       const copy = parent?.copies?.find(copy => copy.id === copyId);
+<<<<<<< HEAD
       // Core admits only direct-root Add bodies, so a host cannot recursively depend on this child.
       if (parent?.placement && part.placement && host && copy)
         placement = joinedCopyPlacement(parent.placement, part.placement, place(host), !!copy.mirrored);
     }
     if (!placement) {
       placement = { position: [cursor - (piece.origin?.[0] ?? 0), -(piece.origin?.[1] ?? 0), 0], rotation: [0, 0, 0, 1] };
+=======
+      const parentAt = parent && effectivePlacement(parent, supports),
+        partAt = effectivePlacement(part, supports);
+      // Core admits only direct-root Add bodies, so a host cannot recursively depend on this child.
+      if (parentAt && partAt && host && copy) placement = joinedCopyPlacement(parentAt, partAt, place(host), !!copy.mirrored);
+    }
+    if (!placement) {
+      // Keep legacy +0 at the origin; unary negation would expose -0 in the placement map.
+      placement = { position: [cursor - (piece.origin?.[0] ?? 0), 0 - (piece.origin?.[1] ?? 0), 0], rotation: [0, 0, 0, 1] };
+>>>>>>> 346bcfcf51c8d7439e0581f9b3840ddc5d4af851
       cursor += piece.width + gap;
     }
     placements.set(key, placement);
