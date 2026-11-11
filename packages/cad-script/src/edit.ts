@@ -1,3 +1,6 @@
+import { lengthExpression } from './curveExpressions';
+import { fitSketchBounds } from './sketchFit';
+import { createSketchCurves } from './sketchCurves';
 import { prepareEmptyStudio } from './emptyStudio';
 import { checkedDesignApi } from './argumentChecks';
 import { buildConstraintForSelection } from '@wbcnc/cad-editor/constraintCommands';
@@ -117,11 +120,12 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     variablesDirty = false;
   };
   const closures: { partId: string; sketchId: string; edgeId: string; from: Xy; to: Xy }[] = [];
-  const measure = (value: Len, what: string, unit: 'mm' | 'scalar' = 'mm'): number => {
+  const measure = (value: Len, what: string, unit: 'mm' | 'scalar' | 'deg' = 'mm'): number => {
     if (typeof value === 'number') return value;
     const result = parseCadValue(value, { unit, variables: cadVariableScope(document) });
     return 'error' in result ? fail(`${what} "${value}": ${result.error}`) : result.value;
   };
+  const lengthTerm = (value: Len) => lengthExpression(value, cadVariableScope(document));
   const expressionOf = (value: Len) => (typeof value === 'string' ? { expression: value } : {});
   const placementOf = ({ at, x = '+x', y = '+y' }: CadPlaceOptions): CadPlacement => {
     const ex = axes[x],
@@ -234,6 +238,14 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
             if (e.type === 'line') return { ...e, startId: swap(e.startId), endId: swap(e.endId) };
             if (e.type === 'arc') return { ...e, startId: swap(e.startId), endId: swap(e.endId), centerId: swap(e.centerId) };
             if (e.type === 'circle') return { ...e, centerId: swap(e.centerId) };
+            if (e.type === 'bezier' || e.type === 'spline')
+              return {
+                ...e,
+                startId: swap(e.startId),
+                endId: swap(e.endId),
+                controlPointIds: e.controlPointIds.map(swap),
+                ...(e.type === 'spline' && { fitPointIds: e.fitPointIds.map(swap) }),
+              };
             return e;
           }),
           own,
@@ -246,7 +258,16 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       constrain({ type: 'positionX', pointId: point.id, value: measure(x, 'X'), label: 'X', ...expressionOf(x) });
       constrain({ type: 'positionY', pointId: point.id, value: measure(y, 'Y'), label: 'Y', ...expressionOf(y) });
     };
+    const curves = createSketchCurves({ current, apply, measure, place, lengthTerm });
     const self: SketchEdit = {
+      bezier: curves.bezier,
+      spline: curves.spline,
+      ellipse: curves.ellipse,
+      offset: curves.offset,
+      fitBounds(items, options) {
+        solveForQuery();
+        return fitSketchBounds({ current, apply, measure, place, lengthTerm }, items, options);
+      },
       id: sketchId,
       rect({ w, h, at, center }) {
         const width = measure(w, 'Width'),
@@ -297,6 +318,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         const vertices: { at: P; typed: LenXy }[] = [{ at: start, typed: from }];
         const edges: CadRef[] = [];
         let cursor = start;
+        let cursorTyped = from;
         // Which way the last segment leaves its end, for a tangent arc after it.
         let heading: P | undefined;
         let closed = false;
@@ -326,6 +348,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
             edges.push({ id: line.id });
             heading = unit({ x: end.x - cursor.x, y: end.y - cursor.y });
             cursor = end;
+            cursorTyped = to;
             return edit;
           },
           arcTo(to, how) {
@@ -409,6 +432,31 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
             const out = { x: end.x - center.x, y: end.y - center.y };
             heading = unit(clockwise ? { x: out.y, y: -out.x } : left(out));
             cursor = end;
+            cursorTyped = to;
+            return edit;
+          },
+          cubicTo(to, { control1, control2 }) {
+            open();
+            const source = cursorTyped;
+            const end = arrive(to, at(to));
+            const curve = curves.pathBezier([source, control1, control2, to]);
+            edges.push({ id: curve.id });
+            const control = at(control2);
+            heading = unit({ x: end.x - control.x, y: end.y - control.y });
+            cursor = end;
+            cursorTyped = to;
+            return edit;
+          },
+          quadTo(to, { control }) {
+            open();
+            const source = cursorTyped;
+            const end = arrive(to, at(to));
+            const curve = curves.pathBezier([source, control, to]);
+            edges.push({ id: curve.id });
+            const handle = at(control);
+            heading = unit({ x: end.x - handle.x, y: end.y - handle.y });
+            cursor = end;
+            cursorTyped = to;
             return edit;
           },
           close(options) {
@@ -814,7 +862,11 @@ export interface CadEditResult {
  * Runs a script against a design, or a new one, then solves and reports on the result. The output is an ordinary
  * document and the script isn't kept, so hand edits later have nothing to fight with.
  */
-export async function editCad(start: CadDocument | null, script: CadScript, options: { name?: string } = {}): Promise<CadEditResult> {
+export async function editCad(
+  start: CadDocument | null,
+  script: CadScript,
+  options: { name?: string; toolpaths?: boolean } = {}
+): Promise<CadEditResult> {
   const base = start ?? createCadDocument(options.name);
   await initializeCadSolver();
   const expectations = new Map<string, CadExpectation[]>();
@@ -828,7 +880,7 @@ export async function editCad(start: CadDocument | null, script: CadScript, opti
   }
   // A failed script leaves the design as it was: half of an intent is worse than none of it.
   const edited = scriptError ? base : { ...session.document(), revision: base.revision + 1 };
-  const inspected = await inspectCadDocument(edited, expectations);
+  const inspected = await inspectCadDocument(edited, expectations, { toolpaths: options.toolpaths });
   if (!scriptError)
     for (const closure of session.closures) {
       const part = inspected.document.parts.find(part => part.id === closure.partId);
