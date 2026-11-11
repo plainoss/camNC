@@ -225,7 +225,7 @@ import { associatedEntityIds, removeInlineConstraint } from '@wbcnc/cad-editor/i
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PartPatternKind } from './partPatternKind';
-import { selectStudioFeature } from './studioFeatureSelection';
+import { featureRowParts, selectStudioFeature } from './studioFeatureSelection';
 import { builtStudioParts, disabledStudioCommands } from './studioParts';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
@@ -284,6 +284,7 @@ import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { StudioStepDialogs } from './StudioStepDialogs';
 import { prepareStudioPreview, useStudioPreview } from './useStudioPreview';
 import { useEditorVariableFields } from './useEditorVariableFields';
+import { featureShownByDefault } from './sketchShown';
 import './cad.css';
 
 type Point = { x: number; y: number };
@@ -460,7 +461,7 @@ export function CadEditor({
   // Where the rollback bar was moved to in the feature list: the step it sits after. Null is the end.
   const [rolledTo, setRolledTo] = useState<string | null>(null);
   // The part whose row is hovered in the feature list, highlighted in the view as the reference does.
-  const [hoveredStepPart, setHoveredStepPart] = useState<string | null>(null);
+  const [hoveredStepParts, setHoveredStepParts] = useState<string[] | null>(null);
   // The face of the part last clicked in the studio, which the next sketch is drawn on, as with a picked plane.
   const [selectedFace, setSelectedFace] = useState<Extract<CadDrawnOn['on'], { partId: string }> | null>(null);
   // A picked face goes with its part.
@@ -3911,8 +3912,7 @@ export function CadEditor({
     (id: string) => {
       if (id in featureVisibility) return featureVisibility[id]!;
       // As the design is shown: rolled back to its sketch, a part isn't extruded yet, so its sketch shows.
-      const sketched = id.endsWith(':sketch') && shownDocument.parts.find(candidate => `${candidate.id}:sketch` === id);
-      return !sketched || !isCadPart(sketched);
+      return featureShownByDefault(shownDocument, id);
     },
     [featureVisibility, shownDocument]
   );
@@ -4091,7 +4091,7 @@ export function CadEditor({
               workspace={showWorkspace}
               document={doc}
               selectedPartId={part?.id ?? null}
-              onSelect={selectStudioFeature(profiles.pickSketch, {
+              onSelect={selectStudioFeature(doc, profiles.pickSketch, {
                 sketch: setSketchRowPicked,
                 face: () => setSelectedFace(null),
                 part: cutSelection.selectPart,
@@ -4100,7 +4100,7 @@ export function CadEditor({
               onAction={featureAction}
               rollback={rollbackStep}
               onRollTo={showWorkspace ? setRolledTo : undefined}
-              onHover={entry => setHoveredStepPart(entry?.kind === 'step' ? entry.step.partId : null)}
+              onHover={entry => setHoveredStepParts(entry?.kind === 'step' ? featureRowParts(doc, entry.step) : null)}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane, onNewSketch: newSketchOn })}
               shown={featureShown}
               onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}
@@ -4459,7 +4459,7 @@ export function CadEditor({
                   cutSelection.selectPart(id, copyId);
                   setSelected([]);
                 }}
-                highlightIds={partCutting ? cutSelection.cutPicked : undefined}
+                highlightIds={partCutting ? cutSelection.cutPicked : cutSelection.selectedReferences}
                 hiddenIds={hiddenParts}
                 featureShown={featureShown}
                 onHover={onHoverPart}
@@ -4478,7 +4478,7 @@ export function CadEditor({
                 selectedPlane={selectedPlane}
                 {...{ selectedFace, pickingMirrorPlane: !!mirrorDialog && !!directionPicker }}
                 onSelectPlane={pickPlane}
-                hoverIds={hoveredStepPart ? [hoveredStepPart] : undefined}
+                hoverIds={hoveredStepParts ?? undefined}
                 picked={
                   selectedPlane ? (pickedPlane(doc, selectedPlane)?.name ?? null) : selectedFace ? drawnOnName(doc, selectedFace) : null
                 }
