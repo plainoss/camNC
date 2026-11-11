@@ -8,7 +8,10 @@ const luminance = (hex: string) => {
   return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 };
 
-/** Diffuse light a face with this normal receives, by Lambert's law, as three.js shades a standard material. */
+/**
+ * Diffuse light a face with this normal receives, by Lambert's law, as three.js shades a standard material. It models
+ * diffuse light only: no tone mapping, specular highlights or the model's vertex tint.
+ */
 function lit(rig: ModelLightRig, normal: LightVector) {
   const n = new Vector3(...normal).normalize();
   let light = 0;

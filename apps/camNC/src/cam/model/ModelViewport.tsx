@@ -279,8 +279,7 @@ export function FitCamera({
     if (name === 'normal') camera.up.set(...(viewRequest?.up ?? [0, 1, 0]));
     else if (name !== 'fit') {
       const vertical = Math.abs(direction.z) > 1 - 1e-10;
-      // From below, the model turns over its X axis: +X stays to the right and the view cube's label reads upright.
-      camera.up.set(0, vertical ? Math.sign(direction.z) : 0, vertical ? 0 : 1);
+      camera.up.set(0, vertical ? 1 : 0, vertical ? 0 : 1);
     }
     if (viewRequest) {
       // Fit every corner in the requested camera frame, including its depth toward the camera.
