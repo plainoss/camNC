@@ -214,6 +214,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { StudioSketchDialog } from './StudioSketchDialog';
 import { sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
+import { toggledKey } from './toggledKey';
 import { usePointPicker } from './pointPicker';
 import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './shortcuts';
@@ -597,7 +598,7 @@ export function CadEditor({
       (featureDialog?.kind === 'pattern' ? featureDialog : null)
   );
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
-  const { rollbackStep, shownDocument, pastRollback, solveFeedback, apartIds } = useFeaturePreview({
+  const { rollbackStep, userRollback, shownDocument, pastRollback, solveFeedback, apartIds } = useFeaturePreview({
     document:
       pointPicker.onPick && transformDialog ? doc : studioPreview.document === doc ? extrusionDepth.document : studioPreview.document,
     enabled: studioSession && showWorkspace,
@@ -1719,6 +1720,7 @@ export function CadEditor({
   useImperativeHandle(controller, () => ({
     finish,
     prepareDocument,
+    rolledTo: () => userRollback,
     updateSettings: settings => {
       const prepared = settings.lengthUnit === documentRef.current.lengthUnit ? documentRef.current : prepareDocument();
       if (!prepared) return false;
@@ -2219,6 +2221,7 @@ export function CadEditor({
       </div>
       <PartsList
         document={doc}
+        rolledTo={userRollback}
         onSketchCopy={onEditFaceSketch && ((partId, copyId, face) => faceEditor.create(face, undefined, { partId, copyId }))}
         onDetachCopy={(partId, copyId) => {
           const result = detachStudioCopy(documentRef.current, partId, copyId);
@@ -2237,14 +2240,7 @@ export function CadEditor({
         ])}
         selectedKey={cutSelection.selectedKey}
         hiddenParts={hiddenParts}
-        onToggleHidden={key =>
-          setHiddenParts(previous => {
-            const next = new Set(previous);
-            if (next.has(key)) next.delete(key);
-            else next.add(key);
-            return next;
-          })
-        }
+        onToggleHidden={key => setHiddenParts(previous => toggledKey(previous, key))}
         trouble={partTrouble}
         onPick={(partId, copyId) => {
           setSelectedFace(null);

@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { addPartCopy, createCadPart, createPlateDocument, type CadDocument } from '@wbcnc/cad';
+import { addPartCopy, createCadDocument, createCadPart, createPlateDocument, designSteps, type CadDocument } from '@wbcnc/cad';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PartsList } from '../PartsList';
@@ -122,5 +122,110 @@ it('says why when there is nothing to export', async () => {
   const dialog = screen.getByRole('dialog', { name: 'Export parts' });
   await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
   expect(within(dialog).getByRole('alert').textContent).toMatch(/no parts/i);
+  expect(files).toEqual([]);
+});
+
+it('exports what the view shows after Roll to here, and says that what is past the bar is left out', async () => {
+  const document = design();
+  const [plate, shelf] = document.parts;
+  // The bar just after the plate's Extrude: its copy and the shelf come later.
+  const rolledTo = designSteps(document).find(step => step.kind === 'extrude' && step.partId === plate!.id)!.id;
+  const files = captureDownloads();
+  render(<StudioExportButton design={() => document} rolledTo={() => rolledTo} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Export parts' });
+  expect(within(dialog).getByText(/rollback bar/)).toBeTruthy();
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+  expect(files.map(file => file.name)).toEqual(['Box.step']);
+  expect(products(await files[0]!.text)).toEqual([plate!.name]);
+  cleanup();
+
+  // A rolled-back part's own row refuses, rather than writing what the view leaves out.
+  render(
+    <PartsList
+      rows={[{ key: shelf!.id, part: shelf!, name: shelf!.name }]}
+      document={document}
+      rolledTo={rolledTo}
+      hidden={false}
+      studio
+      selectedKey={undefined}
+      hiddenParts={new Set()}
+      onToggleHidden={() => undefined}
+      trouble={() => null}
+      onPick={() => undefined}
+      onRename={() => undefined}
+    />
+  );
+  fireEvent.contextMenu(screen.getByRole('button', { name: /^Shelf/ }), { clientX: 10, clientY: 10 });
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Export…' }));
+  const row = screen.getByRole('dialog', { name: 'Export parts' });
+  await userEvent.click(within(row).getByRole('button', { name: 'Download' }));
+  expect(within(row).getByRole('alert').textContent).toMatch(/past the rollback bar/);
+  expect(files).toHaveLength(1);
+});
+
+it('blames the bar only for what it leaves out', async () => {
+  const plateDocument = createPlateDocument({ name: 'Box', width: 120, height: 80, thickness: 18 });
+  // A part that can't be built, before the plate: a loose point is no outline, but more than a new design's blank sketch.
+  const broken = {
+    ...createCadPart('Broken', 12),
+    sketch: { id: 'broken-sketch', entities: [{ id: 'loose', type: 'point' as const, x: 5, y: 5 }], constraints: [] },
+  };
+  const document = { ...plateDocument, parts: [broken, ...plateDocument.parts] };
+  const steps = designSteps(document);
+  const step = (kind: string, partId: string) => steps.find(candidate => candidate.kind === kind && candidate.partId === partId)!.id;
+  const files = captureDownloads();
+  const exportRow = async (rolledTo: string) => {
+    render(
+      <PartsList
+        rows={[{ key: broken.id, part: broken, name: broken.name }]}
+        document={document}
+        rolledTo={rolledTo}
+        hidden={false}
+        studio
+        selectedKey={undefined}
+        hiddenParts={new Set()}
+        onToggleHidden={() => undefined}
+        trouble={() => null}
+        onPick={() => undefined}
+        onRename={() => undefined}
+      />
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: /^Broken/ }), { clientX: 10, clientY: 10 });
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Export…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Export parts' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+    const text = within(dialog).getByRole('alert').textContent;
+    cleanup();
+    return text;
+  };
+  // Before the bar, a broken part says what's wrong with it, not that the bar left it out.
+  expect(await exportRow(step('extrude', broken.id))).toMatch(/^Broken: Its sketch needs fixing first/);
+  // A bar at the last step is no rollback at all.
+  expect(await exportRow(steps.at(-1)!.id)).toMatch(/^Broken: /);
+
+  // Rolled back to before any Extrude, the whole design's export says the bar is why there is nothing.
+  render(<StudioExportButton design={() => document} rolledTo={() => step('sketch', broken.id)} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Export parts' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+  expect(within(dialog).getByRole('alert').textContent).toMatch(/before the rollback bar/);
+  expect(files).toEqual([]);
+  cleanup();
+
+  // At its last step, the bar isn't mentioned.
+  render(<StudioExportButton design={() => document} rolledTo={() => steps.at(-1)!.id} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+  expect(within(screen.getByRole('dialog', { name: 'Export parts' })).queryByText(/rollback bar/)).toBeNull();
+});
+
+it('says a new design has no parts to export, not that its placeholder sketch needs fixing', async () => {
+  const document = { ...createCadDocument('New'), parts: [createCadPart()] };
+  const files = captureDownloads();
+  render(<StudioExportButton design={() => document} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Export parts' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Download' }));
+  expect(within(dialog).getByRole('alert').textContent).toBe('There are no parts to export.');
   expect(files).toEqual([]);
 });

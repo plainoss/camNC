@@ -3,6 +3,7 @@ import { edgeFilletProblems, type CadDocument, type CadFolder, type CadPart } fr
 import { useCallback, useState } from 'react';
 import { PartRowMenu } from './PartRowMenu';
 import { ExportDialog, type ExportTarget } from './export/ExportDialog';
+import { shownPartsTarget } from './export/shownPartsTarget';
 
 export interface PartsListRow {
   /** A part's ID, or `part/copy` for one of its copies. */
@@ -26,6 +27,7 @@ export function PartsList({
   onPick,
   onRename,
   document,
+  rolledTo,
   folders = document?.folders,
   onSketchCopy,
   onDetachCopy,
@@ -36,6 +38,8 @@ export function PartsList({
   onDetachCopy?: (partId: string, copyId: string) => void;
   /** The design: its folders, unless given, and in the studio what a row's Export… writes from. */
   document?: CadDocument;
+  /** The step the view's rollback bar sits after, or null at the end: Export… writes the design as it is there. */
+  rolledTo?: string | null;
   hidden: boolean;
   studio: boolean;
   selectedKey: string | undefined;
@@ -151,7 +155,10 @@ export function PartsList({
               const copyId = menu.key !== row.part.id ? menu.key.slice(row.part.id.length + 1) : undefined;
               const only = { partId: row.part.id, ...(copyId && { copyId }) };
               return [
-                { label: 'Export…', onSelect: () => setExporting({ kind: 'parts', name: menu.name, document: exportDocument, only }) },
+                {
+                  label: 'Export…',
+                  onSelect: () => setExporting(shownPartsTarget(exportDocument, rolledTo, { name: menu.name, only })),
+                },
               ];
             })(),
             ...(() => {

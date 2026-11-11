@@ -56,12 +56,16 @@ describe('studio STEP export', () => {
     const expected = model.meshes.reduce((sum, mesh) => sum + volume(mesh.positions, mesh.indices), 0),
       read = bodies.reduce((sum, body) => sum + volume(body.mesh.positions, body.mesh.indices), 0);
     expect(read / expected).toBeCloseTo(1, 3);
+    // A loop rather than Math.min(...): a large design has more coordinates than a call can take as arguments.
     const bounds = (values: ArrayLike<number>[]) => {
-      const all = values.flatMap(v => Array.from(v));
-      return [0, 1, 2].map(axis => {
-        const along = all.filter((_, i) => i % 3 === axis);
-        return [Math.min(...along), Math.max(...along)];
-      });
+      const box = [0, 1, 2].map(() => [Infinity, -Infinity]);
+      for (const positions of values)
+        for (let i = 0; i < positions.length; i++) {
+          const range = box[i % 3]!;
+          range[0] = Math.min(range[0]!, positions[i]!);
+          range[1] = Math.max(range[1]!, positions[i]!);
+        }
+      return box;
     };
     const view = bounds(model.meshes.map(mesh => mesh.positions)),
       file = bounds(bodies.map(body => body.mesh.positions));

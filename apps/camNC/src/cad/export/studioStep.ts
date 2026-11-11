@@ -2,6 +2,7 @@ import { isJoinedBody, type CadDocument, type CadLengthUnit } from '@wbcnc/cad';
 import { brepProblems, partBrep, writeStep, type StepProduct } from '@wbcnc/cam';
 import { Matrix4 } from 'three';
 import { assemblyModel, instanceKey, type AssemblyInstance } from '../assemblyModel';
+import { isBlankDesign } from '../studioParts';
 
 export interface StudioStepResult {
   text: string;
@@ -26,6 +27,8 @@ export function studioStep(
   } = {}
 ): StudioStepResult {
   const model = assemblyModel(document, options.hidden);
+  // A new design's untouched Part 1 isn't listed as a part yet, so it has nothing wrong with it to report either.
+  const blank = isBlankDesign(document);
   const byId = new Map(document.parts.map(part => [part.id, part]));
   /** The part, or copy, a piece belongs to: a joined body's is the one it's joined to, through any chain of Adds. */
   const owner = (instance: AssemblyInstance) => {
@@ -36,6 +39,7 @@ export function studioStep(
   const products = new Map<string, StepProduct>(),
     // Exporting one part, only its own trouble matters.
     problems: StudioStepResult['problems'] = model.problems
+      .filter(() => !blank)
       // A body joined to the part is part of it too.
       .filter(problem => !options.only || owner({ partId: problem.partId, name: problem.name }).partId === options.only.partId)
       // A hidden part isn't being exported, built or not.
