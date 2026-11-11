@@ -1,6 +1,6 @@
 /**
  * Live provider runs of the carving generator, each drawing checked with the app's own carving preparation.
- * Opt in from apps/camNC: CARVE_LIVE=1 pnpm vitest run --config vitest.carve-live.config.ts
+ * Opt in from apps/camNC: CARVE_LIVE=1 pnpm vitest run --config live-carve.vitest.config.ts
  * Settings and output: src/test/live/README.md.
  */
 import { commands } from '@vitest/browser/context';

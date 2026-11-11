@@ -1,6 +1,6 @@
 /**
  * Live provider runs of the production design assistant loop with the real sandboxed check.
- * Opt in from apps/camNC: ASSISTANT_LIVE=1 pnpm vitest run --config vitest.assistant-live.config.ts
+ * Opt in from apps/camNC: ASSISTANT_LIVE=1 pnpm vitest run --config live-assistant.vitest.config.ts
  * Settings and output: src/test/live/README.md.
  */
 import { commands } from '@vitest/browser/context';

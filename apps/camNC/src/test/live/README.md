@@ -12,8 +12,8 @@ They cost money, so they are not part of any suite: the files end in `.live.ts`,
 From `apps/camNC`, with `OPENAI_API_KEY` (or `GEMINI_API_KEY` for a `gemini-*` model) in the environment:
 
 ```sh
-ASSISTANT_LIVE=1 ASSISTANT_LIVE_REPS=3 pnpm vitest run --config vitest.assistant-live.config.ts
-CARVE_LIVE=1 CARVE_LIVE_BRIEFS=owl,cat CARVE_LIVE_REPS=1 pnpm vitest run --config vitest.carve-live.config.ts
+ASSISTANT_LIVE=1 ASSISTANT_LIVE_REPS=3 pnpm vitest run --config live-assistant.vitest.config.ts
+CARVE_LIVE=1 CARVE_LIVE_BRIEFS=owl,cat CARVE_LIVE_REPS=1 pnpm vitest run --config live-carve.vitest.config.ts
 ```
 
 Settings shared by both, with the prefix `ASSISTANT_LIVE` or `CARVE_LIVE`:
@@ -56,3 +56,5 @@ Every call is priced from its reported usage into `ledger.json` in the output di
 ## Cost
 
 On `gpt-5.4-mini`, a design run (one task, one rep, several requests) costs about USD 0.03, so the default eight tasks × three reps is about USD 0.75. A carving generation is one call of about USD 0.006–0.008, so all eight briefs × two reps is about USD 0.10, plus repairs. The default USD 2 budget covers either full run with room to spare.
+
+The configs are named `live-*.vitest.config.ts` rather than `vitest.*.config.ts` on purpose: they never run in CI, so they don't register the Mergify reporter that `scripts/ci-config.test.mjs` requires of every CI config.
