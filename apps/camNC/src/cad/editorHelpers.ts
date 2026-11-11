@@ -78,3 +78,15 @@ export function asHole(part: CadPart): CadPart {
   delete made.extrude;
   return made;
 }
+
+/**
+ * An extrude of all of its sketch, as a first extrude is: as one outline, or, when the sketch isn't one, such as closed
+ * shapes apart, each of its regions, each group apart becoming a part of its own on OK. A Remove cuts the whole sketch.
+ */
+export function wholeSketch(extrude: CadPart): CadPart {
+  const whole = { ...extrude };
+  delete whole.regions;
+  if (whole.remove || evaluateCadPart(whole).part) return whole;
+  const regions = sketchRegions(whole.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+  return regions.length ? { ...whole, regions } : whole;
+}

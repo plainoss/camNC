@@ -69,7 +69,8 @@ it('starts another extrude of an extruded sketch with Shift+E, even with a drawi
   await waitFor(() => expect(latest().parts).toHaveLength(2));
   const made = latest().parts[1]!;
   expect(made.sketchOf).toBe(plate.id);
-  expect(made.regions).toEqual(sketchRegions(plate.sketch, CAD_CHORD_TOLERANCE).map(region => region.id));
+  // All of its sketch, as its first extrude has: one outline, not its regions picked one by one.
+  expect(made.regions).toBeUndefined();
   await userEvent.click(within(extrude).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(latest().parts).toHaveLength(1));
   expect(latest().parts[0]!.sketch).toEqual(plate.sketch);

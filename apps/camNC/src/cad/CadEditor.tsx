@@ -2208,7 +2208,8 @@ export function CadEditor({
       event.key.toLowerCase() === 'e'
     ) {
       event.preventDefault();
-      if (!busy && part && (partHasOutline || part.extrude === false)) studioCommand('extrude');
+      // A held key, as Shift+E pressed in a sketch closing into this Extrude, doesn't start another.
+      if (!event.repeat && !busy && part && (partHasOutline || part.extrude === false)) studioCommand('extrude');
       return;
     }
     // Shift+S starts a sketch, on the plane or face picked if there is one, as in the reference.

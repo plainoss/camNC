@@ -12,6 +12,7 @@ import {
 } from '@wbcnc/cad';
 import type { ViewRegion } from '@/cam/model/ModelViewport';
 import { withRegionToggled } from './extrudeRegionViews';
+import { wholeSketch } from './editorHelpers';
 
 /** Closed visible sketch areas are selectable even when a solid face sits immediately underneath. */
 export function sketchSelectionRegions(document: CadDocument, shown: (id: string) => boolean, selected: string | null): ViewRegion[] {
@@ -66,9 +67,8 @@ export function replaceExtrudeProfile(
     throw new Error('Choose a profile that does not depend on this extrusion.');
   if (reference === targetId && 'sketch' in selection) {
     if (selection.region) return withRegionToggled(document, targetId, selection.region);
-    if (!target.regions) return document;
-    const entireSketch = { ...target };
-    delete entireSketch.regions;
+    const entireSketch = wholeSketch(target);
+    if (JSON.stringify(entireSketch.regions) === JSON.stringify(target.regions)) return document;
     return { ...document, revision: document.revision + 1, parts: document.parts.map(p => (p.id === targetId ? entireSketch : p)) };
   }
   if (reference === targetId) throw new Error('Choose a face of another part.');
@@ -78,6 +78,7 @@ export function replaceExtrudeProfile(
     const kept: CadPart = {
       id: newCadId(),
       name: `${target.name} sketch`,
+      ...(target.sketchName && { sketchName: target.sketchName }),
       sketch: target.sketch,
       thickness: target.thickness,
       extrude: false,
@@ -96,6 +97,7 @@ export function replaceExtrudeProfile(
     if (owner.drawnOn) next.drawnOn = { ...owner.drawnOn, inward: !!target.drawnOn?.inward };
     else if (owner.placement) next.placement = owner.placement;
     if ('sketch' in selection && selection.region) next.regions = [selection.region];
+    else next = wholeSketch(next);
   } else {
     const face = 'face' in selection ? selection.face : null;
     if (!face) return document;

@@ -9,7 +9,7 @@ import {
   type CadDrawnOn,
   type CadPart,
 } from '@wbcnc/cad';
-import { extrudedSketch, isSingleLine, replacePart } from './editorHelpers';
+import { extrudedSketch, isSingleLine, replacePart, wholeSketch } from './editorHelpers';
 
 type PickedFace = Extract<CadDrawnOn['on'], { partId: string }>;
 
@@ -48,7 +48,6 @@ export function startExtrude(
   // Extrude always starts a new extrude, of the part's sketch here, as in the reference: it starts with the regions
   // the sketch's extrudes leave, or none, or with them all when asked. An extrude already made is edited from its step.
   const next = newExtrudeOf(before, part, `Part ${before.parts.length + 1}`);
-  const all = pickAll && sketchRegions(next.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
-  const made = pickedProfile(all && all.length ? { ...next, regions: all } : next);
+  const made = pickedProfile(pickAll ? wholeSketch(next) : next);
   return { document: { ...before, revision: before.revision + 1, parts: [...before.parts, made] }, partId: made.id };
 }
