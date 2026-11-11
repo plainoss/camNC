@@ -163,6 +163,10 @@ test('CI covers every runtime task and every browser shard, without duplicating 
   const specs = parse(read('.github/workflows/ci.yml')).jobs.specs;
   assert.deepEqual(specs.strategy.matrix.shard, ['1/4', '2/4', '3/4', '4/4']);
   assert.match(specs.steps.find(step => step.name === 'Run sketch behaviour specs').run, /--shard=\$\{\{ matrix.shard \}\}/);
+  // The scenario sharding reserves room on the first shard only, so its extra checks must stay there.
+  const extraShards = specs.steps.flatMap(step => [...String(step.if ?? '').matchAll(/matrix\.shard == '([^']+)'/g)].map(match => match[1]));
+  assert(extraShards.length > 0);
+  assert.deepEqual([...new Set(extraShards)], ['1/4']);
 });
 
 
