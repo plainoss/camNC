@@ -165,6 +165,22 @@ describe('native monochrome generation and tracing', () => {
     expect(context.isPointInPath(path, 40.5, 40.5, 'evenodd')).toBe(false);
   });
 
+  it('keeps a two-pixel wall of at least half the minimum feature, and closes it only when narrower', async () => {
+    const letters = png(context => {
+      context.fillStyle = 'black';
+      context.fillRect(10, 30, 38, 40);
+      context.fillRect(50, 30, 40, 40);
+    });
+    // 80 px across 32 mm is 2.5 px/mm: the 2 px wall is 0.8 mm, most of a 1 mm feature.
+    const kept = await traceCarvingPng(letters, { widthMm: 32, heightMm: 32, detail: 'simple', minFeatureMm: 1 });
+    expect(kept.traceReport).toMatchObject({ components: 2, holes: 0 });
+    expect(kept.warnings.join(' ')).not.toContain('Closed light gaps');
+    // With a 2 mm feature the same wall is 0.4 mm, below half a feature, so the letters merge and that is reported.
+    const merged = await traceCarvingPng(letters, { widthMm: 32, heightMm: 32, detail: 'simple', minFeatureMm: 2 });
+    expect(merged.traceReport).toMatchObject({ components: 1, holes: 0 });
+    expect(merged.warnings.join(' ')).toContain('Closed light gaps');
+  });
+
   it('rejects blank or inverted backgrounds instead of carving a background panel', async () => {
     await expect(
       traceCarvingPng(
