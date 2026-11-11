@@ -316,7 +316,8 @@ export function useCarvingAssistant({
     if (!proposal || disabled || preparing) return;
     try {
       onApply(proposal);
-      setStatus('Artwork applied as one undo step. Select it to change its size or detail.');
+      // The Carve step confirms the edit, with its Undo, as it closes the panel.
+      setStatus('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The proposal could not be applied.');
     }

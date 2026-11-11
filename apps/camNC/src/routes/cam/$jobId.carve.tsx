@@ -1,14 +1,13 @@
 import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
 import { CamJobBar } from '@/cam/CamJobBar';
-import { NumberInput } from '@/cam/NumberInput';
 import { CarvingArtFields } from '@/cam/CarvingArtFields';
-import { CarvingCutoutBar, CarvingCutoutLine, CarvingCutoutToggle, kCutoutSelection } from '@/cam/CarvingCutout';
+import { CarvingCutoutBar, CarvingCutoutLine, kCutoutSelection } from '@/cam/CarvingCutout';
 import {
   carvingProblem,
   cutoutOutline,
   itemName,
-  kVBits,
+  kEmptyCarving,
   placeItem,
   withItems,
   type CarvingArt,
@@ -19,22 +18,24 @@ import { carvingBounds as bounds, carvingPath as pathOf, centred, freeSpot } fro
 import { outlineArt } from '@/cam/carvingOutline';
 import { CarvingAssistant } from '@/cam/carvingAssistant/CarvingAssistant';
 import { CarvingAssistantBoardLayer } from '@/cam/carvingAssistant/BoardLayer';
-import { CarvingAssistantPromptBar } from '@/cam/carvingAssistant/PromptBar';
 import { useCarvingAssistant } from '@/cam/carvingAssistant/useCarvingAssistant';
 import { applyCarvingProposal, generatedCarvingProblem, type CarvingProposal } from '@/cam/carvingAssistant/proposal';
 import { CarvingInlineText as InlineText } from '@/cam/CarvingInlineText';
+import { CarveEmptyStart, CarveToolbar, type CarvePanel } from '@/cam/carve/CarveTools';
+import { CarveItemsPanel } from '@/cam/carve/CarveItemsPanel';
+import { CarveSettingsPanel, kBoardLeast, kBoardMost } from '@/cam/carve/CarveSettingsPanel';
 import { camKeys, useCamJob, useSaveCamJob } from '@/cam/camQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BoardV1 } from '@/cam/boards';
 import type { CamJobV1 } from '@/cam/jobDb';
 import { kDefaultPlan } from '@/cam/planSettings';
-import { cutoutPastBoard, vConeDepth } from '@wbcnc/cam';
+import { cutoutPastBoard } from '@wbcnc/cam';
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { Button } from '@wbcnc/ui/components/button';
+import { toast } from '@wbcnc/ui/components/sonner';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
-import { cn } from '@wbcnc/ui/lib/utils';
 import { SelectionBar } from '@/cam/boards/SelectionBar';
-import { AlertTriangle, Crosshair, Image, ListOrdered, Redo2, Trash2, Type, Undo2 } from 'lucide-react';
+import { AlertTriangle, Crosshair, ListOrdered, Redo2, Undo2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/carve')({ component: CarveStep });
@@ -46,8 +47,6 @@ type BoardGrip = 'w' | 'h' | 'wh';
 
 /** A dragged board edge moves in these steps (Shift: 1 mm), between the board size fields' limits. */
 const kBoardSnap = 10;
-const kBoardLeast = 20;
-const kBoardMost = 2000;
 
 /**
  * The Carve step of a carving job: the artwork on its board, placed by eye. The artwork is outlined here and saved with
@@ -80,6 +79,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [adding, setAdding] = useState(0);
   const [artResets, setArtResets] = useState<Record<string, number>>({});
+  const [panel, setPanel] = useState<CarvePanel | null>(null);
   const selected = carving.items.find(item => item.id === selectedId);
   const editing = selected && { ...selected, ...pending[selected.id] };
   const shown = dragged ?? selected;
@@ -112,7 +112,11 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
     mounted.current = true;
     return () => {
       mounted.current = false;
+      // Its Undo belongs to this editor's history, which leaving the step discards.
+      dismissAdded();
     };
+    // dismissAdded only reads a ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Undo and Redo step through the carving and its board as they were before each edit, as on the Boards step.
@@ -121,8 +125,15 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const history = useRef<Snapshot[]>([]);
   const future = useRef<Snapshot[]>([]);
   const [, setHistorySize] = useState(0);
+  // The "Artwork added" toast offers Undo for that one edit, so any later edit or undo takes the toast away.
+  const addedToast = useRef<string | number | null>(null);
+  const dismissAdded = () => {
+    if (addedToast.current !== null) toast.dismiss(addedToast.current);
+    addedToast.current = null;
+  };
   /** Called right before an edit is saved: the job as it is then is what Undo brings back. */
   const record = () => {
+    dismissAdded();
     const { carving, boards } = latest();
     history.current = [...history.current.slice(-(kUndoSteps - 1)), { carving, boards }];
     future.current = [];
@@ -131,6 +142,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const travel = (from: { current: Snapshot[] }, to: { current: Snapshot[] }) => {
     const back = from.current.at(-1);
     if (!back) return;
+    dismissAdded();
     from.current = from.current.slice(0, -1);
     const { carving: was, boards } = latest();
     to.current = [...to.current, { carving: was, boards }];
@@ -151,6 +163,9 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   };
   const undo = history.current.length ? () => travel(history, future) : undefined;
   const redo = future.current.length ? () => travel(future, history) : undefined;
+  // A toast's Undo runs after later renders, so it reaches the current Undo rather than the one it was made with.
+  const undoLatest = useRef(undo);
+  undoLatest.current = undo;
 
   const saveCarving = (next: CarvingV1, boards = job.boards) => {
     record();
@@ -164,6 +179,18 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
       return next;
     });
     setSelectedId(proposal.item.id);
+    // Done: the board gets its room back, with the new artwork selected and one step to take it back.
+    assistant.setOpen(false);
+    const entry = history.current.at(-1);
+    addedToast.current = toast(proposal.mode === 'replace' ? 'Artwork replaced' : 'Artwork added', {
+      action: {
+        label: 'Undo',
+        // Only while this edit is still the latest: never another edit's, nor after leaving the step.
+        onClick: () => {
+          if (mounted.current && history.current.at(-1) === entry) undoLatest.current?.();
+        },
+      },
+    });
   };
   const assistant = useCarvingAssistant({
     job,
@@ -462,8 +489,26 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const { adding: addError, ...itemErrors } = errors;
   const error = Object.values(itemErrors).find(Boolean);
   const problem = error ?? generatedCarvingProblem(job) ?? (board ? carvingProblem(carving, board) : 'This carving has no board.');
-  const cone = vConeDepth(carving.vBit);
   const flatBit = (job.plan ?? kDefaultPlan).bit;
+  const flatBitName = flatBit.name ?? `⌀${flatBit.diameter} flat bit`;
+  // One side panel at a time, opened from the board's toolbar; the assistant keeps its own open state for its session.
+  const shownPanel: CarvePanel | null = assistant.open ? 'assistant' : panel;
+  const panelRef = useRef<HTMLElement>(null);
+  // On a phone the panel opens below the board, out of sight: bring it into view when it appears.
+  useEffect(() => {
+    if (shownPanel && window.matchMedia('(max-width: 767px)').matches) panelRef.current?.scrollIntoView({ block: 'start' });
+  }, [shownPanel]);
+  const togglePanel = (next: CarvePanel) => {
+    const closing = next === shownPanel;
+    if (next === 'assistant' && !closing) {
+      // The lettering's bar would cover the box; generated artwork stays selected to be reworked.
+      if (!selected?.generated) select(null);
+      setPanel(null);
+    } else setPanel(closing ? null : next);
+    assistant.setOpen(next === 'assistant' && !closing);
+  };
+  const addText = () =>
+    void addItem({ kind: 'text', text: 'Text', font: lastFont.current?.kind === 'text' ? lastFont.current.font : 'serif' });
   const off = allBox && (allBox.x0 < 0 || allBox.y0 < 0 || allBox.x1 > size.w || allBox.y1 > size.h);
   // The cut line as drawn (it follows the artwork once dropped): Plan can't cut the piece out whole while it runs off the board.
   const cutOff = useMemo(() => cutoutPastBoard(cutoutOutline(carving), { w: size.w, h: size.h }), [carving, size.w, size.h]);
@@ -491,7 +536,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
             role="img"
             tabIndex={0}
             aria-label={`Board ${size.w} × ${size.h} mm with the carving`}
-            className="absolute inset-0 h-full w-full touch-none overflow-visible select-none"
+            className="absolute inset-y-0 right-0 left-14 h-full w-[calc(100%-3.5rem)] touch-none overflow-visible select-none"
             viewBox={`${-pad} ${-pad} ${frame.w + 2 * pad} ${frame.h + 2 * pad}`}
             onPointerDown={() => {
               pressed.current = null;
@@ -685,7 +730,6 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               XY zero · lower left
             </text>
           </svg>
-          {assistant.open && <CarvingAssistantPromptBar session={assistant} />}
           {editing &&
             !dragged &&
             editing.id !== inlineId &&
@@ -771,159 +815,80 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
               <LoadingSpinner className="size-3" /> Outlining…
             </div>
           )}
-        </div>
-        <aside className="flex w-full shrink-0 flex-col gap-4 overflow-auto border-l p-4 text-sm md:w-80">
-          <div className="grid gap-2">
-            <h3 className="font-medium">Add</h3>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  void addItem({ kind: 'text', text: 'Text', font: lastFont.current?.kind === 'text' ? lastFont.current.font : 'serif' })
-                }>
-                <Type /> Text
-              </Button>
-              <Button variant="outline" size="sm" aria-busy={choosing} onClick={() => chooseSvg(null)}>
-                {choosing ? <LoadingSpinner className="size-4" aria-label="Opening file chooser" /> : <Image />} SVG
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                aria-expanded={assistant.open}
-                onClick={() => {
-                  // The lettering's bar would cover the box; generated artwork stays selected to be reworked.
-                  if (!assistant.open && !selected?.generated) select(null);
-                  assistant.setOpen(!assistant.open);
-                }}>
-                Assistant
-              </Button>
-            </div>
-            <div className="sr-only">
-              <label htmlFor="carve-svg">SVG file</label>
-              <input
-                id="carve-svg"
-                ref={svgInput}
-                tabIndex={-1}
-                type="file"
-                accept=".svg,image/svg+xml"
-                onChange={e => {
-                  const file = e.target.files?.[0],
-                    id = replaceId.current;
-                  const replacing = carving.items.find(item => item.id === id);
-                  if (!file) setChoosing(false);
-                  else
-                    void file
-                      .text()
-                      .then(svg => {
-                        const art: CarvingArt = { kind: 'svg', svg, fileName: file.name };
-                        if (replacing) void redraw({ ...replacing, ...pending[replacing.id], art });
-                        else void addItem(art);
-                      })
-                      .finally(() => setChoosing(false));
-                  // Choosing the same file again still counts.
-                  e.target.value = '';
-                }}
-              />
-            </div>
-          </div>
-          {assistant.open && <CarvingAssistant job={job} session={assistant} />}
-          <ul aria-label="Items" className="grid gap-1">
-            {carving.items.map(item => (
-              <li key={item.id} className={cn('flex items-center rounded-md', selectedId === item.id && 'bg-muted')}>
-                <button
-                  className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left"
-                  aria-pressed={selectedId === item.id}
-                  onClick={() => select(item.id)}>
-                  {item.art.kind === 'text' ? <Type className="size-4 shrink-0" /> : <Image className="size-4 shrink-0" />}
-                  <span className="truncate">{itemName(item)}</span>
-                </button>
-                <Button variant="ghost" size="icon" aria-label={`Delete ${itemName(item)}`} onClick={() => deleteItem(item.id)}>
-                  <Trash2 />
-                </Button>
-              </li>
-            ))}
-          </ul>
-          {!editing && carving.items.length > 0 && <p className="text-xs text-muted-foreground">Select an item to edit it on the board.</p>}
-          <hr />
-          <Field label="Deepest (mm)" id="carve-depth">
-            <NumberInput
-              id="carve-depth"
-              value={carving.maxDepth}
-              min={0.2}
-              max={thickness - 1}
-              minExclusive
-              unit="mm"
-              onCommit={maxDepth => saveCarving({ ...carving, maxDepth })}
-            />
-          </Field>
-          <Field label="V-bit" id="carve-bit">
-            <select
-              id="carve-bit"
-              className="h-9 rounded-md border bg-background px-2"
-              value={carving.vBit.number}
-              onChange={e => saveCarving({ ...carving, vBit: kVBits.find(b => b.number === Number(e.target.value)) ?? carving.vBit })}>
-              {kVBits.map(b => (
-                <option key={b.number} value={b.number}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <p className="text-xs text-muted-foreground">
-            Strokes wider than{' '}
-            {(2 * (Math.min(carving.maxDepth, cone) / Math.tan(((carving.vBit.angle ?? 90) * Math.PI) / 360))).toFixed(1)} mm get a flat
-            bottom{carving.maxDepth > cone ? `: the bit's cone is only ${cone.toFixed(1)} mm deep` : ''}.
-          </p>
-          <label className="flex items-start gap-2">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={carving.clearWithFlat}
-              onChange={e => saveCarving({ ...carving, clearWithFlat: e.target.checked })}
-            />
-            <span>
-              Clear flat bottoms with the {flatBit.name ?? `⌀${flatBit.diameter} flat bit`} first
-              <span className="block text-xs text-muted-foreground">Otherwise the V-bit clears them: one bit, slower.</span>
-            </span>
-          </label>
-          <hr />
-          <CarvingCutoutToggle
-            carving={carving}
-            taped={board?.taped !== false}
-            bitName={flatBit.name ?? `⌀${flatBit.diameter} flat bit`}
-            onChange={cutout => {
-              saveCarving({ ...carving, cutout });
-              select(cutout ? kCutoutSelection : null);
-            }}
-          />
-          <hr />
-          <h3 className="font-medium">Board</h3>
-          <div className="grid grid-cols-3 gap-2">
-            <Field label="Width" id="carve-board-w">
-              <NumberInput id="carve-board-w" value={size.w} min={kBoardLeast} max={kBoardMost} unit="mm" onCommit={w => setBoard({ w })} />
-            </Field>
-            <Field label="Height" id="carve-board-h">
-              <NumberInput id="carve-board-h" value={size.h} min={kBoardLeast} max={kBoardMost} unit="mm" onCommit={h => setBoard({ h })} />
-            </Field>
-            <Field label="Thick" id="carve-board-t">
-              <NumberInput id="carve-board-t" value={thickness} min={3} max={100} unit="mm" onCommit={t => setBoard({ thickness: t })} />
-            </Field>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Measure the board&rsquo;s thickness: Z0 is its underside, so a thicker board carves deeper and wider.
-          </p>
-          {(problem || off || cutOff || addError) && (
-            <p role="alert" className="flex gap-2 text-amber-600">
+          <CarveToolbar panel={shownPanel} choosing={choosing} onText={addText} onFile={() => chooseSvg(null)} onPanel={togglePanel} />
+          {!carving.items.length && !assistant.open && (
+            <CarveEmptyStart onText={addText} onFile={() => chooseSvg(null)} onAssistant={() => togglePanel('assistant')} />
+          )}
+          {((problem && problem !== kEmptyCarving) || off || cutOff || addError) && (
+            <p
+              role="alert"
+              className="absolute bottom-3 left-16 z-10 flex max-w-md gap-2 rounded-md border bg-background/95 px-3 py-2 text-sm text-amber-600 shadow-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              {problem ??
-                addError ??
+              {(problem !== kEmptyCarving && problem) ||
+                addError ||
                 (off
                   ? 'The artwork reaches past the board: move it or make it smaller.'
                   : 'The cut line runs past the board: move the artwork further onto it, or make the cutout margin smaller.')}
             </p>
           )}
-        </aside>
+          <div className="sr-only">
+            <label htmlFor="carve-svg">SVG file</label>
+            <input
+              id="carve-svg"
+              ref={svgInput}
+              tabIndex={-1}
+              type="file"
+              accept=".svg,image/svg+xml"
+              onChange={e => {
+                const file = e.target.files?.[0],
+                  id = replaceId.current;
+                const replacing = carving.items.find(item => item.id === id);
+                if (!file) setChoosing(false);
+                else
+                  void file
+                    .text()
+                    .then(svg => {
+                      const art: CarvingArt = { kind: 'svg', svg, fileName: file.name };
+                      if (replacing) void redraw({ ...replacing, ...pending[replacing.id], art });
+                      else void addItem(art);
+                    })
+                    .finally(() => setChoosing(false));
+                // Choosing the same file again still counts.
+                e.target.value = '';
+              }}
+            />
+          </div>
+        </div>
+        {shownPanel && (
+          <aside
+            ref={panelRef}
+            aria-label={kPanelNames[shownPanel]}
+            className="flex w-full shrink-0 flex-col gap-4 overflow-auto border-t p-4 text-sm md:w-80 md:border-t-0 md:border-l">
+            {shownPanel === 'assistant' && <CarvingAssistant job={job} session={assistant} onClose={() => togglePanel('assistant')} />}
+            {shownPanel === 'items' && (
+              <CarveItemsPanel
+                items={carving.items}
+                selectedId={selectedId}
+                onSelect={select}
+                onDelete={deleteItem}
+                onClose={() => setPanel(null)}
+              />
+            )}
+            {shownPanel === 'settings' && (
+              <CarveSettingsPanel
+                carving={carving}
+                size={size}
+                thickness={thickness}
+                flatBitName={flatBitName}
+                taped={board?.taped !== false}
+                onCarving={saveCarving}
+                onBoard={setBoard}
+                onSelect={select}
+                onClose={() => setPanel(null)}
+              />
+            )}
+          </aside>
+        )}
       </div>
     </CamPage>
   );
@@ -933,18 +898,9 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
 const kToolButton =
   'flex size-8 items-center justify-center rounded-md text-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-35';
 
-const rotationOf = (degrees: number) => ((degrees % 360) + 360) % 360;
+const kPanelNames: Record<CarvePanel, string> = { items: 'Items', settings: 'Board and bit', assistant: 'AI artwork' };
 
-function Field({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-1">
-      <label htmlFor={id} className="text-xs text-muted-foreground">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
+const rotationOf = (degrees: number) => ((degrees % 360) + 360) % 360;
 
 function Shell({ message, loading }: { message?: string; loading?: string }) {
   return (

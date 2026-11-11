@@ -97,6 +97,8 @@ export function placeItem(item: CarvingItemV1): Loop[] {
 }
 
 export const carvingRegion = (items: CarvingItemV1[]): Loop[] => unionPaths(items.flatMap(placeItem));
+/** Why an empty carving can't be planned; the Carve step's empty board shows the ways to start instead. */
+export const kEmptyCarving = 'Add text or an SVG to carve.';
 export const itemName = (item: CarvingItemV1): string => (item.art.kind === 'text' ? `"${item.art.text}"` : item.art.fileName);
 export const withItems = (carving: CarvingV1, items: CarvingItemV1[]): CarvingV1 => ({ ...carving, items, region: carvingRegion(items) });
 
@@ -190,7 +192,7 @@ export function carvingBoard(size: { w: number; h: number; thickness: number }):
 
 /** Problems that stop the carving from being planned, for people. */
 export function carvingProblem(carving: CarvingV1, board: Pick<BoardV1, 'thickness'>): string | null {
-  if (!carving.items.length) return 'Add text or an SVG to carve.';
+  if (!carving.items.length) return kEmptyCarving;
   if (carving.items.some(item => item.art.kind === 'text' && !item.art.text.trim())) return 'Type something to carve.';
   if (!carving.region.length) return 'The artwork has no filled shapes to carve.';
   if (carving.maxDepth >= board.thickness) return `The depth must be less than the board's ${board.thickness} mm.`;

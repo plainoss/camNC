@@ -1,22 +1,30 @@
 # Illustrations for carving
 
-Open a carving job and choose **Assistant** in the Carve step. A dashed box
-appears on the board in the nearest clear spot: it sets where the illustration
-goes and the largest size it may take. Drag the box to move it, or its corner to
-resize it; **Box width** and **Box height** in the panel do the same. The
+A new carving starts with an empty board, which offers three ways to start:
+**Add lettering**, **Open an SVG file** and **Describe it to AI**. The same
+three are on the toolbar at the board's left edge, with **Items** and **Board and
+bit** under them. Each opens one side panel; clicking it again, or the panel's
+close button, gives the board its room back.
+
+Choose **AI artwork** to open the assistant's panel. A dashed box appears on the
+board in the nearest clear spot: it sets where the illustration goes and the
+largest size it may take. Drag the box to move it, or its corner to resize it;
+**Box width** and **Box height** at the top of the panel do the same. The
 illustration keeps its proportions inside the box. Its actual cut size appears
 in the panel.
 
-Describe the illustration in the bar under the board, such as an owl reading a
-book or a cute mouse playing with a ball. Choose **Line art** or **Bold shapes**
-and 1, 2 or 4 variants, then **Generate**. Each variant is asked for a different
-composition. The variants appear above the bar. Hover one to preview it on the
+Connect a provider key once in the panel, then describe the illustration under
+**What should it show?**, such as an owl reading a book or a cute mouse playing
+with a ball, or start from one of the suggested ideas. Choose **Line art** or
+**Bold shapes**, a **Detail** level (Simple, Balanced, Detailed) and 1, 2 or 4
+ideas, then **Generate** (or press Enter). Each variant is asked for a different
+composition. The variants appear in the panel. Hover one to preview it on the
 board, and click one to pick it. The picked variant is prepared at the box size
 and shown on the board in place, with any compact thin or lost spots circled in
-red. Moving or resizing the box, the **Detail** slider (Simple, Balanced,
-Detailed) and job edits all prepare the picked variant again, locally and without
-another request. **Refine picked** sends the current description together with
-the picked artwork as a revision. **New ideas** starts again from the description.
+red. Moving or resizing the box, the detail level and job edits all prepare the
+picked variant again, locally and without another request. **Refine picked**
+sends the current description together with the picked artwork as a revision.
+**New ideas** starts again from the description.
 
 The assistant produces filled regions for the existing variable-depth V-carving
 workflow. Black means removed material. This does not introduce height-map relief
@@ -33,8 +41,8 @@ does not replay old candidate artwork or the CAD script guide.
 Image generation uses the shared connection: when it has an image model (chosen
 automatically for OpenAI keys), **Image model** is the default generator and uses
 the same key and endpoint. With a provider without image generation, such as
-Anthropic, Carve uses text SVG unless **Use a different image provider** is
-ticked; that separate endpoint, model and key stay in the panel until it closes,
+Anthropic, the panel says so and Carve uses text SVG unless **Advanced → Use a
+different image provider** is ticked; that separate endpoint, model and key stay in the panel until it closes,
 and the text-provider key is never copied to a different image endpoint. Native SVG
 output requires that separate form and support from the selected model and
 project. Image generation and image input are separate capabilities. See the
@@ -52,7 +60,7 @@ refuses oversized images, noisy masks or excessively complex contours. Changing
 size/detail traces the original PNG again locally at the new tolerances. The API
 requests a standard 1024 × 1024 PNG. Source decoding accepts static PNGs up to
 2 MB and four million pixels, then downsamples to at most one million working
-pixels before contour extraction. **More options → Trace an image (PNG)** also
+pixels before contour extraction. **Trace your own image** under **Generate** also
 imports an image made with imagegen or another generator, without a provider
 connection.
 
@@ -74,9 +82,10 @@ guards. These measured bounds and visual inspections do not constitute a promise
 that every possible input image can be converted without a visible change.
 
 Check the prepared artwork on the board, the report and, if needed, the cutting
-paths in the panel, then **Apply artwork** or **Discard**. The artwork goes at the
-box's centre. **Replace** (offered when an item is selected) keeps the selected
-item's identity and rotation. A candidate whose bounding box overlaps another item
+paths in the panel, then **Add to board** or **Discard**. The artwork goes at the
+box's centre, and the panel closes with the new artwork selected and an Undo in
+the confirmation. **Replace** (offered when an item is selected) keeps the
+selected item's identity and rotation, and the button reads **Replace on board**. A candidate whose bounding box overlaps another item
 is refused, because combining them could change the carve after checking: the
 panel asks you to move the box or make it smaller. Warnings from the checks are
 listed under **notes** and do not block Apply; errors do.
