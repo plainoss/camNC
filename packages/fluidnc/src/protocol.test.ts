@@ -76,6 +76,23 @@ describe.each(['v3-81', 'v4'] as const)('FluidncProtocol on %s', variant => {
     expect(last.workKnown).toBe(true);
   });
 
+  it('tells the position units from the decimals only once $I says the firmware is FluidNC', async () => {
+    const fluidnc = await connect(new FakeFluidnc(variant));
+    fluidnc.realtime(0x3f);
+    await until(() => fluidnc.status?.positionUnits !== undefined);
+    expect(fluidnc.status!.positionUnits).toBe('mm');
+
+    const other = new FakeFluidnc(variant);
+    other.respond = line => (line === '$I' ? ['[VER:1.1h.20190825:]', '[OPT:V,15,128]', 'ok'] : undefined);
+    const protocol = await connect(other);
+    expect(protocol.buildInfo).toBeNull();
+    const statuses: MachineStatus[] = [];
+    protocol.on('status', s => statuses.push(s));
+    other.pushStatus();
+    await until(() => statuses.length > 0);
+    expect(statuses[0]!.positionUnits).toBeUndefined();
+  });
+
   it('says when WPos is only MPos because no WCO has been reported yet', async () => {
     const fake = new FakeFluidnc(variant);
     const protocol = await connect(fake);

@@ -2,6 +2,7 @@ import { FakeFluidnc } from '@wbcnc/fluidnc/testing';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CncApi } from '@/lib/fluidnc/cnc-api';
+import fusionBack from '../../../../../packages/cam/test/fixtures/kinderregal-eiche-back.gcode?raw';
 import { boardProgram, camProgram, controllerPercent } from '@/lib/machine/pauseHints.fixture';
 import { useStore } from '@/store/store';
 import { RunningView } from './RunningView';
@@ -169,6 +170,31 @@ describe('the hold card, from the controller through CncApi', () => {
     view = render(<RunningView />);
     await report('Run', 13_000, -36);
     await report('Hold:0', 13_220, -36);
+    expect(card()).toContain(generic);
+  });
+
+  it('a Fusion program held at its first M0, before any move, says to turn the router on, also after a reload', async () => {
+    const bytes = (text: string) => new TextEncoder().encode(text).length;
+    const percentAfter = (text: string) =>
+      controllerPercent(bytes(fusionBack.slice(0, fusionBack.indexOf('\n', fusionBack.indexOf(text)) + 1)), bytes(fusionBack));
+    useStore.getState().updateToolpath(fusionBack, 'back');
+    // Found running at the M0: this tab did not start the job, so it does not know where the bit was then.
+    fake.state = 'Hold:0';
+    fake.job = { file, percent: percentAfter('M0 (MSG Turn ON 15000RPM)') };
+    fake.pushStatus();
+    await until(() => h.api.jobProgress.value?.percent === fake.job!.percent);
+    expect(h.api.jobStartPos.value).toBeNull();
+    view = render(<RunningView />);
+    expect(card()).toContain('Turn ON 15000RPM');
+    // Held again with the reader past the first move after the M0: the job ran on.
+    fake.state = 'Run';
+    fake.job = { file, percent: percentAfter('X-2.64 Y189.682 F9000') };
+    fake.pushStatus();
+    await until(() => h.api.state.value === 'Run');
+    fake.state = 'Hold:0';
+    fake.pushStatus();
+    await until(() => h.api.state.value === 'Hold');
+    view.rerender(<RunningView />);
     expect(card()).toContain(generic);
   });
 });
