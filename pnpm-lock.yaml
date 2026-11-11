@@ -1167,6 +1167,12 @@ importers:
       '@wbcnc/cam':
         specifier: workspace:*
         version: link:../cam
+      '@xmldom/xmldom':
+        specifier: ^0.9.12
+        version: 0.9.12
+      svg-pathdata:
+        specifier: ^9.0.0
+        version: 9.0.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -7489,6 +7495,10 @@ packages:
     resolution: {integrity: sha512-ueFCcIPaMgtuYDS9u0qlUoEvj6GiSsKrwnOLPp9SshqjtcRaR1IEHRjoReq3sXNydsF5i0ZnmuYgXq9dV53t0g==}
     engines: {node: '>=18.0.0'}
 
+  '@xmldom/xmldom@0.9.12':
+    resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
+    engines: {node: '>=14.6'}
+
   '@zeit/schemas@2.36.0':
     resolution: {integrity: sha512-7kjMwcChYEzMKjeex9ZFXkt1AyNov9R5HZtjBKVsmVpw7pa7ZtlCGvCBC2vnnXctaYN+aRI61HjIqeetZW5ROg==}
 
@@ -11536,6 +11546,10 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  svg-pathdata@9.0.0:
+    resolution: {integrity: sha512-h9FuqmNsgDKq2hQBqTMOWjZwqdZOnWijZmcg6FL4iSmH6VvRnobhHrBQSdOiP0W9nwgv0qiW5vQ3//Arrmp19g==}
+    engines: {node: '>=24.14.0'}
 
   svgo@3.3.2:
     resolution: {integrity: sha512-OoohrmuUlBs8B8o6MB2Aevn+pRIH9zDALSR+6hhqVfa6fRwG/Qw9VUMSMW9VNg2CFc/MTIfabtdOVl9ODIJjpw==}
@@ -18491,6 +18505,8 @@ snapshots:
       tslib: 2.9.1
     optional: true
 
+  '@xmldom/xmldom@0.9.12': {}
+
   '@zeit/schemas@2.36.0': {}
 
   '@zip.js/zip.js@2.7.64': {}
@@ -23118,6 +23134,8 @@ snapshots:
       react: 19.1.0
     optionalDependencies:
       '@types/react': 19.1.8
+
+  svg-pathdata@9.0.0: {}
 
   svgo@3.3.2:
     dependencies:
