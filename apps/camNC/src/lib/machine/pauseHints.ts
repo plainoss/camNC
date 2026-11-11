@@ -16,7 +16,8 @@ export interface PauseHint {
  * The only command FluidNC holds a running file at. It parses M1 and M60 but never stops for them, and a manual M6
  * does not hold the file either, so a hint for those would always be wrong.
  */
-const kPause = /\bM0?0\b/i;
+// After a line number too (`N10M0`): only another letter right before the M makes it a different word.
+const kPause = /(?<![A-Z])M0*0(?![\d.])/i;
 /** Lines after the pause that are looked at for what comes next. */
 const kLookAhead = 12;
 

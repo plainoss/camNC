@@ -91,6 +91,22 @@ describe.each(['v3-81', 'v4'] as const)('FluidncProtocol on %s', variant => {
     expect(statuses[2]!.workKnown).toBe(true);
   });
 
+  it('keeps the spindle state of the last report with overrides', async () => {
+    const fake = new FakeFluidnc(variant);
+    const protocol = await connect(fake);
+    const statuses: MachineStatus[] = [];
+    protocol.on('status', s => statuses.push(s));
+    const frames = [
+      '<Run|MPos:0.000,0.000,0.000|FS:0,0>',
+      '<Run|MPos:0.000,0.000,0.000|FS:0,15000|Ov:100,100,100|A:S>',
+      '<Run|MPos:0.000,0.000,0.000|FS:0,15000>',
+      '<Hold:0|MPos:0.000,0.000,0.000|FS:0,15000|Ov:100,100,100>',
+    ];
+    fake.emit(frames);
+    await until(() => statuses.length >= frames.length);
+    expect(statuses.slice(-3).map(s => s.spindleOn)).toEqual([true, true, false]);
+  });
+
   it('sends realtime bytes outside the queue', async () => {
     const fake = new FakeFluidnc(variant);
     const protocol = await connect(fake);

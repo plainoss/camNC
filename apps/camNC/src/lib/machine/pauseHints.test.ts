@@ -54,8 +54,14 @@ describe('pauseHint', () => {
       const program = `G21\n${command} (MSG Something)\nG0 Z5\n` + 'G1 X1\n'.repeat(500);
       expect(pauseHint(program, percentAfter(program, 'Something'))).toBeNull();
     }
-    const m00 = 'G21\nM00 (MSG Something)\nG0 Z5\n' + 'G1 X1\n'.repeat(500);
-    expect(pauseHint(m00, percentAfter(m00, 'Something'))?.line).toBe(2);
+    for (const command of ['M00', 'M0', 'N10M0', 'N10 M0', 'n20m00', 'G0 Z5 M0']) {
+      const program = `G21\n${command} (MSG Something)\nG0 Z5\n` + 'G1 X1\n'.repeat(500);
+      expect(pauseHint(program, percentAfter(program, 'Something'))?.line).toBe(2);
+    }
+    for (const command of ['M30', 'M10', 'M100', 'M0.5', 'XM0']) {
+      const program = `G21\n${command} (MSG Something)\nG0 Z5\n` + 'G1 X1\n'.repeat(500);
+      expect(pauseHint(program, percentAfter(program, 'Something'))).toBeNull();
+    }
   });
 });
 

@@ -104,6 +104,22 @@ describe('the hold card, from the controller through CncApi', () => {
     expect(card()).toMatch(/Ready to start/);
   });
 
+  it('with the controller reporting the spindle running, the start pause is not shown', async () => {
+    view = render(<RunningView />);
+    fake.accessories = 'S';
+    fake.spindleSpeed = 15000;
+    await report('Hold:0', 477, -6.7);
+    await until(() => h.api.status.value?.spindleOn === true);
+    view.rerender(<RunningView />);
+    expect(card()).toContain(generic);
+    fake.accessories = '';
+    fake.spindleSpeed = 0;
+    await report('Hold:0', 477, -6.7);
+    await until(() => h.api.status.value?.spindleOn === false);
+    view.rerender(<RunningView />);
+    expect(card()).toMatch(/Ready to start/);
+  });
+
   it('stopped at the done M0 with the bit parked, the program done steps show', async () => {
     view = render(<RunningView />);
     await report('Run', 13_000, -36);

@@ -48,6 +48,7 @@ function HoldExplanation() {
   const readTo = read && read.file === job?.file ? read.percent : undefined;
   // Until the controller reports the work offset, WPos is just MPos: no work Z to go by.
   const [mz, wz] = [status?.mpos?.z, status?.workKnown ? status.wpos?.z : undefined];
+  const spindle = status?.spindleOn === undefined ? undefined : status.spindleOn ? 'on' : 'off';
   const hint = useMemo(
     () =>
       ours
@@ -57,9 +58,10 @@ function HoldExplanation() {
             holdRequested,
             mpos: mz === undefined ? undefined : { z: mz },
             wpos: wz === undefined ? undefined : { z: wz },
+            spindle,
           })
         : null,
-    [ours, gcode, percent, readTo, holdRequested, mz, wz]
+    [ours, gcode, percent, readTo, holdRequested, mz, wz, spindle]
   );
   if (status?.state === 'Door')
     return (

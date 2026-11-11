@@ -46,15 +46,30 @@ describe('holdHint', () => {
       expect(holdHint(boardProgram, at(sd(477), { wpos: undefined }))).toBeNull();
     });
 
-    it('in a 20 MB program, does not show with the reader in the first cut, inside the position window', () => {
-      const { gcode, size, startEnd } = camProgram(20_000_000);
-      const percent = controllerPercent(startEnd + 390, size);
-      expect((percent / 100) * size).toBeLessThanOrEqual(startEnd + positionWindow(size));
-      for (const holdRequested of [false, true]) {
-        expect(holdHint(gcode, at(percent, { holdRequested, mpos: { z: -36 }, wpos: { z: -6 } }))).toBeNull();
-        expect(holdHint(gcode, at(percent, { holdRequested }))?.marker?.kind).toBe('start');
-      }
+    it('never shows while the controller reports the spindle running', () => {
+      expect(holdHint(boardProgram, at(sd(477), { spindle: 'on' }))).toBeNull();
+      // Small enough that the position alone proves the M3 right after the M0 was not read.
+      expect(holdHint(boardProgram, at(sd(477), { spindle: undefined }))?.marker?.kind).toBe('start');
+      expect(holdHint(boardProgram, at(sd(477), { spindle: 'off' }))?.marker?.kind).toBe('start');
     });
+
+    for (const size of [1_000_000, 20_000_000])
+      it(`in a ${size / 1e6} MB program, a hold during the travel after M3 is not the start pause`, () => {
+        const { gcode, startEnd, travelEnd } = camProgram(size);
+        // The travel at safe Z after M3 and the dwell is inside the window of the start M0.
+        const travel = controllerPercent(travelEnd, size);
+        expect((travel / 100) * size).toBeLessThanOrEqual(startEnd + positionWindow(size));
+        for (const holdRequested of [false, true]) {
+          for (const spindle of ['on', undefined] as const)
+            expect(holdHint(gcode, at(travel, { holdRequested, spindle, wpos: { z: 23.3 } }))).toBeNull();
+          // In the cut, whatever the controller says about the spindle.
+          expect(holdHint(gcode, at(travel, { holdRequested, spindle: 'off', mpos: { z: -36 }, wpos: { z: -6 } }))).toBeNull();
+        }
+        // At the start M0 itself, the spindle reported off: the start card.
+        const atM0 = controllerPercent(startEnd, size);
+        expect(holdHint(gcode, at(atM0, { spindle: 'off' }))?.marker?.kind).toBe('start');
+        expect(holdHint(gcode, at(atM0, { spindle: 'on' }))).toBeNull();
+      });
   });
 
   it('in a 2 MB program, a hold with the reader at the M5 before the done M0 is not that M0 while the bit cuts', () => {

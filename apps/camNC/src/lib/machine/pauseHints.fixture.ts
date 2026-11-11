@@ -35,7 +35,8 @@ export const boardProgram = (() => {
  * For tests: a `size` byte program the way camNC writes it, ASCII only. Its start M0 ends at byte 300 and its done M0
  * 100 bytes before the end; at 2,000,000 bytes both are exactly half a hundredth of a percent of the file, where the
  * controller's rounding is closest to a tie. `m5End` is the end of the M5 before the done M0, within the position window
- * of that M0 on large files. The cut, at work Z -6, starts 16 bytes after the start M0.
+ * of that M0 on large files. After the start M0 come M3, a dwell and a travel at safe Z ending at `travelEnd`, then the
+ * cut at work Z -6.
  */
 export function camProgram(size: number) {
   const doneEnd = size - 100;
@@ -45,20 +46,27 @@ export function camProgram(size: number) {
   const done = [pauseMarker({ kind: 'done' }), 'M0 (MSG Program done. Manual spindle: off now)'];
   const end = ['G0 Z23.3', 'M5', 'G53 G0 Z-5', ...done];
   // 22-byte moves, then comments for the rest.
-  const cutBytes = doneEnd - bytes(head) - bytes(['M3 S15000', 'G4 P3']) - bytes(end);
+  const spindleOn = ['M3 S15000', 'G4 P3', 'G0 X100 Y100'];
+  const cutBytes = doneEnd - bytes(head) - bytes(spindleOn) - bytes(end);
   const moves = Math.floor((cutBytes - 200) / 22);
   const cut = Array.from({ length: moves }, (_, i) => `G1 X${100 + (i % 800)}.25 Y${100 + (i % 400)}.5 Z-6`);
   const program = [
     ...head,
-    'M3 S15000',
-    'G4 P3',
+    ...spindleOn,
     ...cut,
     ...comments(4, cutBytes - 22 * moves),
     ...end,
     ...comments(2, size - doneEnd - bytes(['M30']) + 1),
     'M30',
   ].join('\n');
-  return { gcode: program, size, startEnd: 300, doneEnd, m5End: doneEnd - bytes(['G53 G0 Z-5', ...done]) };
+  return {
+    gcode: program,
+    size,
+    startEnd: 300,
+    travelEnd: 300 + bytes(spindleOn),
+    doneEnd,
+    m5End: doneEnd - bytes(['G53 G0 Z-5', ...done]),
+  };
 }
 
 export const largeProgram = camProgram(2_000_000);

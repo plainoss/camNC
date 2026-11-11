@@ -92,7 +92,9 @@ describe.skipIf(!host)('FluidNC simulator', () => {
     // takes the same few seconds at any --speed, and enough lines that the reader is still in the cut when it is held.
     const moves = Array.from({ length: 320 }, (_, i) => `G1 X${(i < 160 ? i + 1 : 320 - i - 1) / 4} Y0 F1200`);
     const head = 'G21\nG90\nG0 X0 Y0\n(CAMNC PAUSE start; rpm=15000)\nM0 (MSG Router on, then Resume)\n';
-    const gcode = head + moves.join('\n') + '\nM0 (MSG Program done)\n';
+    // M3 right after the start M0, as camNC writes it: the spindle state tells the two apart (no spindle is configured, so
+    // this is the state FluidNC keeps for a router switched by hand).
+    const gcode = head + 'M3 S15000\n' + moves.join('\n') + '\nM5\nM0 (MSG Program done)\n';
     const sd = (end: number) => Math.round((10000 * end) / gcode.length) / 100;
     const held = () => protocol.status?.state === 'Hold' && protocol.status.subState === 0;
     await uploadSdFile(protocol, host!, 'camnc-m0.gcode', gcode);
@@ -101,16 +103,21 @@ describe.skipIf(!host)('FluidNC simulator', () => {
     await until(held, 30_000);
     // Reading stopped at the M0 itself, not lines ahead like the planner reads in the cut.
     expect(protocol.status!.job?.percent).toBe(sd(head.length));
+    await until(() => protocol.status?.spindleOn !== undefined, 10_000);
+    expect(protocol.status!.spindleOn).toBe(false);
     protocol.cycleStart();
     await until(() => protocol.status?.state === 'Run' && (protocol.status.job?.percent ?? 0) > 30, 30_000);
     protocol.feedHold();
     await until(held, 30_000);
     const inCut = protocol.status!.job!.percent;
+    // FluidNC reports a change of spindle state with the next report.
+    expect(protocol.status!.spindleOn).toBe(true);
     expect(inCut).not.toBe(sd(head.length));
     expect(inCut).not.toBe(sd(gcode.length));
     protocol.cycleStart();
     await until(() => held() && protocol.status!.job!.percent > inCut, 60_000);
     expect(protocol.status!.job?.percent).toBe(sd(gcode.length));
+    await until(() => protocol.status?.spindleOn === false, 10_000);
     protocol.cycleStart();
     await until(() => protocol.status?.state === 'Idle' && protocol.status.job === undefined, 60_000);
     await deleteSdFile(protocol, 'camnc-m0.gcode');

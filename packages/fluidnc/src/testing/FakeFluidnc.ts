@@ -46,6 +46,9 @@ export class FakeFluidnc {
   homedMpos: Vec = { x: 3, y: 3, z: 3 };
   wco: Vec = { x: 0, y: 0, z: 0 };
   ov = { feed: 100, rapid: 100, spindle: 100 };
+  /** Reported spindle speed (FS) and accessory state (A, e.g. "S" while the spindle runs clockwise). */
+  spindleSpeed = 0;
+  accessories = '';
   job: { file: string; percent: number } | null = null;
   files = new Map<string, Uint8Array>();
   /** Z (machine) where the probe makes contact. `null` makes `G38.2` fail with ALARM:5. */
@@ -105,9 +108,10 @@ export class FakeFluidnc {
     const parts = [
       `${this.state}`,
       `MPos:${fmt(this.mpos)}`,
-      'FS:0,0',
+      `FS:0,${this.spindleSpeed}`,
       `WCO:${fmt(this.wco)}`,
       `Ov:${this.ov.feed},${this.ov.rapid},${this.ov.spindle}`,
+      ...(this.accessories ? [`A:${this.accessories}`] : []),
     ];
     if (this.job) parts.push(`SD:${this.job.percent.toFixed(2)},${this.job.file}`);
     return `<${parts.join('|')}>`;

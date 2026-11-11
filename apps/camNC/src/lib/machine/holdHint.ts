@@ -11,6 +11,11 @@ export interface HoldContext {
   mpos: { z: number } | undefined;
   /** `undefined` while the work offset is not known yet. */
   wpos: { z: number } | undefined;
+  /**
+   * The spindle as the controller reports its state (A:S or A:C), which it reports again right after any change; not
+   * the FS speed, which a disabled spindle can keep. `undefined` when it has not said yet.
+   */
+  spindle?: 'on' | 'off';
 }
 
 /** How close (mm) Z must be to the height the program went to before the pause. */
@@ -22,7 +27,9 @@ const kAtZ = 0.05;
  *
  * - The start pause, before the spindle runs, has its own signal: the reader cannot pass the first M0 without Resume,
  *   so while it has read no further and the bit is at the safe Z before it, the job has not started cutting, whoever
- *   held it. Missing that card would let a router switched by hand stay off when the cut begins.
+ *   held it. Missing that card would let a router switched by hand stay off when the cut begins. Its spindle start
+ *   (M3) comes right after the M0, so that must not have run either: the spindle reported off, or the reader provably
+ *   short of the end of the M3 line. A spindle reported running never gets it.
  * - A hold camNC sent is a feed hold, wherever the job is.
  * - Every other M0 also needs the bit where the program put it before that M0: a hold from the machine's button or
  *   another client, with the reader blocked just before the M0 (at the M5, say), reports nearly the same position.
@@ -39,7 +46,12 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
     // Within the window: the percent may stand for a byte a little past the M0 even while the reader waits there. On a
     // file of many MB that window reaches into the first cut, so the bit must also be at the safe Z it went to first,
     // where it always is at the real start pause.
-    if (readTo <= lines[first]!.end + positionWindow(size) && bitWhereThePauseLeftIt(lines, first, false, c)) return start;
+    const window = positionWindow(size);
+    const atStart = readTo <= lines[first]!.end + window && bitWhereThePauseLeftIt(lines, first, false, c);
+    // On a file of more than ~100 kB the window also reaches past the M3 and the dwell after the M0, into the travel at
+    // safe Z with the spindle on: only the controller's spindle state tells those apart.
+    const spindleNotStarted = c.spindle === 'off' || (c.spindle !== 'on' && readTo + window < spindleStartEnd(lines, first));
+    if (atStart && spindleNotStarted) return start;
   }
   if (c.holdRequested) return null;
   const index = pauseAt(lines, size, c.percent);
@@ -49,6 +61,12 @@ export function holdHint(gcode: string, c: HoldContext): PauseHint | null {
   // Past the start pause's reader position above, the job is past it.
   if (hint.marker.kind === 'start') return null;
   return bitWhereThePauseLeftIt(lines, index, hint.marker.kind === 'done', c) ? hint : null;
+}
+
+/** End byte of the first spindle start (M3/M4) after line `index`, or the end of the file. */
+function spindleStartEnd(lines: Line[], index: number) {
+  for (let i = index + 1; i < lines.length; i++) if (/(?<![A-Z])M0*[34](?![\d.])/i.test(lines[i]!.code)) return lines[i]!.end;
+  return lines.at(-1)!.end;
 }
 
 /**
