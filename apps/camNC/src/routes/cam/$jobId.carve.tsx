@@ -5,6 +5,7 @@ import { CarvingArtFields } from '@/cam/CarvingArtFields';
 import { CarvingCutoutBar, CarvingCutoutLine, kCutoutSelection } from '@/cam/CarvingCutout';
 import {
   carvingProblem,
+  cutoutOutline,
   itemName,
   kEmptyCarving,
   placeItem,
@@ -28,13 +29,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { BoardV1 } from '@/cam/boards';
 import type { CamJobV1 } from '@/cam/jobDb';
 import { kDefaultPlan } from '@/cam/planSettings';
+import { cutoutPastBoard } from '@wbcnc/cam';
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { Button } from '@wbcnc/ui/components/button';
 import { toast } from '@wbcnc/ui/components/sonner';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { SelectionBar } from '@/cam/boards/SelectionBar';
 import { AlertTriangle, Crosshair, ListOrdered, Redo2, Undo2 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/carve')({ component: CarveStep });
 
@@ -508,6 +510,8 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
   const addText = () =>
     void addItem({ kind: 'text', text: 'Text', font: lastFont.current?.kind === 'text' ? lastFont.current.font : 'serif' });
   const off = allBox && (allBox.x0 < 0 || allBox.y0 < 0 || allBox.x1 > size.w || allBox.y1 > size.h);
+  // The cut line as drawn (it follows the artwork once dropped): Plan can't cut the piece out whole while it runs off the board.
+  const cutOff = useMemo(() => cutoutPastBoard(cutoutOutline(carving), { w: size.w, h: size.h }), [carving, size.w, size.h]);
   // While resizing, the view holds still around the top left corner; it fits the board again once dropped.
   const frame = resized?.from ?? size;
   const pad = Math.max(frame.w, frame.h) * 0.06;
@@ -815,12 +819,16 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
           {!carving.items.length && !assistant.open && (
             <CarveEmptyStart onText={addText} onFile={() => chooseSvg(null)} onAssistant={() => togglePanel('assistant')} />
           )}
-          {((problem && problem !== kEmptyCarving) || off || addError) && (
+          {((problem && problem !== kEmptyCarving) || off || cutOff || addError) && (
             <p
               role="alert"
               className="absolute bottom-3 left-16 z-10 flex max-w-md gap-2 rounded-md border bg-background/95 px-3 py-2 text-sm text-amber-600 shadow-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              {(problem !== kEmptyCarving && problem) || addError || 'The artwork reaches past the board: move it or make it smaller.'}
+              {(problem !== kEmptyCarving && problem) ||
+                addError ||
+                (off
+                  ? 'The artwork reaches past the board: move it or make it smaller.'
+                  : 'The cut line runs past the board: move the artwork further onto it, or make the cutout margin smaller.')}
             </p>
           )}
           <div className="sr-only">

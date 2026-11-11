@@ -34,6 +34,8 @@ async function open(taped = true) {
   await screen.findByTestId('carving-item');
   // Cutting out is set in the Board and bit panel.
   fireEvent.click(screen.getByRole('button', { name: 'Board and bit' }));
+  // On this phone-wide page the panel opens below the board and scrolls into view; the drags here start from the board.
+  window.scrollTo(0, 0);
   return job;
 }
 
@@ -95,4 +97,24 @@ it('holds an untaped board’s cutout with tabs, placed and dragged along the li
   // A double-click on a tab takes it away; with none placed, Plan picks them again.
   fireEvent.doubleClick(screen.getByRole('button', { name: 'Tab 1' }));
   await waitFor(async () => expect((await saved(job.id))?.tabsAt).toBeUndefined());
+});
+
+it('warns while the cut line runs past the board, though the artwork is on it', async () => {
+  const job = await open();
+  fireEvent.click(screen.getByRole('checkbox', { name: /Cut it out/ }));
+  await waitFor(async () => expect((await saved(job.id))?.margin).toBe(6));
+  expect(screen.queryByRole('alert')).toBeNull();
+  // Dragged until its left edge is 3 mm inside the board: the cut line 6 mm round it runs past the edge.
+  const art = carvingBounds(job.carving!.region)!;
+  const middle = { x: (art.x0 + art.x1) / 2, y: (art.y0 + art.y1) / 2 };
+  const path = screen.getByTestId('carving-item');
+  const svg = path.closest('svg')!;
+  fireEvent.pointerDown(path, at(middle.x, middle.y));
+  fireEvent.pointerMove(svg, at(middle.x - (art.x0 - 3), middle.y));
+  fireEvent.pointerUp(svg, at(middle.x - (art.x0 - 3), middle.y));
+  await waitFor(async () => expect(carvingBounds((await getJob(job.id))!.carving!.region)!.x0).toBeCloseTo(3, 0));
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toMatch(/cut line runs past the board/);
+  // A warning, as for artwork past the board: Plan still opens, and says it there.
+  expect(screen.getByRole('link', { name: /Next: Plan/ })).toBeTruthy();
 });
