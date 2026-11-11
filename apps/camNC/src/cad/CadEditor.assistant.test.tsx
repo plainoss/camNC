@@ -82,7 +82,7 @@ it('checks a recorded model proposal, previews it, applies it once and undoes th
   const dock = await screen.findByRole('complementary', { name: 'Design assistant' }, { timeout: 20_000 });
   await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Make the plate 24 mm thick.');
   await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
-  const preview = await within(dock).findByRole('button', { name: 'Preview proposal' }, { timeout: 45_000 });
+  const preview = await within(dock).findByRole('button', { name: 'Review proposal' }, { timeout: 45_000 });
   expect(readConversation(source.id).some(message => message.role === 'tool' && message.text.includes('"stage":"complete"'))).toBe(true);
   expect(latest().parts[0]!.thickness).toBe(18);
   await userEvent.click(preview);
@@ -91,7 +91,7 @@ it('checks a recorded model proposal, previews it, applies it once and undoes th
   await userEvent.click(within(review).getByRole('button', { name: 'Apply as one undo step' }));
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(24));
   expect(readConversation(source.id).some(message => message.proposalOutcome === 'applied')).toBe(true);
-  expect(within(dock).queryByRole('button', { name: 'Preview proposal' })).toBeNull();
+  expect(within(dock).queryByRole('button', { name: 'Review proposal' })).toBeNull();
   expect(latest().parts[0]!.id).toBe(source.parts[0]!.id);
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Undo/ }));
   await waitFor(() => expect(latest().parts[0]!.thickness).toBe(18));
@@ -124,7 +124,7 @@ it('stops further model calls when the user edits while the provider works', asy
   expect(requestSignal?.aborted).toBe(true);
   release!({ role: 'assistant', text: '', calls: [{ id: 'read-1', name: 'cad_script_guide', arguments: {} }] });
   await waitFor(() => expect(within(dock).getByRole('status').textContent).toContain('The design changed'));
-  expect(within(dock).queryByRole('button', { name: 'Preview proposal' })).toBeNull();
+  expect(within(dock).queryByRole('button', { name: 'Review proposal' })).toBeNull();
   expect(requestAssistant).toHaveBeenCalledTimes(1);
   expect(latest().parts[0]!.thickness).toBe(30);
 }, 60_000);
@@ -183,7 +183,7 @@ it('keeps an assistant proposal pending until a feature preview is cancelled', a
   const dock = await screen.findByRole('complementary', { name: 'Design assistant' }, { timeout: 20_000 });
   await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Make the plate 24 mm thick.');
   await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
-  const preview = await within(dock).findByRole('button', { name: 'Preview proposal' }, { timeout: 45_000 });
+  const preview = await within(dock).findByRole('button', { name: 'Review proposal' }, { timeout: 45_000 });
   const toolbar = screen.getByRole('toolbar', { name: 'Part Studio toolbar' });
   await userEvent.click(within(toolbar).getByRole('button', { name: /^Variable$/ }));
   const feature = await screen.findByRole('dialog', { name: 'Variable' });

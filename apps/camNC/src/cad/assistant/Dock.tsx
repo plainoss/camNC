@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { evaluateCadDocument, type CadDocument } from '@wbcnc/cad';
 import { compactCadReport, inspectCadDocument } from '@wbcnc/cad-script';
 import type { CadProposal } from '@wbcnc/cad-editor/proposal';
@@ -8,6 +8,7 @@ import { ProviderSettings } from './ProviderSettings';
 import { readAssistantImage, rasterizeAssistantView } from './images';
 import { assistantQuestion, resumeAssistantMessages, runDesignAssistant } from './loop';
 import { ActivityView } from './ActivityView';
+import { ReplyOptions } from './ReplyOptions';
 import { checkScriptInBrowser } from './scriptCheck';
 import { assistantGuide, guideSections } from './guide';
 import { summarizeAssistantReport } from './report';
@@ -58,12 +59,18 @@ export function AssistantDock({
   selection,
   disabled,
   onProposal,
+  proposal,
+  onCheckedProposal,
+  onDiscardProposal,
   onClose,
 }: {
   document: CadDocument;
   selection?: AssistantSelection;
   disabled?: boolean;
   onProposal: (proposal: CadProposal) => void;
+  proposal: CadProposal | null;
+  onCheckedProposal: (proposal: CadProposal | null) => void;
+  onDiscardProposal: () => void;
   onClose: () => void;
 }) {
   const [credentials, setCredentials] = useState<AssistantCredentials | null>(() => readAssistantCredentials());
@@ -77,17 +84,17 @@ export function AssistantDock({
   const [running, setRunning] = useState(false);
   const [activity, setActivity] = useState('');
   const [error, setError] = useState('');
-  const [proposal, setProposal] = useState<CadProposal | null>(null);
   const [confirmed, setConfirmed] = useState(() => readRequirements(document.id));
   useEffect(
     () =>
       subscribeRequirements(document.id, () => {
         setConfirmed(readRequirements(document.id));
-        setProposal(null);
+        onCheckedProposal(null);
         controller.current?.abort();
       }),
-    [document.id]
+    [document.id, onCheckedProposal]
   );
+  const staleProposal = !!proposal && JSON.stringify(document) !== JSON.stringify(proposal.base);
   const controller = useRef<AbortController | null>(null);
   const activeBase = useRef<string | null>(null);
   const stopReason = useRef('Stopped. The design is unchanged.');
@@ -98,9 +105,12 @@ export function AssistantDock({
       subscribeConversation(document.id, () => {
         const next = readConversation(document.id);
         setMessages(next);
-        if (next.at(-1)?.proposalOutcome) setProposal(null);
+        if (next.at(-1)?.proposalOutcome) {
+          onCheckedProposal(null);
+          setActivity(next.at(-1)?.proposalOutcome === 'applied' ? 'Proposal applied.' : 'Proposal discarded. The design is unchanged.');
+        }
       }),
-    [document.id]
+    [document.id, onCheckedProposal]
   );
   useEffect(() => {
     const snapshot = JSON.stringify(document);
@@ -120,12 +130,17 @@ export function AssistantDock({
   const composer = useRef<HTMLTextAreaElement>(null);
   const attachment = useRef<HTMLInputElement>(null);
   const transcriptEnd = useRef<HTMLDivElement>(null);
+  const replyAnchor = useRef<HTMLDivElement>(null);
   const latest = messages.at(-1);
   const questionMessage = messages.findLast(message => message.role === 'assistant');
-  const question = latest?.role !== 'user' && questionMessage ? assistantQuestion(questionMessage) : undefined;
+  const question = useMemo(
+    () => (latest?.role !== 'user' && questionMessage ? assistantQuestion(questionMessage) : undefined),
+    [latest, questionMessage]
+  );
   useEffect(() => {
-    if (messages.length) transcriptEnd.current?.scrollIntoView({ block: 'nearest' });
-  }, [messages, activity]);
+    if (question) replyAnchor.current?.scrollIntoView({ block: 'start' });
+    else if (messages.length) transcriptEnd.current?.scrollIntoView({ block: 'nearest' });
+  }, [messages, activity, question]);
 
   useEffect(() => {
     mounted.current = true;
@@ -148,7 +163,6 @@ export function AssistantDock({
     setMessages(transcript);
     setRunning(true);
     setError('');
-    setProposal(null);
     writeConversation(start.id, transcript);
     try {
       setActivity('Reading the open design…');
@@ -230,7 +244,7 @@ export function AssistantDock({
       if (!mounted.current) return;
       if (result.proposal && !abort.signal.aborted) {
         bindProposalRequirements(result.proposal, confirmed.revision);
-        setProposal(result.proposal);
+        onCheckedProposal(result.proposal);
       }
       setActivity(
         result.status === 'stopped'
@@ -305,70 +319,65 @@ export function AssistantDock({
             )}
             {messages
               .filter(message => message.role !== 'tool' && (message.text || assistantQuestion(message) || message.images?.length))
+              .filter(message => !(question && message === questionMessage && !message.text && !message.images?.length))
               .map((message, index) => (
                 <article key={index} className="cad-assistant-message" data-role={message.role}>
                   <strong>{message.event ? 'Design' : message.role === 'user' ? 'You' : 'Assistant'}</strong>
                   {message.text && <p>{message.text}</p>}
-                  {assistantQuestion(message) && assistantQuestion(message)?.question !== message.text && (
-                    <p>{assistantQuestion(message)?.question}</p>
-                  )}
+                  {!(question && message === questionMessage) &&
+                    assistantQuestion(message) &&
+                    assistantQuestion(message)?.question !== message.text && <p>{assistantQuestion(message)?.question}</p>}
                   {message.images?.map((image, i) => (
                     <img key={i} src={`data:${image.mediaType};base64,${image.data}`} alt={image.name} />
                   ))}
                 </article>
               ))}
+            {question && (
+              <div ref={replyAnchor}>
+                <ReplyOptions question={question} disabled={running || readingImage} onReply={choice => void send(choice)} />
+              </div>
+            )}
             <div ref={transcriptEnd} />
           </div>
-          {question && !proposal && (
-            <div className="cad-assistant-replies" role="group" aria-label="Suggested replies">
-              {question.choices.map(choice => (
-                <button type="button" key={choice} disabled={running} onClick={() => void send(choice)}>
-                  {choice}
-                </button>
-              ))}
-            </div>
-          )}
           {selection && <small>Selection: {selection.name}</small>}
           {proposal && (
             <div className="cad-assistant-proposal">
               <strong>Checked design proposal</strong>
               <p>Review the changes, lost cuts and warnings before applying.</p>
-              {JSON.stringify(document) !== JSON.stringify(proposal.base) && (
-                <p>The design has changed. Ask again against the current design.</p>
+              {staleProposal && (
+                <p>The design has changed. You can review this proposal, but it cannot be applied. Ask again to check a new proposal.</p>
               )}
-              <button
-                type="button"
-                disabled={disabled || JSON.stringify(document) !== JSON.stringify(proposal.base)}
-                onClick={() => onProposal(proposal)}>
-                Preview proposal
+              <button type="button" className="cad-assistant-primary" disabled={disabled || running} onClick={() => onProposal(proposal)}>
+                Review proposal
               </button>
               {disabled && <p>Complete the current edit before reviewing this proposal.</p>}
-              <button
-                type="button"
-                onClick={() => {
-                  recordAssistantEvent(document.id, 'The user discarded the checked proposal. It was not applied.', 'discarded');
-                  setProposal(null);
-                }}>
+              <button type="button" onClick={onDiscardProposal}>
                 Discard proposal
               </button>
             </div>
           )}
           <p className="cad-assistant-status" data-running={running} role="status">
-            {activity}
+            {proposal && !running && (staleProposal || !question)
+              ? staleProposal
+                ? 'Proposal out of date. It cannot be applied; ask again to check a new proposal.'
+                : 'Checked proposal ready to review.'
+              : activity}
           </p>
           <ActivityView messages={messages} activity={activity} running={running} />
-          <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />
-          <Requirements
-            value={confirmed.requirements}
-            disabled={running}
-            onConfirm={value => {
-              confirmRequirements(document.id, value);
-              recordAssistantEvent(
-                document.id,
-                `Confirmed application requirements: ${JSON.stringify(value)}. These supersede earlier application requirements.`
-              );
-            }}
-          />
+          <div className="cad-assistant-options">
+            <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />
+            <Requirements
+              value={confirmed.requirements}
+              disabled={running}
+              onConfirm={value => {
+                confirmRequirements(document.id, value);
+                recordAssistantEvent(
+                  document.id,
+                  `Confirmed application requirements: ${JSON.stringify(value)}. These supersede earlier application requirements.`
+                );
+              }}
+            />
+          </div>
           {error && <p role="alert">{error}</p>}
           <form
             className="cad-assistant-composer"
@@ -383,22 +392,19 @@ export function AssistantDock({
                 placeholder="Describe your idea, or choose a suggestion…"
                 value={text}
                 onChange={event => setText(event.target.value)}
+                aria-keyshortcuts="Control+Enter Meta+Enter"
+                onKeyDown={event => {
+                  if (event.key !== 'Enter' || (!event.ctrlKey && !event.metaKey) || event.altKey || event.shiftKey) return;
+                  // IME confirmation and a held shortcut must not send partial or duplicate messages.
+                  if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+                  event.preventDefault();
+                  if (!event.repeat) event.currentTarget.form?.requestSubmit();
+                }}
                 disabled={running}
-                rows={3}
+                rows={2}
               />
             </label>
-            <div className="cad-assistant-composer-actions">
-              <button
-                type="button"
-                className="cad-assistant-attach"
-                aria-label="Add reference image"
-                title={credentials?.config.images ? 'Add reference image' : 'Enable image support in Connection'}
-                disabled={running || readingImage || !credentials?.config.images || images.length >= 3}
-                onClick={() => attachment.current?.click()}>
-                <span aria-hidden="true">＋</span> Attach
-              </button>
-              <small>PNG, JPG, WebP or GIF · up to 3</small>
-            </div>
+            <small className="cad-assistant-shortcut">⌘ / Ctrl + Enter to send · Enter for a new line</small>
             <input
               ref={attachment}
               type="file"
@@ -434,23 +440,35 @@ export function AssistantDock({
                 </button>
               </div>
             ))}
-            {running ? (
+            <div className="cad-assistant-composer-actions">
               <button
                 type="button"
-                onClick={() => {
-                  controller.current?.abort();
-                  setActivity('Stopping…');
-                }}>
-                Stop
+                className="cad-assistant-attach"
+                aria-label="Add reference image"
+                title={credentials?.config.images ? 'Add reference image' : 'Enable image support in Connection'}
+                disabled={running || readingImage || !credentials?.config.images || images.length >= 3}
+                onClick={() => attachment.current?.click()}>
+                <span aria-hidden="true">＋</span> Attach
               </button>
-            ) : (
-              <button
-                type="submit"
-                className="cad-assistant-primary"
-                disabled={readingImage || !credentials || (!text.trim() && !images.length)}>
-                Send
-              </button>
-            )}
+              <small>PNG, JPG, WebP or GIF · up to 3</small>
+              {running ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    controller.current?.abort();
+                    setActivity('Stopping…');
+                  }}>
+                  Stop
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="cad-assistant-primary"
+                  disabled={readingImage || !credentials || (!text.trim() && !images.length)}>
+                  Send
+                </button>
+              )}
+            </div>
           </form>
           <button
             className="cad-assistant-footer"
@@ -458,7 +476,6 @@ export function AssistantDock({
             disabled={running}
             onClick={() => {
               writeConversation(document.id, []);
-              setProposal(null);
               setActivity('');
               setUsage(null);
               setText('');
