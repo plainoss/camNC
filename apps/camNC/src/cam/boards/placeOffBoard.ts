@@ -59,6 +59,34 @@ export function tooBigReason(inst: PartInstance, machine: { w: number; h: number
   return `${inst.name} (${mm(inst.size[0])} × ${mm(inst.size[1])} mm) is too big for the machine: its largest board is ${mm(machine.w)} × ${mm(machine.h)} mm, ${inside} inside the edge margins.`;
 }
 
+/** A board takes another body only with room to spare: no part `before` places comes off it in `after`. */
+export function keepsParts(before: BoardV1, after: BoardV1, instances: PartInstance[], bit: number, opts: NestOptions): boolean {
+  const off = new Set(nestBoard(after, instances, bit, { ...opts, holds: false }).unplaced);
+  return nestBoard(before, instances, bit, { ...opts, holds: false }).placements.every(p => !off.has(p.id));
+}
+
+/**
+ * This body moved onto `target` by hand: pinned there, so auto-fill leaves it. Or, when the board has no room for it
+ * (it wouldn't nest, or a part on the board would come off for it, even grown within the machine), why not.
+ */
+export function moveOnto(
+  target: BoardV1,
+  id: string,
+  instances: PartInstance[],
+  bit: number,
+  opts: NestOptions
+): { board: BoardV1 } | { full: string } {
+  const board = { ...withoutPart(target, id), items: [...target.items.filter(i => i !== id), id], pinned: [...unpinned(target, id), id] };
+  const fits = !nestBoard(board, instances, bit, { ...opts, holds: false }).unplaced.includes(id);
+  if (fits && keepsParts(target, board, instances, bit, opts)) return { board };
+  const empty = !nestBoard(target, instances, bit, { ...opts, holds: false }).placements.some(p => p.id !== id);
+  return { full: `${empty ? 'too small' : 'full'}${target.size.fit && opts.machine ? ' and can’t grow within the machine' : ''}` };
+}
+
+/** Why a move by hand was refused: the board has no room, and the body stays where it was. */
+export const moveRefusedNote = (name: string, target: BoardV1, full: string) =>
+  `${name} doesn’t fit on board ${target.name}: it’s ${full}. It stays where it is.`;
+
 export interface OffBoardPlacement {
   boards: BoardV1[];
   /** Bodies now on a board. */
@@ -93,11 +121,7 @@ export function placeOffBoard(
       const home = notAside(current, id);
       const others = next.filter(b => b.id !== board.id && !isCut(b) && b.thickness === board.thickness);
       // A board takes it only with room to spare: a part on it now mustn't come off for it.
-      const keeps = (t: BoardV1, after: BoardV1) => {
-        const off = new Set(nestBoard(after, instances, bit, { ...opts, holds: false }).unplaced);
-        const now = t === home ? current : t;
-        return nestBoard(now, instances, bit, { ...opts, holds: false }).placements.every(p => !off.has(p.id));
-      };
+      const keeps = (t: BoardV1, after: BoardV1) => keepsParts(t === home ? current : t, after, instances, bit, opts);
       const drop = [home, ...others]
         .map(t => ({ t, d: dropPart(t, instances, bit, id, anywhere, 0, opts) }))
         .find(({ t, d }) => d.at && keeps(t, d.board))?.d;
