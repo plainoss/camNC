@@ -10,7 +10,8 @@
  * - `assistant`: a design assistant turn running (reading the design, waiting for the reply, checking a script).
  * - `route`: a navigation still loading its route.
  * - `query`: data queries fetching and mutations running (reading a job, saving boards).
- * - `render`: 3D views not yet drawn, or with a frame requested and not yet drawn (`settledCanvas.ts`).
+ * - `render`: 3D views not yet drawn, or with a frame requested and not yet drawn, and their Html overlays not yet
+ *   filled (`settledCanvas.ts`).
  * - `frame`: 1 until two animation frames have passed since the last input event or change to any of the above, so
  *   React has rendered what that input or result changed (a 3D view's separate overlay root included).
  *
