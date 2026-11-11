@@ -188,16 +188,17 @@ export function FeatureList({
     if (!entry || entry.kind === 'folder') return entry && key(entry);
     const folder = document.folders?.find(candidate => candidate.id === folderOfFeature(document, entry));
     const dragged = entries.find(candidate => candidate.kind === 'step' && candidate.step.id === stepDrop.drop?.stepId);
-    const first = entries[index - 1]?.kind === 'folder' && key(entries[index - 1]!) === folder?.id;
+    // The folder's variables and planes come before its steps, so the first step needn't follow the folder's row.
+    const first = !entries
+      .slice(0, index)
+      .some(candidate => candidate.kind === 'step' && folderOfFeature(document, candidate) === folder?.id);
     if (folder && (folder.collapsed || (first && (!dragged || folderOfFeature(document, dragged) !== folder.id)))) return folder.id;
     return key(entry);
   };
   const landing = stepDrop.drop?.before;
   const dropBefore = landing ? dropRow(entries.findIndex(entry => key(entry) === landing)) : undefined;
-  const dropAfter = landing === null ? dropRow(entries.length - 1) : undefined;
   const dropClasses = (rowKey: string) => [
     rowKey === dropBefore && 'cad-feature-drop-before',
-    rowKey === dropAfter && 'cad-feature-drop-after',
     stepDrop.drop?.error && stepDrop.drop.onto === rowKey && 'cad-feature-drop-refused',
   ];
   const brokenCount = entries.filter(entry => entry.kind === 'step' && entry.step.broken).length;
@@ -254,7 +255,10 @@ export function FeatureList({
           ))}
         </ul>
       )}
-      <ol>
+      <ol
+        onDragLeave={event => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) stepDrop.leave();
+        }}>
         {entries.map((entry, index) => {
           if (entry.kind === 'folder') {
             const folder = document.folders!.find(folder => folder.id === entry.id)!;

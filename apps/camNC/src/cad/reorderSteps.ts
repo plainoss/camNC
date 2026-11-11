@@ -94,10 +94,11 @@ export function reorderDrop(
   if (!dragged || !target || dragged.id === target.id) return null;
   const result = reorderedSteps(document, dragged, target);
   if ('error' in result) return result;
-  if (result.document === document) return null;
+  const order = designSteps(result.document).map(step => step.id);
+  // A drop that leaves the order as it was isn't a move.
+  if (order.every((id, i) => id === steps[i]?.id)) return null;
   // A part's steps move as one, so the line goes before whatever follows the whole run of them.
   const moving = new Set(partLevel(dragged) ? steps.filter(step => step.partId === dragged.partId).map(step => step.id) : [dragged.id]);
-  const order = designSteps(result.document).map(step => step.id);
   let at = order.findIndex(id => moving.has(id));
   while (at < order.length && moving.has(order[at]!)) at++;
   return { before: order[at] ?? null };

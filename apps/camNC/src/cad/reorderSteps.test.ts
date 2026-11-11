@@ -49,6 +49,8 @@ describe('where a dragged step would land', () => {
     expect(reorderDrop(document, `${a.id}:extrude`, `${c.id}:sketch`)).toEqual({ before: `${c.id}:sketch` });
     expect(reorderDrop(document, `${b.id}:extrude`, `${b.id}:sketch`)).toBeNull();
     expect(reorderDrop(document, `${b.id}:extrude`, `${b.id}:extrude`)).toBeNull();
+    // Dropped on the part right after it, a part stays where it is.
+    expect(reorderDrop(document, `${a.id}:extrude`, `${b.id}:sketch`)).toBeNull();
   });
 
   it('says why a step can’t go where it’s dragged', () => {

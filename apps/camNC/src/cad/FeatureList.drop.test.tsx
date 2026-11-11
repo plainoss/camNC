@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
-import { createCadDocument, createCadFolder, createPlateDocument, type CadDocument } from '@wbcnc/cad';
+import { createCadDocument, createCadFolder, createPlateDocument, setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioFeatureList } from './StudioFeatureList';
@@ -83,12 +83,20 @@ describe('dragging a step in the feature list', () => {
 
   it('marks the folder row when a step would land just ahead of the folder', () => {
     const parts = [plate('A'), plate('B'), plate('C')];
-    const made = createCadFolder({ ...createCadDocument(), parts }, { name: 'Box', partIds: [parts[0]!.id, parts[1]!.id] });
+    const made = createCadFolder({ ...createCadDocument(), parts }, { id: 'box', name: 'Box', partIds: [parts[0]!.id, parts[1]!.id] });
     if ('error' in made) throw new Error(made.error);
-    const { row, drag, button } = setup(made.document);
+    // The folder's variable is listed between its row and its first step.
+    const variable = setCadVariable(made.document, { name: 'width', expression: '600 mm', folderId: 'box' });
+    if ('error' in variable) throw new Error(variable.error);
+    const { row, drag, button } = setup(variable.document);
+    expect(button('#width')).toBeTruthy();
     drag(button('Extrude · C'), 'dragstart');
     drag(row('Extrude · A'), 'dragover');
     expect(screen.getByRole('button', { name: 'Box' }).closest('li')!.classList).toContain('cad-feature-drop-before');
     expect(row('Sketch · A').classList).not.toContain('cad-feature-drop-before');
+    // Dragged out of the list, the line goes.
+    const list = row('Sketch · A').closest('ol')!;
+    act(() => void list.dispatchEvent(new DragEvent('dragleave', { bubbles: true, relatedTarget: document.body })));
+    expect(document.querySelector('.cad-feature-drop-before')).toBeNull();
   });
 });

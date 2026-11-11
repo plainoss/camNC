@@ -22,12 +22,14 @@ export function useStepDrop(check?: StepDropCheck) {
     drop,
     start(stepId: string) {
       dragging.current = stepId;
+      // A drag whose end was missed (its row went away) mustn't leave a check made against an older design.
+      shown.current = null;
     },
     end() {
       dragging.current = null;
       if (shown.current) show(null);
     },
-    /** Over a row a step can't be dropped on at all. */
+    /** Over a row a step can't be dropped on at all, or out of the list. */
     leave() {
       if (shown.current) show(null);
     },
