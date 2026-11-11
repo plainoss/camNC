@@ -30,8 +30,9 @@ export class DemoFluidnc extends FakeFluidnc {
     super('v4');
     this.host = 'demo-machine.local';
     this.mpos = { x: 3, y: 3, z: 3 };
-    // Work zero on the clear right side of the demo camera's bed (Y runs right to left), Z zero below the homed height.
-    this.wco = { x: 150, y: 220, z: -30 };
+    // Work zero near the homed corner of the demo bed (X 3–621, Y 3–1241), so a board as big as the bed allows starts
+    // on it: a 594 × 1200 board ends at X 614, Y 1230. Z zero below the homed height.
+    this.wco = { x: 20, y: 30, z: -30 };
     this.probeContactZ = -40;
     this.interpreter = new MotionInterpreter(this.mpos, this.wco);
   }
