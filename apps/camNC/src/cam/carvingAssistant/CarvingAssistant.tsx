@@ -32,6 +32,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
   const id = useId();
   const { connection, current, shown, request } = session;
   const [settings, setSettings] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
   const pngInput = useRef<HTMLInputElement>(null);
   const prepared = current?.prepared;
   const report = prepared?.report;
@@ -104,11 +105,21 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           )}
         </div>
       )}
-      {connection.credentials && !connection.sharedImageModel && !connection.separateImage && (
-        <p className="text-xs text-amber-700 dark:text-amber-300">
-          This connection can&rsquo;t make images, so artwork is drawn as vectors. Images traced on this device usually carve better:
-          connect an OpenAI key, or add an image provider under Advanced.
-        </p>
+      {connection.credentials && connection.needsImageProvider && (
+        <div className="grid gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+          <p>
+            This connection can&rsquo;t make images. Connect an OpenAI key, or add an image provider under Advanced. Or draw the artwork as
+            vectors with Text SVG.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setAdvanced(true)}>
+              Add an image provider
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => connection.setGenerationMode('text')}>
+              Use Text SVG
+            </Button>
+          </div>
+        </div>
       )}
       <form
         aria-label="Describe carving artwork"
@@ -280,7 +291,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           </div>
         </div>
       )}
-      <details className="mt-auto">
+      <details className="mt-auto" open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}>
         <summary className="cursor-pointer text-sm">Advanced</summary>
         <div className="space-y-3 pt-2">
           <fieldset disabled={session.generating} className="flex flex-wrap gap-x-4">
@@ -309,17 +320,19 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
               <p className="text-xs text-muted-foreground">
                 {connection.sharedImageModel
                   ? 'Uses your connected key. The image is traced into filled regions on this device.'
-                  : 'Your connection has no image model. Connect an OpenAI key, or use a different image provider.'}
+                  : 'Your connection has no image model. Connect an OpenAI key, or enter an image provider below.'}
               </p>
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={connection.separateImage}
-                  disabled={session.generating}
-                  onChange={event => connection.setSeparateImage(event.target.checked)}
-                />
-                Use a different image provider
-              </label>
+              {connection.sharedImageModel && (
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={connection.separateImage}
+                    disabled={session.generating}
+                    onChange={event => connection.setSeparateImage(event.target.checked)}
+                  />
+                  Use a different image provider
+                </label>
+              )}
               {connection.separateImage && (
                 <NativeSvgSettings value={connection.native} disabled={session.generating} onChange={connection.setNative} />
               )}

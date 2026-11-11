@@ -101,11 +101,13 @@ function Harness({
   );
 }
 
-async function open(options: { job?: CamJobV1; selectedId?: string | null } = {}) {
+/** Opens the panel. The recorded connection can't make images, so most tests switch to Text SVG first. */
+async function open(options: { job?: CamJobV1; selectedId?: string | null; method?: 'default' | 'text' } = {}) {
   const job = options.job ?? (await createCarvingJob(undefined, { lettering: 'Welcome' }));
   const onApply = vi.fn();
   const view = render(<Harness job={job} selectedId={options.selectedId ?? null} onApply={onApply} />);
   await screen.findByRole('complementary', { name: 'AI artwork' });
+  if ((options.method ?? 'text') === 'text') fireEvent.click(screen.getByRole('button', { name: 'Use Text SVG' }));
   return { job, onApply, ...view };
 }
 const describe = (text = asset.prompt) => fireEvent.change(screen.getByLabelText('What should it show?'), { target: { value: text } });
@@ -139,10 +141,23 @@ it('generates four different variants, previews the first on the board inside th
   expect(proposal.item.generated?.prompt).toBe(asset.prompt);
 });
 
-it('starts from an idea, sends on Enter, and says when the connection cannot make images', async () => {
+it('defaults to image generation and offers Text SVG when the connection cannot make images', async () => {
+  await open({ method: 'default' });
+  // The connected Anthropic-style key has no image model: images need a separate provider until one is entered.
+  expect(screen.getByText(/can.t make images/)).toBeTruthy();
+  describe();
+  expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', true);
+  fireEvent.click(screen.getByRole('button', { name: 'Add an image provider' }));
+  expect(screen.getByRole('radio', { name: 'Image generation' })).toHaveProperty('checked', true);
+  expect(screen.getByLabelText('Image generator API key')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Use Text SVG' }));
+  expect(screen.getByRole('radio', { name: 'Text SVG' })).toHaveProperty('checked', true);
+  expect(screen.queryByText(/can.t make images/)).toBeNull();
+  expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', false);
+});
+
+it('starts from an idea and sends on Enter', async () => {
   await open();
-  // The connected Anthropic-style key has no image model, so the vector route is used and the panel says so.
-  expect(screen.getByText(/can.t make images, so artwork is drawn as vectors/)).toBeTruthy();
   fireEvent.click(within(screen.getByLabelText('Ideas')).getByRole('button', { name: 'Owl' }));
   expect(screen.getByLabelText('What should it show?')).toHaveProperty('value', 'An owl reading a book');
   expect(screen.queryByLabelText('Ideas')).toBeNull();
@@ -327,7 +342,7 @@ it('reopens saved artwork at its current size for a local recheck and replaces i
     checkedFor: 'old-settings',
   };
   rememberAssistantCredentials(null);
-  const { onApply } = await open({ job, selectedId: item.id });
+  const { onApply } = await open({ job, selectedId: item.id, method: 'default' });
   expect(screen.getByLabelText('What should it show?')).toHaveProperty('value', asset.prompt);
   expect(screen.getByRole('checkbox', { name: /^Replace/ })).toHaveProperty('checked', true);
   await ready();
@@ -345,15 +360,14 @@ it('reopens saved artwork at its current size for a local recheck and replaces i
 });
 
 it('uses a separately configured native image key and endpoint, never the design key', async () => {
-  await open();
+  await open({ method: 'default' });
   describe();
   variants(1);
   fireEvent.click(screen.getByText('Advanced'));
-  fireEvent.click(screen.getByRole('radio', { name: 'Image generation' }));
-  // An Anthropic connection has no image model, so a separate provider is the way to images.
+  expect(screen.getByRole('radio', { name: 'Image generation' })).toHaveProperty('checked', true);
+  // An Anthropic connection has no image model, so a separate provider is the way to images, shown without opting in.
   expect(screen.getByText(/Your connection has no image model/)).toBeDefined();
-  expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', true);
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Use a different image provider' }));
+  expect(screen.queryByRole('checkbox', { name: 'Use a different image provider' })).toBeNull();
   expect(screen.getByLabelText('Image generator API key')).toHaveProperty('value', '');
   expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', true);
   fireEvent.change(screen.getByLabelText('Image generator API address'), { target: { value: 'https://native.example/v1' } });
@@ -387,7 +401,9 @@ it("generates images with the connection's own key and image model, without a se
       images: true,
     },
   });
-  await open();
+  await open({ method: 'default' });
+  // The connection makes images itself, so nothing asks for another provider.
+  expect(screen.queryByText(/can.t make images/)).toBeNull();
   describe();
   variants(1);
   fireEvent.click(screen.getByText('Advanced'));
@@ -441,7 +457,7 @@ function pngFile() {
 
 it('traces a local PNG without a provider, keeps its original and prepares it at the box', async () => {
   rememberAssistantCredentials(null);
-  const { onApply } = await open();
+  const { onApply } = await open({ method: 'default' });
   const { file, dataUri } = pngFile();
   fireEvent.change(screen.getByLabelText('PNG image to trace'), { target: { files: [file] } });
   await ready();
@@ -458,7 +474,7 @@ it('traces a local PNG without a provider, keeps its original and prepares it at
 });
 
 it('rejects an oversized PNG before preparing anything', async () => {
-  const { onApply } = await open();
+  const { onApply } = await open({ method: 'default' });
   const file = new File([new Uint8Array(2_000_001)], 'large.png', { type: 'image/png' });
   fireEvent.change(screen.getByLabelText('PNG image to trace'), { target: { files: [file] } });
   expect((await screen.findByRole('alert')).textContent).toMatch(/no larger than 2 MB/);
