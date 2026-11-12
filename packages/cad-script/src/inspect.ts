@@ -40,7 +40,7 @@ import {
 import { nativeCurveReport, sketchCurveDetails } from './curveReport';
 import { curveExtremaPoints } from './curveBounds';
 import { isEdgeNotch } from './notch';
-import { narrowFingersWarnings } from './narrowFingers';
+import { narrowFingersWarnings, notchesBesideBones } from './narrowFingers';
 
 export interface CadExpectation {
   /** Width and height of the outline, in mm. */
@@ -585,12 +585,14 @@ export async function inspectCadDocument(
           // CAM leaves out what no tool fits, so the part wouldn't come out as drawn.
           const dropped = toolpaths.warnings.find(warning => warning.includes('no tool fits'));
           if (dropped) warnings.push({ code: 'toolpath-missing', message: `A cut wouldn't be machined: ${dropped}`, part: part.name });
-          const unrelieved = toolpaths.warnings.find(warning => warning.includes('relieved for'));
-          // Bones made for a smaller bit leave corners the bit can't reach: the relief note already says so.
-          const uncut = (toolpaths.uncut ?? []).filter(notches => !unrelieved || notches.spans);
+          const reliefNote = toolpaths.warnings.find(warning => warning.includes('relieved for'));
+          // Bones made for a smaller bit leave corners the bit can't reach: the relief note already says so for those.
+          const asDrawn = unrelieved.find(candidate => candidate.partId === part.id);
+          const uncut =
+            reliefNote && asDrawn ? notchesBesideBones(toolpaths.uncut ?? [], evaluated, asDrawn, profile.offset) : (toolpaths.uncut ?? []);
           for (const message of narrowFingersWarnings(solved.document, evaluated, uncut, profile.offset, nameOf))
             warnings.push({ code: 'toolpath-missing', message, part: part.name });
-          if (unrelieved) warnings.push({ code: 'relief-bit', message: unrelieved, part: part.name });
+          if (reliefNote) warnings.push({ code: 'relief-bit', message: reliefNote, part: part.name });
           if (toolpaths.blocked.length)
             warnings.push({
               code: 'toolpath-blocked',

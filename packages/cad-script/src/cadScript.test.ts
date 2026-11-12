@@ -257,6 +257,29 @@ describe('corner relief', () => {
     expect(report.warnings.filter(warning => warning.part === 'Seat').map(warning => warning.code)).toContain('relief-bit');
     expect(report.warnings.filter(warning => warning.code === 'toolpath-missing')).toEqual([]);
   });
+
+  it('a sharp V beside such bones is still a cut left unmachined', async () => {
+    const { report } = await editCad(null, d => {
+      const seat = d.newPart('Seat', { thickness: 18, relief: 2.5 });
+      // A 45° V into the top edge, 3.7 mm deep: too small for a bone, so it stays sharp.
+      seat.profile
+        .path([0, 0])
+        .lineTo([200, 0])
+        .lineTo([200, 200])
+        .lineTo([101.53, 200])
+        .lineTo([100, 196.3])
+        .lineTo([98.47, 200])
+        .lineTo([0, 200])
+        .close();
+      seat.profile.rect({ at: [80, 91], w: 40, h: 18 });
+    });
+    const codes = report.warnings.filter(warning => warning.part === 'Seat').map(warning => warning.code);
+    expect(codes).toContain('relief-bit');
+    const missing = report.warnings.filter(warning => warning.code === 'toolpath-missing');
+    expect(missing.map(warning => warning.message)).toEqual([
+      expect.stringMatching(/Material is left in a notch or sharp corner the ⌀3\.175 bit can’t reach/),
+    ]);
+  });
 });
 
 describe('paths', () => {
