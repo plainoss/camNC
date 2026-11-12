@@ -6,7 +6,7 @@ import { planBoard } from './plan';
 import { toolIdentityKey } from './toolIdentity';
 import type { Tool } from './toolpaths';
 import { CamInputError } from './validation';
-import { carvingOperations, vConeDepth, vSlope, type BoardCarving } from './vcarve';
+import { carvingOperations, carvingWork, vConeDepth, vSlope, type BoardCarving } from './vcarve';
 
 const V90: Tool = { number: 3, diameter: 6, name: '90° V-bit', shape: 'v', angle: 90 };
 const V60: Tool = { number: 4, diameter: 8, name: '60° V-bit', shape: 'v', angle: 60 };
@@ -284,5 +284,22 @@ describe('carvings on a board', () => {
     expect(plan.ops.map(o => o.kind)).toEqual(['pocket', 'vcarve']);
     expect(plan.ops.find(o => o.kind === 'vcarve')?.tool).toMatchObject({ shape: 'v', angle: 90 });
     expect(plan.timeMin).toBeGreaterThan(0);
+  });
+});
+
+describe('carvingWork', () => {
+  // A 90° bit to 2 mm deep: 11 wall rings out to 2 mm, then floor rings 0.1 mm apart out to where the artwork closes up.
+  const floorRings = (region: PathsD) => {
+    const points = region.reduce((sum, loop) => sum + loop.length, 0);
+    return (carvingWork(carving(region, { maxDepth: 2 })) - 1) / (0.07 * points) - 11;
+  };
+  it('counts the floor rings out to where the widest stroke closes up, found by searching outward from the walls', () => {
+    expect(floorRings(bar(1))).toBe(0);
+    // A 10 mm bar closes up 5 mm in: 30 floor rings, found to within four of them.
+    expect(floorRings(bar(10))).toBeGreaterThanOrEqual(26);
+    expect(floorRings(bar(10))).toBeLessThanOrEqual(31);
+    // A 40 mm wide panel closes up 20 mm in, as far as half the artwork's size: 180 rings.
+    expect(floorRings([rect(0, 0, 60, 40)])).toBeGreaterThanOrEqual(176);
+    expect(floorRings([rect(0, 0, 60, 40)])).toBeLessThanOrEqual(181);
   });
 });

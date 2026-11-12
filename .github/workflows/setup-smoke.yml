@@ -1,9 +1,8 @@
 name: Production setup smoke
 
+# Not on check_run: Cloudflare Workers Builds no longer builds production (Deploy replaced it), and every check run of
+# any app started this workflow only for it to skip, thousands of runs a week.
 on:
-  # After Cloudflare Workers Builds reports a successful build of the camnc Worker (production) on main.
-  check_run:
-    types: [completed]
   schedule:
     - cron: '0 6 * * *'
   # After the Deploy workflow deploys production from GitHub Actions.
@@ -23,16 +22,9 @@ permissions:
 
 jobs:
   setup-smoke:
-    # The queue SHA becomes main unchanged, so its check suite may still name the queue branch.
-    # Only the production app Worker emits this exact check; previews use camnc-preview.
-    if: >-
-      github.event_name != 'check_run' ||
-      (github.event.check_run.conclusion == 'success' &&
-      github.event.check_run.app.slug == 'cloudflare-workers-and-pages' &&
-      github.event.check_run.name == 'Workers Builds: camnc')
-    # Job level (not workflow level), so that skipped runs don't cancel a running smoke run.
+    # Scheduled smokes and those Deploy calls after a production deploy share one group, so they never overlap.
     concurrency:
-      group: setup-smoke-${{ (github.event_name == 'check_run' || github.event_name == 'schedule') && 'production' || github.ref }}
+      group: setup-smoke-${{ (github.event_name == 'schedule' || github.ref == 'refs/heads/main') && 'production' || github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-24.04
     container:

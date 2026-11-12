@@ -1,3 +1,5 @@
+import type { CadSketch } from '@wbcnc/cad';
+import { isEmptySketch } from '@wbcnc/cad-editor/sketchFeedback';
 import type { ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
 import type { SketchTool } from './sketchTools';
 
@@ -26,4 +28,22 @@ export function sketchPendingFinishReason({
   if (modification.phase === 'extend' && modification.entityId)
     return 'Place the extended endpoint or press Escape before finishing the sketch.';
   return drawing ? 'Complete the current shape or press Escape before finishing the sketch.' : null;
+}
+
+/**
+ * Why the open sketch can't be finished yet, closed back to the studio or the whole design accepted outside one, or null
+ * when it can. A studio sketch finishes unextruded, so points alone, for Hole, are enough there: only Extrude needs a
+ * closed outline, and says so itself.
+ */
+export function openSketchFinishReason(
+  sketch: CadSketch | undefined,
+  problems: readonly string[],
+  state: { checking: boolean; pending: string | null; edgeOnBoard: boolean; thickness: boolean; face: boolean; studio: boolean }
+): string | null {
+  if (state.checking) return 'Wait for the current sketch check to finish.';
+  if (state.pending || state.edgeOnBoard) return state.pending;
+  if (!state.face && !state.thickness) return 'Enter a valid part thickness before finishing the sketch.';
+  if (problems.length) return problems.join(' ');
+  const drawn = state.studio ? !isEmptySketch(sketch) : !!sketch?.entities.some(e => e.type !== 'point' && !e.construction);
+  return state.face || drawn ? null : 'Draw an outline before finishing the sketch.';
 }

@@ -694,7 +694,7 @@
    },
    "toolpaths": {
     "bit": 3.175,
-    "minutes": 81.9,
+    "minutes": 56.2,
     "operations": [
      {
       "label": "Outline: rough + final pass",
@@ -878,7 +878,7 @@
      "ok": true
     }
    ],
-   "minutes": 81.9,
+   "minutes": 56.2,
    "operations": [
     {
      "label": "Outline: rough + final pass",

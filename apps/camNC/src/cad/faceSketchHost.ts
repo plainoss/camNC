@@ -13,7 +13,7 @@ export function faceSketchHost(context: {
   prepare: () => CadDocument | null | undefined;
   commit: (document: CadDocument) => void;
   read: () => CadDocument;
-  onEdit?: (document: CadDocument, partId: string, sketchId: string, scene?: FaceSketchScene) => void;
+  onEdit?: (document: CadDocument, partId: string, sketchId: string, scene?: FaceSketchScene, fromStudio?: boolean) => void;
   root: { current: HTMLElement | null };
   partCamera: StudioCameraRef;
   studioCamera: StudioCameraRef;
@@ -42,9 +42,16 @@ export function faceSketchHost(context: {
       const carried = given ?? snapshot(prepared, id, copyId);
       const added = copyId ? addCopyFaceSketch(prepared, id, copyId, face) : addFaceSketch(prepared, id, face);
       context.commit(added.document);
-      context.onEdit(context.read(), id, added.sketchId, carried && faceSketchScene(prepared, id, face, carried, copyId));
+      context.onEdit(
+        context.read(),
+        id,
+        added.sketchId,
+        carried && faceSketchScene(prepared, id, face, carried, copyId),
+        context.workspace
+      );
     },
-    edit(partId: string, sketchId: string) {
+    /** Opens a face sketch to edit, from the studio's feature list or view (`fromStudio`), or from the part's own view. */
+    edit(partId: string, sketchId: string, fromStudio = context.workspace) {
       if (!context.onEdit) return;
       const prepared = context.prepare();
       if (!prepared || !hasOutline(prepared, partId)) return;
@@ -55,7 +62,8 @@ export function faceSketchHost(context: {
         prepared,
         partId,
         sketchId,
-        face && carried ? faceSketchScene(prepared, partId, face.on, carried, face.copyId) : undefined
+        face && carried ? faceSketchScene(prepared, partId, face.on, carried, face.copyId) : undefined,
+        fromStudio
       );
     },
   };

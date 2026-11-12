@@ -11,6 +11,7 @@ import {
   type CamSettings,
   type HoleChoice,
   type HoleMiddle,
+  type OutlineNotches,
   type Operation,
   type PartCam,
   type Pass,
@@ -31,9 +32,10 @@ import {
   finishRoles,
 } from './passPlanning';
 import { pocketOperation } from './pocketOperation';
+import { loopNotches } from './outlineReach';
 
 export { DEFAULT_SETTINGS, DEFAULT_TOOL } from './toolpathTypes';
-export type { CamSettings, HoleChoice, HoleMiddle, Operation, PartCam, Pass, Tool } from './toolpathTypes';
+export type { CamSettings, HoleChoice, HoleMiddle, Operation, OutlineNotches, PartCam, Pass, Tool } from './toolpathTypes';
 export { MATERIALS, DEFAULT_TABS, type Material, type TabSettings } from './settings';
 export { stepdownFor } from './passPlanning';
 export { pocketOperation } from './pocketOperation';
@@ -518,6 +520,7 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
   const warnings: string[] = [];
   const ops: Operation[] = [];
   const holeMiddles: HoleMiddle[] = [];
+  const outlineNotches: OutlineNotches[] = [];
   const needContained = new Set(context.containedPockets);
   const fits = (region: PathsD, inward: boolean) => (t: Tool) =>
     offset(region, (inward ? -1 : 1) * (t.diameter / 2), offsetToleranceFor(s)).length > 0;
@@ -627,6 +630,8 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
     features.throughHoles.forEach((h, i) => {
       const tool = tools.find(fits([h], true));
       if (!tool) return warnings.push(`through hole ${i + 1}: no tool fits`);
+      // Inside a hole too: its one loop can't reach into narrow notches, or past a neck it can't pass.
+      outlineNotches.push(...loopNotches(h, i, tool.diameter, offsetToleranceFor(s), true));
       if (context.holeMiddles) {
         const planned = planHoleMiddle(h, i, top, tool, s, context.holeMiddles);
         if (planned) holeMiddles.push(planned.middle);
@@ -648,7 +653,12 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
         );
       }
     });
-  if (s.cutThrough) features.outlines.forEach((o, i) => ops.push(profileOperation(`Outline ${i + 1}`, o, top, tools[0], s)));
+  if (s.cutThrough)
+    features.outlines.forEach((o, i) => {
+      ops.push(profileOperation(`Outline ${i + 1}`, o, top, tools[0], s));
+      // The outline's path bridges notches narrower than the bit, such as finger slots: they'd stay uncut.
+      outlineNotches.push(...loopNotches(o, i, tools[0].diameter, offsetToleranceFor(s)));
+    });
   if (features.bottomFaces.length && s.cutThrough)
     warnings.push(`bottom-side features at z=${features.bottomFaces.map(b => b.z).join(', ')}: need a second (flipped) setup`);
   if (features.slopedArea > 1) warnings.push(`${features.slopedArea.toFixed(0)}mm² of sloped faces ignored (not 2.5D)`);
@@ -668,6 +678,7 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
       operations,
       warnings,
       ...(holeMiddles.length && { holeMiddles }),
+      ...(outlineNotches.length && { outlineNotches }),
     },
     s,
     s.blankFootprint

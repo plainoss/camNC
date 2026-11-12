@@ -2,7 +2,15 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import '@/style.css';
 import { page } from '@vitest/browser/context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { addFaceSketch, addLine, cadFaceSketches, createPlateDocument, updateDimension, type CadDocument } from '@wbcnc/cad';
+import {
+  addFaceSketch,
+  addLine,
+  cadFaceSketches,
+  createPlateDocument,
+  updateDimension,
+  type CadDocument,
+  type CadSketch,
+} from '@wbcnc/cad';
 import { useImperativeHandle, useRef, useState, type ComponentType, type Ref, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
@@ -75,9 +83,11 @@ vi.mock('@/cad/CadEditor', () => ({
     onFinish: (d: CadDocument) => Promise<void>;
     onCancel: () => Promise<void>;
     onFinishBlocked?: (reason: string) => void;
-    onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string) => void;
+    onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string, scene?: undefined, fromStudio?: boolean) => void;
     controller?: Ref<CadEditorController>;
     notice?: string | null;
+    startIn3D?: boolean | 'part';
+    selectedStepId?: string;
   }) => {
     const [session] = useState(() => props.editSession ?? cadSession(props.document));
     const current = useRef(session.document);
@@ -133,6 +143,31 @@ vi.mock('@/cad/CadEditor', () => ({
             Open face sketch
           </button>
         )}
+        <output data-testid="start-in-3d">{String(props.startIn3D)}</output>
+        <output data-testid="selected-step">{props.selectedStepId}</output>
+        {props.onEditFaceSketch &&
+          ([true, false] as const).map(fromStudio => (
+            <button
+              key={String(fromStudio)}
+              onClick={() => {
+                const partId = current.current.parts[0]!.id,
+                  added = addFaceSketch(current.current, partId, 'top');
+                const drawn = (sketch: CadSketch) => addLine(sketch, { x1: 10, y1: 10, x2: 40, y2: 10 });
+                const parts = added.document.parts.map(part =>
+                  part.id !== partId
+                    ? part
+                    : {
+                        ...part,
+                        features: part.features!.map(f =>
+                          f.type === 'sketch' && f.sketch.id === added.sketchId ? { ...f, sketch: drawn(f.sketch) } : f
+                        ),
+                      }
+                );
+                props.onEditFaceSketch!({ ...added.document, parts }, partId, added.sketchId, undefined, fromStudio);
+              }}>
+              {fromStudio ? 'Edit a face sketch from the studio' : 'Edit a face sketch from the part'}
+            </button>
+          ))}
       </>
     );
   },
@@ -374,6 +409,33 @@ async function conflictingView() {
   state.save.mockImplementation(actual.saveDesignDraft);
   return { actual, savedB, local, width, session };
 }
+
+describe('finishing a face sketch', () => {
+  it('goes back to the Part Studio with its step selected when it was opened from there', async () => {
+    open();
+    expect(screen.getByTestId('start-in-3d').textContent).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit a face sketch from the studio' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish sketch' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit a face sketch from the studio' })).toBeDefined());
+    const document = JSON.parse(screen.getByTestId('editor-document').textContent!) as CadDocument;
+    const [face] = cadFaceSketches(document.parts[0]!);
+    expect(screen.getByTestId('start-in-3d').textContent).toBe('true');
+    expect(screen.getByTestId('selected-step').textContent).toBe(
+      document.parts[0]!.features!.find(f => f.type === 'sketch' && f.sketch.id === face!.sketch.id)!.id
+    );
+    expect(screen.getByTestId('preferred-part').textContent).toBe(document.parts[0]!.id);
+    endCadSession(document.id);
+  });
+
+  it('goes back to the part’s own view when it was opened from there', async () => {
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit a face sketch from the part' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish sketch' }));
+    await waitFor(() => expect(screen.getByTestId('start-in-3d').textContent).toBe('part'));
+    expect(screen.getByTestId('selected-step').textContent).toBe('');
+    endCadSession(state.job!.design!.draft.id);
+  });
+});
 
 describe('leaving in the middle of a face sketch', () => {
   it('shows its saved edits on coming back, instead of the design from before them', async () => {
