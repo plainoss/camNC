@@ -52,7 +52,23 @@ export function sketchFeedback(result: CadSolveResult) {
     /** What only the sketches got wrong: a feature built from them, broken by an edit, doesn't stop one closing. */
     sketchProblems: [...new Set(issues.filter(d => !result.featuresEvaluated || PROFILE_CODES.has(d.code)).map(d => d.message))],
     conflictedConstraintIds: [...new Set(issues.flatMap(d => d.constraintIds ?? []))],
+    /** Why each part, by id, wasn't built from its solved sketch: the first error building it reported. */
+    featureProblems: Object.fromEntries(
+      result.featuresEvaluated
+        ? issues
+            .filter(d => d.partId)
+            .reverse()
+            .map(d => [d.partId!, d.message])
+        : []
+    ) as Record<string, string>,
   };
+}
+
+/** What the last check of the sketches found, before there's been one or when one fails outright. */
+export interface SketchProblemLists {
+  problems: string[];
+  sketchProblems: string[];
+  featureProblems?: Readonly<Record<string, string>>;
 }
 
 /** Whether a sketch holds nothing drawn: points on their own count, as they're what a sketch for Hole holds. */

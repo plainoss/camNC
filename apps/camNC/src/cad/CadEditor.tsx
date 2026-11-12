@@ -185,6 +185,7 @@ import { loadShownState, saveShownState } from './shownState';
 import { type CadSelectionBox } from './boxSelection';
 import { chainGeometry, type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture } from './editorGestures';
 import { constraintColorNotice, isEmptySketch, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
+import { failedCheckProblems, noSketchProblems } from './sketchProblemLists';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
@@ -352,7 +353,7 @@ export function CadEditor({
   };
   const [searchHighlight, setSearchHighlight] = useState<SearchCommand['id'] | null>(null);
   const [status, setStatus] = useState('Checking sketch…');
-  const [{ problems, sketchProblems }, setProblems] = useState({ problems: [] as string[], sketchProblems: [] as string[] });
+  const [{ problems, sketchProblems, featureProblems }, setProblems] = useState(noSketchProblems);
   const [inProgress, setInProgress] = useState(false);
   const [solving, setSolving] = useState(true);
   const [checkEpoch, setCheckEpoch] = useState(0);
@@ -914,8 +915,7 @@ export function CadEditor({
         if (cancelled || sequence !== solveSequence.current) return;
         lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
         setSolving(false);
-        const problems = [error instanceof Error ? error.message : String(error)];
-        setProblems({ problems, sketchProblems: problems });
+        setProblems(failedCheckProblems(error));
         setInProgress(false);
         setStatus('Sketch could not be checked');
       });
@@ -2365,7 +2365,7 @@ export function CadEditor({
               onRollTo={showWorkspace ? setRolledTo : undefined}
               onHover={entry => setHoveredStepParts(entry?.kind === 'step' ? featureRowParts(doc, entry.step) : null)}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane, onNewSketch: newSketchOn })}
-              shown={featureShown}
+              {...{ shown: featureShown, featureProblems }}
               onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}
             />
           )}
