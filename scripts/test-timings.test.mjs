@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { retriedTests, summarizeFiles } from './test-timings.mjs';
+import { failedTests, retriedTests, summarizeFiles } from './test-timings.mjs';
 
 test('timings retain uncollected failures and distinguish collection from test work', () => {
   assert.deepEqual(summarizeFiles([
@@ -26,4 +26,5 @@ test('lists the tests that passed only on a retry, by file and describe blocks',
     ],
   };
   assert.deepEqual(retriedTests([file], '/repo'), ['src/a.test.ts > group > passes on a retry']);
+  assert.deepEqual(failedTests([file], '/repo'), ['src/a.test.ts > group > fails every try']);
 });
