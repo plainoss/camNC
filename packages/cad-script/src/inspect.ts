@@ -1,6 +1,7 @@
 import {
   cadFaceSketches,
   cadVariableProblems,
+  partCutInputProblems,
   cadVariableScope,
   cadSketchRegions,
   patternMaster,
@@ -358,7 +359,8 @@ export async function inspectCadDocument(
     return ids.map(id => handles.get(id) ?? id);
   };
   // A value that can't follow its variables keeps its last good one, so the design the check solved disagrees with them.
-  for (const d of [...solved.diagnostics, ...cadVariableProblems(input)]) {
+  // A Cut parts step whose tool or target isn't built is left out of the built design, so the solve can't say it.
+  for (const d of [...solved.diagnostics, ...cadVariableProblems(input), ...partCutInputProblems(input)]) {
     const part = solved.document.parts.find(part => part.id === d.partId);
     const constraints = part && [part.sketch, ...cadFaceSketches(part).map(face => face.sketch)].flatMap(sketch => sketch.constraints);
     const ids =
