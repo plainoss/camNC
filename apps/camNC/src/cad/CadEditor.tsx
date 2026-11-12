@@ -114,9 +114,12 @@ import {
   cadSession,
   commitCadSession,
   endCadSession,
+  markCadSession,
   redoCadSession,
+  restoreCadSession,
   undoCadSession,
   type CadCommandCheckpoint,
+  type CadHistoryMark,
 } from '@wbcnc/cad-editor/session';
 import { DimensionGraphics } from './DimensionGraphics';
 import {
@@ -183,7 +186,7 @@ import { cadViewState, saveCadViewState } from '@wbcnc/cad-editor/viewState';
 import { loadShownState, saveShownState } from './shownState';
 import { type CadSelectionBox } from './boxSelection';
 import { chainGeometry, type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture } from './editorGestures';
-import { constraintColorNotice, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
+import { constraintColorNotice, isEmptySketch, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
@@ -212,7 +215,7 @@ import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
 import { FeatureDialog } from './FeatureDialog';
 import { StudioSketchDialog } from './StudioSketchDialog';
-import { sketchPendingFinishReason } from './sketchPendingFinishReason';
+import { openSketchFinishReason, sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
 import { toggledKey } from './toggledKey';
 import { usePointPicker } from './pointPicker';
@@ -239,7 +242,7 @@ import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, normalTurn, straightOn, type SketchTurn } from './sketchOrbit';
-import { captureSketchCamera, carriedSketchCamera, type StudioCameraState } from './studioCamera';
+import { captureSketchCamera, carriedSketchCamera, useEditorCameras } from './studioCamera';
 import { studioViewShortcut } from './studioViewShortcut';
 import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
@@ -281,8 +284,10 @@ export function CadEditor({
   controller,
   onEditFaceSketch,
   partCameraState: suppliedPartCamera,
+  studioCameraState: suppliedStudioCamera,
   faceSketch,
   startIn3D,
+  selectedStepId,
 }: CadEditorProps) {
   const [session] = useState(() => editSession ?? cadSession(initialDocument));
   const [doc, setDocument] = useState(session.document);
@@ -437,9 +442,7 @@ export function CadEditor({
   const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
   const [sketchTurn, setSketchTurn] = useState<SketchTurn>(faceOpening?.turn ?? straightOn);
-  const studioCamera = useRef<StudioCameraState | null>(null);
-  const ownPartCamera = useRef<StudioCameraState | null>(null);
-  const partCameraState = suppliedPartCamera ?? ownPartCamera;
+  const { studioCamera, partCameraState } = useEditorCameras(suppliedStudioCamera, suppliedPartCamera);
   const [sketchCameraShift, setSketchCameraShift] = useState<[number, number]>(faceOpening?.shift ?? [0, 0]);
   // The edges of the parts behind a studio sketch, laid on its plane, and those picked to use in it with `u`.
   const [partEdges, setPartEdges] = useState<PartEdge[]>([]);
@@ -504,12 +507,9 @@ export function CadEditor({
   }, [stepDialogOpen, studioSession, showWorkspace, focusViewIfIdle]);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
-  const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
-  const [cancelledSketch, setCancelledSketch] = useState<{
-    document: CadDocument;
-    partId: string;
-    before: CadDocument;
-  } | null>(null);
+  // A mark rather than a document: Cancel puts undo history back too, so the cancelled sketch isn't left for Undo.
+  const sketchBefore = useRef(useState(() => (studioSession && !showWorkspace ? markCadSession(session) : null))[0]);
+  const [cancelledSketch, setCancelledSketch] = useState<{ document: CadDocument; partId: string; before: CadHistoryMark } | null>(null);
   useEffect(() => {
     if (!cancelledSketch) return;
     const timer = setTimeout(() => setCancelledSketch(null), 12_000);
@@ -1724,11 +1724,7 @@ export function CadEditor({
   const cancel = async () => {
     setBusy(true);
     try {
-      const restored = { ...structuredClone(session.entry), revision: session.document.revision + 1 };
-      session.document = restored;
-      session.past = [];
-      session.future = [];
-      publish(restored);
+      publish(restoreCadSession(session, { document: session.entry, past: [], future: [] }));
       await callbacks.current.onCancel();
       endCadSession(doc.id);
     } catch (error) {
@@ -1740,7 +1736,7 @@ export function CadEditor({
   const openFeature = (
     kind: 'extrude' | 'pattern' | 'hole',
     partId: string,
-    before = documentRef.current,
+    before = markCadSession(session),
     initialPatternKind?: PartPatternKind
   ) => {
     setSelectedFace(null);
@@ -1759,7 +1755,8 @@ export function CadEditor({
   const closeFeature = (keep: boolean) => {
     setDirectionPicker(null);
     // Pattern candidates use the viewport preview transaction, so cancel has no source or history edit to undo.
-    if (!keep && featureDialog && featureDialog.kind !== 'pattern') commit(featureDialog.before);
+    // Cancel puts history back too: a new entry would leave the cancelled edit for Undo to bring back.
+    if (!keep && featureDialog && featureDialog.kind !== 'pattern') publish(restoreCadSession(session, featureDialog.before));
     // Regions picked apart are a part each.
     if (keep && featureDialog?.kind === 'extrude') {
       const split = splitApartRegions(documentRef.current, featureDialog.partId, apartIds);
@@ -1774,7 +1771,7 @@ export function CadEditor({
     setFeatureDialog(null);
   };
   /** Opens a part's sketch from the studio, remembering the design to go back to if it's cancelled. */
-  const openSketch = (stepPartId: string, before = documentRef.current) => {
+  const openSketch = (stepPartId: string, before = markCadSession(session)) => {
     setSelectedFace(null);
     setCancelledSketch(null);
     // A shared sketch is edited where it's drawn, and every extrude of it follows.
@@ -1813,7 +1810,7 @@ export function CadEditor({
     captureSketchCamera(documentRef.current, part, studioCamera, view, sketchTurn, sketchCameraShift, canvasBox);
     if (!keep && sketchBefore.current) {
       const cancelled = { document: structuredClone(documentRef.current), partId: part!.id, before: sketchBefore.current };
-      commit(sketchBefore.current);
+      publish(restoreCadSession(session, sketchBefore.current));
       if (studioSession) setCancelledSketch(cancelled);
     }
     sketchBefore.current = null;
@@ -1853,7 +1850,7 @@ export function CadEditor({
     }
     if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
     // A cut opens its part's sketch view from the studio: cancelling there goes back to the design as it is now.
-    if (studioSession && step.kind === 'cut') sketchBefore.current = documentRef.current;
+    if (studioSession && step.kind === 'cut') sketchBefore.current = markCadSession(session);
     setPartId(step.partId);
     setSelected([]);
     chooseTool('select');
@@ -1869,7 +1866,7 @@ export function CadEditor({
       setShowWorkspace(false);
       setShow3D(hasOutline(documentRef.current, step.partId));
     } else if (step.kind === 'faceSketch' && onEditFaceSketch && step.sketchId) {
-      faceEditor.edit(step.partId, step.sketchId);
+      faceEditor.edit(step.partId, step.sketchId, true);
     }
   };
   /** A row of the studio's feature list: edited, deleted, suppressed, or its sketch opened. */
@@ -1968,8 +1965,8 @@ export function CadEditor({
   };
   /** Starts a new part drawn on a base plane or a part's face, or on one of the design's planes, and opens its sketch. */
   const newPartOn = (on: CadDrawnOn['on'], datum?: string) => {
-    const before = documentRef.current;
-    const made = newSketchPart(before, on, {
+    const before = markCadSession(session);
+    const made = newSketchPart(before.document, on, {
       variables: variableScope,
       studio: studioSession,
       thickness: part?.thickness,
@@ -2045,7 +2042,9 @@ export function CadEditor({
       setVariableDialog({});
     } else if (command === 'hole') {
       const at = { partId: part?.id, copyId: cutSelection.pickedCopyId, cancel: () => featureDialog && closeFeature(false) };
-      startHole({ ...at, rolledTo: userRollback, read: () => documentRef.current, commit, open: openFeature, refuse: setStudioRefusal });
+      const read = () => documentRef.current,
+        mark = () => markCadSession(session);
+      startHole({ ...at, rolledTo: userRollback, read, mark, commit, open: openFeature, refuse: setStudioRefusal });
     } else if (command === 'fillet') setFilletDialog({});
     else if (command === 'mirror') {
       if (part) setMirrorDialog({ partId: part.id });
@@ -2060,12 +2059,13 @@ export function CadEditor({
       setChoosingFace(false);
       setPartCutting({});
     } else if (command === 'extrude' && (selectedFace || part)) {
-      const before = documentRef.current;
+      const mark = markCadSession(session),
+        before = mark.document;
       const from = selectedFace ? { face: selectedFace } : { part: part! };
       const started = startExtrude(before, from, part?.extrude === false && sketchRowPicked === part.id, profiles.pickedProfile);
       if ('refusal' in started) return setStudioRefusal(started.refusal);
       commit(started.document);
-      openFeature('extrude', started.partId, before);
+      openFeature('extrude', started.partId, mark);
     } else if (part)
       cutSelection.featurePart(command, (kind, partId) => openFeature(kind, partId, undefined, initialPatternKind), setStudioRefusal);
   };
@@ -2114,7 +2114,7 @@ export function CadEditor({
     (sketchStatuses[id]?.status === 'conflict' ? 'This part’s sketch can’t be solved with its current values.' : null);
   const displayStatus =
     activeSketchStatus?.status === 'solved' && (inProgress || !problems.length)
-      ? sketchDofStatus(activeSketchStatus.dof, !sketch?.entities.some(e => e.type !== 'point' && !e.construction))
+      ? sketchDofStatus(activeSketchStatus.dof, isEmptySketch(sketch))
       : status;
   const currentSolverResult = !solving && lastCheckedRevision.current === `${doc.id}:${doc.revision}`;
   const colorNotice = currentSolverResult ? constraintColorNotice(activeSketchStatus) : undefined;
@@ -2131,7 +2131,6 @@ export function CadEditor({
   const stroke = sketchStrokeColor(activeSketchStatus, currentSolverResult);
   const grid = Math.max(1, 10 ** Math.floor(Math.log10(view.w / 20)));
   const chainPreview = sketch && chainGeometry(sketch, chain);
-  const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
   const acceptanceNotice = notice ?? useNotice ?? finishError;
   const profiles = useProfileSelection(doc, featureDialog, commit, setStudioRefusal);
   const faceBackdrop = useFaceSketchCamera(faceSketch?.scene, view, sketchTurn, sketchCameraShift, canvasBox);
@@ -2161,20 +2160,14 @@ export function CadEditor({
   };
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
-  // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
-  const sketchFinishReason =
-    busy || solving
-      ? 'Wait for the current sketch check to finish.'
-      : (pendingFinishReason ??
-        (edgeOnBoard
-          ? null
-          : !faceSketch && !thicknessValid
-            ? 'Enter a valid part thickness before finishing the sketch.'
-            : problems.length
-              ? problems.join(' ')
-              : !faceSketch && numberOfShapes === 0
-                ? 'Draw an outline before finishing the sketch.'
-                : null));
+  const sketchFinishReason = openSketchFinishReason(sketch, problems, {
+    checking: busy || solving,
+    pending: pendingFinishReason,
+    edgeOnBoard,
+    thickness: thicknessValid,
+    face: !!faceSketch,
+    studio: studioSession,
+  });
   const sketchCanFinish = sketchFinishReason === null;
   // The studio's Parts list shows each physical instance, with an eye to show or hide it in the view.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
@@ -2361,6 +2354,7 @@ export function CadEditor({
               workspace={showWorkspace}
               document={doc}
               selectedPartId={part?.id ?? null}
+              initialSelection={selectedStepId}
               onSelect={selectStudioFeature(doc, profiles.pickSketch, {
                 sketch: setSketchRowPicked,
                 face: () => setSelectedFace(null),
@@ -2482,7 +2476,7 @@ export function CadEditor({
                 }}>
                 Delete part
               </button>
-              {(!!part.features?.length || onEditFaceSketch) && (
+              {(!!part.features?.length || (onEditFaceSketch && part.extrude !== false)) && (
                 <PartFeatureList
                   part={part}
                   onRemove={featureId => commit(removeCadFeature(documentRef.current, part.id, featureId))}
@@ -2613,9 +2607,9 @@ export function CadEditor({
               onExtrude={() => {
                 if (!closeSketch(true)) return;
                 // Read after closing: a value still being typed is applied as the sketch closes.
-                const before = documentRef.current;
-                const sketched = before.parts.find(candidate => candidate.id === part.id);
-                const started = sketched && startExtrude(before, { part: sketched }, true, picked => picked);
+                const before = markCadSession(session);
+                const sketched = before.document.parts.find(candidate => candidate.id === part.id);
+                const started = sketched && startExtrude(before.document, { part: sketched }, true, picked => picked);
                 if (!started) return;
                 if ('refusal' in started) return setStudioRefusal(started.refusal);
                 commit(started.document);

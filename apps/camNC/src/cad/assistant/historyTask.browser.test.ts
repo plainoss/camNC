@@ -19,8 +19,13 @@ const explanation =
 
 interface ModelReport {
   report?: {
-    parts: { name: string; thickness: number; cuts: { ref: string; from: number; to: number }[] }[];
-    assembly: { collisions: unknown[] };
+    errors: { code: string }[];
+    changedParts: {
+      name: string;
+      thickness: number;
+      cuts: { ref: string; side: string; from?: number; to?: number; through?: boolean }[];
+    }[];
+    removedParts?: string[];
   };
 }
 
@@ -56,11 +61,13 @@ it('retains prior back thickness and reports pin-hole floor after a stock change
         };
       const feedback = request.messages.find(message => message.callId === 'stock-edit');
       const checked = JSON.parse(feedback!.text) as ModelReport;
-      expect(checked.report?.parts.find(part => part.name === 'Back')?.thickness).toBe(6);
-      const side = checked.report?.parts.find(part => part.name === 'Side');
+      // The check lists only what changed: thinner sides move the back, which keeps its 6 mm.
+      expect(checked.report?.changedParts.find(part => part.name === 'Back')?.thickness).toBe(6);
+      expect(checked.report?.removedParts).toBeUndefined();
+      const side = checked.report?.changedParts.find(part => part.name === 'Side');
       expect(side?.thickness).toBe(15);
-      expect(side!.thickness - side!.cuts.find(cut => cut.to === 12)!.to).toBe(3);
-      expect(checked.report?.assembly.collisions).toEqual([]);
+      expect(side!.thickness - side!.cuts.find(cut => cut.to === 12)!.to!).toBe(3);
+      expect(checked.report?.errors.filter(error => error.code === 'parts-collide')).toEqual([]);
       // The legacy start has all four housings despite the earlier pin request. C3's
       // automatic checks do not assess that inherited defect; keep it visible here.
       expect(side!.cuts.filter(cut => /^Shelf(?: [234])?$/.test(cut.ref))).toHaveLength(4);

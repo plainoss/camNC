@@ -1,6 +1,9 @@
 const namespace = 'http://www.w3.org/2000/svg';
 const elements = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line']);
 const geometry = new Set(['x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'width', 'height', 'stroke-width']);
+// Path commands or points in all. A detailed 1024 px line-art trace takes about 3200 commands, in about 110,000
+// characters; the trace worker caps its own path data at 170,000.
+const kMaxCommands = 5000;
 const numeric = /^[\s,0-9eE+.-]+$/;
 const finiteCoordinates = (value: string) =>
   (value.match(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/g) ?? []).every(
@@ -10,8 +13,8 @@ const finiteCoordinates = (value: string) =>
 /** Rebuild a small drawing vocabulary; never insert provider markup into the live DOM. */
 export function sanitizeCarvingSvg(input: string): string {
   // Models annotate parts with comments; drop them before the declaration check. Comment nodes are never copied.
-  const source = input.length > 120_000 ? input : input.replace(/<!--[^]*?-->/g, '');
-  if (source.length > 120_000 || /<!|<\?/.test(source))
+  const source = input.length > 180_000 ? input : input.replace(/<!--[^]*?-->/g, '');
+  if (source.length > 180_000 || /<!|<\?/.test(source))
     throw new Error('Artwork must be a small, self-contained SVG without declarations.');
   const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
   if (parsed.querySelector('parsererror') || parsed.documentElement.localName !== 'svg') throw new Error('Artwork is not valid SVG.');
@@ -55,11 +58,11 @@ export function sanitizeCarvingSvg(input: string): string {
       } else if (name === 'd' && node.localName === 'path') {
         if (!/^[MmLlHhVvCcSsQqTtAaZz\s,0-9eE+.-]*$/.test(value) || !finiteCoordinates(value)) throw new Error('Invalid artwork path.');
         commands += (value.match(/[MmLlHhVvCcSsQqTtAaZz]/g) ?? []).length;
-        if (commands > 2500) throw new Error('Artwork has too many path commands.');
+        if (commands > kMaxCommands) throw new Error('Artwork has too many path commands.');
       } else if (name === 'points' && (node.localName === 'polygon' || node.localName === 'polyline')) {
         if (!numeric.test(value) || !finiteCoordinates(value)) throw new Error('Invalid artwork points.');
         commands += value.trim().split(/[\s,]+/).length / 2;
-        if (commands > 2500) throw new Error('Artwork has too many points.');
+        if (commands > kMaxCommands) throw new Error('Artwork has too many points.');
       } else if (name === 'fill' || name === 'stroke') {
         if (!/^(?:black|white|none|#000(?:000)?|#fff(?:fff)?)$/i.test(value)) throw new Error('Use only black, white or no fill/stroke.');
       } else if (name === 'fill-rule') {

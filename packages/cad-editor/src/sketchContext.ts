@@ -56,6 +56,12 @@ export interface SketchContextItem {
   separatorBefore?: boolean;
 }
 
+/** A pattern or slot relation: one glyph that edits or removes the whole group it ties together. */
+export const isPatternRelation = (sketch: CadSketch, id: string) =>
+  sketch.constraints.some(c => c.id === id && (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot'));
+/** A relation shown as a glyph rather than a dimension, such as Horizontal or Perpendicular. */
+const isConstraintGlyph = (sketch: CadSketch, id: string) => sketch.constraints.some(c => c.id === id && !('value' in c));
+
 /** Visible annotation targets come from their DOM label; geometry uses the same nearest picking as drawing. */
 export function pickSketchContextTarget(
   sketch: CadSketch,
@@ -96,11 +102,16 @@ export function createSketchContext(
       entityIds: entityIds.includes(target.id) ? entityIds : [target.id],
       constraintIds: [],
     };
-  if (
-    target.kind === 'constraint' &&
-    sketch.constraints.some(c => c.id === target.id && (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot'))
-  )
+  if (target.kind === 'constraint' && isPatternRelation(sketch, target.id))
     return { target: { ...target }, position: { ...position }, entityIds: [], constraintIds: [target.id] };
+  // A constraint glyph keeps the other selected glyphs with it, as a selected entity keeps its group.
+  if (target.kind === 'constraint' && isConstraintGlyph(sketch, target.id))
+    return {
+      target: { ...target },
+      position: { ...position },
+      entityIds: [],
+      constraintIds: constraintIds.includes(target.id) ? constraintIds.filter(id => isConstraintGlyph(sketch, id)) : [target.id],
+    };
   if (target.kind === 'dimension' && sketch.constraints.some(c => c.id === target.id && 'value' in c))
     return {
       target: { ...target },
@@ -117,10 +128,10 @@ export function createSketchContext(
 export function selectedSketchContextTarget(sketch: CadSketch, selection: SketchContextSelection): SketchContextTarget {
   const dimension = selection.constraintIds.find(id => sketch.constraints.some(c => c.id === id && 'value' in c));
   if (dimension) return { kind: 'dimension', id: dimension };
-  const pattern = selection.constraintIds.find(id =>
-    sketch.constraints.some(c => c.id === id && (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot'))
-  );
+  const pattern = selection.constraintIds.find(id => isPatternRelation(sketch, id));
   if (pattern) return { kind: 'constraint', id: pattern };
+  const constraint = selection.constraintIds.find(id => isConstraintGlyph(sketch, id));
+  if (constraint) return { kind: 'constraint', id: constraint };
   const entity = selection.entityIds.find(id => sketch.entities.some(entity => entity.id === id));
   return entity ? { kind: 'entity', id: entity } : { kind: 'blank' };
 }
@@ -142,8 +153,19 @@ export function toggleContextConstruction(sketch: CadSketch, ids: readonly strin
 export function sketchContextItems(sketch: CadSketch, context: SketchContext, busy = false): SketchContextItem[] {
   if (context.target.kind === 'constraint') {
     const id = context.target.id;
-    if (!sketch.constraints.some(c => c.id === id && (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot')))
-      return [];
+    if (!isPatternRelation(sketch, id)) {
+      if (!isConstraintGlyph(sketch, id)) return [];
+      return [
+        {
+          action: 'delete-dimensions',
+          label: context.constraintIds.length > 1 ? 'Delete constraints' : 'Delete constraint',
+          disabled: busy,
+          shortcut: 'Delete',
+        },
+        { action: 'clear', label: 'Clear selection', separatorBefore: true, shortcut: 'Space' },
+        { action: 'fit', label: 'Zoom to fit', shortcut: 'F' },
+      ];
+    }
     if (sketch.constraints.some(c => c.id === id && c.type === 'slot'))
       return [
         { action: 'delete-dimensions', label: 'Remove slot relation', disabled: busy, shortcut: 'Delete' },

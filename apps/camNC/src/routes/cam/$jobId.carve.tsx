@@ -43,6 +43,12 @@ export const Route = createFileRoute('/cam/$jobId/carve')({ component: CarveStep
 /** What Undo brings back: the carving and its board. */
 type Snapshot = Pick<CamJobV1, 'carving' | 'boards'>;
 const kUndoSteps = 50;
+/** Text being typed, whose ⌘Z is the browser's: not a checkbox, a select, or a number field showing its saved value. */
+const typingIn = (target: EventTarget | null) =>
+  target instanceof Element &&
+  !!target.closest(
+    'textarea, [contenteditable]:not([contenteditable="false"]), [role="textbox"], input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="button"], [data-saved])'
+  );
 type BoardGrip = 'w' | 'h' | 'wh';
 
 /** A dragged board edge moves in these steps (Shift: 1 mm), between the board size fields' limits. */
@@ -309,16 +315,18 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
         setDragged(null);
       }
       const target = e.target;
-      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"]'))
-        return;
-      // ⌘Z / Ctrl+Z, and ⇧⌘Z or Ctrl+Y; in a text field they stay the field's own.
+      // ⌘Z / Ctrl+Z, and ⇧⌘Z or Ctrl+Y; while text is typed they stay the field's own. A checkbox, a select or a number
+      // field showing its saved value has no undo of its own, so there they undo the carving.
       if ((e.metaKey || e.ctrlKey) && !e.altKey) {
         const k = e.key.toLowerCase();
-        if (k !== 'z' && k !== 'y') return;
-        e.preventDefault();
-        (k === 'y' || e.shiftKey ? redo : undo)?.();
+        if ((k === 'z' || k === 'y') && !typingIn(target)) {
+          e.preventDefault();
+          (k === 'y' || e.shiftKey ? redo : undo)?.();
+        }
         return;
       }
+      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"]'))
+        return;
       if (e.key === 'Enter' && (target === svg.current || target === document.body) && editing?.art.kind === 'text') {
         e.preventDefault();
         setInlineId(editing.id);
@@ -629,7 +637,8 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                   />
                 )
               )}
-              {box && shown && shown.id !== inlineId && (
+              {/* While AI artwork replaces the selected item, its box stands for the item: one frame and one size label. */}
+              {box && shown && shown.id !== inlineId && !(assistant.open && assistant.replace.on) && (
                 <g transform={`translate(${shown.x} ${size.h - shown.y}) rotate(${-shown.rotation})`}>
                   <rect
                     x={box.x0}
@@ -734,6 +743,7 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
             !dragged &&
             editing.id !== inlineId &&
             !resized &&
+            !(assistant.open && assistant.replace.on) &&
             (() => {
               // Above the item and its rotate handle.
               const top = placeItem({
@@ -745,12 +755,17 @@ function CarveEditor({ job, carving, board }: { job: CamJobV1; carving: CarvingV
                 ? toView({ x: (Math.min(...pts.map(p => p.x)) + Math.max(...pts.map(p => p.x))) / 2, y: Math.max(...pts.map(p => p.y)) })
                 : null;
               if (!at) return null;
+              // Keep the AI artwork box visible and reachable while something else is selected.
+              const t = assistant.target;
+              const [a, b] = [toView({ x: t.x - t.w / 2, y: t.y + t.h / 2 }), toView({ x: t.x + t.w / 2, y: t.y - t.h / 2 })];
+              const assistantBox = assistant.open && a && b ? { left: a.x, top: a.y, right: b.x, bottom: b.y } : null;
               return (
                 <SelectionBar<'height' | 'rotation'>
                   key={editing.id}
                   id="carve"
                   title={editing.art.kind === 'text' ? 'Lettering' : editing.art.fileName}
                   at={at}
+                  avoid={assistantBox}
                   fields={[
                     { key: 'height', label: 'Height', name: 'Height (mm)', value: editing.height, min: 5, max: size.h },
                     { key: 'rotation', label: 'Angle', name: 'Rotation (°)', value: editing.rotation, unit: '°', min: -360, max: 720 },

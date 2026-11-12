@@ -1,4 +1,5 @@
 import type { CadDocument, CadDrawnOn, CadValueScope } from '@wbcnc/cad';
+import type { CadHistoryMark } from '@wbcnc/cad-editor/session';
 import { useRef } from 'react';
 import { ExtrudeDialog, type CadConnectorPick } from './PartFeatureDialogs';
 import { HoleDialog } from './HoleDialog';
@@ -9,7 +10,8 @@ import type { DialogPartPicks } from './useDialogPartPick';
 export interface StudioFeatureDialogState {
   kind: 'extrude' | 'pattern' | 'hole';
   partId: string;
-  before: CadDocument;
+  /** The design and its undo history as the dialog found them, for Cancel to go back to. */
+  before: CadHistoryMark;
   initialPatternKind?: PartPatternKind;
 }
 

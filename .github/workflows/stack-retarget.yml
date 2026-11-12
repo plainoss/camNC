@@ -1,0 +1,58 @@
+name: Retarget stacked PRs
+
+# When a PR merges, the open PRs stacked on its branch move to the branch it merged into, so they don't sit orphaned
+# until someone notices. CI doesn't run on a retarget, so each one gets a comment asking its owner to merge the new base
+# in, which starts CI. A base closed without merging is left to the PR watchdog, which flags its children: they still
+# carry its commits. pull_request_target runs main's copy of this file and checks out nothing.
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  retarget:
+    # A fork PR's head names a branch of the fork, which says nothing about this repository's stacks.
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != github.event.pull_request.base.ref
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Retarget the PRs based on the merged branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MERGED: ${{ github.event.pull_request.number }}
+          MERGED_AT: ${{ github.event.pull_request.merged_at }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        # Not the default `bash -e`, which stops at the first error: one PR that fails to retarget or comment must not
+        # leave the rest unhandled.
+        shell: bash --noprofile --norc {0}
+        run: |
+          note="Its base #$MERGED merged, so this PR now targets \`$BASE\`. Merge \`$BASE\` into it and push: that starts its CI, which a retarget doesn't."
+          handled=" "
+          for pr in $(gh pr list --repo "$REPO" --state open --base "$HEAD" --json number --jq '.[].number'); do
+            handled="$handled$pr "
+            if gh pr edit "$pr" --repo "$REPO" --base "$BASE"; then
+              gh pr comment "$pr" --repo "$REPO" --body "$note" && echo "Retargeted #$pr to $BASE"
+            else
+              echo "::warning::Could not retarget #$pr to $BASE"
+            fi
+          done
+          # Deleting the merged branch makes GitHub retarget its children to the base itself, before this runs. Those
+          # still need the comment: they are the PRs into the base that GitHub retargeted since the merge and that carry
+          # the merged head commit.
+          since=$(date -u -d "$MERGED_AT - 1 minute" +%Y-%m-%dT%H:%M:%SZ)
+          for pr in $(gh pr list --repo "$REPO" --state open --base "$BASE" --limit 200 --json number --jq ".[] | select(.number != $MERGED) | .number"); do
+            retargeted=$(gh api "repos/$REPO/issues/$pr/timeline?per_page=100" --paginate \
+              --jq "[.[] | select(.event == \"base_ref_changed\" and .created_at >= \"$since\")] | length" | awk '{n += $1} END {print n + 0}')
+            case "$handled" in *" $pr "*) continue ;; esac
+            [ "$retargeted" -gt 0 ] || continue
+            head=$(gh pr view "$pr" --repo "$REPO" --json headRefOid --jq .headRefOid) || continue
+            status=$(gh api "repos/$REPO/compare/$HEAD_SHA...$head" --jq .status) || continue
+            if [ "$status" = ahead ] || [ "$status" = identical ]; then
+              gh pr comment "$pr" --repo "$REPO" --body "$note" && echo "Commented on #$pr, which GitHub retargeted to $BASE"
+            fi
+          done
