@@ -26,6 +26,7 @@ import {
   isCadPart,
   activeDesign,
   physicalJoinedCopies,
+  smallestCornerRelief,
 } from '@wbcnc/cad';
 import {
   DEFAULT_SETTINGS,
@@ -398,10 +399,15 @@ export async function inspectCadDocument(
   // Physical membership is derived for quantity/name metadata; authoring sketches and history stay in the saved source.
   const physical = physicalJoinedCopies(activeDesign(solved.document));
   // Bones widen a cut past what was drawn, so its opening is measured on the part without them.
-  const unrelieved = solved.document.parts.some(part => part.cornerRelief)
-    ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(({ cornerRelief: _cornerRelief, ...part }) => part) })
-        .parts
-    : solved.parts;
+  // A Cut parts step can relieve its own openings, so its override is dropped as well.
+  const unrelieved =
+    solved.document.parts.some(part => part.cornerRelief) || solved.document.partCuts?.some(step => step.cornerRelief)
+      ? evaluateCadDocument({
+          ...solved.document,
+          parts: solved.document.parts.map(({ cornerRelief: _cornerRelief, ...part }) => part),
+          partCuts: solved.document.partCuts?.map(({ cornerRelief: _cornerRelief, ...step }) => step),
+        }).parts
+      : solved.parts;
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
     const physicalPart = physical.parts.find(candidate => candidate.id === part.id)!;
     const evaluated = solved.parts.find(candidate => candidate.partId === part.id);
@@ -581,7 +587,7 @@ export async function inspectCadDocument(
             part: part.name,
           });
         else if (options.toolpaths !== false) {
-          toolpaths = toolpathSummary(evaluated, profile, part.cornerRelief?.diameter);
+          toolpaths = toolpathSummary(evaluated, profile, smallestCornerRelief(solved.document, part.id));
           // CAM leaves out what no tool fits, so the part wouldn't come out as drawn.
           const dropped = toolpaths.warnings.find(warning => warning.includes('no tool fits'));
           if (dropped) warnings.push({ code: 'toolpath-missing', message: `A cut wouldn't be machined: ${dropped}`, part: part.name });
