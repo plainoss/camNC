@@ -8,17 +8,10 @@ queue_rules:
   - name: main
     # Queue with @mergifyio queue, or label the PR `ready` (pull_request_rules below); passing CI alone is not merge
     # consent.
-    # Mergify queues a PR by itself as soon as these hold (autoqueue). The `ready` label is merge consent that doesn't
-    # need the author around, so passing CI alone never queues a PR. A `ci-fix` or `flaky-test` label is consent too,
-    # and such a PR enters straight away: the batch runs every check on it anyway.
-    autoqueue: true
     queue_conditions:
       - base = main
       - -draft
-      - or:
-          - label = ready
-          - label = ci-fix
-          - label = flaky-test
+      # A test or CI fix enters the queue straight away: the batch runs every check on it anyway.
       - or:
           - check-success = Run tests
           - label = ci-fix
@@ -60,3 +53,13 @@ priority_rules:
           - title ~= ^fix\((ci|test)\)
     priority: high
     allow_checks_interruption: false
+
+# The `ready` label is merge consent that doesn't need the author around: the PR queues once its queue conditions
+# hold (Run tests green, approved, no conflict), even if the session that opened it has stopped.
+pull_request_rules:
+  - name: queue PRs labelled ready
+    conditions:
+      - base = main
+      - label = ready
+    actions:
+      queue:

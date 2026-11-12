@@ -220,9 +220,10 @@ test('the Mergify queue runs all validation, PRs run the quick suites and main o
 
 test('Mergify batches retain the required gate, branch protections and explicit merge consent', () => {
   const config = parse(read('.mergify.yml'));
-  // CI success alone never queues a PR: Mergify queues by itself only PRs labelled `ready`, `ci-fix` or `flaky-test`.
-  assert.equal(config.pull_request_rules, undefined);
-  assert.equal(config.queue_rules[0].autoqueue, true);
+  // CI success alone never queues a PR: the only automatic queueing is for PRs someone labelled `ready`.
+  assert.deepEqual(config.pull_request_rules, [
+    { name: 'queue PRs labelled ready', conditions: ['base = main', 'label = ready'], actions: { queue: null } },
+  ]);
   assert.equal(config.merge_protections_settings?.auto_merge_conditions, undefined);
   assert.equal(config.merge_queue.mode, 'serial', 'speculative batches must include preceding changes');
   // One batch's 11 jobs plus PR CI fit the 20 concurrent runners; two batches did not.
@@ -244,11 +245,8 @@ test('Mergify batches retain the required gate, branch protections and explicit 
   assert(required);
   const gate = `check-success = ${required.name}`;
   assert(queue.merge_conditions.includes(gate), 'batches must pass the validation gate');
-  // A label is merge consent, and only a labelled test or CI fix may queue before its own CI passes.
-  assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'object'), [
-    { or: ['label = ready', 'label = ci-fix', 'label = flaky-test'] },
-    { or: [gate, 'label = ci-fix', 'label = flaky-test'] },
-  ]);
+  // Only a labelled test or CI fix may queue before its own CI passes.
+  assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'object'), [{ or: [gate, 'label = ci-fix', 'label = flaky-test'] }]);
   assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'string').sort(), ['-draft', 'base = main']);
   const { jobs } = parse(read('.github/workflows/ci.yml'));
   const browserChecks = jobs.browser.strategy.matrix.include.map(({ suite }) => `Tests (${suite})`);
