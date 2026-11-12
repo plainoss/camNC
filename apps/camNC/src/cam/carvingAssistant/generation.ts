@@ -50,7 +50,7 @@ export interface CarvingGenerationOptions {
 
 const kMaxSvgCharacters = 48_000;
 /** A local trace's path data is capped at 110,000 characters; the sanitizer accepts up to 120,000. */
-const kMaxTracedSvgCharacters = 120_000;
+const kMaxTracedSvgCharacters = 180_000;
 const tool: AssistantTool = {
   name: 'submit_carving_svg',
   description:
