@@ -82,6 +82,8 @@ export * from './extrudeRemoval';
 
 export * from './lengthUnits';
 export * from './replaceFilletedSketch';
+export type * from './constructionTypes';
+export * from './construction';
 
 export * from './copyTransforms';
 export { smallestCornerRelief } from './partCutRelief';

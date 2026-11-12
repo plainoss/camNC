@@ -94,16 +94,6 @@ it('resolves, renames and tracks a step diameter variable without changing clear
   expect(parseCadDocument(JSON.parse(JSON.stringify(changed.document))).version).toBe(5);
 });
 
-it.each(['constructions'])('refuses unsupported %s even combined with its own relief', key => {
-  const document = source().document;
-  const relieved = updatePartCut(document, document.partCuts![0]!.id, { cornerRelief: null });
-  const combined = { ...relieved, [key]: [] };
-  expect(() => parseCadDocument(combined)).toThrow(/support/i);
-  expect(evaluateCadDocument(combined as CadDocument).diagnostics).toContainEqual(
-    expect.objectContaining({ severity: 'error', code: 'invalid-document' })
-  );
-});
-
 it.each([false, true, 0, -1, 'off', {}, { diameter: 0 }, { diameter: Infinity }, { diameter: 6, kind: 'tbone' }])(
   'refuses malformed relief %j before evaluating geometry',
   relief => {

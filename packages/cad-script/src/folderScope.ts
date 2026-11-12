@@ -12,6 +12,7 @@ import {
 } from '@wbcnc/cad';
 import { fail, resolveHandle } from './editExisting';
 import type { CadScript, DesignEdit, PartCopy, ScriptStepEdit } from './editTypes';
+import { scopedConstruction } from './constructionApi';
 
 interface ScopeContext {
   get(): CadDocument;
@@ -146,6 +147,7 @@ export function runFolderScope(ctx: ScopeContext, root: DesignEdit, name: string
     );
   };
   const scoped: DesignEdit = {
+    construction: options => root.construction(scopedConstruction(options, folderId, names, ownedParts(), ctx.get().constructions ?? [])),
     part,
     newPart(name, options) {
       if (!name.trim()) return fail('A new part needs a name.');
