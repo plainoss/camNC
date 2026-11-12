@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createPlateDocument, designSteps, partCutInputProblems, type CadDocument, type CadPart } from './index';
+import {
+  addPartCopy,
+  createPlateDocument,
+  designSteps,
+  partCutInputProblems,
+  setPartPattern,
+  type CadDocument,
+  type CadPart,
+} from './index';
 
 /** Side cut with Front by one Cut parts step. */
 function joined(front: Partial<CadPart> = {}): CadDocument {
@@ -44,5 +52,55 @@ describe('A Cut parts step whose tool or target isn’t built', () => {
   it('is quiet while every tool and target is built', () => {
     expect(partCutInputProblems(joined())).toEqual([]);
     expect(row(joined())).toBeUndefined();
+  });
+
+  describe('when the tool is one copy of a part', () => {
+    /** Front patterned three times along X, its third instance the step's tool. */
+    const patterned = () => {
+      const document = joined();
+      return retargeted(setPartPattern(document, document.parts[1]!.id, { axis: 'x', spacing: 150, count: 3 }), 1);
+    };
+    /** The design with the step's tool switched to the last copy of the part at `index`. */
+    const retargeted = (document: CadDocument, index: number): CadDocument => {
+      const part = document.parts[index]!;
+      return { ...document, partCuts: [{ ...document.partCuts![0]!, tools: [`${part.id}:${part.copies!.at(-1)!.id}`] }] };
+    };
+
+    it('is quiet while that copy is built', () => {
+      expect(row(patterned())).toBeUndefined();
+    });
+
+    it('says the copy is deleted once the pattern count drops below it', () => {
+      const document = patterned();
+      const fewer = setPartPattern(document, document.parts[1]!.id, { axis: 'x', spacing: 150, count: 2 });
+      expect(fewer.parts[1]!.copies).toHaveLength(1);
+      expect(row(fewer)).toBe('Cut Side with a removed part can’t use its tool, a deleted copy of Front.');
+    });
+
+    it('says a copy of a suppressed pattern is suppressed', () => {
+      const document = patterned();
+      const front = document.parts[1]!;
+      const off = { ...document, parts: [document.parts[0]!, { ...front, pattern: { ...front.pattern!, suppressed: true as const } }] };
+      expect(row(off)).toMatch(/can’t use its tool Front[^,]*, which is suppressed\.$/);
+    });
+
+    it('says a suppressed copy is suppressed', () => {
+      const plain = joined();
+      const document = retargeted(addPartCopy(plain, plain.parts[1]!.id).document, 1);
+      expect(row(document)).toBeUndefined();
+      const front = document.parts[1]!;
+      const off = { ...front, copies: front.copies!.map(copy => ({ ...copy, suppressed: true as const })) };
+      expect(row({ ...document, parts: [document.parts[0]!, off] })).toMatch(/can’t use its tool Front[^,]*, which is suppressed\.$/);
+    });
+  });
+
+  it('says a part drawn on a plane in a suppressed folder is suppressed', () => {
+    const document = joined();
+    const [side, front] = document.parts;
+    const drawn: CadPart = { ...front!, drawnOn: { on: { plane: 'top' }, offset: 0, datum: 'plane' } };
+    const folder = { id: 'f', name: 'Planes', partIds: [], planeIds: ['plane'], suppressed: true as const };
+    expect(row({ ...document, parts: [side!, drawn], folders: [folder] })).toBe(
+      'Cut Side with Front can’t use its tool Front, which is suppressed.'
+    );
   });
 });

@@ -1,22 +1,27 @@
 import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import { partCutLabel } from './partCutVariables';
+import { activeDesign } from './suppression';
 import type { CadDiagnostic, CadDocument } from './types';
 
 /**
- * Why each Cut parts step that's switched on can't use one of its tools or targets: the part is deleted, suppressed
- * (by itself or its folder) or only a sketch, so the built design leaves it out of the step (`activeDesign`) and the
- * step cuts less than it says, or nothing. Said on the step's feature row and on each part the step still joins.
+ * Why each Cut parts step that's switched on can't use one of its tools or targets: the part or copy is deleted,
+ * suppressed (by itself, its pattern, its folder or its plane's folder) or only a sketch, so the built design
+ * (`activeDesign`) leaves it out and the step cuts less than it says, or nothing. Said on the step's feature row and
+ * on each part the step still joins.
  */
 export function partCutInputErrors(document: CadDocument): { stepId: string; partIds: string[]; message: string }[] {
-  const masked = document.folders?.filter(folder => folder.suppressed) ?? [];
-  const folderParts = new Set(masked.flatMap(folder => folder.partIds));
-  const folderCuts = new Set(masked.flatMap(folder => folder.partCutIds ?? []));
+  // What's built is what the step is given: the same rules for suppressed parts, copies, patterns and folders.
+  const built = activeDesign(document);
+  const folderCuts = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partCutIds ?? []));
   const unbuilt = (reference: string, role: 'tool' | 'target'): string[] => {
     const owner = cadPartReferenceOwner(document, reference);
-    const name = cadPartReferenceName(document, reference) ?? owner?.name;
-    if (!owner || !name) return [`a deleted ${role}`];
-    if (owner.suppressed || folderParts.has(owner.id)) return [`its ${role} ${name}, which is suppressed`];
+    if (!owner) return [`a deleted ${role}`];
+    // A copy that's gone, such as one past a pattern's count, can't be named.
+    const name = cadPartReferenceName(document, reference);
+    if (!name) return [`its ${role}, a deleted copy of ${owner.name}`];
     if (owner.extrude === false) return [`its ${role} ${name}, which isn’t extruded`];
+    if (built.parts.find(part => part.id === owner.id)?.extrude === false || !cadPartReferenceName(built, reference))
+      return [`its ${role} ${name}, which is suppressed`];
     return [];
   };
   return (document.partCuts ?? []).flatMap(step => {
