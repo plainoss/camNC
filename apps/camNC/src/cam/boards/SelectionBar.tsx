@@ -67,6 +67,7 @@ export function SelectionBar<K extends string>({
     document.addEventListener('pointerdown', down, true);
     return () => document.removeEventListener('pointerdown', down, true);
   }, []);
+  const [avoidLeft, avoidTop, avoidRight, avoidBottom] = avoid ? [avoid.left, avoid.top, avoid.right, avoid.bottom] : [];
   // Above it, or below when there's no room there, and always within the drawing.
   useLayoutEffect(() => {
     const el = bar.current,
@@ -76,7 +77,8 @@ export function SelectionBar<K extends string>({
     const gap = 16;
     const clampLeft = (left: number) => Math.max(0, Math.min(parent.clientWidth - w, left));
     const usual = { left: clampLeft(at.x - w / 2), top: at.y - h - gap >= 0 ? at.y - h - gap : at.y + gap };
-    if (!avoid) return setPlace(usual);
+    if (avoidLeft === undefined || avoidTop === undefined || avoidRight === undefined || avoidBottom === undefined) return setPlace(usual);
+    const avoid = { left: avoidLeft, top: avoidTop, right: avoidRight, bottom: avoidBottom };
     const clear = (p: { left: number; top: number }) =>
       p.top >= 0 &&
       p.left >= 0 &&
@@ -90,7 +92,7 @@ export function SelectionBar<K extends string>({
       { left: usual.left, top: Math.max(at.y + gap, avoid.bottom + 8) },
     ];
     setPlace(candidates.find(clear) ?? usual);
-  }, [at.x, at.y, offer, title, avoid?.left, avoid?.top, avoid?.right, avoid?.bottom]);
+  }, [at.x, at.y, offer, title, avoidLeft, avoidTop, avoidRight, avoidBottom]);
   return (
     <div
       ref={bar}
