@@ -113,7 +113,14 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
             add an image provider
           </button>
           ,{' '}
-          <button type="button" className="underline" onClick={() => connection.setGenerationMode('text')}>
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              connection.setGenerationMode('text');
+              // This notice goes away with the button: carry on in the prompt rather than drop focus to the page.
+              requestAnimationFrame(() => document.getElementById(`${id}-prompt`)?.focus());
+            }}>
             use Text SVG
           </button>
           , or use another chat below.
@@ -180,7 +187,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {session.generating ? (
             <Button type="button" variant="outline" className="flex-1" onClick={request.stop}>
               <LoadingSpinner className="size-3" /> Stop
