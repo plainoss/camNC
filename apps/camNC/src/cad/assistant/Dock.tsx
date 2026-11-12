@@ -237,7 +237,8 @@ export function AssistantDock({
           if (!candidate.trustedReport) throw new Error('Missing trusted geometry check.');
           const checked = await finalizeBrowserCandidate(
             { ...candidate, report: candidate.trustedReport, parts: candidate.parts ?? [] },
-            signal
+            signal,
+            { bit: candidate.bit }
           );
           const detailReport = compactCadReport(checked.document, checked.report);
           return {
