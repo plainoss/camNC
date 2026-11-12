@@ -396,7 +396,7 @@ export function TransformDialog({
           <button
             type="button"
             className="cad-feature-selection"
-            data-active={picking || !direction ? '' : undefined}
+            data-active={(picking || !direction) && !partPick.active ? '' : undefined}
             onClick={pick}
             aria-label="Direction">
             <small>Direction</small>
@@ -428,7 +428,7 @@ export function TransformDialog({
             key={end}
             type="button"
             className="cad-feature-selection"
-            data-active={pickingMate === end || !picked ? '' : undefined}
+            data-active={(pickingMate === end || !picked) && !partPick.active ? '' : undefined}
             aria-label={kPicks[end].label}
             onClick={() => pickMate(end)}>
             <small>{end === 'from' ? `Connector on ${part.name}` : kPicks[end].title}</small>

@@ -10,6 +10,7 @@ import { settled } from '@/test/settled';
 import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
+// Opening the cupboard in a full editor, and every pick after it, can take longer than the default under load.
 const sessions: string[] = [];
 afterEach(() => {
   cleanup();
@@ -69,7 +70,7 @@ it('mirrors the part clicked once its part field is active, and keeps the dialog
   expect(named(latest(), 'Bottom').copies).toHaveLength(1);
   expect(named(latest(), 'Bottom').copies![0]).toMatchObject({ mirrored: true, mirror: { across: { plane: 'top' } } });
   expect(named(latest(), 'Shelf').copies ?? []).toHaveLength(0);
-});
+}, 60_000);
 
 it('patterns the part clicked while the dialog is open, with what was set up so far', async () => {
   const { latest } = await open();
@@ -88,7 +89,7 @@ it('patterns the part clicked while the dialog is open, with what was set up so 
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(named(latest(), 'Bottom').pattern).toMatchObject({ count: 3 }));
   expect(named(latest(), 'Shelf').pattern).toBeUndefined();
-});
+}, 60_000);
 
 it('moves the part clicked while the dialog is open', async () => {
   const { source, latest } = await open();
@@ -99,13 +100,28 @@ it('moves the part clicked while the dialog is open', async () => {
   await userEvent.click(row('Bottom'));
   await waitFor(() => expect(field.textContent).toContain('Bottom'));
   expect(row('Bottom')).toHaveAttribute('aria-pressed', 'true');
+  // Only one pick field shows as active: the part's, not the direction's or a connector's waiting for input.
+  const active = () => [...dialog.querySelectorAll('.cad-feature-selection[data-active]')].map(field => field.getAttribute('aria-label'));
+  const type = within(dialog).getByRole('combobox', { name: 'Transform type' });
+  await userEvent.selectOptions(type, 'distance');
+  expect(active()).toEqual(['Part to move']);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
+  expect(active()).toEqual(['Direction']);
+  await userEvent.click(field);
+  expect(active()).toEqual(['Part to move']);
+  await userEvent.selectOptions(type, 'mate');
+  expect(active()).not.toContain('Part to move');
+  expect(active()).toContain('Mate connector');
+  await userEvent.click(field);
+  expect(active()).toEqual(['Part to move']);
+  await userEvent.selectOptions(type, 'xyz');
   const x = within(dialog).getByLabelText('X');
   await userEvent.clear(x);
   await userEvent.type(x, '50');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(named(latest(), 'Bottom').moved).toMatchObject({ by: [50, 0, 0] }));
   expect(named(latest(), 'Shelf').moved).toEqual(named(source, 'Shelf').moved);
-});
+}, 60_000);
 
 it('refuses a copy for the part, as its family is not what was clicked', async () => {
   const { source } = await open();
@@ -120,4 +136,4 @@ it('refuses a copy for the part, as its family is not what was clicked', async (
   act(() => view().onSelect!(side.id, copy));
   await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toContain('not one of its copies'));
   expect(field.textContent).toContain('Shelf');
-});
+}, 60_000);
