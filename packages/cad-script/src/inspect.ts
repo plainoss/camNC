@@ -360,6 +360,9 @@ export async function inspectCadDocument(
   /** `bit`: plan the toolpath summary with a flat bit of this diameter, mm, instead of the default one. */
   options: { toolpaths?: boolean; bit?: number } = {}
 ): Promise<{ document: CadDocument; report: CadReport; parts: EvaluatedCadPart[] }> {
+  // A bit of no width would measure every corner as reached.
+  if (options.bit !== undefined && !(Number.isFinite(options.bit) && options.bit > 0))
+    throw new Error(`The bit to plan with needs a diameter greater than zero, not ${options.bit}.`);
   const solved = await solveCadDocument(input);
   const nameOf = (partId?: string) => solved.document.parts.find(part => part.id === partId)?.name;
   const errors: CadReportIssue[] = [],

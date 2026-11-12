@@ -120,3 +120,10 @@ it('names the opening after the tool as it is now when the planned summary is re
   expect((await reach(document, 3))![0]).toMatchObject({ unreached: 4, short: expect.any(Number) });
   expect((await reach(document, 3))![0]!.short).not.toBe(1.24);
 });
+
+it.each([0, -3, Number.NaN, Infinity])('refuses to plan with a %s mm bit', async bit => {
+  const { document } = await editCad(null, d => {
+    d.newPart('Seat', { thickness: 18 }).profile.rect({ at: [0, 0], w: 100, h: 100 });
+  });
+  await expect(inspectCadDocument(document, new Map(), { bit })).rejects.toThrow(/greater than zero/);
+});

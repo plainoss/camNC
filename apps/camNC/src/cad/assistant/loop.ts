@@ -81,7 +81,7 @@ export const assistantTools: AssistantTool[] = [
         bit: {
           type: 'number',
           description:
-            'Diameter in mm of the flat bit the user cuts with. Toolpaths and joint corner reach are checked with it; omitted, the default 3.175 mm bit.',
+            'Diameter in mm of the flat bit the user cuts with. The full check (finalize_design, when offered) plans toolpaths and joint corner reach with it; omitted, the default 3.175 mm bit.',
         },
       },
       []
@@ -139,7 +139,7 @@ For thin requests such as "a stool", ask for sizes and joints or state your prop
 When the answer is a number, add fields to ask_user, prefilled with your proposal; name a field after a requirement (for example width, thickness, minimumWall) when the app should check it on every later proposal.
 Remember earlier constraints in the conversation. If a request conflicts with them or the design, ask a question.
 Select useful views in check_design when matching a reference image or reviewing appearance: views:["top"] for flat outlines, adding front/right only for relevant construction. For visual requests inspect the returned cut-aware views, describe what matches and what needs a person's review.
-For CNC joints a square part fits into (mortises, stopped dados, finger slots), use the user's cutter diameter: pass it as bit to check_design and set cornerRelief: { dogbone: diameter } with a fit clearance such as 0.2mm on that cutParts step. Each corner-unreachable warning in the full check names a mortise whose corners the bit misses; fix it or name it in the proposal. If the user gave no cutter, say the corners were checked only for the default bit and ask which one they use.
+For CNC joints a square part fits into (mortises, stopped dados, finger slots), use the user's cutter diameter: pass it as bit to check_design and set cornerRelief: { dogbone: diameter } with a fit clearance such as 0.2mm on that cutParts step. Each corner-unreachable warning in the full check names a mortise whose corners the bit misses; fix it or name it in the proposal. Only Cut parts openings cut from the top or through are checked: say that blind openings from the underside, openings only a copy has, and Extrude pockets were not checked for corner reach. If the user gave no cutter, say the corners were checked only for the default bit and ask which one they use.
 Treat agreed dimensions and construction as acceptance criteria. Use part.expect for requested finished sizes, thickness and pocket depths; inspect actual reported geometry rather than only script parameters.
 Prefer compact deterministic construction and worked examples over bespoke random or grid searches. Once a checked candidate matches the request and its views have been inspected when needed, offer it; do not redesign it without a specific unmet requirement.
 Prefer the pebble-tray or cupboard recipe with numeric millimetre parameters when it fits the agreed construction. Recipes produce editable geometry. After checking, reuse its scriptId; repair with expectedHash and short exact oldText/newText patches instead of resending the full script. Every revision starts from the original open design.
