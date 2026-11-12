@@ -220,6 +220,8 @@ export interface AssistantRunResult {
   messages: AssistantMessage[];
   proposal?: CadProposal;
   origin?: AssistantProposalOrigin;
+  /** The trusted report of the check the proposal came from: the final verification when there is one. */
+  report?: CadReport;
   checks: number;
   usage: AssistantRunUsage;
   stopReason?: string;
@@ -287,6 +289,10 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     ...(stopReason && { stopReason }),
     ...(status === 'proposal' && proposal && { proposal }),
     ...(status === 'proposal' && proposal && latestCandidate && origins.has(latestCandidate) && { origin: origins.get(latestCandidate) }),
+
+    ...(status === 'proposal' &&
+      proposal &&
+      latestCandidate && { report: (finalized.get(latestCandidate) ?? latestCandidate).trustedReport }),
   });
   const emit = (message: AssistantMessage) => {
     messages.push(message);

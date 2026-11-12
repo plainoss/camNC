@@ -446,6 +446,33 @@ it('rejects questions and other tools while only finalize_design may run, then f
   expect(result.messages.some(message => message.text.includes('Question shown to the user'))).toBe(false);
 });
 
+it("returns the final verification's report with the proposal, also after a cached check", async () => {
+  const options = setup();
+  options.check = vi.fn(async (source, start) => ({
+    ok: source === 'good',
+    document: { ...start, name: source },
+    report: {},
+    trustedReport: { warnings: [{ code: 'geometry', message: source }] } as never,
+  }));
+  options.finalize = vi.fn(async checked => ({
+    ...checked,
+    trustedReport: { warnings: [{ code: 'toolpath-missing', message: `No tool can cut ${checked.document.name}.` }] } as never,
+  }));
+  const replies = [
+    answer('check_design', 'good'),
+    answer('check_design', 'bad'),
+    answer('check_design', 'good'),
+    answer('finalize_design'),
+    { role: 'assistant' as const, text: 'Proposal: checked.' },
+  ];
+  options.request = vi.fn(async () => replies.shift()!);
+  const result = await runDesignAssistant(options);
+  expect(result.status).toBe('proposal');
+  // The third check is a cache hit, so the report must come from the candidate, not from the last check that ran.
+  expect(options.check).toHaveBeenCalledTimes(2);
+  expect(result.report).toEqual({ warnings: [{ code: 'toolpath-missing', message: 'No tool can cut good.' }] });
+});
+
 it('budgets the final note before keeping history verbatim, compacting instead of stopping', async () => {
   const options = setup();
   options.maxChecks = 1;

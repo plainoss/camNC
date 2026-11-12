@@ -175,7 +175,6 @@ export function AssistantDock({
       setActivity('Reading the open design…');
       const inspected = await inspectCadDocument(start);
       if (abort.signal.aborted) return;
-      let finalReport: unknown;
       const result = await runDesignAssistant({
         base: start,
         config: credentials.config,
@@ -226,8 +225,6 @@ export function AssistantDock({
                 )
               : undefined;
           const detailReport = compactCadReport(checked.document, checked.report);
-          // The proposal comes from the last complete check; its warnings go to the review with it.
-          finalReport = checked.report;
           return {
             ...checked,
             trustedReport: checked.report,
@@ -255,7 +252,7 @@ export function AssistantDock({
       if (result.proposal && !abort.signal.aborted) {
         bindProposalRequirements(result.proposal, brief.revision);
         bindProposalOrigin(result.proposal, result.origin);
-        bindProposalWarnings(result.proposal, finalReport);
+        bindProposalWarnings(result.proposal, result.report);
         onCheckedProposal(result.proposal);
       }
       setActivity(
