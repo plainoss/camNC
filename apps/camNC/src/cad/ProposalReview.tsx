@@ -5,9 +5,13 @@ import type { CadSession } from '@wbcnc/cad-editor/session';
 import './proposal.css';
 import { requirementProposalRefusal, subscribeRequirements } from './assistant/requirementStore';
 import { ProposalTweaks } from './ProposalTweaks';
+import type { ViewRequest } from '@/cam/model/ViewCameras';
 
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
 const ignore = () => {};
+// Frame every corner of the proposal exactly, from the studio's usual direction: the quick default fit can crop a tall
+// piece such as a cupboard in a portrait-shaped preview.
+const kFrameProposal: ViewRequest = { name: 'iso', seq: 1, direction: [0.77, -1, 0.17] };
 type Mode = 'before' | 'changes' | 'after';
 
 /** Parts the proposal adds or changes, for highlighting in the Changes view. */
@@ -134,6 +138,7 @@ export function ProposalReview({
               onOpen={ignore}
               showPlanes={false}
               highlightIds={mode === 'changes' && highlighted.length ? highlighted : undefined}
+              viewRequest={kFrameProposal}
             />
           </Suspense>
           {onReplace && (

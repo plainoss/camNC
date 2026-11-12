@@ -44,7 +44,8 @@
   border-top: 1px solid #d7e0ed;
   border-radius: 0;
 }
-@media (min-width: 850px) { .cad-editor:has(> .cad-assistant-dock) > .cad-proposal-review[open] { right: 380px; } }
+/* Beside the dock only when the editor is wide enough for both; otherwise the review covers the dock. */
+@container cad-editor (min-width: 1100px) { .cad-editor:has(> .cad-assistant-dock) > .cad-proposal-review[open] { right: 380px; } }
 .cad-proposal-review:focus { outline: none; }
 .cad-proposal-body > aside { order: -1; border-left: 0; border-right: 1px solid #d7e0ed; font-size: 12px; }
 .cad-proposal-body > aside h2 { font-size: 15px; }
@@ -59,10 +60,16 @@
 .cad-proposal-summary { font-size: 12px; color: #5b6475; }
 .cad-proposal-spacer { flex: 1; min-width: 8px; }
 .cad-proposal-review .cad-proposal-apply:not(:disabled) { background: #176c61; border-color: #176c61; color: #fff; font-weight: 600; }
-.cad-editor .cad-proposal-tweaks { position: absolute; top: 52px; right: 10px; width: 230px; display: grid; gap: 8px; padding: 10px; border: 1px solid #d7e0ed; border-radius: 10px; background: #fff; box-shadow: 0 6px 18px #0001; font-size: 12px; }
+.cad-proposal-view:has(> .cad-proposal-tweaks) { flex-direction: row; }
+/* Beside the preview rather than over it, so the framed proposal isn't hidden under the sliders. */
+.cad-editor .cad-proposal-tweaks { align-self: start; flex-shrink: 0; margin: 52px 10px 0 0; width: 230px; display: grid; gap: 8px; padding: 10px; border: 1px solid #d7e0ed; border-radius: 10px; background: #fff; box-shadow: 0 6px 18px #0001; font-size: 12px; }
 .cad-proposal-tweaks h3 { margin: 0; font-size: 13px; }
 .cad-proposal-tweaks label { display: grid; gap: 2px; }
 .cad-proposal-tweaks label > span { display: flex; justify-content: space-between; }
 .cad-proposal-tweaks input[type='range'] { width: 100%; accent-color: #27756b; }
 .cad-proposal-tweaks [role='status'] { margin: 0; color: #5b6475; }
-@media (max-width: 700px) { .cad-editor > .cad-proposal-review > footer { position: static; transform: none; width: auto; max-width: none; margin: 0; } .cad-editor .cad-proposal-tweaks { position: static; width: auto; } }
+@media (max-width: 700px) {
+  .cad-editor > .cad-proposal-review > footer { position: static; transform: none; width: auto; max-width: none; margin: 0; }
+  .cad-proposal-view:has(> .cad-proposal-tweaks) { flex-direction: column; }
+  .cad-editor .cad-proposal-tweaks { width: auto; margin: 8px; }
+}

@@ -9,10 +9,9 @@ import type { CarvingAssistantSession } from './useCarvingAssistant';
  * No key needed: copy an art-direction prompt to any image chat, then drop, paste or choose the picture it makes. The
  * picture is traced on this device like a generated one.
  */
-export function ExternalChatImage({ session }: { session: CarvingAssistantSession }) {
+export function ExternalChatImage({ session, dropping }: { session: CarvingAssistantSession; dropping: boolean }) {
   const { request } = session;
   const [copied, setCopied] = useState(false);
-  const [dropping, setDropping] = useState(false);
   // When the browser refuses clipboard access, the prompt is shown to copy by hand.
   const [manual, setManual] = useState('');
   // Coming back from another chat, ⌘V / Ctrl+V anywhere brings the image in; text pastes stay where they are.
@@ -57,19 +56,8 @@ export function ExternalChatImage({ session }: { session: CarvingAssistantSessio
               dropping && 'border-violet-500 bg-violet-500/10 text-foreground'
             )}
             disabled={session.generating}
-            onClick={() => pngInput.current?.click()}
-            onDragOver={event => {
-              event.preventDefault();
-              setDropping(true);
-            }}
-            onDragLeave={() => setDropping(false)}
-            onDrop={event => {
-              event.preventDefault();
-              setDropping(false);
-              const image = imageFromTransfer(event.dataTransfer);
-              if (image) void request.importPng(image);
-            }}>
-            <ImageDown className="size-4" /> Drop or paste image
+            onClick={() => pngInput.current?.click()}>
+            <ImageDown className="size-4" /> {dropping ? 'Drop to trace' : 'Drop or paste image'}
           </button>
         </div>
         {manual && (
