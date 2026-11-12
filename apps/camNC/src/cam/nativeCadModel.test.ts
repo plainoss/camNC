@@ -49,7 +49,13 @@ describe('native CAD to CAM', () => {
     const { model } = await nativeCadModel(document);
     expect(model.parts.map(p => [p.id, p.name, p.names])).toEqual([
       [part.id, 'Side', ['Side', 'Side 2']],
-      [mirroredPartId(part.id), 'Side (mirrored)', ['Side 3']],
+      [mirroredPartId(part.id), 'Side 3 (mirrored)', ['Side 3']],
+    ]);
+    // Several mirror images cut alike are one piece, named for the part with each copy listed.
+    const twice = await nativeCadModel(addPartCopy(document, part.id, { mirrored: true }).document);
+    expect(twice.model.parts.map(p => [p.name, p.names])).toEqual([
+      ['Side', ['Side', 'Side 2']],
+      ['Side (mirrored)', ['Side 3', 'Side 4']],
     ]);
     // The hole near the left end of the side is near the right end of its mirror image.
     const holeX = (index: number) => Math.min(...model.parts[index].shape.holes[0].map(p => p[0]));
