@@ -283,8 +283,13 @@ export function planBoard(
   );
   progress.done(post);
   if (flip) {
+    // Side B cuts only undersides, and a cutout (a carving's outline, not one of the board's parts) has none: it is
+    // cut through on side A. Left in, it has no part to look its underside up by.
+    const parts = spec.parts.filter(p => board.parts.some(q => q.id === p.id));
     const b = camBoard(
-      sideBSpec({ ...spec, carvings: undefined, rotationDeg: sideRotation(board, true) }, p => undersideOf(source, p.id, board, p.rotated)),
+      sideBSpec({ ...spec, parts, carvings: undefined, rotationDeg: sideRotation(board, true) }, p =>
+        undersideOf(source, p.id, board, p.rotated)
+      ),
       { ...settings, cutThrough: false },
       progress.step(sideB)
     );
