@@ -56,8 +56,9 @@ const copyOf = (event: KeyboardEvent) =>
  * toolbar button that disables itself). Only keys whose target is the page are forwarded: a key from a field,
  * a menu, a dialog or any other control has an owner, and a key from inside the editor was already handled.
  *
- * Escape also goes to an open step dialog from anywhere else in the editor, such as a part just picked for it in
- * the Parts list or the 3D view, as it would from inside the dialog. A field, a menu or a modal keeps its own Escape.
+ * Escape also goes to an open Mirror, Pattern or Transform dialog from anywhere else in the studio, such as a part
+ * just picked for it in the Parts list or the 3D view, as it would from inside the dialog. A field, a menu, a modal or
+ * an open sketch keeps its own Escape, and any other Escape passes on untouched.
  */
 export function useEditorDocumentKeys(root: RefObject<HTMLElement | null>) {
   useEffect(() => {
@@ -83,7 +84,10 @@ export function useEditorDocumentKeys(root: RefObject<HTMLElement | null>) {
       if (event.key !== 'Escape' || forwarded.has(event) || event.defaultPrevented || event.isComposing) return;
       const target = event.target as HTMLElement;
       const dialog = openFeatureDialog(element);
-      if (!dialog || dialog.contains(target) || keyboardTaken(element)) return;
+      // Only a Part Studio step that takes its part from clicks outside it, such as Mirror, Pattern or Transform. An
+      // open sketch's dialog is not one: Escape on the drawing cancels a tool or clears the selection, not the sketch.
+      if (!dialog?.querySelector('[data-part-pick]') || dialog.contains(target) || keyboardTaken(element)) return;
+      if (element.querySelector('[data-testid="cad-canvas"]')?.checkVisibility()) return;
       // Escape in a field, such as a part's new name, or in a menu or list, is that control's own.
       if (target.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"]')) return;
       const copy = copyOf(event);
