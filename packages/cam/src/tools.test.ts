@@ -31,7 +31,11 @@ const library = {
 
 describe('Fusion tool library', () => {
   it('reads flat end mills with their feeds, in mm', () => {
-    expect(parseFusionToolLibrary(JSON.stringify(library)).map(({ presets, presetId, presetName, ...tool }) => tool)).toEqual([
+    expect(
+      parseFusionToolLibrary(JSON.stringify(library)).map(
+        ({ presets: _presets, presetId: _presetId, presetName: _presetName, ...tool }) => tool
+      )
+    ).toEqual([
       // Stepover applies ("use-stepover"), the preset's stepdown doesn't.
       {
         number: 1,

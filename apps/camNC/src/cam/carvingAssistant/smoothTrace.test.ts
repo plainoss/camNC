@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { flattenCurveContours } from './curveFlatten';
 import { smoothTrace } from './smoothTrace';
-import { compareTraceMasks, traceMaskTopology } from './traceMetrics';
+import { closeTraceGaps, compareTraceMasks, traceFeatureChanges, traceMaskTopology } from './traceMetrics';
 import { smoothCurveJoins } from './curveSmoothing';
 
 describe('smooth curve approximation and independent validation', () => {
@@ -85,6 +85,53 @@ describe('smooth curve approximation and independent validation', () => {
     expect(traceMaskTopology(source, 10)).toEqual({ components: 1, holes: 1 });
     expect(traceMaskTopology(result, 10)).toEqual({ components: 1, holes: 0 });
     expect(compareTraceMasks(source, result, 10, 4).intersectionOverUnion).toBeGreaterThan(0.98);
+  });
+
+  it('matches holes by position, so one lost and one spurious hole do not cancel out', () => {
+    const width = 40,
+      source = new Uint8Array(width * width),
+      moved = source.slice();
+    const square = (mask: Uint8Array, x0: number, y0: number, size: number, value: number) => {
+      for (let y = y0; y < y0 + size; y++) for (let x = x0; x < x0 + size; x++) mask[y * width + x] = value;
+    };
+    square(source, 5, 5, 30, 1);
+    square(moved, 5, 5, 30, 1);
+    square(source, 10, 10, 4, 0);
+    square(moved, 25, 25, 4, 0);
+    expect(traceMaskTopology(source, width)).toEqual(traceMaskTopology(moved, width));
+    expect(traceFeatureChanges(source, moved, width, 9)).toBe(2);
+    // A merge of two filled regions across a gap is a change, as is a pinhole at or above the area threshold.
+    const merged = source.slice();
+    const split = source.slice();
+    square(split, 20, 5, 2, 0);
+    for (let y = 5; y < 35; y++) split[y * width + 20] = split[y * width + 21] = 0;
+    expect(traceFeatureChanges(split, merged, width, 9)).toBeGreaterThan(0);
+    const pinhole = source.slice();
+    square(pinhole, 25, 25, 2, 0);
+    expect(traceFeatureChanges(source, pinhole, width, 9)).toBe(0);
+    expect(traceFeatureChanges(source, pinhole, width, 4)).toBe(1);
+    expect(traceFeatureChanges(source, source, width, 9)).toBe(0);
+  });
+
+  it('fails the boundary check when a thin stroke loses its tip', () => {
+    const width = 60,
+      source = new Uint8Array(width * 20);
+    for (let x = 5; x < 55; x++) source[10 * width + x] = source[11 * width + x] = 1;
+    const result = source.slice();
+    for (let x = 35; x < 55; x++) result[10 * width + x] = result[11 * width + x] = 0;
+    expect(compareTraceMasks(source, result, width, 5).boundaryErrorPx).toBe(Infinity);
+  });
+
+  it('closes only light gaps up to two pixels wide', () => {
+    const width = 20,
+      ink = new Uint8Array(width * width).fill(1);
+    for (let y = 0; y < width; y++) ink[y * width + 5] = ink[y * width + 6] = 0;
+    for (let y = 0; y < width; y++) ink[y * width + 12] = ink[y * width + 13] = ink[y * width + 14] = 0;
+    // The gap rows touching the grid edge open onto the outside and stay light.
+    expect(closeTraceGaps(ink, width)).toBe(2 * (width - 2));
+    expect(ink[3 * width + 5]).toBe(1);
+    expect(ink[5]).toBe(0);
+    expect(ink[3 * width + 13]).toBe(0);
   });
 
   it('measures boundary displacement in both directions rather than relying on area alone', () => {

@@ -20,7 +20,7 @@ runs:
     # workspace and home directories differ. pnpm can also hard-link from it into node_modules. Git ignores it.
     - name: Keep the pnpm store in the workspace
       shell: bash
-      run: echo "npm_config_store_dir=$GITHUB_WORKSPACE/.pnpm-store" >> "$GITHUB_ENV"
+      run: echo "PNPM_CONFIG_STORE_DIR=$GITHUB_WORKSPACE/.pnpm-store" >> "$GITHUB_ENV"
     # The Playwright image has no zstd, so actions/cache archives with gzip there, and the compression is part of an
     # entry's version: a zstd entry saved on the runner never restores in a container. Hide zstd from the pnpm cache
     # steps so every job shares one gzip entry; the last step brings it back for later cache steps.

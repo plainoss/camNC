@@ -7,7 +7,8 @@
     ".": {
       "browser": "./src/browser.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./svg": "./src/svg/index.ts"
   },
   "scripts": {
     "check": "vite-node --config vite.config.ts src/cli.ts",
@@ -15,13 +16,16 @@
     "iterate": "vite-node --config vite.config.ts src/iteration/cli.ts",
     "tasks": "vite-node --config vite.config.ts src/tasks/cli.ts",
     "test": "vitest",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "oxlint --max-warnings 0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
     "@wbcnc/cad": "workspace:*",
     "@wbcnc/cad-editor": "workspace:*",
     "@wbcnc/cam": "workspace:*",
+    "@xmldom/xmldom": "^0.9.12",
+    "svg-pathdata": "^9.0.0",
     "typescript": "catalog:",
     "vite-node": "3.2.4",
     "zod": "catalog:"

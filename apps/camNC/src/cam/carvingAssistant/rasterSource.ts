@@ -1,6 +1,14 @@
 import type { CarvingGenerationConstraints } from './generation';
 import { smoothTrace } from './smoothTrace';
-import { compareTraceMasks, removeTraceSpecks, traceMaskTopology, type TraceCoverage } from './traceMetrics';
+import {
+  closeTraceGaps,
+  compareTraceMasks,
+  fillTracePinholes,
+  removeTraceSpecks,
+  traceFeatureChanges,
+  traceMaskTopology,
+  type TraceCoverage,
+} from './traceMetrics';
 
 export interface TracedCarvingRaster {
   svg: string;
@@ -15,6 +23,7 @@ export interface TracedCarvingRaster {
     holes: number;
     removedSpecks: number;
     removedSpeckPixels: number;
+    filledPinholes?: number;
     roundRegularized?: boolean;
   };
 }
@@ -150,9 +159,26 @@ export async function traceCarvingPng(
     if (!count) throw new Error('The image has no dark filled regions to carve.');
     if (count > ink.length * 0.9) throw new Error('The image is mostly dark background. Request black artwork on a white background.');
     const pixelsPerMm = Math.max((x1 - x0) / constraints.widthMm, (y1 - y0) / constraints.heightMm);
-    const specks = removeTraceSpecks(ink, traceWidth, Math.max(2, ((constraints.minFeatureMm * pixelsPerMm) / 2) ** 2));
+    // Never fit below about a pixel: the source cannot resolve finer detail, and a sub-pixel tolerance follows the
+    // anti-aliasing staircase, which multiplies the curve count (about four times on 1024 px generated line art).
+    const tolerancePx = Math.max(1.25, Math.min(3, (constraints.minFeatureMm * pixelsPerMm) / 4));
+    const physicalNoiseAreaPx = ((constraints.minFeatureMm * pixelsPerMm) / 2) ** 2;
+    const noiseAreaPx = Math.max(2, physicalNoiseAreaPx);
+    const specks = removeTraceSpecks(ink, traceWidth, noiseAreaPx);
     if (!ink.some(Boolean)) throw new Error('Physical noise cleanup removed all artwork. Use a finer detail level or larger artwork.');
-    const tolerancePx = Math.max(0.75, Math.min(3, (constraints.minFeatureMm * pixelsPerMm) / 4));
+    // Anti-aliased edges leave pixel-sized light gaps where two dark shapes nearly touch. Fill those below the physical
+    // threshold; no tool leaves such an island. A pixel that is physically large, as in a small source, stays a counter.
+    const pinholes = fillTracePinholes(ink, traceWidth, physicalNoiseAreaPx);
+    // Close light gaps up to two pixels wide: the tips of narrowing gaps, which curve fitting closes anyway. Where two
+    // pixels are below half the minimum feature, shapes that nearly touch may merge too; no tool could cut that gap.
+    // Where two pixels are up to a whole feature, such a wall is kept: closing is refused if it changes any region.
+    const featurePx = constraints.minFeatureMm * pixelsPerMm;
+    const closedGapPixels =
+      featurePx >= 4
+        ? closeTraceGaps(ink, traceWidth)
+        : featurePx >= 2
+          ? closeTraceGaps(ink, traceWidth, Math.max(noiseAreaPx, featurePx ** 2))
+          : 0;
     // Give Stop a boundary before bounded polygon union. Subsequent physical preparation applies its own geometry limits.
     await new Promise(resolve => setTimeout(resolve, 0));
     abort(signal);
@@ -175,14 +201,20 @@ export async function traceCarvingPng(
     context.fill(new Path2D(smooth.d), 'evenodd');
     const checkedPixels = context.getImageData(0, 0, traceWidth, traceHeight).data;
     const checkedMask = Uint8Array.from({ length: ink.length }, (_, i) => (checkedPixels[i * 4] < 128 ? 1 : 0));
-    const checkedTopology = traceMaskTopology(checkedMask, traceWidth);
+    // Rasterizing two curves that nearly touch can leave a sliver or pinhole a few pixels across between them, and a
+    // pinhole that small next to an edge cannot survive curve fitting at this tolerance. Match every other region by
+    // position. The skip size is capped at the minimum feature area, below which preparation drops islands anyway.
+    const featureAreaPx = Math.max(noiseAreaPx, Math.min(featurePx ** 2, (3 * tolerancePx) ** 2));
     if (
       smooth.components !== topology.components ||
       smooth.holes !== topology.holes ||
-      checkedTopology.components !== topology.components ||
-      checkedTopology.holes !== topology.holes
+      traceFeatureChanges(ink, checkedMask, traceWidth, featureAreaPx)
     )
-      throw new Error('Smooth tracing changed filled components or holes. Use a larger size or finer detail level.');
+      throw new Error(
+        featurePx < 2
+          ? 'Smooth tracing changed filled components or holes. The image has fewer than two pixels across this minimum feature: choose a coarser detail level or a smaller size.'
+          : 'Smooth tracing changed filled components or holes. Use a larger size or finer detail level.'
+      );
     const coverage = compareTraceMasks(ink, checkedMask, traceWidth, Math.ceil(tolerancePx + 2));
     if (coverage.intersectionOverUnion < 0.96 || coverage.boundaryErrorPx > tolerancePx + 1.5)
       throw new Error('Smooth tracing exceeded its measured coverage or boundary-error budget. Use a larger source or simpler artwork.');
@@ -191,6 +223,12 @@ export async function traceCarvingPng(
       `Smooth tracing uses ${smooth.curves} cubic curves and ${smooth.lines} lines; ${topology.components} filled components and ${topology.holes} holes remain. Gentle curve joins have aligned tangents; sharp corners and straight edges are retained.`,
       `Measured raster contour boundary error is ${(coverage.boundaryErrorPx / pixelsPerMm).toFixed(3)} mm; coverage overlap ${(coverage.intersectionOverUnion * 100).toFixed(2)}%; enlargement cannot recover image detail. Compare the source and smooth trace.`,
       `Removed ${specks.components} isolated dark specks (${specks.pixels} tracing pixels) below the physical noise threshold. Small intended marks can also be removed.`,
+      ...(closedGapPixels
+        ? [`Closed light gaps at most two tracing pixels wide (${closedGapPixels} pixels), below half the minimum feature size.`]
+        : []),
+      ...(pinholes.components
+        ? [`Filled ${pinholes.components} enclosed light pinholes (${pinholes.pixels} tracing pixels) below the physical noise threshold.`]
+        : []),
       `Curve-fitting microcorners spanning less than ${Math.min(1, constraints.minFeatureMm)} mm are smoothed; original long corners remain pinned.`,
     ];
     if (smooth.roundRegularized)
@@ -221,6 +259,7 @@ export async function traceCarvingPng(
         holes: topology.holes,
         removedSpecks: specks.components,
         removedSpeckPixels: specks.pixels,
+        filledPinholes: pinholes.components,
         roundRegularized: smooth.roundRegularized,
       },
     };
