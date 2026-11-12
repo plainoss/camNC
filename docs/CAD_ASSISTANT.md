@@ -23,7 +23,7 @@ steps stay with the source family and are not copied into the detached part.
 
 ## Connection and conversation
 
-Open **Assistant** and paste a provider key (later the connection is under the **⋯** menu as **Connection**). Its prefix picks the provider
+Open **Assistant** and paste a provider key (later it is under **⚙ Assistant settings → Connection**). Its prefix picks the provider
 (`sk-ant-` Anthropic, `sk-` OpenAI); **Other…** covers compatible endpoints.
 **Test and connect** lists the provider's models with that key and picks the
 newest main-line model for design (for example Claude Sonnet), and for OpenAI the
@@ -87,7 +87,7 @@ publish a candidate.
 
 ## Usage and limits
 
-**⋯ → Usage, limits and brief** opens **Usage and limits**, which shows the last turn's request/check counts and provider-reported
+**⚙ Assistant settings → Cost and limits** opens **Usage and limits**, which shows the last turn's request/check counts and provider-reported
 input, output and cached tokens. Enter the selected model's prices to calculate
 USD cost. Missing usage or cache prices remain **unknown**, rather than appearing
 as zero. Prices and limits last until the dock closes; verify them after changing
@@ -233,7 +233,7 @@ human review.
 
 `check_design` accepts exactly one of full `source`, a named `recipe` with numeric-mm `parameters`, or an immutable `scriptId`. The tray and cupboard recipes produce ordinary editable parts and variables. A check returns a SHA-256 hash; repairs use `scriptId`, `expectedHash` and bounded exact `oldText`/`newText` patches. Ambiguous patches fail atomically. Handles belong to the original document snapshot and revision; edits and undo cannot revive stale sessions. `read_design` retrieves source only when needed.
 
-Confirmed requirements are explicit application state in the assistant dock, shown as the Brief chips. In the full form under **⋯ → Usage, limits and brief**, draft fields are inactive until Confirm. Fixed-tolerance checks independently measure outline size, thickness, blind cuts, count, outer top-pocket wall and supported floor bounds, plus optional assembly dimensions and preservation of existing IDs. Targets must be globally unambiguous or use exact IDs/report handles. Pierced or opposed-pocket floors are refused rather than claiming a thickness guarantee. Appearance, internal webs and strength still need review. Changing requirements invalidates a proposal even after its review dialog opens.
+Confirmed requirements are explicit application state in the assistant dock, shown as the Brief chips. In the full form under **⚙ Assistant settings → Brief**, draft fields are inactive until Confirm. Fixed-tolerance checks independently measure outline size, thickness, blind cuts, count, outer top-pocket wall and supported floor bounds, plus optional assembly dimensions and preservation of existing IDs. Targets must be globally unambiguous or use exact IDs/report handles. Pierced or opposed-pocket floors are refused rather than claiming a thickness guarantee. Appearance, internal webs and strength still need review. Changing requirements invalidates a proposal even after its review dialog opens.
 
 The browser uses geometry-only repair checks, with trusted reinspection after the sandbox. `finalize_design` runs the full toolpath/report check against the exact cached candidate, without rerunning generated JavaScript. A proposal is impossible before that succeeds. Its warnings and costs go back to the model before its final explanation. Repair attempt limits count geometry checks; finalization does not grant another repair attempt. `views: ["top"]` renders and sends only that projection; legacy `true` selects all three. Other projections remain available explicitly.
 

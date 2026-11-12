@@ -5,6 +5,7 @@ import { createCarvingJob, type CamJobV1 } from '../jobDb';
 import { defaultProvider, rememberAssistantCredentials } from '../../cad/assistant/keyStore';
 import { createAssistantUsage } from '../../cad/assistant/runBudget';
 import { CarvingAssistant } from './CarvingAssistant';
+import { carvingPngFromImage } from './externalImage';
 import { CarvingAssistantBoardLayer } from './BoardLayer';
 import { useCarvingAssistant } from './useCarvingAssistant';
 import { generateCarvingAsset } from './generation';
@@ -107,7 +108,7 @@ async function open(options: { job?: CamJobV1; selectedId?: string | null; metho
   const onApply = vi.fn();
   const view = render(<Harness job={job} selectedId={options.selectedId ?? null} onApply={onApply} />);
   await screen.findByRole('complementary', { name: 'AI artwork' });
-  if ((options.method ?? 'text') === 'text') fireEvent.click(screen.getByRole('button', { name: 'Use Text SVG' }));
+  if ((options.method ?? 'text') === 'text') fireEvent.click(screen.getByRole('button', { name: 'use Text SVG' }));
   return { job, onApply, ...view };
 }
 const describe = (text = asset.prompt) => fireEvent.change(screen.getByLabelText('What should it show?'), { target: { value: text } });
@@ -147,10 +148,10 @@ it('defaults to image generation and offers Text SVG when the connection cannot 
   expect(screen.getByText(/can.t make images/)).toBeTruthy();
   describe();
   expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', true);
-  fireEvent.click(screen.getByRole('button', { name: 'Add an image provider' }));
+  fireEvent.click(screen.getByRole('button', { name: 'add an image provider' }));
   expect(screen.getByRole('radio', { name: 'Image generation' })).toHaveProperty('checked', true);
   expect(screen.getByLabelText('Image generator API key')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'Use Text SVG' }));
+  fireEvent.click(screen.getByRole('button', { name: 'use Text SVG' }));
   expect(screen.getByRole('radio', { name: 'Text SVG' })).toHaveProperty('checked', true);
   expect(screen.queryByText(/can.t make images/)).toBeNull();
   expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', false);
@@ -382,7 +383,8 @@ it('uses a separately configured native image key and endpoint, never the design
   await open({ method: 'default' });
   describe();
   variants(1);
-  fireEvent.click(screen.getByText('Advanced'));
+  fireEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Images' }));
   expect(screen.getByRole('radio', { name: 'Image generation' })).toHaveProperty('checked', true);
   // An Anthropic connection has no image model, so a separate provider is the way to images, shown without opting in.
   expect(screen.getByText(/Your connection has no image model/)).toBeDefined();
@@ -427,7 +429,8 @@ it("generates images with the connection's own key and image model, without a se
   expect(screen.queryByText(/can.t make images/)).toBeNull();
   describe();
   variants(1);
-  fireEvent.click(screen.getByText('Advanced'));
+  fireEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Images' }));
   expect(screen.getByRole('radio', { name: 'Image model · gpt-image-x' })).toHaveProperty('checked', true);
   expect(screen.queryByLabelText('Image generator API key')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
@@ -450,7 +453,8 @@ it('asks one variant at a time when a spending limit is set', async () => {
   await open();
   describe();
   variants(2);
-  fireEvent.click(screen.getByText('Advanced'));
+  fireEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cost and limits' }));
   fireEvent.click(screen.getByText('Usage and limits'));
   fireEvent.change(screen.getByLabelText('USD limit (optional)'), { target: { value: '0.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
@@ -480,7 +484,7 @@ it('traces a local PNG without a provider, keeps its original and prepares it at
   rememberAssistantCredentials(null);
   const { onApply } = await open({ method: 'default' });
   const { file, dataUri } = pngFile();
-  fireEvent.change(screen.getByLabelText('PNG image to trace'), { target: { files: [file] } });
+  fireEvent.change(screen.getByLabelText('Image to trace'), { target: { files: [file] } });
   await ready();
   expect(screen.getByLabelText('What should it show?')).toHaveProperty('value', 'Line art from tiny-owl');
   expect(prepareCarvingArt).toHaveBeenCalledTimes(1);
@@ -497,8 +501,42 @@ it('traces a local PNG without a provider, keeps its original and prepares it at
 it('rejects an oversized PNG before preparing anything', async () => {
   const { onApply } = await open({ method: 'default' });
   const file = new File([new Uint8Array(2_000_001)], 'large.png', { type: 'image/png' });
-  fireEvent.change(screen.getByLabelText('PNG image to trace'), { target: { files: [file] } });
-  expect((await screen.findByRole('alert')).textContent).toMatch(/no larger than 2 MB/);
+  fireEvent.change(screen.getByLabelText('Image to trace'), { target: { files: [file] } });
+  expect((await screen.findByRole('alert')).textContent).toMatch(/could not be read as an image/);
   expect(prepareCarvingArt).not.toHaveBeenCalled();
   expect(onApply).not.toHaveBeenCalled();
+});
+
+it('copies an image prompt for another chat and traces an image pasted back, without a connection', async () => {
+  rememberAssistantCredentials(null);
+  const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+  await open({ method: 'default' });
+  expect(screen.getByRole('button', { name: 'Connect an AI provider' })).toBeDefined();
+  describe('A fox curled up asleep');
+  fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+  expect(writeText.mock.calls[0]![0]).toContain('monochrome line art of A fox curled up asleep');
+  await screen.findByRole('button', { name: 'Prompt copied' });
+  const { file } = pngFile();
+  const data = new DataTransfer();
+  data.items.add(file);
+  window.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true }));
+  await ready();
+  expect(generateCarvingAsset).not.toHaveBeenCalled();
+  expect(prepareCarvingArt).toHaveBeenCalledTimes(1);
+});
+
+it('turns a pasted JPEG into a traceable PNG', async () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 40;
+  const context = canvas.getContext('2d')!;
+  context.fillStyle = 'white';
+  context.fillRect(0, 0, 40, 40);
+  context.fillStyle = 'black';
+  context.fillRect(10, 10, 20, 20);
+  const jpeg = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), 'image/jpeg'));
+  const png = await carvingPngFromImage(new File([jpeg], 'from-chat.jpg', { type: 'image/jpeg' }));
+  expect(png.type).toBe('image/png');
+  expect(png.name).toBe('from-chat.png');
+  await expect(carvingPngFromImage(new File(['x'], 'notes.txt', { type: 'text/plain' }))).rejects.toThrow('Drop or paste an image');
 });

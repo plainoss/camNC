@@ -188,15 +188,7 @@
 .cad-editor .cad-assistant-dock > header { gap: 8px; }
 .cad-editor .cad-assistant-dock > header h2 { flex: 1; font-size: 16px; }
 .cad-editor .cad-assistant-cost { border-radius: 99px; padding: 1px 8px; background: #eaf0ec; color: #4f6459; font: 11px ui-monospace, monospace; }
-.cad-editor .cad-assistant-menu { position: relative; }
-.cad-editor .cad-assistant-menu > summary { list-style: none; cursor: pointer; padding: 2px 8px; border-radius: 6px; color: #5b6c6a; font-size: 16px; line-height: 1.4; }
-.cad-editor .cad-assistant-menu > summary::-webkit-details-marker { display: none; }
-.cad-editor .cad-assistant-menu > summary:hover { background: #edf2ef; }
-.cad-editor .cad-assistant-menu > div { position: absolute; right: 0; top: calc(100% + 4px); z-index: 3; display: grid; min-width: 230px; padding: 4px; border: 1px solid #d9dfdf; border-radius: 10px; background: #fff; box-shadow: 0 10px 28px #1c333322; }
-.cad-editor .cad-assistant-dock .cad-assistant-menu > div button { justify-content: flex-start; border-color: transparent; text-align: left; font-weight: 450; }
 .cad-editor .cad-assistant-dock .cad-assistant-close { border-color: transparent; background: transparent; color: #5b6c6a; padding: 4px 8px; }
-.cad-editor .cad-assistant-dock .cad-assistant-back { align-self: flex-start; border-color: transparent; background: transparent; padding: 2px 4px; }
-.cad-editor .cad-assistant-settings-view { display: grid; gap: 12px; overflow: auto; }
 .cad-editor .cad-assistant-brief { display: grid; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid #e0e5e1; }
 .cad-editor .cad-assistant-brief ul { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .cad-editor .cad-assistant-brief li { display: inline-flex; align-items: center; gap: 2px; border: 1px solid #c7d6cf; border-radius: 99px; padding: 0 2px 0 9px; background: #e4f0ec; color: #1d5a50; font-size: 11.5px; }
@@ -234,3 +226,5 @@
 .cad-editor .cad-assistant-proposal > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .cad-editor .cad-assistant-composer-actions .cad-assistant-shortcut { display: inline; flex: 1; margin: 0; text-align: left; }
 .cad-editor .cad-assistant-messages .cad-assistant-event { margin: 0 0 12px; color: #66737c; font-size: 11px; text-align: center; }
+
+.cad-editor .cad-assistant-dock .cad-assistant-icon { min-height: 0; border-color: transparent; background: transparent; color: #5b6c6a; padding: 3px 7px; font-size: 15px; line-height: 1.2; }
