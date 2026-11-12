@@ -2051,8 +2051,9 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
-    } else if (command === 'hole' && part) {
-      startHole(documentRef.current, part, commit, (partId, before) => openFeature('hole', partId, before), setStudioRefusal);
+    } else if (command === 'hole') {
+      const at = { partId: part?.id, copyId: cutSelection.pickedCopyId, cancel: () => featureDialog && closeFeature(false) };
+      startHole({ ...at, rolledTo: userRollback, read: () => documentRef.current, commit, open: openFeature, refuse: setStudioRefusal });
     } else if (command === 'fillet') setFilletDialog({});
     else if (command === 'mirror') {
       if (part) setMirrorDialog({ partId: part.id });

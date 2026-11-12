@@ -2,7 +2,7 @@ import { cadPartReference, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { builtStudioParts } from './studioParts';
 
-type PartFeature = 'extrude' | 'pattern' | 'hole';
+type PartFeature = 'extrude' | 'pattern';
 
 /** Carry physical-copy identity into cut references and refuse unsupported family-only commands. */
 export function usePartCutSelection(document: CadDocument, part: CadPart | undefined, setPartId: (partId: string) => void) {
@@ -43,6 +43,8 @@ export function usePartCutSelection(document: CadDocument, part: CadPart | undef
     if (part) open(kind, part.id);
   };
   return {
+    /** The copy picked, unchecked: a command that can't work on one copy refuses any, even a copy that is gone. */
+    pickedCopyId: copyId,
     cutPick,
     cutPicked,
     showCutPicked,
