@@ -24,6 +24,8 @@ const kMinimumEngagement = 20;
 const kMinimumShoulder = 8;
 const kMinimumWall = 6;
 const kMinimumWeb = 5;
+/** Widest glue gap per side a glued tenon may sit in: the pattern's 0.2 mm fit bound plus a margin. */
+const kMaximumGlueGap = 0.5;
 const kTolerance = 0.01;
 
 const boxOf = (points: readonly FurniturePoint[]): Box => ({
@@ -159,6 +161,16 @@ export function checkFurnitureJoints(
         'The receivers are actually cut away where the tenon sits.',
         samples.every(p => receivers.every(r => !furnitureMaterial(r.shape, r.local(p))))
       );
+      // Just outside each closed face of the tenon there must be receiver material again: a loose mortise holds no glue line.
+      // Samples sit off the face centres so they miss dogbones and the joint between two laminations.
+      const snug = [0, 1, 2].flatMap(i =>
+        (i === entry ? [outward ? -1 : 1] : [-1, 1]).map(side => {
+          const p = [0, 1, 2].map(k => world.low[k]! + 0.4 * (world.high[k]! - world.low[k]!)) as FurniturePoint;
+          p[i] = side < 0 ? world.low[i]! - kMaximumGlueGap : world.high[i]! + kMaximumGlueGap;
+          return receivers.some(r => furnitureMaterial(r.shape, r.local(p)));
+        })
+      );
+      record('The mortise fits the tenon closely enough for a glue line.', snug.every(Boolean));
       tenons.push({ connectionId: connection.id, receivers, world });
     } else if (connection.kind === 'seat-attachment') {
       const ids = new Set(connection.hardwareIds);
@@ -218,6 +230,21 @@ export function checkFurnitureJoints(
   for (const member of plan.members)
     checks.push({ connectionId: member.role, check: 'The member is joined by a listed connection.', passed: connected.has(member.role) });
   if (plan.recipe === 'frame-stool-glued-v1') {
+    // The builder's stance bound, measured again on the edited parameters.
+    const value = (name: string) => {
+      const id = plan.parameters.find(p => p.name === name)?.variableId;
+      const variable = document.variables?.find(v => v.id === id);
+      const result = variable && cadVariableValues(document).scope[variable.name]?.value;
+      return typeof result === 'number' && Number.isFinite(result) ? result : NaN;
+    };
+    const [width, depth, height] = ['width', 'depth', 'height'].map(value);
+    checks.push({
+      connectionId: 'stance',
+      check: 'The footprint is at least half the seat height.',
+      passed: Math.min(width!, depth!) >= height! / 2 - kTolerance,
+      actual: Math.min(width!, depth!),
+      expected: height! / 2,
+    });
     const legs = new Set(plan.materials.filter(m => m.grain === 'profile-y' && m.kind === 'solid-wood').flatMap(m => m.roles));
     const tenoned = new Map<string, number>();
     for (const c of plan.connections)

@@ -11,6 +11,7 @@ import {
 import { editCad, type CadEditResult } from './edit';
 import { frameStool } from './frameStool';
 import { checkFurnitureConstruction } from './furnitureJoints';
+import { inspectCadDocument } from './inspect';
 import { assessCadTask } from './tasks/assess';
 import { cadSavedTask } from './tasks/catalogue';
 
@@ -128,6 +129,21 @@ describe('frame stool pattern', () => {
       expect(thick.report.errors).toEqual([]);
     }
   }, 180_000);
+
+  it('refuses a loose mortise and a stance edited past the pattern bound', () => {
+    expect(failing(withVariable(reloaded, 'fit', '1mm'), plan).some(c => c.check.includes('glue line'))).toBe(true);
+    expect(failing(withVariable(reloaded, 'height', '900mm'), plan).some(c => c.check.includes('half the seat height'))).toBe(true);
+  });
+
+  it('leaves a plan in a switched-off folder unmeasured', async () => {
+    const parked = { ...reloaded, folders: reloaded.folders!.map(folder => ({ ...folder, suppressed: true as const })) };
+    const { report } = await inspectCadDocument(parked, new Map(), { toolpaths: false });
+    expect(report.errors.filter(error => error.code === 'construction-check')).toEqual([]);
+  }, 60_000);
+
+  it('refuses a cutter too wide for the seat-screw pilots', async () => {
+    expect((await editCad(null, frameStool({ cutter: '4mm' }))).scriptError).toContain('cutter up to 3.4 mm');
+  });
 
   it('refuses layouts that cannot hold the pattern', async () => {
     expect((await editCad(null, frameStool({ legLayer: '25mm' }))).scriptError).toContain('frame-stool pattern needs');

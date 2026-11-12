@@ -90,13 +90,14 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
           v('footrestZ') >= 150 &&
           v('footrestZ + 2*footrestHeight + 30mm') <= v('frameTop - apronHeight - 40mm') &&
           v('cutter') > 0 &&
-          v('cutter') < 4.5 &&
+          // The cutter also mills the 3.5 mm seat-screw pilots.
+          v('cutter') <= 3.4 &&
           v('fit') >= 0 &&
           v('fit') <= 0.2
         )
       )
         return fail(
-          'This frame-stool pattern needs 16–24 mm rail stock, 30–60 mm leg laminations, 15–25 mm seat board, at least 20 mm tenon engagement with a 5 mm web between perpendicular mortises, 25 mm apron and 20 mm footrest tenons, 150 mm between legs, room for staggered footrests below the aprons, cutter < 4.5 mm and fit 0–0.2 mm. Change the layout or stock before completing it.'
+          'This frame-stool pattern needs 16–24 mm rail stock, 30–60 mm leg laminations, 15–25 mm seat board, at least 20 mm tenon engagement with a 5 mm web between perpendicular mortises, 25 mm apron and 20 mm footrest tenons, 150 mm between legs, room for staggered footrests below the aprons, cutter up to 3.4 mm and fit 0–0.2 mm. Change the layout or stock before completing it.'
         );
       // A layout bound for this pattern, not a tipping or load rating.
       if (v('min(width; depth)') < v('height/2'))
