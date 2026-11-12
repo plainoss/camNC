@@ -9,10 +9,12 @@ import {
   placePoint,
   physicalJoinedCopies,
   type CadDocument,
+  type CadEvaluation,
   type CadPlacement,
   type CadPoint,
   type EvaluatedCadPart,
 } from '@wbcnc/cad';
+import { reportGeometry } from '../reportGeometry';
 
 export type ViewPoint = [number, number, number];
 export interface CadViewBody {
@@ -31,12 +33,13 @@ export interface CadViewLine {
 }
 
 /** Physical pieces, with each copy's own evaluated cuts, in the same places CAM names them. */
-export function cadViewBodies(given: CadDocument, parts: readonly EvaluatedCadPart[]): CadViewBody[] {
-  const document = physicalJoinedCopies(activeDesign(given));
+export function cadViewBodies(given: CadDocument, parts: readonly EvaluatedCadPart[], evaluation?: CadEvaluation): CadViewBody[] {
+  const geometry = reportGeometry(given, parts, evaluation);
+  const document = physicalJoinedCopies(activeDesign(geometry.document));
   const supports = cadDrawnOnSupports(document),
     consumed = consumedTools(document);
   return document.parts.flatMap(source => {
-    const shape = parts.find(part => part.partId === source.id);
+    const shape = geometry.parts.find(part => part.partId === source.id);
     if (!shape || !isCadBody(document, source) || consumed.has(source.id) || !shape.outline.length) return [];
     return [
       { id: source.id, name: source.name, shape, placement: effectivePlacement(source, supports) },

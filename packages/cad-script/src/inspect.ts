@@ -17,6 +17,7 @@ import {
   type CadAssemblyReport,
   type CadStepReportEntry,
   type CadDocument,
+  type CadEvaluation,
   type CadPart,
   type CadPoint,
   type CadSketch,
@@ -44,6 +45,8 @@ import {
 import { nativeCurveReport, sketchCurveDetails } from './curveReport';
 import { curveExtremaPoints } from './curveBounds';
 import { isEdgeNotch } from './notch';
+import { reportGeometry, reportPrefix } from './reportGeometry';
+import { spatialReport, type CadSpatialReport } from './spatialReport';
 import { cutPartsCornerReach, type CadCornerReach } from './cornerReach';
 import { narrowFingersWarnings, notchesBesideBones } from './narrowFingers';
 
@@ -80,6 +83,8 @@ export type CadReportEntity =
   | ({ ref: string; type: string; construction?: true } & Partial<ReturnType<typeof nativeCurveReport>>);
 export interface CadReportPart {
   name: string;
+  /** V4 generation record: whether this source body remains available in the physical output. */
+  available?: boolean;
   thickness: number;
   /** Absent when the outline isn't a valid closed profile. */
   outline?: { at: number[]; size: number[] };
@@ -110,7 +115,7 @@ export interface CadReportPart {
   }[];
   /** Copy-specific material, in the family's local frame; ordinary copies continue sharing their source. */
   copyFeatures?: { ref: string; name: string; cuts: CadReportPart['cuts'] }[];
-  /** Features CAM received. */
+  /** This source material's CAM profile. V4 final output membership is reported separately under spatial. */
   cam?: { pockets: number; throughHoles: number; undersidePockets?: number };
   /** Pieces CAM cuts when the part has copies, by name. Mirrored copies are cut as their own shape. */
   pieces?: { names: string[]; mirrored: string[] };
@@ -145,6 +150,15 @@ export interface CadReport {
    * face's frame in words, part patterns, and the openings each "cut parts" step makes.
    */
   steps?: (CadStepReportEntry & { frameInWords?: string })[];
+  /** V4-only ordered history and physical state. Generation remains separate from this after-generation stream. */
+  spatial?: CadSpatialReport;
+}
+export interface CadInspection {
+  document: CadDocument;
+  report: CadReport;
+  parts: EvaluatedCadPart[];
+  /** Derived state only; never substitute its read-only projection for document when editing or saving. */
+  evaluation?: CadEvaluation;
 }
 
 const round = (value: number) => Math.round(value * 1000) / 1000;
@@ -374,11 +388,21 @@ export async function inspectCadDocument(
   expectations: ReadonlyMap<string, readonly CadExpectation[]> = new Map(),
   /** `bit`: plan the toolpath summary with a flat bit of this diameter, mm, instead of the default one. */
   options: { toolpaths?: boolean; bit?: number } = {}
-): Promise<{ document: CadDocument; report: CadReport; parts: EvaluatedCadPart[] }> {
+): Promise<CadInspection> {
   // A bit of no width would measure every corner as reached.
   if (options.bit !== undefined && !(Number.isFinite(options.bit) && options.bit > 0))
     throw new Error(`The bit to plan with needs a diameter greater than zero, not ${options.bit}.`);
   const solved = await solveCadDocument(input);
+  const evaluation: CadEvaluation | undefined =
+    solved.document.operationOrder === undefined
+      ? undefined
+      : {
+          parts: solved.parts,
+          diagnostics: solved.diagnostics,
+          placements: solved.placements,
+          available: solved.available,
+        };
+  const geometry = reportGeometry(solved.document, solved.parts, evaluation);
   const nameOf = (partId?: string) => solved.document.parts.find(part => part.id === partId)?.name;
   const errors: CadReportIssue[] = [],
     warnings: CadReportIssue[] = [];
@@ -415,9 +439,9 @@ export async function inspectCadDocument(
     (d.severity === 'error' ? errors : warnings).push(issue);
   }
   const statuses = solved.sketches;
-  const toCut = cadPartsToCut(solved.document, solved.parts);
+  const toCut = cadPartsToCut(geometry.document, geometry.parts);
   // Physical membership is derived for quantity/name metadata; authoring sketches and history stay in the saved source.
-  const physical = physicalJoinedCopies(activeDesign(solved.document));
+  const physical = physicalJoinedCopies(activeDesign(geometry.document));
   // Bones widen a cut past what was drawn, so its opening is measured on the part without them.
   // A Cut parts step can relieve its own openings, so its override is dropped as well.
   const unrelieved =
@@ -429,7 +453,7 @@ export async function inspectCadDocument(
         }).parts
       : solved.parts;
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
-    const physicalPart = physical.parts.find(candidate => candidate.id === part.id)!;
+    const physicalPart = physical.parts.find(candidate => candidate.id === part.id) ?? part;
     const evaluated = solved.parts.find(candidate => candidate.partId === part.id);
     const faces = cadFaceSketches(part);
     const statusesOf = statuses.filter(status => status.partId === part.id);
@@ -647,6 +671,7 @@ export async function inspectCadDocument(
       part.copies?.length || physicalPart.copies?.length ? { names: names(part.id), mirrored: names(mirroredPartId(part.id)) } : undefined;
     const report: CadReportPart = {
       name: part.name,
+      ...(evaluation && { available: !!evaluation.available?.includes(part.id) }),
       thickness: part.thickness,
       ...(box && { outline: { at: box.at, size: box.size } }),
       // A profile loop explicitly cut through stays in holes and isn't also emitted as a cut.
@@ -667,8 +692,10 @@ export async function inspectCadDocument(
         errors.push({ code: 'expect-failed', message: failure, part: part.name });
     return report;
   });
-  const assembly = assemblyReport(solved.document, solved.parts);
-  const steps = cadStepReport(solved.document, solved.parts).map(step =>
+  const assembly = assemblyReport(geometry.document, geometry.parts);
+  const generation = reportPrefix(solved.document);
+  const generationParts = evaluation ? evaluateCadDocument(generation).parts : solved.parts;
+  const steps = cadStepReport(generation, generationParts).map(step =>
     step.kind === 'drawnOn' && !('error' in step.frame) ? { ...step, frameInWords: frameInWords(step.on, step.frame) } : step
   );
   // A furniture construction is complete only while its measured joints and hardware still hold on this geometry.
@@ -689,6 +716,7 @@ export async function inspectCadDocument(
   return {
     document: solved.document,
     parts: solved.parts,
+    ...(evaluation && { evaluation }),
     report: {
       ok: solved.status === 'solved' && !errors.length,
       status: solved.status,
@@ -697,6 +725,7 @@ export async function inspectCadDocument(
       parts,
       ...(assembly && { assembly }),
       ...(steps.length && { steps }),
+      ...(evaluation && { spatial: spatialReport(solved.document, evaluation) }),
     },
   };
 }

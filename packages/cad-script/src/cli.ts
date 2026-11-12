@@ -11,6 +11,7 @@ import { compactCadReport } from './compactReport';
 import { typeErrors } from './typecheck';
 import { renderCadViews } from './views/render';
 import { renderCadSection, type CadSectionRequest } from './views/section';
+import { reportFlatParts } from './reportGeometry';
 
 function parseArgs(args: string[]) {
   const options: {
@@ -121,13 +122,13 @@ const finish = async (ok: boolean, output: object, document?: unknown, svg?: str
     if (ok && inspected) {
       await mkdir(options.views, { recursive: true });
       drawings = { ...drawings };
-      for (const view of renderCadViews(inspected.document, inspected.parts)) {
+      for (const view of renderCadViews(inspected.document, inspected.parts, true, inspected.evaluation)) {
         const file = path.join(options.views, `${view.name}.svg`);
         await writeFile(file, view.svg);
         drawings[view.name] = file;
       }
       if (options.section) {
-        const section = renderCadSection(inspected.document, inspected.parts, options.section);
+        const section = renderCadSection(inspected.document, inspected.parts, options.section, inspected.evaluation);
         const file = path.join(options.views, 'section.svg');
         await writeFile(file, section.svg);
         drawings.section = file;
@@ -185,7 +186,7 @@ if (options.file) {
         result.ok,
         { ...scriptError, ...result.report, ok: result.ok },
         result.document,
-        renderCadSvg(result.parts),
+        renderCadSvg(reportFlatParts(result.document, result.parts, result.evaluation)),
         // A script that stopped leaves the design as it was, which is what the check reported on.
         result
       );
@@ -193,5 +194,11 @@ if (options.file) {
   }
 } else {
   const inspected = await inspectCadDocument(start!);
-  await finish(inspected.report.ok, inspected.report, inspected.document, renderCadSvg(inspected.parts), inspected);
+  await finish(
+    inspected.report.ok,
+    inspected.report,
+    inspected.document,
+    renderCadSvg(reportFlatParts(inspected.document, inspected.parts, inspected.evaluation)),
+    inspected
+  );
 }
