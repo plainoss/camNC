@@ -264,6 +264,7 @@ export function PartCutDialog({
           Fingers
           <CadValueInput
             bare
+            unit="scalar"
             value={fingersText}
             aria-label="Fingers"
             spellCheck={false}

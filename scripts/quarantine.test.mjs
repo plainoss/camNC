@@ -15,6 +15,8 @@ test('quarantines the tests open flaky-test issues name, including cut titles an
     { number: 5, title: 'Flaky test: src/pr.test.ts > pr', pull_request: {} },
     // Quiet for longer than the quarantine lasts.
     { number: 6, title: 'Flaky test: src/old.test.ts > old', updated_at: new Date(now - QUARANTINE_MS - 1).toISOString() },
+    // Failed its non-gating run, so batches run it again.
+    { number: 7, title: 'Flaky test: src/broken.test.ts > broken', labels: [{ name: 'quarantine-lifted' }] },
   ].map(issue => ({ updated_at, ...issue })), now);
   assert.deepEqual(entries.map(entry => entry.issue), [1, 2, 3]);
   assert.equal(entries[1].prefix, true);

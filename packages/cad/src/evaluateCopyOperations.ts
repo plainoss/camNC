@@ -2,25 +2,32 @@ import { applyPartCuts } from './cutParts';
 import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { isCadBody } from './extrudeSteps';
 import { cadPartReference } from './partReferences';
-import { turnAbout } from './placement';
+import { physicalTransformMembers, physicalTransformTarget } from './physicalTransformTargets';
+import { physicalTransformPose } from './physicalTransformPose';
+import { physicalJoinedCopies } from './physicalJoinedCopies';
 import { cadVariableValues } from './variables';
 import { copyTransformValue } from './copyTransformValues';
 import type { CadDocument, CadEvaluation, CadPlacement, EvaluatedCadPart } from './types';
 
 /** A posed projection for one spatial stage. Source creation placements and regenerated pattern copies stay untouched. */
 function stageDocument(source: CadDocument, placements: Map<string, CadPlacement>, available: Set<string>): CadDocument {
-  return {
-    ...source,
-    parts: source.parts
-      .filter(part => available.has(part.id))
-      .map(part => ({
-        ...part,
-        placement: placements.get(part.id),
-        copies: part.copies
-          ?.filter(copy => available.has(cadPartReference(part.id, copy.id)))
-          .map(copy => ({ ...copy, placement: placements.get(cadPartReference(part.id, copy.id)) })),
-      })),
-  };
+  // Rebuild every stage from generation, then expand once. Material readers retain these authoritative
+  // descriptors within this stage instead of rebasing them against independently rounded moved seeds.
+  return physicalJoinedCopies(
+    {
+      ...source,
+      parts: source.parts
+        .filter(part => available.has(part.id))
+        .map(part => ({
+          ...part,
+          placement: placements.get(part.id),
+          copies: part.copies
+            ?.filter(copy => available.has(cadPartReference(part.id, copy.id)))
+            .map(copy => ({ ...copy, placement: placements.get(cadPartReference(part.id, copy.id)) })),
+        })),
+    },
+    source
+  );
 }
 
 /**
@@ -83,33 +90,38 @@ export function evaluateCopyOperations(source: CadDocument, initial: EvaluatedCa
       const value = copyTransformValue(saved, scope);
       if ('error' in value) {
         diagnostics.push({ code: 'variable-value', severity: 'error', partId: saved.partId, message: value.error });
+        if (saved.seed === true) break;
         continue;
       }
       const { move } = value;
-      const reference = cadPartReference(move.partId, move.copyId),
-        current = placements.get(reference);
-      if (!available.has(reference) || !current) {
+      const target = physicalTransformTarget(move),
+        members = physicalTransformMembers(source, target, available, placements);
+      if ('problem' in members) {
         diagnostics.push({
-          code: 'copy-transform-target-missing',
-          severity: 'warning',
+          code: members.problem.code,
+          severity: members.problem.severity,
           partId: move.partId,
-          message:
-            'The transform target copy is absent, suppressed, unplaced or already consumed at this operation. Restore it or choose another target.',
+          message: members.problem.message,
         });
+        if (members.problem.severity === 'error') break;
         continue;
       }
-      const turned = move.turn ? turnAbout(current, move.turn.about, move.turn.axis, move.turn.degrees) : current;
-      const position = turned.position.map((value, axis) => value + move.by[axis]!) as [number, number, number];
-      if (![...position, ...turned.rotation].every(Number.isFinite)) {
+      const changed = members.references.map(reference => ({
+        reference,
+        placement: physicalTransformPose(placements.get(reference)!, move),
+      }));
+      if (changed.some(change => !change.placement)) {
         diagnostics.push({
-          code: 'copy-transform-nonfinite',
+          code: target.kind === 'copy' ? 'copy-transform-nonfinite' : 'physical-transform-nonfinite',
           severity: 'error',
           partId: move.partId,
           message: 'This transform exceeds finite model coordinates.',
         });
+        if (target.kind === 'seed') break;
         continue;
       }
-      placements.set(reference, { ...turned, position });
+      // Validate every component first. An overflow or absent component must never leave a partially moved host.
+      for (const change of changed) placements.set(change.reference, change.placement!);
       continue;
     }
     // Suppressed or masked cuts are absent from activeDesign, but their order slots remain saved source records.
@@ -124,14 +136,18 @@ export function evaluateCopyOperations(source: CadDocument, initial: EvaluatedCa
       continue;
     }
     const document = stageDocument(source, placements, available);
-    const missingTools = step.tools.filter(reference => !available.has(reference));
+    // Inherited joined slots are stage material, not authored transform targets, so they are absent from available.
+    const material = new Set(
+      document.parts.flatMap(part => [part.id, ...(part.copies ?? []).map(copy => cadPartReference(part.id, copy.id))])
+    );
+    const missingTools = step.tools.filter(reference => !material.has(reference));
     if (missingTools.length)
       diagnostics.push({
         code: 'part-cut-tool-unavailable',
         severity: 'warning',
         message: 'A cut tool is not available at this operation.',
       });
-    const activeStep = { ...step, tools: step.tools.filter(reference => available.has(reference)) };
+    const activeStep = { ...step, tools: step.tools.filter(reference => material.has(reference)) };
     const cut = applyPartCuts({ ...document, partCuts: [activeStep] }, parts, { occupiedTools: true });
     parts = cut.parts;
     diagnostics.push(...cut.diagnostics);

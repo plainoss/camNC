@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { attemptToRead, batchPullRequests, readsRetries, clearsBatches, coveredBy, duplicatesOf, issueFor, issueTitle, parseFailures, quietIssues, QUIET_MS, parseRetries, testedHead } from './flaky-tests.mjs';
+import { attemptToRead, batchPullRequests, readsRetries, clearsBatches, coveredBy, duplicatesOf, issueFor, issueTitle, parseFailures, quietIssues, shouldLift, QUIET_MS, parseRetries, testedHead } from './flaky-tests.mjs';
 
 test('reads failed specs and Vitest tests from a job log, each once', () => {
   const log = [
@@ -131,4 +131,13 @@ test('closes a flaky-test issue after a day with no flake and no comment, unless
     issue(6, { title: 'Spec harness flakes', comments: [{ createdAt: ago(2 * QUIET_MS) }] }),
   ];
   assert.deepEqual(quietIssues(issues, now).map(issue => issue.number), [1, 5]);
+});
+
+test('lifts a quarantine only after two non-gating failures in a row, with no other report between', () => {
+  const failed = { body: '`t` is quarantined, and failed every try of its non-gating run in **Tests (app-browser-1)**' };
+  const flaked = { body: '`t` failed a try in **Tests (app-browser-2)** of a Mergify batch and passed on its retry' };
+  assert.equal(shouldLift([flaked, failed]), false);
+  assert.equal(shouldLift([flaked, failed, failed]), true);
+  assert.equal(shouldLift([failed, flaked, failed]), false);
+  assert.equal(shouldLift([failed, failed, { body: 'On it: #123' }]), false);
 });

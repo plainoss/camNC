@@ -310,6 +310,12 @@ export interface CadPart {
    * editing the sketch there carries through; it's never edited here.
    */
   sketchOf?: string;
+  /**
+   * The New extrude, of another part, that also made this part: of regions of that extrude's sketch that lie apart from
+   * its own. That extrude is one feature making several parts, listed once; this part follows its settings
+   * (`resolveExtrudeSteps`) and is edited through it.
+   */
+  extrudedWith?: string;
   /** Extrudes the solid face named by drawnOn; its profile follows that face without a separate sketch step. */
   faceProfile?: boolean;
   /**
@@ -513,8 +519,8 @@ export interface CadDocument {
   variables?: CadVariable[];
   /** Steps that cut parts out of other parts, in order. */
   partCuts?: CadPartCut[];
-  /** Exact-copy moves remain source records even when their pattern slot is absent. */
-  copyTransforms?: CadCopyTransform[];
+  /** Explicit physical moves remain source records even when their target is temporarily unavailable. */
+  copyTransforms?: CadPhysicalTransform[];
   /** Version 4: ordered union of part-cut and copy-transform IDs. Generation features retain their existing semantics. */
   operationOrder?: string[];
   /** Source-ID prefix evaluated with legacy fixed-tool semantics when upgrading an existing design. */
@@ -527,16 +533,32 @@ export interface CadDocument {
   constructions?: CadConstruction[];
   parts: CadPart[];
 }
-/** A rigid move of one physical copy, applied to its pose at this operation, after earlier cuts and moves. */
-export interface CadCopyTransform {
-  id: string;
-  partId: string;
-  copyId: string;
+/** A physical target is explicit; omitting copyId never turns a family reference into a seed selection. */
+export type CadPhysicalTarget = { kind: 'seed'; partId: string } | { kind: 'copy'; partId: string; copyId: string };
+export interface CadRigidTransformValues {
   by: [number, number, number];
   byExpressions?: [string | null, string | null, string | null];
   turn?: CadTurn;
   suppressed?: true;
 }
+/** The old flat saved-copy record remains unchanged. */
+export interface CadCopyTransform extends CadRigidTransformValues {
+  id: string;
+  partId: string;
+  copyId: string;
+  seed?: never;
+}
+/**
+ * An independent root's original physical instance, after generation and any earlier spatial operations.
+ * Experimental V4 copy-only readers require copyId and explicitly refuse this mutually exclusive seed variant.
+ */
+export interface CadSeedTransform extends CadRigidTransformValues {
+  id: string;
+  partId: string;
+  seed: true;
+  copyId?: never;
+}
+export type CadPhysicalTransform = CadCopyTransform | CadSeedTransform;
 /** Derived world poses are separate from source creation placements; evaluating twice must not move a copy twice. */
 export interface CadEvaluation {
   parts: EvaluatedCadPart[];
@@ -643,6 +665,8 @@ export interface EvaluatedCadCut {
   islands: CadPoint[][];
   /** For a cut another part makes: its opening as a box in the part's sketch coordinates, before any corner bones. */
   opening?: { x0: number; y0: number; x1: number; y1: number };
+  /** The tool's own footprint inside that opening, before clearance: where its corners sit. */
+  tool?: { x0: number; y0: number; x1: number; y1: number };
 }
 export type CadEntityFreedom = 'fully-constrained' | 'underconstrained' | 'unknown';
 export interface CadSketchSolveStatus {
@@ -657,6 +681,12 @@ export interface CadSolveResult extends CadEvaluation {
   document: CadDocument;
   status: 'solved' | 'conflict' | 'invalid';
   sketches: CadSketchSolveStatus[];
+  /**
+   * Every sketch solved without an error and the features were built from them, so the errors left come from building
+   * them: a part's outline, or a feature such as an Extrude whose picked region is gone. A sketch closes despite the
+   * latter; the feature shows as broken.
+   */
+  featuresEvaluated?: true;
 }
 
 /** One Fillet step: corners of a part's sketch, rounded to a radius, as the edges through the part there. */

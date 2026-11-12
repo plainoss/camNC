@@ -1032,18 +1032,18 @@ function* solveCadSteps(document: CadDocument, options: CadSolveOptions): Genera
   let evaluated = evaluateCadDocument(next);
   // Parts drawn on others go where those parts now are, and patterns lay their copies out from there.
   const resolved = resolveDrawnPlacements(next, evaluated.parts);
-  diagnostics.push(...resolved.diagnostics);
   const placed = resolvePartPatterns(resolved.document);
   // Cut-parts and Remove volumes intersect copies where patterns and transforms place them now.
   // Copy-specific features follow the final pattern count too, including dormant features when a copy disappears.
   if (placed !== next && requiresInstanceEvaluation(placed)) evaluated = evaluateCadDocument(placed);
-  diagnostics.push(...evaluated.diagnostics);
+  diagnostics.push(...resolved.diagnostics, ...evaluated.diagnostics);
   return {
     ...evaluated,
     document: placed,
     status: diagnostics.some(d => d.severity === 'error') ? 'invalid' : 'solved',
     diagnostics,
     sketches,
+    featuresEvaluated: true,
   };
 }
 /** Solve with module loading and recovery available between sketches. */

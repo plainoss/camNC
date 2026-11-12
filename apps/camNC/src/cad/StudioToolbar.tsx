@@ -15,6 +15,7 @@ export function StudioToolbar({
   busy,
   disabled,
   active,
+  searchHighlight,
   canUndo,
   canRedo,
   onCommand,
@@ -30,6 +31,8 @@ export function StudioToolbar({
   /** Commands that need something first, such as a selected part, with why. */
   disabled: Partial<Record<StudioCommand, string>>;
   active: StudioCommand | null;
+  /** Search previews a command without selecting or activating it. */
+  searchHighlight?: string | null;
   canUndo: boolean;
   canRedo: boolean;
   canFinish: boolean;
@@ -47,6 +50,10 @@ export function StudioToolbar({
   const hidden = kStudioCommands.slice(overflow.visible);
   const activeHidden = hidden.find(command => command.id === active);
   const [moreOpen, setMoreOpen] = useState(false);
+  const highlighted = (command: StudioCommand) => (searchHighlight === command && !disabled[command]) || undefined;
+  // Search shows a command that sits in More by opening the menu, until the highlight moves on. Deriving the open state
+  // ignores the menu's own light dismiss while search owns it, and never closes a menu the user opened.
+  const searchOpensMore = hidden.some(command => highlighted(command.id)) && !moreOpen;
   const chosen = useRef(false);
   const moreDescription = useId();
   // Busy work, or every command fitting again, closes the menu rather than leaving it to reopen afterwards.
@@ -87,6 +94,7 @@ export function StudioToolbar({
             <button
               type="button"
               className="cad-studio-command"
+              data-command-highlight={highlighted(command.id)}
               aria-pressed={active === command.id}
               aria-disabled={disabled[command.id] ? true : undefined}
               onClick={() => !disabled[command.id] && onCommand(command.id)}>
@@ -96,7 +104,7 @@ export function StudioToolbar({
           </ToolHint>
         ))}
         {hidden.length > 0 && (
-          <DropdownMenu modal={false} open={moreOpen && !busy} onOpenChange={setMoreOpen}>
+          <DropdownMenu modal={false} open={(moreOpen || searchOpensMore) && !busy} onOpenChange={setMoreOpen}>
             <ToolHint label={`More features: ${hidden.map(command => command.label).join(', ')}`}>
               <DropdownMenuTrigger asChild>
                 <button
@@ -119,10 +127,16 @@ export function StudioToolbar({
               className="cad-tool-menu cad-studio-more-menu"
               // Keys typed in the menu are for the menu, not the editor's shortcuts (P, Y, Shift+S...) or its Escape.
               onKeyDown={event => event.stopPropagation()}
-              onEscapeKeyDown={event => event.stopPropagation()}
+              // While search shows a command here, Escape is search's to close itself (and with it the menu).
+              onEscapeKeyDown={event => (searchOpensMore ? event.preventDefault() : event.stopPropagation())}
+              // Keyboard focus stays in the search field while it shows a command here. Radix types this menu prop as
+              // private but passes it through to the content's focus scope; the search highlight tests cover it.
+              {...({ onOpenAutoFocus: (event: Event) => searchOpensMore && event.preventDefault() } as object)}
               onCloseAutoFocus={event => {
-                // A chosen command's dialog has already focused its first field: don't pull focus back to More.
-                if (chosen.current) event.preventDefault();
+                // A chosen command's dialog has already focused its first field: don't pull focus back to More. Nor when
+                // focus was never in the menu, as when search opened it: focus is still in, or was handed on by, search.
+                const elsewhere = document.activeElement && document.activeElement !== document.body;
+                if (chosen.current || elsewhere) event.preventDefault();
                 chosen.current = false;
               }}>
               {hidden.map(command => (
@@ -130,6 +144,10 @@ export function StudioToolbar({
                   <DropdownMenuItem
                     aria-disabled={disabled[command.id] ? true : undefined}
                     aria-current={active === command.id ? 'true' : undefined}
+                    data-command-highlight={highlighted(command.id)}
+                    // Hovering an item would focus it and take typing and Escape away from search while search shows it.
+                    onPointerMove={event => searchOpensMore && event.preventDefault()}
+                    onPointerLeave={event => searchOpensMore && event.preventDefault()}
                     data-active={active === command.id || undefined}
                     onSelect={event => {
                       // Like its toolbar button, a command that needs something first stays put and keeps its reason.

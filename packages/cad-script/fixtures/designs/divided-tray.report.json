@@ -7,7 +7,23 @@
  "ok": true,
  "status": "solved",
  "errors": [],
- "warnings": [],
+ "warnings": [
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Divider cuts in Base, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Base"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Divider 2 cuts in Base, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Base"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Divider 3 cuts in Base, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Base"
+  }
+ ],
  "features": [
   {
    "id": "482b6484-8019-44f0-8ca8-117542cb6838",
@@ -1193,7 +1209,27 @@
     "warnings": [
      "Base: pocket z=8: 6.5mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Divider",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     },
+     {
+      "ref": "Divider 2",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     },
+     {
+      "ref": "Divider 3",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {

@@ -60,3 +60,9 @@
   background: #dfeaf8;
   color: #174f8f;
 }
+/* Search marks a command; the ring stays inside the strip's clip and the menu's scroll box. */
+.cad-editor .cad-studio-toolbar [data-command-highlight='true'],
+.cad-studio-more-menu [role='menuitem'][data-command-highlight='true'] {
+  outline: 2px solid #2979df;
+  outline-offset: -2px;
+}

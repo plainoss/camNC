@@ -2868,7 +2868,21 @@
      }
     ],
     "warnings": [],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Top",
+      "corners": 1,
+      "unreached": 0,
+      "short": 0
+     },
+     {
+      "ref": "Bottom",
+      "corners": 1,
+      "unreached": 0,
+      "short": 0
+     }
+    ]
    },
    "faces": [
     {

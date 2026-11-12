@@ -27,6 +27,7 @@ import {
   createCadPart,
   filletLineCorners,
   linearPatternSketchEntities,
+  migrateDesignUnitNumbers,
   newCadId,
   parseCadValue,
   pointInPolygon,
@@ -123,7 +124,8 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
   const closures: { partId: string; sketchId: string; edgeId: string; from: Xy; to: Xy }[] = [];
   const measure = (value: Len, what: string, unit: 'mm' | 'scalar' | 'deg' = 'mm'): number => {
     if (typeof value === 'number') return value;
-    const result = parseCadValue(value, { unit, variables: cadVariableScope(document) });
+    // Scripts measure in mm whatever the design's unit; `editCad` writes the mm out where the design isn't in mm.
+    const result = parseCadValue(value, { unit, variables: cadVariableScope(document), lengthUnit: 'mm' });
     return 'error' in result ? fail(`${what} "${value}": ${result.error}`) : result.value;
   };
   const lengthTerm = (value: Len) => lengthExpression(value, cadVariableScope(document));
@@ -813,7 +815,11 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     },
     variable(name, expression) {
       const existing = document.variables?.find(variable => variable.name === name);
-      const result = setCadVariable(document, { id: existing?.id, name, expression });
+      const result = setCadVariable(
+        document,
+        { id: existing?.id, name, expression },
+        { lengthUnit: 'mm', spellOutLengths: (document.lengthUnit ?? 'mm') !== 'mm' }
+      );
       if ('error' in result) return fail(`The variable ${name}: ${result.error}`);
       document = resolvePartPatterns(result.document);
       variablesDirty = true;
@@ -895,7 +901,9 @@ export async function editCad(
     scriptError = error.message;
   }
   // A failed script leaves the design as it was: half of an intent is worse than none of it.
-  const edited = scriptError ? base : { ...session.document(), revision: base.revision + 1 };
+  // A script's plain numbers are mm. In a design measured in another unit they're saved saying so (`t + 1 mm`), so they
+  // keep their size when edited in the app, where a plain number is in the design's unit.
+  const edited = scriptError ? base : migrateDesignUnitNumbers({ ...session.document(), revision: base.revision + 1 });
   const inspected = await inspectCadDocument(edited, expectations, { toolpaths: options.toolpaths });
   if (!scriptError)
     for (const closure of session.closures) {
