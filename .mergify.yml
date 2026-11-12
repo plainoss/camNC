@@ -8,10 +8,17 @@ queue_rules:
   - name: main
     # Queue with @mergifyio queue, or label the PR `ready` (pull_request_rules below); passing CI alone is not merge
     # consent.
+    # Mergify queues a PR by itself as soon as these hold (autoqueue). The `ready` label is merge consent that doesn't
+    # need the author around, so passing CI alone never queues a PR. A `ci-fix` or `flaky-test` label is consent too,
+    # and such a PR enters straight away: the batch runs every check on it anyway.
+    autoqueue: true
     queue_conditions:
       - base = main
       - -draft
-      # A test or CI fix enters the queue straight away: the batch runs every check on it anyway.
+      - or:
+          - label = ready
+          - label = ci-fix
+          - label = flaky-test
       - or:
           - check-success = Run tests
           - label = ci-fix
@@ -29,7 +36,9 @@ queue_rules:
     # Required reviews/checks from GitHub must hold to merge, not to queue, so a fix can queue before its own CI ends.
     branch_protection_injection_mode: merge
     merge_method: squash
-    batch_size: 3
+    # Two while batches fail often (42% from Nov 9 to 12): a failed batch of two needs at most one split to find the
+    # PR at fault. Go back to three once fewer than about 1 in 10 batches fail.
+    batch_size: 2
     batch_max_wait_time: 30 seconds
     # Failed batches are bisected; do not hide failures with automatic CI retries.
     max_checks_retries: 0
@@ -51,13 +60,3 @@ priority_rules:
           - title ~= ^fix\((ci|test)\)
     priority: high
     allow_checks_interruption: false
-
-# The `ready` label is merge consent that doesn't need the author around: the PR queues once its queue conditions
-# hold (Run tests green, approved, no conflict), even if the session that opened it has stopped.
-pull_request_rules:
-  - name: queue PRs labelled ready
-    conditions:
-      - base = main
-      - label = ready
-    actions:
-      queue:

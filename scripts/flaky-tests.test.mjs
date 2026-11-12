@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { attemptToRead, batchPullRequests, readsRetries, clearsBatches, coveredBy, duplicatesOf, issueFor, issueTitle, parseFailures, parseRetries, testedHead } from './flaky-tests.mjs';
+import { attemptToRead, batchPullRequests, readsRetries, clearsBatches, coveredBy, duplicatesOf, issueFor, issueTitle, parseFailures, quietIssues, QUIET_MS, parseRetries, testedHead } from './flaky-tests.mjs';
 
 test('reads failed specs and Vitest tests from a job log, each once', () => {
   const log = [
@@ -112,4 +112,20 @@ test('every finished batch reports its retried tests, also one that failed on an
   assert.equal(readsRetries({ ...batch, conclusion: 'failure' }), true);
   assert.equal(readsRetries({ ...batch, conclusion: 'cancelled' }), false);
   assert.equal(readsRetries({ event: 'pull_request', branch: 'feature', conclusion: 'success' }), false);
+});
+
+test('closes a reporter issue after a day with no flake and no comment, unless someone owns it', () => {
+  const now = Date.parse('2026-11-12T12:00:00Z');
+  const ago = ms => new Date(now - ms).toISOString();
+  const bot = { login: 'app/github-actions' };
+  const issue = (number, fields) => ({ number, title: `Flaky test: t${number}`, author: bot, assignees: [], createdAt: ago(2 * QUIET_MS), comments: [], ...fields });
+  const issues = [
+    issue(1),
+    issue(2, { comments: [{ createdAt: ago(QUIET_MS / 2) }] }),
+    issue(3, { createdAt: ago(QUIET_MS / 2) }),
+    issue(4, { assignees: [{ login: 'someone' }] }),
+    issue(5, { author: { login: 'someone' } }),
+    issue(6, { title: 'Spec harness flakes', comments: [{ createdAt: ago(2 * QUIET_MS) }] }),
+  ];
+  assert.deepEqual(quietIssues(issues, now).map(issue => issue.number), [1]);
 });

@@ -142,9 +142,10 @@ async function main() {
   if (readsRetries(run)) await reportRetries(repo, run.id, run.attempt);
 
   const attempt = attemptToRead(run);
-  if (attempt === null) return;
   const runUrl = `https://github.com/${repo}/actions/runs/${run.id}/attempts/${attempt}`;
-  await report(repo, run.id, attempt, `A rerun of the same commit passed: ${runUrl}`);
+  if (attempt !== null) await report(repo, run.id, attempt, `A rerun of the same commit passed: ${runUrl}`);
+  // After the reports, so a flake this run filed counts as a recurrence.
+  if (!process.env.FLAKY_DRY_RUN) closeQuiet(repo);
 }
 
 async function report(repo, runId, attempt, context) {
@@ -212,6 +213,36 @@ async function file(repo, flakes, entryOf) {
     }
     writeFileSync(bodyFile, target.action === 'reopen' ? `Flaky again after this issue was closed. ${entry}` : entry);
     gh(['issue', 'comment', String(target.number), '--repo', repo, '--body-file', bodyFile]);
+  }
+}
+
+export const QUIET_MS = 24 * 3600_000;
+
+/**
+ * The open flaky-test issues the reporter filed that have been quiet for QUIET_MS: no flake of the test (each one
+ * comments) and no one commenting, such as to claim it, since. Assigned issues stay open for their owner.
+ */
+export function quietIssues(issues, now) {
+  return issues.filter(issue => {
+    if (!issue.title.startsWith('Flaky test: ') || !issue.author?.login?.includes('github-actions') || issue.assignees?.length) return false;
+    const last = Math.max(Date.parse(issue.createdAt), ...(issue.comments ?? []).map(comment => Date.parse(comment.createdAt)));
+    return now - last > QUIET_MS;
+  });
+}
+
+// Closing ends the test's quarantine in merge-queue batches (scripts/test-quarantine.mjs); its next flake reopens the
+// issue, which quarantines it again. A test that stays fixed needs no one to come back and close its issue.
+function closeQuiet(repo) {
+  try {
+    const issues = JSON.parse(gh(['issue', 'list', '--repo', repo, '--label', LABEL, '--state', 'open', '--limit', '500',
+      '--json', 'number,title,author,assignees,createdAt,comments']));
+    for (const issue of quietIssues(issues, Date.now())) {
+      console.log(`Closing #${issue.number}, quiet for a day: ${issue.title}`);
+      gh(['issue', 'close', String(issue.number), '--repo', repo, '--reason', 'completed', '--comment',
+        'No flake of this test in a day, so this closes, and merge-queue batches run the test again. Its next flake reopens this issue.']);
+    }
+  } catch (error) {
+    console.log(`Closing quiet flaky-test issues failed: ${error.message.split('\n')[0]}`);
   }
 }
 

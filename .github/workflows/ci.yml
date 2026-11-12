@@ -15,6 +15,9 @@ on:
     - cron: '17 5,17 * * 1-5'
   workflow_dispatch:
 
+# Every job sets timeout-minutes: Actions' default of 360 minutes would hold a runner and the queue's batch for hours
+# when a job hangs. It doesn't bound a run that never starts (an Actions outage leaves runs queued with no jobs); the
+# PR watchdog cancels and reruns those.
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
   # A new PR commit supersedes its previous checks; main pushes can still run independently.
@@ -24,6 +27,7 @@ jobs:
   checks:
     name: Format, lint and types
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     permissions:
       contents: read
       id-token: write
@@ -98,6 +102,8 @@ jobs:
     if: github.event_name != 'push'
     permissions: &turbo-permissions
       contents: read
+      # The test job reads the open flaky-test issues to quarantine their tests in batches.
+      issues: read
       id-token: write
     # CAD/WASM, the app browser suite, and OpenCV must not compete for one runner's CPUs. Each browser shard gets its
     # own runner; the headless suites take seconds each, so they share one runner (and one setup) and run one task at a
@@ -115,6 +121,7 @@ jobs:
             app-tasks: test:domain test:worker test:licenses
             performance: pnpm run test:performance
     runs-on: ubuntu-24.04
+    timeout-minutes: 50
     container: &browser-container
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.
       image: mcr.microsoft.com/playwright:v1.54.1-noble
@@ -157,6 +164,15 @@ jobs:
       # The Vitest suites report to Mergify themselves; the browser shards report as one suite. In the headless suites,
       # the Cloudflare Workers suites write JUnit reports instead, and so does node --test (camNC's license check),
       # keeping its TAP output. Both are uploaded below.
+      # Batch browser shards skip each test with an open `flaky-test` issue (scripts/test-quarantine.mjs), so a test that
+      # flaked once can't eject batches until its fix closes the issue. Other runs still run it.
+      - name: Quarantine flaky tests
+        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'mergify/merge-queue/') && startsWith(matrix.suite, 'app-browser-')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Without the list the batch runs every test, as before.
+        continue-on-error: true
+        run: node scripts/test-quarantine.mjs >> "$GITHUB_ENV"
       - name: Run tests
         id: tests
         timeout-minutes: 20
@@ -256,6 +272,7 @@ jobs:
             performance: ''
     runs-on: ubuntu-24.04
     container: *browser-container
+    timeout-minutes: 35
     defaults: *bash
     env: *mergify-env
     steps: *test-steps
@@ -272,6 +289,7 @@ jobs:
       matrix:
         shard: [1/4, 2/4, 3/4, 4/4]
     runs-on: ubuntu-24.04
+    timeout-minutes: 35
     container:
       # Keep this version in sync with the lockfile; test:ci checks both browser workflows.
       image: mcr.microsoft.com/playwright:v1.54.1-noble
@@ -358,6 +376,7 @@ jobs:
     if: always() && github.event_name != 'push'
     needs: [checks, test, browser, specs, fluidnc-sim]
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Require all validation jobs to pass
         env:
@@ -381,6 +400,7 @@ jobs:
     # Like test, only on pull requests and in the merge queue.
     if: github.event_name != 'push'
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
         with:

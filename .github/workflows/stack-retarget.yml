@@ -1,0 +1,33 @@
+name: Retarget stacked PRs
+
+# When a PR merges, the open PRs stacked on its branch move to the branch it merged into, so they don't sit orphaned
+# until someone notices. CI doesn't run on a retarget, so each one gets a comment asking its owner to merge the new base
+# in, which starts CI. A base closed without merging is left to the PR watchdog, which flags its children: they still
+# carry its commits. pull_request_target runs main's copy of this file and checks out nothing.
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  retarget:
+    # A fork PR's head names a branch of the fork, which says nothing about this repository's stacks.
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != github.event.pull_request.base.ref
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Retarget the PRs based on the merged branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MERGED: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          for pr in $(gh pr list --repo "$REPO" --state open --base "$HEAD" --json number --jq '.[].number'); do
+            gh pr edit "$pr" --repo "$REPO" --base "$BASE"
+            gh pr comment "$pr" --repo "$REPO" --body "Its base #$MERGED merged, so this PR now targets \`$BASE\`. Merge \`$BASE\` into it and push: that starts its CI, which a retarget doesn't."
+            echo "Retargeted #$pr to $BASE"
+          done

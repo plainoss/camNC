@@ -220,10 +220,9 @@ test('the Mergify queue runs all validation, PRs run the quick suites and main o
 
 test('Mergify batches retain the required gate, branch protections and explicit merge consent', () => {
   const config = parse(read('.mergify.yml'));
-  // CI success alone never queues a PR: the only automatic queueing is for PRs someone labelled `ready`.
-  assert.deepEqual(config.pull_request_rules, [
-    { name: 'queue PRs labelled ready', conditions: ['base = main', 'label = ready'], actions: { queue: null } },
-  ]);
+  // CI success alone never queues a PR: Mergify queues by itself only PRs labelled `ready`, `ci-fix` or `flaky-test`.
+  assert.equal(config.pull_request_rules, undefined);
+  assert.equal(config.queue_rules[0].autoqueue, true);
   assert.equal(config.merge_protections_settings?.auto_merge_conditions, undefined);
   assert.equal(config.merge_queue.mode, 'serial', 'speculative batches must include preceding changes');
   // One batch's 11 jobs plus PR CI fit the 20 concurrent runners; two batches did not.
@@ -245,8 +244,11 @@ test('Mergify batches retain the required gate, branch protections and explicit 
   assert(required);
   const gate = `check-success = ${required.name}`;
   assert(queue.merge_conditions.includes(gate), 'batches must pass the validation gate');
-  // Only a labelled test or CI fix may queue before its own CI passes.
-  assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'object'), [{ or: [gate, 'label = ci-fix', 'label = flaky-test'] }]);
+  // A label is merge consent, and only a labelled test or CI fix may queue before its own CI passes.
+  assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'object'), [
+    { or: ['label = ready', 'label = ci-fix', 'label = flaky-test'] },
+    { or: [gate, 'label = ci-fix', 'label = flaky-test'] },
+  ]);
   assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'string').sort(), ['-draft', 'base = main']);
   const { jobs } = parse(read('.github/workflows/ci.yml'));
   const browserChecks = jobs.browser.strategy.matrix.include.map(({ suite }) => `Tests (${suite})`);
@@ -268,6 +270,15 @@ test('only merge-queue browser shards retry a failed test, and the flaky-test re
   assert.equal(retry('', 'app-browser-1', 'schedule'), '0', 'scheduled runs feed flaky detection and retry nothing');
   assert.match(read('apps/camNC/vitest.config.ts'), /retry: Number\(process\.env\.VITEST_RETRY\) \|\| 0/);
   assert.match(read('scripts/test-timings.mjs'), /RETRIED/);
+  const quarantine = jobs.test.steps.find(step => step.name === 'Quarantine flaky tests');
+  const tests = jobs.test.steps.findIndex(step => step.name === 'Run tests');
+  assert(jobs.test.steps.indexOf(quarantine) < tests, 'the quarantine list must be in $GITHUB_ENV before the tests run');
+  assert.equal(quarantine.if, `github.event_name == 'pull_request' && ${expression.split(' && ').slice(1, 3).join(' && ')}`);
+  assert.equal(quarantine['continue-on-error'], true);
+  assert.equal(jobs.test.permissions.issues, 'read');
+  const config = read('apps/camNC/vitest.config.ts');
+  assert.match(config, /src\/test\/quarantine\.ts/);
+  assert.match(config, /process\.env\.VITEST_QUARANTINE/);
 });
 
 test('Mergify draft batch PRs trigger all validation without needing merge_group events', () => {
@@ -328,7 +339,10 @@ test('only the checks job on main saves the pnpm store, and every job restores t
 test('remote caching uses short-lived tokens and skips untrusted fork PRs', () => {
   const { jobs } = parse(read('.github/workflows/ci.yml'));
   for (const id of ['checks', 'test', 'browser', 'specs']) {
-    assert.deepEqual(jobs[id].permissions, { contents: 'read', 'id-token': 'write' });
+    // issues: read is for the test job's quarantine list, in a permissions block other jobs share.
+    const { issues, ...permissions } = jobs[id].permissions;
+    assert.deepEqual(permissions, { contents: 'read', 'id-token': 'write' });
+    assert(issues === undefined || issues === 'read');
     const auth = jobs[id].steps.find(step => step.name === 'Authenticate remote cache');
     assert.equal(auth.uses, 'vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10');
     assert.equal(auth.with.team, '${{ vars.TURBO_TEAM }}');
@@ -352,30 +366,20 @@ test('remote caching uses short-lived tokens and skips untrusted fork PRs', () =
 });
 
 
-test('production smoke accepts Cloudflare production checks after queue merges and rejects previews', () => {
-  const condition = parse(read('.github/workflows/setup-smoke.yml')).jobs['setup-smoke'].if;
-  // Exercise the configured expression against event payloads, including GitHub's retained queue branch name.
-  const evaluate = new Function('github', 'contains', `return (${condition});`);
-  const check = (overrides = {}) => ({
-    event_name: 'check_run',
-    event: { check_run: {
-      conclusion: 'success',
-      name: 'Workers Builds: camnc',
-      app: { slug: 'cloudflare-workers-and-pages' },
-      check_suite: { head_branch: 'gh-readonly-queue/main/pr-166-example' },
-      ...overrides,
-    } },
-  });
-  const passes = event => evaluate(event, (value, part) => value.includes(part));
-  assert.equal(passes(check()), true, 'production checks must work when the queue branch name is retained');
-  assert.equal(passes(check({ name: 'Workers Builds: camnc-preview' })), false);
-  assert.equal(passes(check({ name: 'Workers Builds: camnc-webrtc-cam' })), false);
-  assert.equal(passes(check({ conclusion: 'failure' })), false);
-  assert.equal(passes(check({ app: { slug: 'another-app' } })), false);
-  assert.equal(passes({ event_name: 'workflow_dispatch' }), true);
-  assert.equal(passes({ event_name: 'schedule' }), true);
+test('production smoke runs after Deploy, on a schedule and on demand, not on every check run', () => {
+  const workflow = parse(read('.github/workflows/setup-smoke.yml'));
+  assert.deepEqual(Object.keys(workflow.on).sort(), ['schedule', 'workflow_call', 'workflow_dispatch']);
+  assert.equal(workflow.jobs['setup-smoke'].if, undefined);
 });
 
+test('every CI job is bounded, and the PR watchdog reruns runs an outage leaves queued', () => {
+  const { jobs } = parse(read('.github/workflows/ci.yml'));
+  for (const [id, job] of Object.entries(jobs)) assert(job['timeout-minutes'] > 0, `${id} must set timeout-minutes`);
+  const watchdog = parse(read('.github/workflows/pr-watchdog.yml'));
+  assert(watchdog.on.schedule.length > 0);
+  assert.equal(watchdog.permissions.actions, 'write');
+  assert.match(watchdog.jobs.watch.steps.at(-1).run, /scripts\/pr-watchdog\.mjs/);
+});
 
 test('the explicit Node test allocation is disjoint from browser and storage integration coverage', () => {
   assert(read('vitest.workspace.ts').includes('./apps/*/vitest.node.config.ts'), 'workspace and IDE runs must include domain tests');

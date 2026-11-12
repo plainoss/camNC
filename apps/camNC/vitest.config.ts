@@ -59,7 +59,10 @@ export default defineConfig({
     maxWorkers: 4,
     // Worker tests run in workerd, see vitest.worker.config.ts.
     exclude: ['**/node_modules/**', 'worker/**', ...nodeFiles],
-    setupFiles: ['src/test/isolateIndexedDb.ts', 'src/test/settledReset.ts'],
+    setupFiles: ['src/test/isolateIndexedDb.ts', 'src/test/settledReset.ts', 'src/test/quarantine.ts'],
+    // Merge-queue batches list the tests with an open flaky-test issue here (scripts/test-quarantine.mjs), and
+    // src/test/quarantine.ts skips them. Every other run gets an empty list.
+    provide: { quarantine: JSON.parse(process.env.VITEST_QUARANTINE || '[]') },
     // environment: 'jsdom',
     // opencv tests don't seem to work with jsdom as setup right now.
     browser: {
