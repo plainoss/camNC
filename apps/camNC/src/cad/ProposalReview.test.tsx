@@ -10,7 +10,13 @@ vi.mock('./assistant/recheck', async original => ({
   ...(await original<typeof import('./assistant/recheck')>()),
   recheckAssistantCandidate: vi.fn(() => new Promise(() => {})),
 }));
-vi.mock('./WorkspaceView', () => ({ default: ({ document }: { document: { name: string } }) => <div>{document.name}</div> }));
+const views = vi.hoisted(() => [] as { viewRequest?: { name: string; direction?: number[] } }[]);
+vi.mock('./WorkspaceView', () => ({
+  default: (props: { document: { name: string }; viewRequest?: { name: string; direction?: number[] } }) => {
+    views.push(props);
+    return <div>{props.document.name}</div>;
+  },
+}));
 
 describe('proposal preview', () => {
   it('shows the candidate and original, then applies exactly once and can undo', async () => {
@@ -89,6 +95,23 @@ describe('proposal preview', () => {
     set.call(width, '700');
     width.dispatchEvent(new Event('input', { bubbles: true }));
     await expect.element(apply).toBeDisabled();
+    endCadSession(base.id);
+  });
+
+  it('frames the whole proposal with an exact fit rather than the quick default', async () => {
+    const base = createPlateDocument();
+    const session = cadSession(base);
+    const screen = render(
+      <ProposalReview
+        proposal={cadProposal(base, { ...base, name: 'Candidate' })}
+        session={session}
+        currentDocument={base}
+        onApply={() => {}}
+        onClose={() => {}}
+      />
+    );
+    await expect.element(screen.getByText('Candidate', { exact: true })).toBeVisible();
+    expect(views.at(-1)?.viewRequest).toMatchObject({ name: 'iso', direction: [0.77, -1, 0.17] });
     endCadSession(base.id);
   });
 });
