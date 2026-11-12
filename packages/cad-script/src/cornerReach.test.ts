@@ -100,3 +100,23 @@ it('checks a tenon from below that the clearance carries through the top', async
   expect(seat.cuts).toEqual([expect.objectContaining({ side: 'underside', through: true })]);
   expect(seat.toolpaths!.cornerReach).toEqual([{ ref: 'Tenon', corners: 4, unreached: 4, short: expect.any(Number) }]);
 });
+
+it('names the opening after the tool as it is now when the planned summary is reused', async () => {
+  const { document } = await editCad(null, d => {
+    const seat = d.newPart('Seat', { thickness: 18 });
+    seat.profile.rect({ at: [0, 0], w: 200, h: 200 });
+    seat.drawOn('top');
+    const tenon = d.newPart('Tenon', { thickness: 18 });
+    tenon.profile.rect({ at: [80, 91], w: 40, h: 18 });
+    tenon.drawOn('top', { offset: '9mm' });
+    d.cutParts(seat, { with: tenon, clearance: '0mm' });
+  });
+  const reach = async (source: typeof document, bit: number) =>
+    (await inspectCadDocument(source, new Map(), { bit })).report.parts.find(part => part.name === 'Seat')!.toolpaths!.cornerReach;
+  expect((await reach(document, 6))![0]!.ref).toBe('Tenon');
+  const renamed = { ...document, parts: document.parts.map(part => (part.name === 'Tenon' ? { ...part, name: 'Leg' } : part)) };
+  expect((await reach(renamed, 6))![0]!.ref).toBe('Leg');
+  // The bit is part of what the summary is reused for.
+  expect((await reach(document, 3))![0]).toMatchObject({ unreached: 4, short: expect.any(Number) });
+  expect((await reach(document, 3))![0]!.short).not.toBe(1.24);
+});
