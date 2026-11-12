@@ -1,4 +1,4 @@
-import type { CadPart, CadPartCut } from './types';
+import type { CadDocument, CadPart, CadPartCut } from './types';
 
 /** Validate the bounded source setting before either loading or evaluating a design. */
 export function partCutReliefIssue(value: unknown): string | null {
@@ -19,3 +19,18 @@ export function partCutReliefIssue(value: unknown): string | null {
 /** An explicit Off must not fall back to the part-wide setting. */
 export const effectivePartCutRelief = (step: CadPartCut, target: CadPart) =>
   step.cornerRelief === undefined ? target.cornerRelief : step.cornerRelief;
+
+/**
+ * The smallest bit any of a part's corners is relieved for: its own setting, or a Cut parts step's override on its
+ * openings. A split joint relieves both of its parts. CAM warns when the board's bit is wider than this.
+ */
+export function smallestCornerRelief(document: CadDocument, partId: string): number | undefined {
+  const ofPart = (id: string) => id.split(':')[0] === partId;
+  const diameters = [
+    document.parts.find(part => part.id === partId)?.cornerRelief?.diameter,
+    ...(document.partCuts ?? [])
+      .filter(step => !step.suppressed && (step.targets.some(ofPart) || (step.split !== undefined && step.tools.some(ofPart))))
+      .map(step => step.cornerRelief?.diameter),
+  ].filter((diameter): diameter is number => diameter !== undefined);
+  return diameters.length ? Math.min(...diameters) : undefined;
+}

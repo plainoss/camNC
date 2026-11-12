@@ -15,6 +15,23 @@ export function summarizeFiles(files, root) {
   })).sort((a, b) => b.testsMs + b.collectMs - a.testsMs - a.collectMs);
 }
 
+/**
+ * The tests that failed a try and passed on a retry, as `file > describe > test`, the name a FAIL line gives them.
+ * scripts/flaky-tests.mjs reads the RETRIED lines the reporter prints, so a retry never hides a flake.
+ */
+export function retriedTests(files, root) {
+  const retried = [];
+  const walk = (task, names, file) => {
+    for (const child of task.tasks ?? []) {
+      const path = [...names, child.name];
+      if (child.type === 'suite') walk(child, path, file);
+      else if (child.result?.state === 'pass' && (child.result.retryCount ?? 0) > 0) retried.push([file, ...path].join(' > '));
+    }
+  };
+  for (const file of files) walk(file, [], path.relative(root, file.filepath).split(path.sep).join('/'));
+  return retried;
+}
+
 export default class TimingReporter {
   constructor({ suite = 'tests' } = {}) { this.suite = suite; }
   onInit(ctx) { this.root = ctx.config.root; this.shard = ctx.config.shard; this.started = performance.now(); }
@@ -27,5 +44,8 @@ export default class TimingReporter {
     writeFileSync(path.join(directory, `${this.suite}${shard}.json`), JSON.stringify(report, null, 2) + '\n');
     console.log(`\n${this.suite}: ${(report.wallMs / 1000).toFixed(1)} s wall; slowest files (tests / collection):`);
     for (const file of report.files.slice(0, 10)) console.log(`  ${(file.testsMs / 1000).toFixed(2)}s / ${(file.collectMs / 1000).toFixed(2)}s ${file.file}`);
+    // Tagged with the run, since turbo replays these lines from its cache in later runs that retried nothing.
+    const run = process.env.GITHUB_RUN_ID ?? 'local';
+    for (const test of retriedTests(files, this.root)) console.log(`RETRIED [run ${run}] ${test}`);
   }
 }

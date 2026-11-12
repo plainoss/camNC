@@ -4,6 +4,7 @@ import { TransformDialog } from './TransformDialog';
 import { VariableDialog } from './VariableDialog';
 import { PlaneDialog } from './PlaneDialog';
 import { ShapeStepDialogs } from './ShapeStepDialogs';
+import type { DialogPartPicks } from './useDialogPartPick';
 
 type Transform = { partId: string; copyId?: string; move?: boolean };
 type Plane = { id?: string; preselected?: CadDrawnOn['on'] };
@@ -28,6 +29,7 @@ export function StudioStepDialogs({
   setFillet,
   setDirectionPicker,
   pickPoint,
+  partPicks,
 }: {
   document: CadDocument;
   variables: CadValueScope;
@@ -46,6 +48,8 @@ export function StudioStepDialogs({
   setFillet: (value: null) => void;
   setDirectionPicker: ShapeProps['setDirectionPicker'];
   pickPoint: NonNullable<ComponentProps<typeof TransformDialog>['pickPoint']>;
+  /** Parts clicked while a dialog is open, for a new Mirror's or Transform's part field. */
+  partPicks?: DialogPartPicks;
 }) {
   return (
     <>
@@ -73,6 +77,7 @@ export function StudioStepDialogs({
               pickDirection={picked => setDirectionPicker(picked)}
               pickPoint={pickPoint}
               onConnectorsChange={onConnectorsChange}
+              partPicks={partPicks}
             />
           ) : null;
         })()}
@@ -92,7 +97,7 @@ export function StudioStepDialogs({
       {
         <ShapeStepDialogs
           {...{ document, variables: variables, mirror: mirror, fillet: fillet, commit, onPreview }}
-          {...{ setMirror: setMirror, setFillet: setFillet, pickEdge: pickPoint }}
+          {...{ setMirror: setMirror, setFillet: setFillet, pickEdge: pickPoint, partPicks }}
           setDirectionPicker={setDirectionPicker}
         />
       }

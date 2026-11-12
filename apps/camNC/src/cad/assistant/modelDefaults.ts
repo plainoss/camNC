@@ -1,5 +1,5 @@
 import type { AssistantCredentials } from './keyStore';
-import { providerUrl, type ProviderConfig } from './provider';
+import { AssistantProviderError, providerUrl, type ProviderConfig } from './provider';
 import type { ConnectionPresetId } from './connectionPresets';
 
 /** Which provider a pasted key belongs to, from its published prefix. Anything else needs a choice. */
@@ -52,7 +52,10 @@ export function defaultImageModel(provider: ConnectionPresetId, available: strin
   return newest(available.filter(id => /^gpt-image-\d/.test(id) && !/mini/.test(id))) ?? available.find(id => id === 'dall-e-3');
 }
 
-/** The provider's own model list, with the same key. Returns null when the endpoint has none or refuses the browser. */
+/**
+ * The provider's own model list, with the same key. Null when the endpoint lists no models; a rejected key (400, 401,
+ * 403) or an unreachable endpoint throws, so the caller can say what actually went wrong.
+ */
 export async function listProviderModels(
   config: ProviderConfig,
   key: string,
@@ -71,6 +74,8 @@ export async function listProviderModels(
           ? { 'x-api-key': key, 'anthropic-version': '2026-10-21', 'anthropic-dangerous-direct-browser-access': 'true' }
           : { authorization: `Bearer ${key}` },
     });
+    if (response.status === 400 || response.status === 401 || response.status === 403)
+      throw new AssistantProviderError('http', 'The provider rejected this key.', 401);
     if (!response.ok) return null;
     const body = (await response.json()) as { data?: { id?: unknown }[] };
     const ids = (body.data ?? [])
@@ -79,8 +84,11 @@ export async function listProviderModels(
       // Gemini lists resource names ("models/gemini-…"); requests take the bare ID.
       .map(id => id.replace(/^models\//, ''));
     return ids.length ? ids : null;
-  } catch {
+  } catch (cause) {
     if (signal.aborted) throw new DOMException('Stopped', 'AbortError');
+    if (cause instanceof AssistantProviderError) throw cause;
+    // fetch rejects for network failures and for responses the browser blocks (CORS); a bad body is just no list.
+    if (cause instanceof TypeError) throw new AssistantProviderError('network', 'The browser could not reach this provider.');
     return null;
   }
 }

@@ -6,6 +6,7 @@ import {
   createCadDocument,
   createCadPart,
   evaluateCadDocument,
+  orderedCadDocument,
   parseCadDocument,
   setCadVariable,
   updatePartCut,
@@ -63,6 +64,21 @@ it('keeps legacy inheritance but applies Off and Dogbone only to their own openi
   const inherited = updatePartCut(changed, changed.partCuts![1]!.id, { cornerRelief: undefined });
   expect(inherited.partCuts![1]).not.toHaveProperty('cornerRelief');
   expect(evaluateCadDocument(inherited).parts[0]!.cuts![1]).toEqual(legacy.cuts![1]);
+});
+
+it.each([false, true])('keeps an ordered physical-copy design valid with a relief override (ordered first: %s)', orderedFirst => {
+  const { document } = source();
+  const relieve = (value: CadDocument) => updatePartCut(value, value.partCuts![1]!.id, { cornerRelief: { diameter: 4 } });
+  const changed = orderedFirst ? relieve(orderedCadDocument(document)) : orderedCadDocument(relieve(document));
+  expect(changed.version).toBe(5);
+  expect(changed.operationOrder).toEqual(document.partCuts!.map(step => step.id));
+  const evaluated = evaluateCadDocument(changed);
+  expect(evaluated.diagnostics).toEqual([]);
+  expect(evaluated.parts[0]!.cuts![1]!.outline.length).toBeGreaterThan(4);
+  expect(evaluateCadDocument(parseCadDocument(JSON.parse(JSON.stringify(changed))))).toEqual(evaluated);
+  const inherited = updatePartCut(changed, changed.partCuts![1]!.id, { cornerRelief: undefined });
+  expect(inherited.version).toBe(4);
+  expect(evaluateCadDocument(parseCadDocument(JSON.parse(JSON.stringify(inherited)))).diagnostics).toEqual([]);
 });
 
 it('resolves, renames and tracks a step diameter variable without changing clearance or source relief', () => {

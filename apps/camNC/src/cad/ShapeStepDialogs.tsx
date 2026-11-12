@@ -2,6 +2,7 @@ import type { CadDocument, CadDrawnOn, CadValueScope } from '@wbcnc/cad';
 import { FilletDialog } from './FilletDialog';
 import { MirrorDialog } from './MirrorDialog';
 import type { CadConnectorPick } from './PartFeatureDialogs';
+import type { DialogPartPicks } from './useDialogPartPick';
 
 /** The Mirror and Fillet steps' dialogs, whichever is open, kept by the editor that opens them. */
 export function ShapeStepDialogs({
@@ -15,6 +16,7 @@ export function ShapeStepDialogs({
   setFillet,
   setDirectionPicker,
   pickEdge,
+  partPicks,
 }: {
   document: CadDocument;
   variables?: CadValueScope;
@@ -27,6 +29,7 @@ export function ShapeStepDialogs({
   /** Hands the view's next plane or face pick to a dialog, or stops it with null. */
   setDirectionPicker: (picker: ((on: CadDrawnOn['on'], datum?: string) => void) | null) => void;
   pickEdge: (picked: ((pick: CadConnectorPick) => void) | null) => void;
+  partPicks?: DialogPartPicks;
 }) {
   return (
     <>
@@ -43,6 +46,7 @@ export function ShapeStepDialogs({
           key={mirror.copyId ?? mirror.partId}
           document={document}
           onPreview={onPreview}
+          partPicks={partPicks}
           {...mirror}
           pickPlane={picked => setDirectionPicker(picked)}
           onSave={next => (commit(next), setDirectionPicker(null), setMirror(null))}
