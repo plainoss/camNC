@@ -1,6 +1,6 @@
 name: PR watchdog
 
-# Every 30 minutes, around the clock: cancels and reruns CI runs an Actions outage left queued, and labels
+# Every 30 minutes, around the clock: cancels and reruns PR CI runs an Actions outage left queued for hours, and labels
 # `needs-attention` (with one comment) each open PR that is orphaned, stacked too deep, conflicting, left dequeued or
 # idle, whatever its other labels. Runs main's copy of the script and never checks out PR code. See
 # scripts/pr-watchdog.mjs.

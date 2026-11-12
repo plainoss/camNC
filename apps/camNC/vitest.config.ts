@@ -61,8 +61,12 @@ export default defineConfig({
     exclude: ['**/node_modules/**', 'worker/**', ...nodeFiles],
     setupFiles: ['src/test/isolateIndexedDb.ts', 'src/test/settledReset.ts', 'src/test/quarantine.ts'],
     // Merge-queue batches list the tests with an open flaky-test issue here (scripts/test-quarantine.mjs), and
-    // src/test/quarantine.ts skips them. Every other run gets an empty list.
-    provide: { quarantine: JSON.parse(process.env.VITEST_QUARANTINE || '[]') },
+    // src/test/quarantine.ts skips them, or with VITEST_QUARANTINE_ONLY runs only them. Every other run gets an empty
+    // list.
+    provide: {
+      quarantine: JSON.parse(process.env.VITEST_QUARANTINE || '[]'),
+      quarantineOnly: Boolean(process.env.VITEST_QUARANTINE_ONLY),
+    },
     // environment: 'jsdom',
     // opencv tests don't seem to work with jsdom as setup right now.
     browser: {

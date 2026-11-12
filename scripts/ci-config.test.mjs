@@ -274,6 +274,13 @@ test('only merge-queue browser shards retry a failed test, and the flaky-test re
   assert.equal(quarantine.if, `github.event_name == 'pull_request' && ${expression.split(' && ').slice(1, 3).join(' && ')}`);
   assert.equal(quarantine['continue-on-error'], true);
   assert.equal(jobs.test.permissions.issues, 'read');
+  // Quarantined tests still run, without gating, and report their failures.
+  const isolated = jobs.test.steps.find(step => step.name === 'Quarantined tests (not gating)');
+  assert(jobs.test.steps.indexOf(isolated) > tests);
+  assert.equal(isolated['continue-on-error'], true);
+  assert.equal(isolated.env.VITEST_QUARANTINE_ONLY, '1');
+  assert.match(isolated.if, /env\.VITEST_QUARANTINE != '\[\]'/);
+  assert.match(read('scripts/test-timings.mjs'), /QUARANTINE FAILED/);
   const config = read('apps/camNC/vitest.config.ts');
   assert.match(config, /src\/test\/quarantine\.ts/);
   assert.match(config, /process\.env\.VITEST_QUARANTINE/);

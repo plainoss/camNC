@@ -7,18 +7,26 @@ const ago = minutes => new Date(now - minutes * 60_000).toISOString();
 const pr = (number, head, base, extra = {}) => ({ number, head, base, draft: false, labels: [], lastCommitAt: ago(10), mergeable: 'MERGEABLE', ...extra });
 const reasons = (target, prs, closedHeads = new Map()) => attentionReasons(target, { prs, closedHeads, defaultBranch: 'main', now });
 
-test('only runs whose attempt has been queued for more than 30 minutes, within the last day, are cancelled', () => {
+test('only PR runs at their PR head whose attempt has been queued for more than 3 hours, within the last day, are cancelled', () => {
+  const heads = new Map([['feature', 'new'], ['other', 'x']]);
+  const run = (id, fields) => ({ id, status: 'queued', event: 'pull_request', head_branch: 'feature', head_sha: 'new', created_at: ago(200), run_started_at: ago(200), ...fields });
   const runs = [
-    { id: 1, status: 'queued', created_at: ago(5), run_started_at: ago(5) },
-    { id: 2, status: 'queued', created_at: ago(45), run_started_at: ago(45) },
-    { id: 3, status: 'in_progress', created_at: ago(45), run_started_at: ago(45) },
-    { id: 4, status: 'queued', created_at: ago(25 * 60), run_started_at: ago(25 * 60) },
+    run(1, { created_at: ago(5), run_started_at: ago(5) }),
+    run(2),
+    run(3, { status: 'in_progress' }),
+    run(4, { created_at: ago(25 * 60), run_started_at: ago(25 * 60) }),
     // A rerun keeps its created_at: its new attempt is only a few minutes old.
-    { id: 5, status: 'queued', created_at: ago(120), run_started_at: ago(3) },
-    // Cancelling a batch's check ejects the batch, so batches are left to Mergify.
-    { id: 6, status: 'queued', created_at: ago(45), run_started_at: ago(45), head_branch: 'mergify/merge-queue/abc' },
+    run(5, { run_started_at: ago(3) }),
+    // A run waiting at the 20-job limit is not stuck.
+    run(6, { created_at: ago(50), run_started_at: ago(50) }),
+    // Nothing reruns these, and cancelling a batch's check ejects the batch.
+    run(7, { event: 'push', head_branch: 'main' }),
+    run(8, { event: 'schedule', head_branch: 'main' }),
+    run(9, { head_branch: 'mergify/merge-queue/abc' }),
+    // Superseded by a newer commit.
+    run(10, { head_sha: 'old' }),
   ];
-  assert.deepEqual(stuckRuns(runs, now).map(run => run.id), [2]);
+  assert.deepEqual(stuckRuns(runs, now, heads).map(run => run.id), [2]);
 });
 
 test('only a PR run at its PR head is rerun after the cancel', () => {

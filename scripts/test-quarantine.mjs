@@ -21,7 +21,7 @@ async function main() {
     issues.push(...batch);
     if (batch.length < 100) break;
   }
-  const entries = quarantinedTests(issues);
+  const entries = quarantinedTests(issues, Date.now());
   console.error(`Quarantined in this batch: ${entries.length ? entries.map(e => `\n  #${e.issue} ${e.test}`).join('') : 'none'}`);
   console.log(`VITEST_QUARANTINE=${JSON.stringify(entries)}`);
 }

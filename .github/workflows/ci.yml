@@ -208,6 +208,22 @@ jobs:
           printf '%s\n' "${files[@]}"
           # The browser config's include and exclude lists drop node and worker files.
           pnpm vitest run --passWithNoTests "${files[@]}"
+      # Batches skip quarantined tests, so a PR that breaks one would merge unseen. The first batch browser shard runs
+      # them here, without gating the batch, and scripts/flaky-tests.mjs adds each failure (a QUARANTINE FAILED line) to
+      # the test's flaky-test issue with the batch's PRs.
+      - name: Quarantined tests (not gating)
+        if: matrix.suite == 'app-browser-1' && env.VITEST_QUARANTINE != '' && env.VITEST_QUARANTINE != '[]'
+        continue-on-error: true
+        timeout-minutes: 10
+        working-directory: apps/camNC
+        env:
+          MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
+          MERGIFY_TEST_JOB_NAME: Tests (app-browser, quarantined)
+          VITEST_QUARANTINE_ONLY: '1'
+          VITEST_RETRY: '0'
+        run: |
+          mapfile -t files < <(node -e 'for (const { test } of JSON.parse(process.env.VITEST_QUARANTINE)) console.log(test.split(" > ")[0])' | sort -u)
+          pnpm vitest run --passWithNoTests "${files[@]}"
       - name: Upload Cloudflare Workers test results to Mergify
         if: (success() || failure()) && env.HAS_MERGIFY_TOKEN == 'true' && hashFiles('apps/*/test-results/junit/worker.xml') != ''
         uses: mergifyio/gha-mergify-ci@9a7adba0627bb4ff8f170b0e9854171b5b3e6235 # v29

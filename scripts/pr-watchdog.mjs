@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Finds the PRs and CI runs that stall without anyone noticing, and flags them where agents and the health check look.
-// - CI runs still queued long after their attempt started (an Actions outage leaves them queued with no jobs, and
-//   `timeout-minutes` only counts once a job starts) are cancelled. A PR run at the PR's current head is rerun; a
-//   merge-queue batch is left to Mergify, since a cancelled check ejects the batch anyway.
+// - PR CI runs at their PR's head still queued hours after their attempt started (an Actions outage leaves them
+//   queued with no jobs, and `timeout-minutes` only counts once a job starts) are cancelled and rerun. Main pushes,
+//   scheduled runs and merge-queue batches are never touched: nothing would rerun them, and a cancelled check ejects
+//   a batch.
 // - Open PRs that need someone: stacked on a merged or closed base, stacked more than two deep, conflicting, dequeued
 //   from the merge queue and left there, or idle. Each gets the `needs-attention` label and one comment naming why;
 //   the comment wakes a session that follows the PR, and the label is what the health check lists. Idle time counts
@@ -14,25 +15,27 @@ import { pathToFileURL } from 'node:url';
 export const LABEL = 'needs-attention';
 export const MERGIFY_BATCH = 'mergify/merge-queue/';
 const HOUR = 3600_000;
-// Long enough for a busy hour's runner queue (a few minutes at most), short enough to beat an outage's 13 hours.
-export const STUCK_RUN_MS = 30 * 60_000;
+// Far beyond a run waiting for a free runner at the 20-job limit (well under an hour when the queue is full), short
+// enough to beat an outage's 13 hours.
+export const STUCK_RUN_MS = 3 * HOUR;
 export const IDLE_MS = 6 * HOUR;
 export const DEQUEUED_MS = HOUR;
 export const MAX_STACK_DEPTH = 2;
 
+/** Whether a run is a PR's CI at the PR's current head: the only runs the watchdog cancels and reruns. */
+export const shouldRerun = (run, prHeads) => run.event === 'pull_request' && prHeads.get(run.head_branch) === run.head_sha;
+
 /**
- * The CI runs to cancel: queued for longer than STUCK_RUN_MS since their attempt started (`created_at` stays put across
- * reruns), not older than a day, and not merge-queue batches.
+ * The CI runs to cancel and rerun: PR runs at their PR's head (never main pushes, scheduled runs or merge-queue
+ * batches) queued for longer than STUCK_RUN_MS since their attempt started (`created_at` stays put across reruns), and
+ * not older than a day.
  */
-export function stuckRuns(runs, now) {
+export function stuckRuns(runs, now, prHeads) {
   return runs.filter(run => {
     const age = now - Date.parse(run.run_started_at ?? run.created_at);
-    return run.status === 'queued' && age > STUCK_RUN_MS && age < 24 * HOUR && !(run.head_branch ?? '').startsWith(MERGIFY_BATCH);
+    return run.status === 'queued' && age > STUCK_RUN_MS && age < 24 * HOUR && !(run.head_branch ?? '').startsWith(MERGIFY_BATCH) && shouldRerun(run, prHeads);
   });
 }
-
-/** Whether a cancelled run should run again: only a PR run at its PR's current head. Older commits and main pushes are superseded. */
-export const shouldRerun = (run, prHeads) => run.event === 'pull_request' && prHeads.get(run.head_branch) === run.head_sha;
 
 /** How many PRs deep a PR sits: 1 for a PR into main, 2 for one stacked on such a PR, and so on. */
 export function stackDepth(pr, byHead, defaultBranch = 'main') {
@@ -125,6 +128,9 @@ async function main() {
   if (!dryRun) gh(['label', 'create', LABEL, '--repo', repo, '--force', '--color', 'd93f0b', '--description', 'Flagged by the PR watchdog: stalled, orphaned or conflicting']);
   const summary = [];
   for (const pr of prs) {
+    // GitHub computes mergeability lazily and the listing often says UNKNOWN: leave the PR as it is until it knows,
+    // rather than flapping the label and commenting again on every run.
+    if (pr.mergeable === 'UNKNOWN') continue;
     const reasons = attentionReasons(pr, { prs, closedHeads, defaultBranch, now });
     const flagged = pr.labels.includes(LABEL);
     if (reasons.length) summary.push(`#${pr.number}: ${reasons.join('; ')}`);
@@ -140,9 +146,8 @@ async function main() {
   const runs = json(['api', `repos/${repo}/actions/workflows/ci.yml/runs?status=queued&per_page=100`, '--jq',
     '[.workflow_runs[] | {id, status, event, head_branch, head_sha, created_at, run_started_at}]']);
   const prHeads = new Map(open.map(pr => [pr.headRefName, pr.headRefOid]));
-  const cancelled = stuckRuns(runs, now).filter(run =>
+  const rerun = stuckRuns(runs, now, prHeads).filter(run =>
     act(`Cancelling CI run ${run.id} (${run.head_branch}), queued since ${run.run_started_at}`, ['run', 'cancel', String(run.id), '--repo', repo]));
-  const rerun = cancelled.filter(run => shouldRerun(run, prHeads));
   if (dryRun || !rerun.length) return;
   // A cancelled run can only be rerun once it has completed: wait for all of them at once, within the job's limit.
   const done = run => json(['api', `repos/${repo}/actions/runs/${run.id}`, '--jq', '{status}']).status === 'completed';

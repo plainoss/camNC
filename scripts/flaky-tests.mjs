@@ -29,11 +29,11 @@ export function parseFailures(log) {
  * The tests a job's log says passed only on a retry in run `runId`: the RETRIED lines scripts/test-timings.mjs prints.
  * Lines of another run are a turbo cache replay, already reported when that run passed.
  */
-export function parseRetries(log, runId) {
+export function parseRetries(log, runId, tag = 'RETRIED') {
   const retried = new Set();
+  const pattern = new RegExp(`^(?:@[^\\s:]+:[^\\s]+:)?\\s*${tag}\\s+\\[run (\\S+)\\]\\s+(.+)$`);
   for (const raw of log.split('\n')) {
-    const line = logLine(raw);
-    const match = /^(?:@[^\s:]+:[^\s]+:)?\s*RETRIED\s+\[run (\S+)\]\s+(.+)$/.exec(line);
+    const match = pattern.exec(logLine(raw));
     if (match && match[1] === String(runId)) retried.add(match[2].trim());
   }
   return [...retried];
@@ -139,7 +139,7 @@ async function main() {
 
   // Batches retry a failed browser test once (VITEST_RETRY): a test that passed only on its retry is a flake too, in a
   // batch that failed on another job as well. Each run reports its own retries when it completes.
-  if (readsRetries(run)) await reportRetries(repo, run.id, run.attempt);
+  if (readsRetries(run)) await reportRetries(repo, run.id, run.attempt, run.branch);
 
   const attempt = attemptToRead(run);
   const runUrl = `https://github.com/${repo}/actions/runs/${run.id}/attempts/${attempt}`;
@@ -160,15 +160,28 @@ async function report(repo, runId, attempt, context) {
   await file(repo, flakes, test => `\`${test}\` failed in **${flakes.get(test)}**. ${context}\n`);
 }
 
-/** Files each test that a passing run's browser jobs passed only on a retry. */
-async function reportRetries(repo, runId, attempt) {
+/**
+ * Files each test that a batch's passing browser jobs passed only on a retry, and adds each quarantined test that
+ * failed its non-gating run to its issue, naming the batch's PRs: one of them may have broken it.
+ */
+async function reportRetries(repo, runId, attempt, branch) {
   const jobs = JSON.parse(api(`repos/${repo}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`,
     '[.jobs[] | select(.conclusion == "success" and (.name | startswith("Tests (app-browser"))) | {id, name}]'));
   const flakes = new Map();
-  for (const job of jobs) for (const test of parseRetries(await jobLog(repo, job.id), runId)) flakes.set(test, job.name);
+  const quarantined = new Map();
+  for (const job of jobs) {
+    const log = await jobLog(repo, job.id);
+    for (const test of parseRetries(log, runId)) flakes.set(test, job.name);
+    for (const test of parseRetries(log, runId, 'QUARANTINE FAILED')) quarantined.set(test, job.name);
+  }
   const runUrl = `https://github.com/${repo}/actions/runs/${runId}/attempts/${attempt}`;
   await file(repo, flakes, test =>
     `\`${test}\` failed a try in **${flakes.get(test)}** of a Mergify batch and passed on its retry: ${runUrl}\n`);
+  if (!quarantined.size) return;
+  const draft = JSON.parse(api(`repos/${repo}/pulls?head=${repo.split('/')[0]}:${branch}&state=all`, '[.[0] | {number, body}]'))[0];
+  const prs = draft ? batchPullRequests(draft.body, draft.number).map(pr => `#${pr}`).join(', ') : 'its PRs';
+  await file(repo, quarantined, test =>
+    `\`${test}\` is quarantined, and failed its non-gating run in **${quarantined.get(test)}** of a Mergify batch for ${prs}: ${runUrl}. If it fails every time now, one of those PRs may have broken it.\n`);
 }
 
 /**
@@ -219,12 +232,13 @@ async function file(repo, flakes, entryOf) {
 export const QUIET_MS = 24 * 3600_000;
 
 /**
- * The open flaky-test issues the reporter filed that have been quiet for QUIET_MS: no flake of the test (each one
- * comments) and no one commenting, such as to claim it, since. Assigned issues stay open for their owner.
+ * The open `Flaky test: ` issues, filed by the reporter or by hand, that have been quiet for QUIET_MS: no flake of the
+ * test (each one comments) and no one commenting, such as to claim it, since. Assigned issues stay open for their
+ * owner; their quarantine still ends after a quiet QUARANTINE_MS (scripts/quarantine.mjs).
  */
 export function quietIssues(issues, now) {
   return issues.filter(issue => {
-    if (!issue.title.startsWith('Flaky test: ') || !issue.author?.login?.includes('github-actions') || issue.assignees?.length) return false;
+    if (!issue.title.startsWith('Flaky test: ') || issue.assignees?.length) return false;
     const last = Math.max(Date.parse(issue.createdAt), ...(issue.comments ?? []).map(comment => Date.parse(comment.createdAt)));
     return now - last > QUIET_MS;
   });
