@@ -2,9 +2,11 @@ import { expect, it } from 'vitest';
 import {
   addPartCut,
   addRectangle,
+  cadVariableProblems,
   createCadDocument,
   createCadPart,
   evaluateCadDocument,
+  orderedCadDocument,
   parseCadDocument,
   setCadVariable,
   updatePartCut,
@@ -64,6 +66,21 @@ it('keeps legacy inheritance but applies Off and Dogbone only to their own openi
   expect(evaluateCadDocument(inherited).parts[0]!.cuts![1]).toEqual(legacy.cuts![1]);
 });
 
+it.each([false, true])('keeps an ordered physical-copy design valid with a relief override (ordered first: %s)', orderedFirst => {
+  const { document } = source();
+  const relieve = (value: CadDocument) => updatePartCut(value, value.partCuts![1]!.id, { cornerRelief: { diameter: 4 } });
+  const changed = orderedFirst ? relieve(orderedCadDocument(document)) : orderedCadDocument(relieve(document));
+  expect(changed.version).toBe(5);
+  expect(changed.operationOrder).toEqual(document.partCuts!.map(step => step.id));
+  const evaluated = evaluateCadDocument(changed);
+  expect(evaluated.diagnostics).toEqual([]);
+  expect(evaluated.parts[0]!.cuts![1]!.outline.length).toBeGreaterThan(4);
+  expect(evaluateCadDocument(parseCadDocument(JSON.parse(JSON.stringify(changed))))).toEqual(evaluated);
+  const inherited = updatePartCut(changed, changed.partCuts![1]!.id, { cornerRelief: undefined });
+  expect(inherited.version).toBe(4);
+  expect(evaluateCadDocument(parseCadDocument(JSON.parse(JSON.stringify(inherited)))).diagnostics).toEqual([]);
+});
+
 it('resolves, renames and tracks a step diameter variable without changing clearance or source relief', () => {
   const original = source().document;
   let document: CadDocument = { ...original, variables: [{ id: 'cutter', name: 'cutter', expression: '6 mm' }] };
@@ -99,3 +116,14 @@ it.each([false, true, 0, -1, 'off', {}, { diameter: 0 }, { diameter: Infinity },
     expect(evaluateCadDocument(input as CadDocument).diagnostics).toContainEqual(expect.objectContaining({ severity: 'error' }));
   }
 );
+
+it('says on the joined parts when a step diameter variable gives no usable cutter', () => {
+  const original = source().document;
+  let document: CadDocument = { ...original, variables: [{ id: 'cutter', name: 'cutter', expression: '6 mm' }] };
+  document = updatePartCut(document, document.partCuts![0]!.id, { cornerRelief: { diameter: 6, diameterExpression: 'cutter' } });
+  const changed = setCadVariable(document, { id: 'cutter', name: 'cutter', expression: '0 mm' });
+  if ('error' in changed) throw new Error(changed.error);
+  const problems = cadVariableProblems(changed.document).filter(problem => problem.message.startsWith('Cutter diameter cutter'));
+  expect(problems.length).toBeGreaterThan(0);
+  expect(problems[0]!.message).toMatch(/= 0 mm in Cut .*: a cutter diameter must be greater than zero\./);
+});

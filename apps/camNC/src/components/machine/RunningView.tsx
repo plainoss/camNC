@@ -1,7 +1,7 @@
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { errorText, isJobOfToolpath, runningJobTitle, stopJob } from '@/lib/machine/jobs';
 import { runningJobName } from '@/lib/machine/jobRecovery';
-import { pauseHint } from '@/lib/machine/pauseHints';
+import { holdHint } from '@/lib/machine/holdHint';
 import { useStore } from '@/store/store';
 import { Button } from '@wbcnc/ui/components/button';
 import { toast } from '@wbcnc/ui/components/sonner';
@@ -43,7 +43,38 @@ function HoldExplanation() {
   // Only the file camNC uploaded corresponds to the loaded toolpath.
   const ours = !!gcode && !!job && isJobOfToolpath(job.file, gcode);
   const percent = job?.percent;
-  const hint = useMemo(() => (ours && percent !== undefined ? pauseHint(gcode!, percent) : null), [ours, gcode, percent]);
+  const holdRequested = api.holdRequested.value;
+  const read = api.jobReadTo.value;
+  const readTo = read && read.file === job?.file ? read.percent : undefined;
+  // Until the controller reports the work offset, WPos is just MPos: no work Z to go by.
+  const [mz, wz] = [status?.mpos?.z, status?.workKnown ? status.wpos?.z : undefined];
+  // Running, as last reported, rules the start pause out. Off counts only from a report sent during this hold: one
+  // from before may predate an M3 the job ran since.
+  const inHold = api.spindleInHold.value;
+  const spindle = status?.spindleOn || inHold ? 'on' : inHold === false ? 'off' : undefined;
+  const positionUnits = status?.positionUnits;
+  const start = api.jobStartPos.value;
+  const stillSinceStart =
+    !!start &&
+    start.file === job?.file &&
+    !!status &&
+    (['x', 'y', 'z'] as const).every(axis => Math.abs(status.mpos[axis] - start.mpos[axis]) < 0.01);
+  const hint = useMemo(
+    () =>
+      ours
+        ? holdHint(gcode!, {
+            percent,
+            readTo,
+            holdRequested,
+            mpos: mz === undefined ? undefined : { z: mz },
+            wpos: wz === undefined ? undefined : { z: wz },
+            spindle,
+            stillSinceStart,
+            positionUnits,
+          })
+        : null,
+    [ours, gcode, percent, readTo, holdRequested, mz, wz, spindle, stillSinceStart, positionUnits]
+  );
   if (status?.state === 'Door')
     return (
       <p className="text-sm rounded-md bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-100 p-2">

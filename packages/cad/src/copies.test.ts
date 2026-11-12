@@ -23,7 +23,7 @@ describe('copies of a part', () => {
     const document = plate(),
       partId = document.parts[0]!.id;
     const added = addPartCopy(document, partId, { mirrored: true });
-    expect(added.document.parts[0]!.copies).toEqual([{ id: added.id, mirrored: true }]);
+    expect(added.document.parts[0]!.copies).toEqual([{ id: added.id, mirrored: true, number: 2 }]);
     expect(added.document.revision).toBe(document.revision + 1);
     expect(parseCadDocument(JSON.parse(JSON.stringify(added.document)))).toEqual(added.document);
     expect(removePartCopy(added.document, partId, added.id).parts[0]).not.toHaveProperty('copies');

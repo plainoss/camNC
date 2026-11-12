@@ -7,6 +7,8 @@ import { endCadSession } from '@wbcnc/cad-editor/session';
 
 import { OrthographicCamera, Vector3 } from 'three';
 import { ModelViewport } from '@/cam/model/ModelViewport';
+import { settled } from '@/test/settled';
+import { studioCommand } from './studioToolbarTesting';
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 
 const sessions: string[] = [];
@@ -14,8 +16,6 @@ afterEach(() => {
   cleanup();
   sessions.splice(0).forEach(endCadSession);
 });
-const settled = () =>
-  waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
 
 it('mirrors the selected part across a picked plane, and changes the plane from its step', async () => {
   const source = createPlateDocument({ width: 100, height: 60 });
@@ -29,27 +29,30 @@ it('mirrors the selected part across a picked plane, and changes the plane from 
   );
   await settled();
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   const features = screen.getByRole('region', { name: 'Features' });
   const geometry = within(features).getByRole('list', { name: 'Default geometry' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /^Mirror/ }));
+  await userEvent.click(await studioCommand(/^Mirror/));
   const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
   // The mirror plane is picked straight away.
   expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).hasAttribute('data-active')).toBe(true);
   await userEvent.click(within(geometry).getByRole('button', { name: /Right/ }));
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('right plane'));
+  await settled();
+  expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('right plane');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(latest().parts[0]!.copies).toHaveLength(1));
+  await settled();
+  expect(latest().parts[0]!.copies).toHaveLength(1);
   const copy = latest().parts[0]!.copies![0]!;
   expect(copy).toMatchObject({ mirrored: true, mirror: { across: { plane: 'right' } } });
-  await waitFor(() => expect(latest().parts[0]!.copies![0]!.placement!.position[0]).toBeCloseTo(-30, 6));
+  expect(latest().parts[0]!.copies![0]!.placement!.position[0]).toBeCloseTo(-30, 6);
   // Its step opens it again, to mirror across another plane.
   await userEvent.dblClick(await within(features).findByRole('button', { name: /Plate 2|copy|Copy/ }));
   const again = await screen.findByRole('dialog', { name: 'Mirror' });
   await userEvent.click(within(again).getByRole('button', { name: 'Mirror plane' }));
   await userEvent.click(within(geometry).getByRole('button', { name: /Front/ }));
   await userEvent.click(within(again).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(latest().parts[0]!.copies![0]!.mirror).toEqual({ across: { plane: 'front' } }));
+  await settled();
+  expect(latest().parts[0]!.copies![0]!.mirror).toEqual({ across: { plane: 'front' } });
 });
 
 it('uses another part face as the mirror plane', async () => {
@@ -74,13 +77,15 @@ it('uses another part face as the mirror plane', async () => {
     vi
       .mocked(ModelViewport)
       .mock.calls.findLast(([props]) => props.cameraState && props.meshes.some(mesh => mesh.partId === support.id))?.[0];
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /^Mirror/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/^Mirror/));
   const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
   const frame = cadFaceFrame(source, { partId: support.id, face: 'top' });
   if ('error' in frame) throw new Error(frame.error);
-  // The lazy model canvas publishes its camera after the editor is ready, including under parallel renderer load.
+  // The model canvas is loaded lazily, which the settled signal can't see before its module arrives: wait for the
+  // camera it publishes, then for its frames.
   await waitFor(() => expect(props()?.cameraState?.current?.height).toBeGreaterThan(0), { timeout: 20_000 });
+  await settled();
   const canvas = screen.getByTestId('workspace-3d').querySelector('canvas')!;
   const box = canvas.getBoundingClientRect();
   const state = props()!.cameraState!.current!;
@@ -95,12 +100,10 @@ it('uses another part face as the mirror plane', async () => {
     .addScaledVector(new Vector3(...frame.y), 30)
     .project(projection);
   await userEvent.click(canvas, { position: { x: ((point.x + 1) * box.width) / 2, y: ((1 - point.y) * box.height) / 2 } });
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('Support'));
+  await settled();
+  expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('Support');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() =>
-    expect(change.mock.calls.at(-1)?.[0].parts[0]!.copies?.[0]?.mirror).toEqual({
-      across: { partId: support.id, face: 'top' },
-    })
-  );
+  await settled();
+  expect(change.mock.calls.at(-1)?.[0].parts[0]!.copies?.[0]?.mirror).toEqual({ across: { partId: support.id, face: 'top' } });
   expect(change.mock.calls.at(-1)![0].parts[0]!.copies![0]!.placement!.position[2]).toBeCloseTo(236, 6);
 }, 40_000);

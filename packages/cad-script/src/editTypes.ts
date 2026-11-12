@@ -27,6 +27,12 @@ export interface CadPartFace {
   readonly face: Extract<CadDrawnOn['on'], { partId: string }>['face'];
 }
 
+export type CadSketchSelection = readonly (CadRef | { edges: readonly CadRef[] | Record<string, CadRef> })[];
+export interface CadCurveRef extends CadRef {
+  start: CadRef;
+  end: CadRef;
+  controls: CadRef[];
+}
 export interface SketchEdit {
   readonly id: string;
   /** Dimensioned and placed, so it's fully constrained. `at` is the lower-left corner; use `center` for the middle. */
@@ -47,6 +53,30 @@ export interface SketchEdit {
   line(from: Xy, to: Xy): CadRef & { start: CadRef; end: CadRef };
   /** Counterclockwise around `at` from `from` degrees to `to` degrees. */
   arc(options: { at: Xy; r: number; from: number; to: number }): CadRef & { center: CadRef; start: CadRef; end: CadRef };
+  /** A native polynomial curve; endpoints and control coordinates remain dimensioned and editable. */
+  bezier(options: { points: readonly LenXy[] }): CadCurveRef;
+  /** A native interpolating spline. Fit points and endpoint tangent handles follow coordinate expressions. */
+  spline(options: { points: readonly LenXy[]; closed?: boolean }): CadCurveRef & { fitPoints: CadRef[] };
+  /** Native ellipse with two radius drivers and an angle in degrees (or an angle expression). */
+  ellipse(options: { at: LenXy; rx: Len; ry: Len; angle?: Len }): CadRef & { center: CadRef; major: CadRef[]; minor: CadRef[] };
+  /** Linked offset. Positive distances go inward for closed loops; a single line uses its left normal. Curves other than lines/arcs/circles are refused. */
+  offset(items: CadSketchSelection, options: { distance: Len; wholeLoop?: boolean }): { edges: CadRef[]; dimension: CadRef };
+  /**
+   * Fit the measured curve bounds into a box, anchored at its lower-left corner (default [0,0]).
+   * preserveAspect:true uses uniform contain scaling; false explicitly permits distortion for polynomial curves.
+   * Replaces selected size/position drivers with target expressions; returned replacedExpressions discloses old drivers.
+   * Shared external references, patterns, fixed points and unsupported nonuniform constraints are refused.
+   */
+  fitBounds(
+    items: CadSketchSelection,
+    options: { w: Len; h: Len; at?: LenXy; preserveAspect: boolean }
+  ): {
+    source: { at: [number, number]; size: [number, number] };
+    fitted: { at: [number, number]; size: [number, number] };
+    scale: [number, number];
+    preserveAspect: boolean;
+    replacedExpressions: string[];
+  };
   /** Rounds corners that join two lines, sharing one radius, which can be an expression. */
   fillet(corners: readonly CadRef[], r: Len): CadRef[];
   /** A geometric relation between curves or points, under the same rules as the sketch editor's tools. */
@@ -75,6 +105,10 @@ export interface PathEdit {
    * `tangent`, it carries on smoothly from the segment before it, and its radius follows from where it ends.
    */
   arcTo(to: LenXy, how: { r: Len; clockwise?: boolean; large?: boolean } | { tangent: true }): PathEdit;
+  /** A native cubic Bézier ending at to, with absolute control coordinates. */
+  cubicTo(to: LenXy, options: { control1: LenXy; control2: LenXy }): PathEdit;
+  /** A native quadratic Bézier ending at to, with an absolute control coordinate. */
+  quadTo(to: LenXy, options: { control: LenXy }): PathEdit;
   /** Joins the end back to the start with a line, unless it's already there. */
   close(options?: { straight?: boolean }): { edges: CadRef[]; corners: CadRef[] };
 }

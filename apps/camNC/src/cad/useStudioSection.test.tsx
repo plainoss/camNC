@@ -34,6 +34,7 @@ function setup(document = source(), options: Partial<Omit<Props, 'document'>> = 
     onViewRequest = vi.fn(),
     partId = document.parts[0]!.id;
   const model: AssemblyModel = {
+    solids: [],
     meshes: [],
     parts: [],
     problems: [],

@@ -6,21 +6,14 @@ import { cadDrawnOnSupports, effectivePlacement } from './drawnOn';
 import { mirroredPlacement, turnAbout } from './placement';
 import { cadDirectionVector } from './directions';
 import { circularPartPatternStep } from './circularPartPattern';
+import { numberedCadCopy } from './copyNumbers';
 import type { CadDocument, CadPart, CadPartCopy, CadPartPattern, CadPlacement } from './types';
 
 const kAxes = { x: 0, y: 1, z: 2 } as const;
 /** The most pieces a pattern makes, counting the part itself. */
 export const CAD_MAX_PART_PATTERN = 200;
 
-/** What a copy is called: its own name, or the part's with a number counting the part as the first. */
-export const cadCopyName = (part: Pick<CadPart, 'name' | 'copies'>, index: number): string =>
-  part.copies?.[index]?.name ??
-  (() => {
-    const copy = part.copies?.[index];
-    const logical = copy?.pattern ? Number(copy.id.slice(copy.pattern.length + 1)) : NaN;
-    const own = part.copies?.filter(copy => !copy.pattern).length ?? 0;
-    return `${part.name} ${Number.isInteger(logical) ? own + logical + 1 : index + 2}`;
-  })();
+export { cadCopyName, cadCopyNumber, nextCadCopyNumber, numberedCadCopy } from './copyNumbers';
 
 /**
  * A pattern's copies, laid out from where the part sits, which for an unplaced part others are drawn on is the origin.
@@ -194,7 +187,9 @@ export function addPartMirror(
   const next = {
     ...document,
     revision: document.revision + 1,
-    parts: document.parts.map(part => (part.id === partId ? { ...part, copies: [...(part.copies ?? []), copy] } : part)),
+    parts: document.parts.map(part =>
+      part.id === partId ? { ...part, copies: [...(part.copies ?? []), numberedCadCopy(part, copy)] } : part
+    ),
   };
   return { document: resolvePartPatterns(next), id };
 }

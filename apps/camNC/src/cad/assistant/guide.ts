@@ -26,6 +26,8 @@ d.variable('board', '18mm') adds/updates a variable. Expressions such as 'width 
 Create a whole piece in d.folder('Stool', scoped => { ... }); edit with d.existingFolder(nameOrHandle, scoped => { ... }). Scoped names/expressions refer to that folder; folders cannot nest.
 Geometry: const p = d.newPart('Plate', { thickness: 'board' }); p.profile.rect({ at: [0, 0], w: 400, h: 300 });
 p.profile.circle({ at: [30, 30], d: 8 }) makes a profile hole. Sketch coordinates are local, Y up. Rectangles/circles are constrained.
+Native curves: sketch.bezier({points:[[0,0],[40,80],[100,0]]}), sketch.spline({points:[[0,0],[50,30],[100,0]],closed:false}), sketch.ellipse({at:[50,40],rx:50,ry:40,angle:0}). Coordinates and radii may be length expressions. Retrieve geometry help for endpoint references and curve limitations.
+sketch.offset(items,{distance:'wall',wholeLoop:true}) links supported line/circle/arc loops; other curve types are refused. sketch.fitBounds(items,{w:'width',h:'height',at:[0,0],preserveAspect:true}) measures actual curve extrema and contains within the box; preserveAspect:false explicitly distorts supported curves. Fitting replaces source coordinate expressions with target-derived drivers; inspect returned replacedExpressions. Never claim a uniform fit fills both dimensions when aspect ratios differ.
 const top = p.sketchOn('top'); top.circle({ at: [100, 80], d: 20 }); p.cut(top.regionAt(100, 80), { depth: 6 });
 depth: 'through' makes a hole; through cuts cannot reach the part edge. Change the profile for open notches. Underside sketches reverse local X.
 const s = d.existingCopy('Shelf 2'); const face = s.sketchOn('top'); face.circle({ at: [100, 80], d: 60 }); s.cut(face.regionAt(100, 80), { depth: 'through' }); changes only that physical copy.
@@ -33,7 +35,7 @@ p.thickness(24); p.existingCut(handle).depth(6); p.profile.fillet([p.profile.fin
 d.step(handle).set accepts thickness on extrudes; depth on cuts; tools/targets/clearance on cut-parts; count/spacing/axis on linear part patterns; radius on fillets; suppression where supported.
 Studio axes: X left/right, Y front/back, Z up. Draw a part's profile BEFORE calling drawOn. p.drawOn('front', { offset: 0 }) places that profile on a plane ('top', 'front' or 'right'); p.drawOn(other.face('+x'), { offset: 0 }) attaches to a face.
 p.pattern({ axis: 'z', count: 3, spacing: '100mm' }) returns copies excluding p; p.copy({ at, x, y, mirrored?, name? }) adds a placed copy.
-d.cutParts(target, { with: [tools], clearance: 'fit' }) makes housings following intersecting rectangular tool material. A source tool includes its copies; a returned copy cuts alone.
+d.cutParts(target, { with: [tools], clearance: 0.2 }) makes housings following intersecting rectangular tool material. A source tool includes its copies; a returned copy cuts alone.
 d.cutParts(target, { with: tenon, clearance: '0.2mm', cornerRelief: { dogbone: 6 } }) puts bones for that cutter in only this step's openings; 'off' keeps them square.
 d.cutParts(a, { with: b, split: 'half' }) makes a half lap; split: { fingers: 5 } makes fingers. Start with plain boards; retrieve assembly help for limits.
 sketch.pattern(items, { count, step: [dx, dy], rows? }) repeats holes/curves; cutting the seed region cuts the pattern. Counts/steps can be expressions.

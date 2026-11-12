@@ -8,6 +8,7 @@ import { defaultProvider, rememberAssistantCredentials } from './assistant/keySt
 import { requestAssistant, type AssistantMessage } from './assistant/provider';
 import { readConversation } from './assistant/conversationStore';
 import { checkScriptInBrowser } from './assistant/scriptCheck';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('./assistant/provider', { spy: true });
 vi.mock('./assistant/scriptCheck', { spy: true });
@@ -46,6 +47,7 @@ function recorded() {
       text: '',
       calls: [{ id: 'check-1', name: 'check_design', arguments: { source: 'd => { d.part("Plate").thickness(24); }' } }],
     },
+    { role: 'assistant', text: '', calls: [{ id: 'finalize-1', name: 'finalize_design', arguments: {} }] },
     { role: 'assistant', text: 'Proposal: the plate is 24 mm thick, with its original outline and IDs.' },
   ];
   vi.mocked(requestAssistant).mockImplementation(async () => replies.shift()!);
@@ -82,6 +84,7 @@ it('checks a recorded model proposal, previews it, applies it once and undoes th
   await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), 'Make the plate 24 mm thick.');
   await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
   const preview = await within(dock).findByRole('button', { name: 'Review proposal' }, { timeout: 45_000 });
+  expect(readConversation(source.id).some(message => message.role === 'tool' && message.text.includes('"stage":"complete"'))).toBe(true);
   expect(latest().parts[0]!.thickness).toBe(18);
   await userEvent.click(preview);
   const review = await screen.findByRole('dialog', { name: 'Review design change' });
@@ -183,7 +186,7 @@ it('keeps an assistant proposal pending until a feature preview is cancelled', a
   await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
   const preview = await within(dock).findByRole('button', { name: 'Review proposal' }, { timeout: 45_000 });
   const toolbar = screen.getByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /^Variable$/ }));
+  await userEvent.click(await studioCommand(/^Variable$/));
   const feature = await screen.findByRole('dialog', { name: 'Variable' });
   expect(preview).toHaveProperty('disabled', true);
   expect(screen.getByRole('button', { name: 'Assistant' })).toHaveProperty('disabled', true);
