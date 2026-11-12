@@ -8,6 +8,8 @@ import { defaultProvider, rememberAssistantCredentials } from './keyStore';
 import { runDesignAssistant } from './loop';
 import { readConversation, recordAssistantEvent, writeConversation } from './conversationStore';
 import { createAssistantUsage } from './runBudget';
+import { proposalCheckWarnings } from './proposalWarnings';
+import { cadProposal } from '@wbcnc/cad-editor/proposal';
 
 vi.mock('@wbcnc/cad-script', async importOriginal => ({
   ...(await importOriginal<typeof import('@wbcnc/cad-script')>()),
@@ -303,4 +305,32 @@ it('says a proposal was undone, and adds no generic design-changed notice for ap
   view.rerender(<AssistantDock {...props} proposal={null} document={{ ...candidate, name: 'Hand edit', revision: base.revision + 4 }} />);
   await waitFor(() => expect(readConversation(base.id).some(message => message.text.includes('The open design changed'))).toBe(true));
   writeConversation(base.id, []);
+});
+
+it("hands the proposal to the review with its final check's warnings", async () => {
+  const source = createPlateDocument();
+  const proposal = cadProposal(source, { ...source, name: 'Checked candidate' });
+  vi.mocked(runDesignAssistant).mockResolvedValueOnce({
+    status: 'proposal',
+    messages: [],
+    checks: 1,
+    usage: createAssistantUsage(),
+    proposal,
+    report: { warnings: [{ code: 'toolpath-missing', message: 'No tool can cut the 3 mm slot.', part: 'p1' }] } as never,
+  });
+  const onCheckedProposal = vi.fn();
+  render(
+    <AssistantDock
+      proposal={null}
+      onCheckedProposal={onCheckedProposal}
+      onDiscardProposal={() => {}}
+      document={source}
+      onProposal={() => {}}
+      onClose={() => {}}
+    />
+  );
+  await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'Add a slot.');
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+  await waitFor(() => expect(onCheckedProposal).toHaveBeenCalledWith(proposal));
+  expect(proposalCheckWarnings(proposal)).toEqual(['No tool can cut the 3 mm slot.']);
 });

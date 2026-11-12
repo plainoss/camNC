@@ -1,17 +1,18 @@
-import { describeStep, type AssistantWorkStep, type Outcome } from './stepSummary';
+import { describeStep, turnOutcome, type AssistantWorkStep, type Outcome } from './stepSummary';
 
-const icons: Record<Outcome, string> = { done: '✓', passed: '✓', failed: '↻', working: '◌', missing: '–' };
+const icons: Record<Outcome, string> = { done: '✓', passed: '✓', warned: '⚠', failed: '↻', working: '◌', missing: '–' };
 
 /** The assistant's work for one turn, inline in the conversation: open while it runs, folded to one line after. */
 export function WorkSteps({ steps, running, activity }: { steps: AssistantWorkStep[]; running: boolean; activity?: string }) {
   const described = steps.map(step => describeStep(step, running));
+  const outcome = turnOutcome(steps, running);
   const checks = steps.filter(step => step.call.name === 'check_design' || step.call.name === 'check_svg').length;
   const images = steps.flatMap(step => step.result?.images ?? []);
   return (
-    <details className="cad-assistant-work" open={running || undefined} data-running={running}>
+    <details className="cad-assistant-work" open={running || undefined} data-running={running} data-outcome={outcome}>
       <summary>
         <span aria-hidden="true" className="cad-assistant-work-icon">
-          {running ? '◌' : '✓'}
+          {icons[outcome]}
         </span>
         <span>
           {running

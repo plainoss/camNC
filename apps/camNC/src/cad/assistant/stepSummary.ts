@@ -1,10 +1,11 @@
 import type { AssistantMessage, AssistantToolCall } from './provider';
+import { checkWarningMessages } from './proposalWarnings';
 
 export interface AssistantWorkStep {
   call: AssistantToolCall;
   result?: AssistantMessage;
 }
-export type Outcome = 'done' | 'passed' | 'failed' | 'working' | 'missing';
+export type Outcome = 'done' | 'passed' | 'warned' | 'failed' | 'working' | 'missing';
 
 function parse(text: string): Record<string, unknown> | null {
   try {
@@ -64,8 +65,17 @@ export function describeStep({ call, result }: AssistantWorkStep, running: boole
                 : 'Wrote and checked a design script';
       if (!result) return { text: what, outcome: pending };
       if (!parsed) return { text: what, outcome: 'failed', note: short(result.text) };
-      if (parsed.ok === true)
+      if (parsed.ok === true) {
+        // A pass can still carry problems the person must see, such as a cut no tool can machine.
+        const warnings = checkWarningMessages((parsed.report as { warnings?: unknown } | undefined)?.warnings);
+        if (warnings.length)
+          return {
+            text: what,
+            outcome: 'warned',
+            note: short(`${warnings.length === 1 ? 'Passed with a warning' : `Passed with ${warnings.length} warnings`}: ${warnings[0]}`),
+          };
         return { text: what, outcome: 'passed', note: call.name === 'finalize_design' ? 'Ready to review' : 'Check passed' };
+      }
       return { text: what, outcome: 'failed', note: short(failure(parsed) ?? 'Needs repair') };
     }
     default:
@@ -100,4 +110,12 @@ export function conversationItems(messages: AssistantMessage[]) {
     if (message.role !== 'assistant') items.push({ kind: 'message', message });
   }
   return items;
+}
+
+/** The folded summary's mark: the last check decides, so a turn whose check failed is never shown as done. */
+export function turnOutcome(steps: AssistantWorkStep[], running: boolean): Outcome {
+  if (running) return 'working';
+  const checks = steps.filter(step => ['check_design', 'check_svg', 'finalize_design'].includes(step.call.name));
+  const last = checks.at(-1);
+  return last ? describeStep(last, false).outcome : 'done';
 }
