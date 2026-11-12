@@ -42,7 +42,6 @@ import {
   type CadPlacement,
   type CadPointEntity,
   type CadSketch,
-  type EvaluatedCadPart,
   type NewCadConstraint,
   cadCopyName,
   resolvePartPatterns,
@@ -50,7 +49,7 @@ import {
   solveCadDocumentNow,
 } from '@wbcnc/cad';
 import { combineExpressions, differenceExpression } from './linearExpression';
-import { inspectCadDocument, shortHandles, type CadExpectation, type CadReport } from './inspect';
+import { inspectCadDocument, shortHandles, type CadExpectation, type CadInspection } from './inspect';
 import { CadScriptError, fail, resolveHandle, existingDesignEdit } from './editExisting';
 import { runFolderScope } from './folderScope';
 
@@ -864,12 +863,8 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
   };
 }
 
-export interface CadEditResult {
+export interface CadEditResult extends CadInspection {
   ok: boolean;
-  document: CadDocument;
-  report: CadReport;
-  /** The finished parts, for drawing. */
-  parts: EvaluatedCadPart[];
   /** Why the script stopped. The design is then returned as it was before the script. */
   scriptError?: string;
 }

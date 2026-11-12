@@ -1,4 +1,4 @@
-import { pointInPolygon, type CadDocument, type CadPoint, type EvaluatedCadPart } from '@wbcnc/cad';
+import { pointInPolygon, type CadDocument, type CadEvaluation, type CadPoint, type EvaluatedCadPart } from '@wbcnc/cad';
 import { cadViewBodies, svgNumber as n, svgText } from './geometry';
 
 export interface CadSectionRequest {
@@ -61,8 +61,13 @@ function materialAt(part: EvaluatedCadPart, axis: 'x' | 'y', at: number): CadSec
 }
 
 /** A local section through a named evaluated cut, so pocket floors can be measured rather than guessed from a box. */
-export function renderCadSection(document: CadDocument, parts: readonly EvaluatedCadPart[], request: CadSectionRequest): CadSectionDrawing {
-  const bodies = cadViewBodies(document, parts);
+export function renderCadSection(
+  document: CadDocument,
+  parts: readonly EvaluatedCadPart[],
+  request: CadSectionRequest,
+  evaluation?: CadEvaluation
+): CadSectionDrawing {
+  const bodies = cadViewBodies(document, parts, evaluation);
   const matching = bodies.filter(body => body.id === request.part || body.name === request.part);
   if (matching.length !== 1)
     throw new Error(

@@ -68,6 +68,20 @@ are the document's own, so the same design always prints the same text and a dif
 two reports shows what changed. With a script it reports on the design the script made;
 the exit code still follows the check.
 
+Ordered version 4 documents additionally report `spatial`: the saved operation IDs,
+settings and order, each operation's physical output at its own prefix, and the final
+physical instances and CAM groups. Generation features and sketch frames stay before
+this spatial stream; their report does not present later cut openings as earlier
+results. Instance bounds describe the evaluated profile's world envelope; CAM volumes
+integrate occupied material layers. Consumed and missing instances are absent from
+the physical output, while the raw source and stable references remain saved.
+
+This is a draft source contract for generation followed by ordered cuts and copy pose
+operations. It does not provide a creation-stage binding for a new sketch or body
+authored after a move. `--out`, workflow source snapshots and source hashes always use
+the raw generation source, preserving its creation poses. Derived final poses are
+used for inspection, placed drawings, flat CAM drawings and board membership.
+
 #### Placed views and sections
 
 ```sh

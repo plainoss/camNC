@@ -6,10 +6,12 @@ import {
   isCadBody,
   parseCadDocument,
   type CadDocument,
+  type CadEvaluation,
   type CadPlacement,
   type EvaluatedCadPart,
 } from '@wbcnc/cad';
 import { inspectCadDocument, type CadReport } from '../inspect';
+import { reportGeometry } from '../reportGeometry';
 
 export type WorkflowLayer = 'source' | 'solver' | 'geometry' | 'assembly' | 'cam' | 'persistence';
 export type WorkflowValue = null | boolean | number | string | WorkflowValue[] | { [key: string]: WorkflowValue };
@@ -86,8 +88,9 @@ export interface WorkflowResult {
 }
 
 /** Source IDs remain present in every checkpoint, so a reference can compare the same bodies across edits. */
-function bodies(document: CadDocument): WorkflowBody[] {
-  const active = activeDesign(document),
+function bodies(document: CadDocument, parts: readonly EvaluatedCadPart[], evaluation?: CadEvaluation): WorkflowBody[] {
+  const geometry = reportGeometry(document, parts, evaluation);
+  const active = activeDesign(geometry.document),
     consumed = consumedTools(active);
   return active.parts.flatMap(part => {
     // Match the domain's physical-piece seam: absorbed tools cut the target but are no longer output bodies.
@@ -197,7 +200,7 @@ export async function runCadWorkflow(workflow: CadWorkflow, options: { through?:
           const inspected = await inspectCadDocument(sourceDocument, new Map(), { toolpaths: false });
           row.timings.inspectMs = performance.now() - inspectStarted;
           row.solvedDocument = inspected.document;
-          row.bodies = bodies(inspected.document);
+          row.bodies = bodies(inspected.document, inspected.parts, inspected.evaluation);
           document = inspected.document;
           if (inspected.report.status !== 'solved')
             failure('solver', 'The sketch solver did not solve the checkpoint.', 'solved', inspected.report.status);

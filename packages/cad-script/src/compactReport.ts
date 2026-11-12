@@ -1,13 +1,20 @@
 import { cadFaceSketches, designSteps, patternMaster, type CadDocument } from '@wbcnc/cad';
 import { shortHandles, type CadReport } from './inspect';
+import { reportPrefix } from './reportGeometry';
+import { compactSpatialReport } from './compactSpatialReport';
+export type { CadCompactSpatialReport, CadCompactSpatialStage } from './compactSpatialReport';
 
 /** A model-facing report groups pattern instances; the full report and evaluated geometry retain every instance. */
 export function compactCadReport(document: CadDocument, report: CadReport) {
+  const { spatial, ...summary } = report;
   const partHandles = shortHandles(document.parts.map(part => part.id));
-  const steps = designSteps(document);
-  const stepHandles = shortHandles(steps.map(step => step.id));
+  const steps = designSteps(reportPrefix(document));
+  // Ordered Cut parts steps are reported under `spatial`, but the editor resolves handles against every step, so
+  // handles are only as short as they stay unique among all of them.
+  const stepHandles = shortHandles(designSteps(document).map(step => step.id));
   return {
-    ...report,
+    ...summary,
+    ...(spatial && { spatial: compactSpatialReport(spatial) }),
     featureList: steps.map(({ id, partId, ...step }) => ({
       ...step,
       ref: stepHandles.get(id)!,
