@@ -17,15 +17,16 @@ export interface CadThicknessFieldProps {
   onValidityChange?: (valid: boolean) => void;
 }
 
-const rangeError = `Thickness must be at least ${CAD_MIN_THICKNESS} mm.`;
 function thicknessValue(
   text: string,
   variables: CadValueScope | undefined,
-  parseCadValue: ReturnType<typeof useDesignUnits>['parseCadValue']
+  { parseCadValue, formatLength, lengthUnit }: ReturnType<typeof useDesignUnits>
 ): { value: number; expression?: string } | { error: string } {
   const parsed = parseCadValue(text, { unit: 'mm', variables });
   if ('error' in parsed) return parsed;
-  return parsed.value >= CAD_MIN_THICKNESS ? parsed : { error: rangeError };
+  return parsed.value >= CAD_MIN_THICKNESS
+    ? parsed
+    : { error: `Thickness must be at least ${formatLength(CAD_MIN_THICKNESS)} ${lengthUnit}.` };
 }
 
 /** Invalid drafts stay visible until corrected or explicitly canceled; blur never moves focus. */
@@ -38,7 +39,8 @@ export function CadThicknessField({
   onValidityChange,
   livePreview = false,
 }: CadThicknessFieldProps) {
-  const { parseCadValue, lengthText } = useDesignUnits();
+  const units = useDesignUnits();
+  const { lengthText, formatLength, lengthUnit } = units;
   const id = useId();
   const typed = expression ?? lengthText(value);
   const [text, setText] = useState(typed);
@@ -49,7 +51,7 @@ export function CadThicknessField({
   const lastValidity = useRef<boolean | undefined>(undefined);
   // `#name = value` is taken as its value, which the field uses once it has made the variable.
   const definition = variableDefinition(text);
-  const valid = !('error' in thicknessValue(definition ? definition.expression : text, variables, parseCadValue));
+  const valid = !('error' in thicknessValue(definition ? definition.expression : text, variables, units));
   useEffect(() => {
     validityCallback.current = onValidityChange;
     if (lastValidity.current !== valid) {
@@ -73,7 +75,7 @@ export function CadThicknessField({
   }, [typed]);
 
   const commit = () => {
-    const parsed = thicknessValue(text, variables, parseCadValue);
+    const parsed = thicknessValue(text, variables, units);
     if ('error' in parsed) {
       setError(parsed.error);
       return false;
@@ -101,7 +103,7 @@ export function CadThicknessField({
               const next = event.target.value;
               dirty.current = true;
               setText(next);
-              const parsed = thicknessValue(next, variables, parseCadValue);
+              const parsed = thicknessValue(next, variables, units);
               if (error) setError('error' in parsed ? parsed.error : null);
               // Keep the literal draft while previewing; normalizing it here would interrupt units and expressions.
               if (livePreview && !('error' in parsed) && (parsed.value !== value || parsed.expression !== expression))
@@ -135,7 +137,7 @@ export function CadThicknessField({
         </span>
       </label>
       <p id={`${id}-hint`} className="cad-thickness-hint">
-        {CAD_MIN_THICKNESS} mm minimum. Units, arithmetic and variables accepted.
+        {formatLength(CAD_MIN_THICKNESS)} {lengthUnit} minimum. Units, arithmetic and variables accepted.
       </p>
       {error && (
         <p id={`${id}-error`} role="alert" className="cad-thickness-error">

@@ -15,8 +15,11 @@ interface Quantity {
   typedUnit: boolean;
   fraction: boolean;
 }
-/** A word is a unit or a variable name. */
-type Token = { kind: 'number'; value: number } | { kind: 'word'; text: string } | { kind: 'operator'; text: string };
+/** A word is a unit or a variable name. `start` and `end` are where it is in the text. */
+type Token = ({ kind: 'number'; value: number } | { kind: 'word'; text: string } | { kind: 'operator'; text: string }) & {
+  start: number;
+  end: number;
+};
 
 const plainNumber = /^[+-]?(?:\d+[.,]?\d*|[.,]\d+)(?:e[+-]?\d+)?$/i;
 /** Normalized millimetres/degrees, before any value is published to a sketch or sent to WASM. */
@@ -70,33 +73,34 @@ function tokenize(text: string, unitsOnly = false): Token[] {
       argumentLists.at(-1) ? /^(?:\d+(?:\.\d*|,\d+)?|[.,]\d+)(?:e[+-]?\d+)?/i : /^(?:\d+[.,]?\d*|[.,]\d+)(?:e[+-]?\d+)?/i
     ).exec(rest);
     if (separator) {
-      result.push({ kind: 'operator', text: ',' });
-      index++;
+      result.push({ kind: 'operator', text: ',', start: index, end: ++index });
     } else if (mixed) {
       const whole = unitsOnly ? 0 : checked(Number(mixed[1])),
         numerator = unitsOnly ? 0 : checked(Number(mixed[2])),
         denominator = unitsOnly ? 1 : checked(Number(mixed[3]));
       if (denominator === 0) throw new Error('Cannot divide by zero.');
-      result.push({ kind: 'number', value: checked(whole + checked(numerator / denominator)) });
-      index += mixed[0].length;
+      result.push({
+        kind: 'number',
+        value: checked(whole + checked(numerator / denominator)),
+        start: index,
+        end: (index += mixed[0].length),
+      });
     } else if (numeric) {
       if (!unitsOnly && /,\d{3}(?!\d)/.test(numeric[0]))
         throw new Error('Ambiguous comma group: use a decimal point or remove thousands separators.');
       const value = unitsOnly ? 0 : checked(Number(numeric[0].replace(',', '.')));
       if (!unitsOnly && value === 0 && /[1-9]/.test(numeric[0].split(/e/i)[0]!)) throw new Error('The number is too small to represent.');
-      result.push({ kind: 'number', value });
-      index += numeric[0].length;
+      result.push({ kind: 'number', value, start: index, end: (index += numeric[0].length) });
     } else {
       const word = /^(?:#?[a-z_][a-z0-9_]*|°|"|″)/i.exec(rest);
       if (word) {
-        result.push({ kind: 'word', text: word[0] });
-        index += word[0].length;
+        result.push({ kind: 'word', text: word[0], start: index, end: (index += word[0].length) });
       } else if ('+-*/();'.includes(text[index]!)) {
         if (text[index] === '(') {
           const previous = result.at(-1);
           argumentLists.push(previous?.kind === 'word' ? /^(min|max)$/i.test(previous.text) : (argumentLists.at(-1) ?? false));
         } else if (text[index] === ')') argumentLists.pop();
-        result.push({ kind: 'operator', text: text[index]! });
+        result.push({ kind: 'operator', text: text[index]!, start: index, end: index + 1 });
         index++;
       } else if (unitsOnly) {
         index++;
@@ -151,10 +155,23 @@ export function renameCadExpressionVariables(text: string, names: ReadonlyMap<st
   );
 }
 
-/** A bounded arithmetic parser, with fixed functions, no eval and no application-state access. Variables come only from the scope given. */
+/** Tokens `[from, to)` of a plain number that is read as a length, to write its unit after it. */
+type Span = [number, number];
+
+/**
+ * A bounded arithmetic parser, with fixed functions, no eval and no application-state access. Variables come only from
+ * the scope given. A plain number is in the design's `lengthUnit` wherever it's read as a length, and the expression it
+ * returns says so, so it reads the same whatever the design's unit: in inches `t + 0.125` gives `t + 0.125 in`.
+ * `spellOutLengths` writes the unit even for mm, to make an expression saved in mm portable.
+ */
 export function parseCadValue(
   text: string,
-  { unit = 'mm', variables = {}, lengthUnit = 'mm' }: { unit?: CadValueUnit; variables?: CadValueScope; lengthUnit?: CadLengthUnit } = {}
+  {
+    unit = 'mm',
+    variables = {},
+    lengthUnit = 'mm',
+    spellOutLengths = false,
+  }: { unit?: CadValueUnit; variables?: CadValueScope; lengthUnit?: CadLengthUnit; spellOutLengths?: boolean } = {}
 ): CadValueResult {
   const original = text.trim();
   if (!original) return { error: 'Enter a value.' };
@@ -189,13 +206,21 @@ export function parseCadValue(
         typedUnit: true,
       };
     };
-    const compatible = (left: Quantity, right: Quantity): [Quantity, Quantity] => {
-      // A plain number added to a variable is in that variable's base unit: `depth + 10` is 10 mm more, wherever it's
-      // typed. With a typed unit, as in `2 + 1in`, the plain number stays ambiguous and still needs its own.
-      const plain = (q: Quantity) => !q.dimension && !q.explicitUnits && !q.fraction;
+    const plain = (q: Quantity) => !q.dimension && !q.explicitUnits && !q.fraction;
+    const lengthFactor = unitFactors[lengthUnit]!.factor;
+    const spelled: Span[] = [];
+    /** A plain number taking a variable's dimension: as a length it's in the design unit, as a standalone number is. */
+    const adopt = (q: Quantity, dimension: Quantity['dimension'], spans: Span[]): Quantity => {
+      if (dimension !== 'length') return { ...q, dimension };
+      if (lengthUnit !== 'mm' || spellOutLengths) spelled.push(...spans);
+      return { ...q, dimension, value: checked(q.value * lengthFactor) };
+    };
+    const compatible = (left: Quantity, right: Quantity, leftSpans: Span[] = [], rightSpans: Span[] = []): [Quantity, Quantity] => {
+      // A plain number added to a variable takes its dimension, in the design's unit: in inches `depth + 0.5` is half an
+      // inch more. With a typed unit, as in `2 + 1in`, the plain number stays ambiguous and still needs its own.
       const named = (q: Quantity) => (q.dimension === 'length' || q.dimension === 'angle') && !q.typedUnit;
-      if (plain(left) && named(right)) left = { ...left, dimension: right.dimension };
-      if (plain(right) && named(left)) right = { ...right, dimension: left.dimension };
+      if (plain(left) && named(right)) left = adopt(left, right.dimension, leftSpans);
+      if (plain(right) && named(left)) right = adopt(right, left.dimension, rightSpans);
       if (left.dimension !== right.dimension && (left.fraction || right.fraction))
         throw new Error('Put units on each fraction, or put the whole sum in parentheses before its unit.');
       if ((!left.dimension && left.explicitUnits && right.dimension) || (!right.dimension && right.explicitUnits && left.dimension))
@@ -224,10 +249,17 @@ export function parseCadValue(
         const name = token.text.toLowerCase();
         if (!isFunction(name)) throw new Error(`Unknown function: ${token.text}.`);
         index += 2;
-        const args = [sum(depth + 1)];
+        const spans: Span[] = [];
+        const argument = () => {
+          const start = index,
+            result = sum(depth + 1);
+          spans.push([start, index]);
+          return result;
+        };
+        const args = [argument()];
         while (operator(';') || operator(',')) {
           index++;
-          args.push(sum(depth + 1));
+          args.push(argument());
         }
         if (!operator(')')) throw new Error('Close the parentheses.');
         index++;
@@ -236,8 +268,11 @@ export function parseCadValue(
         if (name === 'min' || name === 'max') {
           if (args.length < 2) throw new Error(`${name} needs at least two arguments. Separate values with ", " or ";".`);
           result = first;
-          for (const arg of args.slice(1)) {
-            const [left, right] = compatible(result, arg);
+          // The plain arguments so far, which all take a unit if a later one is a length.
+          let plainSpans = [spans[0]!];
+          for (const [at, arg] of args.entries()) {
+            if (!at) continue;
+            const [left, right] = compatible(result, arg, plainSpans, [spans[at]!]);
             result = {
               value: name === 'min' ? Math.min(left.value, right.value) : Math.max(left.value, right.value),
               dimension: left.dimension,
@@ -245,6 +280,7 @@ export function parseCadValue(
               typedUnit: left.typedUnit || right.typedUnit,
               fraction: left.fraction || right.fraction,
             };
+            plainSpans = plain(result) ? [...plainSpans, spans[at]!] : [];
           }
         } else {
           if (args.length !== 1) throw new Error(`${name} needs exactly one argument.`);
@@ -318,12 +354,14 @@ export function parseCadValue(
       return left;
     };
     const sum = (depth: number): Quantity => {
+      const start = index;
       let left = product(depth);
       while (operator('+') || operator('-')) {
-        const subtract = operator('-');
-        index++;
+        const subtract = operator('-'),
+          leftEnd = index++,
+          rightStart = index;
         let right = product(depth);
-        [left, right] = compatible(left, right);
+        [left, right] = compatible(left, right, [[start, leftEnd]], [[rightStart, index]]);
         left = {
           value: checked(left.value + (subtract ? -right.value : right.value), left.dimension),
           dimension: left.dimension ?? right.dimension,
@@ -347,16 +385,48 @@ export function parseCadValue(
     // Unitless user input uses the design unit; named lengths and explicit units already resolve to mm.
     const implicitLength = unit === 'mm' && !result.dimension && !result.explicitUnits && lengthUnit !== 'mm';
     if (implicitLength) result.value = checked(result.value * unitFactors[lengthUnit]!.factor);
-    const expression = implicitLength ? `(${original.replace(/^=/, '')}) ${lengthUnit}` : original;
+    const expression = implicitLength ? `(${original.replace(/^=/, '')}) ${lengthUnit}` : withUnits(original, tokens, spelled, lengthUnit);
     if (Math.abs(result.value) > CAD_MAX_INPUT_MAGNITUDE)
       throw new Error(
         `Use an absolute value of at most ${CAD_MAX_INPUT_MAGNITUDE}${unit === 'mm' ? ' mm' : unit === 'deg' ? ' degrees' : ''}.`
       );
     const baseUnitLiteral = unit !== 'scalar' && isBareBaseUnitLiteral(original, unit, result.value);
-    return { value: checked(result.value), ...((implicitLength || (!plainNumber.test(original) && !baseUnitLiteral)) && { expression }) };
+    return {
+      value: checked(result.value),
+      ...((implicitLength || spelled.length || (!plainNumber.test(original) && !baseUnitLiteral)) && { expression }),
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Enter a valid arithmetic expression.' };
   }
+}
+
+/** The text with a unit written after each span of tokens, in parentheses unless it's one value already. */
+function withUnits(original: string, tokens: Token[], spans: Span[], lengthUnit: CadLengthUnit): string {
+  if (!spans.length) return original;
+  // Token positions are in the text without its leading `=`.
+  const offset = original.startsWith('=') ? 1 : 0;
+  let text = original;
+  for (const [from, to] of [...spans].sort((a, b) => b[0] - a[0])) {
+    const start = tokens[from]!.start + offset,
+      end = tokens[to - 1]!.end + offset;
+    if (to - from === 1 || closesGroup(tokens, from, to)) text = `${text.slice(0, end)} ${lengthUnit}${text.slice(end)}`;
+    else text = `${text.slice(0, start)}(${text.slice(start, end)}) ${lengthUnit}${text.slice(end)}`;
+  }
+  return text;
+}
+
+/** Whether tokens `[from, to)` are one parenthesized group or function call, so a unit can follow them as they are. */
+function closesGroup(tokens: Token[], from: number, to: number): boolean {
+  const last = tokens[to - 1]!;
+  if (last.kind !== 'operator' || last.text !== ')') return false;
+  let depth = 0;
+  for (let at = to - 1; at >= from; at--) {
+    const token = tokens[at]!;
+    if (token.kind !== 'operator') continue;
+    if (token.text === ')') depth++;
+    else if (token.text === '(' && --depth === 0) return at === from || (at === from + 1 && tokens[from]!.kind === 'word');
+  }
+  return false;
 }
 
 const trimDecimal = (text: string) => (text.includes('.') ? text.replace(/0+$/, '').replace(/\.$/, '') : text);

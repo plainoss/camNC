@@ -3,7 +3,8 @@ import { resolveExtrudeSteps } from './extrudeSteps';
 import { cadFaceSketches, faceIsUnderside } from './featureModel';
 import { cadCopyName } from './partPatterns';
 import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
-import type { CadDocument, CadPart } from './types';
+import type { CadDocument, CadLengthUnit, CadPart } from './types';
+import { cadLengthUnitMm } from './sketchExport';
 import { trimCadFolders } from './folderModel';
 import { partCutLabel, partCutVariableErrors } from './partCutVariables';
 import { cadVariableScope } from './variables';
@@ -29,8 +30,13 @@ export interface DesignStep {
   broken?: string;
 }
 
-const typed = (expression: string | undefined, value: number) =>
-  expression ? `${expression} = ${+value.toFixed(3)} mm` : `${+value.toFixed(3)} mm`;
+/** A typed length as the feature list reads it, in the design's unit. */
+function typed(expression: string | undefined, value: number, lengthUnit: CadLengthUnit = 'mm') {
+  const shown = `${+(value / cadLengthUnitMm[lengthUnit]).toFixed(3)} ${lengthUnit}`;
+  // A plain number typed in the design's unit is saved as `(2) in`, which says no more than its value does.
+  const literal = new RegExp(`^\\(?\\s*[+-]?(?:\\d+[.,]?\\d*|[.,]\\d+)\\s*\\)?\\s*${lengthUnit}$`);
+  return expression && !literal.test(expression) ? `${expression} = ${shown}` : shown;
+}
 
 function faceName(part: CadPart, on: ReturnType<typeof cadFaceSketches>[number]['on']) {
   if (typeof on === 'object') return faceIsUnderside(part, on) ? 'a pocket floor from below' : 'a pocket floor';
@@ -44,8 +50,8 @@ function extrudeDetail(document: CadDocument, part: CadPart) {
   if (part.addTo === '') return 'choose merge scope';
   if (part.addTo) return `add to ${names(document, [part.addTo])}`;
   if (part.remove)
-    return `remove ${part.remove.depth === 'through' ? 'through all' : typed(part.remove.depthExpression, part.remove.depth)}`;
-  return typed(part.thicknessExpression, part.thickness);
+    return `remove ${part.remove.depth === 'through' ? 'through all' : typed(part.remove.depthExpression, part.remove.depth, document.lengthUnit)}`;
+  return typed(part.thicknessExpression, part.thickness, document.lengthUnit);
 }
 
 /** A sketch's name in the feature list, and wherever else the sketch is named. */
@@ -152,7 +158,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
         id: step.id,
         kind: 'partCut',
         label: partCutLabel(document, step),
-        detail: `clearance ${typed(step.clearanceExpression, step.clearance)}`,
+        detail: `clearance ${typed(step.clearanceExpression, step.clearance, document.lengthUnit)}`,
         partId: owner?.id ?? reference,
         ...(owner && reference !== owner.id && { copyId: reference.slice(owner.id.length + 1) }),
         partCutId: step.id,
@@ -224,7 +230,11 @@ function listedSteps(document: CadDocument): DesignStep[] {
           id: feature.id,
           kind: 'cut',
           label: `Cut ${cut} · ${featureName(feature.copyId)}`,
-          detail: feature.suppressed ? 'off' : feature.depth === 'through' ? 'through' : typed(feature.depthExpression, feature.depth),
+          detail: feature.suppressed
+            ? 'off'
+            : feature.depth === 'through'
+              ? 'through'
+              : typed(feature.depthExpression, feature.depth, document.lengthUnit),
           partId: part.id,
           suppressed: !!feature.suppressed,
           cutId: feature.id,
@@ -239,7 +249,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
         id: fillet.id,
         kind: 'fillet',
         label: `Fillet · ${part.name}`,
-        detail: fillet.suppressed ? 'off' : `r ${typed(fillet.radiusExpression, fillet.radius)}`,
+        detail: fillet.suppressed ? 'off' : `r ${typed(fillet.radiusExpression, fillet.radius, document.lengthUnit)}`,
         partId: part.id,
         suppressed: !!fillet.suppressed,
       });
@@ -263,7 +273,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
           : `Pattern · ${part.name} × ${part.pattern.count} along ${part.pattern.axis}`,
         detail: part.pattern.circular
           ? `angle ${part.pattern.circular.angleExpression ? `${part.pattern.circular.angleExpression} = ` : ''}${+part.pattern.circular.angle.toFixed(3)}°`
-          : `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing)}`,
+          : `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing, document.lengthUnit)}`,
         partId: part.id,
         suppressed: !!part.pattern.suppressed,
       });

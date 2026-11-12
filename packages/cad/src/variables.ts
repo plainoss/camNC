@@ -10,7 +10,7 @@ import {
   type LinearPatternWithExpressions,
   type TypedValueOwner,
 } from './typedValues';
-import type { CadDiagnostic, CadDocument, CadLinearPattern, CadVariable } from './types';
+import type { CadDiagnostic, CadDocument, CadLengthUnit, CadLinearPattern, CadVariable } from './types';
 import {
   cadExpressionNames,
   cadVariableNameError,
@@ -74,6 +74,41 @@ export function cadVariableValues(document: CadDocument): { scope: Record<string
 }
 
 export const cadVariableScope = (document: CadDocument): CadValueScope => cadVariableValues(document).scope;
+
+/**
+ * A variable's expression as saved, typed in a design measured in `lengthUnit`. Saved variables are worked out in mm, so
+ * a plain number added to a length gets the design's unit written after it: `t + 0.125` in inches is `t + 0.125 in`.
+ * `spellOutLengths` writes mm too. A unitless expression stays a number variable.
+ */
+export function cadVariableExpression(
+  expression: string,
+  variables: CadValueScope,
+  lengthUnit: CadLengthUnit = 'mm',
+  spellOutLengths = false
+): string {
+  if (lengthUnit === 'mm' && !spellOutLengths) return expression;
+  for (const unit of ['scalar', 'mm'] as const) {
+    const parsed = parseCadValue(expression, { unit, variables, lengthUnit, spellOutLengths });
+    if ('value' in parsed) return parsed.expression ?? expression;
+  }
+  return expression;
+}
+
+/**
+ * A variable made in a value field, as `#name = value`: it's a value of the field's kind, so a plain number in a length
+ * field is a length in the design's unit (`300` in a cm design is `300 cm`), and stays that size when the unit changes.
+ */
+export function cadFieldVariableExpression(
+  expression: string,
+  unit: 'mm' | 'deg',
+  variables: CadValueScope,
+  lengthUnit: CadLengthUnit = 'mm'
+): string {
+  const text = expression.trim().replace(/^=/, '');
+  if (!('value' in parseCadValue(text, { unit: 'scalar', variables }))) return expression;
+  const suffix = unit === 'deg' ? '°' : ` ${lengthUnit}`;
+  return /^[+-]?(?:\d+[.,]?\d*|[.,]\d+)(?:e[+-]?\d+)?$/i.test(text) ? `${text}${suffix}` : `(${text})${suffix}`;
+}
 
 const kPatternCounts = ['countX', 'countY'] as const,
   kPatternSpacings = [
@@ -197,7 +232,7 @@ export function setCadVariable(
   change: { id?: string; name: string; expression: string; folderId?: string | null }
 ): { document: CadDocument; id: string } | { error: string } {
   const name = change.name.trim(),
-    expression = change.expression.trim();
+    expression = cadVariableExpression(change.expression.trim(), cadVariableScope(document), document.lengthUnit);
   const nameError = cadVariableNameError(name);
   if (nameError) return { error: nameError };
   if (!expression) return { error: 'Enter a value.' };

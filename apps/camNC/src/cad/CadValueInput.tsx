@@ -102,7 +102,7 @@ export function CadValueInput({
   const define = (input: HTMLInputElement) => {
     const definition = fields && variableDefinition(input.value);
     if (!definition) return false;
-    const refused = fields.define(definition.name, definition.expression);
+    const refused = fields.define(definition.name, definition.expression, unit);
     setProblem(refused);
     if (!refused) {
       quiet.current = true;

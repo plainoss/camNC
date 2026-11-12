@@ -288,8 +288,9 @@ CLI tools and file writers, while the default Node entry keeps the headless tool
 - `d.variable('board', '18mm')` adds a design variable, or changes the one with that
   name. A length can then be an expression: `w: 'width - 2*board'`, `thickness: 'board'`.
   The expression is saved, so the part keeps following the variable when someone changes
-  it in the app. A plain number next to a variable takes that variable's unit:
-  `'depth + 10'` is mm.
+  it in the app. A plain number next to a length variable is in the design's length
+  unit: `'depth + 10'` is 10 mm more in an mm design, and `'t + 0.125'` is an eighth of an
+  inch more in an inch design, saved as `'t + 0.125 in'`.
 - Cut depths (`{ depth: 'board/2' }`), offsets, clearances, pattern counts and positions
   follow variables too. `d.value('board + margin')` works an expression out now, for a
   script's own loops. A count or ratio without units, such as

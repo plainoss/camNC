@@ -1,5 +1,5 @@
 import { useMemo, type RefObject } from 'react';
-import { cadVariableScope, formatCadValue, setCadVariable, type CadDocument } from '@wbcnc/cad';
+import { cadFieldVariableExpression, cadVariableScope, formatCadValue, setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { useDesignUnits } from './designUnits';
 import { useProvideCadVariableFields, type CadVariableFields } from './variableFields';
 
@@ -14,10 +14,12 @@ export function useEditorVariableFields(document: CadDocument, current: RefObjec
         const value = result && (result.kind === 'length' ? formatLength(result.value) : formatCadValue(result.value));
         return { name: variable.name, shown: result ? `${value}${unit}` : variable.expression };
       }),
-      define: (name, expression) => {
+      define: (name, expression, unit = 'mm') => {
         const source = current.current;
         const existing = source.variables?.find(variable => variable.name === name);
-        const result = setCadVariable(source, { ...(existing && { id: existing.id }), name, expression });
+        // A plain number takes the field's unit, so the variable keeps its size when the design's unit changes.
+        const typed = cadFieldVariableExpression(expression, unit, cadVariableScope(source), source.lengthUnit);
+        const result = setCadVariable(source, { ...(existing && { id: existing.id }), name, expression: typed });
         if ('error' in result) return result.error;
         commit(result.document);
         return null;
