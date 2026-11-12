@@ -13,7 +13,7 @@ import { boardGeometryKey } from '@/cam/cadDesign';
 import { cutBoardWith, edgeNote, freezeSpacing, isCut, spacingProblem } from '@/cam/boards';
 import { CutBadge } from '@/cam/boards/CutBadge';
 import { orderBoardQueue } from '@wbcnc/cam/board';
-import { friendly } from '@/cam/plan/planNotes';
+import { friendly, uncutNotes } from '@/cam/plan/planNotes';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { Hint } from '@/cam/Hint';
 import { PlanSettingsPanel } from '@/cam/plan/PlanSettingsPanel';
@@ -715,6 +715,8 @@ function Checks({
     ).values(),
   ];
   const failed = [...plan.safety, ...releaseSafety];
+  // Not a safety problem, but the part wouldn't come out as drawn: said before any "passed".
+  const uncut = uncutNotes(board, instance => partOf(instance)?.name);
   const skins = (plan.holding ?? []).filter(h => h.how === 'skin');
   const moves = 'no rapid moves in the stock, stays on the board, never deeper than the cut-through depth.';
   return (
@@ -756,6 +758,11 @@ function Checks({
           parts free” step cuts {skins.length === 1 ? 'it' : 'them'} free one at a time.
         </p>
       )}
+      {uncut.map(w => (
+        <p key={w} className="flex gap-2 text-amber-700 dark:text-amber-400" data-uncut>
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" /> {w}
+        </p>
+      ))}
       {!checked ? null : failed.length > 0 ? (
         failed.map(s => (
           <p key={s} className="flex gap-2 text-destructive">
@@ -765,6 +772,8 @@ function Checks({
       ) : planBlock(board) ? null : (board.timeline ?? []).some(e => e.kind === 'loose') ? (
         // Parts cut loose as the user chose: only the moves passed.
         <p className="text-muted-foreground">The moves pass the safety checks, but nothing holds the parts: {moves}</p>
+      ) : uncut.length ? (
+        <p className="text-muted-foreground">The moves pass the safety checks, but not everything drawn gets cut (see above): {moves}</p>
       ) : (
         <p className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
           <ShieldCheck className="size-4" /> Safety checks passed: {moves}

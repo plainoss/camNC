@@ -27,12 +27,20 @@ import {
   activeDesign,
   physicalJoinedCopies,
 } from '@wbcnc/cad';
-import { narrowFingersWarning } from './narrowFingers';
-import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_TABS,
+  planBoard,
+  profileFeatures,
+  type BoardRequest,
+  type OutlineNotches,
+  type PlanResult,
+} from '@wbcnc/cam';
 
 import { nativeCurveReport, sketchCurveDetails } from './curveReport';
 import { curveExtremaPoints } from './curveBounds';
 import { isEdgeNotch } from './notch';
+import { narrowFingersWarnings } from './narrowFingers';
 
 export interface CadExpectation {
   /** Width and height of the outline, in mm. */
@@ -114,6 +122,8 @@ export interface CadToolpathSummary {
   warnings: string[];
   /** What would stop the job in the app: broken safety rules, or something coming loose. */
   blocked: string[];
+  /** Notches and sharp corners the outline and hole paths can't reach, side A's, in the planner's part coordinates. */
+  uncut?: Omit<OutlineNotches, 'part'>[];
 }
 export interface CadReport {
   ok: boolean;
@@ -296,6 +306,7 @@ export function planSummary(plan: PlanResult): Omit<CadToolpathSummary, 'bit'> {
     minutes: Math.round((plan.timeMin + (sideB?.timeMin ?? 0)) * 10) / 10,
     operations: [...operations(plan, ''), ...(sideB ? operations(sideB, 'Side B: ') : [])],
     warnings: [...plan.warnings, ...(sideB?.warnings ?? [])],
+    ...(plan.outlineNotches?.length && { uncut: plan.outlineNotches.map(({ part: _part, ...notches }) => notches) }),
     blocked: [
       ...plan.safety,
       ...(sideB?.safety ?? []),
@@ -574,8 +585,8 @@ export async function inspectCadDocument(
           // CAM leaves out what no tool fits, so the part wouldn't come out as drawn.
           const dropped = toolpaths.warnings.find(warning => warning.includes('no tool fits'));
           if (dropped) warnings.push({ code: 'toolpath-missing', message: `A cut wouldn't be machined: ${dropped}`, part: part.name });
-          const narrow = narrowFingersWarning(solved.document, evaluated, toolpaths.warnings, nameOf);
-          if (narrow) warnings.push({ code: 'toolpath-missing', message: narrow, part: part.name });
+          for (const message of narrowFingersWarnings(solved.document, evaluated, toolpaths.uncut ?? [], profile.offset, nameOf))
+            warnings.push({ code: 'toolpath-missing', message, part: part.name });
           const unrelieved = toolpaths.warnings.find(warning => warning.includes('relieved for'));
           if (unrelieved) warnings.push({ code: 'relief-bit', message: unrelieved, part: part.name });
           if (toolpaths.blocked.length)
