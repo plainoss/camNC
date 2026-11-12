@@ -198,8 +198,8 @@
       "metrics": [
         {
           "file": "default-pocket-150x120x6-d3.175.nc",
-          "sha256": "11292579aa35b7b51913337edcb9d2a06b922f269833452c149e07f33480ee08",
-          "bytes": 84650,
+          "sha256": "427740f9f9ebfa06fbe173571fcf48f5d61714264f062d58691e7c618487f758",
+          "bytes": 84730,
           "executableBlocks": 3355,
           "motionBlocks": 3347,
           "arcBlocks": 1455,

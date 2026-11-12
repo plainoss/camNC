@@ -4,7 +4,8 @@ import { intersect as intersectPaths, union as unionPaths } from '../geom';
 import { loadStep } from '../import';
 import type { Mesh, Pt } from '../geom';
 import { arcRuns } from './arcs';
-import { brepProblems, partBrep } from './brep';
+import { brepProblems, partBrep, type Brep } from './brep';
+import { stackedWalls } from './walls';
 import { writeStep } from './writer';
 
 /** A circle as the sketch tessellates it, within 0.01 mm. */
@@ -51,7 +52,30 @@ function meshVolume(mesh: Mesh) {
     volume +=
       (a[0]! * (b[1]! * c[2]! - b[2]! * c[1]!) - a[1]! * (b[0]! * c[2]! - b[2]! * c[0]!) + a[2]! * (b[0]! * c[1]! - b[1]! * c[0]!)) / 6;
   }
-  return Math.abs(volume);
+  // Signed, so a solid that reads back inside out fails.
+  return volume;
+}
+/** Edges of the mesh, welded by position, that aren't used once each way: none for a closed solid. */
+function openEdges(mesh: Mesh) {
+  const p = mesh.positions,
+    ids = new Map<string, number>();
+  const weld = (i: number) => {
+    const key = `${Math.round(p[3 * i]! * 1e3)},${Math.round(p[3 * i + 1]! * 1e3)},${Math.round(p[3 * i + 2]! * 1e3)}`;
+    return ids.get(key) ?? ids.set(key, ids.size).get(key)!;
+  };
+  const uses = new Map<string, number>();
+  for (let t = 0; t < mesh.indices.length; t += 3) {
+    const v = [weld(mesh.indices[t]!), weld(mesh.indices[t + 1]!), weld(mesh.indices[t + 2]!)];
+    // A triangle whose corners weld together has no edges.
+    if (v[0] === v[1] || v[1] === v[2] || v[0] === v[2]) continue;
+    for (let k = 0; k < 3; k++) uses.set(`${v[k]},${v[(k + 1) % 3]}`, (uses.get(`${v[k]},${v[(k + 1) % 3]}`) ?? 0) + 1);
+  }
+  let open = 0;
+  for (const [edge, n] of uses) {
+    const [a, b] = edge.split(',');
+    if (n !== 1 || uses.get(`${b},${a}`) !== 1) open++;
+  }
+  return open;
 }
 const count = (step: string, entity: string) => step.split(`=${entity}(`).length - 1;
 
@@ -71,6 +95,11 @@ describe('closed path runs', () => {
     expect(runs.filter(run => !run.circle)).toHaveLength(4);
     expect(runs.filter(run => run.circle).every(run => Math.abs(run.circle!.r - 8) < 1e-3)).toBe(true);
   });
+});
+
+it('counts an arc edge a loop only used part of as a problem', () => {
+  const brep: Brep = { points: [], edges: [], faces: [], partialArcs: 2 };
+  expect(brepProblems(brep)).toEqual(['2 arc edges used part way']);
 });
 
 describe('part STEP export', () => {
@@ -99,6 +128,7 @@ describe('part STEP export', () => {
     expect(step).toContain("PRODUCT('Side','Side'");
     const { bodies } = await loadStep(new TextEncoder().encode(step));
     expect(bodies).toHaveLength(1);
+    expect(openEdges(bodies[0]!.mesh)).toBe(0);
     const area = (path: Pt[]) =>
       Math.abs(path.reduce((sum, p, i) => sum + p.x * path[(i + 1) % path.length]!.y - path[(i + 1) % path.length]!.x * p.y, 0) / 2);
     const expected =
@@ -117,6 +147,9 @@ describe('part STEP export', () => {
     const step = writeStep([{ name: 'Moved', solids: [{ brep, matrix }] }], { unit: 'in' });
     expect(step).toContain("CONVERSION_BASED_UNIT('INCH'");
     const { bodies } = await loadStep(new TextEncoder().encode(step));
+    expect(openEdges(bodies[0]!.mesh)).toBe(0);
+    // Turned and moved, still the right way out.
+    expect(meshVolume(bodies[0]!.mesh)).toBeGreaterThan(0);
     const p = bodies[0]!.mesh.positions;
     const xs: number[] = [],
       zs: number[] = [];
@@ -128,6 +161,106 @@ describe('part STEP export', () => {
     expect(Math.min(...xs)).toBeCloseTo(200, 1);
     expect(Math.max(...xs)).toBeCloseTo(320, 1);
     expect(Math.max(...zs) - Math.min(...zs)).toBeCloseTo(60, 1);
+  });
+});
+
+describe('part STEP walls through a pocket depth', () => {
+  // A panel with filleted corners, two through holes and a pocket in the middle that touches none of them.
+  const thickness = 18;
+  const source = {
+    thickness,
+    outline: rounded(0, 0, 400, 300, 25),
+    holes: [circle(60, 60, 5), circle(340, 240, 17.5)],
+    cuts: [{ id: 'pocket', from: 0, to: 6, through: false, outline: rect(150, 100, 250, 200), islands: [] }] as SidedCut[],
+  };
+
+  it('writes each wall, fillet and hole as one face from top to bottom', async () => {
+    const { features, below } = profileFeatures(source);
+    const brep = partBrep(features, below);
+    expect(brepProblems(brep)).toEqual([]);
+    const step = writeStep([{ name: 'Panel', solids: [{ brep }] }], { timestamp: '2026-11-11T00:00:00' });
+    // Top, bottom, four outer walls, the pocket floor and its four walls; four fillets and each hole as two half cylinders.
+    expect(count(step, 'PLANE')).toBe(11);
+    expect(count(step, 'CYLINDRICAL_SURFACE')).toBe(8);
+    expect(count(step, 'ADVANCED_FACE')).toBe(19);
+    const sides = brep.faces.filter(face => face.surface.kind === 'cylinder' || face.surface.normal[2] === 0);
+    const heights = (face: (typeof brep.faces)[number]) =>
+      face.loops.flat().flatMap(({ edge }) => [brep.edges[edge]!.start, brep.edges[edge]!.end].map(v => brep.points[v]![2]));
+    // Outer walls, fillets and holes run from the bottom to the top; the pocket's walls stop at its floor.
+    const outer = sides.filter(face => Math.min(...heights(face)) === 0);
+    expect(outer).toHaveLength(12);
+    expect(outer.every(face => Math.max(...heights(face)) === thickness)).toBe(true);
+    expect(sides.filter(face => Math.min(...heights(face)) === thickness - 6)).toHaveLength(4);
+    // No vertex is left over at the pocket floor's height on the outer walls.
+    expect(brep.points.filter(p => p[2] === thickness - 6)).toHaveLength(4);
+    const { bodies } = await loadStep(new TextEncoder().encode(step));
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]!.mesh.faceRanges).toHaveLength(19);
+    expect(openEdges(bodies[0]!.mesh)).toBe(0);
+    expect(meshVolume(bodies[0]!.mesh)).toBeGreaterThan(0);
+  });
+});
+
+describe('part STEP holes with an odd number of points', () => {
+  /** A counterclockwise circle of exactly `count` points, starting `shift` points along. */
+  const ring = (cx: number, cy: number, r: number, count: number, shift = 0): Pt[] =>
+    Array.from({ length: count }, (_, i) => {
+      const a = (2 * Math.PI * (i + shift)) / count;
+      return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+    });
+
+  it('keeps both halves whole where the slab above starts the circle elsewhere', () => {
+    const ids = new Map<string, number>();
+    const vertex = (x: number, y: number, z: number) => {
+      const key = `${x.toFixed(6)},${y.toFixed(6)},${z}`;
+      return ids.get(key) ?? ids.set(key, ids.size).get(key)!;
+    };
+    // A hole runs clockwise, with the material on its left.
+    const hole = ring(0, 0, 5, 37).reverse();
+    for (const shift of [1, 17, 19, 35]) {
+      const turned = [...hole.slice(shift), ...hole.slice(0, shift)];
+      const walls = stackedWalls(
+        [
+          { low: 0, high: 6, region: [hole] },
+          { low: 6, high: 18, region: [turned] },
+        ],
+        [{ x: 0, y: 0, r: 5 }],
+        vertex
+      );
+      expect(
+        walls.map(wall => `${wall.low}-${wall.high}`),
+        `shift ${shift}`
+      ).toEqual(['0-18', '0-18']);
+    }
+  });
+
+  it('writes a 37-point hole as two half cylinders from top to bottom', async () => {
+    const thickness = 18;
+    const { features, below } = profileFeatures({
+      thickness,
+      outline: rect(0, 0, 200, 100),
+      holes: [ring(40, 50, 5, 37)],
+      cuts: [{ id: 'pocket', from: 0, to: 6, through: false, outline: rect(100, 20, 160, 80), islands: [] }],
+    });
+    const brep = partBrep(features, below);
+    expect(brepProblems(brep)).toEqual([]);
+    const cylinders = brep.faces.filter(face => face.surface.kind === 'cylinder');
+    expect(cylinders).toHaveLength(2);
+    const heights = (face: (typeof brep.faces)[number]) =>
+      face.loops.flat().flatMap(({ edge }) => [brep.edges[edge]!.start, brep.edges[edge]!.end].map(v => brep.points[v]![2]));
+    expect(cylinders.map(face => [Math.min(...heights(face)), Math.max(...heights(face))])).toEqual([
+      [0, thickness],
+      [0, thickness],
+    ]);
+    const step = writeStep([{ name: 'Odd hole', solids: [{ brep }] }], { timestamp: '2026-11-11T00:00:00' });
+    // Top, bottom, four outer walls, the pocket floor and its four walls, and the hole's two halves.
+    expect(count(step, 'ADVANCED_FACE')).toBe(13);
+    const { bodies } = await loadStep(new TextEncoder().encode(step));
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]!.mesh.faceRanges).toHaveLength(13);
+    expect(openEdges(bodies[0]!.mesh)).toBe(0);
+    const expected = (200 * 100 - Math.PI * 25) * thickness - 60 * 60 * 6;
+    expect(meshVolume(bodies[0]!.mesh) / expected).toBeCloseTo(1, 2);
   });
 });
 
@@ -173,6 +306,7 @@ describe('part STEP export with random cuts', () => {
     expect(brepProblems(brep), `seed ${seed}`).toEqual([]);
     const { bodies } = await loadStep(new TextEncoder().encode(writeStep([{ name: 'Random', solids: [{ brep }] }])));
     expect(bodies).toHaveLength(1);
+    expect(openEdges(bodies[0]!.mesh), `seed ${seed}`).toBe(0);
     // The same material as the slabs CAM machines.
     const levels = [...(features.meshLevels ?? features.levels)];
     const underLevels = [...(below?.meshLevels ?? below?.levels ?? [])];

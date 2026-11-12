@@ -47,7 +47,7 @@ afterEach(cleanup);
 
 describe('the Plan step of a carving', () => {
   it('shows the carving’s V-bit, not the job’s flat bit, and keeps the V-bit chosen on Carve', async () => {
-    const created = await createCarvingJob();
+    const created = await createCarvingJob(undefined, { lettering: 'Welcome' });
     const vBit = kVBits.find(b => b.angle === 90 && b.diameter === 8)!;
     const job = await saveJob({ ...created, carving: { ...created.carving!, vBit } });
     params.jobId = job.id;
@@ -64,7 +64,7 @@ describe('the Plan step of a carving', () => {
   }, 60_000);
 
   it('leaves the flat bit out when the V-bit clears the bottoms itself', async () => {
-    const created = await createCarvingJob();
+    const created = await createCarvingJob(undefined, { lettering: 'Welcome' });
     const job = await saveJob({ ...created, carving: { ...created.carving!, clearWithFlat: false } });
     params.jobId = job.id;
     render(

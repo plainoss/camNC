@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pauseHint } from './pauseHints';
+import { boardProgram, controllerPercent, largeProgram } from './pauseHints.fixture';
+import { pauseHint, positionWindow } from './pauseHints';
 
 const percentAfter = (gcode: string, text: string) => {
   const bytes = new TextEncoder().encode(gcode);
@@ -35,17 +36,63 @@ describe('pauseHint', () => {
     expect(pauseHint(fusion, 60)).toBeNull();
   });
 
+  it('reads CRLF files like FluidNC: `;M0 (…)` is a comment there too', () => {
+    const crlf = fusion.replaceAll('\n', '\r\n');
+    expect(pauseHint(crlf, percentAfter(crlf, 'Attach probe'))).toBeNull();
+    expect(pauseHint(crlf, percentAfter(crlf, 'Turn ON'))?.line).toBe(6);
+  });
+
   it('explains a probe and a tool change that come next', () => {
     const probe = 'G21\nM0 (MSG Attach probe)\nG38.2 Z-50 F100\n' + 'G1 X1\n'.repeat(500);
     expect(pauseHint(probe, percentAfter(probe, 'Attach'))?.next).toBe(
       'Next it probes Z (G38). Attach the probe clip and put the plate under the bit, then Resume.'
     );
-    const toolChange = '(T2 D=3.175 CR=0 - ZMIN=-2 - flat end mill)\nG21\nT2 M6\nG0 Z5\n' + 'G1 X1\n'.repeat(500);
-    const hint = pauseHint(toolChange, percentAfter(toolChange, 'T2 M6'));
-    expect(hint?.reason).toBe('The job stopped at a tool change (M6) on line 3.');
+    const toolChange = '(T2 D=3.175 CR=0 - ZMIN=-2 - flat end mill)\nG21\nM0 (MSG Change bit)\nT2 M6\nG0 Z5\n' + 'G1 X1\n'.repeat(500);
+    const hint = pauseHint(toolChange, percentAfter(toolChange, 'Change bit'));
+    expect(hint?.reason).toBe('The job stopped at a program pause (M0) on line 3: “Change bit”.');
     expect(hint?.next).toBe(
       'Tool change to T2 (3.175 mm flat end mill): change the bit, then Resume. Re-zero Z if the program does not probe.'
     );
+  });
+
+  it('FluidNC holds a running file only at M0: never explains an M1, M60 or M6 as the pause', () => {
+    for (const command of ['M1', 'M01', 'M60', 'T2 M6', 'M06 T2']) {
+      const program = `G21\n${command} (MSG Something)\nG0 Z5\n` + 'G1 X1\n'.repeat(500);
+      expect(pauseHint(program, percentAfter(program, 'Something'))).toBeNull();
+    }
+    for (const command of ['M00', 'M0', 'N10M0', 'N10 M0', 'n20m00', 'G0 Z5 M0']) {
+      const program = `G21\n${command} (MSG Something)\nG0 Z5\n` + 'G1 X1\n'.repeat(500);
+      expect(pauseHint(program, percentAfter(program, 'Something'))?.line).toBe(2);
+    }
+    for (const command of ['M30', 'M10', 'M100', 'M0.5', 'XM0']) {
+      const program = `G21\n${command} (MSG Something)\nG0 Z5\n` + 'G1 X1\n'.repeat(500);
+      expect(pauseHint(program, percentAfter(program, 'Something'))).toBeNull();
+    }
+  });
+});
+
+describe('the position window', () => {
+  // Byte positions where the printed percent is closest to a tie, and some in between.
+  const edges = (size: number) =>
+    [1, 2, 3, 9999, 10000, 5000, 1234].flatMap(k => {
+      const tie = ((k + 0.5) * size) / 10000;
+      return [-1, 0, 1].map(d => Math.round(tie) + d).filter(p => p > 0 && p <= size);
+    });
+
+  it('holds at any file size, also where the controller rounds a tie', () => {
+    for (const size of [137, 13_225, 99_991, 2_000_000, 2_000_003, 16_777_259, 64_000_037]) {
+      for (const position of [...edges(size), size, Math.floor(size / 3), Math.floor((size * 7) / 9)]) {
+        const reported = (controllerPercent(position, size) / 100) * size;
+        expect(Math.abs(reported - position)).toBeLessThanOrEqual(positionWindow(size));
+      }
+    }
+  });
+
+  it('finds both M0s of a 2 MB program at their rounding-edge positions', () => {
+    const { gcode, size, startEnd, doneEnd } = largeProgram;
+    expect(new TextEncoder().encode(gcode).length).toBe(size);
+    expect(pauseHint(gcode, controllerPercent(startEnd, size))?.marker).toEqual({ kind: 'start', rpm: 15000 });
+    expect(pauseHint(gcode, controllerPercent(doneEnd, size))?.marker).toEqual({ kind: 'done' });
   });
 });
 
@@ -98,5 +145,41 @@ describe('camNC’s own pauses', () => {
 
   it('other programs have no marker', () => {
     expect(pauseHint(fusion, percentAfter(fusion, 'Turn ON'))?.marker).toBeUndefined();
+  });
+});
+
+describe('a Pause in the cut of a board program (#792)', () => {
+  // The percent FluidNC reports at that byte.
+  const sd = (byte: number) => controllerPercent(byte, 13_225);
+  const end = (lines: string[]) => new TextEncoder().encode(lines.join('\n')).length + 1;
+
+  it('the program has the reported shape', () => {
+    const lines = boardProgram.split('\n');
+    expect(new TextEncoder().encode(boardProgram).length).toBe(13_225);
+    expect(lines.length).toBe(771);
+    expect([lines[14], lines[15], lines[765], lines[768]]).toEqual([
+      'M0 (MSG Router on at 15000 RPM, then Resume)',
+      'M3 S15000',
+      'M5',
+      'M0 (MSG Program done)',
+    ]);
+    expect(end(lines.slice(0, 15))).toBe(477);
+    expect(end(lines.slice(0, 769))).toBe(13_220);
+  });
+
+  it('stopped at the start and done M0s, the controller reports the byte after them', () => {
+    expect(pauseHint(boardProgram, sd(477))).toMatchObject({ line: 15, marker: { kind: 'start', rpm: 15000 } });
+    expect(pauseHint(boardProgram, sd(13_220))).toMatchObject({ line: 769, marker: { kind: 'done' } });
+  });
+
+  it('a hold at 12.2 %, 30.2 % or 88.2 % is in the cut, not at an M0', () => {
+    for (const percent of [12.2, 30.2, 88.2]) expect(pauseHint(boardProgram, percent)).toBeNull();
+  });
+
+  it('the line next to an M0 is not the M0: the window is the rounding of the percent, not kilobytes', () => {
+    // Reading stopped after M3, one line past the start M0, or one line before the done M0.
+    expect(sd(487)).toBe(3.68);
+    expect(pauseHint(boardProgram, sd(487))).toBeNull();
+    expect(pauseHint(boardProgram, sd(13_220 - 22))).toBeNull();
   });
 });

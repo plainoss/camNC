@@ -24,6 +24,16 @@ export interface ParsedStatus {
   overrides?: Overrides;
   /** Active input pins (Pn), e.g. "PXZ". Absent means no pin is active. */
   pins?: string;
+  /**
+   * Accessory state (A), e.g. "S" (spindle clockwise), "C" (counter-clockwise), "F" (flood), "M" (mist). FluidNC sends it
+   * only with the overrides (Ov), and only when something is on: an Ov report without it means all off.
+   */
+  accessories?: string;
+  /**
+   * Units of MPos/WPos, from their decimals: FluidNC prints 3 in mm and 4 in inches (`$Report/Inches`, Report.cpp
+   * `report_util_axis_values`, in 3.9.9 and 4.1.1). Absent when the report has neither or other decimals.
+   */
+  positionUnits?: 'mm' | 'inch';
   /** Progress of a file running from SD or local FS (SD) */
   job?: JobProgress;
 }
@@ -90,6 +100,7 @@ export function parseFluidNCLine(line: string): ParsedStatus | null {
   const fsMatch = line.match(/\|FS:([^|>]+)/);
   const ovMatch = line.match(/\|Ov:([^|>]+)/);
   const pnMatch = line.match(/\|Pn:([^|>]*)/);
+  const aMatch = line.match(/\|A:([^|>]*)/);
   // The file name may contain commas, so only split at the first one.
   const sdMatch = line.match(/\|SD:([\d.]+),([^|>]*)/);
 
@@ -110,6 +121,10 @@ export function parseFluidNCLine(line: string): ParsedStatus | null {
     status.overrides = { feed, rapid, spindle };
   }
   if (pnMatch) status.pins = pnMatch[1];
+  if (aMatch) status.accessories = aMatch[1];
+  const decimals = (mposMatch ?? wposMatch)?.[1]!.split(',')[0]!.split('.')[1]?.length;
+  if (decimals === 3) status.positionUnits = 'mm';
+  else if (decimals === 4) status.positionUnits = 'inch';
   if (sdMatch) status.job = { percent: Number(sdMatch[1]), file: sdMatch[2]! };
   return status;
 }

@@ -21,6 +21,23 @@ const options = (value: unknown, method: string, keys: readonly string[], requir
   return value as Record<string, unknown>;
 };
 
+const selection = (value: unknown, method: string) => {
+  if (!Array.isArray(value) || !value.length) return fail(`${method} needs a nonempty array of sketch references.`);
+  const reference = (ref: unknown) => {
+    if (!ref || typeof ref !== 'object' || !('id' in ref) || typeof ref.id !== 'string' || !ref.id.trim())
+      fail(`${method} needs sketch references with an id.`);
+  };
+  value.forEach(item => {
+    if (item && typeof item === 'object' && 'edges' in item) {
+      const edges = item.edges;
+      if (!edges || typeof edges !== 'object') return fail(`${method} needs an edges array or record.`);
+      const entries = Array.isArray(edges) ? edges : Object.values(edges);
+      if (!entries.length) return fail(`${method} needs at least one edge.`);
+      entries.forEach(reference);
+    } else reference(item);
+  });
+};
+
 function check(method: string, args: unknown[]) {
   const [first, second] = args;
   if (
@@ -55,6 +72,37 @@ function check(method: string, args: unknown[]) {
     const value = options(first, method, ['at', 'd'], ['at', 'd']);
     tuple(value.at, 2, 'circle.at');
     length(value.d, 'circle.d');
+  }
+  if (method === 'bezier' || method === 'spline') {
+    const value = options(first, method, method === 'spline' ? ['points', 'closed'] : ['points'], ['points']);
+    if (!Array.isArray(value.points)) return fail(`${method}.points must be an array of coordinates.`);
+    value.points.forEach(point => tuple(point, 2, `${method} point`));
+    if (value.closed !== undefined && typeof value.closed !== 'boolean') fail('spline.closed must be true or false.');
+  }
+  if (method === 'ellipse') {
+    const value = options(first, method, ['at', 'rx', 'ry', 'angle'], ['at', 'rx', 'ry']);
+    tuple(value.at, 2, 'ellipse.at');
+    for (const key of ['rx', 'ry', 'angle']) if (value[key] !== undefined) length(value[key], `ellipse.${key}`);
+  }
+  if (method === 'fitBounds') {
+    selection(first, method);
+    const value = options(second, method, ['w', 'h', 'at', 'preserveAspect'], ['w', 'h', 'preserveAspect']);
+    length(value.w, 'fitBounds.w');
+    length(value.h, 'fitBounds.h');
+    if (value.at !== undefined) tuple(value.at, 2, 'fitBounds.at');
+    if (typeof value.preserveAspect !== 'boolean') fail('fitBounds.preserveAspect must explicitly be true or false.');
+  }
+  if (method === 'offset') {
+    selection(first, method);
+    const value = options(second, method, ['distance', 'wholeLoop'], ['distance']);
+    length(value.distance, 'offset.distance');
+    if (value.wholeLoop !== undefined && typeof value.wholeLoop !== 'boolean') fail('offset.wholeLoop must be true or false.');
+  }
+  if (method === 'cubicTo' || method === 'quadTo') {
+    tuple(first, 2, method);
+    const keys = method === 'cubicTo' ? ['control1', 'control2'] : ['control'];
+    const value = options(second, method, keys, keys);
+    keys.forEach(key => tuple(value[key], 2, `${method}.${key}`));
   }
   if (method === 'arc') {
     const value = options(first, method, ['at', 'r', 'from', 'to'], ['at', 'r', 'from', 'to']);

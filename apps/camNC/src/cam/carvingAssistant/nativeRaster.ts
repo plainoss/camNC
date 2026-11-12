@@ -19,6 +19,7 @@ export async function generateNativeRasterAsset(
       key: native.key,
     },
     pricing: undefined,
+    locallyTraced: true,
     request: async request => {
       const base64 = await requestNativeImage(request, native, 'png', fetcher);
       traced = await traceCarvingPng(base64, options.constraints, request.signal);

@@ -4,6 +4,7 @@ import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { endCadSession } from '@wbcnc/cad-editor/session';
+import { studioCommand } from './studioToolbarTesting';
 
 const sessions: string[] = [];
 afterEach(() => {
@@ -34,7 +35,7 @@ it('makes round holes at the points of a sketch on a part’s face', async () =>
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
   const features = await screen.findByRole('region', { name: 'Features' });
   await userEvent.click(within(features).getByRole('button', { name: /Sketch · Points/ }));
-  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /^Hole/ }));
+  await userEvent.click(await studioCommand(/^Hole/));
   const dialog = await screen.findByRole('dialog', { name: 'Hole · Points' });
   await waitFor(() => expect(latest().parts[1]).toMatchObject({ hole: { diameter: 5 }, remove: { depth: 'through' } }));
   const diameter = within(dialog).getByRole('textbox', { name: 'Diameter' });

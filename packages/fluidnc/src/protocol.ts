@@ -67,6 +67,18 @@ export interface MachineStatus extends ParsedStatus {
   mpos: Position;
   wpos: Position;
   wco: Position;
+  /** The controller has reported WCO or WPos since connecting. Until then `wco` is zero and `wpos` is just `mpos`. */
+  workKnown?: boolean;
+  /**
+   * The controller's spindle state (A:S or A:C), from the last report with overrides: FluidNC sends the A field only
+   * with those, every few reports and right after a change. `undefined` until such a report.
+   */
+  spindleOn?: boolean;
+  /**
+   * This very report carried the overrides and so the accessory state: {@link spindleOn} is the spindle state when it
+   * was sent. FluidNC computes A from the spindle's current state at report time (Report.cpp, `spindle->get_state()`).
+   */
+  overridesReported?: boolean;
 }
 
 export type ConsoleLineKind = 'sent' | 'ok' | 'error' | 'alarm' | 'msg' | 'reset' | 'data';
@@ -416,7 +428,12 @@ export class FluidncProtocol {
       mpos,
       wpos,
       wco,
+      workKnown: !!(parsed.wco || parsed.wpos || prev?.workKnown),
+      // Told by the decimals only as FluidNC prints them: unknown for other firmware, or before `$I` says it is FluidNC.
+      positionUnits: this.buildInfo ? (parsed.positionUnits ?? prev?.positionUnits) : undefined,
       overrides: parsed.overrides ?? prev?.overrides,
+      spindleOn: parsed.overrides ? /[SC]/.test(parsed.accessories ?? '') : prev?.spindleOn,
+      overridesReported: !!parsed.overrides,
     };
     this.status = status;
     this.events.emit('status', status);

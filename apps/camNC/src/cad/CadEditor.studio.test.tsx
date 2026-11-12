@@ -18,14 +18,22 @@ import {
 } from '@wbcnc/cad';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
 import { endCadSession } from '@wbcnc/cad-editor/session';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { settled } from '@/test/settled';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
+
+// The editor's lazy views and the solver's worker and WASM load once per file. Loaded here, that one-time cost doesn't
+// count against the first test's time limit, which it otherwise runs out of on a busy machine.
+beforeAll(async () => {
+  await Promise.all([import('./WorkspaceView'), import('./SketchBackdrop'), import('./PartView3D'), import('./FaceSketchBackdrop')]);
+  await solveCadDocument(createPlateDocument({ width: 200, height: 100 }));
+}, 60_000);
 
 const sessions: string[] = [];
 afterEach(() => {
@@ -480,7 +488,7 @@ it('renames a part from its row in the Parts list, leaving its features named as
   const parts = screen.getByRole('region', { name: 'Parts panel' });
   fireEvent.contextMenu(within(parts).getByRole('button', { name: new RegExp(`^${before}$`) }));
   const menu = screen.getByRole('menu', { name: `${before} actions` });
-  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual(['Rename', 'Hide']);
+  expect([...menu.querySelectorAll('[role=menuitem]')].map(item => item.textContent)).toEqual(['Rename', 'Hide', 'Export…']);
   await userEvent.click(within(menu).getByRole('menuitem', { name: 'Rename' }));
   const name = within(parts).getByRole('textbox', { name: `New name for ${before}` });
   await userEvent.clear(name);
@@ -494,7 +502,7 @@ it('renames a part from its row in the Parts list, leaving its features named as
 it('lists variables with the steps, edits them in a dialog, and offers a menu on each feature', async () => {
   const { latest } = await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Variable/ }));
+  await userEvent.click(await studioCommand(/Variable/));
   let dialog = screen.getByRole('dialog', { name: 'Variable' });
   await userEvent.type(within(dialog).getByRole('textbox', { name: /Name/ }), 'board');
   await userEvent.type(within(dialog).getByRole('textbox', { name: /Value/ }), '19 mm');
@@ -619,7 +627,7 @@ it('says why a variable in use can’t be deleted, and edits a variable from an 
 it('closes an open variable dialog when another step is started', async () => {
   await studio();
   const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Variable/ }));
+  await userEvent.click(await studioCommand(/Variable/));
   expect(screen.getByRole('dialog', { name: 'Variable' })).toBeDefined();
   await userEvent.click(within(toolbar).getByRole('button', { name: /Extrude/ }));
   expect(await screen.findByRole('dialog', { name: /^Extrude · Part / })).toBeDefined();
@@ -666,8 +674,8 @@ it('moves a part with a transform when Copy part is off, as the reference does b
   );
   await settled();
   const latest = () => change.mock.calls.at(-1)?.[0] ?? source;
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
   expect(within(dialog).getByRole('checkbox', { name: 'Copy part' })).toHaveProperty('checked', false);
   const z = within(dialog).getAllByRole('textbox')[2]!;
@@ -685,7 +693,7 @@ it('moves a part with a transform when Copy part is off, as the reference does b
   expect(within(again).getAllByRole('textbox')[2]).toHaveProperty('value', '40');
   await userEvent.click(within(again).getByRole('button', { name: 'Cancel' }));
   // Another transform from the toolbar moves it on from there, keeping the first move.
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  await userEvent.click(await studioCommand(/Transform/));
   const more = await screen.findByRole('dialog', { name: 'Transform · Plate' });
   const z2 = within(more).getAllByRole('textbox')[2]!;
   await userEvent.clear(z2);
@@ -697,8 +705,8 @@ it('moves a part with a transform when Copy part is off, as the reference does b
 
 it('copies a part with a transform, and edits the copy from its feature', async () => {
   const { latest } = await studio();
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Transform/));
   let dialog = await screen.findByRole('dialog', { name: 'Transform · Plate' });
   // A transform moves the part unless Copy part is on, as in the reference.
   await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
@@ -956,8 +964,8 @@ it('patterns a part along an edge picked in the view', async () => {
     const ys = props().meshes[index]!.positions.filter((_, coordinate) => coordinate % 3 === 1);
     return [Math.min(...ys), Math.max(...ys)];
   };
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Pattern/));
   const dialog = await screen.findByRole('dialog', { name: /^Linear pattern/ });
   const click = (edge?: { a: [number, number, number]; b: [number, number, number] }) => {
     const { instanceIds, onSelect } = props();
@@ -986,8 +994,8 @@ it('patterns a part along a picked Front plane', async () => {
   const source = createPlateDocument({ width: 200, height: 100 });
   source.parts[0]!.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
   const { latest } = await studio(source);
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Pattern/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Pattern/));
   const dialog = await screen.findByRole('dialog', { name: /^Linear pattern/ });
   await userEvent.click(within(dialog).getByRole('button', { name: 'Direction' }));
   const features = screen.getByRole('region', { name: 'Features' });
@@ -1009,8 +1017,8 @@ it('patterns a part along a picked Front plane', async () => {
 
 it('copies a part by a distance along a plane picked for the direction, as the reference’s Translate by distance', async () => {
   const { latest } = await studio();
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'distance');
@@ -1055,8 +1063,8 @@ it('moves a part so a corner of it lands on a corner of another, by mate connect
   await waitFor(() => expect(props().instanceIds).toContain('boss'), { timeout: 10_000 });
   const panel = screen.getByRole('region', { name: 'Parts panel' });
   await userEvent.click(within(panel).getByRole('button', { name: /^▱?\s*Boss/ }));
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: 'Transform · Boss' });
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'mate');
   // The first connector has to be on the part itself.
@@ -1128,8 +1136,8 @@ it('copies a part along a line from one picked point to another, as Translate by
     const index = instanceIds!.indexOf(part.id);
     act(() => onSelect!(part.id, index, { partId: part.id, index, point, normal: [0, 0, 1] }));
   };
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'line');
@@ -1172,8 +1180,8 @@ it('moves a part along an edge picked for the line, and turns it about an edge p
       onSelect!(part.id, index, { partId: part.id, index, point: [80, 0, 18], normal: [0, 0, 1], edge: { a: [0, 0, 18], b: [200, 0, 18] } })
     );
   };
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Transform/));
   let dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'line');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Line start' }));
@@ -1205,8 +1213,8 @@ it('rotates a part about the line out of a face picked for the axis', async () =
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() => expect(props().instanceIds?.length).toBeGreaterThan(0), { timeout: 10_000 });
   const part = latest().parts[0]!;
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Transform/));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'rotate');
   // Without an axis it says what to pick.
@@ -1274,8 +1282,8 @@ it('saves a picked-direction distance expression and removes it when replaced by
   const source = createPlateDocument({ width: 200, height: 100 });
   source.variables = [{ id: 'gap-variable', name: 'gap', expression: '30mm' }];
   const { latest } = await studio(source);
-  const toolbar = await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /Transform/ }));
+  await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
+  await userEvent.click(await studioCommand(/Transform/));
   let dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Copy part' }));
   await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Transform type' }), 'distance');

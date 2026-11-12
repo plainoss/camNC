@@ -351,7 +351,8 @@ export function polygonArea(points: CadPoint[]): number {
   );
 }
 
-function segmentsMeet(a: CadPoint, b: CadPoint, c: CadPoint, d: CadPoint): boolean {
+/** Whether two segments touch or cross, within the geometry tolerance. */
+export function segmentsMeet(a: CadPoint, b: CadPoint, c: CadPoint, d: CadPoint): boolean {
   const eps = CAD_GEOMETRY_TOLERANCE;
   if (
     Math.max(a.x, b.x) + eps < Math.min(c.x, d.x) ||
