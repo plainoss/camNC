@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { attemptToRead, batchPullRequests, clearsBatches, coveredBy, duplicatesOf, issueFor, issueTitle, parseFailures, parseRetries, testedHead } from './flaky-tests.mjs';
+import { attemptToRead, batchPullRequests, readsRetries, clearsBatches, coveredBy, duplicatesOf, issueFor, issueTitle, parseFailures, parseRetries, testedHead } from './flaky-tests.mjs';
 
 test('reads failed specs and Vitest tests from a job log, each once', () => {
   const log = [
@@ -104,4 +104,12 @@ test('a flake goes to its open issue, else reopens its closed one, else files a 
     { number: 5, title, state: 'CLOSED', stateReason: 'DUPLICATE' },
   ], title), { action: 'reopen', number: 3 }, 'with only duplicates closed, the oldest is the original');
   assert.deepEqual(issueFor([{ number: 7, title: 'Flaky test: other', state: 'OPEN' }], title), { action: 'create' });
+});
+
+test('every finished batch reports its retried tests, also one that failed on another job', () => {
+  const batch = { event: 'pull_request', branch: 'mergify/merge-queue/abc' };
+  assert.equal(readsRetries({ ...batch, conclusion: 'success' }), true);
+  assert.equal(readsRetries({ ...batch, conclusion: 'failure' }), true);
+  assert.equal(readsRetries({ ...batch, conclusion: 'cancelled' }), false);
+  assert.equal(readsRetries({ event: 'pull_request', branch: 'feature', conclusion: 'success' }), false);
 });

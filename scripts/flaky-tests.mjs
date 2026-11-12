@@ -50,6 +50,10 @@ export function attemptToRead({ conclusion, attempt }) {
   return null;
 }
 
+/** A finished Mergify batch, passed or failed, reports the browser tests its passing shards retried. */
+export const readsRetries = ({ event, conclusion, branch = '' }) =>
+  event === 'pull_request' && ['success', 'failure'].includes(conclusion) && branch.startsWith(MERGIFY_BATCH);
+
 /** A passing Mergify batch can clear earlier failed ones. */
 export const clearsBatches = ({ event, conclusion, branch = '' }) =>
   event === 'pull_request' && conclusion === 'success' && branch.startsWith(MERGIFY_BATCH);
@@ -130,10 +134,12 @@ async function main() {
       await report(repo, failure.id, failure.run_attempt,
         `A Mergify batch failed ${failedUrl} for ${list}, and a later batch with the same commits passed: https://github.com/${repo}/actions/runs/${run.id}. It can also be an interaction with a PR that was in the failed batch only.`);
     }
-    // Batches retry a failed browser test once (VITEST_RETRY): a test that passed only on its retry is a flake too.
-    await reportRetries(repo, run.id, run.attempt);
     // A batch that passed on a rerun also reports its failed attempt, below.
   }
+
+  // Batches retry a failed browser test once (VITEST_RETRY): a test that passed only on its retry is a flake too, in a
+  // batch that failed on another job as well. Each run reports its own retries when it completes.
+  if (readsRetries(run)) await reportRetries(repo, run.id, run.attempt);
 
   const attempt = attemptToRead(run);
   if (attempt === null) return;
@@ -161,7 +167,7 @@ async function reportRetries(repo, runId, attempt) {
   for (const job of jobs) for (const test of parseRetries(await jobLog(repo, job.id), runId)) flakes.set(test, job.name);
   const runUrl = `https://github.com/${repo}/actions/runs/${runId}/attempts/${attempt}`;
   await file(repo, flakes, test =>
-    `\`${test}\` failed a try in **${flakes.get(test)}** and passed on its retry, in a Mergify batch that passed: ${runUrl}\n`);
+    `\`${test}\` failed a try in **${flakes.get(test)}** of a Mergify batch and passed on its retry: ${runUrl}\n`);
 }
 
 /**
