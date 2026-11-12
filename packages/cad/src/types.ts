@@ -669,6 +669,12 @@ export interface CadSolveResult extends CadEvaluation {
   document: CadDocument;
   status: 'solved' | 'conflict' | 'invalid';
   sketches: CadSketchSolveStatus[];
+  /**
+   * Every sketch solved without an error and the features were built from them, so the errors left come from building
+   * them: a part's outline, or a feature such as an Extrude whose picked region is gone. A sketch closes despite the
+   * latter; the feature shows as broken.
+   */
+  featuresEvaluated?: true;
 }
 
 /** One Fillet step: corners of a part's sketch, rounded to a radius, as the edges through the part there. */

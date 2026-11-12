@@ -32,6 +32,23 @@ describe('feedback while sketching', () => {
     ).toMatchObject({ inProgress: false, status: 'Sketch solver reset', problems: [message], conflictedConstraintIds: [] });
   });
 
+  it('leaves out of the sketch’s own problems what broke in a feature built from it, but not its outline’s', () => {
+    const document = createCadDocument();
+    const part = createCadPart();
+    document.parts.push(part);
+    const result = (code: string, featuresEvaluated?: true) => ({
+      document,
+      status: 'invalid' as const,
+      parts: [],
+      diagnostics: [{ code, severity: 'error' as const, message: code, partId: part.id }],
+      sketches: [{ partId: part.id, dof: 0, status: 'solved' as const }],
+      ...(featuresEvaluated && { featuresEvaluated }),
+    });
+    expect(sketchFeedback(result('region-missing', true))).toMatchObject({ problems: ['region-missing'], sketchProblems: [] });
+    expect(sketchFeedback(result('self-intersection', true)).sketchProblems).toEqual(['self-intersection']);
+    expect(sketchFeedback(result('conflicting-constraints')).sketchProblems).toEqual(['conflicting-constraints']);
+  });
+
   it('treats an empty sketch and an open chain as normal work in progress with meaningful DOF', async () => {
     const document = createCadDocument();
     const part = createCadPart();
