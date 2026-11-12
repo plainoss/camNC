@@ -5,6 +5,7 @@ import type { MotionRole } from './motion';
 import { geometryTolerances, planAccuracy } from './accuracy';
 import { conservativePocketRingSpacing, pocketEndpointDeviation, pocketRingSpacing } from './pocketSpacing';
 import { createPocketRings } from './pocketRings';
+import { forEachRegion, regionLinks } from './pocketRegionOrder';
 import { pocketCoverageRadius, pocketRingsCoverFloor, pocketRowsCoverFloor } from './pocketCoverage';
 import { nextPocketFloorSpacing } from './pocketFloorRefinement';
 import type { CamSettings, Operation, Pass, Tool } from './toolpathTypes';
@@ -165,6 +166,25 @@ function wallsOnRight(line: PathD, walls: PathsD): PathD {
   return insideRegion(probe, walls) ? line : [...line].reverse();
 }
 
+/**
+ * Clipped pieces of closed loops, with the two pieces that meet where a loop starts (`seams`) joined back into one: the
+ * loop's start is just where it was opened for clipping, not an end of the path.
+ */
+function joinAtSeams(pieces: PathsD, seams: { x: number; y: number }[]): PathsD {
+  const at = (p: { x: number; y: number }, q: { x: number; y: number }) => dist2(p, q) < 1e-12;
+  const out = [...pieces];
+  for (const seam of seams) {
+    const a = out.findIndex(l => at(l[l.length - 1], seam) || at(l[0], seam));
+    const b = out.findIndex((l, i) => i !== a && (at(l[0], seam) || at(l[l.length - 1], seam)));
+    if (a < 0 || b < 0) continue;
+    const into = at(out[a][out[a].length - 1], seam) ? out[a] : [...out[a]].reverse();
+    const from = at(out[b][0], seam) ? out[b] : [...out[b]].reverse();
+    out[a] = [...into, ...from.slice(1)];
+    out.splice(b, 1);
+  }
+  return out;
+}
+
 /** Distance from p to the nearest edge of `paths` (closed loops). */
 function distToEdges(p: { x: number; y: number }, paths: PathsD): number {
   let best = Infinity;
@@ -249,6 +269,7 @@ function openPocketPasses(
   floorZ: number,
   tool: Tool,
   s: CamSettings,
+  from: { x: number; y: number },
   stepover = pocketRingSpacing(s, tool.diameter),
   coverageAttempt = 0
 ): Pass[] {
@@ -296,9 +317,12 @@ function openPocketPasses(
     const hit = cache.get(d);
     if (hit) return hit;
     const around = offsetPaths(localWalls, d);
-    const out = clipLines(
-      around.map(l => [...l, l[0]]),
-      clipArea
+    const out = joinAtSeams(
+      clipLines(
+        around.map(l => [...l, l[0]]),
+        clipArea
+      ),
+      around.map(l => l[0])
     )
       .filter(l => l.length > 1 && pathLength(l, false) > 0.5)
       .map(l => wallsOnRight(l, around));
@@ -343,14 +367,19 @@ function openPocketPasses(
       floorZ,
       tool,
       s,
+      from,
       nextPocketFloorSpacing(stepover, conservative, coverageAttempt),
       coverageAttempt + 1
     );
-  // The row next to the walls is climb; each row before it runs the way that ends where the next one starts.
-  for (let k = n - 1; k >= 0; k--) {
-    const next = rows[k + 1][0]?.[0];
-    if (next) rows[k] = rows[k].map(l => (dist2(l[0], next) < dist2(l[l.length - 1], next) ? [...l].reverse() : l));
-  }
+  // Where the rows split (the arms of an edge groove), each arm is cut through all its depths before the next.
+  const links = regionLinks(rows, tool.diameter + stepover, false);
+  // The row next to the walls is climb; each row before it runs the way that ends where the one it leads into starts.
+  for (let k = n - 1; k >= 0; k--)
+    rows[k] = rows[k].map((l, i) => {
+      const to = links.nodes[links.succs[links.id(k, i)][0]];
+      const next = to ? rows[to.group][to.index][0] : rows[k + 1][0]?.[0];
+      return next && dist2(l[0], next) < dist2(l[l.length - 1], next) ? [...l].reverse() : l;
+    });
   const passes: Pass[] = [];
   let last: Vec3 | undefined;
   const run = (line: PathD, z: number, feed: number, rampFrom?: number) => {
@@ -364,11 +393,14 @@ function openPocketPasses(
     passes.push(pass);
     last = pass.pts[pass.pts.length - 1];
   };
-  let prevZ = topZ;
-  for (const z of levels) {
-    rows.forEach((row, k) => row.forEach((line, i) => run(line, z, s.feed, k === 0 && i === 0 ? prevZ : undefined)));
-    prevZ = z;
-  }
+  forEachRegion(rows, links, false, from, region => {
+    let prevZ = topZ;
+    for (const z of levels) {
+      region.forEach(({ group, index }, i) => run(rows[group][index], z, s.feed, i === 0 ? prevZ : undefined));
+      prevZ = z;
+    }
+    return last && { x: last[0], y: last[1] };
+  });
   // Finish the walls at bounded axial depths, climb.
   if (allowance > 0)
     for (const z of depthLevels(topZ, floorZ, s.pocketFinishStepdown ?? stepdown))
@@ -464,7 +496,7 @@ export function pocketOperation(
     remaining.delete(ci);
     // With no walls, such as when a pocket covers the whole top, there's nothing to follow: clear it in rings below.
     if (solid && walls?.length && offsetPaths(comps[ci], -r).some(l => rotateToWaste(l, solid))) {
-      const open = openPocketPasses(comps[ci], walls, solid, topZ, floorZ, tool, s);
+      const open = openPocketPasses(comps[ci], walls, solid, topZ, floorZ, tool, s, pos);
       if (open.length) {
         roughWallAllowance = Math.max(
           roughWallAllowance,
@@ -500,16 +532,20 @@ export function pocketOperation(
         rings = createPocketRings(comps[ci], r, allowance, s, ringSpacing, terminalRadius);
       }
     }
-    let prevZ = topZ;
-    for (const z of depthLevels(topZ, floorZ, stepdown)) {
-      let last: Vec3 | undefined;
-      // Closed pockets clear from the center out. Open to the edge: the outer ring first, entering from the waste,
-      // then inwards, keeping the edge supported by waste during its cut.
-      const open = !!solid && !!rings[0]?.some(l => rotateToWaste(l, solid));
-      const order = rings.map((_, i) => i);
-      if (!open) order.reverse();
-      for (const ri of order) {
-        for (const raw of rings[ri]) {
+    // Closed pockets clear from the center out. Open to the edge: the outer ring first, entering from the waste,
+    // then inwards, keeping the edge supported by waste during its cut.
+    const open = !!solid && !!rings[0]?.some(l => rotateToWaste(l, solid));
+    const order = rings.map((_, i) => i);
+    if (!open) order.reverse();
+    // Where the rings split (lobes past a narrow neck), each lobe is cut through all its depths before the next.
+    const groups = order.map(ri => rings[ri]);
+    forEachRegion(groups, regionLinks(groups, tool.diameter + ringSpacing, true), true, pos, region => {
+      let prevZ = topZ;
+      for (const z of depthLevels(topZ, floorZ, stepdown)) {
+        let last: Vec3 | undefined;
+        for (const { group, index } of region) {
+          const ri = order[group];
+          const raw = rings[ri][index];
           // Clipper: outer loops CCW, holes CW -> material on the right = climb with an M3 spindle.
           const oriented = s.climb ? raw : [...raw].reverse();
           // The wall ring of a closed pocket, reached from an inner ring: join and leave it on tangent arcs.
@@ -529,10 +565,11 @@ export function pocketOperation(
           passes.push({ ...pass, materialSide: s.climb ? 'right' : 'left' });
           last = pass.pts[pass.pts.length - 1];
         }
+        if (last) pos = { x: last[0], y: last[1] };
+        prevZ = z;
       }
-      if (last) pos = { x: last[0], y: last[1] };
-      prevZ = z;
-    }
+      return pos;
+    });
     // Bound axial engagement while the radial finishing allowance is removed.
     if (allowance > 0 && rings.length) {
       let last: Vec3 = passes[passes.length - 1].pts.at(-1)!;

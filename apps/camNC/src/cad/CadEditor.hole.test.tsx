@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
+import { HoleDialog } from './HoleDialog';
 import { endCadSession } from '@wbcnc/cad-editor/session';
 import { studioCommand } from './studioToolbarTesting';
 
@@ -55,4 +56,111 @@ it('makes round holes at the points of a sketch on a part’s face', async () =>
     expect(latest().parts[0]!.features?.filter(feature => feature.type === 'cut' && feature.depth === 'through')).toHaveLength(2)
   );
   expect(within(features).getByRole('button', { name: /Hole · Points/ })).toBeDefined();
+});
+
+const boardWithPoints = (withPoints: boolean): CadDocument => {
+  const board = { ...createPlateDocument({ width: 100, height: 60 }).parts[0]!, name: 'Board' };
+  board.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  if (!withPoints) return { ...createCadDocument(), parts: [board] };
+  const points = {
+    ...createCadPart('Points', 18),
+    drawnOn: { on: { partId: board.id, face: 'top' as const }, offset: 0 },
+    extrude: false as const,
+  };
+  points.sketch = addPoint(addPoint(points.sketch, { x: 20, y: 30 }), { x: 80, y: 30 });
+  return { ...createCadDocument(), parts: [board, points] };
+};
+
+const openWithBoardSelected = async (source: CadDocument) => {
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={vi.fn()} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  await userEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: /^▱?\s*Board/ }));
+  await userEvent.click(await studioCommand(/^Hole/));
+  return () => change.mock.calls.at(-1)?.[0] ?? source;
+};
+
+it('refuses Hole on a selected board without sketch points, and keeps the board', async () => {
+  const latest = await openWithBoardSelected(boardWithPoints(false));
+  const refusal = await screen.findByRole('alert');
+  expect(refusal.textContent).toBe(
+    'Hole drills at the points of a sketch on Board. Sketch points on its top or underside, then choose Hole.'
+  );
+  expect(screen.queryByRole('dialog', { name: /^Hole/ })).toBeNull();
+  const board = latest().parts[0]!;
+  expect(board.hole).toBeUndefined();
+  expect(board.remove).toBeUndefined();
+  expect(board.extrude).not.toBe(false);
+  expect(screen.getByRole('list', { name: 'Parts' }).textContent).toContain('Board');
+});
+
+it('drills a selected board at the points sketched on its face', async () => {
+  const latest = await openWithBoardSelected(boardWithPoints(true));
+  const dialog = await screen.findByRole('dialog', { name: 'Hole · Points' });
+  // Leaving the diameter field applies it: it must go to the points sketch, not the board.
+  const diameter = within(dialog).getByRole('textbox', { name: 'Diameter' });
+  await userEvent.clear(diameter);
+  await userEvent.type(diameter, '8');
+  await userEvent.tab();
+  await waitFor(() => expect(latest().parts[1]!.hole).toEqual({ diameter: 8 }));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Hole · Points' })).toBeNull());
+  await waitFor(() =>
+    expect(latest().parts[0]!.features?.filter(feature => feature.type === 'cut' && feature.depth === 'through')).toHaveLength(2)
+  );
+  const [board, points] = latest().parts;
+  expect(board).not.toHaveProperty('hole');
+  expect(board).not.toHaveProperty('remove');
+  expect(board!.extrude).not.toBe(false);
+  expect(points).toMatchObject({ hole: { diameter: 8 }, remove: { depth: 'through' } });
+});
+
+it('puts the points sketch back when Hole started from a board is cancelled', async () => {
+  const source = boardWithPoints(true);
+  const latest = await openWithBoardSelected(source);
+  const dialog = await screen.findByRole('dialog', { name: 'Hole · Points' });
+  await waitFor(() => expect(latest().parts[1]).toHaveProperty('hole'));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Hole · Points' })).toBeNull());
+  await waitFor(() => expect(latest().parts[1]).not.toHaveProperty('hole'));
+  const [board, points] = latest().parts;
+  expect(points).not.toHaveProperty('remove');
+  expect(points!.extrude).toBe(false);
+  expect(board).not.toHaveProperty('hole');
+  expect(board!.features ?? []).toHaveLength(0);
+});
+
+it('cancels an open Hole step before Hole drills the selected board again', async () => {
+  const latest = await openWithBoardSelected(boardWithPoints(true));
+  await screen.findByRole('dialog', { name: 'Hole · Points' });
+  await userEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: /^▱?\s*Board/ }));
+  await userEvent.click(await studioCommand(/^Hole/));
+  const dialog = await screen.findByRole('dialog', { name: 'Hole · Points' });
+  // Left open, the first Hole would have used up the points sketch, and the second would be refused.
+  expect(screen.queryByText(/^Hole drills/)).toBeNull();
+  expect(latest().parts[0]).not.toHaveProperty('hole');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(latest().parts[1]).not.toHaveProperty('hole'));
+  expect(latest().parts[1]!.extrude).toBe(false);
+  expect(latest().parts[0]).not.toHaveProperty('hole');
+});
+
+it('never writes a hole onto a board the Hole dialog is opened on', async () => {
+  const source = boardWithPoints(false);
+  let current = source;
+  const onChange = vi.fn((change: (document: CadDocument) => CadDocument) => (current = change(current)));
+  render(<HoleDialog document={source} part={source.parts[0]!} onChange={onChange} onOk={vi.fn()} onCancel={vi.fn()} />);
+  const dialog = await screen.findByRole('dialog', { name: 'Hole · Board' });
+  expect(within(dialog).getByRole('alert').textContent).toBe('Hole drills at the points of a sketch, not into Board itself.');
+  const diameter = within(dialog).getByRole('textbox', { name: 'Diameter' });
+  await userEvent.clear(diameter);
+  await userEvent.type(diameter, '8');
+  await userEvent.tab();
+  expect(current.parts[0]).toEqual(source.parts[0]);
+  expect((within(dialog).getByRole('button', { name: 'OK' }) as HTMLButtonElement).disabled).toBe(true);
 });

@@ -1,6 +1,8 @@
 import type { CadDocument } from '@wbcnc/cad';
 import type { CadReport } from '@wbcnc/cad-script';
 import type { EvaluatedCadPart } from '@wbcnc/cad';
+import { checkNextStep } from './checkHints';
+import { compactCheckReport } from './compactCheck';
 import { checkAssistantRequirements, validateAssistantRequirements, type AssistantRequirements } from './requirements';
 import { assistantRecipeCatalog, type AssistantRecipeName, type AssistantRecipeParameters } from './recipeCatalog';
 import { createAssistantScriptSession } from './scriptSession';
@@ -297,15 +299,23 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       return finish('exhausted');
     }
     const finalizing = checks >= maxChecks || turn === maxTurns - 1;
-    const tools = finalizing
-      ? options.finalize && latestCandidate && !proposal && turn < maxTurns - 1
-        ? assistantTools.filter(tool => tool.name === 'finalize_design')
-        : []
-      : [...assistantTools.filter(tool => tool.name !== 'finalize_design' || options.finalize), ...(options.svg ? [svgAssistantTool] : [])];
-    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}\nConfirmed application requirements (cannot be changed by scripts): ${JSON.stringify(requirements)}${finalizing ? (tools.length ? '\nThe geometry repair budget is used. Call finalize_design for the last passing candidate before a proposal.' : '\nThis is the final response. Do not call tools. Begin with Proposal: only for the latest successful complete check, otherwise Question: explaining what is needed.') : ''}`;
+    const finalizeOnly = finalizing && !!options.finalize && !!latestCandidate && !proposal && turn < maxTurns - 1;
+    const finalResponse = finalizing && !finalizeOnly;
+    // System and tools stay byte-identical on every turn so the provider's cached prefix survives to the final turn.
+    // The last turns are steered by a trailing note instead, and the final one forbids calls with tool_choice.
+    const tools = [
+      ...assistantTools.filter(tool => tool.name !== 'finalize_design' || options.finalize),
+      ...(options.svg ? [svgAssistantTool] : []),
+    ];
+    const finalNote = finalizeOnly
+      ? '[Application: the geometry repair budget is used. Only finalize_design remains available: call it for the last passing candidate before a proposal.]'
+      : finalResponse
+        ? '[Application: this is the final response. Do not call tools. Begin with Proposal: only for the latest successful complete check, otherwise Question: explaining what is needed.]'
+        : undefined;
+    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}\nConfirmed application requirements (cannot be changed by scripts): ${JSON.stringify(requirements)}`;
     const stagedSystem =
       (options.finalize
-        ? `${system}\nChecks use the geometry repair lane. A passing geometry check is not a proposal. Call finalize_design for the exact latest passing candidate after repairs; review its full warnings and costs before offering Proposal:.${finalizing && tools.length ? ' Only finalize_design remains available.' : ''}`
+        ? `${system}\nChecks use the geometry repair lane. A passing geometry check is not a proposal. Call finalize_design for the exact latest passing candidate after repairs; review its full warnings and costs before offering Proposal:.`
         : system) +
       (options.svg
         ? `\nSession SVG assets (data): ${JSON.stringify(options.svg.assets)}. Reuse handles; never repeat stored XML. Use SVG for imported/custom outlines, and parametric recipes when they meet the request.`
@@ -318,7 +328,17 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     }
     let modelMessages: AssistantMessage[];
     try {
-      modelMessages = buildAssistantContext(messages, { images: options.config.images, maxCharacters: messageCharacters });
+      modelMessages = [
+        // Older tool batches stay verbatim while everything fits: compacting them mid-run rewrites the cached prefix.
+        ...buildAssistantContext(messages, {
+          images: options.config.images,
+          maxCharacters: messageCharacters,
+          compactOnlyOverLimit: true,
+          // The note follows the context, so it is budgeted before deciding whether history still fits verbatim.
+          reserveCharacters: finalNote ? assistantContextCharacters([{ role: 'user', text: finalNote }]) : 0,
+        }),
+        ...(finalNote ? [{ role: 'user' as const, text: finalNote }] : []),
+      ];
     } catch (error) {
       stopReason = error instanceof Error ? error.message : 'Context budget exceeded.';
       return finish('exhausted');
@@ -349,6 +369,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
         system: stagedSystem,
         messages: modelMessages,
         tools,
+        ...(finalResponse && { toolChoice: 'none' as const }),
         maxOutputTokens: Math.min(
           limits.maxOutputTokens ?? 8192,
           limits.maxTotalTokens === undefined
@@ -391,7 +412,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       stopReason = 'The assistant did not return a complete Proposal: or Question: response.';
       return finish('exhausted');
     }
-    if (finalizing && !tools.length) {
+    if (finalResponse) {
       for (const call of answer.calls) emit({ role: 'tool', callId: call.id, text: 'Not run: the run has reached its final response.' });
       stopReason = 'The assistant requested tools after its execution budget ended.';
       return finish('exhausted');
@@ -400,6 +421,17 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     if (answer.calls.length > 12) {
       for (const call of answer.calls) emit({ role: 'tool', callId: call.id, text: 'Not run: too many tool calls in one turn.' });
       return finish('exhausted');
+    }
+    // With the repair budget spent, only the final check may run; a question would otherwise end the run early here.
+    if (finalizeOnly && answer.calls.some(call => call.name !== 'finalize_design')) {
+      for (const call of answer.calls)
+        emit({
+          role: 'tool',
+          callId: call.id,
+          text: 'Not run: only finalize_design remains available. Call it alone for the last passing candidate.',
+          isError: true,
+        });
+      continue;
     }
     // Questions must be isolated: a mixed batch must not run edits after asking for consent.
     if (answer.calls.some(call => call.name === 'ask_user')) {
@@ -416,7 +448,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       continue;
     }
     for (const call of answer.calls) {
-      let text: string, images: AssistantImage[] | undefined;
+      let text: string,
+        images: AssistantImage[] | undefined,
+        isError = false;
       if (options.signal.aborted) {
         emit({ role: 'tool', callId: call.id, text: 'Stopped by the user; this tool was not run.' });
         continue;
@@ -465,13 +499,16 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
           latestReport = full.detailReport ?? full.report;
           if (!runSignal.aborted && full.ok && acceptance.ok) proposal = cadProposal(base, full.document);
           if (!full.ok || !acceptance.ok) latestCandidate = undefined;
+          // A stopped script built nothing: the unchanged design's report would only bury the error.
           text = JSON.stringify({
             ok: full.ok && acceptance.ok,
             stage: 'complete',
-            report: full.report,
+            ...(!full.scriptError && { report: full.report }),
             requirements: acceptance,
             ...(full.scriptError && { scriptError: full.scriptError }),
+            next: checkNextStep({ ...full, ok: full.ok && acceptance.ok, stage: 'complete', requirements: acceptance.checks }),
           });
+          isError = !!full.scriptError;
         } else if (call.name === 'check_design' || (call.name === 'check_svg' && options.svg)) {
           if (checks >= maxChecks) text = `Stopped after ${maxChecks} checks. Explain what you found and ask the user how to continue.`;
           else {
@@ -513,16 +550,20 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
                   });
                 if (!options.finalize) proposal = cadProposal(base, checked.document);
               }
+              const stage = options.finalize ? 'geometry-only' : 'complete';
               text = JSON.stringify({
                 ok: checked.ok && acceptance.ok,
-                stage: options.finalize ? 'geometry-only' : 'complete',
-                report: checked.report,
+                stage,
+                // Only what changed against the open design; read_design_report keeps the full detail.
+                ...(!checked.scriptError && { report: compactCheckReport(checked.detailReport ?? checked.report, options.report) }),
                 ...(script && { scriptId: script.scriptId, hash: script.hash }),
                 ...(script?.recipe && { recipe: script.recipe, parameters: script.parameters }),
                 ...(checked.asset !== undefined && { asset: checked.asset }),
                 ...(acceptance.checks.length && { requirements: acceptance }),
                 ...(checked.scriptError && { scriptError: checked.scriptError }),
+                next: checkNextStep({ ...checked, ok: checked.ok && acceptance.ok, stage, requirements: acceptance.checks }),
               });
+              isError = !!checked.scriptError;
               images = options.config.images ? checked.images : undefined;
               options.onActivity?.(checked.ok ? `Attempt ${checks} checked. Reviewing the result.` : `Attempt ${checks} needs repair.`);
             }
@@ -535,8 +576,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
           latestCandidate = undefined;
         }
         text = error instanceof Error ? error.message : 'The check failed.';
+        isError = true;
       }
-      emit({ role: 'tool', callId: call.id, text, ...(images?.length && { images }) });
+      emit({ role: 'tool', callId: call.id, text, ...(images?.length && { images }), ...(isError && { isError }) });
     }
     if (options.signal.aborted) return finish('stopped');
   }

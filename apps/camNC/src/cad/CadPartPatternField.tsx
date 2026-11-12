@@ -35,6 +35,7 @@ function LinearPartPatternField({
   onChange,
   onDone,
   ready,
+  onValidityChange,
 }: {
   pattern: CadPartPattern | undefined;
   document?: CadDocument;
@@ -47,6 +48,8 @@ function LinearPartPatternField({
   onDone?: () => void;
   /** Patterning from the start, as the reference's Linear pattern dialog opens: no checkbox to switch it on first. */
   ready?: boolean;
+  /** Why the count or spacing as typed can't be used, or null: a dialog refuses OK while there is one. */
+  onValidityChange?: (problem: string | null) => void;
 }) {
   const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const id = useId();
@@ -86,6 +89,20 @@ function LinearPartPatternField({
       setError(null);
     }
   }, [typedCount, typedSpacing]);
+  const parse = (countText: string, spacingText: string) => {
+    const parsedCount = parseCadValue(countText, { unit: 'scalar', variables });
+    if ('error' in parsedCount) return parsedCount.error;
+    const n = Math.floor(parsedCount.value + 1e-9);
+    if (n < 1 || n > CAD_MAX_PART_PATTERN) return `A pattern makes one to ${CAD_MAX_PART_PATTERN}, counting the part itself.`;
+    const parsedSpacing = parseCadValue(spacingText, { unit: 'mm', variables });
+    if ('error' in parsedSpacing) return parsedSpacing.error;
+    return { n, parsedCount, parsedSpacing };
+  };
+  // What the fields show is what's kept: while either can't be read, it says why, and nothing older stands in for it.
+  const parsedNow = pattern ? parse(count, spacing) : null;
+  const problem = typeof parsedNow === 'string' ? parsedNow : null;
+  useEffect(() => onValidityChange?.(problem), [problem, onValidityChange]);
+  useEffect(() => () => onValidityChange?.(null), [onValidityChange]);
   const apply = (
     axis = current.axis,
     direction: Pattern['direction'] | null = current.direction,
@@ -94,21 +111,9 @@ function LinearPartPatternField({
     spacingText = spacing,
     preview = false
   ) => {
-    const parsedCount = parseCadValue(countText, { unit: 'scalar', variables });
-    if ('error' in parsedCount) {
-      if (!preview) setError(parsedCount.error);
-      return;
-    }
-    const n = Math.floor(parsedCount.value + 1e-9);
-    if (n < 1 || n > CAD_MAX_PART_PATTERN) {
-      if (!preview) setError(`A pattern makes one to ${CAD_MAX_PART_PATTERN}, counting the part itself.`);
-      return;
-    }
-    const parsedSpacing = parseCadValue(spacingText, { unit: 'mm', variables });
-    if ('error' in parsedSpacing) {
-      if (!preview) setError(parsedSpacing.error);
-      return;
-    }
+    const parsed = parse(countText, spacingText);
+    if (typeof parsed === 'string') return;
+    const { n, parsedCount, parsedSpacing } = parsed;
     if (!preview) dirty.current = false;
     setError(null);
     const next: Pattern = {
@@ -285,7 +290,7 @@ function LinearPartPatternField({
                 id={`${id}-count`}
                 value={count}
                 spellCheck={false}
-                aria-invalid={error ? true : undefined}
+                aria-invalid={problem || error ? true : undefined}
                 onChange={edit('count')}
                 onBlur={() => dirty.current && apply()}
                 onKeyDown={keys}
@@ -300,7 +305,7 @@ function LinearPartPatternField({
                 id={`${id}-spacing`}
                 value={spacing}
                 spellCheck={false}
-                aria-invalid={error ? true : undefined}
+                aria-invalid={problem || error ? true : undefined}
                 onChange={edit('spacing')}
                 onBlur={() => dirty.current && apply()}
                 onKeyDown={keys}
@@ -310,9 +315,9 @@ function LinearPartPatternField({
           </label>
         </>
       )}
-      {error && (
+      {(problem ?? error) && (
         <p role="alert" className="cad-thickness-error">
-          {error}
+          {problem ?? error}
         </p>
       )}
     </div>

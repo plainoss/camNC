@@ -151,6 +151,11 @@ describe('isolated browser design checks', () => {
     },
     45_000
   );
+  it('names the failing script line of a plain JavaScript error', async () => {
+    const source = `import { design } from '@wbcnc/cad-script';\nexport default design(d => {\n  const part = d.newPart('Panel');\n  const sizes = null;\n  sizes.length;\n});`;
+    const result = await checkScriptInBrowser(createCadDocument(), source);
+    expect(result.scriptError).toMatch(/TypeError: .*\(script line 5: sizes\.length;\)/);
+  }, 45_000);
   it('reports misspelled options with the supported name', async () => {
     const result = await checkScriptInBrowser(createCadDocument(), `d=>{d.newPart('Panel').profile.circle({at:[20,20],radius:5});}`);
     expect(result.scriptError).toMatch(/circle has no option radius.*\bd\b/);

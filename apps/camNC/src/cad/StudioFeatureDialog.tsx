@@ -5,6 +5,7 @@ import { ExtrudeDialog, type CadConnectorPick } from './PartFeatureDialogs';
 import { HoleDialog } from './HoleDialog';
 import { StudioPatternDialog } from './StudioPatternDialog';
 import type { PartPatternKind } from './partPatternKind';
+import type { DialogPartPicks } from './useDialogPartPick';
 
 export interface StudioFeatureDialogState {
   kind: 'extrude' | 'pattern' | 'hole';
@@ -29,6 +30,7 @@ export function StudioFeatureDialog({
   onEditSketch,
   pickDirection,
   pickPoint,
+  partPicks,
 }: {
   state: StudioFeatureDialogState;
   document: CadDocument;
@@ -43,6 +45,8 @@ export function StudioFeatureDialog({
   onEditSketch: (partId: string) => void;
   pickDirection: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
   pickPoint: (picked: ((pick: CadConnectorPick) => void) | null) => void;
+  /** Parts clicked while it's open, for a new pattern's part field. */
+  partPicks?: DialogPartPicks;
 }) {
   const opening = useRef({ state, generation: 0 });
   // Starting the same feature again still owns a fresh candidate, even if its source document has not changed.
@@ -72,6 +76,7 @@ export function StudioFeatureDialog({
       onPreview={onPreview}
       pickDirection={pickDirection}
       pickPoint={pickPoint}
+      partPicks={partPicks}
     />
   );
 }

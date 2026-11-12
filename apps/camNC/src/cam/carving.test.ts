@@ -297,4 +297,36 @@ describe('a carving cut out of its board', () => {
     expect(tabs.holdDown).toBe('tabs');
     expect(tabs.cutouts?.map(c => c.tabsAt?.length).sort()).toEqual([1, 2]);
   });
+
+  it('carries placed tabs with the piece they are on when it is moved, turned or sized', async () => {
+    const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
+    const near = item({ x: 40, y: 70 }),
+      far = item({ id: 'far', x: 220, y: 70 });
+    // A tab 6 mm right of each piece, and one above the near one.
+    const tabsAt = [
+      { x: 56, y: 70 },
+      { x: 40, y: 81 },
+      { x: 236, y: 70 },
+    ];
+    const carving = { ...withItems(job.carving!, [near, far]), cutout: { ...newCutout(false), tabsAt } };
+    // Moved: its two tabs move with it, the other piece's stays.
+    expect(withItems(carving, [{ ...near, x: 60, y: 50 }, far]).cutout?.tabsAt).toEqual([
+      { x: 76, y: 50 },
+      { x: 60, y: 61 },
+      { x: 236, y: 70 },
+    ]);
+    // Turned a quarter about its centre, and doubled in size.
+    const turned = withItems(carving, [
+      { ...near, rotation: 90, height: 20, outline: near.outline.map(l => l.map(p => ({ x: p.x * 2, y: p.y * 2 }))) },
+      far,
+    ]);
+    const [right, above] = turned.cutout!.tabsAt!;
+    expect(right.x).toBeCloseTo(40);
+    expect(right.y).toBeCloseTo(102);
+    expect(above.x).toBeCloseTo(18);
+    expect(above.y).toBeCloseTo(70);
+    // Changes that don't move the artwork keep the tabs as they are.
+    expect(withItems(carving, [near, far, item({ id: 'new', x: 150 })]).cutout?.tabsAt).toBe(tabsAt);
+    expect(withItems(carving, [far]).cutout?.tabsAt).toBe(tabsAt);
+  });
 });

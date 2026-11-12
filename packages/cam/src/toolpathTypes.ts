@@ -210,6 +210,29 @@ export interface HoleMiddle {
 
 export type HoleChoice = 'clear' | 'leave';
 
+/**
+ * Waste a profile path leaves because the bit can't reach into it: notches narrower than the bit, such as finger
+ * joint slots, or sharp inside corners. One entry per loop for the pieces that span their notch, one for the others.
+ */
+export interface OutlineNotches {
+  /** The loop: an index into the part's outlines, or into its through holes when `inside`. */
+  outline: number;
+  inside?: true;
+  count: number;
+  /** mm, the narrowest piece's: the widest disk that fits in it. */
+  width: number;
+  /** The bit's, mm. */
+  diameter: number;
+  /** Each piece fills its notch up to the mouth: the path runs straight across, and the notch isn't cut at all. */
+  spans: boolean;
+  /** mm² left, all pieces together. */
+  area: number;
+  /** Each piece's middle, in the part's own coordinates (as its features are). */
+  at: { x: number; y: number }[];
+  /** On a board: the part (instance id). */
+  part?: string;
+}
+
 export interface PartCam {
   stockTop: number;
   operations: Operation[];
@@ -224,6 +247,8 @@ export interface PartCam {
   stockFootprint?: PathsD;
   /** Through holes that leave a piece in their middle: what happens to it. */
   holeMiddles?: HoleMiddle[];
+  /** Notches and sharp corners the outline and hole paths can't reach. */
+  outlineNotches?: OutlineNotches[];
   /** Configured stage limits, not a measured source/CAD accuracy certificate. */
   accuracy?: PlanAccuracy;
   stockSummary?: StockSummary;
