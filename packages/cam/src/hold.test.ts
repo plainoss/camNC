@@ -45,9 +45,29 @@ describe('do the tabs hold?', () => {
     const board = spec([{ id: 'p', name: 'side', features: plain(), size: [200, 100, 8], x: 30, y: 30, rotated: false }], 260, 160);
     const [hold] = holdCheck(camBoard(board, {}), board);
     expect(hold.part).toBe('side');
+    expect(hold.id).toBe('p');
     expect(hold.tabs.length).toBeGreaterThanOrEqual(3);
     expect(hold.anchored).toBe(hold.tabs.length);
     expect(hold.ok).toBe(true);
+  });
+
+  it('tells two parts of the same name apart by their ids', () => {
+    const board = spec(
+      [
+        { id: 'top#0', name: 'Top', features: plain(), size: [200, 100, 8], x: 30, y: 30, rotated: false },
+        { id: 'bottom#0', name: 'Top', features: plain(), size: [200, 100, 8], x: 30, y: 160, rotated: false },
+      ],
+      260,
+      290
+    );
+    const holds = holdCheck(camBoard(board, {}), board);
+    expect(holds.map(h => [h.part, h.id])).toEqual([
+      ['Top', 'top#0'],
+      ['Top', 'bottom#0'],
+    ]);
+    // Each one's tabs are on its own outline.
+    expect(holds[0].tabs.every(t => t.at.y < 145)).toBe(true);
+    expect(holds[1].tabs.every(t => t.at.y > 145)).toBe(true);
   });
 
   it('tabs into the sliver between two neighbouring cuts or a narrow edge strip hold nothing', () => {

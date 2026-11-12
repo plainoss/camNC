@@ -719,7 +719,7 @@ function Checks({
   return (
     <div className="flex flex-col gap-1.5 text-[13px]">
       {loose(board).map(h => (
-        <p key={h.part} className="flex gap-2 text-destructive">
+        <p key={h.id ?? h.part} className="flex gap-2 text-destructive">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           {h.part}: {h.anchored === 0 ? 'none' : `only ${h.anchored}`} of its {h.tabs.length} tabs would hold it, so it would come loose. On
           the Boards step, switch the board to a bottom skin, or give it more room.
@@ -734,10 +734,10 @@ function Checks({
       )}
       {(board.timeline ?? [])
         // A part whose tabs don't hold is already listed above.
-        .filter(e => !(e.kind === 'loose' && loose(board).some(h => h.part === e.what)))
+        .filter(e => !(e.kind === 'loose' && loose(board).some(h => (h.id ? h.id === e.id : h.part === e.what))))
         .map(e => (
           <p
-            key={`${e.kind}-${e.what}-${e.step}`}
+            key={`${e.kind}-${e.id ?? e.what}-${e.step}`}
             className={cn('flex gap-2', e.block ? 'text-destructive' : 'text-amber-700 dark:text-amber-400')}>
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             {e.message}

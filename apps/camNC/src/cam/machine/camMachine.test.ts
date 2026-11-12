@@ -152,8 +152,8 @@ describe('machine queue', () => {
     it('a timeline note that doesn’t block, and tabs held anyway, block nothing', () => {
       const fine = ready([3.175], {
         timeline: [{ block: false, message: 'keep an eye on it' }],
-        hold: [{ part: 'p', ok: false, tabs: [], anchored: 0 }],
-        holding: [{ name: 'p', how: 'tabs', tabs: 3 }],
+        hold: [{ part: 'p', id: 'p#0', ok: false, tabs: [], anchored: 0 }],
+        holding: [{ id: 'p#0', name: 'p', how: 'tabs', tabs: 3 }],
       } as unknown as Partial<PlanResult>);
       expect(planBlock(fine)).toBeNull();
       expect(machineQueue([onBoard('A')], [fine], context)[0].blocked).toBeUndefined();

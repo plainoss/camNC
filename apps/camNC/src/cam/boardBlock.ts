@@ -17,7 +17,7 @@ export const releaseProblems = (plan: PlanResult | undefined) => plan?.release?.
 /** Parts that would come loose: tabs were placed for them, but too few hold. */
 export function loose(plan: PlanResult | undefined) {
   if (!plan?.hold) return [];
-  return plan.hold.filter(h => !h.ok && (plan.holding?.find(x => x.name === h.part)?.how ?? 'placed') === 'placed');
+  return plan.hold.filter(h => !h.ok && ((h.id && plan.holding?.find(x => x.id === h.id)?.how) ?? 'placed') === 'placed');
 }
 
 /** Stock that would turn or lift during the job, a part that comes loose, or a screw or clamp in the bit's way. */

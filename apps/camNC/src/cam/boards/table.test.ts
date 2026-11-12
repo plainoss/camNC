@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestColumns, fitScale, kTableGap, layoutTable, type TableBoard } from './table';
+import { bestColumns, fitScale, kBoardPad, kTableGap, layoutTable, type TableBoard } from './table';
 
 const board = (id: string, w: number, h: number, off: TableBoard['off'] = []): TableBoard => ({ id, w, h, off });
 const overlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
@@ -55,7 +55,17 @@ describe('bestColumns', () => {
 
 describe('fitScale', () => {
   it('fills the area by whichever side is tighter, leaving room for labels', () => {
-    expect(fitScale({ w: 572, h: 2000 }, { w: 500, h: 100 })).toBeCloseTo(1, 5);
-    expect(fitScale({ w: 2000, h: 588 }, { w: 100, h: 500 })).toBeCloseTo(1, 5);
+    expect(fitScale({ w: 572, h: 5000 }, { w: 1000, h: 100 })).toBeCloseTo(0.5, 5);
+    expect(fitScale({ w: 5000, h: 588 }, { w: 100, h: 1000 })).toBeCloseTo(0.5, 5);
+  });
+
+  it('keeps a board’s selection frame, its pad beyond the board, in view: a small board in a big area too', () => {
+    const area = { w: 900, h: 700 };
+    const board = { w: 100, h: 100 };
+    const s = fitScale(area, board);
+    // Zoomed in this far, the pad is wider than the room for labels: the frame, and a little beyond it, fits instead.
+    expect(kBoardPad * s).toBeGreaterThan(44);
+    expect((board.w + 2 * kBoardPad) * s).toBeLessThanOrEqual(area.w - 16 + 1e-9);
+    expect((board.h + 2 * kBoardPad) * s).toBeLessThanOrEqual(area.h - 16 + 1e-9);
   });
 });

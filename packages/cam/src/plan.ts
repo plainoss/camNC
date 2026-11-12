@@ -134,7 +134,7 @@ export interface PlanResult {
    * With tabs: per part, which tabs hold it once its outline is cut through (the stock beyond a tab must be wide
    * enough and reach the board's edge). A part with too few is not held: the job is blocked.
    */
-  hold?: { part: string; tabs: { at: { x: number; y: number }; anchored: boolean }[]; anchored: number; ok: boolean }[];
+  hold?: { part: string; id?: string; tabs: { at: { x: number; y: number }; anchored: boolean }[]; anchored: number; ok: boolean }[];
   /**
    * What comes loose during the job, at the step where it happens (see `holdTimeline`). `block`: the job is blocked
    * (stock that can turn or lift; a part that should be held but isn't). Without `block`: as the user chose (nothing
@@ -145,6 +145,8 @@ export interface PlanResult {
     after: string;
     kind: 'board' | 'pivot' | 'loose' | 'pocket';
     what: string;
+    /** The board part's id, for a part (names can repeat). */
+    id?: string;
     at: { x: number; y: number };
     block: boolean;
     message: string;
@@ -152,7 +154,7 @@ export interface PlanResult {
   /** Hold points the bit would hit (blocks the job). */
   holdClash?: { x: number; y: number }[];
   /** Per part: tabs placed (`tabs` of them; `wanted` when fewer fit than asked), a bottom skin, or nothing that holds it. */
-  holding?: { name: string; how: 'placed' | 'skin' | 'unheld'; tabs: number; wanted?: number; moved?: boolean }[];
+  holding?: { id: string; name: string; how: 'placed' | 'skin' | 'unheld'; tabs: number; wanted?: number; moved?: boolean }[];
   /** Bottom skin thickness, mm, for the parts that have one. */
   skin?: number;
   /** The board is taped down: the skin is the layer on the tape, cut for all parts in one go at the end. */
@@ -308,6 +310,7 @@ export function planBoard(
   const flat = board.rotationDeg ? camBoard({ ...spec, rotationDeg: 0 }, settings, progress.step(unturned)) : cam;
   progress.done(unturned);
   const holding = (cam.holding ?? []).map(h => ({
+    id: h.id,
     name: h.name,
     how: h.how,
     tabs: h.tabs.length,
@@ -344,7 +347,12 @@ export function planBoard(
       ...(board.holdDown === 'fixture-tape' && { taped: true }),
     };
   if (!usesTabs(board.holdDown)) return plan;
-  return { ...plan, hold: holdCheck(flat, board, holdOptionsOf(spec, settings)), holding, skin: board.skin ?? kDefaultSkin };
+  return {
+    ...plan,
+    hold: holdCheck(flat, { ...board, parts: spec.parts }, holdOptionsOf(spec, settings)),
+    holding,
+    skin: board.skin ?? kDefaultSkin,
+  };
 }
 
 /**
@@ -366,7 +374,7 @@ function withCutLineProblem(plan: PlanResult, past: BoardCutout[]): PlanResult {
  */
 function stability(flat: PartCam, spec: BoardSpec, settings: Partial<CamSettings>): Pick<PlanResult, 'timeline'> {
   if (spec.holdDown === 'fixture-tape') return {};
-  const how = (part: string) => flat.holding?.find(h => h.name === part)?.how;
+  const how = (ev: { what: string; id?: string }) => flat.holding?.find(h => (ev.id ? h.id === ev.id : h.name === ev.what))?.how;
   // Nothing holds the parts, as the user chose: say so, don't block.
   const watched = spec.holdDown === 'none';
   const after = (op: string) => {
@@ -400,7 +408,7 @@ function stability(flat: PartCam, spec: BoardSpec, settings: Partial<CamSettings
               ? `has ${ev.holds} screws or clamps, but all to one side of it`
               : `is held by ${ev.holds === 0 ? 'no' : `only ${ev.holds}`} screw${ev.holds === 1 ? '' : 's'} or clamp${ev.holds === 1 ? '' : 's'}`
           }, so it can turn or lift. Keep an eye on it, or add one (ringed on the board).`
-        : how(ev.what) === 'unheld'
+        : how(ev) === 'unheld'
           ? `${ev.what} has no two opposite edges where tabs would hold it, so it would come loose when its outline is cut through. On the Boards step, move it, or switch the board to a bottom skin.`
           : `${ev.what} comes loose when its outline is cut through${watched ? ', as you chose: nothing holds the parts. Keep an eye on it.' : ': no tabs into stock that is held.'}`;
     return { ...ev, block, message };
