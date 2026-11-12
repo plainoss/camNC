@@ -33,7 +33,9 @@ const relay = () => {
           terminate();
           port.postMessage({ type: 'failed', message: 'The isolated script checker could not start.' });
         };
-        worker.postMessage({ document: message.data.document, source: message.data.source }, [channel.port2]);
+        worker.postMessage({ document: message.data.document, source: message.data.source, toolpaths: message.data.toolpaths !== false }, [
+          channel.port2,
+        ]);
       } catch (error) {
         terminate();
         port.postMessage({

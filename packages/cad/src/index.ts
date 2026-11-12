@@ -17,6 +17,7 @@ export * from './sketchSvg';
 export * from './pointEquivalence';
 export * from './curveContacts';
 export * from './sketchRegions';
+export * from './solidSketchRegions';
 export * from './featureModel';
 export * from './features';
 export * from './directions';

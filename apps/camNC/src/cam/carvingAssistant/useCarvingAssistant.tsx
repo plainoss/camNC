@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CamJobV1 } from '../jobDb';
+import { nativeImageFromConnection } from '../../cad/assistant/modelDefaults';
 import { readAssistantCredentials, redactAssistantText, type AssistantCredentials } from '../../cad/assistant/keyStore';
 import type { AssistantRunSettings } from '../../cad/assistant/RunSettings';
 import { createAssistantUsage, type AssistantRunUsage } from '../../cad/assistant/runBudget';
@@ -7,6 +8,7 @@ import { generateCarvingAsset, type CarvingGenerationOptions, type GeneratedCarv
 import { generateNativeSvgAsset } from './nativeSvg';
 import { generateNativeRasterAsset } from './nativeRaster';
 import { readCarvingPngAsset } from './pngImport';
+import { carvingPngFromImage } from './externalImage';
 import { carvingDetailMm, type CarvingDetail } from './prepare';
 import type { NativeSvgConnection } from './NativeSvgSettings';
 import type { CarvingProposal } from './proposal';
@@ -46,7 +48,11 @@ export function useCarvingAssistant({
   const selected = job.carving?.items.find(item => item.id === selectedId);
   const [open, setOpen] = useState(false);
   const [credentials, setCredentials] = useState<AssistantCredentials | null>(readAssistantCredentials);
-  const [generationMode, setGenerationMode] = useState<'text' | 'native'>('text');
+  // Image generation is the default: traced images carve smoother than drawn vectors. A connection without an image
+  // model needs a separate image provider for it; text SVG stays one click away.
+  const [generationMode, setGenerationMode] = useState<'text' | 'native'>('native');
+  // A separate image provider is an override; normally the connection's own key and image model are used.
+  const [separateImage, setSeparateImage] = useState(false);
   const [native, setNative] = useState<NativeSvgConnection>({
     endpoint: 'https://api.openai.com/v1',
     model: '',
@@ -168,16 +174,36 @@ export function useCarvingAssistant({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, picked, pickedVariant?.asset, key, disabled]);
 
+  const shared = nativeImageFromConnection(credentials, native.quality);
+  const hasSharedImages = !!shared;
+  const modeChosen = useRef(false);
+  const chooseMode = (mode: 'text' | 'native') => {
+    modeChosen.current = true;
+    setGenerationMode(mode);
+  };
+  // Saved artwork is revised with Text SVG, so reopening it on a connection without images starts there.
+  useEffect(() => {
+    if (open && selected?.generated && !hasSharedImages && !separateImage && !modeChosen.current) setGenerationMode('text');
+  }, [open, selected?.generated, hasSharedImages, separateImage]);
+  // Connecting a key with an image model switches to images, unless the person already chose a method.
+  useEffect(() => {
+    if (hasSharedImages && !modeChosen.current) setGenerationMode('native');
+  }, [hasSharedImages]);
+  // Shared images always take the traced PNG route; SVG output needs the explicit opt-in of the separate form.
+  // Without an image model on the connection, the separate image provider is the only way to images.
+  const useSeparateImage = separateImage || !shared;
+  const nativeConfig: NativeSvgConnection =
+    !useSeparateImage && shared ? { ...native, ...shared, supportsSvg: true, format: 'png' } : native;
   const credentialsFor = (): AssistantCredentials | null =>
     generationMode === 'native'
-      ? native.key.trim() && native.model.trim() && native.supportsSvg
+      ? nativeConfig.key.trim() && nativeConfig.model.trim() && nativeConfig.supportsSvg
         ? {
-            key: native.key.trim(),
+            key: nativeConfig.key.trim(),
             config: {
               kind: 'compatible',
               protocol: 'chat',
-              endpoint: native.endpoint,
-              model: native.model.trim(),
+              endpoint: nativeConfig.endpoint,
+              model: nativeConfig.model.trim(),
               tools: true,
               images: false,
             },
@@ -220,7 +246,7 @@ export function useCarvingAssistant({
       try {
         const result =
           generationMode === 'native'
-            ? await (native.format === 'png' ? generateNativeRasterAsset : generateNativeSvgAsset)(options, native)
+            ? await (nativeConfig.format === 'png' ? generateNativeRasterAsset : generateNativeSvgAsset)(options, nativeConfig)
             : await generateCarvingAsset(options);
         if (abort.signal.aborted || !mounted.current) return;
         const asset: GeneratedCarvingAsset = { ...result.asset, prompt: prompt.trim() };
@@ -271,7 +297,9 @@ export function useCarvingAssistant({
     setStatus('Tracing the image on this device…');
     const constraints = { widthMm: target.w, heightMm: target.h, detail, minFeatureMm: carvingDetailMm[detail] };
     try {
-      const asset = await readCarvingPngAsset(file, constraints, abort.signal);
+      const png = await carvingPngFromImage(file);
+      if (abort.signal.aborted || !mounted.current) return;
+      const asset = await readCarvingPngAsset(png, constraints, abort.signal);
       if (abort.signal.aborted || !mounted.current) return;
       const variant: CarvingVariant = {
         id: crypto.randomUUID(),
@@ -298,7 +326,8 @@ export function useCarvingAssistant({
     if (!proposal || disabled || preparing) return;
     try {
       onApply(proposal);
-      setStatus('Artwork applied as one undo step. Select it to change its size or detail.');
+      // The Carve step confirms the edit, with its Undo, as it closes the panel.
+      setStatus('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The proposal could not be applied.');
     }
@@ -318,7 +347,27 @@ export function useCarvingAssistant({
     open,
     setOpen,
     board,
-    connection: { credentials, setCredentials, generationMode, setGenerationMode, native, setNative, runSettings, setRunSettings, usage },
+    connection: {
+      credentials,
+      setCredentials,
+      generationMode,
+      setGenerationMode: chooseMode,
+      native,
+      // A complete provider entered while it is the only way to images stays in use after reconnecting.
+      setNative: (value: NativeSvgConnection) => {
+        // Only a complete provider sticks, so a half-filled form never blocks a later key with its own image model.
+        if (!shared && value.key.trim() && value.model.trim() && value.supportsSvg) setSeparateImage(true);
+        setNative(value);
+      },
+      sharedImageModel: shared?.model,
+      separateImage: useSeparateImage,
+      setSeparateImage,
+      /** Images need a key and model first: the connection has none, and the separate provider isn't filled in. */
+      needsImageProvider: generationMode === 'native' && !shared && !credentialsFor(),
+      runSettings,
+      setRunSettings,
+      usage,
+    },
     request: { prompt, setPrompt, style, setStyle, count, setCount, canGenerate, generate, importPng, stop },
     target,
     setTarget,

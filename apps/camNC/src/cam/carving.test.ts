@@ -175,7 +175,7 @@ describe('a carving job', () => {
   });
 
   it('starts with lettering on a fixed board, opens on Carve, and has no model file', async () => {
-    const job = await createCarvingJob();
+    const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
     expect(job.carving?.region.length).toBeGreaterThan(0);
     expect(job.carving?.vBit).toEqual(kDefaultVBit);
     expect(kDefaultVBit).toMatchObject({ number: 14, shape: 'v', angle: 60, diameter: 6 });
@@ -194,13 +194,13 @@ describe('a carving job', () => {
   });
 
   it('clears flat bottoms with the job’s flat bit only when asked', async () => {
-    const job = await createCarvingJob();
+    const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
     expect(boardCarving(job.carving!, kDefaultPlan).clearTool).toEqual(kDefaultPlan.bit);
     expect(boardCarving({ ...job.carving!, clearWithFlat: false }, kDefaultPlan).clearTool).toBeUndefined();
   });
 
   it('plans its board in the worker: V-carving, with nothing unsafe', async () => {
-    const job = await createCarvingJob();
+    const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
     const [board] = reconcileBoards(job.boards, [], 'oak');
     const nest = nestBoard(board, [], kDefaultPlan.bit.diameter);
     const request = withCarving(boardRequest(board, nest, []), job);
@@ -257,7 +257,7 @@ describe('carving items', () => {
   });
 
   it('plans text and SVG together as one carving with their union', async () => {
-    const job = await createCarvingJob();
+    const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
     const items = [item(), item({ id: 'svg', x: 100, art: { kind: 'svg', svg: '', fileName: 'logo.svg' } })];
     const carving = withItems(job.carving!, items);
     const [board] = job.boards!;
@@ -271,7 +271,7 @@ describe('carving items', () => {
 
 describe('a carving cut out of its board', () => {
   it('plans the silhouette as cutouts, held as asked, with each placed tab on its own piece', async () => {
-    const job = await createCarvingJob();
+    const job = await createCarvingJob(undefined, { lettering: 'Welcome' });
     // Two pieces too far apart to join.
     const items = [item({ x: 40, y: 70 }), item({ id: 'far', x: 220, y: 70 })];
     const [board] = job.boards!;

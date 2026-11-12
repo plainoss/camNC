@@ -11,6 +11,7 @@ import { keepPendingDesignDraft, pendingDesignDraft } from '@/cam/designDraftRec
 import type { CadEditorController } from '@/cad/CadEditor';
 import type { CamStageDestination } from '@/cam/CamJobBar';
 import { Route } from './$jobId.design';
+import { svgAssetsForDocument } from '@/cad/svg/svgAssets';
 
 const state = vi.hoisted(() => ({
   job: null as CamJobV1 | null,
@@ -87,6 +88,7 @@ vi.mock('@/cad/CadEditor', () => ({
         return true;
       },
       prepareDocument: () => (state.prepared === undefined ? current.current : state.prepared),
+      rolledTo: () => null,
       finish: async () => {
         state.finishRequests();
         if (state.editorBlocked) {
@@ -168,6 +170,17 @@ const open = () =>
   );
 
 describe('returning from a design edit', () => {
+  it('retains SVG source across the face-sketch editor and releases it when the document route closes', async () => {
+    const view = open();
+    const store = svgAssetsForDocument(state.job!.design!.draft.id);
+    const asset = store.register('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 10"><rect width="20" height="10"/></svg>');
+    fireEvent.click(screen.getByRole('button', { name: 'Open face sketch' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Open face sketch' })).toBeNull());
+    await Promise.resolve();
+    expect(store.get(asset.handle).contours).toHaveLength(1);
+    view.unmount();
+    await waitFor(() => expect(store.list()).toEqual([]));
+  });
   it('reserves the phone tabs and follows viewport height changes', async () => {
     const original = { width: window.innerWidth, height: window.innerHeight };
     const view = open();
