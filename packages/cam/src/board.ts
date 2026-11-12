@@ -19,6 +19,7 @@ import {
   type CamSettings,
   type HoleChoice,
   type HoleMiddle,
+  type OutlineNotches,
   type Operation,
   type PartCam,
   type TabSettings,
@@ -383,6 +384,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
   const warnings: string[] = [];
   const ops: { op: Operation; part: BoardPart; index: number }[] = [];
   const holeMiddles: HoleMiddle[] = [];
+  const outlineNotches: OutlineNotches[] = [];
   // Tabs only where they hold; the others are cut without, and the job is blocked until that's dealt with.
   const holding = tabs
     ? planTabs(board, settings)
@@ -449,6 +451,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
       ]);
     warnings.push(...cam.warnings.map(w => `${part.name}: ${w}`));
     holeMiddles.push(...(cam.holeMiddles ?? []).map(m => ({ ...m, part: part.id })));
+    outlineNotches.push(...(cam.outlineNotches ?? []).map(n => ({ ...n, part: part.id })));
     cam.operations.forEach((op, index) =>
       ops.push({
         op: {
@@ -530,6 +533,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
       warnings,
       ...(holding && { holding: [...holding.values()] }),
       ...(holeMiddles.length && { holeMiddles }),
+      ...(outlineNotches.length && { outlineNotches }),
       ...aboveHolds(board, stockTop, settings),
     },
     { ...DEFAULT_SETTINGS, ...settings },

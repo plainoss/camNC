@@ -13,6 +13,7 @@ import { boardGeometryKey } from '@/cam/cadDesign';
 import { cutBoardWith, edgeNote, freezeSpacing, isCut, spacingProblem } from '@/cam/boards';
 import { CutBadge } from '@/cam/boards/CutBadge';
 import { orderBoardQueue } from '@wbcnc/cam/board';
+import { friendly, uncutNotes } from '@/cam/plan/planNotes';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { Hint } from '@/cam/Hint';
 import { PlanSettingsPanel } from '@/cam/plan/PlanSettingsPanel';
@@ -714,6 +715,8 @@ function Checks({
     ).values(),
   ];
   const failed = [...plan.safety, ...releaseSafety];
+  // Not a safety problem, but the part wouldn't come out as drawn: said before any "passed".
+  const uncut = uncutNotes(board, instance => partOf(instance)?.name);
   const skins = (plan.holding ?? []).filter(h => h.how === 'skin');
   const moves = 'no rapid moves in the stock, stays on the board, never deeper than the cut-through depth.';
   return (
@@ -755,6 +758,11 @@ function Checks({
           parts free” step cuts {skins.length === 1 ? 'it' : 'them'} free one at a time.
         </p>
       )}
+      {uncut.map(w => (
+        <p key={w} className="flex gap-2 text-amber-700 dark:text-amber-400" data-uncut>
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" /> {w}
+        </p>
+      ))}
       {!checked ? null : failed.length > 0 ? (
         failed.map(s => (
           <p key={s} className="flex gap-2 text-destructive">
@@ -764,6 +772,8 @@ function Checks({
       ) : planBlock(board) ? null : (board.timeline ?? []).some(e => e.kind === 'loose') ? (
         // Parts cut loose as the user chose: only the moves passed.
         <p className="text-muted-foreground">The moves pass the safety checks, but nothing holds the parts: {moves}</p>
+      ) : uncut.length ? (
+        <p className="text-muted-foreground">The moves pass the safety checks, but not everything drawn gets cut (see above): {moves}</p>
       ) : (
         <p className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
           <ShieldCheck className="size-4" /> Safety checks passed: {moves}
@@ -796,20 +806,6 @@ function Checks({
 
 /** Listed on their own, with a way to clear the hole. */
 const kLooseHoleWarning = /through hole \d+: .* comes loose on the last pass/;
-
-/** The CAM core's notes, in words a user can act on. */
-function friendly(w: string) {
-  const corners = w.match(/left in corners\/narrow spots with D=([\d.]+)/);
-  if (corners)
-    return `Inside corners stay rounded to the bit radius (${+(+corners[1] / 2).toFixed(2)} mm). A second, smaller bit doesn’t clean them up yet.`;
-  if (w.includes('no tool fits')) return `${w.split(':')[0]}: narrower than the bit, choose a smaller bit.`;
-  if (w.includes('flipped')) return 'Features on the bottom face are not cut: they need a second, flipped setup.';
-  if (w.includes('sloped')) return 'Small sloped faces (chamfers, fillets) come out square.';
-  const flutes = w.match(/bit D=([\d.]+) cuts ([\d.]+) mm deep from the stock top, its flutes are ([\d.]+) mm long/);
-  if (flutes)
-    return `The ⌀${flutes[1]} bit cuts ${flutes[2]} mm deep but its flutes are only ${flutes[3]} mm long: the shank would rub. Use a longer bit or thinner stock.`;
-  return w;
-}
 
 function Shell({
   bar,
