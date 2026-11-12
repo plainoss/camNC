@@ -284,8 +284,9 @@ export function planBoard(
   progress.done(post);
   if (flip) {
     // Side B cuts only undersides, and a cutout (a carving's outline, not one of the board's parts) has none: it is
-    // cut through on side A. Left in, it has no part to look its underside up by.
-    const parts = spec.parts.filter(p => board.parts.some(q => q.id === p.id));
+    // cut through on side A. Left in, it has no part to look its underside up by. Told apart by what it is, not its
+    // id, which may match a part's.
+    const parts = spec.parts.filter(p => !cutoutPieces.has(p));
     const b = camBoard(
       sideBSpec({ ...spec, parts, carvings: undefined, rotationDeg: sideRotation(board, true) }, p =>
         undersideOf(source, p.id, board, p.rotated)
@@ -604,10 +605,16 @@ function boardSpec(board: BoardRequest, source: BoardPartSource): BoardSpec {
       };
     }),
   };
-  for (const cutout of board.cutouts ?? [])
-    spec.parts.push({ id: cutout.id, name: cutout.name, ...cutoutPart(cutout, board.thickness), rotated: false });
+  for (const cutout of board.cutouts ?? []) {
+    const piece = { id: cutout.id, name: cutout.name, ...cutoutPart(cutout, board.thickness), rotated: false };
+    cutoutPieces.add(piece);
+    spec.parts.push(piece);
+  }
   return spec;
 }
+
+/** The board pieces `boardSpec` made of cutouts: side B leaves them out. */
+const cutoutPieces = new WeakSet<BoardSpec['parts'][number]>();
 
 /** Depths of a part's underside measured from the stock's new top (its old bottom), as side B sees it. */
 function undersideOf(source: BoardPartSource, instanceId: string, board: BoardRequest, rotated: boolean): PartFeatures {
