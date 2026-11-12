@@ -1,6 +1,7 @@
 import type { CadDocument } from '@wbcnc/cad';
 import type { CadReport } from '@wbcnc/cad-script';
 import type { EvaluatedCadPart } from '@wbcnc/cad';
+import { checkNextStep } from './checkHints';
 import { checkAssistantRequirements, validateAssistantRequirements, type AssistantRequirements } from './requirements';
 import { assistantRecipeCatalog, type AssistantRecipeName, type AssistantRecipeParameters } from './recipeCatalog';
 import { createAssistantScriptSession } from './scriptSession';
@@ -416,7 +417,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       continue;
     }
     for (const call of answer.calls) {
-      let text: string, images: AssistantImage[] | undefined;
+      let text: string,
+        images: AssistantImage[] | undefined,
+        isError = false;
       if (options.signal.aborted) {
         emit({ role: 'tool', callId: call.id, text: 'Stopped by the user; this tool was not run.' });
         continue;
@@ -465,13 +468,16 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
           latestReport = full.detailReport ?? full.report;
           if (!runSignal.aborted && full.ok && acceptance.ok) proposal = cadProposal(base, full.document);
           if (!full.ok || !acceptance.ok) latestCandidate = undefined;
+          // A stopped script built nothing: the unchanged design's report would only bury the error.
           text = JSON.stringify({
             ok: full.ok && acceptance.ok,
             stage: 'complete',
-            report: full.report,
+            ...(!full.scriptError && { report: full.report }),
             requirements: acceptance,
             ...(full.scriptError && { scriptError: full.scriptError }),
+            next: checkNextStep({ ...full, ok: full.ok && acceptance.ok, stage: 'complete', requirements: acceptance.checks }),
           });
+          isError = !!full.scriptError;
         } else if (call.name === 'check_design' || (call.name === 'check_svg' && options.svg)) {
           if (checks >= maxChecks) text = `Stopped after ${maxChecks} checks. Explain what you found and ask the user how to continue.`;
           else {
@@ -513,16 +519,19 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
                   });
                 if (!options.finalize) proposal = cadProposal(base, checked.document);
               }
+              const stage = options.finalize ? 'geometry-only' : 'complete';
               text = JSON.stringify({
                 ok: checked.ok && acceptance.ok,
-                stage: options.finalize ? 'geometry-only' : 'complete',
-                report: checked.report,
+                stage,
+                ...(!checked.scriptError && { report: checked.report }),
                 ...(script && { scriptId: script.scriptId, hash: script.hash }),
                 ...(script?.recipe && { recipe: script.recipe, parameters: script.parameters }),
                 ...(checked.asset !== undefined && { asset: checked.asset }),
                 ...(acceptance.checks.length && { requirements: acceptance }),
                 ...(checked.scriptError && { scriptError: checked.scriptError }),
+                next: checkNextStep({ ...checked, ok: checked.ok && acceptance.ok, stage, requirements: acceptance.checks }),
               });
+              isError = !!checked.scriptError;
               images = options.config.images ? checked.images : undefined;
               options.onActivity?.(checked.ok ? `Attempt ${checks} checked. Reviewing the result.` : `Attempt ${checks} needs repair.`);
             }
@@ -535,8 +544,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
           latestCandidate = undefined;
         }
         text = error instanceof Error ? error.message : 'The check failed.';
+        isError = true;
       }
-      emit({ role: 'tool', callId: call.id, text, ...(images?.length && { images }) });
+      emit({ role: 'tool', callId: call.id, text, ...(images?.length && { images }), ...(isError && { isError }) });
     }
     if (options.signal.aborted) return finish('stopped');
   }
