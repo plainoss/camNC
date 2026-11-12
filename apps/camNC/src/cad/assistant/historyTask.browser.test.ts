@@ -20,7 +20,11 @@ const explanation =
 interface ModelReport {
   report?: {
     errors: { code: string }[];
-    changedParts: { name: string; thickness: number; cuts: { ref: string; depth: number | 'through' }[] }[];
+    changedParts: {
+      name: string;
+      thickness: number;
+      cuts: { ref: string; side: string; from?: number; to?: number; through?: boolean }[];
+    }[];
     removedParts?: string[];
   };
 }
@@ -62,7 +66,7 @@ it('retains prior back thickness and reports pin-hole floor after a stock change
       expect(checked.report?.removedParts).toBeUndefined();
       const side = checked.report?.changedParts.find(part => part.name === 'Side');
       expect(side?.thickness).toBe(15);
-      expect(side!.thickness - (side!.cuts.find(cut => cut.depth === 12)!.depth as number)).toBe(3);
+      expect(side!.thickness - side!.cuts.find(cut => cut.to === 12)!.to!).toBe(3);
       expect(checked.report?.errors.filter(error => error.code === 'parts-collide')).toEqual([]);
       // The legacy start has all four housings despite the earlier pin request. C3's
       // automatic checks do not assess that inherited defect; keep it visible here.

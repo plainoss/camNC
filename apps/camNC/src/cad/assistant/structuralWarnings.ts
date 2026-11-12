@@ -2,7 +2,12 @@ import type { CadReport, CadReportIssue } from '@wbcnc/cad-script';
 
 type Body = NonNullable<CadReport['assembly']>['parts'][number];
 const round = (value: number) => Math.round(value);
-const touches = (a: Body, b: Body, tolerance = 0.5) =>
+/**
+ * Close enough to be held: an inset door's reveal, a shelf's clearance between sides on pins or a drawer's running gap
+ * are a few millimetres, so only a part farther than this from every other part counts as touching nothing.
+ */
+const kHeldWithin = 5;
+const touches = (a: Body, b: Body, tolerance = kHeldWithin) =>
   [0, 1, 2].every(axis => a.at[axis]! <= b.at[axis]! + b.size[axis]! + tolerance && b.at[axis]! <= a.at[axis]! + a.size[axis]! + tolerance);
 
 /** Rough physical sanity from placed boxes only: a part touching nothing, a tall piece on a small footprint, a thin stick. */
@@ -30,7 +35,8 @@ export function structuralWarnings(report: CadReport): CadReportIssue[] {
     });
   for (const body of bodies) {
     const across = Math.max(body.size[0]!, body.size[1]!);
-    if (across < 60 && body.size[2]! / across > 20)
+    // Ordinary legs (30 × 30 × 650 mm, about 22:1) are fine; a stick under 25 mm across at more than 25:1 is not.
+    if (across < 25 && body.size[2]! / across > 25)
       warnings.push({
         code: 'slender-part',
         part: body.name,

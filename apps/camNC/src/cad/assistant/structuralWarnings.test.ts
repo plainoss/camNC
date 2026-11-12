@@ -24,3 +24,21 @@ it('stays quiet for a sturdy cupboard and for a single board', () => {
   expect(codes(cupboard)).toEqual([]);
   expect(codes(report([{ name: 'Side', at: [0, 0, 0], size: [18, 300, 1200] }]))).toEqual([]);
 });
+
+it('does not flag an inset door with a reveal, a shelf on pins between its sides, or ordinary stool legs', () => {
+  const cabinet = report([
+    { name: 'Left', at: [0, 0, 0], size: [18, 300, 700] },
+    { name: 'Right', at: [482, 0, 0], size: [18, 300, 700] },
+    { name: 'Top', at: [0, 0, 682], size: [500, 300, 18] },
+    // Clearance of 1 mm to each side, resting on pins that aren't modelled.
+    { name: 'Shelf', at: [19, 0, 350], size: [462, 280, 18] },
+    // Inset between the sides with a 2 mm reveal all round.
+    { name: 'Door', at: [20, -20, 2], size: [460, 18, 678] },
+  ]);
+  expect(codes(cabinet)).toEqual([]);
+  const stool = report([
+    { name: 'Seat', at: [0, 0, 650], size: [300, 300, 25] },
+    ...[0, 270].flatMap(x => [0, 270].map(y => ({ name: `Leg ${x}-${y}`, at: [x, y, 0], size: [30, 30, 650] }))),
+  ]);
+  expect(codes(stool)).toEqual([]);
+});

@@ -13,15 +13,37 @@ function brief(part: Data, body?: Data): Data {
     ...(rows(part.cuts).length && {
       cuts: rows(part.cuts).map(cut => ({
         ref: cut.ref,
-        depth: cut.through ? 'through' : cut.to,
+        // Where and from which face: moving a dado or flipping a pocket underneath is a real change.
+        side: cut.side,
+        at: cut.at,
         size: cut.size,
+        ...(cut.through ? { through: true } : { from: cut.from, to: cut.to }),
         ...(cut.count ? { count: cut.count } : {}),
       })),
     }),
     ...(body && { at: body.at, size: body.size }),
   };
 }
-const signature = (part: Data, body?: Data) => JSON.stringify(brief({ ...part, ref: undefined }, body));
+
+/** Handles are renumbered when other parts change, so they are left out of the geometry comparison. */
+const withoutRefs = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(withoutRefs)
+    : value && typeof value === 'object'
+      ? Object.fromEntries(
+          Object.entries(value)
+            .filter(([key]) => key !== 'ref')
+            .map(([key, item]) => [key, withoutRefs(item)])
+        )
+      : value;
+function hash(text: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return (h >>> 0).toString(36);
+}
+// A reshaped outline inside the same bounding box changes the sketches, not the summary, so they are compared too.
+const signature = (part: Data, body?: Data) =>
+  JSON.stringify([withoutRefs(brief(part, body)), record(part.outline).at, hash(JSON.stringify(withoutRefs(part.sketches ?? [])))]);
 
 /** Check result for the model: verdict, diagnostics and only the parts this script added or changed. */
 export function compactCheckReport(checked: unknown, initial: unknown): Data {
