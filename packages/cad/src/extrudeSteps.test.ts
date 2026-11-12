@@ -296,14 +296,22 @@ describe('a New extrude of regions apart', () => {
     expect(split.folders![0]!.partIds).toEqual(['post', 'post-1', 'post-2', 'post-3']);
   });
 
-  it('leaves its parts extrudes of their own once it adds to or removes from a part', () => {
-    const { split, post } = fourPosts();
+  it('adds or cuts every region its parts had once it is an Add or a Remove, and makes them again made New', () => {
+    const { split, post, regions } = fourPosts();
     for (const change of [{ addTo: 'posts' }, { remove: { depth: 5 } }] as Partial<CadPart>[]) {
       const resolved = resolveExtrudeSteps({
         ...split,
         parts: split.parts.map(part => (part.id === post.id ? { ...part, ...change } : part)),
       });
-      expect(resolved.parts.filter(part => part.extrudedWith)).toEqual([]);
+      expect(resolved.parts.map(part => part.id)).toEqual(['posts', 'post']);
+      expect(new Set(resolved.parts[1]!.regions)).toEqual(new Set(regions));
+      expect(designSteps(resolved).filter(step => step.kind === 'extrude')).toHaveLength(1);
+      const backToNew = { ...resolved.parts[1]! };
+      delete backToNew.addTo;
+      delete backToNew.remove;
+      const again = splitApartRegions({ ...resolved, parts: [resolved.parts[0]!, backToNew] }, post.id);
+      expect(again.parts.filter(part => part.extrudedWith === post.id)).toHaveLength(3);
+      expect(designSteps(again).filter(step => step.kind === 'extrude')).toHaveLength(1);
     }
   });
 });

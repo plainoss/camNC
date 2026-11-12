@@ -188,13 +188,33 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     return owner && !owner.sketchOf && owner.sketch !== part.sketch ? { ...part, sketch: owner.sketch } : part;
   });
 
-  // A part another New extrude made too follows that extrude's settings; once that extrude is gone, or no longer a New
-  // extrude of the same sketch, the part is an extrude of its own.
-  const leads = new Map(parts.map(part => [part.id, part]));
+  // A part another New extrude made too follows that extrude's settings; once that extrude is gone, or no longer of the
+  // same sketch, the part is an extrude of its own. Made an Add or a Remove, the extrude takes the parts' regions back:
+  // it's one feature, adding or cutting them all, and made New again it makes a part of each again.
+  let leads = new Map(parts.map(part => [part.id, part]));
+  const folds = (part: CadPart, lead = leads.get(part.extrudedWith ?? '')) =>
+    !!lead && !lead.extrudedWith && !lead.hole && (lead.addTo !== undefined || !!lead.remove) && sharesSketch(lead, part);
+  const folded = new Map<string, string[]>();
+  for (const part of parts)
+    if (folds(part)) folded.set(part.extrudedWith!, [...(folded.get(part.extrudedWith!) ?? []), ...(part.regions ?? [])]);
+  if (folded.size) {
+    parts = parts.flatMap(part => {
+      if (folds(part)) return [];
+      const regions = folded.get(part.id);
+      return regions ? [{ ...part, regions: [...new Set([...(part.regions ?? []), ...regions])] }] : [part];
+    });
+    leads = new Map(parts.map(part => [part.id, part]));
+    const kept = new Set(parts.map(part => part.id));
+    if (document.folders)
+      document = {
+        ...document,
+        folders: document.folders.map(folder => ({ ...folder, partIds: folder.partIds.filter(id => kept.has(id)) })),
+      };
+  }
   parts = parts.map(part => {
     if (!part.extrudedWith) return part;
     const lead = leads.get(part.extrudedWith);
-    if (!lead || lead.extrudedWith || lead.addTo !== undefined || lead.remove || lead.hole || !sharesSketch(lead, part)) {
+    if (!lead || lead.extrudedWith || lead.hole || !sharesSketch(lead, part)) {
       const own = { ...part };
       delete own.extrudedWith;
       return own;
@@ -264,7 +284,8 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     return next;
   });
 
-  const changed = parts.some((part, index) => JSON.stringify(part) !== JSON.stringify(document.parts[index]));
+  const changed =
+    parts.length !== document.parts.length || parts.some((part, index) => JSON.stringify(part) !== JSON.stringify(document.parts[index]));
   if (!changed) return document;
   return { ...document, parts, version: cadDocumentVersion({ ...document, parts }) };
 }

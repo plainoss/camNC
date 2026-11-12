@@ -53,7 +53,7 @@ export function extrudeRegionViews(document: CadDocument, target: CadPart): View
 
 /**
  * A region picked for an extrude, or taken off it, or off a part it made too, when it's picked again. A part left with
- * none is its whole sketch again.
+ * none is its whole sketch again, unless it made other parts too.
  */
 export function withRegionToggled(document: CadDocument, partId: string, regionId: string): CadDocument {
   // A region of a part the extrude made too is taken off that part; a part left with none is no longer made.
@@ -65,6 +65,14 @@ export function withRegionToggled(document: CadDocument, partId: string, regionI
       parts: document.parts.flatMap(p => (p.id !== made.id ? [p] : regions.length ? [{ ...p, regions }] : [])),
     };
   }
+  // Its own last region taken off, the extrude takes over the first part it made too, rather than the whole sketch.
+  const own = document.parts.find(p => p.id === partId);
+  const next = document.parts.find(p => p.extrudedWith === partId);
+  if (next && own?.regions?.length === 1 && own.regions[0] === regionId)
+    return {
+      ...document,
+      parts: document.parts.flatMap(p => (p.id === next.id ? [] : p.id === partId ? [{ ...p, regions: next.regions ?? [] }] : [p])),
+    };
   return {
     ...document,
     parts: document.parts.map(p => {

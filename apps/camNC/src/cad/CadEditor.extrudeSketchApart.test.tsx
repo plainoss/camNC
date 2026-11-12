@@ -59,6 +59,19 @@ it('names the sketch to extrude as the feature list does, and picks all of its s
   await waitFor(() => expect(made().map(part => part.id)).toEqual(ids));
   expect(made().map(part => part.thickness)).toEqual([30, 30, 30]);
   expect(extrudes()).toHaveLength(1);
+  // Made a Remove, it's still one feature, cutting all three regions; made New again, OK makes a part of each again.
+  await userEvent.dblClick(extrudes()[0]!);
+  const third = await screen.findByRole('dialog', { name: 'Extrude · Part 1' });
+  const operation = within(third).getByRole('tablist', { name: 'Extrude operation' });
+  await userEvent.click(within(operation).getByRole('tab', { name: 'Remove' }));
+  await waitFor(() => expect(made()).toHaveLength(1));
+  expect(made()[0]!.regions).toHaveLength(3);
+  expect(extrudes()).toHaveLength(1);
+  await userEvent.click(within(operation).getByRole('tab', { name: 'New' }));
+  await waitFor(() => expect(third.querySelector('.cad-feature-selection span')!.textContent).toBe('3 regions of selectme'));
+  await userEvent.click(within(third).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(made()).toHaveLength(3));
+  expect(extrudes()).toHaveLength(1);
   // Deleting the feature deletes every part it made.
   fireEvent.contextMenu(extrudes()[0]!);
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Delete' }));

@@ -1,4 +1,7 @@
 import {
+  addCircle,
+  createCadDocument,
+  createCadPart,
   createPlateDocument,
   evaluateCadPart,
   newExtrudeOf,
@@ -9,6 +12,7 @@ import {
 } from '@wbcnc/cad';
 import { expect, it } from 'vitest';
 import { replaceExtrudeProfile, sketchSelectionRegions } from './profileSelection';
+import { withRegionToggled } from './extrudeRegionViews';
 import saved from '../../../../packages/cad-script/fixtures/designs/extrude-three-profiles.json';
 import apart from '../../../../packages/cad-script/fixtures/designs/extrude-sketch-apart.json';
 
@@ -152,4 +156,18 @@ it('takes a region off the part an extrude made too, and that part away once it 
   const back = replaceExtrudeProfile(next, target.id, { sketch: selectme.id, region });
   expect(back.parts.find(p => p.id === target.id)!.regions).toContain(region);
   expect(splitApartRegions(back, target.id).parts.filter(p => p.extrudedWith === target.id)).toHaveLength(2);
+});
+
+it('takes over the regions of a part it made when its own sketch’s extrude loses its last region, not the whole sketch', () => {
+  const part = { ...createCadPart('Posts', 10), drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
+  part.sketch = [100, 200, 300].reduce((sketch, x) => addCircle(sketch, { x, y: 10, radius: 5 }), part.sketch);
+  const shapes = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+  expect(shapes).toHaveLength(3);
+  const split = splitApartRegions({ ...createCadDocument(), parts: [{ ...part, regions: shapes }] }, part.id);
+  const own = split.parts[0]!.regions!;
+  expect(own).toHaveLength(1);
+  const made = split.parts.filter(p => p.extrudedWith === part.id);
+  const next = withRegionToggled(split, part.id, own[0]!);
+  expect(next.parts.find(p => p.id === part.id)!.regions).toEqual(made[0]!.regions);
+  expect(next.parts.map(p => p.id)).toEqual([part.id, made[1]!.id]);
 });
