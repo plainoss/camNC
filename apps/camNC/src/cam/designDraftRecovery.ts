@@ -57,8 +57,15 @@ export function keepPendingDesignDraft(jobId: string, saved: CadDocument, docume
 function migratedRecord(jobId: string): PendingDraft | null {
   const pending = read(jobId);
   if (!pending) return null;
-  const document = migrateDesignUnitNumbers(pending.document),
+  let document: CadDocument, sources: string[];
+  try {
+    document = migrateDesignUnitNumbers(pending.document);
     sources = pending.sources.map(source => JSON.stringify(migrateDesignUnitNumbers(JSON.parse(source) as CadDocument)));
+  } catch {
+    // A record whose drafts can't be read is dropped, as `read` drops one it can't parse: the stored job still opens.
+    discardPendingDesignDraft(jobId);
+    return null;
+  }
   if (same(document, pending.document) && sources.every((source, index) => source === pending.sources[index])) return pending;
   try {
     sessionStorage.setItem(key(jobId), JSON.stringify({ document, sources }));

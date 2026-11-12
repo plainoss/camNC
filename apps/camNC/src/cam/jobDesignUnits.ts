@@ -4,7 +4,8 @@ import type { CamJobV1 } from './jobDb';
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const migrated = (document: CadDocument) => {
   const next = migrateDesignUnitNumbers(document);
-  return same(next, document) ? document : next;
+  // An mm design comes back as it is: no need to compare it, on every job listed or opened.
+  return next === document || same(next, document) ? document : next;
 };
 
 /**

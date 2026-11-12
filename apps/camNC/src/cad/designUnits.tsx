@@ -24,6 +24,17 @@ export function shownLengthText(text: string, unit: CadLengthUnit): string {
   return text;
 }
 
+/**
+ * A value field's text as its owner means it: the exact length while the field still shows the rounded one it was
+ * given (`CadValueInput` marks it), otherwise what's in it. For an owner that reads the field itself.
+ */
+export const cadFieldText = (input: HTMLInputElement | null, otherwise: string) =>
+  !input
+    ? otherwise
+    : input.dataset.shownLength !== undefined && input.value === input.dataset.shownLength
+      ? input.dataset.exactLength!
+      : input.value;
+
 export function useDesignUnits(preference?: CadLengthUnit) {
   const inherited = useContext(DesignUnitContext);
   const lengthUnit = preference ?? inherited;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lengthText, lengthUnitScale, shownLengthText } from './designUnits';
+import { cadFieldText, lengthText, lengthUnitScale, shownLengthText } from './designUnits';
 
 describe('a length as a field shows it', () => {
   it.each([
@@ -29,4 +29,15 @@ describe('a length as a field shows it', () => {
     expect(shownLengthText('t + 0.70866141732', 'in')).toBe('t + 0.70866141732');
     expect(shownLengthText('(0.7086614173228347) in', 'in')).toBe('(0.7086614173228347) in');
   });
+});
+
+it('reads a field as its owner means it: exact while it shows what it was given, typed once edited', () => {
+  const input = document.createElement('input');
+  expect(cadFieldText(null, '18')).toBe('18');
+  input.value = '0.70866';
+  input.dataset.exactLength = lengthText(18, 'in');
+  input.dataset.shownLength = '0.70866';
+  expect(cadFieldText(input, '')).toBe(lengthText(18, 'in'));
+  input.value = '0.7087';
+  expect(cadFieldText(input, '')).toBe('0.7087');
 });

@@ -134,6 +134,8 @@ export function CadValueInput({
         ref={setRefs}
         value={shownValue}
         defaultValue={defaultValue}
+        data-exact-length={shownValue !== value ? value : undefined}
+        data-shown-length={shownValue !== value ? shownValue : undefined}
         aria-invalid={problem ? true : props['aria-invalid']}
         title={problem ?? props.title}
         aria-expanded={fields ? !!menu : undefined}

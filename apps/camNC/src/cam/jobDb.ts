@@ -302,15 +302,20 @@ async function migrateStored(context: StorageContext, jobs: CamJobV1[]): Promise
       if (JSON.stringify(rehearsalJobs.get(job.id)) === before) rehearsalJobs.set(job.id, structuredClone(job));
     return next;
   }
-  await tx(context, [kJobs], 'readwrite', t => {
-    const store = t.objectStore(kJobs);
-    for (const { before, job } of changed) {
-      const read = store.get(job.id) as IDBRequest<CamJobV1 | undefined>;
-      read.onsuccess = () => {
-        if (JSON.stringify(read.result) === before) store.put(job);
-      };
-    }
-  });
+  try {
+    await tx(context, [kJobs], 'readwrite', t => {
+      const store = t.objectStore(kJobs);
+      for (const { before, job } of changed) {
+        const read = store.get(job.id) as IDBRequest<CamJobV1 | undefined>;
+        read.onsuccess = () => {
+          if (JSON.stringify(read.result) === before) store.put(job);
+        };
+      }
+    });
+  } catch {
+    // Storing it is only so the first save matches; a full, blocked or aborted write mustn't stop the job opening. The
+    // migrated copy reads the same, and the next read tries storing it again.
+  }
   return next;
 }
 
