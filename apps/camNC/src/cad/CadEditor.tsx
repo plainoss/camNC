@@ -220,7 +220,8 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { asHole, editable, hasOutline, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { editable, hasOutline, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { startHole } from './holeSource';
 import { useFeaturePreview } from './useFeaturePreview';
 import { SketchProblems } from './SketchProblems';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
@@ -2050,10 +2051,8 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
-    } else if (command === 'hole' && part?.extrude === false) {
-      const before = documentRef.current;
-      commit(replacePart(before, part.id, asHole));
-      openFeature('hole', part.id, before);
+    } else if (command === 'hole' && part) {
+      startHole(documentRef.current, part, commit, (partId, before) => openFeature('hole', partId, before), setStudioRefusal);
     } else if (command === 'fillet') setFilletDialog({});
     else if (command === 'mirror') {
       if (part) setMirrorDialog({ partId: part.id });

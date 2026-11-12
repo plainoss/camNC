@@ -56,3 +56,56 @@ it('makes round holes at the points of a sketch on a part’s face', async () =>
   );
   expect(within(features).getByRole('button', { name: /Hole · Points/ })).toBeDefined();
 });
+
+const boardWithPoints = (withPoints: boolean): CadDocument => {
+  const board = { ...createPlateDocument({ width: 100, height: 60 }).parts[0]!, name: 'Board' };
+  board.drawnOn = { on: { plane: 'top' }, offset: 0 };
+  if (!withPoints) return { ...createCadDocument(), parts: [board] };
+  const points = {
+    ...createCadPart('Points', 18),
+    drawnOn: { on: { partId: board.id, face: 'top' as const }, offset: 0 },
+    extrude: false as const,
+  };
+  points.sketch = addPoint(addPoint(points.sketch, { x: 20, y: 30 }), { x: 80, y: 30 });
+  return { ...createCadDocument(), parts: [board, points] };
+};
+
+const openWithBoardSelected = async (source: CadDocument) => {
+  sessions.push(source.id);
+  const change = vi.fn<(document: CadDocument) => void>();
+  render(
+    <div style={{ height: 700, display: 'flex' }}>
+      <CadEditor document={source} startIn3D onDraftChange={change} onFinish={vi.fn()} onCancel={() => {}} />
+    </div>
+  );
+  await settled();
+  await userEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: /^▱?\s*Board/ }));
+  await userEvent.click(await studioCommand(/^Hole/));
+  return () => change.mock.calls.at(-1)?.[0] ?? source;
+};
+
+it('refuses Hole on a selected board without sketch points, and keeps the board', async () => {
+  const latest = await openWithBoardSelected(boardWithPoints(false));
+  const refusal = await screen.findByRole('alert');
+  expect(refusal.textContent).toBe('Hole drills at the points of a sketch on Board. Sketch points on one of its faces, then choose Hole.');
+  expect(screen.queryByRole('dialog', { name: /^Hole/ })).toBeNull();
+  const board = latest().parts[0]!;
+  expect(board.hole).toBeUndefined();
+  expect(board.remove).toBeUndefined();
+  expect(board.extrude).not.toBe(false);
+  expect(screen.getByRole('list', { name: 'Parts' }).textContent).toContain('Board');
+});
+
+it('drills a selected board at the points sketched on its face', async () => {
+  const latest = await openWithBoardSelected(boardWithPoints(true));
+  const dialog = await screen.findByRole('dialog', { name: 'Hole · Points' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Hole · Points' })).toBeNull());
+  await waitFor(() =>
+    expect(latest().parts[0]!.features?.filter(feature => feature.type === 'cut' && feature.depth === 'through')).toHaveLength(2)
+  );
+  const [board, points] = latest().parts;
+  expect(board).not.toHaveProperty('hole');
+  expect(board).not.toHaveProperty('remove');
+  expect(points).toMatchObject({ hole: { diameter: 5 }, remove: { depth: 'through' } });
+});
