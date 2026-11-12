@@ -7,6 +7,7 @@ export function detectKeyProvider(key: string): ConnectionPresetId | null {
   const value = key.trim();
   if (value.startsWith('sk-ant-')) return 'anthropic';
   if (value.startsWith('sk-')) return 'openai';
+  if (value.startsWith('AIza')) return 'gemini';
   return null;
 }
 
@@ -26,16 +27,31 @@ function newest(ids: string[]): string | undefined {
 // Specialised or reduced variants are never the default; a person can still choose one under Models.
 const kNotDefault = /(mini|nano|image|audio|realtime|tts|transcribe|search|instruct|codex|embedding|moderation|preview|oss|chat-latest)/;
 
+const kGeminiNotDefault = /(lite|image|tts|audio|live|embedding|computer|robotics|learnlm|gemma)/;
+
 /** The model the assistants use unless the person picks another: the provider's newest general model of its main line. */
 export function defaultTextModel(provider: ConnectionPresetId, available: string[]): string | undefined {
   if (provider === 'anthropic')
     return newest(available.filter(id => /^claude-sonnet-\d/.test(id))) ?? newest(available.filter(id => /^claude-/.test(id)));
+  if (provider === 'gemini') {
+    // Flash is Gemini's main line for tool use: fast and cheap. Previews only when nothing stable is listed.
+    const general = available.filter(id => /^gemini-\d/.test(id) && !kGeminiNotDefault.test(id));
+    const stable = (ids: string[]) => ids.filter(id => !/(preview|exp)/.test(id));
+    const flash = general.filter(id => /-flash/.test(id));
+    return newest(stable(flash)) ?? newest(stable(general)) ?? newest(flash) ?? newest(general);
+  }
   return newest(available.filter(id => /^gpt-\d/.test(id) && !kNotDefault.test(id)));
 }
 
 /** The image model Carve uses with the same key; none for providers without image generation. */
 export function defaultImageModel(provider: ConnectionPresetId, available: string[]): string | undefined {
   if (provider === 'anthropic') return undefined;
+  if (provider === 'gemini') {
+    // Imagen's standard tier first (not fast or ultra), then Gemini's own image models.
+    const imagen = available.filter(id => /^imagen-[\d.]+-generate/.test(id));
+    const gemini = available.filter(id => /^gemini-.*-image/.test(id));
+    return newest(imagen) ?? newest(gemini.filter(id => !/preview/.test(id))) ?? newest(gemini);
+  }
   return newest(available.filter(id => /^gpt-image-\d/.test(id) && !/mini/.test(id))) ?? available.find(id => id === 'dall-e-3');
 }
 
@@ -60,7 +76,11 @@ export async function listProviderModels(
     });
     if (!response.ok) return null;
     const body = (await response.json()) as { data?: { id?: unknown }[] };
-    const ids = (body.data ?? []).map(item => item.id).filter((id): id is string => typeof id === 'string' && id.length <= 200);
+    const ids = (body.data ?? [])
+      .map(item => item.id)
+      .filter((id): id is string => typeof id === 'string' && id.length <= 200)
+      // Gemini lists resource names ("models/gemini-…"); requests take the bare ID.
+      .map(id => id.replace(/^models\//, ''));
     return ids.length ? ids : null;
   } catch {
     if (signal.aborted) throw new DOMException('Stopped', 'AbortError');
