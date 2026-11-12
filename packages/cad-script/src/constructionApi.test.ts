@@ -146,3 +146,38 @@ it('rolls malformed declarations back as script errors without changing source',
     expect(result.document).toEqual(base.document);
   }
 });
+
+it('replaces a construction declared again without an ID, so repeated runs leave one plan and the design stays editable', async () => {
+  const declared = await editCad(null, d => {
+    d.variable('stock', '18mm');
+    d.variable('boltLength', '30mm');
+    let member: CadRef,
+      sketchId = '',
+      hole = '';
+    const folder = d.folder('Chair', scope => {
+      const part = scope.newPart('Key', { thickness: 'stock' });
+      part.profile.rect({ at: [0, 0], w: 40, h: 60 });
+      hole = part.profile.circle({ at: [20, 20], d: 4.5 }).id;
+      sketchId = part.profile.id;
+      member = part;
+    });
+    for (let run = 0; run < 40; run++)
+      d.existingFolder(folder.id, scope => scope.construction(declaration(folder.id, member!, sketchId, hole)));
+  });
+  expect(declared.scriptError).toBeUndefined();
+  expect(declared.document.constructions).toHaveLength(1);
+  const [plan] = declared.document.constructions!;
+  // Another run over the saved design replaces the same plan in place.
+  const again = await editCad(declared.document, d => {
+    const part = declared.document.parts.find(p => p.name === 'Key')!;
+    d.existingFolder('Chair', scope =>
+      scope.construction(
+        declaration(plan!.folderId!, { id: part.id }, part.sketch.id, part.sketch.entities.find(e => e.type === 'circle')!.id)
+      )
+    );
+    d.variable('extra', '5mm');
+  });
+  expect(again.scriptError).toBeUndefined();
+  expect(again.document.constructions!.map(p => p.id)).toEqual([plan!.id]);
+  expect(again.document.variables!.some(v => v.name === 'extra')).toBe(true);
+});
