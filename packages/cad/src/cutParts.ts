@@ -287,14 +287,14 @@ export function applyPartCuts(
       ],
     ])
   );
-  // Each target's square corners as its bones were last worked out. Only the final count is said, once all openings
-  // are in, so a corner a later opening squares doesn't leave an earlier, smaller count behind.
-  const squareCorners = new Map<object, { partName: string; skipped: Map<string, CadPoint[]> }>();
-  /** Puts `shape` on the target with every Cut parts opening's bones worked out again. */
+  // Targets given an opening, by name. Their bones are worked out once, after every step has cut: relief depends only
+  // on the square openings, never on step order, and doing it per opening made a part with dozens of mortises slow.
+  // Later steps read tools and targets from `before`, so nothing in between sees the bones.
+  const relieved = new Map<{ shape: EvaluatedCadPart }, string>();
+  /** Puts `shape`, its new opening still square, on the target. */
   const settleRelief = (target: { shape: EvaluatedCadPart }, partName: string, shape: EvaluatedCadPart) => {
-    const { part, skipped } = relieveStepOpenings(shape);
-    target.shape = part;
-    squareCorners.set(target, { partName, skipped });
+    target.shape = shape;
+    relieved.set(target, partName);
   };
   for (const step of document.partCuts ?? []) {
     let made = 0,
@@ -611,7 +611,9 @@ export function applyPartCuts(
   }
   // Copies of one target are cut alike, so their corners are said once, at the first one's.
   const reliefSaid = new Set<string>();
-  for (const { partName, skipped } of squareCorners.values())
+  for (const [target, partName] of relieved) {
+    const { part, skipped } = relieveStepOpenings(target.shape);
+    target.shape = part;
     for (const [id, points] of skipped) {
       const toolId = /^cut-parts:[^:]+:([^:#]+)/.exec(id)?.[1];
       const tool = document.parts.find(candidate => candidate.id === toolId)?.name ?? 'another part';
@@ -619,6 +621,7 @@ export function applyPartCuts(
       if (!reliefSaid.has(message)) diagnostics.push({ code: 'corner-relief-skipped', severity: 'warning', message, points });
       reliefSaid.add(message);
     }
+  }
   for (const [id, instances] of targets) {
     const original = instances[0]!.shape;
     const copyCuts: Record<string, EvaluatedCadCut[]> = {};
