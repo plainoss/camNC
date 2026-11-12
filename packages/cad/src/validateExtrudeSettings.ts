@@ -15,6 +15,7 @@ export function validateExtrudeSettings(p: CadPart, number: (value: unknown) => 
     if (regions !== undefined && (!Array.isArray(regions) || !regions.every(id => typeof id === 'string')))
       throw new Error('Invalid CAD part regions');
   if (p.sketchOf !== undefined) reference(p.sketchOf);
+  if (p.extrudedWith !== undefined) reference(p.extrudedWith);
   if (p.addTo !== undefined && p.addTo !== '') reference(p.addTo);
   if (
     p.faceProfile !== undefined &&

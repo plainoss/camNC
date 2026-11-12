@@ -2,6 +2,7 @@ import type { CadSnapResult } from '@wbcnc/cad-editor/picking';
 import {
   entityPointIds as curvePointIds,
   evaluateCadPart,
+  extrudeLeadId,
   isCadPart,
   solidSketchRegionIds,
   type CadDocument,
@@ -38,6 +39,21 @@ export const hasOutline = (document: CadDocument, partId: string) =>
   !!evaluateCadPart(document.parts.find(part => part.id === partId)!).part;
 export function replacePart(document: CadDocument, partId: string, change: (part: CadPart) => CadPart): CadDocument {
   return { ...document, parts: document.parts.map(p => (p.id === partId ? change(p) : p)) };
+}
+
+/** The part whose feature a dialog opens: a part another extrude made too is edited through that extrude. */
+export const featureLeadId = (document: CadDocument, kind: string, partId: string): string =>
+  kind === 'extrude' ? extrudeLeadId(document, partId) : partId;
+
+/** Whether a part has a sketch of its own: not another's shared, nor a face's. */
+export function ownsItsSketch(document: CadDocument, partId: string): boolean {
+  const part = document.parts.find(p => p.id === partId);
+  return !!part && !part.sketchOf && !part.faceProfile;
+}
+
+/** The design without the parts a part's extrude made too, as when that extrude is deleted. */
+export function withoutPartsMadeWith(document: CadDocument, partId: string): CadDocument {
+  return { ...document, parts: document.parts.filter(p => p.extrudedWith !== partId) };
 }
 
 /**

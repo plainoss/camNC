@@ -33,6 +33,7 @@ export function extrudeRegionViews(document: CadDocument, target: CadPart): View
     }));
   }
   const regions = sketchRegions(target.sketch, CAD_CHORD_TOLERANCE);
+  const alsoMade = new Set(document.parts.flatMap(p => (p.extrudedWith === target.id ? (p.regions ?? []) : [])));
   // One region is worth showing too when the sketch as a whole can't be the part, as with a stray line beside it, or
   // when the regions are another extrude's to share.
   const wholeFails = !target.regions && evaluateCadPart(target).diagnostics.some(diagnostic => diagnostic.severity === 'error');
@@ -46,12 +47,26 @@ export function extrudeRegionViews(document: CadDocument, target: CadPart): View
     frame: { origin, x: frame.x, y: frame.y, normal: frame.normal },
     outline: region.points,
     holes: region.holes,
-    picked: !!target.regions?.includes(region.id),
+    picked: !!target.regions?.includes(region.id) || alsoMade.has(region.id),
   }));
 }
 
-/** A region picked for an extrude, or taken off it when it's picked again. A part left with none is its whole sketch again. */
+/**
+ * A region picked for an extrude, or taken off it, or off a part it made too, when it's picked again. A part left with
+ * none is its whole sketch again, unless it made other parts too.
+ */
 export function withRegionToggled(document: CadDocument, partId: string, regionId: string): CadDocument {
+  // A region of a part the extrude made too is taken off that part; a part left with none is no longer made.
+  const made = document.parts.find(p => p.extrudedWith === partId && p.regions?.includes(regionId));
+  if (made) {
+    const regions = made.regions!.filter(id => id !== regionId);
+    return {
+      ...document,
+      parts: document.parts.flatMap(p => (p.id !== made.id ? [p] : regions.length ? [{ ...p, regions }] : [])),
+    };
+  }
+  // An extrude that made other parts too keeps making them with none of its own: OK hands its feature to the first.
+  const makesOthers = document.parts.some(p => p.extrudedWith === partId);
   return {
     ...document,
     parts: document.parts.map(p => {
@@ -59,7 +74,7 @@ export function withRegionToggled(document: CadDocument, partId: string, regionI
       const removing = p.remove && removalRegions(document, p);
       const current = p.regions ?? (removing && !('error' in removing) ? removing.cut : []);
       const regions = current.includes(regionId) ? current.filter(id => id !== regionId) : [...current, regionId];
-      if (regions.length || p.sketchOf || p.addTo || p.remove) return { ...p, regions };
+      if (regions.length || p.sketchOf || p.addTo || p.remove || makesOthers) return { ...p, regions };
       const whole = { ...p };
       delete whole.regions;
       return whole;

@@ -54,6 +54,8 @@ function extrudeDetail(document: CadDocument, part: CadPart) {
   return typed(part.thicknessExpression, part.thickness);
 }
 
+const withPartCount = (detail: string, parts: number) => (parts > 1 ? `${detail} · ${parts} parts` : detail);
+
 /** A sketch's name in the feature list, and wherever else the sketch is named. */
 export function sketchStepLabel(part: CadPart): string {
   return part.sketchName ?? `Sketch · ${part.name}`;
@@ -169,21 +171,26 @@ function listedSteps(document: CadDocument): DesignStep[] {
       },
     ]);
   }
+  const byId = new Map(document.parts.map(part => [part.id, part]));
+  const madeWith = (part: CadPart) => !!part.extrudedWith && !!byId.get(part.extrudedWith) && !byId.get(part.extrudedWith)!.extrudedWith;
   return document.parts.flatMap((part, partIndex) => {
     const steps: DesignStep[] = [
       // A part extruding another's sketch has none of its own.
       ...(part.sketchOf || part.faceProfile
         ? []
         : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: sketchStepLabel(part), partId: part.id }]),
-      // A sketch not yet extruded is only its sketch.
-      ...(part.extrude === false
+      // A sketch not yet extruded is only its sketch, and a part made by another's extrude is listed in that one.
+      ...(part.extrude === false || madeWith(part)
         ? []
         : [
             {
               id: `${part.id}:extrude`,
               kind: 'extrude' as const,
               label: part.extrudeName ?? `${part.hole ? 'Hole' : 'Extrude'} · ${part.name}`,
-              detail: extrudeDetail(document, part),
+              detail: withPartCount(
+                extrudeDetail(document, part),
+                1 + (part.extrudedWith ? 0 : document.parts.filter(other => other.extrudedWith === part.id).length)
+              ),
               partId: part.id,
               suppressed: !!part.suppressed,
             },
@@ -295,11 +302,15 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
   const at = steps.findIndex(step => step.id === stepId);
   if (at < 0 || at === steps.length - 1) return document;
   const kept = new Set(steps.slice(0, at + 1).map(step => step.id));
+  // A part made by another's extrude is kept or rolled back with that extrude.
+  const ids = new Set(steps.map(step => step.id));
+  const extrudeOf = (part: CadPart) =>
+    !ids.has(`${part.id}:extrude`) && part.extrudedWith ? `${part.extrudedWith}:extrude` : `${part.id}:extrude`;
   const parts = document.parts
-    .filter(part => kept.has(`${part.id}:${part.sketchOf || part.faceProfile ? 'extrude' : 'sketch'}`))
+    .filter(part => kept.has(part.sketchOf || part.faceProfile ? extrudeOf(part) : `${part.id}:sketch`))
     .map(part => {
       // Rolled back past its extrude, a part is only its sketch.
-      const next: CadPart = kept.has(`${part.id}:extrude`) || part.extrude === false ? { ...part } : { ...part, extrude: false };
+      const next: CadPart = kept.has(extrudeOf(part)) || part.extrude === false ? { ...part } : { ...part, extrude: false };
       // What Remove steps cut follows from those steps, below.
       // Rolled back past its move, a part sits where it's drawn.
       if (!kept.has(`${part.id}:move`)) delete next.moved;

@@ -77,6 +77,7 @@ import {
   removeDatumPlane,
   removeEdgeFillet,
   splitApartRegions,
+  handOverEmptyExtrude,
   cadCopyName,
   setCutDepth,
   setCutSuppressed,
@@ -228,6 +229,7 @@ import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './short
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
 import { editable, hasOutline, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { featureLeadId, ownsItsSketch, withoutPartsMadeWith } from './editorHelpers';
 import { startHole } from './holeSource';
 import { useFeaturePreview } from './useFeaturePreview';
 import { SketchProblems } from './SketchProblems';
@@ -1743,6 +1745,7 @@ export function CadEditor({
     before = markCadSession(session),
     initialPatternKind?: PartPatternKind
   ) => {
+    partId = featureLeadId(documentRef.current, kind, partId);
     setSelectedFace(null);
     setPartCutting(null);
     setVariableDialog(null);
@@ -1763,7 +1766,7 @@ export function CadEditor({
     if (!keep && featureDialog && featureDialog.kind !== 'pattern') publish(restoreCadSession(session, featureDialog.before));
     // Regions picked apart are a part each.
     if (keep && featureDialog?.kind === 'extrude') {
-      const split = splitApartRegions(documentRef.current, featureDialog.partId, apartIds);
+      const split = handOverEmptyExtrude(splitApartRegions(documentRef.current, featureDialog.partId, apartIds), featureDialog.partId);
       if (split !== documentRef.current) commit(split);
     }
     // A Remove is a cut in the board its sketch is drawn on, so that board is the one selected.
@@ -1928,16 +1931,11 @@ export function CadEditor({
     if (step.kind === 'fillet') return commit(removeEdgeFillet(current, step.partId, step.id));
     if (step.kind === 'move') return commit(replacePart(current, step.partId, ({ moved: _moved, ...p }) => p));
     // In the studio a sketch stands on its own, as in the reference: deleting its Extrude leaves the sketch.
-    if (
-      step.kind === 'extrude' &&
-      studioSession &&
-      !current.parts.find(p => p.id === step.partId)?.sketchOf &&
-      !current.parts.find(p => p.id === step.partId)?.faceProfile
-    )
-      commit(replacePart(current, step.partId, withoutExtrude));
+    if (step.kind === 'extrude' && studioSession && ownsItsSketch(current, step.partId))
+      commit(replacePart(withoutPartsMadeWith(current, step.partId), step.partId, withoutExtrude));
     else if (step.kind === 'sketch' || step.kind === 'extrude') {
-      // A part is its sketch pushed out, so deleting either deletes the part.
-      const parts = current.parts.filter(candidate => candidate.id !== step.partId);
+      // A part is its sketch pushed out, so deleting either deletes the part, and the parts its extrude made with it.
+      const parts = withoutPartsMadeWith(current, step.partId).parts.filter(candidate => candidate.id !== step.partId);
       commit(withFeatureVersion({ ...current, parts }));
       setPartId(parts[0]?.id ?? '');
     } else if (step.kind === 'pattern') commit(setPartPattern(current, step.partId, null));
