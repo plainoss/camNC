@@ -2,6 +2,7 @@ import {
   CAD_CHORD_TOLERANCE,
   cadVariableValues,
   rotateVector,
+  smallestCornerRelief,
   type CadConstruction,
   type CadConstructionHardware,
   type CadDocument,
@@ -96,6 +97,35 @@ export function checkFurnitureHardware(
   const members = furnitureMembers(document, parts, plan),
     variables = cadVariableValues(document);
   const checks: FurnitureHardwareCheck[] = [];
+  // Relieved joint corners only clear when the cutter is no wider than the relief they were drawn for.
+  const reliefs = [...members.values()]
+    .map(member => smallestCornerRelief(document, member.source.id))
+    .filter((diameter): diameter is number => diameter !== undefined);
+  if (reliefs.length)
+    checks.push({
+      hardwareId: plan.id,
+      check: 'The selected cutter reaches the relieved joint corners.',
+      passed: Number.isFinite(selectedCutter) && selectedCutter <= Math.min(...reliefs) + 1e-6,
+      actual: selectedCutter,
+      expected: Math.min(...reliefs),
+    });
+  // Each keyed tenon is held by exactly one bolt through its own key, and no physical hole serves two items.
+  for (const connection of plan.connections.filter(c => c.kind === 'keyed-through-tenon')) {
+    const bolts = plan.hardware.filter(h => connection.hardwareIds.includes(h.id) && h.kind === 'key-locking-bolt');
+    checks.push({
+      hardwareId: connection.id,
+      check: 'The keyed tenon is retained by one key-locking bolt through its own key.',
+      passed: bolts.length === 1 && bolts[0]!.holes.some(hole => hole.purpose === 'clearance' && connection.roles.includes(hole.role)),
+    });
+  }
+  const holeKeys = plan.hardware.flatMap(h =>
+    h.holes.map(hole => `${members.get(hole.role)?.identity ?? hole.role}|${hole.sketchId}|${[...hole.entityIds].sort().join()}`)
+  );
+  checks.push({
+    hardwareId: plan.id,
+    check: 'No physical hole is declared for two hardware items.',
+    passed: new Set(holeKeys).size === holeKeys.length,
+  });
   for (const hardware of plan.hardware) {
     const record = (check: string, passed: boolean, actual?: number, expected?: number) =>
       checks.push({ hardwareId: hardware.id, check, passed, actual, expected });
@@ -127,6 +157,12 @@ export function checkFurnitureHardware(
       entry.radius >= hardware.diameter / 2 + 0.1,
       2 * entry.radius,
       hardware.diameter + 0.2
+    );
+    record(
+      'The clearance opening leaves the head and washer a bearing face.',
+      2 * entry.radius <= Math.min(hardware.headDiameter, hardware.washerDiameter) - 1,
+      2 * entry.radius,
+      Math.min(hardware.headDiameter, hardware.washerDiameter) - 1
     );
     record(
       'The selected cutter fits the actual smallest opening.',
@@ -222,6 +258,13 @@ export function checkFurnitureHardware(
       );
       const pilot = pilots[0];
       if (!pilot) continue;
+      // Wood screws bite in a pilot of about their core diameter: too small splits, too large holds nothing.
+      record(
+        'The receiving pilot is sized for the screw core.',
+        2 * pilot.radius >= 0.6 * hardware.diameter && 2 * pilot.radius <= 0.85 * hardware.diameter,
+        2 * pilot.radius,
+        0.7 * hardware.diameter
+      );
       const delta = minus(pilot.start, entry.start),
         along = dot(delta, entry.axis);
       const perpendicular = Math.hypot(...delta.map((n, i) => n - entry.axis[i]! * along));

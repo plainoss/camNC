@@ -63,6 +63,8 @@ export function panelChair(options: PanelChairOptions = {}): CadScript {
           d.value('board') <= 24 &&
           d.value('width - 6*board') > 160 &&
           d.value('depth') >= 360 &&
+          // The seat's two side tenons sit 60–120 mm in from each end and must not meet.
+          d.value('seatDepth') >= 260 &&
           d.value('height - seatHeight') >= 330 &&
           d.value('seatHeight - board') > 300 &&
           d.value('cutter') > 0 &&
