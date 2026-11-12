@@ -7,6 +7,28 @@ export function constraintColorNotice(status?: CadSketchSolveStatus): string | u
     : 'Sketch solved; some constraint colors unavailable';
 }
 
+/**
+ * What a sketch drawn as a whole part's outline gets wrong itself, found when that outline is made: these still hold
+ * the sketch open. Anything else after the sketches solved belongs to a feature built from them.
+ */
+const PROFILE_CODES = new Set([
+  'thin-profile',
+  'missing-point',
+  'invalid-curve',
+  'invalid-curve-endpoints',
+  'zero-length',
+  'invalid-arc-endpoints',
+  'open-profile',
+  'ambiguous-profile',
+  'curve-complexity',
+  'intersecting-profiles',
+  'empty-sketch',
+  'degenerate-profile',
+  'self-intersection',
+  'disconnected-profile',
+  'nested-island',
+]);
+
 /** An open wire is normal while sketching; conflicting constraints and bad geometry are errors. */
 export function sketchFeedback(result: CadSolveResult) {
   const issues = result.diagnostics.filter(d => d.severity === 'error');
@@ -27,8 +49,26 @@ export function sketchFeedback(result: CadSolveResult) {
     status,
     inProgress,
     problems: [...new Set(issues.map(d => d.message))],
+    /** What only the sketches got wrong: a feature built from them, broken by an edit, doesn't stop one closing. */
+    sketchProblems: [...new Set(issues.filter(d => !result.featuresEvaluated || PROFILE_CODES.has(d.code)).map(d => d.message))],
     conflictedConstraintIds: [...new Set(issues.flatMap(d => d.constraintIds ?? []))],
+    /** Why each part, by id, wasn't built from its solved sketch: the first error building it reported. */
+    featureProblems: Object.fromEntries(
+      result.featuresEvaluated
+        ? issues
+            .filter(d => d.partId)
+            .reverse()
+            .map(d => [d.partId!, d.message])
+        : []
+    ) as Record<string, string>,
   };
+}
+
+/** What the last check of the sketches found, before there's been one or when one fails outright. */
+export interface SketchProblemLists {
+  problems: string[];
+  sketchProblems: string[];
+  featureProblems?: Readonly<Record<string, string>>;
 }
 
 /** Whether a sketch holds nothing drawn: points on their own count, as they're what a sketch for Hole holds. */

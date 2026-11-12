@@ -3,11 +3,14 @@ import { resolveExtrudeSteps } from './extrudeSteps';
 import { cadFaceSketches, faceIsUnderside } from './featureModel';
 import { cadCopyName } from './partPatterns';
 import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
-import type { CadDocument, CadPart } from './types';
+import type { CadDocument, CadLengthUnit, CadPart } from './types';
+import { cadLengthUnitMm } from './sketchExport';
 import { trimCadFolders } from './folderModel';
 import { copyOperationPrefix } from './copyTransforms';
+import { partCutInputErrors } from './partCutInputs';
 import { partCutLabel, partCutVariableErrors } from './partCutVariables';
 import { cadVariableScope } from './variables';
+import { missingRegionProblem } from './regionProfile';
 
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
@@ -26,12 +29,20 @@ export interface DesignStep {
   copyId?: string;
   /** Switched off in the feature list. */
   suppressed?: boolean;
-  /** Why the step can't be built as it stands: what it was drawn on or adds to is suppressed, deleted or not extruded. */
+  /**
+   * Why the step can't be built as it stands: what it was drawn on or adds to is suppressed, deleted or not extruded,
+   * or the regions an Extrude picked are gone from its sketch.
+   */
   broken?: string;
 }
 
-const typed = (expression: string | undefined, value: number) =>
-  expression ? `${expression} = ${+value.toFixed(3)} mm` : `${+value.toFixed(3)} mm`;
+/** A typed length as the feature list reads it, in the design's unit. */
+function typed(expression: string | undefined, value: number, lengthUnit: CadLengthUnit = 'mm') {
+  const shown = `${+(value / cadLengthUnitMm[lengthUnit]).toFixed(3)} ${lengthUnit}`;
+  // A plain number typed in the design's unit is saved as `(2) in`, which says no more than its value does.
+  const literal = new RegExp(`^\\(?\\s*[+-]?(?:\\d+[.,]?\\d*|[.,]\\d+)\\s*\\)?\\s*${lengthUnit}$`);
+  return expression && !literal.test(expression) ? `${expression} = ${shown}` : shown;
+}
 
 function faceName(part: CadPart, on: ReturnType<typeof cadFaceSketches>[number]['on']) {
   if (typeof on === 'object') return faceIsUnderside(part, on) ? 'a pocket floor from below' : 'a pocket floor';
@@ -45,9 +56,11 @@ function extrudeDetail(document: CadDocument, part: CadPart) {
   if (part.addTo === '') return 'choose merge scope';
   if (part.addTo) return `add to ${names(document, [part.addTo])}`;
   if (part.remove)
-    return `remove ${part.remove.depth === 'through' ? 'through all' : typed(part.remove.depthExpression, part.remove.depth)}`;
-  return typed(part.thicknessExpression, part.thickness);
+    return `remove ${part.remove.depth === 'through' ? 'through all' : typed(part.remove.depthExpression, part.remove.depth, document.lengthUnit)}`;
+  return typed(part.thicknessExpression, part.thickness, document.lengthUnit);
 }
+
+const withPartCount = (detail: string, parts: number) => (parts > 1 ? `${detail} · ${parts} parts` : detail);
 
 /** A sketch's name in the feature list, and wherever else the sketch is named. */
 export function sketchStepLabel(part: CadPart): string {
@@ -63,8 +76,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
   const partCutProblems = new Map<string, string>();
+  // A tool or target that isn't built comes first: the step cuts less than it says whatever its values are.
   if (document.partCuts?.length)
-    for (const { stepId, message } of partCutVariableErrors(document, cadVariableScope(document)))
+    for (const { stepId, message } of [...partCutInputErrors(document), ...partCutVariableErrors(document, cadVariableScope(document))])
       if (!partCutProblems.has(stepId)) partCutProblems.set(stepId, message);
   return listedSteps(document).map(step => {
     const own = broken.get(step.partId);
@@ -76,7 +90,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
           ? `It’s on ${part.name}, which is suppressed.`
           : own && `It’s on ${part.name}, which can’t be built.`
         : null;
-    const reason = (step.kind === 'sketch' || step.kind === 'extrude') && own ? own : onFace;
+    // An Extrude whose picked regions an edit of its sketch took away waits for them to be picked again.
+    const regions = step.kind === 'extrude' && part && !own ? missingRegionProblem(part) : null;
+    const reason = (step.kind === 'sketch' || step.kind === 'extrude') && own ? own : (regions ?? onFace);
     // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
     const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;
     // A Fillet step that can't round some of its corners leaves them sharp, and says so on its row. A part that's
@@ -102,7 +118,7 @@ export function brokenParts(document: CadDocument): Map<string, string> {
     if (!host) return 'a deleted part';
     if (host.suppressed || masked.has(host.id)) return `${host.name}, which is suppressed`;
     if (host.extrude === false) return `${host.name}, which isn’t extruded`;
-    if (broken.has(id)) return `${host.name}, which can’t be built`;
+    if (broken.has(id) || missingRegionProblem(host)) return `${host.name}, which can’t be built`;
     return null;
   };
   // In order, so a part built on a broken one is broken too.
@@ -153,7 +169,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
         id: step.id,
         kind: 'partCut',
         label: partCutLabel(document, step),
-        detail: `clearance ${typed(step.clearanceExpression, step.clearance)}`,
+        detail: `clearance ${typed(step.clearanceExpression, step.clearance, document.lengthUnit)}`,
         partId: owner?.id ?? reference,
         ...(owner && reference !== owner.id && { copyId: reference.slice(owner.id.length + 1) }),
         partCutId: step.id,
@@ -161,21 +177,26 @@ function listedSteps(document: CadDocument): DesignStep[] {
       },
     ]);
   }
+  const byId = new Map(document.parts.map(part => [part.id, part]));
+  const madeWith = (part: CadPart) => !!part.extrudedWith && !!byId.get(part.extrudedWith) && !byId.get(part.extrudedWith)!.extrudedWith;
   return document.parts.flatMap((part, partIndex) => {
     const steps: DesignStep[] = [
       // A part extruding another's sketch has none of its own.
       ...(part.sketchOf || part.faceProfile
         ? []
         : [{ id: `${part.id}:sketch`, kind: 'sketch' as const, label: sketchStepLabel(part), partId: part.id }]),
-      // A sketch not yet extruded is only its sketch.
-      ...(part.extrude === false
+      // A sketch not yet extruded is only its sketch, and a part made by another's extrude is listed in that one.
+      ...(part.extrude === false || madeWith(part)
         ? []
         : [
             {
               id: `${part.id}:extrude`,
               kind: 'extrude' as const,
               label: part.extrudeName ?? `${part.hole ? 'Hole' : 'Extrude'} · ${part.name}`,
-              detail: extrudeDetail(document, part),
+              detail: withPartCount(
+                extrudeDetail(document, part),
+                1 + (part.extrudedWith ? 0 : document.parts.filter(other => other.extrudedWith === part.id).length)
+              ),
               partId: part.id,
               suppressed: !!part.suppressed,
             },
@@ -225,7 +246,11 @@ function listedSteps(document: CadDocument): DesignStep[] {
           id: feature.id,
           kind: 'cut',
           label: `Cut ${cut} · ${featureName(feature.copyId)}`,
-          detail: feature.suppressed ? 'off' : feature.depth === 'through' ? 'through' : typed(feature.depthExpression, feature.depth),
+          detail: feature.suppressed
+            ? 'off'
+            : feature.depth === 'through'
+              ? 'through'
+              : typed(feature.depthExpression, feature.depth, document.lengthUnit),
           partId: part.id,
           suppressed: !!feature.suppressed,
           cutId: feature.id,
@@ -240,7 +265,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
         id: fillet.id,
         kind: 'fillet',
         label: `Fillet · ${part.name}`,
-        detail: fillet.suppressed ? 'off' : `r ${typed(fillet.radiusExpression, fillet.radius)}`,
+        detail: fillet.suppressed ? 'off' : `r ${typed(fillet.radiusExpression, fillet.radius, document.lengthUnit)}`,
         partId: part.id,
         suppressed: !!fillet.suppressed,
       });
@@ -264,7 +289,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
           : `Pattern · ${part.name} × ${part.pattern.count} along ${part.pattern.axis}`,
         detail: part.pattern.circular
           ? `angle ${part.pattern.circular.angleExpression ? `${part.pattern.circular.angleExpression} = ` : ''}${+part.pattern.circular.angle.toFixed(3)}°`
-          : `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing)}`,
+          : `spacing ${typed(part.pattern.spacingExpression, part.pattern.spacing, document.lengthUnit)}`,
         partId: part.id,
         suppressed: !!part.pattern.suppressed,
       });
@@ -287,11 +312,15 @@ export function rolledBackTo(document: CadDocument, stepId: string): CadDocument
   const at = steps.findIndex(step => step.id === stepId);
   if (at < 0 || at === steps.length - 1) return document;
   const kept = new Set(steps.slice(0, at + 1).map(step => step.id));
+  // A part made by another's extrude is kept or rolled back with that extrude.
+  const ids = new Set(steps.map(step => step.id));
+  const extrudeOf = (part: CadPart) =>
+    !ids.has(`${part.id}:extrude`) && part.extrudedWith ? `${part.extrudedWith}:extrude` : `${part.id}:extrude`;
   const parts = document.parts
-    .filter(part => kept.has(`${part.id}:${part.sketchOf || part.faceProfile ? 'extrude' : 'sketch'}`))
+    .filter(part => kept.has(part.sketchOf || part.faceProfile ? extrudeOf(part) : `${part.id}:sketch`))
     .map(part => {
       // Rolled back past its extrude, a part is only its sketch.
-      const next: CadPart = kept.has(`${part.id}:extrude`) || part.extrude === false ? { ...part } : { ...part, extrude: false };
+      const next: CadPart = kept.has(extrudeOf(part)) || part.extrude === false ? { ...part } : { ...part, extrude: false };
       // What Remove steps cut follows from those steps, below.
       // Rolled back past its move, a part sits where it's drawn.
       if (!kept.has(`${part.id}:move`)) delete next.moved;

@@ -7,7 +7,48 @@
  "ok": true,
  "status": "solved",
  "errors": [],
- "warnings": [],
+ "warnings": [
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 1 of the 1 corners of the opening Apron front cuts in Leg front left, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg front left"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Footrest rail front cuts in Leg front left, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg front left"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 1 of the 1 corners of the opening Apron front cuts in Leg front right, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg front right"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Footrest rail front cuts in Leg front right, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg front right"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Apron left cuts in Leg back left, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg back left"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Footrest rail left cuts in Leg back left, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg back left"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Apron right cuts in Leg back right, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg back right"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 4 of the 4 corners of the opening Footrest rail right cuts in Leg back right, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg back right"
+  }
+ ],
  "features": [
   {
    "id": "1277014e-7f61-41ec-85f5-8d67f37bbb5a:sketch",
@@ -2420,7 +2461,21 @@
      "Leg front left: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
      "Leg front left: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Apron front",
+      "corners": 1,
+      "unreached": 1,
+      "short": 0.66
+     },
+     {
+      "ref": "Footrest rail front",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {
@@ -2587,7 +2642,21 @@
      "Leg front right: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
      "Leg front right: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Apron front",
+      "corners": 1,
+      "unreached": 1,
+      "short": 0.66
+     },
+     {
+      "ref": "Footrest rail front",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {
@@ -2754,7 +2823,21 @@
      "Leg back left: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
      "Leg back left: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Apron left",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.66
+     },
+     {
+      "ref": "Footrest rail left",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {
@@ -2921,7 +3004,21 @@
      "Leg back right: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
      "Leg back right: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Apron right",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.66
+     },
+     {
+      "ref": "Footrest rail right",
+      "corners": 4,
+      "unreached": 4,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {

@@ -1,4 +1,4 @@
-import type { CadDocument } from '@wbcnc/cad';
+import { migrateDesignUnitNumbers, type CadDocument } from '@wbcnc/cad';
 import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
 
 interface PendingDraft {
@@ -50,8 +50,33 @@ export function keepPendingDesignDraft(jobId: string, saved: CadDocument, docume
   }
 }
 
-export function pendingDesignDraft(jobId: string, saved: CadDocument) {
+/**
+ * The record with `migrateDesignUnitNumbers` applied, as the stored job it was kept against now is, so a draft kept
+ * before that migration still matches its source instead of opening as a conflict. Stored back when it changed.
+ */
+function migratedRecord(jobId: string): PendingDraft | null {
   const pending = read(jobId);
+  if (!pending) return null;
+  let document: CadDocument, sources: string[];
+  try {
+    document = migrateDesignUnitNumbers(pending.document);
+    sources = pending.sources.map(source => JSON.stringify(migrateDesignUnitNumbers(JSON.parse(source) as CadDocument)));
+  } catch {
+    // A record whose drafts can't be read is dropped, as `read` drops one it can't parse: the stored job still opens.
+    discardPendingDesignDraft(jobId);
+    return null;
+  }
+  if (same(document, pending.document) && sources.every((source, index) => source === pending.sources[index])) return pending;
+  try {
+    sessionStorage.setItem(key(jobId), JSON.stringify({ document, sources }));
+  } catch {
+    // The migrated record is still used for this load.
+  }
+  return { document, sources };
+}
+
+export function pendingDesignDraft(jobId: string, saved: CadDocument) {
+  const pending = migratedRecord(jobId);
   if (!pending || pending.document.id !== saved.id) return null;
   if (same(pending.document, saved)) {
     // The transaction may have committed just before reload, without delivering its acknowledgement.

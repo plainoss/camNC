@@ -36,6 +36,7 @@ d.step(handle).set accepts thickness on extrudes; depth on cuts; tools/targets/c
 Studio axes: X left/right, Y front/back, Z up. Draw a part's profile BEFORE calling drawOn. p.drawOn('front', { offset: 0 }) places that profile on a plane ('top', 'front' or 'right'); p.drawOn(other.face('+x'), { offset: 0 }) attaches to a face.
 p.pattern({ axis: 'z', count: 3, spacing: '100mm' }) returns copies excluding p; p.copy({ at, x, y, mirrored?, name? }) adds a placed copy.
 d.cutParts(target, { with: [tools], clearance: 0.2 }) makes housings following intersecting rectangular tool material. A source tool includes its copies; a returned copy cuts alone.
+d.cutParts(target, { with: tenon, clearance: '0.2mm', cornerRelief: { dogbone: 6 } }) puts bones for that cutter in only this step's openings; 'off' keeps them square.
 d.cutParts(a, { with: b, split: 'half' }) makes a half lap; split: { fingers: 5 } makes fingers. Start with plain boards; retrieve assembly help for limits.
 sketch.pattern(items, { count, step: [dx, dy], rows? }) repeats holes/curves; cutting the seed region cuts the pattern. Counts/steps can be expressions.
 d.detachCopy('Shelf 2', 'Cable shelf') makes a separately editable part. Retrieve editing help before detaching mirrored/referenced copies or deleting entities.

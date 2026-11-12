@@ -3833,7 +3833,21 @@
      "Side: pocket z=12: 1.2mm² left in corners/narrow spots with D=3.175",
      "Side: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Top",
+      "corners": 1,
+      "unreached": 0,
+      "short": 0
+     },
+     {
+      "ref": "Bottom",
+      "corners": 1,
+      "unreached": 0,
+      "short": 0
+     }
+    ]
    },
    "faces": [
     {

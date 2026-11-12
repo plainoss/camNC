@@ -48,8 +48,8 @@ export async function runLiveTask(
       guideSections,
       report,
       context: JSON.stringify({ design: summarizeAssistantReport(report) }),
-      check: async (source, document, signal) => {
-        const checked = await checkScriptInBrowser(document, source, { signal });
+      check: async (source, document, signal, checkOptions) => {
+        const checked = await checkScriptInBrowser(document, source, { signal, bit: checkOptions?.bit });
         if (checked.scriptError) run.scriptErrors++;
         if (!checked.ok) run.failedChecks++;
         const detailReport = compactCadReport(checked.document, checked.report);

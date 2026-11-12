@@ -91,7 +91,7 @@ export function TransformDialog({
   /** Parts clicked while it's open: a new transform's part field takes them. */
   partPicks?: DialogPartPicks;
 }) {
-  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
+  const { parseCadValue, lengthText, formatLength, lengthUnit } = useDesignUnits();
   const editing = !!copyId || !!move;
   // What was picked on the part before belongs to that part, not to the one picked instead.
   const partPick = useDialogPartPick({
@@ -435,7 +435,7 @@ export function TransformDialog({
             <span>
               {picked
                 ? picked.edge
-                  ? `Edge of ${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'a part'}, ${lengthText(Math.hypot(...picked.edge.b.map((value, axis) => value - picked.edge!.a[axis]!)))} ${lengthUnit}`
+                  ? `Edge of ${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'a part'}, ${formatLength(Math.hypot(...picked.edge.b.map((value, axis) => value - picked.edge!.a[axis]!)))} ${lengthUnit}`
                   : `${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part'} at ${picked.point.map(value => +value.toFixed(2)).join(', ')}`
                 : end === 'from' || end === 'to'
                   ? 'Click a corner or the middle of a face'

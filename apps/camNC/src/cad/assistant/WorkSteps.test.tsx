@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it } from 'vitest';
 import { WorkSteps } from './WorkSteps';
-import { conversationItems, describeStep } from './stepSummary';
+import { conversationItems, describeStep, turnOutcome } from './stepSummary';
 import type { AssistantMessage } from './provider';
 
 afterEach(cleanup);
@@ -68,4 +68,28 @@ it('folds finished work to one line and keeps raw tool data behind Details witho
 it('shows the live activity while the turn runs', () => {
   render(<WorkSteps steps={[]} running activity="Checking attempt 1 of 5…" />);
   expect(screen.getByText('Checking attempt 1 of 5…')).toBeDefined();
+});
+
+it('marks a turn by its last check: passed with warnings, or failed, never a plain tick', () => {
+  const check = (id: string, result: unknown) => ({
+    call: { id, name: 'finalize_design', arguments: {} },
+    result: { role: 'tool' as const, callId: id, text: JSON.stringify(result) },
+  });
+  const warned = check('w', {
+    ok: true,
+    report: {
+      warnings: [
+        { code: 'toolpath-missing', message: 'No tool can cut the slot.' },
+        { code: 'empty-sketch', message: 'Sketch 2 is empty.' },
+      ],
+    },
+  });
+  expect(describeStep(warned, false)).toMatchObject({ outcome: 'warned', note: 'Passed with a warning: No tool can cut the slot.' });
+  expect(turnOutcome([warned], false)).toBe('warned');
+  const failed = check('f', { ok: false, errors: [{ message: 'The pocket is deeper than the stock.' }] });
+  expect(turnOutcome([warned, failed], false)).toBe('failed');
+  expect(turnOutcome([failed], true)).toBe('working');
+  const view = render(<WorkSteps steps={[warned, failed]} running={false} />);
+  expect(view.container.querySelector('details')?.dataset.outcome).toBe('failed');
+  expect(view.container.querySelector('summary')?.textContent).not.toContain('✓');
 });

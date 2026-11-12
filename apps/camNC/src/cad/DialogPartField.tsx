@@ -23,6 +23,8 @@ export function DialogPartField({
         type="button"
         className="cad-feature-selection"
         aria-label={label}
+        // Marks a dialog whose part is picked outside it, so Escape from there still reaches it.
+        data-part-pick=""
         data-active={pick.active ? '' : undefined}
         onClick={onActivate}>
         <small>{label}</small>

@@ -11,8 +11,8 @@ afterEach(() => {
   ids.forEach(endCadSession);
   ids.length = 0;
 });
-async function setup() {
-  const source = createCadDocument();
+async function setup(lengthUnit?: CadDocument['lengthUnit']) {
+  const source = { ...createCadDocument(), ...(lengthUnit && { lengthUnit }) };
   source.parts.push(createCadPart());
   ids.push(source.id);
   const change = vi.fn<(document: CadDocument) => void>();
@@ -264,4 +264,19 @@ it.each(['rectangle', 'circle'] as const)('updates the pending %s size fields in
     expect(reopened.parentElement!.querySelector('[aria-hidden="true"]')).toBeNull();
     expect(document.activeElement).toBe(reopened);
   }
+});
+
+it('accepts an inch drawing value left as shown at its exact measured length, not the rounded one shown', async () => {
+  const { latest, settle, drag } = await setup('in');
+  await userEvent.keyboard('c');
+  await drag(80, 70, 100, 70);
+  await userEvent.click(screen.getByRole('button', { name: /^Circle diameter: .* in\. Enter a value/ }));
+  const input = screen.getByRole('textbox', { name: 'Circle diameter value' }) as HTMLInputElement;
+  // Shown rounded, while the field keeps every digit of the drawn length.
+  expect(input.value.length).toBeLessThan(9);
+  const drawn = 2 * (latest().entities.find(entity => entity.type === 'circle') as { radius: number }).radius;
+  expect(Math.abs(Number(input.value) * 25.4 - drawn)).toBeGreaterThan(1e-9);
+  await userEvent.keyboard('{Enter}');
+  await settle();
+  expect((latest().constraints.find(c => c.type === 'diameter') as { value: number }).value).toBeCloseTo(drawn, 9);
 });

@@ -12,6 +12,21 @@
    "code": "empty-sketch",
    "message": "Draw a closed profile to create this flat part.",
    "part": "Part 1"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Seat cuts in Left side, missing by up to 0.37 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Left side"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Back panel cuts in Left side, missing by up to 0.38 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Left side"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Lower rail cuts in Left side, missing by up to 0.38 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Left side"
   }
  ],
  "features": [
@@ -1033,7 +1048,27 @@
     "warnings": [
      "Left side: pocket z=8.8: 3.3mm² left in corners/narrow spots with D=3.175"
     ],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Seat",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.37
+     },
+     {
+      "ref": "Back panel",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.38
+     },
+     {
+      "ref": "Lower rail",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.38
+     }
+    ]
    },
    "faces": [
     {

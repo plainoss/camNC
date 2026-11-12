@@ -96,6 +96,7 @@ export function FeatureList({
   onPickPlane,
   shown,
   onToggleShown,
+  featureProblems,
   onNewSketch,
   onChange,
 }: {
@@ -128,6 +129,8 @@ export function FeatureList({
    * such row has. Hidden, its row is greyed.
    */
   shown?: (id: string) => boolean;
+  /** Why each part, by id, wasn't built from its solved sketch, as its last check found: its Extrude shows as broken. */
+  featureProblems?: Readonly<Record<string, string>>;
   onToggleShown?: (id: string) => void;
   /** New sketch, from a base plane's right-click menu, as the reference's. */
   onNewSketch?: (plane: string) => void;
@@ -135,7 +138,15 @@ export function FeatureList({
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
-  const entries = folderFeatureEntries(document);
+  const entries = folderFeatureEntries(document).map(entry =>
+    entry.kind === 'step' &&
+    entry.step.kind === 'extrude' &&
+    !entry.step.broken &&
+    !entry.step.suppressed &&
+    featureProblems?.[entry.step.partId]
+      ? { ...entry, step: { ...entry.step, broken: featureProblems[entry.step.partId] } }
+      : entry
+  );
   const [selectedEntry, setSelectedEntry] = useState<string | null>(initialSelection ?? null);
   const folders = useFolderControls({ document, onChange, onRollTo, selectedPartId });
   const select = (entry: FeatureEntry) => {

@@ -13,6 +13,7 @@ import {
   type CadDocument,
   designSteps,
   rolledBackTo,
+  sketchRegions,
 } from './index';
 import { describe, expect, it } from 'vitest';
 
@@ -58,6 +59,24 @@ describe('the design’s steps', () => {
       `It’s drawn on a face of ${base.name}, which isn’t extruded.`,
     ]);
     expect(flagged({ ...document, parts: [boss] })[0]).toEqual(['Sketch · Boss', 'It’s drawn on a face of a deleted part.']);
+  });
+
+  it('flags an Extrude whose picked region an edit of its sketch took away, and not its sketch', () => {
+    const part = { ...createCadPart('Plate', 18), drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
+    part.sketch = addRectangle(part.sketch, { x: 0, y: 0, width: 200, height: 100 });
+    part.regions = sketchRegions(part.sketch).map(region => region.id);
+    const document = { ...createCadDocument(), parts: [part] };
+    expect(designSteps(document).every(step => !step.broken)).toBe(true);
+    const side = part.sketch.entities.find(entity => entity.type === 'line')!;
+    const opened = { ...part, sketch: { ...part.sketch, entities: part.sketch.entities.filter(entity => entity !== side) } };
+    const steps = designSteps({ ...document, parts: [opened] });
+    expect(steps.find(step => step.kind === 'sketch')?.broken).toBeUndefined();
+    expect(steps.find(step => step.kind === 'extrude')?.broken).toBe(
+      'A region picked for Plate is no longer in its sketch. Pick its regions again.'
+    );
+    const boss = { ...createCadPart('Boss', 6), drawnOn: { on: { partId: part.id, face: 'top' as const }, offset: 0 } };
+    const built = designSteps({ ...document, parts: [opened, boss] }).filter(step => step.partId === boss.id);
+    expect(built.find(step => step.kind === 'extrude')?.broken).toBe('It’s drawn on a face of Plate, which can’t be built.');
   });
 
   it('puts a step cutting parts after the last part it uses', () => {

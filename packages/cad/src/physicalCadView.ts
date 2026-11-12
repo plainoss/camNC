@@ -80,6 +80,6 @@ export function physicalCadView(source: CadDocument, evaluation: CadEvaluation):
   const built = new Set(parts.map(part => part.id));
   return {
     parts: evaluation.parts.filter(part => built.has(part.partId)),
-    document: physicalJoinedCopies({ ...projected, parts }),
+    document: physicalJoinedCopies({ ...projected, parts }, document),
   };
 }

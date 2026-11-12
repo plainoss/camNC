@@ -13,6 +13,7 @@ import { Transcript } from './Transcript';
 import { AssistantSettingsDialog } from './SettingsDialog';
 import { useAssistantSettings } from './useAssistantSettings';
 import { bindProposalOrigin } from './recheck';
+import { bindProposalWarnings } from './proposalWarnings';
 import { connectionLabel } from './connectionPresets';
 import type { AssistantRequirements } from './requirements';
 import { checkScriptInBrowser } from './scriptCheck';
@@ -236,7 +237,8 @@ export function AssistantDock({
           if (!candidate.trustedReport) throw new Error('Missing trusted geometry check.');
           const checked = await finalizeBrowserCandidate(
             { ...candidate, report: candidate.trustedReport, parts: candidate.parts ?? [] },
-            signal
+            signal,
+            { bit: candidate.bit }
           );
           const detailReport = compactCadReport(checked.document, checked.report);
           return {
@@ -251,6 +253,7 @@ export function AssistantDock({
       if (result.proposal && !abort.signal.aborted) {
         bindProposalRequirements(result.proposal, brief.revision);
         bindProposalOrigin(result.proposal, result.origin);
+        bindProposalWarnings(result.proposal, result.report);
         onCheckedProposal(result.proposal);
       }
       setActivity(

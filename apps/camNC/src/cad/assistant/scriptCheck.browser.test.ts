@@ -13,6 +13,18 @@ import { checkScriptInBrowser } from './scriptCheck';
 const source = `d=>{const part=d.newPart('Panel',{thickness:18});part.profile.rect({at:[0,0],w:100,h:80});part.expect({size:[100,80],freedom:0});}`;
 
 describe('isolated browser design checks', () => {
+  it('checks mortise corners with the cutter the assistant names', async () => {
+    const mortise = (relief: string) =>
+      `d=>{const seat=d.newPart('Seat',{thickness:18});seat.profile.rect({at:[0,0],w:200,h:200});seat.drawOn('top');const tenon=d.newPart('Tenon',{thickness:18});tenon.profile.rect({at:[80,91],w:40,h:18});tenon.drawOn('top',{offset:'9mm'});d.cutParts(seat,{with:tenon,clearance:'0.2mm'${relief}});}`;
+    const unreached = async (relief: string) =>
+      (await checkScriptInBrowser(createCadDocument(), mortise(relief), { bit: 6 })).report.warnings.filter(
+        warning => warning.code === 'corner-unreachable'
+      );
+    expect(await unreached('')).toEqual([expect.objectContaining({ part: 'Seat', message: expect.stringContaining('⌀6 bit') })]);
+    expect((await unreached('')).at(0)?.message).toContain('opening Tenon cuts in Seat');
+    expect(await unreached(',cornerRelief:{dogbone:6}')).toEqual([]);
+  }, 60_000);
+
   it.each([
     ['plate', plate],
     ['bracket', bracket],
