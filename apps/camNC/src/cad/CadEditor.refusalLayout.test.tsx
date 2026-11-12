@@ -8,6 +8,7 @@ import { CamPage } from '@/cam/CamPage';
 import { CadEditor } from './CadEditor';
 import { solveCadDocument } from './solveCad';
 import tray from '../../../../packages/cad-script/fixtures/designs/divided-tray.json';
+import { studioCommand } from './studioToolbarTesting';
 
 const initialViewport = { width: window.innerWidth, height: window.innerHeight };
 const viewports = [
@@ -41,7 +42,7 @@ it('keeps every word of copy-transform recovery guidance clear of workspace cont
   await screen.findByRole('group', { name: 'Workspace view' }, { timeout: 20_000 });
   await waitFor(() => expect(document.querySelector('.cad-editor')).toHaveAttribute('aria-busy', 'false'), { timeout: 20_000 });
   await userEvent.click(within(screen.getByRole('list', { name: 'Parts' })).getByRole('button', { name: /^Divider 3(?: |$)/ }));
-  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Transform/ }));
+  await userEvent.click(await studioCommand(/Transform/));
   const alert = screen.getByRole('alert');
   expect(alert.textContent).toBe(
     'Transforming only the selected copy is not supported. Select the source part in Parts to transform its whole family.'
