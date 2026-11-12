@@ -6,6 +6,7 @@ import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import type { CadDocument, CadPart } from './types';
 import { trimCadFolders } from './folderModel';
 import { copyOperationPrefix } from './copyTransforms';
+import { partCutInputErrors } from './partCutInputs';
 import { partCutLabel, partCutVariableErrors } from './partCutVariables';
 import { cadVariableScope } from './variables';
 import { missingRegionProblem } from './regionProfile';
@@ -67,8 +68,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
   const partCutProblems = new Map<string, string>();
+  // A tool or target that isn't built comes first: the step cuts less than it says whatever its values are.
   if (document.partCuts?.length)
-    for (const { stepId, message } of partCutVariableErrors(document, cadVariableScope(document)))
+    for (const { stepId, message } of [...partCutInputErrors(document), ...partCutVariableErrors(document, cadVariableScope(document))])
       if (!partCutProblems.has(stepId)) partCutProblems.set(stepId, message);
   return listedSteps(document).map(step => {
     const own = broken.get(step.partId);
