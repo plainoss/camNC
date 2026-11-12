@@ -181,7 +181,7 @@ async function reportRetries(repo, runId, attempt, branch) {
   const draft = JSON.parse(api(`repos/${repo}/pulls?head=${repo.split('/')[0]}:${branch}&state=all`, '[.[0] | {number, body}]'))[0];
   const prs = draft ? batchPullRequests(draft.body, draft.number).map(pr => `#${pr}`).join(', ') : 'its PRs';
   await file(repo, quarantined, test =>
-    `\`${test}\` is quarantined, and failed its non-gating run in **${quarantined.get(test)}** of a Mergify batch for ${prs}: ${runUrl}. If it fails every time now, one of those PRs may have broken it.\n`);
+    `\`${test}\` is quarantined, and failed its non-gating run in **${quarantined.get(test)}** of a Mergify batch for ${prs}: ${runUrl}. If it fails every time now, one of those PRs may have broken it. Batches run this test again (\`${LIFTED}\`) until it is fixed and this issue closes.\n`, { lift: true });
 }
 
 /**
@@ -198,7 +198,11 @@ export function issueFor(issues, title) {
   return closed ? { action: 'reopen', number: closed.number } : { action: 'create' };
 }
 
-async function file(repo, flakes, entryOf) {
+// A quarantined test that failed its non-gating run gates batches again: it may be broken rather than flaky, and every
+// batch's failure comment would otherwise keep its quarantine from expiring. Reopening the issue takes the label off.
+export const LIFTED = 'quarantine-lifted';
+
+async function file(repo, flakes, entryOf, { lift = false } = {}) {
   if (!flakes.size) return;
   // FLAKY_DRY_RUN=1 lists what it would file, for trying the script on a past run.
   if (process.env.FLAKY_DRY_RUN) return console.log(Object.fromEntries([...flakes.keys()].map(test => [test, entryOf(test)])));
@@ -221,11 +225,19 @@ async function file(repo, flakes, entryOf) {
     }
     if (target.action === 'reopen') {
       gh(['issue', 'reopen', String(target.number), '--repo', repo]);
+      try {
+        gh(['issue', 'edit', String(target.number), '--repo', repo, '--remove-label', LIFTED]);
+      } catch {}
       // Later flakes in this same report comment on it rather than reopening it again.
       issues.push({ number: target.number, title, state: 'OPEN' });
     }
     writeFileSync(bodyFile, target.action === 'reopen' ? `Flaky again after this issue was closed. ${entry}` : entry);
     gh(['issue', 'comment', String(target.number), '--repo', repo, '--body-file', bodyFile]);
+    if (lift) {
+      gh(['label', 'create', LIFTED, '--repo', repo, '--force', '--color', 'b60205',
+        '--description', 'A quarantined test that failed its non-gating run: merge-queue batches run it again']);
+      gh(['issue', 'edit', String(target.number), '--repo', repo, '--add-label', LIFTED]);
+    }
   }
 }
 
