@@ -20,7 +20,7 @@ export function copyOperationSourceIssue(document: CadDocument): string | null {
       !text(move.id) ||
       ids.has(move.id) ||
       !text(move.partId) ||
-      !text(move.copyId) ||
+      !(move.seed === true ? move.copyId === undefined : move.seed === undefined && text(move.copyId)) ||
       !vector(move.by, 3) ||
       (move.suppressed !== undefined && move.suppressed !== true)
     )

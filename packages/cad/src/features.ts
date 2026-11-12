@@ -417,7 +417,9 @@ export function evaluateCadDocument(given: CadDocument, options: { through?: str
   // What's suppressed in the feature list isn't built.
   // Regenerate named face cuts before evaluating the sketches that reference their pocket floors.
   const document = activeDesign(given.parts.some(part => part.remove && !isSpatialRemoval(part)) ? resolveExtrudeSteps(given) : given);
-  const diagnostics = validateCadDocument(document);
+  // A mask may omit cut records while their saved order slots remain. Validate the raw operation source,
+  // then evaluate the active cuts below; never mistake a valid masked stream for a dangling saved order.
+  const diagnostics = validateCadDocument(given.operationOrder === undefined ? document : { ...document, partCuts: given.partCuts });
   if (diagnostics.some(d => d.severity === 'error')) return { parts: [], diagnostics };
   const parts: EvaluatedCadPart[] = [];
   for (const part of document.parts) {
