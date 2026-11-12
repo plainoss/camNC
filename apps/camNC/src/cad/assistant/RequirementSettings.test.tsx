@@ -9,7 +9,7 @@ it('keeps field and identity changes as a draft until explicitly confirmed', asy
   const onConfirm = vi.fn();
   const value = { width: 280 };
   const view = render(<Requirements value={value} onConfirm={onConfirm} />);
-  await userEvent.click(screen.getByText('Confirmed requirements · active'));
+  expect(screen.getByRole('heading', { name: 'Confirmed requirements · active' })).toBeDefined();
   const confirm = screen.getByRole('button', { name: 'Confirm requirements' });
   expect(confirm).toBeDisabled();
   await userEvent.fill(screen.getByLabelText('Part outline width (mm)'), '300');
@@ -28,7 +28,6 @@ it('keeps field and identity changes as a draft until explicitly confirmed', asy
 it('clears only the draft until the user confirms removing requirements', async () => {
   const onConfirm = vi.fn();
   render(<Requirements value={{ width: 280, minimumFloor: 10, preserveExistingIds: true }} onConfirm={onConfirm} />);
-  await userEvent.click(screen.getByText('Confirmed requirements · active'));
   await userEvent.click(screen.getByRole('button', { name: 'Clear fields' }));
   expect(onConfirm).not.toHaveBeenCalled();
   expect((screen.getByLabelText('Part outline width (mm)') as HTMLInputElement).value).toBe('');
@@ -46,7 +45,6 @@ it.each([
 ])('rejects invalid confirmed input for %s', async (label, invalid) => {
   const onConfirm = vi.fn();
   render(<Requirements value={{}} onConfirm={onConfirm} />);
-  await userEvent.click(screen.getByText('Confirmed requirements · optional'));
   await userEvent.fill(screen.getByLabelText(label), invalid);
   await userEvent.click(screen.getByRole('button', { name: 'Confirm requirements' }));
   expect(onConfirm).not.toHaveBeenCalled();
@@ -59,7 +57,6 @@ it('disables every input and action while busy without discarding the pending dr
   const onConfirm = vi.fn();
   const value = { width: 280 };
   const view = render(<Requirements value={value} onConfirm={onConfirm} />);
-  await userEvent.click(screen.getByText('Confirmed requirements · active'));
   const width = screen.getByLabelText('Part outline width (mm)') as HTMLInputElement;
   await userEvent.fill(width, '300');
   view.rerender(<Requirements value={value} disabled onConfirm={onConfirm} />);
@@ -77,7 +74,6 @@ it('disables every input and action while busy without discarding the pending dr
 it('uses newly confirmed parent state when the selected design or requirements change', async () => {
   const onConfirm = vi.fn();
   const view = render(<Requirements value={{ width: 280 }} onConfirm={onConfirm} />);
-  await userEvent.click(screen.getByText('Confirmed requirements · active'));
   const width = screen.getByLabelText('Part outline width (mm)') as HTMLInputElement;
   await userEvent.fill(width, '300');
   view.rerender(<Requirements value={{ width: 400, minimumFloor: 12 }} onConfirm={onConfirm} />);
