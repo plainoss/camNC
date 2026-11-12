@@ -65,14 +65,8 @@ export function withRegionToggled(document: CadDocument, partId: string, regionI
       parts: document.parts.flatMap(p => (p.id !== made.id ? [p] : regions.length ? [{ ...p, regions }] : [])),
     };
   }
-  // Its own last region taken off, the extrude takes over the first part it made too, rather than the whole sketch.
-  const own = document.parts.find(p => p.id === partId);
-  const next = document.parts.find(p => p.extrudedWith === partId);
-  if (next && own?.regions?.length === 1 && own.regions[0] === regionId)
-    return {
-      ...document,
-      parts: document.parts.flatMap(p => (p.id === next.id ? [] : p.id === partId ? [{ ...p, regions: next.regions ?? [] }] : [p])),
-    };
+  // An extrude that made other parts too keeps making them with none of its own: OK hands its feature to the first.
+  const makesOthers = document.parts.some(p => p.extrudedWith === partId);
   return {
     ...document,
     parts: document.parts.map(p => {
@@ -80,7 +74,7 @@ export function withRegionToggled(document: CadDocument, partId: string, regionI
       const removing = p.remove && removalRegions(document, p);
       const current = p.regions ?? (removing && !('error' in removing) ? removing.cut : []);
       const regions = current.includes(regionId) ? current.filter(id => id !== regionId) : [...current, regionId];
-      if (regions.length || p.sketchOf || p.addTo || p.remove) return { ...p, regions };
+      if (regions.length || p.sketchOf || p.addTo || p.remove || makesOthers) return { ...p, regions };
       const whole = { ...p };
       delete whole.regions;
       return whole;

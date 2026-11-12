@@ -7,6 +7,8 @@ import {
   newExtrudeOf,
   sketchRegions,
   splitApartRegions,
+  designSteps,
+  handOverEmptyExtrude,
   CAD_CHORD_TOLERANCE,
   parseCadDocument,
 } from '@wbcnc/cad';
@@ -158,16 +160,31 @@ it('takes a region off the part an extrude made too, and that part away once it 
   expect(splitApartRegions(back, target.id).parts.filter(p => p.extrudedWith === target.id)).toHaveLength(2);
 });
 
-it('takes over the regions of a part it made when its own sketch’s extrude loses its last region, not the whole sketch', () => {
+it('hands the feature, on OK, to the next part it made when its own sketch’s extrude loses its last region', () => {
   const part = { ...createCadPart('Posts', 10), drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
   part.sketch = [100, 200, 300].reduce((sketch, x) => addCircle(sketch, { x, y: 10, radius: 5 }), part.sketch);
   const shapes = sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
   expect(shapes).toHaveLength(3);
   const split = splitApartRegions({ ...createCadDocument(), parts: [{ ...part, regions: shapes }] }, part.id);
   const own = split.parts[0]!.regions!;
-  expect(own).toHaveLength(1);
-  const made = split.parts.filter(p => p.extrudedWith === part.id);
-  const next = withRegionToggled(split, part.id, own[0]!);
-  expect(next.parts.find(p => p.id === part.id)!.regions).toEqual(made[0]!.regions);
-  expect(next.parts.map(p => p.id)).toEqual([part.id, made[1]!.id]);
+  const [second, third] = split.parts.filter(p => p.extrudedWith === part.id);
+  // A counterbore added to the second part, and a name of its own.
+  const bore = { type: 'sketch' as const, id: 'bore', on: 'top' as const, sketch: createCadPart('Bore', 1).sketch };
+  const withBore = {
+    ...split,
+    parts: split.parts.map(p => (p.id === second!.id ? { ...p, name: 'Leg', features: [bore] } : p)),
+  };
+  // Unpicked, the extrude keeps making the others rather than falling back to the whole sketch.
+  const unpicked = withRegionToggled(withBore, part.id, own[0]!);
+  expect(unpicked.parts.find(p => p.id === part.id)!.regions).toEqual([]);
+  expect(unpicked.parts.filter(p => p.extrudedWith === part.id)).toHaveLength(2);
+  // On OK the second part takes over the feature, keeping all it had; the first is its sketch alone.
+  const handed = handOverEmptyExtrude(unpicked, part.id);
+  const lead = handed.parts.find(p => p.id === second!.id)!;
+  expect(lead).toMatchObject({ name: 'Leg', features: [bore], regions: second!.regions });
+  expect(lead.extrudedWith).toBeUndefined();
+  expect(handed.parts.find(p => p.id === third!.id)!.extrudedWith).toBe(second!.id);
+  expect(handed.parts.find(p => p.id === part.id)!.extrude).toBe(false);
+  const extrudes = designSteps(handed).filter(step => step.kind === 'extrude');
+  expect(extrudes.map(step => [step.partId, step.detail])).toEqual([[second!.id, '10 mm · 2 parts']]);
 });

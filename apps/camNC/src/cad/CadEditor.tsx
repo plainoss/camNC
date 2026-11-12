@@ -76,6 +76,7 @@ import {
   removeDatumPlane,
   removeEdgeFillet,
   splitApartRegions,
+  handOverEmptyExtrude,
   cadCopyName,
   setCutDepth,
   setCutSuppressed,
@@ -1761,7 +1762,7 @@ export function CadEditor({
     if (!keep && featureDialog && featureDialog.kind !== 'pattern') publish(restoreCadSession(session, featureDialog.before));
     // Regions picked apart are a part each.
     if (keep && featureDialog?.kind === 'extrude') {
-      const split = splitApartRegions(documentRef.current, featureDialog.partId, apartIds);
+      const split = handOverEmptyExtrude(splitApartRegions(documentRef.current, featureDialog.partId, apartIds), featureDialog.partId);
       if (split !== documentRef.current) commit(split);
     }
     // A Remove is a cut in the board its sketch is drawn on, so that board is the one selected.

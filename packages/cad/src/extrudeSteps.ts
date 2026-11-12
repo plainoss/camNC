@@ -494,3 +494,30 @@ export function splitApartRegions(
   );
   return { ...document, revision: document.revision + 1, parts, ...(folders && { folders }) };
 }
+
+/**
+ * An extrude left with no regions of its own while it makes other parts hands the feature to the first of them, which
+ * keeps all it has. The extrude's own part is no longer made: it's the sketch alone when the sketch is its own, and
+ * gone when it extrudes another's.
+ */
+export function handOverEmptyExtrude(document: CadDocument, partId: string): CadDocument {
+  const lead = document.parts.find(part => part.id === partId);
+  const next = document.parts.find(part => part.extrudedWith === partId);
+  if (!lead || !next || lead.regions?.length !== 0) return document;
+  const parts = document.parts.flatMap((part): CadPart[] => {
+    if (part.id === next.id) {
+      const promoted: CadPart = { ...part, ...(lead.extrudeName !== undefined && { extrudeName: lead.extrudeName }) };
+      delete promoted.extrudedWith;
+      return [promoted];
+    }
+    if (part.extrudedWith === partId) return [{ ...part, extrudedWith: next.id }];
+    if (part.id !== partId) return [part];
+    if (part.sketchOf) return [];
+    const sketch: CadPart = { ...part, extrude: false };
+    for (const key of ['regions', 'extrudeName', 'upTo', 'upToDatum', 'symmetric', 'suppressed', 'thin'] as const) delete sketch[key];
+    return [sketch];
+  });
+  const kept = new Set(parts.map(part => part.id));
+  const folders = document.folders?.map(folder => ({ ...folder, partIds: folder.partIds.filter(id => kept.has(id)) }));
+  return { ...document, revision: document.revision + 1, parts, ...(folders && { folders }) };
+}

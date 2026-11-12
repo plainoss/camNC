@@ -236,7 +236,7 @@ export function ExtrudeDialog({
   // Regions picked apart are fine for New: each group becomes a part of its own on OK.
   const apart = operation === 'new' && splitApartRegions(document, part.id) !== document;
   const profileError =
-    operation === 'remove' || !ownExtrusion || part.thin || apart
+    operation === 'remove' || !ownExtrusion || part.thin || apart || (part.regions?.length === 0 && alsoMade.length)
       ? undefined
       : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
   const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? lengthText(part.thin.depth)) : lengthText(100));
