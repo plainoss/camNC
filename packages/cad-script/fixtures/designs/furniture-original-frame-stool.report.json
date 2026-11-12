@@ -2417,6 +2417,7 @@
     ],
     "warnings": [
      "Leg front left: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",
+     "Leg front left: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
      "Leg front left: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175"
     ],
     "blocked": []
@@ -2583,6 +2584,7 @@
     ],
     "warnings": [
      "Leg front right: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",
+     "Leg front right: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
      "Leg front right: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175"
     ],
     "blocked": []
@@ -2749,6 +2751,7 @@
     ],
     "warnings": [
      "Leg back left: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+     "Leg back left: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
      "Leg back left: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175"
     ],
     "blocked": []
@@ -2915,6 +2918,7 @@
     ],
     "warnings": [
      "Leg back right: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+     "Leg back right: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
      "Leg back right: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175"
     ],
     "blocked": []
@@ -4269,9 +4273,13 @@
    ],
    "warnings": [
     "Leg front left: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",
+    "Leg front left: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
     "Leg front right: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",
+    "Leg front right: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
     "Leg back left: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+    "Leg back left: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
     "Leg back right: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
+    "Leg back right: bit D=3.175 cuts 40.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
     "Leg front left: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
     "Leg front right: pocket z=30: 3.3mm² left in corners/narrow spots with D=3.175",
     "Leg back left: pocket z=22: 1.6mm² left in corners/narrow spots with D=3.175",

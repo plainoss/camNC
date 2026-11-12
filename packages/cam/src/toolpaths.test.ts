@@ -618,11 +618,21 @@ describe('warnings', () => {
     expect(camPart(thick(), { tools: [{ number: 1, diameter: 6, fluteLength: 12 }] }).operations).toHaveLength(1);
   });
 
+  it('warns about a cut over seven diameters deep when the bit has no flute length, without stopping it', () => {
+    const cut = (diameter: number) => camPart(thick(), { tools: [{ number: 1, diameter }] });
+    expect(cut(2.9).warnings).toEqual([
+      'bit D=2.9 cuts 20.8 mm deep from the stock top, over 7 times its diameter: check its flute length',
+    ]);
+    expect(cut(2.9).operations).toHaveLength(1);
+    expect(cut(3.175).warnings).toEqual([]);
+  });
+
   const window = (w: number, h: number) => rect(50, 20, 50 + w, 20 + h).reverse();
 
   it('warns about the loose piece of a big through hole, not of a small one or a narrow slot', () => {
     const warn = (w: number, h: number, diameter = 3.175) =>
-      camPart(thick({ throughHoles: [window(w, h)] }), { tools: [{ number: 1, diameter }] }).warnings;
+      // A flute length long enough for this 20.5 mm board keeps the deep-cut warning out of these.
+      camPart(thick({ throughHoles: [window(w, h)] }), { tools: [{ number: 1, diameter, fluteLength: 22 }] }).warnings;
     expect(warn(120, 60)[0]).toMatch(/^through hole 1: the 120 x 60 mm piece inside it comes loose on the last pass/);
     expect(warn(120, 60)[0]).toMatch(/Tape it down, or stop/);
     expect(warn(50, 50)).toEqual([]);
@@ -631,7 +641,9 @@ describe('warnings', () => {
     expect(warn(120, 22, 12)).toEqual([]);
     // Doesn't stop anything, and no through cuts on a second side: no piece.
     expect(camPart(thick({ throughHoles: [window(120, 60)] }), {}).operations.length).toBeGreaterThan(0);
-    expect(camPart(thick({ throughHoles: [window(120, 60)] }), { cutThrough: false }).warnings).toEqual([]);
+    expect(
+      camPart(thick({ throughHoles: [window(120, 60)] }), { cutThrough: false }).warnings.filter(w => !w.includes('times its diameter'))
+    ).toEqual([]);
   });
 });
 

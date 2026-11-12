@@ -3830,7 +3830,8 @@
     ],
     "warnings": [
      "Side: pocket z=16: 1.2mm² left in corners/narrow spots with D=3.175",
-     "Side: pocket z=12: 1.2mm² left in corners/narrow spots with D=3.175"
+     "Side: pocket z=12: 1.2mm² left in corners/narrow spots with D=3.175",
+     "Side: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length"
     ],
     "blocked": []
    },
@@ -3922,7 +3923,9 @@
       "steps": 16
      }
     ],
-    "warnings": [],
+    "warnings": [
+     "Bottom: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length"
+    ],
     "blocked": []
    },
    "faces": [
@@ -4013,7 +4016,9 @@
       "steps": 16
      }
     ],
-    "warnings": [],
+    "warnings": [
+     "Top: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length"
+    ],
     "blocked": []
    },
    "faces": [
@@ -4204,7 +4209,9 @@
       "steps": 16
      }
     ],
-    "warnings": [],
+    "warnings": [
+     "Shelf: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length"
+    ],
     "blocked": []
    },
    "faces": [
@@ -4662,8 +4669,16 @@
    "warnings": [
     "Side: pocket z=16: 1.2mm² left in corners/narrow spots with D=3.175",
     "Side: pocket z=12: 1.2mm² left in corners/narrow spots with D=3.175",
+    "Side: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
     "Right side: pocket z=16: 1.2mm² left in corners/narrow spots with D=3.175",
-    "Right side: pocket z=12: 1.2mm² left in corners/narrow spots with D=3.175"
+    "Right side: pocket z=12: 1.2mm² left in corners/narrow spots with D=3.175",
+    "Right side: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
+    "Bottom: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
+    "Top: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
+    "Shelf: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
+    "Shelf 2: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
+    "Shelf 3: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
+    "Shelf 4: bit D=3.175 cuts 24.3 mm deep from the stock top, over 7 times its diameter: check its flute length"
    ],
    "blocked": []
   }
