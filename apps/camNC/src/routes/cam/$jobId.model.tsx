@@ -1,7 +1,8 @@
 import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
 import { camKeys, useCamJob, useCamModel, useSaveCamJob } from '@/cam/camQueries';
-import { deleteJob, replaceModel } from '@/cam/jobDb';
+import { replaceModel } from '@/cam/jobDb';
+import { deleteJobWithUndo } from '@/cam/pendingJobDeletions';
 import { CamJobBar } from '@/cam/CamJobBar';
 import { Hint } from '@/cam/Hint';
 import { ModelViewport, type ModelView } from '@/cam/model/ModelViewport';
@@ -52,10 +53,8 @@ function ModelStep() {
       await queryClient.invalidateQueries({ queryKey: camKeys.job(job.id) });
     }
   };
-  const remove = async () => {
-    await deleteJob(job.id);
-    void queryClient.invalidateQueries({ queryKey: camKeys.jobs });
-    toast(`Deleted ${job.name}`);
+  const remove = () => {
+    deleteJobWithUndo(job, () => queryClient.invalidateQueries({ queryKey: camKeys.jobs }));
     void navigate({ to: '/cam' });
   };
   const milledById = new Map(job.parts.map(p => [p.id, p.milled]));
@@ -104,7 +103,7 @@ function ModelStep() {
             <Button size="sm" variant="outline" onClick={() => void replace()}>
               Open another file…
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => void remove()}>
+            <Button size="sm" variant="ghost" onClick={remove}>
               Delete job
             </Button>
           </div>

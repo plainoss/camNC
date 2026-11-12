@@ -1,4 +1,4 @@
-import { addConstraint, addLine, createCadDocument, createCadPart, solveCadDocument } from '@wbcnc/cad';
+import { addConstraint, addLine, addPoint, createCadDocument, createCadPart, solveCadDocument } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
 import { constraintColorNotice, sketchFeedback } from './sketchFeedback';
 
@@ -42,6 +42,16 @@ describe('feedback while sketching', () => {
     expect(feedback.inProgress).toBe(true);
     expect(feedback.status).toBe('4 degrees of freedom');
     expect(feedback.problems).toHaveLength(1);
+  });
+
+  it('does not call a sketch of only points empty', async () => {
+    const document = createCadDocument();
+    const part = { ...createCadPart(), extrude: false as const };
+    part.sketch = addPoint(addPoint(part.sketch, { x: 40, y: 50 }), { x: 160, y: 50 });
+    document.parts.push(part);
+    expect(sketchFeedback(await solveCadDocument(document))).toMatchObject({ status: '4 degrees of freedom', problems: [] });
+    part.sketch = { ...part.sketch, entities: part.sketch.entities.map(entity => ({ ...entity, construction: true })) };
+    expect(sketchFeedback(await solveCadDocument(document)).status).toBe('Empty sketch');
   });
 
   it('retains errors for conflicting dimensions instead of hiding them as an unfinished outline', async () => {

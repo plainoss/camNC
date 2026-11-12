@@ -14,6 +14,7 @@ import {
   type PartInstance,
 } from './boards';
 import type { BoardRequest, ModelImport } from './camTypes';
+import { onBoardOnly } from './boards/placement';
 import { useHoldHardware } from './holdHardware';
 import type { CamJobV1 } from './jobDb';
 import { kDefaultPlan } from './planSettings';
@@ -61,7 +62,7 @@ export function useJobBoards(job: CamJobV1 | null | undefined, model: ModelImpor
           : laidOut;
       return {
         board,
-        nest,
+        nest: onBoardOnly(nest),
         ...(generatedCarvingProblem(job) && { carvingProblem: generatedCarvingProblem(job)! }),
         request: withCarving(boardRequest(board, nest, instances, { skin: plan.skin, holes: plan.holes, leaveOut: plan.leaveOut }), job),
       };

@@ -46,6 +46,11 @@ export function usePartCutSelection(document: CadDocument, part: CadPart | undef
     /** The copy picked, unchecked: a command that can't work on one copy refuses any, even a copy that is gone. */
     pickedCopyId: copyId,
     cutPick,
+    /**
+     * A Mirror, Transform or Pattern dialog takes its part from the same clicks, rather than the click moving the
+     * selection away from its part, and the selection follows the part it takes.
+     */
+    dialogPicks: { pick: cutPick, select: (partId: string) => selectPart(partId) },
     cutPicked,
     showCutPicked,
     pickForCut,
