@@ -16,10 +16,14 @@ export function scopedConstruction(
   input: ScriptConstruction,
   folderId: string,
   aliases: ReadonlyMap<string, string>,
-  owned: CadPart[]
+  owned: CadPart[],
+  existing: readonly CadConstruction[] = []
 ): ScriptConstruction {
   try {
     if (!input || input.folderId !== folderId) return fail('A scoped construction must belong to its current folder.');
+    // Declaring a plan replaces the one with its ID, so a folder may only replace its own.
+    if (existing.some(plan => plan.id === input.id && plan.folderId !== folderId))
+      return fail(`Construction ${input.id} belongs to another folder.`);
     for (const binding of input.members) {
       if (!owned.some(p => binding.member.id === p.id || p.copies?.some(c => binding.member.id === `${p.id}:${c.id}`)))
         return fail(`Construction member ${binding.role} is not in this folder.`);
