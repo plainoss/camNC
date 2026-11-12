@@ -54,7 +54,12 @@ export function AssistantSettingsDialog({
             </button>
           ))}
         </nav>
-        <section aria-label={current.label}>{open && current.content}</section>
+        {/* Every section stays mounted, so a key typed but not yet saved survives a section switch or closing. */}
+        {sections.map(item => (
+          <section key={item.id} aria-label={item.label} hidden={item.id !== current.id}>
+            {item.content}
+          </section>
+        ))}
       </div>
     </dialog>
   );

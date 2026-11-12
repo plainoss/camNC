@@ -32,3 +32,4 @@
 /* The dock styles every button as a card; the section list stays plain. */
 .cad-editor .cad-assistant-dock .assistant-settings-body > nav button:not([aria-current]) { border-color: transparent; background: transparent; }
 .cad-editor .cad-assistant-dock .assistant-settings-body > nav button[aria-current] { border-color: transparent; background: #27756b1f; }
+.assistant-settings-body > section[hidden] { display: none; }

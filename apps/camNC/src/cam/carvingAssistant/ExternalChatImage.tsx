@@ -20,6 +20,10 @@ export function ExternalChatImage({ session }: { session: CarvingAssistantSessio
     const paste = (event: ClipboardEvent) => {
       const image = imageFromTransfer(event.clipboardData);
       if (!image || session.generating) return;
+      // Pasting into a text field with text on the clipboard is a text paste, even if an image rides along.
+      const target = event.target instanceof Element ? event.target : null;
+      const editable = !!target?.closest('input, textarea, [contenteditable]:not([contenteditable="false"])');
+      if (editable && event.clipboardData?.types.includes('text/plain')) return;
       event.preventDefault();
       void request.importPng(image);
     };

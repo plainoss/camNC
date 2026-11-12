@@ -5,7 +5,7 @@ import { createCarvingJob, type CamJobV1 } from '../jobDb';
 import { defaultProvider, rememberAssistantCredentials } from '../../cad/assistant/keyStore';
 import { createAssistantUsage } from '../../cad/assistant/runBudget';
 import { CarvingAssistant } from './CarvingAssistant';
-import { carvingPngFromImage } from './externalImage';
+import { carvingPngFromImage, kMaxInputBytes } from './externalImage';
 import { CarvingAssistantBoardLayer } from './BoardLayer';
 import { useCarvingAssistant } from './useCarvingAssistant';
 import { generateCarvingAsset } from './generation';
@@ -498,13 +498,65 @@ it('traces a local PNG without a provider, keeps its original and prepares it at
   expect(generateNativeRasterAsset).not.toHaveBeenCalled();
 });
 
-it('rejects an oversized PNG before preparing anything', async () => {
+it('refuses an image over the byte limit or the pixel limit before decoding or preparing it', async () => {
   const { onApply } = await open({ method: 'default' });
-  const file = new File([new Uint8Array(2_000_001)], 'large.png', { type: 'image/png' });
-  fireEvent.change(screen.getByLabelText('Image to trace'), { target: { files: [file] } });
-  expect((await screen.findByRole('alert')).textContent).toMatch(/could not be read as an image/);
+  const big = new File([new Uint8Array(kMaxInputBytes + 1)], 'large.png', { type: 'image/png' });
+  fireEvent.change(screen.getByLabelText('Image to trace'), { target: { files: [big] } });
+  expect((await screen.findByRole('alert')).textContent).toMatch(/larger than 25 MB/);
+  // A tiny file whose header claims 10000 × 10000 pixels is refused from the header alone.
+  const header = new Uint8Array(33);
+  header.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+  new DataView(header.buffer).setUint32(16, 10_000);
+  new DataView(header.buffer).setUint32(20, 10_000);
+  const bitmap = vi.spyOn(window, 'createImageBitmap');
+  await expect(carvingPngFromImage(new File([header], 'huge.png', { type: 'image/png' }))).rejects.toThrow('more than 40 megapixels');
+  expect(bitmap).not.toHaveBeenCalled();
   expect(prepareCarvingArt).not.toHaveBeenCalled();
   expect(onApply).not.toHaveBeenCalled();
+});
+
+function canvasBlob(width: number, height: number, type: string, paint: (context: CanvasRenderingContext2D) => void) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  paint(canvas.getContext('2d')!);
+  return new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), type));
+}
+
+it('downscales a large image to a traceable PNG, and refuses one too detailed even when small', async () => {
+  const large = await canvasBlob(3000, 2000, 'image/jpeg', context => {
+    context.fillStyle = 'white';
+    context.fillRect(0, 0, 3000, 2000);
+    context.fillStyle = 'black';
+    context.fillRect(500, 500, 2000, 1000);
+  });
+  const png = await carvingPngFromImage(new File([large], 'poster.jpg', { type: 'image/jpeg' }));
+  const decoded = await createImageBitmap(png);
+  expect(Math.max(decoded.width, decoded.height)).toBeLessThanOrEqual(1600);
+  expect(png.size).toBeLessThanOrEqual(2_000_000);
+  // Random noise doesn't compress: even at the smallest size it stays over the tracer's 2 MB.
+  const noise = await canvasBlob(2000, 2000, 'image/png', context => {
+    const pixels = context.createImageData(2000, 2000);
+    crypto.getRandomValues(pixels.data.subarray(0, 65536));
+    for (let i = 0; i < pixels.data.length; i += 65536) crypto.getRandomValues(pixels.data.subarray(i, i + 65536));
+    for (let i = 3; i < pixels.data.length; i += 4) pixels.data[i] = 255;
+    context.putImageData(pixels, 0, 0);
+  });
+  await expect(carvingPngFromImage(new File([noise], 'noise.png', { type: 'image/png' }))).rejects.toThrow('too detailed');
+}, 30_000);
+
+it('leaves a mixed text and image paste into a text field to the field', async () => {
+  rememberAssistantCredentials(null);
+  await open({ method: 'default' });
+  const { file } = pngFile();
+  const data = new DataTransfer();
+  data.items.add(file);
+  data.setData('text/plain', 'a fox');
+  const prompt = screen.getByLabelText('What should it show?');
+  prompt.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  await new Promise(resolve => setTimeout(resolve, 100));
+  expect(screen.queryByText(/Tracing the image/)).toBeNull();
+  expect(prepareCarvingArt).not.toHaveBeenCalled();
 });
 
 it('copies an image prompt for another chat and traces an image pasted back, without a connection', async () => {
