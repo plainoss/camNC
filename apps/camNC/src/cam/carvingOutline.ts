@@ -1,4 +1,4 @@
-import { unionPaths } from '@wbcnc/cam';
+import { simplifyLoop, unionPaths } from '@wbcnc/cam';
 import { isWebFont, kCarvingFonts, type CarvingArt } from './carving';
 import { ensureWebFont, webFontCss } from './webFonts';
 
@@ -10,48 +10,6 @@ const kPxPerMm = 10;
 const kMaxPixels = 6_000_000;
 /** How far a simplified outline may stray from the pixel staircase, in pixels. */
 const kSimplifyPx = 0.6;
-
-/** Douglas-Peucker on a closed loop. */
-function simplify(loop: Loop, tol: number): Loop {
-  if (loop.length < 4) return loop;
-  const keep = new Uint8Array(loop.length);
-  const stack: [number, number][] = [];
-  // Split the loop at its first point and the point farthest from it.
-  let far = 0,
-    farD = -1;
-  loop.forEach((p, i) => {
-    const d = (p.x - loop[0].x) ** 2 + (p.y - loop[0].y) ** 2;
-    if (d > farD) {
-      farD = d;
-      far = i;
-    }
-  });
-  keep[0] = keep[far] = 1;
-  const closed = [...loop, loop[0]];
-  stack.push([0, far], [far, loop.length]);
-  while (stack.length) {
-    const [a, b] = stack.pop()!;
-    const A = closed[a],
-      B = closed[b];
-    const dx = B.x - A.x,
-      dy = B.y - A.y,
-      len = Math.hypot(dx, dy) || 1;
-    let best = -1,
-      bestD = tol;
-    for (let i = a + 1; i < b; i++) {
-      const d = Math.abs((closed[i].x - A.x) * dy - (closed[i].y - A.y) * dx) / len;
-      if (d > bestD) {
-        bestD = d;
-        best = i;
-      }
-    }
-    if (best >= 0) {
-      keep[best] = 1;
-      stack.push([a, best], [best, b]);
-    }
-  }
-  return loop.filter((_, i) => keep[i]);
-}
 
 /** Ink of a drawn image: dark, opaque pixels. */
 function inkMask(data: Uint8ClampedArray, w: number, h: number): Uint8Array {
@@ -68,8 +26,16 @@ function inkMask(data: Uint8ClampedArray, w: number, h: number): Uint8Array {
  * Outlines of a pixel mask in mm, Y up, centred on (0, 0): each row's runs of ink become rectangles, rows with the same
  * runs one taller rectangle, and their union is simplified back to smooth lines.
  */
-export function maskOutline(ink: Uint8Array, w: number, h: number, pxPerMm: number): Loop[] {
+export function maskOutline(
+  ink: Uint8Array,
+  w: number,
+  h: number,
+  pxPerMm: number,
+  maxRuns = Infinity,
+  simplifyPixels = kSimplifyPx
+): Loop[] {
   const rects: Loop[] = [];
+  let runCount = 0;
   const runsOf = (y: number) => {
     const runs: number[] = [];
     for (let x = 0; x < w; ) {
@@ -80,6 +46,8 @@ export function maskOutline(ink: Uint8Array, w: number, h: number, pxPerMm: numb
       const start = x;
       while (x < w && ink[y * w + x]) x++;
       runs.push(start, x);
+      // Generated noisy masks can contain hundreds of thousands of runs; reject before polygon union allocates them.
+      if (++runCount > maxRuns) throw new Error('Artwork has too many pixel runs. Use simpler filled shapes.');
     }
     return runs;
   };
@@ -99,9 +67,9 @@ export function maskOutline(ink: Uint8Array, w: number, h: number, pxPerMm: numb
   }
   close(h);
   if (!rects.length) return [];
-  const tol = kSimplifyPx / pxPerMm;
+  const tol = simplifyPixels / pxPerMm;
   return unionPaths(rects)
-    .map(loop => simplify(loop, tol))
+    .map(loop => simplifyLoop(loop, tol))
     .filter(loop => loop.length >= 3);
 }
 
@@ -144,7 +112,13 @@ async function svgImage(svg: string): Promise<HTMLImageElement> {
  * The artwork's outlines, mm, Y up, centred on (0, 0), with its ink `height` mm tall. Text is drawn in the browser's
  * font, an SVG as an image; both are outlined from 0.1 mm pixels (coarser for very long text).
  */
-export async function outlineArt(art: CarvingArt, height: number): Promise<{ region: Loop[]; width: number; height: number }> {
+export async function outlineArt(
+  art: CarvingArt,
+  height: number,
+  limits: { pixelsPerMm?: number; maxPixels?: number; maxMaskRuns?: number; simplifyPixels?: number } = {}
+): Promise<{ region: Loop[]; width: number; height: number }> {
+  const pixelsPerMm = Math.min(kPxPerMm, limits.pixelsPerMm ?? kPxPerMm);
+  const maxPixels = Math.min(kMaxPixels, limits.maxPixels ?? kMaxPixels);
   if (art.kind === 'text') {
     const font = art.font;
     if (isWebFont(font)) await ensureWebFont(font);
@@ -155,7 +129,7 @@ export async function outlineArt(art: CarvingArt, height: number): Promise<{ reg
     const inkH = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
     if (!art.text.trim() || inkH <= 0) return { region: [], width: 0, height: 0 };
     const width = ((m.actualBoundingBoxLeft + m.actualBoundingBoxRight) / inkH) * height;
-    const ppm = Math.min(kPxPerMm, Math.sqrt(kMaxPixels / ((width + 2) * (height + 2))));
+    const ppm = Math.min(pixelsPerMm, Math.sqrt(maxPixels / ((width + 2) * (height + 2))));
     const pad = 4;
     const w = Math.ceil(width * ppm) + 2 * pad,
       h = Math.ceil(height * ppm) + 2 * pad;
@@ -166,7 +140,7 @@ export async function outlineArt(art: CarvingArt, height: number): Promise<{ reg
     ctx.textBaseline = 'alphabetic';
     const scale = size / 100;
     ctx.fillText(art.text, pad + m.actualBoundingBoxLeft * scale, pad + m.actualBoundingBoxAscent * scale);
-    const region = maskOutline(inkMask(ctx.getImageData(0, 0, w, h).data, w, h), w, h, ppm);
+    const region = maskOutline(inkMask(ctx.getImageData(0, 0, w, h).data, w, h), w, h, ppm, limits.maxMaskRuns, limits.simplifyPixels);
     return { region, width, height };
   }
   const doc = new DOMParser().parseFromString(art.svg, 'image/svg+xml');
@@ -189,7 +163,7 @@ export async function outlineArt(art: CarvingArt, height: number): Promise<{ reg
   if (!validViewBox) svg.setAttribute('viewBox', `0 0 ${sourceWidth} ${sourceHeight}`);
   const aspect = sourceWidth / sourceHeight;
   const width = height * aspect;
-  const ppm = Math.min(kPxPerMm, Math.sqrt(kMaxPixels / ((width + 2) * (height + 2))));
+  const ppm = Math.min(pixelsPerMm, Math.sqrt(maxPixels / ((width + 2) * (height + 2))));
   const w = Math.max(1, Math.round(width * ppm)),
     h = Math.max(1, Math.round(height * ppm));
   // Give the image an explicit pixel viewport: intrinsic sizes may be missing or use physical/percentage units.
@@ -199,7 +173,11 @@ export async function outlineArt(art: CarvingArt, height: number): Promise<{ reg
   const img = await svgImage(new XMLSerializer().serializeToString(svg));
   const ctx = canvas(w, h);
   ctx.drawImage(img, 0, 0, w, h);
-  return { region: maskOutline(inkMask(ctx.getImageData(0, 0, w, h).data, w, h), w, h, ppm), width, height };
+  return {
+    region: maskOutline(inkMask(ctx.getImageData(0, 0, w, h).data, w, h), w, h, ppm, limits.maxMaskRuns, limits.simplifyPixels),
+    width,
+    height,
+  };
 }
 
 /** The outlines moved to the artwork's place on the board. */

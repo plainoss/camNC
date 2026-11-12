@@ -147,7 +147,7 @@ export function runFolderScope(ctx: ScopeContext, root: DesignEdit, name: string
     );
   };
   const scoped: DesignEdit = {
-    construction: options => root.construction(scopedConstruction(options, folderId, names, ownedParts())),
+    construction: options => root.construction(scopedConstruction(options, folderId, names, ownedParts(), ctx.get().constructions ?? [])),
     part,
     newPart(name, options) {
       if (!name.trim()) return fail('A new part needs a name.');

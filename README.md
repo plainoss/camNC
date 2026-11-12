@@ -8,8 +8,7 @@
 
 [![Desktop app](https://img.shields.io/badge/desktop-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-2ea44f)](#desktop-app-recommended)
 [![FluidNC](https://img.shields.io/badge/FluidNC-3.9.9%20%C2%B7%204.1.x-555)](#run-the-job-from-the-same-screen)
-
-[Explore demo](https://run.camnc.app/demo)
+[![camNC Labs](https://img.shields.io/badge/Labs-highly%20experimental-d97706)](#camnc-labs-highly-experimental)
 
 | Camera image (wide-angle lens, rotated to match)                                                                       | camNC top view of the same frame, with the toolpath                                                                                    |
 | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -20,8 +19,8 @@ _The raw camera image (left, rotated to match) and camNC's corrected top view of
 </div>
 
 camNC shows your CNC toolpath on a live camera image of the machine bed, so you can check stock placement, offsets and
-clamps before the spindle starts. It also runs the job: connect to FluidNC, zero, probe and start from the same screen,
-and preview the cut in 3D first.
+clamps before the spindle starts, and preview the cut in 3D first. Newer, still highly experimental tools run the job on
+FluidNC and design and plan parts in the same app: see [camNC Labs](#camnc-labs-highly-experimental).
 
 camNC is built for the [V1 Engineering LowRider V4](https://docs.v1e.com/lowrider/) running FluidNC, and that is the
 machine it is tested on. It should work just as well on other FluidNC machines.
@@ -38,26 +37,6 @@ Mount a camera above the machine (an old phone, a webcam or an IP camera) and pr
 the camera with OpenCV, finds its pose from the markers and corrects lens distortion and perspective, so you get a
 top-down view in machine coordinates with the G-code drawn on top. Drag the toolpath onto the stock and check clamps and
 offsets before the spindle starts.
-
-## Run the job from the same screen
-
-camNC talks to FluidNC (3.9.9 and 4.1.x) directly. Home, jog, set XY zero to the toolpath, probe Z and run the job from
-the SD card. A checklist catches a missed home or probe, and a green line on the camera image shows how far the job has
-got. Feed and spindle overrides, macros and a console are one click away.
-
-<img alt="A job running at 52 %, with progress drawn on the toolpath and the machine panel open" src="docs/images/readme/fluidnc-job.jpg" />
-
-## Sketch flat parts and keep their machining setup
-
-Choose **New design** in CAM to draw flat parts with lines, rectangles, circles and arcs. Add driving dimensions and
-geometric constraints, then finish the sketch to arrange boards and generate through-cuts. Keyboard shortcuts include `L`, `G`/`R`, `C`, `A`, `D`, `M` and `Q`.
-
-Return to **Design** from Boards, Plan or the machine view to edit the same parts. Tool choices, cutting data, stock,
-placements and holding settings stay with the project. Geometry changes regenerate affected plans; references that no
-longer resolve remain visible for repair. Running and resumable programs keep their original design and setup snapshot.
-Sketch drafts are autosaved separately from the geometry accepted for CAM. Trim supports line, circle and arc segments;
-rational curves can act as boundaries. CAD currently creates through-cuts; pocket features come later. See
-[Status](docs/STATUS.md) for supported tools, current limits and known gaps.
 
 ## Preview the cut in 3D
 
@@ -90,6 +69,60 @@ lines up well. The setup used an old Pixel 5 on a ~120×60 cm [MPCNC LowRider V4
 reprojection error of around 2:
 
 https://github.com/user-attachments/assets/0c16f067-9cb2-4bc9-9941-f04e23f4bc24
+
+## camNC Labs (highly experimental)
+
+> [!WARNING]
+> These features are new and highly experimental. They have had very little time on real machines. Check every
+> toolpath in Plan and on the camera image before you cut, and expect missing features and breaking changes.
+
+| Feature                                                                                           | Status                 | Screenshot                                                                                                               |
+| ------------------------------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **[Toolpath on the camera image](#see-the-toolpath-where-it-will-cut)**<br>top view, drag to zero | Stable                 | <img width="260" alt="Corrected top view with a toolpath" src="docs/images/readme/top-view.jpg" />                       |
+| **[FluidNC controls](#run-the-job-from-the-same-screen)**<br>home, jog, probe, run                | 🧪 Highly experimental | <img width="260" alt="Machine panel next to the camera view" src="docs/images/readme/labs-fluidnc.jpg" />                |
+| **[CAM for STEP models](#plan-cuts-for-a-step-model)**<br>lay flat, nest, pockets, simulate       | 🧪 Highly experimental | <img width="260" alt="Simulated cut of a STEP shelf's parts on one board" src="docs/images/readme/labs-step-plan.jpg" /> |
+| **[Simple CAD and carving](#design-parts-and-carvings)**<br>Part Studio, V-carve text             | 🧪 Highly experimental | <img width="260" alt="A cupboard in the Part Studio" src="docs/images/readme/labs-cad.jpg" />                            |
+| **[AI carves and 3D models](#ai-assistants-bring-your-own-key)**<br>bring your own API key        | 🧪 Highly experimental | <img width="260" alt="A generated tray shown for review before applying" src="docs/images/readme/labs-ai-model.jpg" />   |
+
+See [Status](docs/STATUS.md) for supported tools, current limits and known gaps.
+
+### Run the job from the same screen
+
+camNC talks to FluidNC (3.9.9 and 4.1.x) directly. Home, jog, set XY zero to the toolpath, probe Z and run the job from
+the SD card. A checklist catches a missed home or probe, and a green line on the camera image shows how far the job has
+got. Feed and spindle overrides, macros and a console are one click away.
+
+<img alt="The machine panel with jog, probe and the loaded job next to the camera view" src="docs/images/readme/labs-fluidnc.jpg" />
+
+<img alt="A job running at 52 %, with progress drawn on the toolpath and the machine panel open" src="docs/images/readme/fluidnc-job.jpg" />
+
+### Plan cuts for a STEP model
+
+Open a STEP file of an assembled piece. camNC finds its flat parts, their pockets, grooves and outlines, and lays them
+flat. Arrange them on boards, choose how they are held, then plan and simulate the cuts in 3D before taking the job to
+the machine. **Open sample project** in CAM loads a small shelf to try it.
+
+| Parts found in the model                                                                                          | The planned cut, simulated                                                                   |
+| ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| <img alt="The parts of a STEP shelf with their detected features" src="docs/images/readme/labs-step-model.jpg" /> | <img alt="Simulated cut of the shelf's parts" src="docs/images/readme/labs-step-plan.jpg" /> |
+
+### Design parts and carvings
+
+Choose **New design** in CAM to build parts in the Part Studio: sketch with lines, arcs, dimensions and constraints,
+then extrude, cut, pattern and mirror them. Tool choices, stock and holding stay with the project when you change the
+design. **New carving** lays out text and artwork for a V-bit.
+
+<img alt="A cupboard with shelf pin holes in the Part Studio" src="docs/images/readme/labs-cad.jpg" />
+
+### AI assistants (bring your own key)
+
+Describe a carving or a part, and an assistant draws it using your own Anthropic or OpenAI API key. The key stays in
+your browser. Carving artwork is traced and checked for the V-bit, and a design change opens for review in 3D. Nothing
+is applied until you accept it, and you should still check the cut in Plan.
+
+| Carving assistant                                                                                          | Design assistant                                                                                               |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| <img alt="Generated owl artwork variants on a carving board" src="docs/images/readme/labs-carve-ai.jpg" /> | <img alt="A generated pebble tray in the review before applying" src="docs/images/readme/labs-ai-model.jpg" /> |
 
 ## Getting started
 
@@ -175,8 +208,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together
 
 ## Development
 
-Requirements: Node.js (see [`.nvmrc`](.nvmrc), `^20.19` or `>=22.12`) and pnpm (version pinned in `package.json`,
-e.g. via `corepack enable`).
+Requirements: Node.js (see [`.nvmrc`](.nvmrc), `>=22.12`) and pnpm (version pinned in `package.json`, e.g. via
+`corepack enable`). pnpm 12 ships no standalone macOS binary, so a pnpm 10 install can't switch to it: use corepack or
+`npm install -g pnpm@<pinned version>`.
 
 ```bash
 pnpm install

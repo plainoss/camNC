@@ -10,6 +10,7 @@ const instance = (name: string) =>
   name.startsWith('Shelf ') ? { partId: 'Shelf', copyId: `pattern:${Number(name.slice(-1)) - 1}`, name } : { partId: name, name };
 const model = (names: string[]): AssemblyModel => ({
   meshes: [],
+  solids: [],
   parts: [],
   placements: new Map(),
   problems: [],

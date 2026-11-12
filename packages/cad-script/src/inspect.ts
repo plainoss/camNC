@@ -1,5 +1,6 @@
 import {
   cadFaceSketches,
+  cadVariableProblems,
   cadVariableScope,
   cadSketchRegions,
   patternMaster,
@@ -25,10 +26,13 @@ import {
   isCadPart,
   activeDesign,
   physicalJoinedCopies,
+  smallestCornerRelief,
 } from '@wbcnc/cad';
 import { checkFurnitureConstruction } from './furnitureJoints';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
+import { nativeCurveReport, sketchCurveDetails } from './curveReport';
+import { curveExtremaPoints } from './curveBounds';
 import { isEdgeNotch } from './notch';
 
 export interface CadExpectation {
@@ -61,7 +65,7 @@ export type CadReportEntity =
   | { ref: string; type: 'line'; a: number[]; b: number[]; ends: string[]; construction?: true }
   | { ref: string; type: 'circle'; at: number[]; d: number; construction?: true }
   | { ref: string; type: 'arc'; at: number[]; r: number; a: number[]; b: number[]; ends: string[]; construction?: true }
-  | { ref: string; type: string; construction?: true };
+  | ({ ref: string; type: string; construction?: true } & Partial<ReturnType<typeof nativeCurveReport>>);
 export interface CadReportPart {
   name: string;
   thickness: number;
@@ -89,6 +93,8 @@ export interface CadReportPart {
     entities: CadReportEntity[];
     constraints: number;
     patterns?: { ref: string; copies: number }[];
+    offsets?: ReturnType<typeof sketchCurveDetails>['offsets'];
+    fitting?: ReturnType<typeof sketchCurveDetails>['fitting'];
   }[];
   /** Copy-specific material, in the family's local frame; ordinary copies continue sharing their source. */
   copyFeatures?: { ref: string; name: string; cuts: CadReportPart['cuts'] }[];
@@ -132,7 +138,14 @@ function curveExtremes(sketch: CadSketch | undefined): CadPoint[] {
   if (!sketch) return [];
   const points = new Map(sketch.entities.flatMap(e => (e.type === 'point' ? [[e.id, e] as const] : [])));
   return sketch.entities.flatMap(e => {
-    if (e.type !== 'circle' && e.type !== 'arc') return [];
+    if (e.type !== 'circle' && e.type !== 'arc') {
+      if (!['bezier', 'spline', 'ellipse', 'conic'].includes(e.type) || e.type === 'point') return [];
+      try {
+        return curveExtremaPoints(e, points);
+      } catch {
+        return [];
+      }
+    }
     const center = points.get(e.centerId);
     if (!center) return [];
     const extremes = [0, 1, 2, 3].map(quarter => ({
@@ -187,8 +200,7 @@ export function shortHandles(ids: readonly string[]): Map<string, string> {
   return handles;
 }
 
-function reportEntities(sketch: CadSketch): CadReportEntity[] {
-  const handles = shortHandles(sketch.entities.map(e => e.id));
+function reportEntities(sketch: CadSketch, handles: ReadonlyMap<string, string>): CadReportEntity[] {
   const ref = (id: string) => handles.get(id)!;
   const points = new Map(sketch.entities.flatMap(e => (e.type === 'point' ? [[e.id, e] as const] : [])));
   const at = (id: string) => xy(points.get(id)!);
@@ -213,14 +225,39 @@ function reportEntities(sketch: CadSketch): CadReportEntity[] {
           ...flag,
         },
       ];
-    return [{ ref: ref(e.id), type: e.type, ...flag }];
+    return [{ ref: ref(e.id), type: e.type, ...nativeCurveReport(sketch, e, ref), ...flag }];
   });
 }
 
 /** Room around the part on its board, mm: enough for the bit and the tabs. */
 const BOARD_MARGIN = 20;
 
+/**
+ * Planned summaries by everything planning reads, so inspecting a design again (the assistant inspects the open design
+ * and each checked candidate) only plans the parts that changed. Planning one part takes up to a second.
+ */
+const plannedSummaries = new Map<string, CadToolpathSummary>();
+const kPlannedSummaries = 256;
+
 function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof profileFeatures>, cornerRelief?: number): CadToolpathSummary {
+  // `profile` is derived from these fields alone, and the board from them and the profile.
+  const { partId, name, thickness, outline, holes, cuts } = source;
+  const key = JSON.stringify({ partId, name, thickness, outline, holes, cuts, cornerRelief });
+  let summary = plannedSummaries.get(key);
+  if (!summary) {
+    summary = planToolpathSummary(source, profile, cornerRelief);
+    if (plannedSummaries.size >= kPlannedSummaries) plannedSummaries.delete(plannedSummaries.keys().next().value!);
+    plannedSummaries.set(key, summary);
+  }
+  // Each report gets its own copy, so a caller changing one can't change what a later inspection returns.
+  return structuredClone(summary);
+}
+
+function planToolpathSummary(
+  source: EvaluatedCadPart,
+  profile: ReturnType<typeof profileFeatures>,
+  cornerRelief?: number
+): CadToolpathSummary {
   const [w, h] = profile.size;
   const board: BoardRequest = {
     id: 'check',
@@ -322,7 +359,8 @@ export async function inspectCadDocument(
     const handles = shortHandles(all);
     return ids.map(id => handles.get(id) ?? id);
   };
-  for (const d of solved.diagnostics) {
+  // A value that can't follow its variables keeps its last good one, so the design the check solved disagrees with them.
+  for (const d of [...solved.diagnostics, ...cadVariableProblems(input)]) {
     const part = solved.document.parts.find(part => part.id === d.partId);
     const constraints = part && [part.sketch, ...cadFaceSketches(part).map(face => face.sketch)].flatMap(sketch => sketch.constraints);
     const ids =
@@ -350,9 +388,15 @@ export async function inspectCadDocument(
   // Physical membership is derived for quantity/name metadata; authoring sketches and history stay in the saved source.
   const physical = physicalJoinedCopies(activeDesign(solved.document));
   // Bones widen a cut past what was drawn, so its opening is measured on the part without them.
-  const unrelieved = solved.document.parts.some(part => part.cornerRelief)
-    ? evaluateCadDocument({ ...solved.document, parts: solved.document.parts.map(({ cornerRelief: _, ...part }) => part) }).parts
-    : solved.parts;
+  // A Cut parts step can relieve its own openings, so its override is dropped as well.
+  const unrelieved =
+    solved.document.parts.some(part => part.cornerRelief) || solved.document.partCuts?.some(step => step.cornerRelief)
+      ? evaluateCadDocument({
+          ...solved.document,
+          parts: solved.document.parts.map(({ cornerRelief: _cornerRelief, ...part }) => part),
+          partCuts: solved.document.partCuts?.map(({ cornerRelief: _cornerRelief, ...step }) => step),
+        }).parts
+      : solved.parts;
   const parts = solved.document.parts.map((part: CadPart): CadReportPart => {
     const physicalPart = physical.parts.find(candidate => candidate.id === part.id)!;
     const evaluated = solved.parts.find(candidate => candidate.partId === part.id);
@@ -385,24 +429,45 @@ export async function inspectCadDocument(
     // it's drawn, so it has no status of its own on this part.
     const solvedHere = [!part.sketchOf, ...faces.map(face => !face.removedBy)];
     const statusOf = (i: number) => (solvedHere[i] ? statusesOf[solvedHere.slice(0, i).filter(Boolean).length] : undefined);
-    const reported = sketches.map(({ sketch, ref, on }, i) => ({
-      ref,
-      on,
-      freedom: statusOf(i)?.dof ?? null,
-      status: solvedHere[i] ? (statusOf(i)?.status ?? 'invalid') : 'shared',
-      entities: reportEntities(sketch),
-      constraints: sketch.constraints.length,
-      ...(() => {
-        const patterns = sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern');
-        const handles = shortHandles(sketch.constraints.map(c => c.id));
-        return patterns.length
-          ? { patterns: patterns.map(pattern => ({ ref: handles.get(pattern.id)!, copies: pattern.countX * pattern.countY - 1 })) }
-          : {};
-      })(),
-    }));
+    // Curve and fitting reports can reference every control and dimension. Build each shortest-prefix map once,
+    // rather than rebuilding its quadratic collision search for every reference in a large fitted sketch.
+    const handlesBySketch = new Map(
+      sketches.map(({ sketch }) => [
+        sketch.id,
+        {
+          entities: shortHandles(sketch.entities.map(entity => entity.id)),
+          constraints: shortHandles(sketch.constraints.map(constraint => constraint.id)),
+        },
+      ])
+    );
+    const reported = sketches.map(({ sketch, ref, on }, i) => {
+      const handles = handlesBySketch.get(sketch.id)!;
+      const patterns = sketch.constraints.filter(c => c.type === 'linearPattern' || c.type === 'circularPattern');
+      return {
+        ref,
+        on,
+        freedom: statusOf(i)?.dof ?? null,
+        status: solvedHere[i] ? (statusOf(i)?.status ?? 'invalid') : 'shared',
+        entities: reportEntities(sketch, handles.entities),
+        constraints: sketch.constraints.length,
+        ...sketchCurveDetails(
+          sketch,
+          id => handles.entities.get(id) ?? id,
+          id => handles.constraints.get(id) ?? id
+        ),
+        ...(patterns.length
+          ? {
+              patterns: patterns.map(pattern => ({
+                ref: handles.constraints.get(pattern.id)!,
+                copies: pattern.countX * pattern.countY - 1,
+              })),
+            }
+          : {}),
+      };
+    });
     for (const sketch of [part.sketch, ...faces.map(face => face.sketch)]) {
       const regions = cadSketchRegions(part, sketch.id);
-      const handles = shortHandles(sketch.constraints.map(c => c.id));
+      const handles = handlesBySketch.get(sketch.id)!.constraints;
       // A copy cuts its outline less any islands inside it, so an island changes it as much as a changed outline.
       const area = (region: (typeof regions)[number]) =>
         Math.abs(polygonArea(region.points)) - region.holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0);
@@ -511,7 +576,7 @@ export async function inspectCadDocument(
             part: part.name,
           });
         else if (options.toolpaths !== false) {
-          toolpaths = toolpathSummary(evaluated, profile, part.cornerRelief?.diameter);
+          toolpaths = toolpathSummary(evaluated, profile, smallestCornerRelief(solved.document, part.id));
           // CAM leaves out what no tool fits, so the part wouldn't come out as drawn.
           const dropped = toolpaths.warnings.find(warning => warning.includes('no tool fits'));
           if (dropped) warnings.push({ code: 'toolpath-missing', message: `A cut wouldn't be machined: ${dropped}`, part: part.name });

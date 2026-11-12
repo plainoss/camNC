@@ -20,6 +20,7 @@ import {
   sharesSketch,
   sketchOwnerId,
   sketchRegions,
+  sketchStepLabel,
   splitApartRegions,
   type CadDocument,
   type CadPart,
@@ -219,10 +220,10 @@ export function ExtrudeDialog({
     part.faceProfile && part.drawnOn
       ? drawnOnName(document, part.drawnOn.on)
       : regionCount === null
-        ? `${owner.name}’s sketch`
+        ? sketchStepLabel(owner)
         : regionCount === 1
-          ? `A region of ${owner.name}’s sketch`
-          : `${regionCount} regions of ${owner.name}’s sketch`;
+          ? `A region of ${sketchStepLabel(owner)}`
+          : `${regionCount} regions of ${sketchStepLabel(owner)}`;
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';

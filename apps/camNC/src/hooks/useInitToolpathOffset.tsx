@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
 
+import { isManufacturingLocked } from '@/cam/machine/camMachine';
 import { getCncApi } from '@/lib/fluidnc/machine';
 import { useStore } from '@/store/store';
 
@@ -31,6 +32,9 @@ export function useInitToolpathOffset(): void {
     if (hasInitialised.current) return;
     if (!toolpath || !currentZero) return;
     if (offset.x !== 0 || offset.y !== 0) return;
+    // While a job runs, is being prepared or waits to be recovered, the drawing shows where that job cuts: moving it to
+    // the zero would show the cut somewhere else, and a recovered job would resume from the moved spot.
+    if (isManufacturingLocked()) return;
 
     // Align toolpath to machine zero.
     setOffset(new Vector3(currentZero.x, currentZero.y, 0));

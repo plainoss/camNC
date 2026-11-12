@@ -206,6 +206,14 @@
         "react/only-export-components": "off"
       }
     },
+    // Recorded trial scripts are kept exactly as they were written (see packages/cad-script/fixtures/tasks/README.md),
+    // unused names included.
+    {
+      "files": ["packages/cad-script/fixtures/tasks/recordings/**"],
+      "rules": {
+        "no-unused-vars": "off"
+      }
+    },
     {
       "files": ["packages/ui/**", "packages/camera-calibration/src/components/CoverageHeatmap.tsx"],
       "rules": {

@@ -1,13 +1,18 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { assemblyReport, evaluateCadDocument, type CadDocument } from '@wbcnc/cad';
+import { assemblyReport, evaluateCadDocument, parseCadDocument, type CadDocument } from '@wbcnc/cad';
 import { cupboard, editCad, inspectCadDocument } from '@wbcnc/cad-script';
-import { cadProposal, type CadProposal } from '@wbcnc/cad-editor/proposal';
-import type { CadSession } from '@wbcnc/cad-editor/session';
+import { cadProposal, compareCadProposal, type CadProposal } from '@wbcnc/cad-editor/proposal';
+import { sameContent, type CadSession } from '@wbcnc/cad-editor/session';
 import { ProposalReview } from './ProposalReview';
 import { assistantSelection } from './assistant/selection';
+import { listedStudioParts } from './studioParts';
 import type { AssistantProposalState } from './assistant/useAssistantProposal';
 import './assistant/dock.css';
+import { SvgInsert } from './svg/SvgInsert';
+import { useSvgAssetSession } from './svg/useSvgAssetSession';
+
+const unchangedFile = 'This file matches the open design. Reviewing it would change nothing.';
 
 const AssistantDock = lazy(() => import('./assistant/Dock').then(module => ({ default: module.AssistantDock })));
 
@@ -27,10 +32,19 @@ export function StudioProposals({
   disabled?: boolean;
   onApply: (document: CadDocument) => void;
 }) {
+  useSvgAssetSession(document.id);
   const [assistant, setAssistant] = useState(false);
   const [proposal, setProposal] = useState<CadProposal | null>(null);
+  // A new review, not a re-checked tweak of the same one, starts with fresh sliders.
+  const [reviewKey, setReviewKey] = useState(0);
   const assistantProposal = useRef<CadProposal | null>(null);
   const [error, setError] = useState('');
+  // A file that would change nothing is not a failure: say so neutrally, with the same way out.
+  const [notice, setNotice] = useState('');
+  const clearMessages = () => {
+    setError('');
+    setNotice('');
+  };
   const [building, setBuilding] = useState(false);
   const tools = useRef<HTMLDivElement>(null);
   const [overlayHost, setOverlayHost] = useState<Element | null>(null);
@@ -38,20 +52,42 @@ export function StudioProposals({
   useEffect(() => setOverlayHost(tools.current?.closest('.cad-editor') ?? null), []);
   const insert = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  // The editor stops keydown propagation, so listen in the capture phase on its host; never consume the key.
+  useEffect(() => {
+    if (!overlayHost || !(error || notice)) return;
+    const dismiss = (event: Event) => {
+      const keyboard = event as KeyboardEvent;
+      if (keyboard.key !== 'Escape' || keyboard.isComposing) return;
+      if ((event.target as HTMLElement).closest?.('input, textarea, select, [contenteditable="true"], dialog, [role="dialog"]')) return;
+      setError('');
+      setNotice('');
+    };
+    overlayHost.addEventListener('keydown', dismiss, true);
+    return () => overlayHost.removeEventListener('keydown', dismiss, true);
+  }, [overlayHost, error, notice]);
   const [sizes, setSizes] = useState({ width: 600, height: 720, depth: 300, board: 18, shelves: 3 });
   const reviewFile = async (file: File) => {
     if (building || disabled) return;
     const start = structuredClone(document);
     setBuilding(true);
-    setError('');
+    clearMessages();
     setProposal(null);
     try {
-      const candidate = cadProposal(start, JSON.parse(await file.text()));
+      const parsed = parseCadDocument(JSON.parse(await file.text()));
+      if (parsed.id !== start.id) throw new Error('This file is a different design. Open it from Projects › Open model… instead.');
+      // Check before solving: an untouched new design fails the check only because its sketch is still empty.
+      // Revisions are ignored, so an edit and its undo still match the file saved before them.
+      if (sameContent(parsed, parseCadDocument(structuredClone(start)))) return setNotice(unchangedFile);
+      const candidate = cadProposal(start, parsed);
       // Saved coordinates can lag behind their constraints. Review exactly the solved geometry Apply will keep.
       const checked = await inspectCadDocument(candidate.document);
       if (!checked.report.ok)
         throw new Error(checked.report.errors.map(error => error.message).join('\n') || 'Fix this design before reviewing it.');
-      setProposal(cadProposal(start, checked.document));
+      const next = cadProposal(start, checked.document);
+      const comparison = compareCadProposal(next);
+      if (!comparison.added.length && !comparison.changed.length && !comparison.removed.length) return setNotice(unchangedFile);
+      setProposal(next);
+      setReviewKey(key => key + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to read this design.');
     } finally {
@@ -75,12 +111,14 @@ export function StudioProposals({
           depth: `${sizes.depth}mm`,
           board: `${sizes.board}mm`,
           shelves: sizes.shelves,
-          at: [start.parts.length ? x + 100 : 0, 0, 0],
+          // A new design's hidden placeholder Part 1 is not a part to keep clear of.
+          at: [listedStudioParts(start).length ? x + 100 : 0, 0, 0],
         })
       );
       if (!result.ok) throw new Error(result.scriptError ?? result.report.errors.map(error => error.message).join('\n'));
       insert.current?.close();
       setProposal(cadProposal(start, result.document));
+      setReviewKey(key => key + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to build this cupboard.');
     } finally {
@@ -93,12 +131,13 @@ export function StudioProposals({
         <details className="cad-insert-menu">
           <summary>Insert</summary>
           <div>
+            <SvgInsert document={document} disabled={disabled || building} onProposal={setProposal} />
             <button
               type="button"
               disabled={disabled || building}
               onClick={event => {
                 event.currentTarget.closest('details')?.removeAttribute('open');
-                setError('');
+                clearMessages();
                 insert.current?.showModal();
               }}>
               Cupboard…
@@ -108,6 +147,7 @@ export function StudioProposals({
               disabled={disabled || building}
               onClick={event => {
                 event.currentTarget.closest('details')?.removeAttribute('open');
+                clearMessages();
                 input.current?.click();
               }}>
               Review design file…
@@ -120,7 +160,10 @@ export function StudioProposals({
           aria-label="Assistant"
           aria-pressed={assistant}
           disabled={disabled}
-          onClick={() => setAssistant(value => !value)}>
+          onClick={() => {
+            clearMessages();
+            setAssistant(value => !value);
+          }}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 4h16v12H9l-5 4V4Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </svg>
@@ -139,9 +182,20 @@ export function StudioProposals({
           }}
         />
         {error && !insert.current?.open && (
-          <span role="alert" className="cad-proposal-error">
-            {error}
-          </span>
+          <div role="alert" className="cad-proposal-error">
+            <span>{error}</span>
+            <button type="button" aria-label="Dismiss message" onClick={clearMessages}>
+              ×
+            </button>
+          </div>
+        )}
+        {notice && !error && (
+          <div role="status" className="cad-proposal-error cad-proposal-notice">
+            <span>{notice}</span>
+            <button type="button" aria-label="Dismiss message" onClick={clearMessages}>
+              ×
+            </button>
+          </div>
         )}
       </div>
       {overlayHost &&
@@ -195,6 +249,7 @@ export function StudioProposals({
                   onProposal={value => {
                     assistantProposal.current = value;
                     setProposal(value);
+                    setReviewKey(key => key + 1);
                   }}
                   onClose={() => setAssistant(false)}
                 />
@@ -202,6 +257,7 @@ export function StudioProposals({
             )}
             {proposal && (
               <ProposalReview
+                key={reviewKey}
                 proposal={proposal}
                 session={session}
                 currentDocument={document}
@@ -223,6 +279,19 @@ export function StudioProposals({
                   assistantProposal.current = null;
                   setProposal(null);
                 }}
+                onReplace={
+                  assistantProposal.current === proposal
+                    ? next => {
+                        // A tweak re-checked in review becomes the assistant's proposal, kept after closing as before,
+                        // unless the dock has offered a newer one meanwhile.
+                        if (checkedProposal.proposal !== proposal) return false;
+                        assistantProposal.current = next;
+                        checkedProposal.receive(next);
+                        setProposal(next);
+                        return true;
+                      }
+                    : undefined
+                }
               />
             )}
           </>,

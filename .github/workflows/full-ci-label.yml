@@ -1,0 +1,29 @@
+name: Remove full-ci
+
+# `full-ci` runs every browser shard and spec shard on a PR, 7 extra jobs per push. It is meant for one validation run,
+# so once a CI run on the PR passes, the label comes off and later pushes run the quick suites again. Add it again to
+# repeat the full run. Never checks out code.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  remove:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success' && !startsWith(github.event.workflow_run.head_branch, 'mergify/merge-queue/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Remove the label from the run's PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PRS: ${{ toJSON(github.event.workflow_run.pull_requests.*.number) }}
+        run: |
+          for pr in $(jq -r '.[]' <<< "$PRS"); do
+            # 404 when the PR doesn't carry the label.
+            gh api -X DELETE "repos/$REPO/issues/$pr/labels/full-ci" > /dev/null 2>&1 && echo "Removed full-ci from #$pr" || true
+          done

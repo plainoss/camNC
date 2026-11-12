@@ -77,7 +77,8 @@ it('preserves the usable seat with an explicit expanded keyed envelope and durab
   ).toBe(true);
   // Purchased bolts/nuts are deliberately absent from the wooden blank handoff.
   expect(result.report.parts.map(p => p.name)).not.toContain('key-locking-bolt');
-});
+  // Builds the whole chair, then re-evaluates it after several edits: about 23 s alone, more under a parallel run.
+}, 90_000);
 
 it('does not hide a functional-seat loss behind an outside-envelope check', async () => {
   const result = await editCad(null, panelChair({ width: '440mm', depth: '420mm', seatWidth: '404mm', seatDepth: '402mm' }));

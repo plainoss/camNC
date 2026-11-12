@@ -5,6 +5,8 @@ import { endCadSession } from '@wbcnc/cad-editor/session';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { CadEditor } from './CadEditor';
+import { settled } from '@/test/settled';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 const sessions: string[] = [];
@@ -31,45 +33,55 @@ async function studio(document = plate()) {
       <CadEditor document={document} startIn3D onDraftChange={change} onFinish={async () => {}} onCancel={() => {}} />
     </div>
   );
-  await waitFor(() => expect(documentElement().getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
-  await waitFor(() => expect(viewport().instanceIds).toContain(document.parts[0]!.id), { timeout: 10_000 });
-  // The viewport can render before the opening solver publishes normalized placements; aria-busy only tracks editor actions.
-  await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
+  // The viewport is loaded lazily, which the settled signal can't see before its module arrives: wait for its props.
+  await waitFor(() => expect(viewport().instanceIds).toContain(document.parts[0]!.id), { timeout: 20_000 });
+  // Then the opening solver, which can publish normalized placements after the viewport renders.
+  await settled();
+  expect(documentElement().getAttribute('aria-busy')).toBe('false');
+  expect(screen.queryByText(/^Checking sketch/)).toBeNull();
   const latest = () => change.mock.calls.at(-1)?.[0] ?? document;
   return { document, change, latest };
 }
 async function transform() {
-  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Transform/ }));
+  await userEvent.click(await studioCommand(/Transform/));
   return screen.findByRole('dialog', { name: /^Transform/ });
 }
 async function typeX(dialog: HTMLElement, value: string) {
   const field = within(dialog).getByRole('textbox', { name: 'X' });
   await userEvent.clear(field);
   await userEvent.type(field, value);
+  // Every keystroke reached the field, so a preview that lags behind it is a dropped update rather than a lost key (#852).
+  expect(field).toHaveValue(value);
   expect(document.activeElement).toBe(field);
 }
 
 it('previews XYZ geometry while the field retains focus, cancels cleanly, and accepts one undoable change', async () => {
   const { change, latest } = await studio();
-  await waitFor(() => expect(extent(0)).toEqual([0, 200]));
+  expect(extent(0)).toEqual([0, 200]);
   let dialog = await transform();
   change.mockClear();
   await typeX(dialog, '25');
-  await waitFor(() => expect(extent(0)).toEqual([25, 225]));
+  await settled();
+  expect(extent(0)).toEqual([25, 225]);
   expect(change).not.toHaveBeenCalled();
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(extent(0)).toEqual([0, 200]));
+  await settled();
+  expect(extent(0)).toEqual([0, 200]);
   expect(change).not.toHaveBeenCalled();
   dialog = await transform();
   await typeX(dialog, '35');
-  await waitFor(() => expect(extent(0)).toEqual([35, 235]));
+  await settled();
+  expect(extent(0)).toEqual([35, 235]);
   await typeX(dialog, '60');
-  await waitFor(() => expect(extent(0)).toEqual([60, 260]));
+  await settled();
+  expect(extent(0)).toEqual([60, 260]);
   expect(change).not.toHaveBeenCalled();
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(latest().parts[0]!.moved).toEqual({ by: [60, 0, 0] }));
+  await settled();
+  expect(latest().parts[0]!.moved).toEqual({ by: [60, 0, 0] });
   await userEvent.click(screen.getByRole('button', { name: /^Undo/ }));
-  await waitFor(() => expect(extent(0)).toEqual([0, 200]));
+  await settled();
+  expect(extent(0)).toEqual([0, 200]);
   expect(latest().parts[0]!.moved).toBeUndefined();
 });
 
@@ -77,21 +89,25 @@ it('previews edits to one existing transformed copy without accumulating copies 
   const source = plate();
   source.parts[0]!.copies = [{ id: 'shifted', name: 'Shifted', offset: { position: [50, 0, 0], rotation: [0, 0, 0, 1] } }];
   const { change } = await studio(resolvePartPatterns(source));
-  await waitFor(() => expect(viewport().meshes).toHaveLength(2));
+  expect(viewport().meshes).toHaveLength(2);
   const features = screen.getByRole('region', { name: 'Features' });
   await userEvent.dblClick(within(features).getByRole('button', { name: /Transform · / }));
   const dialog = await screen.findByRole('dialog', { name: /^Transform/ });
   change.mockClear();
   const copyIndex = () => viewport().instanceIds!.findIndex(id => id.endsWith('/shifted'));
-  await waitFor(() => expect(copyIndex()).toBeGreaterThanOrEqual(0));
+  await settled();
+  expect(copyIndex()).toBeGreaterThanOrEqual(0);
   await typeX(dialog, '70');
-  await waitFor(() => expect(extent(copyIndex())).toEqual([70, 270]));
+  await settled();
+  expect(extent(copyIndex())).toEqual([70, 270]);
   await typeX(dialog, '90');
-  await waitFor(() => expect(extent(copyIndex())).toEqual([90, 290]));
+  await settled();
+  expect(extent(copyIndex())).toEqual([90, 290]);
   expect(viewport().meshes).toHaveLength(2);
   expect(change).not.toHaveBeenCalled();
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(extent(copyIndex())).toEqual([50, 250]));
+  await settled();
+  expect(extent(copyIndex())).toEqual([50, 250]);
   expect(change).not.toHaveBeenCalled();
 });
 
@@ -124,15 +140,15 @@ it.each([false, true])(
     };
     // Entering mate mode already activates the original connector. Selecting it activates the destination.
     pick(original.id, [200, 100, 0], [0, 0, -1]);
-    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mate connector' }).textContent).toMatch(/Plate at 200, 100, 0/));
+    await settled();
+    expect(within(dialog).getByRole('button', { name: 'Mate connector' }).textContent).toMatch(/Plate at 200, 100, 0/);
     expect(within(dialog).getByRole('button', { name: 'Mate connector to move to' }).hasAttribute('data-active')).toBe(true);
-    await waitFor(() =>
-      expect(viewport().connectors).toEqual([
-        expect.objectContaining({ label: 'Source mate connector', point: [200, 100, 0], normal: [0, 0, -1] }),
-      ])
-    );
+    expect(viewport().connectors).toEqual([
+      expect.objectContaining({ label: 'Source mate connector', point: [200, 100, 0], normal: [0, 0, -1] }),
+    ]);
     pick(destination, destinationPoint, [0, 0, 1]);
-    await waitFor(() => expect(viewport().meshes).toHaveLength(5));
+    await settled();
+    expect(viewport().meshes).toHaveLength(5);
     expect(viewport().connectors).toEqual([
       expect.objectContaining({ label: 'Source mate connector', point: [200, 100, 0] }),
       expect.objectContaining({ label: 'Destination mate connector', point: destinationPoint }),
@@ -144,7 +160,8 @@ it.each([false, true])(
     expect(extent(copied, 2)).toEqual([18, 36]);
     expect(change).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(viewport().meshes).toHaveLength(4));
+    await settled();
+    expect(viewport().meshes).toHaveLength(4);
     expect(viewport().connectors).toEqual([]);
     expect(change).not.toHaveBeenCalled();
   }

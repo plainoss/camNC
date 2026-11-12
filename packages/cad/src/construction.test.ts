@@ -68,6 +68,18 @@ function fixture() {
 }
 
 describe('durable construction source and compatibility', () => {
+  it('refuses a plan whose IDs repeat one already in the design, so the saved file still opens', () => {
+    const { document, plan } = fixture();
+    const partId = document.parts[0]!.id;
+    expect(() => setCadConstruction(document, { ...plan, id: partId })).toThrow(/unique/);
+    expect(() => setCadConstruction(document, { ...plan, id: 'furniture' })).toThrow(/unique/);
+    const first = setCadConstruction(document, plan);
+    expect(() => setCadConstruction(first, { ...plan, id: 'second' })).toThrow(/unique/);
+    // Replacing a plan with itself keeps its own IDs.
+    const replaced = setCadConstruction(first, structuredClone(plan));
+    expect(parseCadDocument(JSON.parse(JSON.stringify(replaced))).constructions).toHaveLength(1);
+  });
+
   it('opts only construction-bearing documents into v6 and preserves facts across JSON reload', () => {
     const { document, plan } = fixture();
     expect(document.version).toBe(3);

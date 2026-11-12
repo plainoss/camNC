@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readdirSync, readFileSync } from 'node:fs';
-import { parseShard, selectShard, scenarioWeight } from '../apps/camNC/e2e/spec/sharding.mjs';
+import { parseShard, selectShard, scenarioWeight, shardReservations } from '../apps/camNC/e2e/spec/sharding.mjs';
 
-const directory = new URL('../apps/camNC/e2e/spec/scenarios/sketch/', import.meta.url);
-const scenarios = readdirSync(directory).filter(file => file.endsWith('.json')).flatMap(file => JSON.parse(readFileSync(new URL(file, directory), 'utf8')));
+const directory = new URL('../apps/camNC/e2e/spec/scenarios/', import.meta.url);
+const scenarios = readdirSync(directory, { recursive: true }).filter(file => file.endsWith('.json')).flatMap(file => JSON.parse(readFileSync(new URL(file, directory), 'utf8')));
 
 test('every real behaviour scenario runs exactly once across deterministic balanced shards', () => {
   for (const count of [1, 2, 3, 4]) {
@@ -13,9 +13,18 @@ test('every real behaviour scenario runs exactly once across deterministic balan
     for (let index = 1; index <= count; index++) {
       assert.deepEqual(selectShard([...scenarios].reverse(), { index, count }).map(s => s.id).sort(), shards[index - 1].map(s => s.id).sort());
     }
-    const weights = shards.map(list => list.reduce((sum, scenario) => sum + scenarioWeight(scenario), 0));
+    const reserved = shardReservations(count);
+    const weights = shards.map((list, i) => list.reduce((sum, scenario) => sum + scenarioWeight(scenario), reserved[i] ?? 0));
     assert(Math.max(...weights) - Math.min(...weights) <= Math.max(...scenarios.map(scenarioWeight)));
   }
+});
+
+test('the first shard runs fewer scenarios to make room for its extra CI checks', () => {
+  assert.deepEqual(shardReservations(1), []);
+  const [reserve] = shardReservations(4);
+  assert(reserve > 0);
+  const load = index => selectShard(scenarios, { index, count: 4 }).reduce((sum, scenario) => sum + scenarioWeight(scenario), 0);
+  assert(load(1) + reserve / 2 < Math.min(load(2), load(3), load(4)));
 });
 
 test('bad shard arguments cannot quietly skip coverage', () => {

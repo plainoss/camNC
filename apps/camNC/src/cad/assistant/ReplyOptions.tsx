@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import type { AssistantChoiceSketch } from './choiceSketch';
+import { answerQuestionFields, type AssistantQuestionField } from './questionFields';
+import type { AssistantRequirements } from './requirements';
 
 /** The text is the answer; optional sketches only illustrate the choice. */
 export function ReplyOptions({
@@ -6,13 +9,52 @@ export function ReplyOptions({
   disabled,
   onReply,
 }: {
-  question: { question?: string; choices: string[]; sketches?: AssistantChoiceSketch[] };
+  question: { question?: string; choices: string[]; sketches?: AssistantChoiceSketch[]; fields?: AssistantQuestionField[] };
   disabled: boolean;
-  onReply: (choice: string) => void;
+  /** Typed field answers come with the requirements they confirm. */
+  onReply: (choice: string, requirements?: AssistantRequirements) => void;
 }) {
+  const fields = question.fields ?? [];
+  const [values, setValues] = useState<Record<string, number | undefined>>(() =>
+    Object.fromEntries(fields.map(field => [field.name, field.value]))
+  );
+  const answer = answerQuestionFields(fields, values);
   return (
     <div className="cad-assistant-replies" role="group" aria-label="Suggested replies">
       {question.question && <p className="cad-assistant-reply-question">{question.question}</p>}
+      {fields.length > 0 && (
+        <form
+          className="cad-assistant-fields"
+          aria-label="Answer with values"
+          onSubmit={event => {
+            event.preventDefault();
+            if (answer.text) onReply(answer.text, answer.requirements);
+          }}>
+          <div>
+            {fields.map(field => (
+              <label key={field.name}>
+                {field.label}
+                <span>
+                  <input
+                    type="number"
+                    min={field.unit === 'count' ? 0 : 0.1}
+                    step={field.unit === 'count' ? 1 : 'any'}
+                    disabled={disabled}
+                    value={values[field.name] ?? ''}
+                    onChange={event =>
+                      setValues(previous => ({ ...previous, [field.name]: event.target.value ? Number(event.target.value) : undefined }))
+                    }
+                  />
+                  {field.unit === 'mm' && <small>mm</small>}
+                </span>
+              </label>
+            ))}
+          </div>
+          <button type="submit" className="cad-assistant-primary" disabled={disabled || !answer.text}>
+            Use these values
+          </button>
+        </form>
+      )}
       {question.choices.map((choice, index) => {
         const sketch = question.sketches?.find(item => item.choiceIndex === index);
         const colon = choice.indexOf(':');
