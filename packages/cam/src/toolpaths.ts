@@ -31,6 +31,7 @@ import {
   finishRoles,
 } from './passPlanning';
 import { pocketOperation } from './pocketOperation';
+import { outlineNotchWarning } from './outlineReach';
 
 export { DEFAULT_SETTINGS, DEFAULT_TOOL } from './toolpathTypes';
 export type { CamSettings, HoleChoice, HoleMiddle, Operation, PartCam, Pass, Tool } from './toolpathTypes';
@@ -639,7 +640,13 @@ export function camPart(features: PartFeatures, settings: Partial<CamSettings> =
         );
       }
     });
-  if (s.cutThrough) features.outlines.forEach((o, i) => ops.push(profileOperation(`Outline ${i + 1}`, o, top, tools[0], s)));
+  if (s.cutThrough)
+    features.outlines.forEach((o, i) => {
+      ops.push(profileOperation(`Outline ${i + 1}`, o, top, tools[0], s));
+      // The outline's path bridges notches narrower than the bit, such as finger slots: say so, they'd stay uncut.
+      const notches = outlineNotchWarning(i, o, tools[0].diameter, offsetToleranceFor(s));
+      if (notches) warnings.push(notches);
+    });
   if (features.bottomFaces.length && s.cutThrough)
     warnings.push(`bottom-side features at z=${features.bottomFaces.map(b => b.z).join(', ')}: need a second (flipped) setup`);
   if (features.slopedArea > 1) warnings.push(`${features.slopedArea.toFixed(0)}mm² of sloped faces ignored (not 2.5D)`);

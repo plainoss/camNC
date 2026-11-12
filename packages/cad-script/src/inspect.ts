@@ -27,6 +27,7 @@ import {
   activeDesign,
   physicalJoinedCopies,
 } from '@wbcnc/cad';
+import { narrowFingersWarning } from './narrowFingers';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
 
 import { nativeCurveReport, sketchCurveDetails } from './curveReport';
@@ -573,6 +574,8 @@ export async function inspectCadDocument(
           // CAM leaves out what no tool fits, so the part wouldn't come out as drawn.
           const dropped = toolpaths.warnings.find(warning => warning.includes('no tool fits'));
           if (dropped) warnings.push({ code: 'toolpath-missing', message: `A cut wouldn't be machined: ${dropped}`, part: part.name });
+          const narrow = narrowFingersWarning(solved.document, evaluated, toolpaths.warnings, nameOf);
+          if (narrow) warnings.push({ code: 'toolpath-missing', message: narrow, part: part.name });
           const unrelieved = toolpaths.warnings.find(warning => warning.includes('relieved for'));
           if (unrelieved) warnings.push({ code: 'relief-bit', message: unrelieved, part: part.name });
           if (toolpaths.blocked.length)
