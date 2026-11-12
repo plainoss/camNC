@@ -24,6 +24,8 @@ export interface CadEditorProps {
    */
   onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string, scene?: FaceSketchScene, fromStudio?: boolean) => void;
   partCameraState?: StudioCameraRef;
+  /** The Part Studio's camera, kept by the host so the view stays as it was left when the editor opens again. */
+  studioCameraState?: StudioCameraRef;
   /** Editing one face sketch, with the part's outline shown behind it. It can be open, and it isn't a profile. */
   faceSketch?: { outline: CadPoint[]; floor?: CadPoint[]; label: string; below?: boolean; scene?: FaceSketchScene };
   /** Open in 3D, when there's an outline to show: the whole design, or with `'part'` the selected part on its own. */

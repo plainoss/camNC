@@ -238,7 +238,7 @@ import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, normalTurn, straightOn, type SketchTurn } from './sketchOrbit';
-import { captureSketchCamera, carriedSketchCamera, type StudioCameraState } from './studioCamera';
+import { captureSketchCamera, carriedSketchCamera, useEditorCameras } from './studioCamera';
 import { studioViewShortcut } from './studioViewShortcut';
 import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
@@ -280,6 +280,7 @@ export function CadEditor({
   controller,
   onEditFaceSketch,
   partCameraState: suppliedPartCamera,
+  studioCameraState: suppliedStudioCamera,
   faceSketch,
   startIn3D,
   selectedStepId,
@@ -437,9 +438,7 @@ export function CadEditor({
   const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
   const [sketchTurn, setSketchTurn] = useState<SketchTurn>(faceOpening?.turn ?? straightOn);
-  const studioCamera = useRef<StudioCameraState | null>(null);
-  const ownPartCamera = useRef<StudioCameraState | null>(null);
-  const partCameraState = suppliedPartCamera ?? ownPartCamera;
+  const { studioCamera, partCameraState } = useEditorCameras(suppliedStudioCamera, suppliedPartCamera);
   const [sketchCameraShift, setSketchCameraShift] = useState<[number, number]>(faceOpening?.shift ?? [0, 0]);
   // The edges of the parts behind a studio sketch, laid on its plane, and those picked to use in it with `u`.
   const [partEdges, setPartEdges] = useState<PartEdge[]>([]);

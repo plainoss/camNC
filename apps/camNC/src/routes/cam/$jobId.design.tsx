@@ -107,6 +107,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     fromStudio?: boolean;
   } | null>(null);
   const partCameraState = useRef<StudioCameraRef['current']>(null);
+  const studioCameraState = useRef<StudioCameraRef['current']>(null);
   const [conflicted, setConflicted] = useState(!!session.conflict);
   const [recovering, setRecovering] = useState(false);
   const activeSession = useRef(session);
@@ -392,6 +393,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
             document={editorDocument}
             editSession={session}
             partCameraState={partCameraState}
+            studioCameraState={studioCameraState}
             startIn3D={returnTo && !returnTo.studio ? 'part' : true}
             {...(returnTo?.studio && returnTo.stepId && { selectedStepId: returnTo.stepId })}
             onEditFaceSketch={(base, partId, sketchId, scene, fromStudio) => {
