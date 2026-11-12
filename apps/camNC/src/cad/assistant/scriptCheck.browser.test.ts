@@ -67,7 +67,10 @@ describe('isolated browser design checks', () => {
   it('imports the furniture patterns, whose measured construction checks pass', async () => {
     const result = await checkScriptInBrowser(
       createCadDocument(),
-      `import { design, frameStool, panelChair } from '@wbcnc/cad-script';\nexport default design(d => { frameStool()(d); panelChair({ name: 'Chair', at: [500, 0, 0] })(d); });`
+      `import { design, frameStool, panelChair } from '@wbcnc/cad-script';\nexport default design(d => { frameStool()(d); panelChair({ name: 'Chair', at: [500, 0, 0] })(d); });`,
+      // The assistant's geometry lane, as the Dock checks: the construction checks run without planning toolpaths. Building
+      // and measuring 38 parts twice takes about 15 s here, so the check gets the sandbox's longest budget on a busy runner.
+      { toolpaths: false, timeoutMs: 60_000 }
     );
     expect(result.scriptError).toBeUndefined();
     expect(result.report.errors).toEqual([]);
