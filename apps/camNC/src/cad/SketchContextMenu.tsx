@@ -10,7 +10,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@wbcnc/ui/components/dropdown-menu';
-import { sketchContextItems, type SketchContext, type SketchContextAction } from '@wbcnc/cad-editor/sketchContext';
+import { isPatternRelation, sketchContextItems, type SketchContext, type SketchContextAction } from '@wbcnc/cad-editor/sketchContext';
 import './SketchContextMenu.css';
 
 export interface SketchContextMenuProps {
@@ -41,7 +41,9 @@ export function SketchContextMenu({ sketch, context, busy = false, onClose, onAc
   const items = sketchContextItems(sketch, context, busy);
   const name =
     context.target.kind === 'constraint'
-      ? 'Sketch pattern menu'
+      ? isPatternRelation(sketch, context.target.id)
+        ? 'Sketch pattern menu'
+        : 'Sketch constraint menu'
       : context.target.kind === 'dimension'
         ? 'Sketch dimension menu'
         : context.target.kind === 'entity'
