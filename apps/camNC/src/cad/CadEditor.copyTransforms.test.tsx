@@ -7,6 +7,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { nativeCadModel } from '@/cam/nativeCadModel';
 import { boundaryVolume, orderedCopyFixture } from '@/test/orderedCopyFixture';
+import { settled } from '@/test/settled';
 import { CadEditor, type CadEditorController } from './CadEditor';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
@@ -35,15 +36,6 @@ async function open(source: CadDocument) {
       .mocked(ModelViewport)
       .mock.calls.findLast(([props]) => props.cameraState && props.meshes.some(mesh => mesh.partId === source.parts[0]!.id))![0];
   await waitFor(() => expect(props().cameraState!.current?.height).toBeGreaterThan(0), { timeout: 20_000 });
-  // Idle means not busy and not solving: aria-busy shows only the first, and the status line says "Checking sketch…" for the second.
-  const settled = () =>
-    waitFor(
-      () => {
-        expect(document.querySelector('.cad-editor')).toHaveAttribute('aria-busy', 'false');
-        expect(document.querySelector('.cad-status')?.textContent).not.toContain('Checking sketch');
-      },
-      { timeout: 20_000 }
-    );
   const top = async () => {
     frame.focus();
     await userEvent.keyboard('{Shift>}5{/Shift}');
@@ -61,9 +53,11 @@ async function open(source: CadDocument) {
     });
   };
   // prepareDocument returns null while the editor is busy or solving, as it is for a moment after a click or an Undo,
-  // so the document is only prepared once the editor is idle.
+  // so the document is only prepared once the editor is idle. The settled signal counts the solve from when it starts,
+  // and stays pending for two frames after a change, so it also covers the render that commits a new revision before
+  // the effect that starts its check runs (the status line still reads idle then).
   const prepare = async () => {
-    await settled();
+    await settled({ timeout: 20_000 });
     let value: CadDocument | null = null;
     act(() => {
       value = controller.current!.prepareDocument();
@@ -71,7 +65,17 @@ async function open(source: CadDocument) {
     if (!value) throw Error('The current source was not ready to save.');
     return value as CadDocument;
   };
-  return { ...mounted, controller, frame, props, click, top, settled, prepare, latest: () => change.mock.calls.at(-1)?.[0] ?? source };
+  return {
+    ...mounted,
+    controller,
+    frame,
+    props,
+    click,
+    top,
+    settled: () => settled({ timeout: 20_000 }),
+    prepare,
+    latest: () => change.mock.calls.at(-1)?.[0] ?? source,
+  };
 }
 
 // These workflows include actual lazy-renderer readiness, worker solving and a second imported renderer lifecycle.
