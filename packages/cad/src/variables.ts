@@ -97,16 +97,20 @@ export function cadVariableExpression(
 /**
  * A variable made in a value field, as `#name = value`: it's a value of the field's kind, so a plain number in a length
  * field is a length in the design's unit (`300` in a cm design is `300 cm`), and stays that size when the unit changes.
+ * In a count's `scalar` field it stays a number. Redefining a variable keeps its kind, `existing`, so what uses it, as
+ * `(#w) mm` uses a number, reads as before.
  */
 export function cadFieldVariableExpression(
   expression: string,
-  unit: 'mm' | 'deg',
+  unit: 'mm' | 'deg' | 'scalar',
   variables: CadValueScope,
-  lengthUnit: CadLengthUnit = 'mm'
+  lengthUnit: CadLengthUnit = 'mm',
+  existing?: CadVariableKind
 ): string {
+  const kind = existing ?? (unit === 'mm' ? 'length' : unit === 'deg' ? 'angle' : 'number');
   const text = expression.trim().replace(/^=/, '');
-  if (!('value' in parseCadValue(text, { unit: 'scalar', variables }))) return expression;
-  const suffix = unit === 'deg' ? '°' : ` ${lengthUnit}`;
+  if (kind === 'number' || !('value' in parseCadValue(text, { unit: 'scalar', variables }))) return expression;
+  const suffix = kind === 'angle' ? '°' : ` ${lengthUnit}`;
   return /^[+-]?(?:\d+[.,]?\d*|[.,]\d+)(?:e[+-]?\d+)?$/i.test(text) ? `${text}${suffix}` : `(${text})${suffix}`;
 }
 
@@ -229,10 +233,17 @@ export function cadVariableUses(document: CadDocument, name: string): number {
  */
 export function setCadVariable(
   document: CadDocument,
-  change: { id?: string; name: string; expression: string; folderId?: string | null }
+  change: { id?: string; name: string; expression: string; folderId?: string | null },
+  /** How a plain number in it is read, as `cadVariableExpression` says: the design's unit unless given. */
+  units: { lengthUnit?: CadLengthUnit; spellOutLengths?: boolean } = {}
 ): { document: CadDocument; id: string } | { error: string } {
   const name = change.name.trim(),
-    expression = cadVariableExpression(change.expression.trim(), cadVariableScope(document), document.lengthUnit);
+    expression = cadVariableExpression(
+      change.expression.trim(),
+      cadVariableScope(document),
+      units.lengthUnit ?? document.lengthUnit,
+      units.spellOutLengths
+    );
   const nameError = cadVariableNameError(name);
   if (nameError) return { error: nameError };
   if (!expression) return { error: 'Enter a value.' };

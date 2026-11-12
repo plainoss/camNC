@@ -1,19 +1,20 @@
-import { useDesignUnits } from './designUnits';
+import { shownLengthText, useDesignUnits } from './designUnits';
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type Ref } from 'react';
 import { cadValueHasUnit } from './valueExpressions';
 import { settleField, useCadVariableFields, variableDefinition, variablePrefix, whenVariable } from './variableFields';
 
 type Props = ComponentPropsWithoutRef<'input'> & {
   inputRef?: Ref<HTMLInputElement>;
-  unit?: 'mm' | 'deg';
+  /** What the field takes; a `scalar` field, such as a count, has no unit. */
+  unit?: 'mm' | 'deg' | 'scalar';
   unitClassName?: string;
   /** Leaves out the unit beside the field, where its label already says it. */
   bare?: boolean;
 };
 
-export function CadUnitSuffix({ text, unit = 'mm', className }: { text: string; unit?: 'mm' | 'deg'; className?: string }) {
+export function CadUnitSuffix({ text, unit = 'mm', className }: { text: string; unit?: 'mm' | 'deg' | 'scalar'; className?: string }) {
   const { lengthUnit } = useDesignUnits();
-  return cadValueHasUnit(text) ? null : (
+  return unit === 'scalar' || cadValueHasUnit(text) ? null : (
     <span aria-hidden="true" className={className}>
       {unit === 'deg' ? '°' : lengthUnit}
     </span>
@@ -45,7 +46,18 @@ export function CadValueInput({
   ...props
 }: Props) {
   const fields = useCadVariableFields();
+  const { lengthUnit } = useDesignUnits();
   const own = useRef<HTMLInputElement | null>(null);
+  /**
+   * A length this field was given shows rounded (`shownLengthText`), while its owner keeps every digit: as long as the
+   * field's text is what it was given, the owner reads, and saves, the exact length. Once it's typed in, what's typed is
+   * the value. `typed` tells the owner's echo of a keystroke from a new value given from outside.
+   */
+  const given = useRef<{ exact: string; shown: string } | null>(null);
+  const typed = useRef<string | null>(null);
+  if (unit === 'mm' && typeof value === 'string' && value !== typed.current && value !== given.current?.exact)
+    given.current = { exact: value, shown: shownLengthText(value, lengthUnit) };
+  const shownValue = typeof value === 'string' && value === given.current?.exact ? given.current.shown : value;
   const [draft, setDraft] = useState(() => String(defaultValue ?? ''));
   const [menu, setMenu] = useState<{ start: number; typed: string; at: number } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -120,12 +132,13 @@ export function CadValueInput({
       <input
         {...props}
         ref={setRefs}
-        value={value}
+        value={shownValue}
         defaultValue={defaultValue}
         aria-invalid={problem ? true : props['aria-invalid']}
         title={problem ?? props.title}
         aria-expanded={fields ? !!menu : undefined}
         onChange={event => {
+          typed.current = event.currentTarget.value;
           setDraft(event.currentTarget.value);
           setProblem(null);
           if (quiet.current) {

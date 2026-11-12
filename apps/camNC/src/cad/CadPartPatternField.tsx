@@ -282,6 +282,7 @@ function LinearPartPatternField({
             <span>
               <CadValueInput
                 bare
+                unit="scalar"
                 id={`${id}-count`}
                 value={count}
                 spellCheck={false}

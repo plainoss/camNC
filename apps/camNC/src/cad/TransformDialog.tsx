@@ -86,7 +86,7 @@ export function TransformDialog({
   /** Starts picking a mate connector in the view: a part's face corner or middle, as a click snaps to. Null stops it. */
   pickPoint?: (picked: ((pick: CadConnectorPick) => void) | null) => void;
 }) {
-  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
+  const { parseCadValue, lengthText, formatLength, lengthUnit } = useDesignUnits();
   const copy = part.copies?.find(candidate => candidate.id === copyId);
   const moved = move ? part.moved : undefined;
   const alongNow = copy?.along ?? (moved && 'along' in moved ? moved : undefined);
@@ -406,7 +406,7 @@ export function TransformDialog({
             <span>
               {picked
                 ? picked.edge
-                  ? `Edge of ${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'a part'}, ${lengthText(Math.hypot(...picked.edge.b.map((value, axis) => value - picked.edge!.a[axis]!)))} ${lengthUnit}`
+                  ? `Edge of ${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'a part'}, ${formatLength(Math.hypot(...picked.edge.b.map((value, axis) => value - picked.edge!.a[axis]!)))} ${lengthUnit}`
                   : `${document.parts.find(candidate => candidate.id === picked.partId)?.name ?? 'Part'} at ${picked.point.map(value => +value.toFixed(2)).join(', ')}`
                 : end === 'from' || end === 'to'
                   ? 'Click a corner or the middle of a face'

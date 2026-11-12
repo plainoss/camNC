@@ -1,29 +1,26 @@
 import { createContext, useContext, useMemo } from 'react';
-import { formatCadValue, type CadLengthUnit } from '@wbcnc/cad';
-import { rememberShownLength } from './shownLengths';
-import { parseCadValue } from './valueExpressions';
+import { formatCadValue, parseCadValue, type CadLengthUnit } from '@wbcnc/cad';
 
 // Legacy documents without a preference retain millimeter input semantics.
 export const DesignUnitContext = createContext<CadLengthUnit>('mm');
 export const lengthUnitScale = (unit: CadLengthUnit) => ({ mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8 })[unit];
-/**
- * A length as an edit field starts with, in the design's unit: with the fewest decimals that keep it within 0.0001 mm,
- * so 18 mm reads `0.70866` in inches rather than every digit of the float. Taking the field as it is keeps the exact
- * length (see `shownLengths`).
- */
-export function lengthText(value: number, unit: CadLengthUnit): string {
-  const scale = lengthUnitScale(unit);
-  if (unit === 'mm' || !Number.isFinite(value)) return String(value / scale);
-  for (let decimals = 0; decimals < 8; decimals++) {
-    const shown = +(value / scale).toFixed(decimals);
-    if (Math.abs(shown * scale - value) < 1e-4) return remembered(String(shown), unit, value);
-  }
-  return remembered(String(+(value / scale).toFixed(8)), unit, value);
-}
+/** A length as a field's text, in the design's unit with every digit, so taking the field as it is keeps the length. */
+export const lengthText = (value: number, unit: CadLengthUnit) => String(value / lengthUnitScale(unit));
 
-/** A rounded text, remembered with its exact length so a field left as it is keeps that length. */
-function remembered(text: string, unit: CadLengthUnit, value: number) {
-  if (Number(text) * lengthUnitScale(unit) !== value) rememberShownLength(text, unit, value);
+const plainNumber = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
+/**
+ * A field's plain number as it's shown, in a design measured in `unit`: with the fewest decimals that keep it within
+ * 0.0001 mm, so 18 mm reads `0.70866` in inches rather than `0.7086614173228347`. Anything else is shown as it is.
+ */
+export function shownLengthText(text: string, unit: CadLengthUnit): string {
+  if (unit === 'mm' || !plainNumber.test(text)) return text;
+  const scale = lengthUnitScale(unit),
+    value = Number(text) * scale;
+  if (!Number.isFinite(value)) return text;
+  for (let decimals = 0; decimals < 8; decimals++) {
+    const shown = String(+(value / scale).toFixed(decimals));
+    if (Math.abs(Number(shown) * scale - value) < 1e-4) return shown.length < text.length ? shown : text;
+  }
   return text;
 }
 

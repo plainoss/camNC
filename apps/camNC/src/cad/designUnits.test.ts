@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { lengthText, lengthUnitScale } from './designUnits';
-import { parseCadValue } from './valueExpressions';
+import { lengthText, lengthUnitScale, shownLengthText } from './designUnits';
 
-describe('a length as an edit field starts with', () => {
+describe('a length as a field shows it', () => {
   it.each([
     [18, 'in', '0.70866'],
     [100, 'in', '3.93701'],
@@ -13,26 +12,21 @@ describe('a length as an edit field starts with', () => {
     [6, 'cm', '0.6'],
     [304.8, 'ft', '1'],
     [18, 'mm', '18'],
-    [17.5, 'mm', '17.5'],
+    [17.123456789, 'mm', '17.123456789'],
   ] as const)('shows %s mm in %s as %s', (value, unit, text) => {
-    expect(lengthText(value, unit)).toBe(text);
+    expect(shownLengthText(lengthText(value, unit), unit)).toBe(text);
   });
 
-  it('keeps the size when the field is taken as it is', () => {
+  it('stays within 0.0001 mm, and keeps the field’s own text exact', () => {
     for (const unit of ['in', 'cm', 'm', 'ft'] as const)
-      for (const value of [0.1, 3, 6, 12.7, 18, 19.05, 100, 333.333, 2440])
-        expect(Math.abs(Number(lengthText(value, unit)) * lengthUnitScale(unit) - value)).toBeLessThan(1e-4);
+      for (const value of [0.1, 3, 6, 12.7, 18, 19.05, 100, 333.333, 2440]) {
+        expect(Number(lengthText(value, unit)) * lengthUnitScale(unit)).toBeCloseTo(value, 9);
+        expect(Math.abs(Number(shownLengthText(lengthText(value, unit), unit)) * lengthUnitScale(unit) - value)).toBeLessThan(1e-4);
+      }
   });
 
-  it('gives back the exact length for a rounded text left as it was', () => {
-    const exact = 31.3580244091242;
-    const text = lengthText(exact, 'in');
-    expect(text).toBe('1.23457');
-    expect(parseCadValue(text, { lengthUnit: 'in' })).toEqual({ value: exact });
-    expect(parseCadValue(` ${text} `, { unit: 'mm', lengthUnit: 'in' })).toEqual({ value: exact });
-    // Anything else is read as typed.
-    expect((parseCadValue('1.23458', { lengthUnit: 'in' }) as { value: number }).value).toBeCloseTo(1.23458 * 25.4, 9);
-    expect(parseCadValue(text, { unit: 'scalar', lengthUnit: 'in' })).toEqual({ value: 1.23457 });
-    expect((parseCadValue(text, { lengthUnit: 'cm' }) as { value: number }).value).toBeCloseTo(12.3457, 9);
+  it('shows anything but a plain number as it is', () => {
+    expect(shownLengthText('t + 0.70866141732', 'in')).toBe('t + 0.70866141732');
+    expect(shownLengthText('(0.7086614173228347) in', 'in')).toBe('(0.7086614173228347) in');
   });
 });

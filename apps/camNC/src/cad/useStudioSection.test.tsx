@@ -2,7 +2,6 @@ import { act, cleanup, fireEvent, renderHook } from '@testing-library/react';
 import { createPlateDocument, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { AssemblyModel } from './assemblyModel';
-import { lengthText } from './designUnits';
 import { useStudioSection } from './useStudioSection';
 
 const hosts: HTMLElement[] = [];
@@ -521,7 +520,7 @@ it.each([
   expect(JSON.stringify(document)).toBe(before);
 });
 
-it('converts physical handle moves and millimeter steps to inch input that keeps full precision and restores canceled expressions', () => {
+it('converts physical handle moves and millimeter steps to full-precision inch input and restores canceled expressions', () => {
   const document = source();
   document.lengthUnit = 'in';
   const before = JSON.stringify(document);
@@ -542,18 +541,17 @@ it('converts physical handle moves and millimeter steps to inch input that keeps
   expect(result.current.offset).toBe('0.5');
   act(() => result.current.control!.onStep!(1));
   expect(result.current.control!.offset).toBeCloseTo(13.7, 12);
-  // The field reads rounded, and its offset keeps every digit.
-  expect(result.current.offset).toBe('0.53937');
+  expect(result.current.offset).toBe(String(13.7 / 25.4));
   // Batched key repeats must each add physical millimeters without display rounding or a stale offset.
   act(() => {
     result.current.control!.onStep!(10);
     result.current.control!.onStep!(-1);
   });
   expect(result.current.control!.offset).toBeCloseTo(22.7, 12);
-  expect(result.current.offset).toBe(lengthText(22.7, 'in'));
+  expect(Number(result.current.offset) * 25.4).toBeCloseTo(22.7, 12);
   const precise = 12.3456789012345;
   act(() => result.current.moveOffset(precise));
-  expect(result.current.offset).toBe(lengthText(precise, 'in'));
+  expect(result.current.offset).toBe(String(precise / 25.4));
   expect(result.current.control!.offset).toBeCloseTo(precise, 12);
   const accepted = result.current.offset;
   act(() => result.current.confirm());

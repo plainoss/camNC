@@ -2,6 +2,7 @@ import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
 import { carvingBoard, carvingRegion, kCarvingBoard, kDefaultVBit, type CarvingV1 } from './carving';
 import { outlineArt } from './carvingOutline';
 import { rebaseJob } from './rebaseJob';
+import { withDesignUnitNumbers } from './jobDesignUnits';
 import { trackPending } from '@/lib/settled';
 import type { BoardV1, StockBoardV1 } from './boards';
 import type { NestObjective } from './autoNest';
@@ -267,21 +268,50 @@ export function listJobs(): Promise<CamJobV1[]> {
 }
 
 async function listJobsIn(context: StorageContext): Promise<CamJobV1[]> {
-  if (context === 'rehearsal') return structuredClone([...rehearsalJobs.values()]).sort((a, b) => b.updatedAt - a.updatedAt);
+  if (context === 'rehearsal')
+    return migrateStored(context, structuredClone([...rehearsalJobs.values()])).then(jobs =>
+      jobs.sort((a, b) => b.updatedAt - a.updatedAt)
+    );
   const db = await openDb(context);
   const jobs = await request(db.transaction(kJobs).objectStore(kJobs).getAll() as IDBRequest<CamJobV1[]>);
-  return jobs.sort((a, b) => b.updatedAt - a.updatedAt);
+  return (await migrateStored(context, jobs)).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function getJob(id: string): Promise<CamJobV1 | null> {
   const context = captureStorageContext();
   if (context === 'rehearsal') {
     const job = rehearsalJobs.get(id);
-    return job ? structuredClone(job) : null;
+    return job ? (await migrateStored(context, [structuredClone(job)]))[0]! : null;
   }
   const db = await openDb(context);
   const job = await request(db.transaction(kJobs).objectStore(kJobs).get(id) as IDBRequest<CamJobV1 | undefined>);
-  return job ?? null;
+  return job ? (await migrateStored(context, [job]))[0]! : null;
+}
+
+/**
+ * Jobs as read, with designs saved before plain numbers took the design's unit migrated (`withDesignUnitNumbers`). A
+ * migrated job is stored at once, so the draft an editor starts from is the stored one and its first save isn't taken
+ * for a change made elsewhere. It's stored only while the job is still as read, so it never replaces a newer save.
+ */
+async function migrateStored(context: StorageContext, jobs: CamJobV1[]): Promise<CamJobV1[]> {
+  const next = jobs.map(withDesignUnitNumbers);
+  const changed = next.flatMap((job, index) => (job === jobs[index] ? [] : [{ before: JSON.stringify(jobs[index]), job }]));
+  if (!changed.length) return next;
+  if (context === 'rehearsal') {
+    for (const { before, job } of changed)
+      if (JSON.stringify(rehearsalJobs.get(job.id)) === before) rehearsalJobs.set(job.id, structuredClone(job));
+    return next;
+  }
+  await tx(context, [kJobs], 'readwrite', t => {
+    const store = t.objectStore(kJobs);
+    for (const { before, job } of changed) {
+      const read = store.get(job.id) as IDBRequest<CamJobV1 | undefined>;
+      read.onsuccess = () => {
+        if (JSON.stringify(read.result) === before) store.put(job);
+      };
+    }
+  });
+  return next;
 }
 
 export async function getModelBytes(id: string): Promise<Uint8Array | null> {

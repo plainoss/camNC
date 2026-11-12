@@ -1,5 +1,5 @@
-import { useDesignUnits } from './designUnits';
-import { CAD_MIN_THICKNESS, type CadValueScope } from '@wbcnc/cad';
+import { lengthUnitScale, useDesignUnits } from './designUnits';
+import { CAD_MIN_THICKNESS, type CadLengthUnit, type CadValueScope } from '@wbcnc/cad';
 import { useEffect, useId, useRef, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { variableDefinition } from './variableFields';
@@ -17,16 +17,26 @@ export interface CadThicknessFieldProps {
   onValidityChange?: (valid: boolean) => void;
 }
 
+/**
+ * The minimum thickness in the design's unit, to two significant digits and at least three decimals. It's rounded up,
+ * not to the nearest or down, so the value it gives is one the field takes: 0.1 mm is `0.004` in, where `0.003` in
+ * would be refused.
+ */
+function minimumText(lengthUnit: CadLengthUnit) {
+  const value = CAD_MIN_THICKNESS / lengthUnitScale(lengthUnit);
+  const decimals = Math.max(3, 1 - Math.floor(Math.log10(value)));
+  const step = 10 ** decimals;
+  return `${+(Math.ceil(value * step - 1e-9) / step).toFixed(decimals)} ${lengthUnit}`;
+}
+
 function thicknessValue(
   text: string,
   variables: CadValueScope | undefined,
-  { parseCadValue, formatLength, lengthUnit }: ReturnType<typeof useDesignUnits>
+  { parseCadValue, lengthUnit }: ReturnType<typeof useDesignUnits>
 ): { value: number; expression?: string } | { error: string } {
   const parsed = parseCadValue(text, { unit: 'mm', variables });
   if ('error' in parsed) return parsed;
-  return parsed.value >= CAD_MIN_THICKNESS
-    ? parsed
-    : { error: `Thickness must be at least ${formatLength(CAD_MIN_THICKNESS)} ${lengthUnit}.` };
+  return parsed.value >= CAD_MIN_THICKNESS ? parsed : { error: `Thickness must be at least ${minimumText(lengthUnit)}.` };
 }
 
 /** Invalid drafts stay visible until corrected or explicitly canceled; blur never moves focus. */
@@ -40,7 +50,7 @@ export function CadThicknessField({
   livePreview = false,
 }: CadThicknessFieldProps) {
   const units = useDesignUnits();
-  const { lengthText, formatLength, lengthUnit } = units;
+  const { lengthText, lengthUnit } = units;
   const id = useId();
   const typed = expression ?? lengthText(value);
   const [text, setText] = useState(typed);
@@ -137,7 +147,7 @@ export function CadThicknessField({
         </span>
       </label>
       <p id={`${id}-hint`} className="cad-thickness-hint">
-        {formatLength(CAD_MIN_THICKNESS)} {lengthUnit} minimum. Units, arithmetic and variables accepted.
+        {minimumText(lengthUnit)} minimum. Units, arithmetic and variables accepted.
       </p>
       {error && (
         <p id={`${id}-error`} role="alert" className="cad-thickness-error">

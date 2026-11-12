@@ -87,6 +87,13 @@ describe('a variable made in a length field keeps its size', () => {
     expect(cadFieldVariableExpression(typed, unit, lengths({ t: 10 }), lengthUnit)).toBe(saved);
   });
 
+  it('leaves a count a number, and keeps the kind of a variable it redefines', () => {
+    expect(cadFieldVariableExpression('5', 'scalar', {}, 'cm')).toBe('5');
+    expect(cadFieldVariableExpression('400', 'mm', {}, 'cm', 'number')).toBe('400');
+    expect(cadFieldVariableExpression('30', 'mm', {}, 'cm', 'angle')).toBe('30°');
+    expect(cadFieldVariableExpression('4', 'scalar', {}, 'in', 'length')).toBe('4 in');
+  });
+
   it('gives "#w" the same length after the design changes from mm to cm', () => {
     let document = createPlateDocument();
     const width = widthOf(document).id;

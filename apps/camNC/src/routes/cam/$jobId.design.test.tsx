@@ -2,10 +2,19 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import '@/style.css';
 import { page } from '@vitest/browser/context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { addFaceSketch, addLine, cadFaceSketches, createPlateDocument, updateDimension, type CadDocument } from '@wbcnc/cad';
+import {
+  addFaceSketch,
+  addLine,
+  cadFaceSketches,
+  cadVariableScope,
+  createPlateDocument,
+  parseCadValue,
+  updateDimension,
+  type CadDocument,
+} from '@wbcnc/cad';
 import { useImperativeHandle, useRef, useState, type ComponentType, type Ref, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDesignJob, getJob, type CamJobV1 } from '@/cam/jobDb';
+import { createDesignJob, getJob, saveJob, type CamJobV1 } from '@/cam/jobDb';
 import { acknowledgeCadSession, cadSession, commitCadSession, endCadSession, type CadSession } from '@wbcnc/cad-editor/session';
 import { keepPendingDesignDraft, pendingDesignDraft } from '@/cam/designDraftRecovery';
 import type { CadEditorController } from '@/cad/CadEditor';
@@ -521,4 +530,52 @@ it('preserves the durable checkpoint when a unit change remounts the editor befo
   fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
   await waitFor(async () => expect((await getJob(state.job!.id))!.design!.draft.revision).toBe(source.revision + 2));
   expect(screen.queryByRole('alert')).toBeNull();
+});
+
+describe('opening an inch design saved before plain numbers took its unit', () => {
+  const legacyJob = async () => {
+    const empty = await createDesignJob('Legacy inch plate');
+    const draft: CadDocument = {
+      ...createPlateDocument(),
+      id: empty.design!.draft.id,
+      lengthUnit: 'in',
+      variables: [{ id: 't', name: 't', expression: '0.75 in' }],
+    };
+    // Saved as the app saved it then: `t + 0.125` meant 0.125 mm.
+    Object.assign(draft.parts[0]!, { thickness: 19.175, thicknessExpression: 't + 0.125' });
+    return saveJob({ ...empty, design: { ...empty.design!, draft } });
+  };
+
+  it('keeps a legacy "t + 0.125" at its size through an edit, without a conflict', async () => {
+    const actual = await vi.importActual<typeof import('@/cam/cadDesign')>('@/cam/cadDesign');
+    const legacy = await legacyJob();
+    state.job = await getJob(legacy.id);
+    const opened = state.job!.design!.draft;
+    expect(opened.parts[0]).toMatchObject({ thickness: 19.175, thicknessExpression: 't + 0.125 mm' });
+    // The migration is stored, so the editor's first save finds the draft it started from.
+    expect((await getJob(legacy.id))!.design!.draft).toEqual(opened);
+    state.save.mockImplementation(actual.saveDesignDraft);
+    endCadSession(opened.id);
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
+    await waitFor(async () => expect((await getJob(legacy.id))!.design!.draft.revision).toBeGreaterThan(opened.revision));
+    const stored = (await getJob(legacy.id))!.design!.draft;
+    expect(stored.parts[0]).toMatchObject({ thickness: 19.175, thicknessExpression: 't + 0.125 mm' });
+    // Read again in inches, as the field reads it, it's still 19.175 mm.
+    const reread = parseCadValue(stored.parts[0]!.thicknessExpression!, { variables: cadVariableScope(stored), lengthUnit: 'in' });
+    expect((reread as { value: number }).value).toBeCloseTo(19.175, 9);
+    expect(screen.queryByRole('alert')).toBeNull();
+    endCadSession(opened.id);
+  });
+
+  it('recovers an unsaved edit kept before the migration without calling it a conflict', async () => {
+    const legacy = await legacyJob();
+    const edited = { ...legacy.design!.draft, revision: legacy.design!.draft.revision + 1 };
+    keepPendingDesignDraft(legacy.id, legacy.design!.draft, edited);
+    const migrated = (await getJob(legacy.id))!.design!.draft;
+    const recovery = pendingDesignDraft(legacy.id, migrated);
+    expect(recovery?.conflict).toBe(false);
+    expect(recovery?.document.parts[0]!.thicknessExpression).toBe('t + 0.125 mm');
+    expect(recovery?.checkpoint).toEqual(migrated);
+  });
 });

@@ -17,8 +17,10 @@ export function useEditorVariableFields(document: CadDocument, current: RefObjec
       define: (name, expression, unit = 'mm') => {
         const source = current.current;
         const existing = source.variables?.find(variable => variable.name === name);
-        // A plain number takes the field's unit, so the variable keeps its size when the design's unit changes.
-        const typed = cadFieldVariableExpression(expression, unit, cadVariableScope(source), source.lengthUnit);
+        // A plain number takes the field's unit, so the variable keeps its size when the design's unit changes. One
+        // that's there keeps its kind.
+        const variables = cadVariableScope(source);
+        const typed = cadFieldVariableExpression(expression, unit, variables, source.lengthUnit, existing && variables[name]?.kind);
         const result = setCadVariable(source, { ...(existing && { id: existing.id }), name, expression: typed });
         if ('error' in result) return result.error;
         commit(result.document);

@@ -7,7 +7,7 @@ export interface CadVariableFields {
    * Sets `#name = expression` as typed in a field of `unit`: the variable is made, or changed if it's there. Returns why
    * not.
    */
-  define: (name: string, expression: string, unit?: 'mm' | 'deg') => string | null;
+  define: (name: string, expression: string, unit?: 'mm' | 'deg' | 'scalar') => string | null;
 }
 
 // The open editor's variables. One editor is open at a time; fields outside one get none.
