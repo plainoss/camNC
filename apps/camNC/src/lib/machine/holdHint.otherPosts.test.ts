@@ -119,4 +119,40 @@ describe('an M0 of another post with no lift before it', () => {
     expect(holdHint(gcode, at(after(gcode, m0), { wpos: { z: 11 } }))?.reason).toContain('Change to T2');
     expect(holdHint(gcode, at(heldAtTheM5(gcode), cutting))).toBeNull();
   });
+
+  describe('with cutting lines that carry no Z', () => {
+    /** A cut in X and Y only, at the Z the plunge went to. */
+    const flat = Array.from({ length: 30_000 }, (_, i) => `G1 X${i % 90} Y${i % 40}`);
+    const flatProgram = (before: string[], stop: string[]) =>
+      [...before, ...flat, ...stop, 'G90', 'G0 Z11', 'G1 Z-6 F300', ...flat, 'M30', ''].join('\n');
+
+    it('the first plunge of the program is not a lift', () => {
+      const gcode = flatProgram(['G21', 'G90', 'G0 Z11', 'G0 X0 Y0', 'G1 Z-6 F300'], ['M5', m0]);
+      expect(holdHint(gcode, at(heldAtTheM5(gcode), cutting))).toBeNull();
+      expect(holdHint(gcode, at(after(gcode, m0), cutting))).toBeNull();
+    });
+
+    it('a plunge shallower than earlier cuts is not a lift', () => {
+      const gcode = flatProgram(['G21', 'G90', 'G0 Z11', 'G1 Z-6 F300', 'G1 X10', 'G0 Z11', 'G0 X0 Y0', 'G1 Z-3 F300'], ['M5', m0]);
+      expect(holdHint(gcode, at(heldAtTheM5(gcode), { wpos: { z: -3 }, mpos: { z: -33 } }))).toBeNull();
+    });
+
+    it('a rapid back to an earlier depth, followed by feed moves at it, is not a lift', () => {
+      const gcode = flatProgram(['G21', 'G90', 'G0 Z11', 'G1 Z-6 F300', 'G1 X10', 'G0 Z11', 'G0 X0 Y0', 'G0 Z-6'], ['M5', m0]);
+      expect(holdHint(gcode, at(heldAtTheM5(gcode), cutting))).toBeNull();
+      expect(holdHint(gcode, at(after(gcode, m0), cutting))).toBeNull();
+    });
+
+    it('a feed lift followed by feed moves at that height is a lift only while above every earlier cut', () => {
+      const gcode = flatProgram(['G21', 'G90', 'G0 Z11', 'G1 Z-6 F300'], ['G1 Z5', 'G1 X0 Y0', 'M5', m0]);
+      expect(holdHint(gcode, at(after(gcode, m0), { wpos: { z: 5 } }))?.reason).toContain('Change to T2');
+      expect(holdHint(gcode, at(heldAtTheM5(gcode), cutting))).toBeNull();
+    });
+
+    it('a feed lift after the cut, with no feed move after it, still shows the M0 with the bit up', () => {
+      const gcode = flatProgram(['G21', 'G90', 'G0 Z11', 'G1 Z-6 F300'], ['G1 Z5', 'M5', m0]);
+      expect(holdHint(gcode, at(after(gcode, m0), { wpos: { z: 5 } }))?.reason).toContain('Change to T2');
+      expect(holdHint(gcode, at(heldAtTheM5(gcode), cutting))).toBeNull();
+    });
+  });
 });

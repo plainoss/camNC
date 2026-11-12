@@ -142,8 +142,8 @@ function bitWhereThePauseLeftIt(lines: Line[], index: number, done: boolean, c: 
 
 /**
  * For an M0 of another post: the bit at or above the last Z the program moved to before it, in its coordinates. Only
- * evidence when that Z was a lift: a rapid (G0, G53 G0, G28/G30), or a feed move above every Z cut so far. After a cut
- * (an operator stop with the bit still down), a hold with the reader just before the M0 reports the same position.
+ * evidence when that Z was a lift: a rapid (G0, G53 G0, G28/G30), or a feed move up to above every Z cut so far. Feed
+ * moves at that work Z after it are cuts there, so then only a Z above every cut before it counts. After a cut (an operator stop with the bit still down), a hold with the reader just before the M0 reports the same position.
  */
 function bitAtOrAbove(lines: Line[], index: number, c: HoldContext) {
   const at = zBefore(lines, index);
@@ -198,6 +198,8 @@ function readZBefore(lines: Line[], index: number): ZBefore | null {
   let workZ: number | undefined;
   /** The highest work Z (mm) a feed move (or one of unknown motion) ended at or ran at: Infinity when not known. */
   let highestCut = -Infinity;
+  /** The last work Z move went above every Z cut before it. */
+  let aboveCuts = false;
   /** The last G53 Z move, the lower bound for G28/G30. */
   let lastMachine: { z: number; units: 'mm' | 'inch' } | null = null;
   const mm = (z: number, u: 'mm' | 'inch') => (u === 'mm' ? z : z * kMmPerInch);
@@ -243,8 +245,12 @@ function readZBefore(lines: Line[], index: number): ZBefore | null {
     }
     const feed = axes && motion !== 0;
     if (!z) {
-      // A move at the current height: a feed move there cuts at it.
-      if (feed) highestCut = Math.max(highestCut, workZ ?? Infinity);
+      // A move at the current height: a feed move there cuts at it. Then a work Z reached by a rapid is a lift only if
+      // above every cut before it (a first G0 Z11 with feed moves at that height, not a rapid to an earlier depth).
+      if (feed) {
+        highestCut = Math.max(highestCut, workZ ?? Infinity);
+        if (!aboveCuts && last && last.lift && !last.machine) last = { ...(last as ZBefore), lift: false };
+      }
       continue;
     }
     const machine = hasWord(words, 'G', 53);
@@ -266,7 +272,11 @@ function readZBefore(lines: Line[], index: number): ZBefore | null {
       continue;
     }
     const to = mm(z.value, units);
-    last = { z: z.value, machine, units, lift: motion === 0 || to > highestCut + kAtZ };
+    // A feed move counts as a lift only going up from a known height, and above every cut: a plunge never is, also the
+    // first one of the program (nothing cut yet) or one shallower than earlier cuts.
+    const up = workZ !== undefined && to > workZ + kAtZ;
+    aboveCuts = to > highestCut + kAtZ;
+    last = { z: z.value, machine, units, lift: motion === 0 || (up && aboveCuts) };
     workZ = to;
     if (feed) highestCut = Math.max(highestCut, to);
   }
