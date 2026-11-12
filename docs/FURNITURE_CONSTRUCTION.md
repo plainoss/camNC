@@ -128,6 +128,29 @@ chairs and stools from these patterns by default, and the saved `stool` task onl
 passes a built stool whose measured construction checks pass. These are geometric
 pattern bounds, not load ratings.
 
+## Proposal gate and rebuild tasks
+
+A construction plan only measures the pieces it names, so a design can also fail by
+adding pieces outside any plan: a loose seat laid on a frame, or rails dropped into
+open notches beside a pattern. `unplannedFurniturePieces(document)` lists the active
+wooden pieces (source instances and exact copies) that no active plan names.
+
+- For a chair or stool request, the assistant's check fails while any piece it adds
+  belongs to no plan (`apps/camNC/src/cad/assistant/seatingGate.ts`). The model
+  then has to build the piece from `frameStool` or `panelChair`, or explain the
+  constraint that stops it; a loose design is never offered as a proposal. Pieces
+  already in the open design are left alone.
+- `rebuild-panel-chair` and `rebuild-frame-stool` are saved tasks that start from
+  the two unchanged originals. A rebuild passes only when the right pattern's plan
+  measures clean, every wooden piece is a plan member (no original housing or notch
+  is left behind), nothing collides, and the original seat height and overall height
+  (and, for the chair, the 404 mm clear seat) are kept. The `stool` task applies the
+  same membership check.
+- `furnitureRebuild.test.ts` fails both originals, and fails them again with a
+  borrowed plan whose roles name every original piece: the joints don't measure on
+  the weak geometry. A rebuild from each pattern passes, and still passes after
+  reload and a stock or footrest-height edit.
+
 ## Bounded feasibility results
 
 `furniturePrototype.test.ts` exercises two partial joints, not whole furniture:

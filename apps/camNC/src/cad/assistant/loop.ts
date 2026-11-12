@@ -4,6 +4,7 @@ import type { EvaluatedCadPart } from '@wbcnc/cad';
 import { checkNextStep } from './checkHints';
 import { compactCheckReport } from './compactCheck';
 import { checkAssistantRequirements, validateAssistantRequirements, type AssistantRequirements } from './requirements';
+import { seatingConstructionCheck } from './seatingGate';
 import { assistantRecipeCatalog, type AssistantRecipeName, type AssistantRecipeParameters } from './recipeCatalog';
 import { createAssistantScriptSession } from './scriptSession';
 import { normalizeAssistantViews } from './designViews';
@@ -137,7 +138,7 @@ Whole pieces are first-class: build each in its own named folder beside existing
 Use ask_user alone when a clarifying question has 2–4 useful suggested replies. Ask one question at a time and keep custom replies welcome. Never invent user preferences.
 For appearance or layout choices, include optional sketches only when useful to distinguish the alternatives. Use simple numeric shapes on the 100 by 100 canvas, indexed to the choices; these are illustrations, not checked geometry. Prefer concise "Title: description" choices and do not repeat the tool question in accompanying prose.
 For thin requests such as "a stool", ask for sizes and joints or state your proposed choices and ask before building.
-Load-bearing seating starts from a construction pattern: frameStool for a leg-and-rail stool or bench, panelChair for a chair or stool made from sheet stock. Size it with the pattern's options and propose its joints (retained tenons, keys or glue, and how the seat is fastened). Never offer open unretained housings, shallow whole-rail notches, intersecting mortises or a loose seat as a finished design. If a pattern refuses the size or stock, explain the constraint and change the layout; a construction-check error must be repaired before you offer a proposal.
+Load-bearing seating starts from a construction pattern: frameStool for a leg-and-rail stool or bench, panelChair for a chair or stool made from sheet stock. Size it with the pattern's options and propose its joints (retained tenons, keys or glue, and how the seat is fastened). Never offer open unretained housings, shallow whole-rail notches, intersecting mortises or a loose seat as a finished design. If a pattern refuses the size or stock, explain the constraint and change the layout; a construction-check error must be repaired before you offer a proposal. For a chair or stool, a check fails while any new piece belongs to no construction plan; to repair an existing weak chair or stool, remove its loose pieces and their cuts and build the pattern in their place.
 When the answer is a number, add fields to ask_user, prefilled with your proposal; name a field after a requirement (for example width, thickness, minimumWall) when the app should check it on every later proposal.
 Remember earlier constraints in the conversation. If a request conflicts with them or the design, ask a question.
 Select useful views in check_design when matching a reference image or reviewing appearance: views:["top"] for flat outlines, adding front/right only for relevant construction. For visual requests inspect the returned cut-aware views, describe what matches and what needs a person's review.
@@ -270,7 +271,13 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
   let latestCandidate: AssistantCheck | undefined;
   const origins = new WeakMap<AssistantCheck, AssistantProposalOrigin>();
   const finalized = new WeakMap<AssistantCheck, AssistantCheck>();
-  const acceptanceOf = (checked: AssistantCheck) =>
+  const requests = messages.filter(message => message.role === 'user' && !message.event).map(message => message.text);
+  const acceptanceOf = (checked: AssistantCheck) => {
+    const accepted = confirmedAcceptance(checked);
+    const seating = seatingConstructionCheck(base, checked.document, requests);
+    return seating ? { ok: false, checks: [...accepted.checks, seating] } : accepted;
+  };
+  const confirmedAcceptance = (checked: AssistantCheck) =>
     Object.keys(requirements).length
       ? checked.trustedReport && checked.parts
         ? checkAssistantRequirements(requirements, base, checked.document, checked.trustedReport, checked.parts)
