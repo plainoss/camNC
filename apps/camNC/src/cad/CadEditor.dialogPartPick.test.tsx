@@ -54,11 +54,14 @@ it('mirrors the part clicked once its part field is active, and keeps the dialog
   await userEvent.click(row('Bottom'));
   await waitFor(() => expect(field.textContent).toContain('Bottom'));
   expect(row('Bottom')).toHaveAttribute('aria-pressed', 'true');
-  // A click in the 3D view takes a part too.
+  // With its part taken, the mirror goes on to its plane. Back on the part field, a click in the 3D view takes a part too.
+  expect(within(dialog).getByRole('button', { name: 'Mirror plane' })).toHaveAttribute('data-active');
+  await userEvent.click(field);
   const view = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   const back = named(source, 'Back');
   act(() => view().onSelect!(back.id, view().instanceIds!.indexOf(back.id)));
   await waitFor(() => expect(field.textContent).toContain('Back'));
+  await userEvent.click(field);
   await userEvent.click(row('Bottom'));
   await waitFor(() => expect(field.textContent).toContain('Bottom'));
   await userEvent.click(within(dialog).getByRole('button', { name: 'Mirror plane' }));
