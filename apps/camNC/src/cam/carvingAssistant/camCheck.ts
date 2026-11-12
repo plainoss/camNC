@@ -16,7 +16,7 @@ export function checkCarvingInWorker(carving: BoardCarving, thickness: number, s
       else resolve(operations ?? []);
     };
     const stopped = () => finish(undefined, new DOMException('Artwork preparation stopped.', 'AbortError'));
-    const timer = setTimeout(() => finish(undefined, new Error('The carving check exceeded 15 seconds. Use simpler artwork.')), 15_000);
+    const timer = setTimeout(() => finish(undefined, new Error('The carving check exceeded 30 seconds. Use simpler artwork.')), 30_000);
     signal?.addEventListener('abort', stopped, { once: true });
     worker.onmessage = (event: MessageEvent<{ operations?: Operation[]; error?: string }>) => {
       if (event.data.error) finish(undefined, new Error(event.data.error));

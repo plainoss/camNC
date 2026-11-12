@@ -6,6 +6,7 @@ import { sanitizeCarvingSvg } from './sanitize';
 import { checkCarvingInWorker } from './camCheck';
 import { offset, difference, polyArea } from '../../../../../packages/cam/src/geom';
 import { carvingWork } from '../../../../../packages/cam/src/vcarve';
+import { kMaxOutlinePoints } from './curveFlatten';
 
 export type Loop = { x: number; y: number }[];
 export type CarvingDetail = 'simple' | 'balanced' | 'detailed';
@@ -17,6 +18,9 @@ export const carvingDetailMm: Record<CarvingDetail, number> = { simple: 1, balan
  */
 export const kCarvedFractionWarn = 0.6;
 export const kCarvedFractionError = 0.85;
+// After detail preparation a detailed 1024 px illustration carved at 100 mm keeps about 7000 points. The CAM check's
+// own work estimate (`carvingWork`) bounds the rings times points, so this only stops geometry that could never pass.
+const kMaxCamPoints = 12_000;
 export interface CarvingPreparationReport {
   ok: boolean;
   errors: string[];
@@ -97,9 +101,6 @@ export function carvingOutlineSvg(outline: Loop[]): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box.x0} ${-box.y1} ${box.w} ${box.h}"><path fill="black" fill-rule="nonzero" d="${path}"/></svg>`;
 }
 
-// Smooth traces are flattened at 0.015 mm, so a 1024 px generated illustration carved at 300 mm needs about 5000 points.
-const kMaxOutlinePoints = 8000;
-
 /** Prepare a fresh candidate. The caller keeps original source for future size/detail changes. No job is mutated. */
 export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Promise<PreparedCarvingArt> {
   const { art, width, height, detail, carving, board, signal } = options;
@@ -127,7 +128,11 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   abort(signal);
   const box = bounds(drawn.region);
   if (!Number.isFinite(box.w) || box.w <= 0 || box.h <= 0) throw new Error('Artwork has no dark filled shapes to carve.');
-  if (drawn.region.length > 500 || drawn.region.reduce((sum, loop) => sum + loop.length, 0) > kMaxOutlinePoints)
+  // Outlines of model-written SVG keep the lower limit: their cleanup below runs on the main thread.
+  if (
+    drawn.region.length > 500 ||
+    drawn.region.reduce((sum, loop) => sum + loop.length, 0) > (options.sourceOutline ? kMaxOutlinePoints : 8000)
+  )
     throw new Error('Artwork is too complex. Request fewer details or simpler filled shapes.');
   const scale = Math.min(width / box.w, height / box.h);
   let outline = drawn.region.map(loop =>
@@ -257,7 +262,7 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
     ...(carving.clearWithFlat && options.clearTool && { clearTool: options.clearTool }),
   };
   let operations: Operation[] = [];
-  if (report.points > 4000 || !Number.isFinite(cap) || cap <= 0 || cap > 8 || Math.min(accepted.w, accepted.h) > 250)
+  if (report.points > kMaxCamPoints || !Number.isFinite(cap) || cap <= 0 || cap > 8 || Math.min(accepted.w, accepted.h) > 250)
     report.errors.push('Artwork exceeds the bounded assistant CAM check. Use smaller or simpler artwork or a shallower depth.');
   // CAM's estimator measures the region's actual widest interior with bounded offset probes. Overall artwork
   // dimensions are a poor floor-ring estimate for line illustrations: an 80 mm face can have only 2 mm strokes.

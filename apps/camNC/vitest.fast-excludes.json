@@ -22,5 +22,6 @@
   "src/workers/cam.worker.test.ts",
   "src/routes/cam/$jobId.boards.drag.test.tsx",
   "src/routes/cam/$jobId.boards.holds.test.tsx",
-  "src/routes/cam/$jobId.boards.settings.test.tsx"
+  "src/routes/cam/$jobId.boards.settings.test.tsx",
+  "src/cam/carvingAssistant/lineArtFixtures.test.ts"
 ]
