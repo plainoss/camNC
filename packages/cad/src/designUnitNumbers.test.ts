@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPlateDocument } from './document';
 import { designSteps } from './designSteps';
-import { withCadLengthUnit } from './lengthUnits';
+import { migrateDesignUnitNumbers, withCadLengthUnit } from './lengthUnits';
 import { parseCadDocument } from './parseCadDocument';
 import type { CadDocument, CadLengthUnit } from './types';
 import { parseCadValue, type CadValueScope } from './valueExpressions';
@@ -155,6 +155,21 @@ describe('designs saved in another unit before plain numbers took it', () => {
     const edited = parseCadValue('t + 0.125 mm', { variables: cadVariableScope(loaded), lengthUnit: 'in' }) as { value: number };
     expect(edited.value).toBeCloseTo(19.175, 9);
     expect(reload(loaded)).toEqual(loaded);
+  });
+
+  it('writes out the mm of a part’s and a Cut parts step’s corner relief diameter', () => {
+    const document = legacy('in');
+    document.parts[0]!.cornerRelief = { diameter: 7, diameterExpression: 'u - 13.05' };
+    document.partCuts = [
+      { id: 'cut', tools: ['a'], targets: ['b'], clearance: 0, cornerRelief: { diameter: 8, diameterExpression: 't - 11.05' } },
+      { id: 'plain', tools: ['a'], targets: ['b'], clearance: 0, cornerRelief: null },
+    ];
+    const migrated = migrateDesignUnitNumbers(document);
+    expect(migrated.parts[0]!.cornerRelief).toEqual({ diameter: 7, diameterExpression: 'u - 13.05 mm' });
+    expect(migrated.partCuts![0]!.cornerRelief).toEqual({ diameter: 8, diameterExpression: 't - 11.05 mm' });
+    expect(migrated.partCuts![1]!.cornerRelief).toBeNull();
+    const scope = cadVariableScope(migrated);
+    expect((parseCadValue('t - 11.05 mm', { variables: scope, lengthUnit: 'in' }) as { value: number }).value).toBeCloseTo(8, 9);
   });
 
   it('leaves mm designs untouched', () => {
