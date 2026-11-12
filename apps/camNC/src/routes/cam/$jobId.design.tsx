@@ -96,9 +96,16 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
   // The editor joins the recovered session using its durable checkpoint, so it does not acknowledge unsaved work.
   const [editorDocument, setEditorDocument] = useState(initialJob.design!.draft);
   const [editorEpoch, setEditorEpoch] = useState(0);
-  // Back from a face sketch, the editor opens on that part, where its new regions are cut.
-  const [returnToPart, setReturnToPart] = useState<string | null>(null);
-  const [faceEdit, setFaceEdit] = useState<{ base: CadDocument; partId: string; sketchId: string; scene?: FaceSketchScene } | null>(null);
+  // Back from a face sketch, the editor opens where the sketch was opened: the Part Studio with its step selected, or
+  // the part's own view, where its new regions are cut.
+  const [returnTo, setReturnTo] = useState<{ partId: string; studio: boolean; stepId?: string } | null>(null);
+  const [faceEdit, setFaceEdit] = useState<{
+    base: CadDocument;
+    partId: string;
+    sketchId: string;
+    scene?: FaceSketchScene;
+    fromStudio?: boolean;
+  } | null>(null);
   const partCameraState = useRef<StudioCameraRef['current']>(null);
   const [conflicted, setConflicted] = useState(!!session.conflict);
   const [recovering, setRecovering] = useState(false);
@@ -251,7 +258,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
       setSettings(nextSession.document);
       unitPreference.current = nextSession.document.lengthUnit;
       setEditorDocument(current.design.draft);
-      setReturnToPart(null);
+      setReturnTo(null);
       setEditorEpoch(epoch => epoch + 1);
       setConflicted(false);
       setError(null);
@@ -288,7 +295,7 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     }
   };
   const leaveFaceSketch = (document: CadDocument) => {
-    const { base, partId, sketchId } = faceEdit!,
+    const { base, partId, sketchId, fromStudio } = faceEdit!,
       isEmpty = (source: CadDocument) => {
         const face = source.parts.find(part => part.id === partId)?.features?.find(f => f.type === 'sketch' && f.sketch.id === sketchId);
         return face?.type === 'sketch' && !face.sketch.entities.some(entity => entity.type !== 'point') ? face : null;
@@ -303,7 +310,8 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
     replaceCadSession(session, next, isNew ? null : base);
     endCadSession(faceSketchDocument(base, partId, sketchId).id);
     setEditorDocument(session.document);
-    setReturnToPart(partId);
+    const stepId = next.parts.find(part => part.id === partId)?.features?.find(f => f.type === 'sketch' && f.sketch.id === sketchId)?.id;
+    setReturnTo({ partId, studio: !!fromStudio, ...(stepId && { stepId }) });
     setEditorEpoch(epoch => epoch + 1);
     setFaceEdit(null);
   };
@@ -384,12 +392,13 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
             document={editorDocument}
             editSession={session}
             partCameraState={partCameraState}
-            startIn3D={returnToPart ? 'part' : true}
-            onEditFaceSketch={(base, partId, sketchId, scene) => {
+            startIn3D={returnTo && !returnTo.studio ? 'part' : true}
+            {...(returnTo?.studio && returnTo.stepId && { selectedStepId: returnTo.stepId })}
+            onEditFaceSketch={(base, partId, sketchId, scene, fromStudio) => {
               draft(base);
-              setFaceEdit({ base, partId, sketchId, scene });
+              setFaceEdit({ base, partId, sketchId, scene, fromStudio });
             }}
-            preferredPartId={returnToPart ?? context.part}
+            preferredPartId={returnTo?.partId ?? context.part}
             onDraftChange={draft}
             onFinish={finish}
             onCancel={cancel}

@@ -18,11 +18,16 @@ export interface CadEditorProps {
   notice?: string | null;
   preferredPartId?: string;
   controller?: Ref<CadEditorController>;
-  /** Hosts that can open a face sketch offer drawing on the part's top face. */
-  onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string, scene?: FaceSketchScene) => void;
+  /**
+   * Hosts that can open a face sketch offer drawing on the part's top face. `fromStudio` says it was opened from the Part
+   * Studio, which finishing it goes back to, rather than from the part's own view.
+   */
+  onEditFaceSketch?: (document: CadDocument, partId: string, sketchId: string, scene?: FaceSketchScene, fromStudio?: boolean) => void;
   partCameraState?: StudioCameraRef;
   /** Editing one face sketch, with the part's outline shown behind it. It can be open, and it isn't a profile. */
   faceSketch?: { outline: CadPoint[]; floor?: CadPoint[]; label: string; below?: boolean; scene?: FaceSketchScene };
   /** Open in 3D, when there's an outline to show: the whole design, or with `'part'` the selected part on its own. */
   startIn3D?: boolean | 'part';
+  /** The step the Part Studio's feature list opens with selected, such as a face sketch just finished. */
+  selectedStepId?: string;
 }
