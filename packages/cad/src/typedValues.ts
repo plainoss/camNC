@@ -12,7 +12,7 @@ export interface TypedValue {
 
 /** What a typed value measures: how it's worked out, what it has to satisfy and how a problem with it reads. */
 export interface TypedValueKind {
-  /** Starts the problem that says it can't be worked out. A dimension has none: its expression says which it is. */
+  /** Starts the problem that says it can't be worked out. A dimension has none, since its expression says which it is, and neither has a quiet value. */
   label?: string;
   unit: CadValueUnit;
   /** A count says how many fit, so a part-way result rounds down. */
@@ -85,25 +85,24 @@ const kPartPatternAngle: TypedValueKind = { label: 'Part pattern', unit: 'deg' }
 const cutDepthError = (value: number) =>
   value < 0 ? 'A cut can’t be less than nothing deep.' : value === 0 ? 'A cut needs some depth.' : null;
 const kCutDepth: TypedValueKind = { label: 'Cut depth', unit: 'mm', check: cutDepthError };
-const kRemoveDepth: TypedValueKind = { label: 'Remove depth', unit: 'mm', check: cutDepthError, quiet: true };
+const kRemoveDepth: TypedValueKind = { unit: 'mm', check: cutDepthError, quiet: true };
 const kHoleDiameter: TypedValueKind = {
-  label: 'Hole diameter',
   unit: 'mm',
   check: moreThanNothing('A hole needs to be wider than nothing.'),
   quiet: true,
 };
 const kFilletRadius: TypedValueKind = {
-  label: 'Fillet radius',
   unit: 'mm',
   check: moreThanNothing('A fillet needs some radius.'),
   quiet: true,
 };
-const kTurn: TypedValueKind = { label: 'Turn', unit: 'deg', quiet: true };
-const kPlaneOffset: TypedValueKind = { label: 'Plane offset', unit: 'mm', quiet: true };
+const kTurn: TypedValueKind = { unit: 'deg', quiet: true };
+const kPlaneOffset: TypedValueKind = { unit: 'mm', quiet: true };
 const kAxes = ['x', 'y', 'z'] as const;
 type AxisKinds = readonly [TypedValueKind, TypedValueKind, TypedValueKind];
-const kPosition = kAxes.map(axis => ({ label: `Position ${axis}`, unit: 'mm' })) as unknown as AxisKinds;
-const kMoveBy = kAxes.map(axis => ({ label: `Move ${axis}`, unit: 'mm', quiet: true })) as unknown as AxisKinds;
+const perAxis = (kind: (axis: (typeof kAxes)[number]) => TypedValueKind): AxisKinds => [kind('x'), kind('y'), kind('z')];
+const kPosition = perAxis(axis => ({ label: `Position ${axis}`, unit: 'mm' }));
+const kMoveBy = perAxis(() => ({ unit: 'mm', quiet: true }));
 export const kPartCutClearance: TypedValueKind = {
   label: 'Clearance',
   unit: 'mm',
@@ -287,9 +286,14 @@ export function mapTypedExpressions(document: CadDocument, edit: (expression: st
     value: (typed, kind) => ({ expression: edit(typed.expression, kind.unit), value: typed.value }),
     pattern(pattern) {
       const expressions = { ...pattern.expressions };
-      for (const key of Object.keys(kLinearPatternUnits) as (keyof typeof kLinearPatternUnits)[])
-        if (expressions[key]) expressions[key] = edit(expressions[key], kLinearPatternUnits[key]);
-      return { ...pattern, expressions };
+      let changed = false;
+      for (const key of Object.keys(kLinearPatternUnits) as (keyof typeof kLinearPatternUnits)[]) {
+        const expression = expressions[key];
+        if (!expression) continue;
+        expressions[key] = edit(expression, kLinearPatternUnits[key]);
+        changed ||= expressions[key] !== expression;
+      }
+      return changed ? { ...pattern, expressions } : pattern;
     },
   });
 }

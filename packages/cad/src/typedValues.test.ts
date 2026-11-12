@@ -10,7 +10,7 @@ import {
   type CadPart,
 } from './index';
 
-/** One part and one Cut parts step holding every kind of typed value, each typed as `size`, `turns` or `many`. */
+/** A part and a Cut parts step holding typed values of most kinds, each typed as `size`, `turns` or `many`. */
 function everyTypedValue(): CadDocument {
   const document = createPlateDocument({ name: 'Plate', width: 200, height: 100 });
   const plate = document.parts[0]!;
@@ -161,6 +161,29 @@ describe('typed values', () => {
     expect(cadVariableProblems(broken).map(problem => problem.message)).toContain(
       'Part pattern many: A part pattern makes one to 200, counting the part itself.'
     );
+    const both = { ...broken, variables: broken.variables!.map(v => (v.id === 'size' ? { ...v, expression: '20 deg' } : v)) };
+    expect(applyCadVariables(both).parts[0]!.pattern).toMatchObject({ count: 4, spacing: 12 });
+    expect(
+      cadVariableProblems(both)
+        .map(problem => problem.message)
+        .filter(message => message.startsWith('Part pattern'))
+    ).toHaveLength(2);
+  });
+
+  it('leaves alone what holds no typed value', () => {
+    const { partCuts: _partCuts, ...document } = everyTypedValue();
+    const applied = applyCadVariables({
+      ...document,
+      variables: document.variables!.map(v => (v.id === 'size' ? { ...v, expression: '9 mm' } : v)),
+    });
+    expect(applied).not.toHaveProperty('partCuts');
+    expect(applied).not.toHaveProperty('planes');
+    expect(applied.parts[1]).not.toHaveProperty('features');
+    const renamed = setCadVariable(applied, { id: 'turns', name: 'twist', expression: '30 deg' });
+    if ('error' in renamed) throw new Error(renamed.error);
+    expect(renamed.document).not.toHaveProperty('partCuts');
+    expect(renamed.document.parts[1]).toBe(applied.parts[1]);
+    expect(withCadLengthUnit(applied, 'in').parts[1]).toBe(applied.parts[1]);
   });
 
   it('gives every bare length, and nothing else, its unit when the design’s unit changes', () => {

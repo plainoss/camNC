@@ -8,6 +8,7 @@ import {
   visitTypedValues,
   workOutTypedValue,
   type LinearPatternWithExpressions,
+  type TypedValueOwner,
 } from './typedValues';
 import type { CadDiagnostic, CadDocument, CadLinearPattern, CadVariable } from './types';
 import {
@@ -140,7 +141,7 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
   const problems: CadDiagnostic[] = (document.variables ?? [])
     .filter(variable => errors[variable.id])
     .map(variable => ({ code: 'invalid-variable', severity: 'error', message: `${variable.name}: ${errors[variable.id]}` }));
-  const problem = (owner: { partId?: string; constraintId?: string }, message: string) =>
+  const problem = (owner: TypedValueOwner, message: string) =>
     problems.push({
       code: 'variable-value',
       severity: 'error',
