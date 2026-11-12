@@ -46,12 +46,9 @@ export function defaultTextModel(provider: ConnectionPresetId, available: string
 /** The image model Carve uses with the same key; none for providers without image generation. */
 export function defaultImageModel(provider: ConnectionPresetId, available: string[]): string | undefined {
   if (provider === 'anthropic') return undefined;
-  if (provider === 'gemini') {
-    // Imagen's standard tier first (not fast or ultra), then Gemini's own image models.
-    const imagen = available.filter(id => /^imagen-[\d.]+-generate/.test(id));
-    const gemini = available.filter(id => /^gemini-.*-image/.test(id));
-    return newest(imagen) ?? newest(gemini.filter(id => !/preview/.test(id))) ?? newest(gemini);
-  }
+  // Only Imagen is known to answer Gemini's OpenAI-compatible images endpoint; Gemini's own image models can still be
+  // entered under Models.
+  if (provider === 'gemini') return newest(available.filter(id => /^imagen-[\d.]+-generate/.test(id)));
   return newest(available.filter(id => /^gpt-image-\d/.test(id) && !/mini/.test(id))) ?? available.find(id => id === 'dall-e-3');
 }
 

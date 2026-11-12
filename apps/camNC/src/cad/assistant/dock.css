@@ -176,8 +176,9 @@
     .cad-proposal-error { top: 74px; }
   }
 }
-.cad-editor .cad-assistant-presets { display: flex; gap: 6px; margin: 12px 0 4px; }
-.cad-editor .cad-assistant-dock .cad-assistant-presets button { flex: 1; min-height: 34px; }
+/* Four providers wrap into two rows in a narrow dock rather than squeezing their names. */
+.cad-editor .cad-assistant-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 6px; margin: 12px 0 4px; }
+.cad-editor .cad-assistant-dock .cad-assistant-presets button { min-width: 0; min-height: 34px; }
 .cad-editor .cad-assistant-dock .cad-assistant-presets button[aria-checked='true'] { background: #e7efeb; border-color: #27756b; color: #244f44; }
 .cad-editor .cad-assistant-advanced { margin: 6px 0; border-top: 1px solid #e0e5e1; padding-top: 6px; }
 .cad-editor .cad-assistant-advanced summary { cursor: pointer; color: #52696a; font-size: 12px; font-weight: 550; }
