@@ -39,7 +39,7 @@ describe('provider defaults from a key alone', () => {
     expect(defaultTextModel('gemini', gemini)).toBe('gemini-3.5-flash');
     expect(defaultTextModel('gemini', ['gemini-4-flash-preview', 'gemini-3-pro-preview'])).toBe('gemini-4-flash-preview');
     expect(defaultImageModel('gemini', gemini)).toBe('imagen-4.0-generate-001');
-    expect(defaultImageModel('gemini', ['gemini-3.5-flash', 'gemini-3.5-flash-image'])).toBe('gemini-3.5-flash-image');
+    expect(defaultImageModel('gemini', ['gemini-3.5-flash', 'gemini-3.5-flash-image'])).toBeUndefined();
   });
 
   it('lists models with the same key and endpoint, and treats a refusal as no list', async () => {
