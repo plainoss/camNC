@@ -8,7 +8,8 @@ const NO_VOLUME = 1e-3;
 /**
  * The B-rep as one closed shell per piece of material: faces joined through the edges they share. A piece a cut
  * separates from the rest, or one that only touches it along an edge, is a solid of its own, which a reader takes for a
- * void when it's written into the same shell. Shells with no volume are left out.
+ * void when it's written into the same shell. Shells with no volume are left out, unless that would leave nothing: then
+ * the B-rep is written as it is, so a part is never listed with no solid.
  */
 export function brepShells(brep: Brep): Brep[] {
   const parent = brep.faces.map((_, i) => i);
@@ -26,8 +27,8 @@ export function brepShells(brep: Brep): Brep[] {
   });
   const groups = new Map<number, number[]>();
   brep.faces.forEach((_, f) => (groups.get(root(f)) ?? groups.set(root(f), []).get(root(f))!).push(f));
-  if (groups.size === 1) return Math.abs(shellVolume(brep)) > NO_VOLUME ? [brep] : [];
-  return [...groups.values()].flatMap(group => {
+  if (groups.size === 1) return [brep];
+  const shells = [...groups.values()].flatMap(group => {
     // Only the shell's own edges, numbered in their old order.
     const used = [...new Set(group.flatMap(f => brep.faces[f]!.loops.flat().map(({ edge }) => edge)))].sort((a, b) => a - b),
       at = new Map(used.map((edge, i) => [edge, i]));
@@ -41,6 +42,7 @@ export function brepShells(brep: Brep): Brep[] {
     });
     return Math.abs(shellVolume(shell)) > NO_VOLUME ? [shell] : [];
   });
+  return shells.length ? shells : [brep];
 }
 
 /** Points along an edge from its start, without its end: arcs in short steps. */
@@ -61,23 +63,29 @@ function edgePoints(edge: BrepEdge, points: readonly Vec3[]): Vec3[] {
 }
 
 /**
- * The volume a shell encloses, positive when it faces outward. Its walls are vertical, so only its flat tops and
- * bottoms count: each one's height times its area as seen from above (arcs as short chords), counterclockwise seen
- * from outside being negative for a bottom.
+ * The volume a shell encloses, positive when it faces outward, by the divergence theorem with the field (0, 0, z): the
+ * sum over its faces of z times their area as seen from above, signed by the way they face. A plane in any direction
+ * counts, from its loops as polygons (arcs as short chords), whose fans of triangles are exact for a plane. A cylinder
+ * is vertical (`BrepFace`), so it faces sideways everywhere and adds nothing.
  */
 export function shellVolume(brep: Brep): number {
   let volume = 0;
   for (const face of brep.faces) {
-    const { surface } = face;
-    if (surface.kind !== 'plane' || Math.abs(surface.normal[2]) < 0.5) continue;
+    if (face.surface.kind !== 'plane') continue;
     for (const loop of face.loops) {
       const ring = loop.flatMap(({ edge, forward }) => {
         const along = edgePoints(brep.edges[edge]!, brep.points);
         // Backward, the walk starts at the edge's end and takes its points in reverse.
         return forward ? along : [brep.points[brep.edges[edge]!.end]!, ...along.slice(1).reverse()];
       });
-      const area = ring.reduce((sum, p, i) => sum + p[0] * ring[(i + 1) % ring.length]![1] - ring[(i + 1) % ring.length]![0] * p[1], 0) / 2;
-      volume += surface.origin[2] * area;
+      const o = ring[0]!;
+      for (let i = 1; i + 1 < ring.length; i++) {
+        const b = ring[i]!,
+          c = ring[i + 1]!;
+        // z is linear over the triangle, so its mean times the area seen from above is exact.
+        const area = ((b[0] - o[0]) * (c[1] - o[1]) - (c[0] - o[0]) * (b[1] - o[1])) / 2;
+        volume += (area * (o[2] + b[2] + c[2])) / 3;
+      }
     }
   }
   return volume;

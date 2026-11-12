@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { profileFeatures, type SidedCut } from '../cutFeatures';
-import type { Mesh, Pt } from '../geom';
+import type { Mesh, Pt, Vec3 } from '../geom';
 import { loadStep } from '../import';
-import { brepProblems, partBrep } from './brep';
+import { brepProblems, partBrep, type Brep } from './brep';
 import { partSlabs, wrongPairs } from './pairCheck';
 import { brepShells, shellVolume } from './shells';
 import { writeStep } from './writer';
@@ -154,5 +154,123 @@ describe('part STEP pieces', () => {
     const { bodies } = await loadStep(new TextEncoder().encode(step));
     expect(bodies).toHaveLength(1);
     expect(meshVolume(bodies[0]!.mesh)).toBeGreaterThan(0);
+  });
+});
+
+const plane = (normal: Vec3) => ({ kind: 'plane' as const, origin: [0, 0, 0] as Vec3, normal });
+const loop = (uses: [number, boolean][]) => uses.map(([edge, forward]) => ({ edge, forward }));
+
+describe('shell volume and pieces with no volume', () => {
+  it('counts a sloped face, as the divergence theorem does', () => {
+    // A tetrahedron whose sloped face looks mostly sideways: corners at the origin, x = 1, y = 1 and z = 3.
+    const brep: Brep = {
+      points: [
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 3],
+      ],
+      edges: [
+        { start: 0, end: 1 },
+        { start: 0, end: 2 },
+        { start: 0, end: 3 },
+        { start: 1, end: 2 },
+        { start: 1, end: 3 },
+        { start: 2, end: 3 },
+      ],
+      faces: [
+        {
+          surface: plane([0, 0, -1]),
+          loops: [
+            loop([
+              [1, true],
+              [3, false],
+              [0, false],
+            ]),
+          ],
+        },
+        {
+          surface: plane([0, -1, 0]),
+          loops: [
+            loop([
+              [0, true],
+              [4, true],
+              [2, false],
+            ]),
+          ],
+        },
+        {
+          surface: plane([-1, 0, 0]),
+          loops: [
+            loop([
+              [2, true],
+              [5, false],
+              [1, false],
+            ]),
+          ],
+        },
+        {
+          surface: { ...plane([3, 3, 1]), origin: [0, 0, 3] },
+          loops: [
+            loop([
+              [3, true],
+              [5, true],
+              [4, false],
+            ]),
+          ],
+        },
+      ],
+    };
+    expect(brepProblems(brep)).toEqual([]);
+    expect(shellVolume(brep)).toBeCloseTo(0.5, 9);
+  });
+
+  it('writes a part that is all sliver as it is, rather than as a part with no solid', () => {
+    // Two walls back to back: a closed shell with nothing inside.
+    const sliver: Brep = {
+      points: [
+        [0, 0, 0],
+        [10, 0, 0],
+        [10, 0, 5],
+        [0, 0, 5],
+      ],
+      edges: [
+        { start: 0, end: 1 },
+        { start: 1, end: 2 },
+        { start: 2, end: 3 },
+        { start: 3, end: 0 },
+      ],
+      faces: [
+        { surface: plane([0, -1, 0]), loops: [loop([0, 1, 2, 3].map(edge => [edge, true]))] },
+        { surface: plane([0, 1, 0]), loops: [loop([3, 2, 1, 0].map(edge => [edge, false]))] },
+      ],
+    };
+    expect(brepProblems(sliver)).toEqual([]);
+    expect(shellVolume(sliver)).toBeCloseTo(0, 9);
+    expect(brepShells(sliver)).toEqual([sliver]);
+    // Beside a real piece, the sliver is left out.
+    const { brep: board } = part([]);
+    const both: Brep = {
+      points: [...board.points, ...sliver.points],
+      edges: [
+        ...board.edges,
+        ...sliver.edges.map(edge => ({ start: edge.start + board.points.length, end: edge.end + board.points.length })),
+      ],
+      faces: [
+        ...board.faces,
+        ...sliver.faces.map(face => ({
+          ...face,
+          loops: face.loops.map(uses => uses.map(use => ({ ...use, edge: use.edge + board.edges.length }))),
+        })),
+      ],
+    };
+    expect(brepShells(both).map(shell => shell.faces.length)).toEqual([board.faces.length]);
+    const step = writeStep([
+      { name: 'Sliver', solids: [{ brep: sliver }] },
+      { name: 'Board', solids: [{ brep: both }] },
+    ]);
+    expect(count(step, 'MANIFOLD_SOLID_BREP')).toBe(2);
+    expect(step).toContain("MANIFOLD_SOLID_BREP('Sliver'");
+    expect(step).toContain("MANIFOLD_SOLID_BREP('Board'");
   });
 });
