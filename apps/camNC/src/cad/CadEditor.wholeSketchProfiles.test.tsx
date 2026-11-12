@@ -26,7 +26,7 @@ async function studio() {
   const features = screen.getByRole('region', { name: 'Features' });
   await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Part 2/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
-  expect(within(dialog).getByText('2 regions of Part 2’s sketch')).toBeDefined();
+  expect(within(dialog).getByText('2 regions of Sketch · Part 2')).toBeDefined();
   const pick = within(dialog).getByRole('button', { name: 'Select profile' });
   if (pick.getAttribute('aria-pressed') !== 'true') await userEvent.click(pick);
   return { source, features, dialog, latest: () => change.mock.calls.at(-1)?.[0] ?? source };
@@ -35,7 +35,7 @@ async function studio() {
 it('selects every eligible region from the source sketch row while editing Remove and retains settings through confirm and reload', async () => {
   const { source, features, dialog, latest } = await studio();
   await userEvent.click(within(features).getByRole('button', { name: /Sketch · Part 2/ }));
-  await waitFor(() => expect(within(dialog).getByText('Part 2’s sketch')).toBeDefined());
+  await waitFor(() => expect(within(dialog).getByText('Sketch · Part 2', { selector: '.cad-feature-selection span' })).toBeDefined());
   expect(latest().parts[1]!.regions).toBeUndefined();
   expect(latest().parts[1]!.id).toBe(source.parts[1]!.id);
   expect(latest().parts[1]!.sketch.id).toBe(source.parts[1]!.sketch.id);

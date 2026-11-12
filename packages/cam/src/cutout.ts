@@ -1,0 +1,119 @@
+import { areaD, type PathD, type PathsD } from 'clipper2-ts';
+import { profileFeatures } from './cutFeatures';
+import type { PartFeatures } from './features';
+import type { SafetyFilter } from './safety';
+import { offset, union } from './geom';
+import { simplifyLoop } from './simplifyLoop';
+
+/**
+ * A piece cut out of the board along a closed outline (board frame, mm): a carved sign cut to its silhouette. It is
+ * planned as a part with nothing but its outline, so the board's tabs or skin hold it like any other part.
+ */
+export interface BoardCutout {
+  id: string;
+  name: string;
+  outline: PathD;
+  /** Tabs the user placed, board frame: used instead of picked ones, each moved onto the bit's path. */
+  tabsAt?: { x: number; y: number }[];
+}
+
+/** How a carving's cutout follows it: the artwork's own outline, or a rounded plaque round it. */
+export type CutoutShape = 'outline' | 'plaque';
+
+/** Widest gap between pieces of artwork the outline bridges to keep them one piece, mm. */
+const kMaxBridge = 40;
+/**
+ * How far the outline may stray from the artwork's own before it is grown, mm. Artwork is traced off a raster, so its
+ * outline is a staircase of tiny steps, and growing the corner of every step by the margin takes hundreds of
+ * milliseconds for a word of text, on the main thread where the Carve step draws it. Smoothed, it takes a few. The
+ * margin grows by as much, so the cut stays clear of the artwork by the margin.
+ */
+const kTraceTolerance = 0.1;
+
+const outer = (paths: PathsD) => paths.filter(path => areaD(path) > 0);
+const biggest = (paths: PathsD) => [...paths].sort((a, b) => areaD(b) - areaD(a));
+
+/**
+ * The silhouette a carving is cut out along, board frame: its outer outline grown by `margin` (holes filled), and
+ * pieces closer than `kMaxBridge` joined by closing the gap between them, so a word comes out as one piece.
+ * `plaque`: a rounded rectangle `margin` round the artwork. Empty when nothing is drawn.
+ */
+export function cutoutSilhouette(region: PathsD, shape: CutoutShape, margin: number, cornerRadius = 6): PathsD {
+  if (!region.length) return [];
+  if (shape === 'outline') {
+    const grown = outer(
+      offset(
+        outer(region).map(loop => simplifyLoop(loop, kTraceTolerance)),
+        margin + kTraceTolerance
+      )
+    );
+    for (let bridge = 0; bridge <= kMaxBridge; bridge += 4) {
+      const closed = bridge ? outer(offset(offset(grown, bridge), -bridge)) : outer(union(grown, []));
+      if (closed.length <= 1) return closed;
+      if (bridge + 4 > kMaxBridge) return biggest(closed);
+    }
+  }
+  const xs = region.flat().map(p => p.x),
+    ys = region.flat().map(p => p.y);
+  const box = { x0: Math.min(...xs) - margin, y0: Math.min(...ys) - margin, x1: Math.max(...xs) + margin, y1: Math.max(...ys) + margin };
+  const r = Math.min(cornerRadius, (box.x1 - box.x0) / 2 - 0.1, (box.y1 - box.y0) / 2 - 0.1);
+  const inner = [
+    { x: box.x0 + r, y: box.y0 + r },
+    { x: box.x1 - r, y: box.y0 + r },
+    { x: box.x1 - r, y: box.y1 - r },
+    { x: box.x0 + r, y: box.y1 - r },
+  ];
+  return r > 0 ? outer(offset([inner], r)) : [inner];
+}
+
+/**
+ * Whether a cutout's outline (board frame, mm, X0 Y0 at the board's lower left) runs past the board's edge: the piece
+ * would come out cut short there, and the bit's path round it leaves the board.
+ */
+export function cutoutPastBoard(outline: PathsD, size: { w: number; h: number }): boolean {
+  // Rounding in the offsets: a line laid exactly along the edge is on the board.
+  const e = 1e-3;
+  return outline.some(loop => loop.some(p => p.x < -e || p.y < -e || p.x > size.w + e || p.y > size.h + e));
+}
+
+/** How far past the bit's radius a move off the board may be from a cut line and still be the bit going round it, mm. */
+const kNearCutLine = 1;
+
+const toLoop = (q: { x: number; y: number }, loop: PathD) =>
+  Math.min(
+    ...loop.map((a, i) => {
+      const b = loop[(i + 1) % loop.length];
+      const dx = b.x - a.x,
+        dy = b.y - a.y,
+        l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((q.x - a.x) * dx + (q.y - a.y) * dy) / l2)) : 0;
+      return Math.hypot(q.x - a.x - t * dx, q.y - a.y - t * dy);
+    })
+  );
+
+/**
+ * Leaves out the moves off the board that go round `cutouts` (board frame; `flipH`: the program runs with the board
+ * turned over, Y mirrored about this height), so a cut line past the edge is said once, not once per move. Every other
+ * issue is kept: moves off the board elsewhere (a V-carve, another part, a dowel) still show. `dropped()`: whether any was.
+ */
+export function cutLineFilter(cutouts: BoardCutout[], flipH?: number): { keep: SafetyFilter; dropped: () => boolean } {
+  let dropped = false;
+  const keep: SafetyFilter = (issue, toolRadius) => {
+    if (issue.rule !== 'outside-board' || !issue.at || !cutouts.length) return true;
+    const at = flipH === undefined ? issue.at : { x: issue.at.x, y: flipH - issue.at.y };
+    const round = cutouts.some(c => toLoop(at, c.outline) <= toolRadius + kNearCutLine);
+    dropped ||= round;
+    return !round;
+  };
+  return { keep, dropped: () => dropped };
+}
+
+/** A cutout as CAM takes a part: its features, size and lower left corner on the board. */
+export function cutoutPart(
+  cutout: BoardCutout,
+  thickness: number
+): { features: PartFeatures; size: [number, number, number]; x: number; y: number; tabsAt?: { x: number; y: number }[] } {
+  const { features, size, offset: at } = profileFeatures({ thickness, outline: cutout.outline, holes: [] });
+  const tabsAt = cutout.tabsAt?.map(q => ({ x: q.x - at.x, y: q.y - at.y }));
+  return { features, size, x: at.x, y: at.y, ...(tabsAt?.length && { tabsAt }) };
+}

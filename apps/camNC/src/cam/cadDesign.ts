@@ -1,4 +1,5 @@
-import { cadPartsToCut, type CadDocument } from '@wbcnc/cad';
+import type { CadDocument } from '@wbcnc/cad';
+import { studioCutParts } from '../cad/studioGeometry';
 import { solveCadDocument } from '../cad/solveCad';
 import { updateJobForModel, type CamJobV1 } from './jobDb';
 import { carryDesignTabs } from './designTabAnchors';
@@ -34,15 +35,15 @@ export async function saveDesignDraft(
 export async function acceptDesign(base: CamJobV1, document: CadDocument): Promise<CamJobV1> {
   if (!base.design) throw new Error('This job is not a native design.');
   const solved = await solveCadDocument(document);
-  if (solved.status !== 'solved' || !cadPartsToCut(solved.document, solved.parts).length)
+  if (solved.status !== 'solved' || !studioCutParts(solved).length)
     throw new Error(
       solved.diagnostics.find(d => d.severity === 'error')?.message || 'Draw at least one closed part before continuing to Boards.'
     );
   const before = base.design.accepted ? await solveCadDocument(base.design.accepted) : null;
   // Mirrored copies are parts of their own to CAM, and plain copies add to a part's quantity.
-  const toCut = cadPartsToCut(solved.document, solved.parts),
+  const toCut = studioCutParts(solved),
     cut = toCut.map(entry => entry.part),
-    cutBefore = before ? cadPartsToCut(before.document, before.parts).map(entry => entry.part) : [];
+    cutBefore = before ? studioCutParts(before).map(entry => entry.part) : [];
   // Keyed as milled: a part that now lies turned over is another program, so a sheet cut the other way up no longer matches.
   const partGeometryKeys = Object.fromEntries(
     await Promise.all(cut.map(async part => [part.partId, await designGeometryKey(asMilled(part))]))

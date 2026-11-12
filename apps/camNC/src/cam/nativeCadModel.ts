@@ -1,4 +1,5 @@
-import { cadPartsToCut, solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
+import { solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
+import { studioCutParts } from '@/cad/studioGeometry';
 import { profileFeatures, summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three';
 import type { BodyMesh, CamPartInfo, ModelImport, Outline2D } from './camTypes';
@@ -15,7 +16,13 @@ export interface NativeCadEntry {
 }
 
 /** Native curves are tessellated once by CAD, then go straight to CAM's polygon feature seam. */
-export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; info: CamPartInfo; mesh: BodyMesh } {
+export function nativePart(source: EvaluatedCadPart): {
+  entry: NativeCadEntry;
+  info: CamPartInfo;
+  mesh: BodyMesh;
+  /** Side B's features, when it has cuts from below: with `entry.features`, what the mesh and a STEP solid are built from. */
+  below?: PartFeatures;
+} {
   const { features, below, turned, holeSources, offset, size, problem } = profileFeatures(source);
   if (problem) throw new Error(`${source.name}: ${problem}`);
   const outer = features.outlines[0]!;
@@ -50,6 +57,7 @@ export function nativePart(source: EvaluatedCadPart): { entry: NativeCadEntry; i
   };
   const paths = (loops: { x: number; y: number }[][]): Outline2D => loops.map(loop => loop.map(p => [p.x, p.y]));
   return {
+    ...(below && { below }),
     entry: { part, features, ...(turned && { flipped: { x: turned('x'), y: turned('y') } }) },
     info: {
       id: source.partId,
@@ -82,7 +90,7 @@ export async function nativeCadModel(document: CadDocument): Promise<{ model: Mo
   const started = performance.now();
   const solved = await solveCadDocument(document);
   if (solved.status !== 'solved') throw new Error(solved.diagnostics.map(d => d.message).join(' ') || 'The design could not be solved.');
-  const parts = cadPartsToCut(solved.document, solved.parts).map(({ part, names }) => {
+  const parts = studioCutParts(solved).map(({ part, names }) => {
     const native = nativePart(asMilled(part));
     native.info.names = names;
     // A mirrored copy is cut as a part of its own, relieved like the part it mirrors.

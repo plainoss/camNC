@@ -5,11 +5,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { parse } from 'yaml';
+import { parse, parseAllDocuments } from 'yaml';
 
 const root = new URL('../', import.meta.url);
 const read = file => readFileSync(new URL(file, root), 'utf8');
-const lock = parse(read('pnpm-lock.yaml'));
+// pnpm 11+ writes the pinned pnpm in a first document and the project's dependencies in the last.
+const lock = parseAllDocuments(read('pnpm-lock.yaml')).at(-1).toJS();
 const require = createRequire(import.meta.url);
 
 // Evaluates a workflow `if:` the way Actions would for these tests: `always()` is true, as for a gate after a failed
@@ -121,7 +122,7 @@ test('the required check rejects a failed, cancelled or skipped dependency', () 
   assert.notEqual(run({ ...light, SIM_RESULT: 'skipped' }).status, 0);
 });
 
-test('CI covers every runtime task and both browser shards, without duplicating other tests', () => {
+test('CI covers every runtime task and every browser shard, without duplicating other tests', () => {
   const { jobs } = parse(read('.github/workflows/ci.yml'));
   const suites = [...jobs.test.strategy.matrix.include, ...jobs.browser.strategy.matrix.include];
   const selected = (tasks, filters) => {
@@ -133,14 +134,21 @@ test('CI covers every runtime task and both browser shards, without duplicating 
       .filter(task => (tasks.includes(task.task) || tasks.includes(task.taskId)) && task.command !== '<NONEXISTENT>')
       .map(task => task.taskId);
   };
-  const assigned = suites.flatMap(suite => selected(suite.tasks.split(/\s+/), suite.filter.split(/\s+/)));
+  // A suite's app-tasks run in a second turbo run, scoped to camNC (see the Run tests step).
+  const appFilter = '--filter=@wbcnc/camNC';
+  assert(jobs.test.steps.find(step => step.name === 'Run tests').run.includes(`run \${{ matrix.app-tasks }} --log-order=stream ${appFilter}`));
+  const assigned = suites.flatMap(suite => [
+    ...selected(suite.tasks.split(/\s+/), suite.filter.split(/\s+/)),
+    ...(suite['app-tasks'] ? selected(suite['app-tasks'].split(/\s+/), [appFilter]) : []),
+  ]);
   const expected = [
     ...selected(['test'], ['--filter=!@wbcnc/camNC']),
     ...selected(['test:domain', 'test:worker', 'test:licenses', 'test:browser'], ['--filter=@wbcnc/camNC']),
-    '@wbcnc/camNC#test:browser',
+    // One browser shard runs test:browser in the plan above; each further shard runs it again.
+    ...Array(suites.filter(suite => suite.tasks === 'test:browser').length - 1).fill('@wbcnc/camNC#test:browser'),
   ];
   assert.deepEqual(assigned.sort(), expected.sort());
-  assert.deepEqual(suites.filter(suite => suite.tasks === 'test:browser').map(suite => suite.args).sort(), ['--shard=1/2', '--shard=2/2']);
+  assert.deepEqual(suites.filter(suite => suite.tasks === 'test:browser').map(suite => suite.args).sort(), ['--shard=1/3', '--shard=2/3', '--shard=3/3']);
   // Both gates run serially in one job, after its functional tests, and never through turbo's cache.
   assert.deepEqual(suites.map(suite => suite.performance).filter(Boolean), ['pnpm run test:performance']);
   const scripts = JSON.parse(read('package.json')).scripts;
@@ -162,6 +170,10 @@ test('CI covers every runtime task and both browser shards, without duplicating 
   const specs = parse(read('.github/workflows/ci.yml')).jobs.specs;
   assert.deepEqual(specs.strategy.matrix.shard, ['1/4', '2/4', '3/4', '4/4']);
   assert.match(specs.steps.find(step => step.name === 'Run sketch behaviour specs').run, /--shard=\$\{\{ matrix.shard \}\}/);
+  // The scenario sharding reserves room on the first shard only, so its extra checks must stay there.
+  const extraShards = specs.steps.flatMap(step => [...String(step.if ?? '').matchAll(/matrix\.shard == '([^']+)'/g)].map(match => match[1]));
+  assert(extraShards.length > 0);
+  assert.deepEqual([...new Set(extraShards)], ['1/4']);
 });
 
 
@@ -194,33 +206,53 @@ test('the Mergify queue runs all validation, PRs run the quick suites and main o
   // The queue validated the commit that lands on main, so main only warms caches through the checks job.
   const onMain = Object.keys(workflow.jobs).filter(id => runs(workflow.jobs[id], { event_name: 'push' }));
   assert.deepEqual(onMain, ['checks']);
+  for (const [job, step] of [['test', 'Run tests'], ['specs', 'Run sketch behaviour specs']]) {
+    assert.match(workflow.jobs[job].steps.find(entry => entry.name === step).env.TURBO_FORCE, /schedule/, `${step} must not replay cached results on scheduled runs`);
+  }
+  // Scheduled and manual runs on main run every suite, so Mergify's flaky-test detection sees the tests on main.
+  assert(workflow.on.schedule?.length, 'main must run the full suites on a schedule');
+  for (const event_name of ['schedule', 'workflow_dispatch']) {
+    for (const [id, job] of Object.entries(workflow.jobs)) {
+      assert(runs(job, { event_name, head_ref: '', event: {} }), `${id} must run on ${event_name}`);
+    }
+  }
 });
 
 test('Mergify batches retain the required gate, branch protections and explicit merge consent', () => {
   const config = parse(read('.mergify.yml'));
-  assert.equal(config.pull_request_rules, undefined, 'CI success must not automatically request a merge');
+  // CI success alone never queues a PR: the only automatic queueing is for PRs someone labelled `ready`.
+  assert.deepEqual(config.pull_request_rules, [
+    { name: 'queue PRs labelled ready', conditions: ['base = main', 'label = ready'], actions: { queue: null } },
+  ]);
   assert.equal(config.merge_protections_settings?.auto_merge_conditions, undefined);
   assert.equal(config.merge_queue.mode, 'serial', 'speculative batches must include preceding changes');
-  assert(config.merge_queue.max_parallel_checks > 1 && config.merge_queue.max_parallel_checks <= 2);
+  // One batch's 11 jobs plus PR CI fit the 20 concurrent runners; two batches did not.
+  assert.equal(config.merge_queue.max_parallel_checks, 1);
+  // Only a flaky-test fix discards running batches; other CI fixes wait for the running batch.
+  const interrupting = config.priority_rules.filter(rule => rule.allow_checks_interruption);
+  assert.deepEqual(interrupting.map(rule => rule.conditions), [['label = flaky-test']]);
   assert.equal(config.merge_queue.skip_intermediate_results ?? false, false);
   assert.equal(config.queue_rules.length, 1);
   const [queue] = config.queue_rules;
   assert(queue.queue_conditions.includes('base = main'));
   assert(queue.queue_conditions.includes('-draft'));
-  assert.equal(queue.branch_protection_injection_mode, 'queue');
+  // GitHub's protections gate the merge; a fix may queue before its own CI ends, because the batch runs every check.
+  assert.equal(queue.branch_protection_injection_mode, 'merge');
   assert.equal(queue.merge_method, 'squash');
   assert(queue.batch_size > 1 && queue.batch_size <= 3);
   assert.equal(queue.max_checks_retries, 0);
   const required = Object.values(parse(read('.github/workflows/ci.yml')).jobs).find(job => job.name === 'Run tests');
   assert(required);
-  for (const conditions of [queue.queue_conditions, queue.merge_conditions]) {
-    assert(conditions.includes(`check-success = ${required.name}`), 'both original PRs and batches must pass their validation gate');
-  }
+  const gate = `check-success = ${required.name}`;
+  assert(queue.merge_conditions.includes(gate), 'batches must pass the validation gate');
+  // Only a labelled test or CI fix may queue before its own CI passes.
+  assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'object'), [{ or: [gate, 'label = ci-fix', 'label = flaky-test'] }]);
+  assert.deepEqual(queue.queue_conditions.filter(condition => typeof condition === 'string').sort(), ['-draft', 'base = main']);
   const { jobs } = parse(read('.github/workflows/ci.yml'));
   const browserChecks = jobs.browser.strategy.matrix.include.map(({ suite }) => `Tests (${suite})`);
   const specChecks = jobs.specs.strategy.matrix.shard.map(shard => `Behaviour specs (${shard})`);
   assert.deepEqual(queue.merge_conditions.filter(condition => !queue.queue_conditions.includes(condition)).sort(),
-    [...browserChecks, ...specChecks].map(name => `check-success = ${name}`).sort(),
+    [required.name, ...browserChecks, ...specChecks].map(name => `check-success = ${name}`).sort(),
     'distinct merge conditions must require all browser/spec checks, preventing direct merge after only light PR CI');
 });
 
@@ -271,7 +303,7 @@ test('only the checks job on main saves the pnpm store, and every job restores t
   // A cached path outside the workspace resolves differently in the Playwright container.
   assert(!/^[/~]|\.\./.test(restore.with.path), 'cache a workspace-relative path');
   assert.match(steps.find(step => step.name === 'Keep the pnpm store in the workspace').run,
-    new RegExp(`npm_config_store_dir=\\$GITHUB_WORKSPACE/${restore.with.path}"`));
+    new RegExp(`PNPM_CONFIG_STORE_DIR=\\$GITHUB_WORKSPACE/${restore.with.path}"`));
   assert(read('.gitignore').split('\n').includes(restore.with.path));
   // Both cache steps must see the gzip-only environment of the container, and later steps get zstd back.
   const index = name => steps.findIndex(step => step.name === name);
@@ -478,4 +510,34 @@ test('every CI test run reports its results to Mergify, and fork PRs without the
     // The Workers pool cannot load the reporter's runner setup, so those suites write a JUnit report for an upload step.
     if (!file.endsWith('vitest.fast.config.ts')) assert.match(read(file), /'@mergifyio\/vitest'|outputFile: \{ junit: 'test-results\/junit\/worker\.xml' \}/, file);
   }
+});
+
+test('Deploy ships production only from main pushes and previews only same-repository PRs', () => {
+  const workflow = parse(read('.github/workflows/deploy.yml'));
+  assert.deepEqual(workflow.on.push.branches, ['main']);
+  const { deploy, 'setup-smoke': smoke } = workflow.jobs;
+  const evaluate = new Function('github', 'startsWith', `return (${deploy.if});`);
+  const runs = github => evaluate({ repository: 'plainoss/camNC', ...github }, (value, prefix) => value.startsWith(prefix));
+  const pr = (head, repo = 'plainoss/camNC') => ({
+    event_name: 'pull_request',
+    head_ref: head,
+    event: { pull_request: { head: { repo: { full_name: repo } } } },
+  });
+  assert.equal(runs({ event_name: 'push' }), true);
+  assert.equal(runs(pr('feat/x')), true);
+  assert.equal(runs(pr('feat/x', 'someone/camNC')), false, 'fork PRs have no token');
+  assert.equal(runs(pr('mergify/merge-queue/abc')), false, 'queue batches are not previewed');
+  const step = name => deploy.steps.find(candidate => candidate.name === name);
+  assert.equal(step('Deploy production').if, "github.event_name == 'push'");
+  assert.match(step('Deploy production').run, /pnpm run deploy$/);
+  assert.equal(step('Upload preview version').if, "github.event_name == 'pull_request'");
+  assert.match(step('Upload preview version').run, /deploy:preview --preview-alias pr-/);
+  assert.match(step('Upload preview version').run, /set -o pipefail/, 'a failed upload must not pass on tee');
+  const comment = step('Comment the preview links');
+  assert.equal(comment.if, "github.event_name == 'pull_request'");
+  assert.match(comment.run, /camnc-preview -->[\s\S]*PATCH/, 'one preview comment, edited on every upload');
+  assert.equal(deploy.permissions['pull-requests'], 'write');
+  assert.equal(smoke.uses, './.github/workflows/setup-smoke.yml');
+  assert.equal(smoke.if, "github.event_name == 'push'");
+  assert('workflow_call' in parse(read('.github/workflows/setup-smoke.yml')).on);
 });

@@ -301,6 +301,164 @@ describe('CncApi', () => {
     api.connect(fake.host);
     await until(() => api.connection.value === 'unreachable');
   });
+
+  it('knows a hold is the Pause camNC sent until the job runs again, not a program pause after it', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    fake.state = 'Run';
+    fake.job = { file: '/sd/job.gcode', percent: 88.2 };
+    fake.pushStatus();
+    await until(() => api.state.value === 'Run');
+    api.feedHold();
+    expect(api.holdRequested.value).toBe(true);
+    // A report sent before the controller took the Pause does not end it.
+    fake.state = 'Run';
+    fake.pushStatus();
+    await until(() => fake.realtime.includes(Realtime.feedHold));
+    fake.state = 'Hold:0';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Hold');
+    expect(api.holdRequested.value).toBe(true);
+    // Resume ends it right away, even if the Run report that follows is missed.
+    await api.resume();
+    expect(api.holdRequested.value).toBe(false);
+    // The program's own M0 is a Hold camNC did not send.
+    fake.state = 'Hold:0';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Hold');
+    expect(api.holdRequested.value).toBe(false);
+  });
+
+  it('forgets the Pause once the job ends, or runs again after a report that was not Run', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    fake.state = 'Run';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Run');
+    api.feedHold();
+    fake.state = 'Idle';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Idle');
+    expect(api.holdRequested.value).toBe(false);
+    fake.state = 'Run';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Run');
+    api.feedHold();
+    fake.state = 'Hold:1';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Hold');
+    // Resumed from another client or the machine's button.
+    fake.state = 'Run';
+    fake.pushStatus();
+    await until(() => api.state.value === 'Run');
+    expect(api.holdRequested.value).toBe(false);
+  });
+
+  it('forgets the Pause once the controller reads on past where it held, though the Run report was missed', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    const hold = async (state: string, percent: number) => {
+      fake.state = state;
+      fake.job = { file: '/sd/job.gcode', percent };
+      fake.pushStatus();
+      await until(() => api.status.value?.state === state.split(':')[0] && api.jobProgress.value?.percent === percent);
+    };
+    await hold('Run', 40);
+    api.feedHold();
+    // Still reading into the planner while it slows down: not past the hold yet.
+    await hold('Hold:1', 40.5);
+    await hold('Hold:0', 41);
+    await hold('Hold:0', 41);
+    expect(api.holdRequested.value).toBe(true);
+    // Resumed elsewhere, ran on and held again (an M0) between two reports.
+    await hold('Hold:0', 63.2);
+    expect(api.holdRequested.value).toBe(false);
+  });
+
+  it('a feed hold sent while Idle is not a Pause, and a new job starts with none', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    fake.pushStatus();
+    await until(() => api.state.value === 'Idle');
+    api.feedHold();
+    expect(api.holdRequested.value).toBe(false);
+    // Nor does one from an earlier job carry over to the next.
+    api.holdRequested.value = true;
+    api.jobReadTo.value = { file: '/sd/job.gcode', percent: 50 };
+    fake.files.set('job.gcode', new TextEncoder().encode('G21\n'));
+    await api.runFile('job.gcode');
+    expect(api.holdRequested.value).toBe(false);
+    expect(api.jobReadTo.value).toEqual({ file: '/sd/job.gcode', percent: 0 });
+  });
+
+  it('knows the spindle state of a hold only from a report sent during it', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    const frame = async (state: string, percent: number, ov: string, done: () => boolean) => {
+      fake.emit([`<${state}|MPos:0.000,0.000,0.000|FS:0,0${ov}|SD:${percent.toFixed(2)},/sd/job.gcode>`]);
+      await until(done);
+    };
+    await frame('Run', 3, '|Ov:100,100,100', () => api.status.value?.spindleOn === false && api.state.value === 'Run');
+    await frame('Hold:0', 3.2, '', () => api.state.value === 'Hold');
+    expect(api.spindleInHold.value).toBeUndefined();
+    await frame('Hold:0', 3.2, '|Ov:100,100,100', () => api.spindleInHold.value === false);
+    // Read on while still in Hold: it ran in between, so the off is from before.
+    await frame('Hold:0', 4, '', () => api.jobProgress.value?.percent === 4);
+    expect(api.spindleInHold.value).toBeUndefined();
+    await frame('Hold:0', 4, '|Ov:100,100,100|A:S', () => api.spindleInHold.value === true);
+    await frame('Run', 4.5, '', () => api.state.value === 'Run');
+    expect(api.spindleInHold.value).toBeUndefined();
+  });
+
+  it('notes where the bit was when a job camNC started first reports, and not for a job found running', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    fake.state = 'Run';
+    fake.job = { file: '/sd/found.gcode', percent: 20 };
+    fake.pushStatus();
+    await until(() => api.jobProgress.value?.file === '/sd/found.gcode');
+    expect(api.jobStartPos.value).toBeNull();
+    fake.state = 'Idle';
+    fake.job = null;
+    fake.pushStatus();
+    await until(() => api.state.value === 'Idle');
+    fake.mpos = { x: 3, y: 4, z: -2 };
+    fake.files.set('job.gcode', new TextEncoder().encode('G21\n'));
+    await api.runFile('job.gcode');
+    await until(() => api.jobStartPos.value !== null);
+    expect(api.jobStartPos.value).toEqual({ file: '/sd/job.gcode', mpos: { x: 3, y: 4, z: -2, extra: undefined } });
+  });
+
+  it('records the start position only for the file it started, not another job reported first', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    // The controller takes the command but another job shows first (another client started one).
+    fake.respond = line => (line.startsWith('$SD/Run=') ? [] : undefined);
+    const started = api.runFile('job.gcode');
+    fake.emit(['<Run|MPos:1.000,1.000,1.000|FS:0,0|SD:40.00,/sd/other.gcode>']);
+    await started;
+    expect(api.jobStartPos.value).toBeNull();
+    fake.emit(['<Run|MPos:5.000,6.000,-1.000|FS:0,0|SD:0.10,/sd/job.gcode>']);
+    await until(() => api.jobStartPos.value !== null);
+    expect(api.jobStartPos.value?.file).toBe('/sd/job.gcode');
+    expect(api.jobStartPos.value?.mpos.x).toBe(5);
+  });
+
+  it('keeps the furthest SD position read in the job', async () => {
+    const fake = new FakeFluidnc('v4');
+    const api = await connected(fake);
+    fake.state = 'Run';
+    for (const percent of [3.61, 12.2, 9]) {
+      fake.job = { file: '/sd/job.gcode', percent };
+      fake.pushStatus();
+      await until(() => api.jobProgress.value?.percent === percent);
+    }
+    expect(api.jobReadTo.value).toEqual({ file: '/sd/job.gcode', percent: 12.2 });
+    fake.job = { file: '/sd/other.gcode', percent: 1 };
+    fake.pushStatus();
+    await until(() => api.jobReadTo.value?.file === '/sd/other.gcode');
+    expect(api.jobReadTo.value?.percent).toBe(1);
+  });
 });
 
 describe('overrideSteps', () => {

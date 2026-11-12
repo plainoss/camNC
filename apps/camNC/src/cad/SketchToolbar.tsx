@@ -363,11 +363,20 @@ export function SketchToolGlyph({ kind }: { kind: Glyph }) {
   );
 }
 
-export function ToolHint({ label, children }: { label: string; children: ReactNode }) {
+export function ToolHint({
+  label,
+  side = 'bottom',
+  children,
+}: {
+  label: string;
+  /** Where the hint opens; a menu item's hint opens beside it so it doesn't cover the next item. */
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  children: ReactNode;
+}) {
   return (
     <Tooltip delayDuration={400}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="bottom" sideOffset={6} className="cad-toolbar-tooltip">
+      <TooltipContent side={side} sideOffset={6} className="cad-toolbar-tooltip">
         {label}
       </TooltipContent>
     </Tooltip>

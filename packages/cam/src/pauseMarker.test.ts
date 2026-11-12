@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { parsePauseMarker, pauseMarker, type PauseMarker } from './pauseMarker';
+import {
+  kMaxStartPauseGapLines,
+  kStartPauseGapLine,
+  parsePauseMarker,
+  pauseMarker,
+  type PauseMarker,
+  positionWindow,
+  startPauseGap,
+} from './pauseMarker';
 
 const comment = (m: PauseMarker) => pauseMarker(m).slice(1, -1);
 
@@ -31,5 +39,31 @@ describe('pause markers', () => {
     expect(parsePauseMarker('MSG Take out Part 1b')).toBeNull();
     expect(parsePauseMarker('CAMNC PAUSE take-out; part=a')).toBeNull();
     expect(parsePauseMarker('CAMNC PAUSE something')).toBeNull();
+  });
+});
+
+describe('the gap after the start pause', () => {
+  const m3 = 'M3 S18000\n'.length;
+
+  it('makes the M3 end more than two position windows after the start M0, at any size up to the cap', () => {
+    for (let size = 1000; size < 41_000_000; size = Math.ceil(size * 1.07)) {
+      const gap = startPauseGap(size, m3);
+      const final = size + gap.length * 80;
+      if (gap.length < kMaxStartPauseGapLines) expect(gap.length * 80 + m3).toBeGreaterThan(2 * positionWindow(final));
+    }
+    // About 40 MB is the largest the capped gap covers.
+    const atCap = 40_000_000;
+    expect(startPauseGap(atCap, m3).length).toBeLessThanOrEqual(kMaxStartPauseGapLines);
+    expect(kMaxStartPauseGapLines * 80 + m3).toBeGreaterThan(2 * positionWindow(atCap + kMaxStartPauseGapLines * 80));
+    expect(startPauseGap(100_000_000, m3)).toHaveLength(kMaxStartPauseGapLines);
+  });
+
+  it('is nothing for programs under about 60 kB, and plain `;` comment lines of 80 bytes', () => {
+    expect(startPauseGap(50_000, m3)).toEqual([]);
+    const gap = startPauseGap(1_000_000, m3);
+    expect(gap.length).toBeGreaterThan(0);
+    expect(new Set(gap)).toEqual(new Set([kStartPauseGapLine]));
+    expect(new TextEncoder().encode(kStartPauseGapLine + '\n').length).toBe(80);
+    expect(kStartPauseGapLine.startsWith(';')).toBe(true);
   });
 });
