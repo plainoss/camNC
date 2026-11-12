@@ -303,6 +303,37 @@ it('requests views only on demand and automatically for the latest reference ima
   expect(vi.mocked(options.check).mock.calls[0][3]).toEqual({ views: true });
 });
 
+it('checks with the cutter the assistant names, as its own check, and refuses an implausible bit', async () => {
+  const options = setup();
+  const withBit = (bit: unknown) => {
+    const call = answer('check_design', 'mortise');
+    call.calls![0].arguments.bit = bit;
+    return call;
+  };
+  const replies = [withBit(6), withBit(6), withBit(3), withBit(0), { role: 'assistant' as const, text: 'Proposal: checked.' }];
+  const emitted: AssistantMessage[] = [];
+  options.onMessage = message => emitted.push(message);
+  options.request = vi.fn(async () => replies.shift()!);
+  const result = await runDesignAssistant(options);
+  expect(vi.mocked(options.check).mock.calls.map(call => call[3])).toEqual([
+    { views: false, bit: 6 },
+    { views: false, bit: 3 },
+  ]);
+  expect(result.usage.reusedChecks).toBe(1);
+  expect(emitted.filter(message => message.role === 'tool').at(-1)?.text).toContain('flat bit diameter');
+});
+
+it('plans the full check with the bit its geometry check named', async () => {
+  const options = setup();
+  options.finalize = vi.fn(async checked => checked);
+  const checkWith6 = answer('check_design', 'mortise');
+  checkWith6.calls![0].arguments.bit = 6;
+  const replies = [checkWith6, answer('finalize_design'), { role: 'assistant' as const, text: 'Proposal: checked.' }];
+  options.request = vi.fn(async () => replies.shift()!);
+  await runDesignAssistant(options);
+  expect(vi.mocked(options.finalize).mock.calls[0]![0].bit).toBe(6);
+});
+
 it('stops before requesting overlarge input and stops when capped provider usage is unknown', async () => {
   const options = setup();
   options.limits = { maxInputCharacters: 1 };
