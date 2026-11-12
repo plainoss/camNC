@@ -40,3 +40,14 @@ export function placedRect(p: { x: number; y: number; rotated: boolean }, inst: 
   const s = placedSize({ id: inst.id, w: inst.size[0], h: inst.size[1] }, p.rotated);
   return { x: p.x, y: p.y, w: s.w, h: s.h };
 }
+
+/**
+ * The nest as it is drawn and cut: only the parts that are on the board. After a design edit, a part whose stored spot
+ * no longer works (off the board, or on a part that grew) keeps that spot in `placements`, so undoing the edit brings it
+ * back there, but it is `unplaced`: it is drawn off the board, once, not also at its old spot over the other parts.
+ */
+export function onBoardOnly<N extends Pick<BoardNest, 'placements' | 'unplaced'>>(nest: N): N {
+  const off = new Set(nest.unplaced);
+  if (!nest.placements.some(p => off.has(p.id))) return nest;
+  return { ...nest, placements: nest.placements.filter(p => !off.has(p.id)) };
+}

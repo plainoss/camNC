@@ -840,7 +840,8 @@ export function boardRequest(
   hold: { skin?: number; holes?: HoleChoices; leaveOut?: readonly string[] } = {}
 ): BoardRequest {
   const byId = new Map(instances.map(i => [i.id, i]));
-  // Invalid positions remain on the drawing for repair; they can never be executable placements.
+  // A stored spot that no longer works stays in the layout, for when the edit is undone, but its part is unplaced: drawn
+  // off the board (see `onBoardOnly`), and never an executable placement.
   const excluded = new Set([...(nest.unplaced ?? []), ...(hold.leaveOut ?? [])]);
   return {
     id: board.id,

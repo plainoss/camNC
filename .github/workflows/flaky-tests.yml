@@ -1,6 +1,7 @@
 name: Flaky tests
 
-# Files or updates a `flaky-test` issue for each test that failed in CI but passed on the same code. Runs main's copy of
+# Files or updates a `flaky-test` issue for each test that failed in CI but passed on the same code, and for each browser
+# test a merge-queue batch passed only on its retry, whether the batch passed or failed on another job. Runs main's copy of
 # the script and never checks out the tested code, so the write token stays away from PR changes.
 on:
   workflow_run:
@@ -15,7 +16,7 @@ permissions:
 jobs:
   report:
     if: >-
-      (startsWith(github.event.workflow_run.head_branch, 'mergify/merge-queue/') && github.event.workflow_run.conclusion == 'success') ||
+      (startsWith(github.event.workflow_run.head_branch, 'mergify/merge-queue/') && contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)) ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.run_attempt > 1)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
