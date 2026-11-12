@@ -1,4 +1,4 @@
-import { createJob, getJob, listJobs, saveJob } from '@/cam/jobDb';
+import { createJob, getJob, getModelBytes, listJobs, saveJob } from '@/cam/jobDb';
 import { createPlateDocument } from '@wbcnc/cad';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Route } from './index';
 
 const toastError = vi.hoisted(() => vi.fn());
+const toastShow = vi.hoisted(() => vi.fn());
 const picked = vi.hoisted(() => ({ file: null as File | null }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -16,7 +17,7 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, className }: { children: ReactNode; className?: string }) => <a className={className}>{children}</a>,
 }));
 vi.mock('@/components/page-header', () => ({ PageHeader: ({ title }: { title: string }) => <header>{title}</header> }));
-vi.mock('@wbcnc/ui/components/sonner', () => ({ toast: Object.assign(vi.fn(), { error: toastError }) }));
+vi.mock('@wbcnc/ui/components/sonner', () => ({ toast: Object.assign(toastShow, { error: toastError }) }));
 vi.mock('@/cam/openModelFile', async importOriginal => ({
   ...(await importOriginal<typeof import('@/cam/openModelFile')>()),
   pickModelFile: async () => picked.file,
@@ -24,7 +25,15 @@ vi.mock('@/cam/openModelFile', async importOriginal => ({
 
 const CamIndex = (Route as unknown as { options: { component: ComponentType } }).options.component;
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  toastShow.mockReset();
+});
+
+type ToastOptions = { duration: number; action: { label: string; onClick: () => void }; onAutoClose: () => void; onDismiss: () => void };
+/** The options of the newest toast with this title. */
+const toastFor = (title: string) => toastShow.mock.calls.findLast(([text]) => text === title)![1] as ToastOptions;
+const saveProject = () => createJob(new File(['solid'], `shelf-${crypto.randomUUID()}.step`));
 
 const renderIndex = () =>
   render(
@@ -85,6 +94,57 @@ describe('CAM job list', () => {
     const row = (await screen.findByText(job.name)).closest('li')!;
     expect(within(row).getByText('Could not be read')).toBeTruthy();
     fireEvent.click(within(row).getByRole('button', { name: `Delete ${job.name}` }));
+    toastFor(`Deleted ${job.name}`).onAutoClose();
+    await waitFor(async () => expect(await getJob(job.id)).toBeNull());
+  });
+
+  it('hides a deleted project at once, keeps it stored during the Undo window and brings it back on Undo', async () => {
+    const job = await saveProject();
+    renderIndex();
+    const row = (await screen.findByText(job.name)).closest('li')!;
+    fireEvent.click(within(row).getByRole('button', { name: `Delete ${job.name}` }));
+    await waitFor(() => expect(screen.queryByText(job.name)).toBeNull());
+    const deleted = toastFor(`Deleted ${job.name}`);
+    expect(deleted).toMatchObject({ duration: 10_000, action: { label: 'Undo' } });
+    // Nothing is removed while Undo is offered, so a reload now still finds the whole project.
+    expect(await getJob(job.id)).toEqual(job);
+    expect(await getModelBytes(job.id)).not.toBeNull();
+
+    deleted.action.onClick();
+    expect(await screen.findByText(job.name)).toBeTruthy();
+    // The closing toast no longer removes a project that was brought back.
+    deleted.onAutoClose();
+    deleted.onDismiss();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(await getJob(job.id)).toEqual(job);
+    expect(await getModelBytes(job.id)).not.toBeNull();
+    expect(screen.getByText(job.name)).toBeTruthy();
+  });
+
+  it('removes a deleted project and its model for good once the Undo window closes', async () => {
+    const job = await saveProject();
+    const other = await saveProject();
+    renderIndex();
+    const row = (await screen.findByText(job.name)).closest('li')!;
+    fireEvent.click(within(row).getByRole('button', { name: `Delete ${job.name}` }));
+    const deleted = toastFor(`Deleted ${job.name}`);
+    deleted.onAutoClose();
+    await waitFor(async () => expect(await getJob(job.id)).toBeNull());
+    expect(await getModelBytes(job.id)).toBeNull();
+    // Too late to bring it back, and it does not reappear in the list.
+    deleted.action.onClick();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(screen.queryByText(job.name)).toBeNull();
+    expect(screen.getByText(other.name)).toBeTruthy();
+    expect(await getJob(other.id)).not.toBeNull();
+  });
+
+  it('removes a deleted project when its toast is dismissed', async () => {
+    const job = await saveProject();
+    renderIndex();
+    const row = (await screen.findByText(job.name)).closest('li')!;
+    fireEvent.click(within(row).getByRole('button', { name: `Delete ${job.name}` }));
+    toastFor(`Deleted ${job.name}`).onDismiss();
     await waitFor(async () => expect(await getJob(job.id)).toBeNull());
   });
 

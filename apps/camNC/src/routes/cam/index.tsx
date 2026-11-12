@@ -4,7 +4,8 @@ import { SampleProjectCard } from '@/cam/samples/SampleProjectCard';
 import { PageHeader } from '@/components/page-header';
 import { CamPage } from '@/cam/CamPage';
 import { camKeys, useCamJobs } from '@/cam/camQueries';
-import { createCarvingJob, createDesignJob, deleteJob } from '@/cam/jobDb';
+import { createCarvingJob, createDesignJob } from '@/cam/jobDb';
+import { deleteJobWithUndo, useHiddenJobIds } from '@/cam/pendingJobDeletions';
 import { kDesignFile, kModelFile } from '@/cam/jobDb';
 import { createJobFromFile, firstStage, pickModelFile, toastNotAModel } from '@/cam/openModelFile';
 import { useQueryClient } from '@tanstack/react-query';
@@ -27,7 +28,8 @@ function CamIndex() {
   const navigate = useNavigate();
   const { sample, notice } = useSearch({ from: '/cam/' });
   const queryClient = useQueryClient();
-  const { data: jobs } = useCamJobs();
+  const hidden = useHiddenJobIds();
+  const jobs = useCamJobs().data?.filter(job => !hidden.has(job.id));
 
   const open = async () => {
     const file = await pickModelFile();
@@ -42,11 +44,8 @@ function CamIndex() {
     }
   };
 
-  const remove = async (id: string, name: string) => {
-    await deleteJob(id);
-    void queryClient.invalidateQueries({ queryKey: camKeys.jobs });
-    toast(`Deleted ${name}`);
-  };
+  const remove = (id: string, name: string) =>
+    deleteJobWithUndo({ id, name }, () => queryClient.invalidateQueries({ queryKey: camKeys.jobs }));
   const carving = async () => {
     try {
       const job = await createCarvingJob();
@@ -134,11 +133,11 @@ function CamIndex() {
                       </span>
                     </Link>
                     {job.readError ? (
-                      <Button variant="outline" size="sm" aria-label={`Delete ${job.name}`} onClick={() => void remove(job.id, job.name)}>
+                      <Button variant="outline" size="sm" aria-label={`Delete ${job.name}`} onClick={() => remove(job.id, job.name)}>
                         <Trash2 /> Delete
                       </Button>
                     ) : (
-                      <Button variant="ghost" size="icon" aria-label={`Delete ${job.name}`} onClick={() => void remove(job.id, job.name)}>
+                      <Button variant="ghost" size="icon" aria-label={`Delete ${job.name}`} onClick={() => remove(job.id, job.name)}>
                         <Trash2 />
                       </Button>
                     )}
