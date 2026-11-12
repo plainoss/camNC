@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { camBoard, type BoardSpec } from './board';
+import { camBoard, camBoardParts, type BoardSpec } from './board';
 import { extractFeatures, type PartFeatures } from './features';
 import { readStep } from './fixtures';
 import { holdCheck } from './hold';
@@ -43,7 +43,8 @@ const spec = (parts: BoardSpec['parts'], w: number, h: number): BoardSpec => ({
 describe('do the tabs hold?', () => {
   it('a part with room around it: every tab reaches stock that is fixed to the board', () => {
     const board = spec([{ id: 'p', name: 'side', features: plain(), size: [200, 100, 8], x: 30, y: 30, rotated: false }], 260, 160);
-    const [hold] = holdCheck(camBoard(board, {}), board);
+    const { cam, partIds } = camBoardParts(board, {});
+    const [hold] = holdCheck(cam, { ...board, partIds });
     expect(hold.part).toBe('side');
     expect(hold.id).toBe('p');
     expect(hold.tabs.length).toBeGreaterThanOrEqual(3);
@@ -60,14 +61,15 @@ describe('do the tabs hold?', () => {
       260,
       290
     );
-    const holds = holdCheck(camBoard(board, {}), board);
-    expect(holds.map(h => [h.part, h.id])).toEqual([
-      ['Top', 'top#0'],
-      ['Top', 'bottom#0'],
-    ]);
+    const { cam, partIds } = camBoardParts(board, {});
+    const holds = holdCheck(cam, { ...board, partIds });
+    expect(holds.map(h => h.part)).toEqual(['Top', 'Top']);
+    const of = (id: string) => holds.find(h => h.id === id)!;
     // Each one's tabs are on its own outline.
-    expect(holds[0].tabs.every(t => t.at.y < 145)).toBe(true);
-    expect(holds[1].tabs.every(t => t.at.y > 145)).toBe(true);
+    expect(of('top#0').tabs.every(t => t.at.y < 145)).toBe(true);
+    expect(of('bottom#0').tabs.every(t => t.at.y > 145)).toBe(true);
+    // The program is the same with or without the ids.
+    expect(cam).toEqual(camBoard(board, {}));
   });
 
   it('tabs into the sliver between two neighbouring cuts or a narrow edge strip hold nothing', () => {

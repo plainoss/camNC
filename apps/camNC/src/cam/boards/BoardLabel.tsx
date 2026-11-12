@@ -7,8 +7,9 @@ const fmt = (v: number) => `${+v.toFixed(1)}`;
 
 /**
  * A board's label on the table, above its drawing: its name, thickness and size, and what needs attention. It stops at
- * `maxWidth` (short of the next board's label), but the name always shows whole: an empty board has no width of its own,
- * so its name may reach a little further into the gap. What follows the name is cut short instead.
+ * `maxWidth` (short of the next board's label), but only the thickness and size are cut short: the name and the
+ * warnings always show whole, reaching a little further into the gap when they must (an empty board has no width of
+ * its own).
  */
 export function BoardLabel({
   board,
@@ -38,20 +39,18 @@ export function BoardLabel({
   return (
     <div
       data-board-label
-      className="pointer-events-none absolute flex items-center gap-x-2 text-xs whitespace-nowrap"
+      className="pointer-events-none absolute flex items-center gap-x-2 text-xs whitespace-nowrap *:shrink-0"
       style={{ left, bottom, maxWidth }}>
-      <span className="shrink-0 font-medium">{boardLabel(board)}</span>
-      <span className="flex min-w-0 items-center gap-x-2 overflow-hidden *:shrink-0">
-        {isCut(board) && <CutBadge board={board} />}
-        <span className="!shrink truncate text-muted-foreground">
-          {fmt(board.thickness)} mm · <span className="font-mono text-[11px]">{boardSizeLabel(sized, nest)}</span>
-        </span>
-        {nest.unplaced.length > 0 && <span className="font-medium text-amber-600 dark:text-amber-400">{nest.unplaced.length} off it</span>}
-        {unheld > 0 && <span className="font-medium text-destructive">{unheld} can’t hold</span>}
-        {nutHits && <span className="font-medium text-destructive">collet nut hits</span>}
-        {fetching && <LoadingSpinner className="size-3" />}
-        {children}
+      <span className="font-medium">{boardLabel(board)}</span>
+      {isCut(board) && <CutBadge board={board} />}
+      <span className="!shrink min-w-0 truncate text-muted-foreground">
+        {fmt(board.thickness)} mm · <span className="font-mono text-[11px]">{boardSizeLabel(sized, nest)}</span>
       </span>
+      {nest.unplaced.length > 0 && <span className="font-medium text-amber-600 dark:text-amber-400">{nest.unplaced.length} off it</span>}
+      {unheld > 0 && <span className="font-medium text-destructive">{unheld} can’t hold</span>}
+      {nutHits && <span className="font-medium text-destructive">collet nut hits</span>}
+      {fetching && <LoadingSpinner className="size-3" />}
+      {children}
     </div>
   );
 }

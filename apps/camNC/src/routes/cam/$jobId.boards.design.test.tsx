@@ -85,6 +85,9 @@ describe('CAM boards after design edits', () => {
     expect(screen.queryAllByRole('button', { name: /^Shelf: drag, or move/ })).toHaveLength(0);
     expect(within(drawing('A')).getAllByRole('button', { name: /^Bottom: drag, or move/ })).toHaveLength(1);
     expect(within(drawing('A')).getByText('1 off it')).toBeTruthy();
+    // Zoomed out, the size is cut short, never what needs attention.
+    for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    await waitFor(() => expect(unclipped(within(drawing('A')).getByText('1 off it'))).toBe(true));
   }, 90_000);
 
   it('edits the tabs of the part they are on, when another part has the same name', async () => {

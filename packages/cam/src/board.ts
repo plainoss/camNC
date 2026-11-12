@@ -374,6 +374,18 @@ export function boardWork(board: Pick<BoardSpec, 'parts' | 'carvings'>) {
  * nearest-first.
  */
 export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onProgress?: OnProgress): PartCam {
+  return camBoardParts(board, settings, onProgress).cam;
+}
+
+/**
+ * `camBoard`, and the board part each of its operations cuts, by operation index (none for pin holes and carvings).
+ * Kept beside the program, not in it: names can repeat, the id tells parts apart, and the program stays the same.
+ */
+export function camBoardParts(
+  board: BoardSpec,
+  settings: Partial<CamSettings>,
+  onProgress?: OnProgress
+): { cam: PartCam; partIds: (string | undefined)[] } {
   // Weighing the carvings takes a few offsets each: only when someone is watching.
   const work = onProgress ? boardWork(board) : { parts: 0, carvings: 0, checks: 0 };
   const progress = progressOver(onProgress, work.parts + work.carvings + work.checks);
@@ -463,11 +475,13 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
   }
   const diameters = [...new Set(ops.map(o => o.op.tool.diameter))].sort((a, b) => a - b);
   const operations: Operation[] = [];
+  const partIds: (string | undefined)[] = [];
   // Pin holes first, with the first bit: the board is still whole.
   if (board.dowels) {
     const pins = dowelOperations(board, board.dowels, settings);
     warnings.push(...fluteWarnings(pins, stockTop));
     operations.push(...pins.map(op => transformOperation(op, turn)));
+    partIds.push(...pins.map(() => undefined));
   }
   // Carvings next, also on the whole board: each one's flat bit, then its V-bit.
   for (const carving of board.carvings ?? []) {
@@ -476,6 +490,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
     progress.done(cost);
     warnings.push(...carved.flatMap(op => op.warnings ?? []).map(w => `${carving.name}: ${w}`));
     operations.push(...carved.map(op => transformOperation(op, turn)));
+    partIds.push(...carved.map(() => undefined));
   }
   let pos = { x: 0, y: 0 };
   // Per bit, inner features before outlines. When every part keeps a layer until the end, the inner features of every
@@ -507,6 +522,7 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
           .filter(o => o.part === part)
           .sort((a, b) => kFeatureOrder[a.op.feature] - kFeatureOrder[b.op.feature] || a.index - b.index);
         operations.push(...mine.map(o => o.op));
+        partIds.push(...mine.map(o => o.part.id));
         const last = mine.at(-1)?.op.passes.at(-1)?.pts.at(-1);
         if (last) pos = { x: last[0], y: last[1] };
       }
@@ -536,7 +552,8 @@ export function camBoard(board: BoardSpec, settings: Partial<CamSettings>, onPro
     blank
   );
   progress.done(work.checks);
-  return plan;
+  // Finalizing keeps the operations and their order: the ids still line up.
+  return { cam: plan, partIds };
 }
 
 /** Bits in the order a board program uses them. */

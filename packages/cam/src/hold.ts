@@ -26,26 +26,12 @@ export interface PartHold {
   ok: boolean;
 }
 
-/** The board's parts, where they lie: what tells two cut outlines of the same name apart. */
+/** The board, and the board part each operation of its program cuts (see `camBoardParts`). */
 export interface HoldBoard {
   w: number;
   h: number;
-  parts?: readonly { id: string; name: string; x: number; y: number; size: readonly number[]; rotated: boolean }[];
-}
-
-/**
- * The board part an outline cut through belongs to: the part of its name, or of two of the same name (copies, or a part
- * renamed like another), the one it goes around.
- */
-function partIdOf(board: HoldBoard, name: string, loop: P2[]): string | undefined {
-  const named = board.parts?.filter(p => p.name === name) ?? [];
-  if (named.length < 2) return named[0]?.id;
-  const [x, y] = [(minOf(loop.map(q => q.x)) + maxOf(loop.map(q => q.x))) / 2, (minOf(loop.map(q => q.y)) + maxOf(loop.map(q => q.y))) / 2];
-  const dist = (p: (typeof named)[number]) => {
-    const [w, h] = p.rotated ? [p.size[1], p.size[0]] : [p.size[0], p.size[1]];
-    return Math.hypot(x - (p.x + w / 2), y - (p.y + h / 2));
-  };
-  return named.reduce((a, b) => (dist(b) < dist(a) ? b : a)).id;
+  /** By operation index: what tells two parts of the same name apart. Without it, parts have only their names. */
+  partIds?: readonly (string | undefined)[];
 }
 
 export interface HoldOptions {
@@ -157,7 +143,7 @@ export function holdState(cam: PartCam, board: HoldBoard, opts: HoldOptions = {}
   // The tabs' own material: left out when judging the stock beyond them (it would widen a thin strip).
   const bridges: PathsD = [];
   const parts: { part: string; id?: string; interior: PathsD; tabs: Tab[]; r: number }[] = [];
-  for (const op of cam.operations) {
+  for (const [index, op] of cam.operations.entries()) {
     if (op.kind !== 'profile') continue;
     const r = op.tool.diameter / 2;
     for (const pass of op.passes) {
@@ -210,8 +196,7 @@ export function holdState(cam: PartCam, board: HoldBoard, opts: HoldOptions = {}
       bridges.push(...inflatePathsD(tabLines, r, JoinType.Round, EndType.Butt, 2, PRECISION));
       if (op.feature === 'outline') {
         const loop = pass.pts.map(q => ({ x: q[0], y: q[1] }));
-        const part = op.name.replace(/: [^:]*$/, '');
-        parts.push({ part, id: partIdOf(board, part, loop), interior: offset(union([loop]), -r), tabs, r });
+        parts.push({ part: op.name.replace(/: [^:]*$/, ''), id: board.partIds?.[index], interior: offset(union([loop]), -r), tabs, r });
       }
     }
   }

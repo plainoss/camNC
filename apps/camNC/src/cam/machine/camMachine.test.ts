@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PlanResult, ReleaseProgram } from '../camTypes';
 import type { JobBoard } from '../useJobBoards';
-import { boardBlock, planBlock } from '../boardBlock';
+import { boardBlock, loose, planBlock } from '../boardBlock';
 import {
   currentEntry,
   cutsToRecord,
@@ -147,6 +147,20 @@ describe('machine queue', () => {
       const q = machineQueue([onBoard('A')], [ready([3.175], change)], context);
       expect(q.length).toBeGreaterThan(0);
       for (const e of q) expect(e.blocked).toMatch(why);
+    });
+
+    it('a part whose tabs don’t hold, by its id: not another of the same name on a skin', () => {
+      const plan = {
+        hold: [
+          { part: 'Top', id: 'a', ok: false, tabs: [], anchored: 0 },
+          { part: 'Top', id: 'b', ok: false, tabs: [], anchored: 0 },
+        ],
+        holding: [
+          { id: 'a', name: 'Top', how: 'skin', tabs: 0 },
+          { id: 'b', name: 'Top', how: 'placed', tabs: 2 },
+        ],
+      } as unknown as PlanResult;
+      expect(loose(plan).map(h => h.id)).toEqual(['b']);
     });
 
     it('a timeline note that doesn’t block, and tabs held anyway, block nothing', () => {
