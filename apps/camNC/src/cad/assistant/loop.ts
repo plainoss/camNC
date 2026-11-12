@@ -329,7 +329,13 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     try {
       modelMessages = [
         // Older tool batches stay verbatim while everything fits: compacting them mid-run rewrites the cached prefix.
-        ...buildAssistantContext(messages, { images: options.config.images, maxCharacters: messageCharacters, compactOnlyOverLimit: true }),
+        ...buildAssistantContext(messages, {
+          images: options.config.images,
+          maxCharacters: messageCharacters,
+          compactOnlyOverLimit: true,
+          // The note follows the context, so it is budgeted before deciding whether history still fits verbatim.
+          reserveCharacters: finalNote ? assistantContextCharacters([{ role: 'user', text: finalNote }]) : 0,
+        }),
         ...(finalNote ? [{ role: 'user' as const, text: finalNote }] : []),
       ];
     } catch (error) {
@@ -415,6 +421,17 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       for (const call of answer.calls) emit({ role: 'tool', callId: call.id, text: 'Not run: too many tool calls in one turn.' });
       return finish('exhausted');
     }
+    // With the repair budget spent, only the final check may run; a question would otherwise end the run early here.
+    if (finalizeOnly && answer.calls.some(call => call.name !== 'finalize_design')) {
+      for (const call of answer.calls)
+        emit({
+          role: 'tool',
+          callId: call.id,
+          text: 'Not run: only finalize_design remains available. Call it alone for the last passing candidate.',
+          isError: true,
+        });
+      continue;
+    }
     // Questions must be isolated: a mixed batch must not run edits after asking for consent.
     if (answer.calls.some(call => call.name === 'ask_user')) {
       const question = assistantQuestion(answer);
@@ -435,11 +452,6 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
         isError = false;
       if (options.signal.aborted) {
         emit({ role: 'tool', callId: call.id, text: 'Stopped by the user; this tool was not run.' });
-        continue;
-      }
-      // Every tool stays offered for the cache, but the repair budget is spent: only the final check may run.
-      if (finalizeOnly && call.name !== 'finalize_design') {
-        emit({ role: 'tool', callId: call.id, text: 'Not run: only finalize_design remains available.', isError: true });
         continue;
       }
       try {
