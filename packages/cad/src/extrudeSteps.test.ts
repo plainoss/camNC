@@ -19,6 +19,10 @@ import {
   resolveExtrudeSteps,
   sketchRegions,
   splitApartRegions,
+  designSteps,
+  extrudeGroup,
+  extrudeLeadId,
+  rolledBackTo,
   isJoinedBody,
   isCadPart,
   evaluateCadPart,
@@ -225,6 +229,82 @@ describe('a New extrude of regions apart', () => {
     expect(split.parts[1]).toMatchObject({ sketchOf: part.id, thickness: 25, drawnOn: part.drawnOn });
     expect(split.parts.map(made => made.regions!.length)).toEqual([1, 1]);
     expect(split.parts.every(made => evaluateCadPart(made).part)).toBe(true);
+  });
+
+  /** Four circles apart, extruded together by one New extrude. */
+  function fourPosts() {
+    const sketch = [0, 1, 2, 3].reduce(
+      (at, index) => addCircle(at, { x: (index % 2) * 100, y: Math.floor(index / 2) * 100, radius: 10 }),
+      createCadPart('Posts', 25).sketch
+    );
+    const owner: CadPart = {
+      ...createCadPart('Posts', 25),
+      id: 'posts',
+      sketch,
+      drawnOn: { on: { plane: 'top' }, offset: 0 },
+      extrude: false,
+    };
+    const regions = sketchRegions(sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+    const post: CadPart = { ...owner, id: 'post', name: 'Post', sketchOf: owner.id, regions };
+    delete post.extrude;
+    let index = 0;
+    const split = splitApartRegions({ ...createCadDocument(), parts: [owner, post] }, post.id, () => `post-${++index}`);
+    return { split, owner, post, regions };
+  }
+
+  it('is one feature making a part of each, listed once, which its parts follow', () => {
+    const { split, post } = fourPosts();
+    const made = split.parts.filter(part => part.sketchOf === 'posts');
+    expect(made.map(part => part.id)).toEqual(['post', 'post-1', 'post-2', 'post-3']);
+    expect(made.slice(1).every(part => part.extrudedWith === post.id)).toBe(true);
+    expect(extrudeGroup(split, post.id)).toHaveLength(4);
+    expect(extrudeLeadId(split, 'post-2')).toBe(post.id);
+    const extrudes = designSteps(split).filter(step => step.kind === 'extrude');
+    expect(extrudes.map(step => [step.label, step.detail])).toEqual([['Extrude · Post', '25 mm · 4 parts']]);
+    // Made thicker, flipped or suppressed, every part it made follows.
+    const edited = resolveExtrudeSteps({
+      ...split,
+      parts: split.parts.map(part =>
+        part.id === post.id
+          ? { ...part, thickness: 40, thicknessExpression: '4 cm', suppressed: true as const, drawnOn: { ...part.drawnOn!, inward: true } }
+          : part
+      ),
+    });
+    for (const part of extrudeGroup(edited, post.id))
+      expect(part).toMatchObject({ thickness: 40, thicknessExpression: '4 cm', suppressed: true, drawnOn: { inward: true } });
+  });
+
+  it('keeps its parts when rolled back to it, and leaves them extrudes of their own once it is gone', () => {
+    const { split, post } = fourPosts();
+    const steps = designSteps(split);
+    const at = steps.find(step => step.id === `${post.id}:extrude`)!;
+    expect(rolledBackTo(split, at.id).parts.filter(part => part.sketchOf === 'posts' && part.extrude !== false)).toHaveLength(4);
+    const alone = resolveExtrudeSteps({ ...split, parts: split.parts.filter(part => part.id !== post.id) });
+    expect(alone.parts.some(part => part.extrudedWith)).toBe(false);
+    expect(designSteps(alone).filter(step => step.kind === 'extrude')).toHaveLength(3);
+  });
+
+  it('puts its parts in its folder, beside it', () => {
+    const { owner, post } = fourPosts();
+    const document: CadDocument = {
+      ...createCadDocument(),
+      parts: [owner, post],
+      folders: [{ id: 'f', name: 'Posts', partIds: [post.id] }],
+    };
+    let index = 0;
+    const split = splitApartRegions(document, post.id, () => `post-${++index}`);
+    expect(split.folders![0]!.partIds).toEqual(['post', 'post-1', 'post-2', 'post-3']);
+  });
+
+  it('leaves its parts extrudes of their own once it adds to or removes from a part', () => {
+    const { split, post } = fourPosts();
+    for (const change of [{ addTo: 'posts' }, { remove: { depth: 5 } }] as Partial<CadPart>[]) {
+      const resolved = resolveExtrudeSteps({
+        ...split,
+        parts: split.parts.map(part => (part.id === post.id ? { ...part, ...change } : part)),
+      });
+      expect(resolved.parts.filter(part => part.extrudedWith)).toEqual([]);
+    }
   });
 });
 

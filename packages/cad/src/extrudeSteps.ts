@@ -188,6 +188,20 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     return owner && !owner.sketchOf && owner.sketch !== part.sketch ? { ...part, sketch: owner.sketch } : part;
   });
 
+  // A part another New extrude made too follows that extrude's settings; once that extrude is gone, or no longer a New
+  // extrude of the same sketch, the part is an extrude of its own.
+  const leads = new Map(parts.map(part => [part.id, part]));
+  parts = parts.map(part => {
+    if (!part.extrudedWith) return part;
+    const lead = leads.get(part.extrudedWith);
+    if (!lead || lead.extrudedWith || lead.addTo !== undefined || lead.remove || lead.hole || !sharesSketch(lead, part)) {
+      const own = { ...part };
+      delete own.extrudedWith;
+      return own;
+    }
+    return withExtrudeSettingsOf(part, lead);
+  });
+
   const added = new Map<string, string[]>();
   for (const step of parts) {
     const target = step.addTo && parts.find(part => part.id === step.addTo);
@@ -378,9 +392,48 @@ export function newExtrudeOf(document: CadDocument, part: CadPart, name: string)
   return unused.length && evaluateCadPart(made).part ? made : { ...made, regions: [] };
 }
 
+/** What a part made by another's extrude takes from it: how far, which way and whether it's extruded at all. */
+const extrudeSettingKeys = [
+  'thickness',
+  'thicknessExpression',
+  'extrude',
+  'upTo',
+  'upToDatum',
+  'symmetric',
+  'suppressed',
+  'thin',
+  'cornerRelief',
+] as const;
+
+function withExtrudeSettingsOf(part: CadPart, lead: CadPart): CadPart {
+  const next: CadPart = { ...part };
+  for (const key of extrudeSettingKeys) {
+    if (lead[key] === undefined) delete next[key];
+    else (next as unknown as Record<string, unknown>)[key] = lead[key];
+  }
+  if (next.drawnOn && lead.drawnOn) {
+    next.drawnOn = { ...next.drawnOn };
+    if (lead.drawnOn.inward === undefined) delete next.drawnOn.inward;
+    else next.drawnOn.inward = lead.drawnOn.inward;
+  }
+  return JSON.stringify(next) === JSON.stringify(part) ? part : next;
+}
+
+/** The parts a part's extrude makes: itself, then those made with it, in the design's order. */
+export function extrudeGroup(document: Pick<CadDocument, 'parts'>, partId: string): CadPart[] {
+  return document.parts.filter(part => part.id === partId || part.extrudedWith === partId);
+}
+
+/** The part whose extrude made a part: the one it was made with, or itself. */
+export function extrudeLeadId(document: Pick<CadDocument, 'parts'>, partId: string): string {
+  const with_ = document.parts.find(part => part.id === partId)?.extrudedWith;
+  return with_ && document.parts.some(part => part.id === with_) ? with_ : partId;
+}
+
 /**
  * A New extrude of regions that lie apart makes a part of each group of them that touch, as the first is: the first
- * group stays with the extrude, and each other is a part of its own of the same sketch, as thick. `id` names the part
+ * group stays with the extrude, and each other is a part of its own of the same sketch, as thick, made with it: the
+ * extrude stays one feature. `id` names the part
  * made of each group after the first, by its index, so a preview of the split and the split itself make the same parts.
  */
 export function splitApartRegions(
@@ -400,8 +453,10 @@ export function splitApartRegions(
       id: id(index + 1),
       name: `Part ${document.parts.length + index + 1}`,
       sketchOf: owner,
+      extrudedWith: part.id,
       regions: group.regionIds,
     };
+    delete next.extrudeName;
     // What was done to the extrude's own part afterwards isn't the new part's.
     for (const key of ['features', 'copies', 'pattern', 'addedRegions', 'moved'] as const) delete next[key];
     return next;
@@ -409,5 +464,12 @@ export function splitApartRegions(
   const parts = document.parts.flatMap(candidate =>
     candidate.id === partId ? [{ ...candidate, regions: groups[0]!.regionIds }, ...made] : [candidate]
   );
-  return { ...document, revision: document.revision + 1, parts };
+  // They're in the extrude's folder too, beside it.
+  const madeIds = made.map(next => next.id);
+  const folders = document.folders?.map(folder =>
+    folder.partIds.includes(partId)
+      ? { ...folder, partIds: folder.partIds.flatMap(id => (id === partId ? [id, ...madeIds] : [id])) }
+      : folder
+  );
+  return { ...document, revision: document.revision + 1, parts, ...(folders && { folders }) };
 }

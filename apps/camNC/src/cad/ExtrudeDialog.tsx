@@ -215,7 +215,9 @@ export function ExtrudeDialog({
     return true;
   };
   const stepProblem = extrudeStepProblem(document, part);
-  const regionCount = operation === 'remove' && !part.regions ? null : (part.regions?.length ?? null);
+  // The regions of the parts it made too are the feature's as well.
+  const alsoMade = document.parts.flatMap(p => (p.extrudedWith === part.id ? (p.regions ?? []) : []));
+  const regionCount = operation === 'remove' && !part.regions ? null : part.regions ? part.regions.length + alsoMade.length : null;
   const selection =
     part.faceProfile && part.drawnOn
       ? drawnOnName(document, part.drawnOn.on)

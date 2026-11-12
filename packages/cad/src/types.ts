@@ -308,6 +308,12 @@ export interface CadPart {
    * editing the sketch there carries through; it's never edited here.
    */
   sketchOf?: string;
+  /**
+   * The New extrude, of another part, that also made this part: of regions of that extrude's sketch that lie apart from
+   * its own. That extrude is one feature making several parts, listed once; this part follows its settings
+   * (`resolveExtrudeSteps`) and is edited through it.
+   */
+  extrudedWith?: string;
   /** Extrudes the solid face named by drawnOn; its profile follows that face without a separate sketch step. */
   faceProfile?: boolean;
   /**

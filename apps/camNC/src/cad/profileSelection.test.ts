@@ -134,3 +134,22 @@ it('takes a region out of an extrude of the whole shared sketch when it is picke
   const next = replaceExtrudeProfile(document, target.id, { sketch: selectme.id, region: b! });
   expect(next.parts.find(p => p.id === target.id)!.regions).toEqual([a, c]);
 });
+
+it('takes a region off the part an extrude made too, and that part away once it has none, keeping one feature', () => {
+  const document = parseCadDocument(structuredClone(apart));
+  const selectme = document.parts.find(p => p.sketchName === 'selectme')!;
+  const target = document.parts.find(p => p.sketchOf === selectme.id)!;
+  const shapes = sketchRegions(selectme.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+  const picked = { ...document, parts: document.parts.map(p => (p.id === target.id ? { ...p, regions: shapes } : p)) };
+  const split = splitApartRegions(picked, target.id);
+  const made = split.parts.filter(p => p.extrudedWith === target.id);
+  expect(made).toHaveLength(2);
+  const region = made[0]!.regions![0]!;
+  const next = replaceExtrudeProfile(split, target.id, { sketch: selectme.id, region });
+  expect(next.parts.some(p => p.id === made[0]!.id)).toBe(false);
+  expect(next.parts.find(p => p.id === target.id)!.regions).toEqual(split.parts.find(p => p.id === target.id)!.regions);
+  // Picked again, it's the extrude's own, and OK makes a part of it again.
+  const back = replaceExtrudeProfile(next, target.id, { sketch: selectme.id, region });
+  expect(back.parts.find(p => p.id === target.id)!.regions).toContain(region);
+  expect(splitApartRegions(back, target.id).parts.filter(p => p.extrudedWith === target.id)).toHaveLength(2);
+});
