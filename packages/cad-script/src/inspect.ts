@@ -28,12 +28,22 @@ import {
   physicalJoinedCopies,
   smallestCornerRelief,
 } from '@wbcnc/cad';
-import { DEFAULT_SETTINGS, DEFAULT_TABS, DEFAULT_TOOL, planBoard, profileFeatures, type BoardRequest, type PlanResult } from '@wbcnc/cam';
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_TABS,
+  DEFAULT_TOOL,
+  planBoard,
+  profileFeatures,
+  type BoardRequest,
+  type OutlineNotches,
+  type PlanResult,
+} from '@wbcnc/cam';
 
 import { nativeCurveReport, sketchCurveDetails } from './curveReport';
 import { curveExtremaPoints } from './curveBounds';
 import { isEdgeNotch } from './notch';
 import { cutPartsCornerReach, type CadCornerReach } from './cornerReach';
+import { narrowFingersWarnings, notchesBesideBones } from './narrowFingers';
 
 export interface CadExpectation {
   /** Width and height of the outline, in mm. */
@@ -117,6 +127,8 @@ export interface CadToolpathSummary {
   blocked: string[];
   /** Openings "cut parts" makes from the top or through, and whether the bit reaches the corners of the tool fitting each. */
   cornerReach?: CadCornerReach[];
+  /** Notches and sharp corners the outline and hole paths can't reach, side A's, in the planner's part coordinates. */
+  uncut?: Omit<OutlineNotches, 'part'>[];
 }
 export interface CadReport {
   ok: boolean;
@@ -308,6 +320,7 @@ export function planSummary(plan: PlanResult): Omit<CadToolpathSummary, 'bit'> {
     minutes: Math.round((plan.timeMin + (sideB?.timeMin ?? 0)) * 10) / 10,
     operations: [...operations(plan, ''), ...(sideB ? operations(sideB, 'Side B: ') : [])],
     warnings: [...plan.warnings, ...(sideB?.warnings ?? [])],
+    ...(plan.outlineNotches?.length && { uncut: plan.outlineNotches.map(({ part: _part, ...notches }) => notches) }),
     blocked: [
       ...plan.safety,
       ...(sideB?.safety ?? []),
@@ -599,8 +612,14 @@ export async function inspectCadDocument(
           // CAM leaves out what no tool fits, so the part wouldn't come out as drawn.
           const dropped = toolpaths.warnings.find(warning => warning.includes('no tool fits'));
           if (dropped) warnings.push({ code: 'toolpath-missing', message: `A cut wouldn't be machined: ${dropped}`, part: part.name });
-          const unrelieved = toolpaths.warnings.find(warning => warning.includes('relieved for'));
-          if (unrelieved) warnings.push({ code: 'relief-bit', message: unrelieved, part: part.name });
+          const reliefNote = toolpaths.warnings.find(warning => warning.includes('relieved for'));
+          // Bones made for a smaller bit leave corners the bit can't reach: the relief note already says so for those.
+          const asDrawn = unrelieved.find(candidate => candidate.partId === part.id);
+          const uncut =
+            reliefNote && asDrawn ? notchesBesideBones(toolpaths.uncut ?? [], evaluated, asDrawn, profile.offset) : (toolpaths.uncut ?? []);
+          for (const message of narrowFingersWarnings(solved.document, evaluated, uncut, profile.offset, nameOf))
+            warnings.push({ code: 'toolpath-missing', message, part: part.name });
+          if (reliefNote) warnings.push({ code: 'relief-bit', message: reliefNote, part: part.name });
           for (const reach of toolpaths.cornerReach ?? [])
             if (reach.unreached)
               warnings.push({

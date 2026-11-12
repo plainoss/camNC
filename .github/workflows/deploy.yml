@@ -1,7 +1,8 @@
 name: Deploy
 
 # Builds and deploys the camnc Workers from GitHub Actions: production on every push to main, and a preview version
-# of camnc-preview on every pull request from this repository. Replaces Cloudflare Workers Builds, whose build
+# of camnc-preview on every pull request from this repository. The phone camera page (camnc-webrtc-cam) deploys on
+# pushes to main that change it or its workspace dependencies. Replaces Cloudflare Workers Builds, whose build
 # minutes the account can run out of. Needs the CLOUDFLARE_API_TOKEN secret (Workers Scripts and D1 edit) and the
 # CLERK_PUBLISHABLE_KEY_PRODUCTION and CLERK_PUBLISHABLE_KEY_PREVIEW variables.
 
@@ -85,6 +86,53 @@ jobs:
           else
             gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
           fi
+
+  deploy-webrtc-cam:
+    name: Deploy camnc-webrtc-cam
+    if: github.event_name == 'push'
+    concurrency:
+      group: deploy-webrtc-cam
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history, so turbo can diff against the commit before this push.
+          fetch-depth: 0
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+      # Deploys when the page or one of its workspace dependencies changed (turbo also counts lockfile and global
+      # changes), when this workflow changed, or when the previous commit is unknown (first push, force push).
+      - name: Check whether the page changed
+        id: changed
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          elif ! git diff --quiet "$BEFORE" HEAD -- .github/workflows/deploy.yml; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            affected=$(TURBO_SCM_BASE="$BEFORE" TURBO_SCM_HEAD=HEAD pnpm --silent turbo ls --affected --output json)
+            if echo "$affected" | jq -e '.packages.items[] | select(.name == "@wbcnc/webrtc-cam")' > /dev/null; then
+              echo "deploy=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "deploy=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          cat "$GITHUB_OUTPUT"
+      - name: Build
+        if: steps.changed.outputs.deploy == 'true'
+        run: pnpm turbo run build --filter @wbcnc/webrtc-cam
+      - name: Deploy
+        if: steps.changed.outputs.deploy == 'true'
+        working-directory: apps/webrtc-cam
+        run: pnpm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
   setup-smoke:
     name: Production setup smoke

@@ -1,4 +1,13 @@
-import { addCircle, addLine, createCadDocument, createCadPart, createPlateDocument, type CadDimension, type CadDocument } from '@wbcnc/cad';
+import {
+  addCircle,
+  addConstraint,
+  addLine,
+  createCadDocument,
+  createCadPart,
+  createPlateDocument,
+  type CadDimension,
+  type CadDocument,
+} from '@wbcnc/cad';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { cdp, userEvent } from '@vitest/browser/context';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -318,6 +327,38 @@ describe('integrated real-pointer sketch context commands', () => {
     await settled();
     expect(circle().radius).toBe(15);
     expect(center()).toMatchObject({ x: expect.closeTo(80, 1), y: expect.closeTo(60, 1) });
+  });
+
+  it('deletes a constraint from its glyph’s menu or the keyboard, and stops saying it is selected', async () => {
+    const source = createCadDocument(),
+      part = createCadPart();
+    part.sketch = addLine(part.sketch, { x1: 20, y1: 10, x2: 120, y2: 10 });
+    const first = part.sketch.entities.at(-1)!;
+    part.sketch = addLine(part.sketch, { x1: 120, y1: 10, x2: 160, y2: 80 });
+    const second = part.sketch.entities.at(-1)!;
+    part.sketch = addConstraint(part.sketch, { type: 'horizontal', entityId: first.id });
+    part.sketch = addConstraint(part.sketch, { type: 'perpendicular', entityAId: first.id, entityBId: second.id });
+    const [horizontal, perpendicular] = part.sketch.constraints.slice(-2).map(c => c.id);
+    source.parts.push(part);
+    const { canvas, latest, settled, rightClick } = await setup(source);
+    const glyph = (id: string) => canvas.querySelector(`[data-constraint-id="${id}"]`)!;
+    const status = () => document.querySelector('.cad-instruction')!.textContent;
+    await rightClick(glyph(perpendicular!));
+    const menu = await screen.findByRole('menu', { name: 'Sketch constraint menu' });
+    expect(Array.from(menu.querySelectorAll('[role="menuitem"]'), item => item.textContent)).toEqual([
+      'Delete constraintDelete',
+      'Clear selectionSpace',
+      'Zoom to fitF',
+    ]);
+    await userEvent.click(screen.getByRole('menuitem', { name: /^Delete constraint/ }));
+    await settled();
+    expect(latest().parts[0]!.sketch.constraints.some(c => c.id === perpendicular)).toBe(false);
+    await userEvent.click(glyph(horizontal!));
+    expect(status()).toContain('Constraint selected');
+    await userEvent.keyboard('{Delete}');
+    await settled();
+    expect(latest().parts[0]!.sketch.constraints.some(c => c.id === horizontal)).toBe(false);
+    expect(status()).not.toContain('Constraint selected');
   });
 
   it('blocks Finish while thickness text is invalid and restores it when Escape resets the field', async () => {
