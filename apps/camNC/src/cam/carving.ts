@@ -100,7 +100,51 @@ export const carvingRegion = (items: CarvingItemV1[]): Loop[] => unionPaths(item
 /** Why an empty carving can't be planned; the Carve step's empty board shows the ways to start instead. */
 export const kEmptyCarving = 'Add text or an SVG to carve.';
 export const itemName = (item: CarvingItemV1): string => (item.art.kind === 'text' ? `"${item.art.text}"` : item.art.fileName);
-export const withItems = (carving: CarvingV1, items: CarvingItemV1[]): CarvingV1 => ({ ...carving, items, region: carvingRegion(items) });
+/** The carving with these items. Tabs placed on the cut line move, turn and scale with the artwork they are next to. */
+export const withItems = (carving: CarvingV1, items: CarvingItemV1[]): CarvingV1 => {
+  const tabsAt = carving.cutout?.tabsAt && followArtwork(carving.cutout.tabsAt, carving.items, items);
+  return {
+    ...carving,
+    items,
+    region: carvingRegion(items),
+    ...(carving.cutout && tabsAt && tabsAt !== carving.cutout.tabsAt && { cutout: { ...carving.cutout, tabsAt } }),
+  };
+};
+
+/**
+ * Board points next to the artwork, carried along when it is moved, turned or sized: each with the item it is closest to,
+ * in that item's own frame. Left where they were, each is snapped to the nearest point of the moved cut line, so the
+ * tabs would all bunch at the end closest to their old places.
+ */
+function followArtwork(points: { x: number; y: number }[], before: CarvingItemV1[], after: CarvingItemV1[]) {
+  const moved = new Map(
+    after.flatMap(next => {
+      const was = before.find(item => item.id === next.id);
+      const same = !was || (was.x === next.x && was.y === next.y && was.rotation === next.rotation && was.height === next.height);
+      return same || !was.outline.length ? [] : [[was.id, { was, next }] as const];
+    })
+  );
+  if (!moved.size) return points;
+  const placed = before.filter(item => item.outline.length).map(item => ({ id: item.id, loops: placeItem(item) }));
+  return points.map(q => {
+    let owner: { id: string; d: number } | null = null;
+    for (const { id, loops } of placed)
+      for (const loop of loops) {
+        const d = closestOnLoop(q, loop).d;
+        if (!owner || d < owner.d) owner = { id, d };
+      }
+    const move = owner && moved.get(owner.id);
+    if (!move) return q;
+    const { was, next } = move;
+    const turn = ((next.rotation - was.rotation) * Math.PI) / 180,
+      scale = was.height ? next.height / was.height : 1;
+    const c = Math.cos(turn) * scale,
+      s = Math.sin(turn) * scale,
+      dx = q.x - was.x,
+      dy = q.y - was.y;
+    return { x: next.x + dx * c - dy * s, y: next.y + dx * s + dy * c };
+  });
+}
 
 /** V-bits offered for carving: the largest that fits the collet is ⌀8. Cutting data is cautious, for hardwood. */
 export const kVBits: LibraryTool[] = [

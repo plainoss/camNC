@@ -50,6 +50,8 @@ async function typeX(dialog: HTMLElement, value: string) {
   const field = within(dialog).getByRole('textbox', { name: 'X' });
   await userEvent.clear(field);
   await userEvent.type(field, value);
+  // Every keystroke reached the field, so a preview that lags behind it is a dropped update rather than a lost key (#852).
+  expect(field).toHaveValue(value);
   expect(document.activeElement).toBe(field);
 }
 

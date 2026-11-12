@@ -175,3 +175,51 @@ describe('planBoard', () => {
     expect(plan.sideB?.ops.find(op => op.kind === 'pocket')!.zBottom).toBeCloseTo(19 - 6, 3);
   });
 });
+
+describe('two parts of the same name', () => {
+  const plate = source(profileFeatures({ thickness: 18, outline: rect(0, 0, 100, 100), holes: [] }));
+  // "a" has room all round. "b" is 3 mm from the left edge and 4 mm from the top and bottom ones: only its right edge
+  // has stock wide enough for tabs.
+  const pair = (b: Partial<BoardRequest['parts'][number]> = {}) =>
+    board({
+      w: 240,
+      h: 108,
+      parts: [
+        { id: 'a', partId: 'plate', name: 'Top', x: 130, y: 4, rotated: false },
+        { id: 'b', partId: 'plate', name: 'Top', x: 3, y: 4, rotated: false, ...b },
+      ],
+    });
+
+  it('blocks the job for the one whose tabs don’t hold, by its id', () => {
+    // Its tabs dragged into the strips along the left and bottom edges, which hold nothing.
+    const plan = planBoard(
+      pair({
+        tabsAt: [
+          { x: 0, y: 50 },
+          { x: 50, y: 0 },
+        ],
+      }),
+      {},
+      plate
+    );
+    expect(plan.hold?.map(h => [h.id, h.ok]).sort()).toEqual([
+      ['a', true],
+      ['b', false],
+    ]);
+    const blocked = plan.timeline!.filter(e => e.block);
+    expect(blocked.map(e => [e.kind, e.id])).toEqual([['loose', 'b']]);
+    expect(blocked[0]!.message).toMatch(/^Top comes loose when its outline is cut through: no tabs/);
+  });
+
+  it('says why by the part it is about, not the first of that name', () => {
+    // Left to the planner, "b" has no two opposite edges for tabs; "a", listed first under the same name, is held.
+    const plan = planBoard(pair(), {}, plate);
+    expect(plan.holding?.map(h => [h.id, h.how])).toEqual([
+      ['a', 'placed'],
+      ['b', 'unheld'],
+    ]);
+    const [loose] = plan.timeline!.filter(e => e.kind === 'loose');
+    expect(loose!.id).toBe('b');
+    expect(loose!.message).toMatch(/^Top has no two opposite edges where tabs would hold it/);
+  });
+});

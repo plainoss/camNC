@@ -50,12 +50,23 @@ export default defineConfig({
     globals: false,
     sequence: { sequencer: BalancedBrowserSequencer },
     reporters: ['default', new TimingReporter({ suite: 'browser' }), '@mergifyio/vitest'],
+    // Merge-queue batches set VITEST_RETRY=1, so one flaky try no longer ejects a whole batch. The timing reporter
+    // prints each test that passed only on a retry, and scripts/flaky-tests.mjs files it, so the flake stays visible.
+    // Local runs, PR runs and scheduled runs retry nothing.
+    retry: Number(process.env.VITEST_RETRY) || 0,
     // CAD WASM workers and WebGL simulations share the GPU/process budget with each browser test page.
     // Keep parallel coverage without flooding the renderer with one page per available CPU thread.
     maxWorkers: 4,
     // Worker tests run in workerd, see vitest.worker.config.ts.
     exclude: ['**/node_modules/**', 'worker/**', ...nodeFiles],
-    setupFiles: ['src/test/isolateIndexedDb.ts', 'src/test/settledReset.ts'],
+    setupFiles: ['src/test/isolateIndexedDb.ts', 'src/test/settledReset.ts', 'src/test/quarantine.ts'],
+    // Merge-queue batches list the tests with an open flaky-test issue here (scripts/test-quarantine.mjs), and
+    // src/test/quarantine.ts skips them, or with VITEST_QUARANTINE_ONLY runs only them. Every other run gets an empty
+    // list.
+    provide: {
+      quarantine: JSON.parse(process.env.VITEST_QUARANTINE || '[]'),
+      quarantineOnly: Boolean(process.env.VITEST_QUARANTINE_ONLY),
+    },
     // environment: 'jsdom',
     // opencv tests don't seem to work with jsdom as setup right now.
     browser: {

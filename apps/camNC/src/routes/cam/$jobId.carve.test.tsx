@@ -333,6 +333,44 @@ describe('the Carve step', () => {
     expect(undo.disabled).toBe(false);
   });
 
+  it('undoes by ⌘Z or Ctrl+Z from a panel checkbox, select or number field, but not while a number is typed', async () => {
+    const job = await open();
+    const carving = async () => (await getJob(job.id))!.carving!;
+    fireEvent.click(screen.getByRole('button', { name: 'Board and bit' }));
+    const cut = screen.getByRole('checkbox', { name: /Cut it out/ });
+    cut.focus();
+    fireEvent.click(cut);
+    await waitFor(async () => expect((await carving()).cutout).toBeDefined());
+    expect(document.activeElement).toBe(cut);
+    fireEvent.keyDown(cut, { key: 'z', metaKey: true });
+    await waitFor(async () => expect((await carving()).cutout).toBeUndefined());
+
+    const bit = screen.getByLabelText('V-bit') as HTMLSelectElement;
+    bit.focus();
+    fireEvent.change(bit, { target: { value: '16' } });
+    await waitFor(async () => expect((await carving()).vBit.number).toBe(16));
+    fireEvent.keyDown(bit, { key: 'z', ctrlKey: true });
+    await waitFor(async () => expect((await carving()).vBit.number).toBe(job.carving!.vBit.number));
+    expect(bit.value).toBe(String(job.carving!.vBit.number));
+
+    const depth = screen.getByLabelText('Deepest (mm)') as HTMLInputElement;
+    const was = job.carving!.maxDepth;
+    fireEvent.change(depth, { target: { value: '4' } });
+    fireEvent.blur(depth);
+    await waitFor(async () => expect((await carving()).maxDepth).toBe(4));
+    // Typing not yet taken is the field's own to undo.
+    fireEvent.change(depth, { target: { value: '5' } });
+    fireEvent.keyDown(depth, { key: 'z', metaKey: true });
+    expect(depth.value).toBe('5');
+    expect((await carving()).maxDepth).toBe(4);
+    // Showing the saved value again, the field's ⌘Z undoes the depth.
+    fireEvent.keyDown(depth, { key: 'Escape' });
+    expect(Number(depth.value)).toBe(4);
+    fireEvent.keyDown(depth, { key: 'z', metaKey: true });
+    await waitFor(async () => expect((await carving()).maxDepth).toBe(was));
+    expect(Number(depth.value)).toBe(was);
+  });
+
   it('drops a board resize under way when undoing, keeping redo', async () => {
     const job = await open();
     openPanel('Board and bit');
