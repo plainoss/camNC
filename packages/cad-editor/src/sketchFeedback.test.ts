@@ -1,6 +1,6 @@
 import { addConstraint, addLine, addPoint, createCadDocument, createCadPart, solveCadDocument } from '@wbcnc/cad';
 import { describe, expect, it } from 'vitest';
-import { constraintColorNotice, sketchFeedback } from './sketchFeedback';
+import { constraintColorNotice, isEmptyDesign, sketchFeedback } from './sketchFeedback';
 
 describe('feedback while sketching', () => {
   it('explains limited constraint colors without treating validated geometry as an error', () => {
@@ -49,18 +49,17 @@ describe('feedback while sketching', () => {
     expect(sketchFeedback(result('conflicting-constraints')).sketchProblems).toEqual(['conflicting-constraints']);
   });
 
-  it('reports nothing for a design with nothing drawn, and an open chain as normal work in progress with meaningful DOF', async () => {
+  it('treats an empty sketch and an open chain as normal work in progress with meaningful DOF', async () => {
     const document = createCadDocument();
     const part = createCadPart();
     document.parts.push(part);
-    // The editor's own hint asks for a first part; a "Sketch in progress" card would only repeat it (#934).
-    expect(sketchFeedback(await solveCadDocument(document))).toMatchObject({
-      inProgress: false,
-      status: 'Empty sketch',
-      problems: [],
-      sketchProblems: [],
-    });
+    // Nothing drawn still blocks finishing; the editor leaves out the progress card itself (#934).
+    expect(isEmptyDesign(document)).toBe(true);
+    const empty = sketchFeedback(await solveCadDocument(document));
+    expect(empty).toMatchObject({ inProgress: true, status: 'Empty sketch' });
+    expect(empty.problems).toHaveLength(1);
     part.sketch = addLine(part.sketch, { x1: 10, y1: 10, x2: 40, y2: 20 });
+    expect(isEmptyDesign(document)).toBe(false);
     const feedback = sketchFeedback(await solveCadDocument(document));
     expect(feedback.inProgress).toBe(true);
     expect(feedback.status).toBe('4 degrees of freedom');

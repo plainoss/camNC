@@ -189,7 +189,7 @@ import { cadViewState, saveCadViewState } from '@wbcnc/cad-editor/viewState';
 import { loadShownState, saveShownState } from './shownState';
 import { type CadSelectionBox } from './boxSelection';
 import { chainGeometry, type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture } from './editorGestures';
-import { constraintColorNotice, isEmptySketch, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
+import { constraintColorNotice, isEmptyDesign, isEmptySketch, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
 import { failedCheckProblems, noSketchProblems } from './sketchProblemLists';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
@@ -3633,7 +3633,7 @@ export function CadEditor({
         </span>
         <span>{saveStatus ?? 'Draft'}</span>
       </footer>
-      {!acceptanceNotice && <SketchProblems problems={openSketchProblems} inProgress={inProgress} />}
+      {!acceptanceNotice && <SketchProblems problems={openSketchProblems} inProgress={inProgress} nothingDrawn={isEmptyDesign(doc)} />}
     </div>
   );
   return <DesignUnitContext value={lengthUnit}>{content}</DesignUnitContext>;
