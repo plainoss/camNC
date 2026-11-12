@@ -25,9 +25,12 @@
     color: var(--color-secondary);
   }
 
-  .gradient-text {
-    @apply bg-clip-text text-transparent;
-    @apply bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-pink-500;
+  /* The machine bed's 10 mm grid, drawn behind the hero. */
+  .bed-grid {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 4%) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 4%) 1px, transparent 1px);
+    background-size: 32px 32px;
   }
 }
 

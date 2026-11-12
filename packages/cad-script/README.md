@@ -31,7 +31,10 @@ Options: `--from <document.json>` edits an existing design, or reports on it if 
 script is given. `--out` writes the document, only if the check passed. Open that
 file in camNC's CAM page to get it as a new job. `--svg` draws
 the parts. A failed check removes any existing `--out` file and any existing `--svg`
-file unless it writes a new SVG for that run. See `examples/` for more.
+file unless it writes a new SVG for that run. `--export-sketch <name> --export
+<drawing.dxf|drawing.svg>` writes one sketch, named as the feature list names it,
+as DXF or SVG at 1:1; add `--export-unit in` (mm, cm, m, in or ft) and
+`--export-construction` to include construction geometry. See `examples/` for more.
 
 ## The full report
 
@@ -190,6 +193,18 @@ change a variable or a dimension, or a step's settings. So:
 - Handles in the report, such as `7b8b`, work with `find` and `sketch` on that same
   revision of the design. `redundant-constraint` names the involved entity handles.
 - A script that stops with an error leaves the design as it was.
+- A variable that can't be worked out (`invalid-variable`) and a value that can't follow
+  its variables (`variable-value`, such as a thickness below 0.1 mm or a finger count that
+  isn't a whole number of at least 2) are errors, and fail the check. The design keeps its
+  last good value meanwhile, so its parts and report disagree with the variable until it's fixed.
+
+### Native curves, offsets and measured fitting
+
+`sketch.bezier({ points })` creates a native Bézier control polygon; `sketch.spline({ points, closed? })` interpolates fit points. Both return curve and point references. `sketch.ellipse({ at, rx, ry, angle? })` creates an ellipse with two radius drivers and an angle in degrees. Coordinates, radii and angles accept expressions in their corresponding units. A path can share endpoints with `.cubicTo(to, { control1, control2 })` and `.quadTo(to, { control })`.
+
+`sketch.offset(items, { distance, wholeLoop? })` creates linked offsets for supported lines, circles and arcs. General curve offsets are explicitly unsupported. `sketch.fitBounds(items, { w, h, at?, preserveAspect })` measures true curve extrema before fitting. `preserveAspect: true` uniformly contains the selection within the target box; `false` explicitly distorts supported curves. The anchor is the lower-left of the measured bounds. Fitting replaces source coordinate expressions with target-derived drivers and returns `replacedExpressions` for review. Nonuniform circle/arc fits and selections with unsupported external dependencies are refused. Reports include native controls, fit points, curve bounds and fitting drivers.
+
+Precision SVG geometry is available through [`@wbcnc/cad-script/svg`](src/svg/README.md). Import source once and reuse an asset handle; SVG artwork supplies curves, not inferred parametric design intent.
 
 ### Native curves, offsets and measured fitting
 
@@ -337,7 +352,7 @@ by the parts that fit them.
 - The report's `steps` say where each face is in words: "Side's top (+x): sketch origin
   at 18, 0, 0, its x along +y, its y along +z, looking +x." Read them to check a part
   sits where you meant before reading anything else.
-- `d.cutParts(target, { with: [tools], clearance: 'fit' })` cuts the tools out of the
+- `d.cutParts(target, { with: [tools], clearance: 0.2 })` cuts the tools out of the
   target wherever they reach in: rebates, dados, grooves and mortises that follow both
   parts. The clearance grows every side of an opening inside the target and deepens a
   blind one; sides that run off the target's edge stay open. Each opening is listed in

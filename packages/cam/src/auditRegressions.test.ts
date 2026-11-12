@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readGcode } from './analyze';
 import { limitRemovalRate } from './engagement';
 import { toGcode } from './gcode';
-import type { PathD, Vec3 } from './geom';
+import type { Vec3 } from './geom';
 import { applyFeedPolicy, type MotionPath } from './motion';
 import { quantizedArcIsSafe } from './postValidation';
 import { StockModel } from './stock';
@@ -11,12 +11,6 @@ import { estimateProgramTime, LOWRIDER_V4_REFERENCE_PROFILE } from './timing';
 import type { PartCam, Pass } from './toolpaths';
 
 const path = (points: Vec3[]): MotionPath => ({ pts: points, feeds: points.map(() => 1000), link: 'retract' });
-const rect = (x0: number, y0: number, x1: number, y1: number): PathD => [
-  { x: x0, y: y0 },
-  { x: x1, y: y0 },
-  { x: x1, y: y1 },
-  { x: x0, y: y1 },
-];
 const policy = {
   plungeFeed: 300,
   rampFeed: 420,

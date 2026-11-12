@@ -79,7 +79,7 @@ export default class Peer {
     };
 
     /* Swap to in-band signalling once channel opens */
-    let internalDataChannelReady = new Promise<void>(resolve => {
+    const internalDataChannelReady = new Promise<void>(resolve => {
       this.internalDataChannel.addEventListener(
         'open',
         () => {
@@ -95,7 +95,7 @@ export default class Peer {
         { once: true, signal: this.signal }
       );
     });
-    let dataChannelReady = new Promise<void>(resolve => {
+    const dataChannelReady = new Promise<void>(resolve => {
       this.dataChannel.addEventListener(
         'open',
         () => {

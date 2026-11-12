@@ -23,14 +23,27 @@ steps stay with the source family and are not copied into the detached part.
 
 ## Connection and conversation
 
-Open **Assistant**, then **Connection**. Enter your provider address, model ID
-and key. Anthropic uses Messages. Compatible providers can use Responses or
-Chat Completions. Choose the protocol the endpoint implements and mark whether
-that model supports tools and images. Tools are required. Image support enables
-reference attachments and sends rendered candidate views back for inspection.
+Open **Assistant** and paste a provider key (later it is under **⚙ Assistant settings → Connection**). Its prefix picks the provider
+(`sk-ant-` Anthropic, `sk-` OpenAI); **Other…** covers compatible endpoints.
+**Test and connect** lists the provider's models with that key and picks the
+newest main-line model for design (for example Claude Sonnet), and for OpenAI the
+newest `gpt-image` model for Carve's image generation. If the list is unavailable,
+Anthropic falls back to its recommended model, and other providers ask for a model
+ID. The test then sends one small tool-calling request with a 1 × 1 pixel image and
+no design data. It confirms browser access, the key, the model and tool calls. If
+the model refuses the image, image support is turned off and the test is repeated
+without it. A failed test saves nothing and says why.
 
-Requests go from the browser to the selected provider. The key stays in memory
-unless **Remember key on this device** is selected. Remembered keys use their own
+**Models (optional)** overrides the design model and the image model.
+**Address and capabilities** shows the API address, the API type (Anthropic
+Messages, OpenAI Responses or Chat Completions), image input and prompt caching,
+and offers **Save without testing**. The design assistant and the carving
+assistant use the same connection; `nativeImageFromConnection` gives Carve the
+image model with the same key and endpoint, or nothing for providers without image
+generation.
+
+Requests go from the browser to the selected provider. **Remember on this device** is selected by default;
+without it the key stays in memory until the app reloads. Remembered keys use their own
 localStorage entry, outside account settings, server sync and settings backups.
 **Forget key** removes that entry. A provider that refuses browser requests
 produces a connection error; the application does not silently proxy the design
@@ -49,6 +62,20 @@ Suggested replies appear as clickable cards. For visual decisions, the assistant
 can include simple **Illustration** thumbnails alongside the choices. These are
 schematic concepts, not checked CAD previews; custom typed replies remain available.
 
+When a question needs numbers, the assistant can add fields prefilled with its
+proposal, such as width, depth and wall. **Use these values** answers in words.
+Fields named after a requirement (width, thickness, minimum wall and so on) are
+also confirmed as the **Brief**: chips pinned above the conversation. The app
+checks every later proposal against the brief, independently of the generated
+script. A chip's × removes it, and **Edit** opens the full requirements form.
+
+The assistant's work for a turn appears inline as plain steps: which recipe or
+example it used, and each check with its result. A failed check shows the first
+unmet requirement or error, for example the measured wall. While the turn runs,
+the steps are open and show the current activity. Afterwards they fold to a
+single line such as "3 steps · 2 checks". **Details** shows the raw tool inputs
+and results, without image data.
+
 The assistant reads the guide and examples, checks a script on a copy and repairs
 it. Each attempt starts from the original snapshot. Stop cancels provider access
 and terminates a running script. A turn is limited to five checks and twelve model
@@ -60,7 +87,7 @@ publish a candidate.
 
 ## Usage and limits
 
-**Usage and limits** shows the last turn's request/check counts and provider-reported
+**⚙ Assistant settings → Cost and limits** opens **Usage and limits**, which shows the last turn's request/check counts and provider-reported
 input, output and cached tokens. Enter the selected model's prices to calculate
 USD cost. Missing usage or cache prices remain **unknown**, rather than appearing
 as zero. Prices and limits last until the dock closes; verify them after changing
@@ -99,10 +126,22 @@ discarding user constraints.
 
 ## Review and acceptance
 
-**Review proposal** opens the checked candidate in a 3D view. Orbit it or switch between
-the original and candidate. The review lists added, changed and removed steps,
-new warnings and lost cuts or joint openings. A successful geometry check does
-not establish that a piece matches a picture or that its joints are strong.
+**Review proposal** opens the checked candidate over the workspace, below the
+toolbar and beside the assistant, so the conversation stays in view. The list on
+the left shows added, changed and removed steps, the cost of the change in lost
+cuts or joint openings, and new warnings. **Before**, **Changes** and **After**
+switch the view; Changes highlights the parts the proposal adds or changes.
+Escape or **Close** keeps the proposal for later. A successful geometry check
+does not establish that a piece matches a picture or that its joints are strong.
+
+A proposal built from a recipe shows **Adjust before applying**: a slider for each
+of the recipe's numbers, such as width, wall or shelves. Moving one rebuilds the
+recipe with that value and runs the same trusted path as an assistant candidate:
+the sandboxed script check, the complete final check and the confirmed brief. No
+model request is made. A value the checks refuse leaves the previous proposal in
+place and says why. When the open design has changed since the proposal was made,
+**Re-check on current design** runs the same script on the current design in the
+same way, so the change need not be asked for again.
 
 Only **Apply as one undo step** changes the open document. A hand edit made after
 the request invalidates the proposal, including when that edit has been undone.
@@ -194,7 +233,7 @@ human review.
 
 `check_design` accepts exactly one of full `source`, a named `recipe` with numeric-mm `parameters`, or an immutable `scriptId`. The tray and cupboard recipes produce ordinary editable parts and variables. A check returns a SHA-256 hash; repairs use `scriptId`, `expectedHash` and bounded exact `oldText`/`newText` patches. Ambiguous patches fail atomically. Handles belong to the original document snapshot and revision; edits and undo cannot revive stale sessions. `read_design` retrieves source only when needed.
 
-Confirmed requirements are explicit application state in the assistant dock. Draft fields are inactive until Confirm. Fixed-tolerance checks independently measure outline size, thickness, blind cuts, count, outer top-pocket wall and supported floor bounds, plus optional assembly dimensions and preservation of existing IDs. Targets must be globally unambiguous or use exact IDs/report handles. Pierced or opposed-pocket floors are refused rather than claiming a thickness guarantee. Appearance, internal webs and strength still need review. Changing requirements invalidates a proposal even after its review dialog opens.
+Confirmed requirements are explicit application state in the assistant dock, shown as the Brief chips. In the full form under **⚙ Assistant settings → Brief**, draft fields are inactive until Confirm. Fixed-tolerance checks independently measure outline size, thickness, blind cuts, count, outer top-pocket wall and supported floor bounds, plus optional assembly dimensions and preservation of existing IDs. Targets must be globally unambiguous or use exact IDs/report handles. Pierced or opposed-pocket floors are refused rather than claiming a thickness guarantee. Appearance, internal webs and strength still need review. Changing requirements invalidates a proposal even after its review dialog opens.
 
 The browser uses geometry-only repair checks, with trusted reinspection after the sandbox. `finalize_design` runs the full toolpath/report check against the exact cached candidate, without rerunning generated JavaScript. A proposal is impossible before that succeeds. Its warnings and costs go back to the model before its final explanation. Repair attempt limits count geometry checks; finalization does not grant another repair attempt. `views: ["top"]` renders and sends only that projection; legacy `true` selects all three. Other projections remain available explicitly.
 

@@ -7,6 +7,7 @@ import {
   cadSketchRegions,
   cadVariableValues,
   designSteps,
+  edgeFilletProblems,
   extrudeStepProblem,
   isCadPart,
   isSpatialRemoval,
@@ -114,6 +115,8 @@ export interface CadFullReport {
   ok: boolean;
   /** Why the script stopped, when one did: the design reported on is then the one it started from. */
   scriptError?: string;
+  /** Why a sketch asked for with --export-sketch couldn't be written: no sketch is named so. */
+  exportError?: string;
   status: string;
   errors: CadReport['errors'];
   warnings: CadReport['warnings'];
@@ -563,10 +566,14 @@ export async function fullCadReport(
       }
       if (step.kind === 'fillet') {
         const fillet = part.fillets!.find(candidate => candidate.id === step.id)!;
+        // Corners the radius can't take are left sharp, and the step says how many and why.
+        const sharp = step.broken ? (edgeFilletProblems(part).find(problem => problem.filletId === fillet.id)?.corners.length ?? 0) : 0;
         return {
           ...base,
           settings: { corners: fillet.corners.length, radius: typed(fillet.radius, fillet.radiusExpression) },
-          result: { corners: fillet.corners.length },
+          result: step.broken
+            ? { corners: fillet.corners.length, rounded: fillet.corners.length - sharp, sharp, problem: step.broken }
+            : { corners: fillet.corners.length },
         };
       }
       // Cut parts.

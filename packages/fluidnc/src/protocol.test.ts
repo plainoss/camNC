@@ -73,6 +73,55 @@ describe.each(['v3-81', 'v4'] as const)('FluidncProtocol on %s', variant => {
     const last = statuses.at(-1)!;
     expect(last.wpos).toEqual({ x: 10, y: 0, z: 0 });
     expect(last.overrides).toEqual({ feed: 100, rapid: 100, spindle: 100 });
+    expect(last.workKnown).toBe(true);
+  });
+
+  it('tells the position units from the decimals only once $I says the firmware is FluidNC', async () => {
+    const fluidnc = await connect(new FakeFluidnc(variant));
+    fluidnc.realtime(0x3f);
+    await until(() => fluidnc.status?.positionUnits !== undefined);
+    expect(fluidnc.status!.positionUnits).toBe('mm');
+
+    const other = new FakeFluidnc(variant);
+    other.respond = line => (line === '$I' ? ['[VER:1.1h.20190825:]', '[OPT:V,15,128]', 'ok'] : undefined);
+    const protocol = await connect(other);
+    expect(protocol.buildInfo).toBeNull();
+    const statuses: MachineStatus[] = [];
+    protocol.on('status', s => statuses.push(s));
+    other.pushStatus();
+    await until(() => statuses.length > 0);
+    expect(statuses[0]!.positionUnits).toBeUndefined();
+  });
+
+  it('says when WPos is only MPos because no WCO has been reported yet', async () => {
+    const fake = new FakeFluidnc(variant);
+    const protocol = await connect(fake);
+    const statuses: MachineStatus[] = [];
+    protocol.on('status', s => statuses.push(s));
+    fake.emit(['<Hold:0|MPos:1.000,2.000,-5.000|FS:0,0|SD:50.00,/sd/job.gcode>']);
+    await until(() => statuses.length > 0);
+    expect(statuses[0]!.workKnown).toBe(false);
+    expect(statuses[0]!.wpos.z).toBe(-5);
+    fake.pushStatus();
+    fake.emit(['<Hold:0|MPos:1.000,2.000,-5.000|FS:0,0|SD:50.00,/sd/job.gcode>']);
+    await until(() => statuses.length > 2);
+    expect(statuses[2]!.workKnown).toBe(true);
+  });
+
+  it('keeps the spindle state of the last report with overrides', async () => {
+    const fake = new FakeFluidnc(variant);
+    const protocol = await connect(fake);
+    const statuses: MachineStatus[] = [];
+    protocol.on('status', s => statuses.push(s));
+    const frames = [
+      '<Run|MPos:0.000,0.000,0.000|FS:0,0>',
+      '<Run|MPos:0.000,0.000,0.000|FS:0,15000|Ov:100,100,100|A:S>',
+      '<Run|MPos:0.000,0.000,0.000|FS:0,15000>',
+      '<Hold:0|MPos:0.000,0.000,0.000|FS:0,15000|Ov:100,100,100>',
+    ];
+    fake.emit(frames);
+    await until(() => statuses.length >= frames.length);
+    expect(statuses.slice(-3).map(s => s.spindleOn)).toEqual([true, true, false]);
   });
 
   it('sends realtime bytes outside the queue', async () => {

@@ -1,4 +1,4 @@
-import { createPlateDocument, type CadDocument } from '@wbcnc/cad';
+import { addRectangle, createCadPart, createPlateDocument, resolveDrawnPlacements, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -63,6 +63,70 @@ it('hides and shows sketches, planes and the origin with the eye on their rows, 
     within(within(geometry).getByRole('button', { name: /Front/ }).closest('li')!).getByRole('button', { name: 'Hide' })
   );
   await waitFor(() => expect(props().planes?.map(plane => plane.label)).toEqual(['Top', 'Right']));
+});
+
+it('hides a face sketch once an Extrude adds or removes with it, and shows it rolled back to its sketch', async () => {
+  const plate = createPlateDocument({ width: 200, height: 120 });
+  const board = plate.parts[0]!;
+  const onTop = (id: string, name: string, operation: Partial<CadPart>): CadPart => {
+    const part: CadPart = { ...createCadPart(name, 10), id, drawnOn: { on: { partId: board.id, face: 'top' }, offset: 0 }, ...operation };
+    part.sketch = addRectangle(part.sketch, { x: 60, y: 35, width: 80, height: 50 });
+    return part;
+  };
+  const source = resolveDrawnPlacements({
+    ...plate,
+    parts: [board, onTop('pocket', 'Pocket', { remove: { depth: 'through' } }), onTop('boss', 'Boss', { addTo: board.id })],
+  }).document;
+  await studio(source);
+  await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  const features = screen.getByRole('region', { name: 'Features' });
+  const row = (name: RegExp) => within(features).getByRole('button', { name }).closest('li')!;
+  await waitFor(() => expect(row(/Sketch · Pocket/).className).toContain('cad-feature-hidden'));
+  expect(row(/Sketch · Boss/).className).toContain('cad-feature-hidden');
+  const lines = () => props().sketchLines?.map(line => line.partId) ?? [];
+  expect(lines()).not.toContain('pocket');
+  expect(lines()).not.toContain('boss');
+  // Rolled back to its sketch, the Remove isn't built yet, so its sketch shows.
+  fireEvent.contextMenu(within(row(/Sketch · Pocket/)).getByRole('button', { name: /Sketch · Pocket/ }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Roll to here' }));
+  await waitFor(() => expect(lines()).toContain('pocket'));
+  expect(row(/Sketch · Pocket/).className).not.toContain('cad-feature-hidden');
+});
+
+it.each([
+  ['not extruded', { extrude: false as const }],
+  ['used by an Extrude Remove', { remove: { depth: 'through' as const } }],
+])('leaves a face sketch below the rollback bar out of the view when it is %s', async (_, operation) => {
+  const plate = createPlateDocument({ width: 200, height: 120 });
+  const board = plate.parts[0]!;
+  const face: CadPart = {
+    ...createCadPart('Face', 10),
+    id: 'face',
+    drawnOn: { on: { partId: board.id, face: 'top' }, offset: 0 },
+    ...operation,
+  };
+  face.sketch = addRectangle(face.sketch, { x: 60, y: 35, width: 80, height: 50 });
+  await studio(resolveDrawnPlacements({ ...plate, parts: [board, face] }).document);
+  await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  const features = screen.getByRole('region', { name: 'Features' });
+  const row = (name: RegExp) => within(features).getByRole('button', { name }).closest('li')!;
+  const lines = () => props().sketchLines?.map(line => line.partId) ?? [];
+  const removed = 'remove' in operation;
+  await waitFor(() => expect(lines().includes('face')).toBe(!removed));
+  fireEvent.contextMenu(within(row(/Extrude · Plate/)).getByRole('button', { name: /Extrude · Plate/ }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Roll to here' }));
+  await waitFor(() => expect(row(/Sketch · Face/).className).toContain('cad-feature-rolled-back'));
+  await waitFor(() => expect(lines()).not.toContain('face'));
+  // Rolled back, the row has no eye at all: it couldn't show the sketch.
+  expect(within(row(/Sketch · Face/)).queryByRole('button', { name: /^(Hide|Show)$/ })).toBeNull();
+  expect(within(row(/Sketch · Plate/)).getByRole('button', { name: 'Show' })).toBeDefined();
+  // Back at the end, the usual rules: shown until an Extrude uses it.
+  fireEvent.contextMenu(within(row(/Sketch · Face/)).getByRole('button', { name: /Sketch · Face/ }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Roll to end' }));
+  await waitFor(() => expect(lines().includes('face')).toBe(!removed));
+  expect(within(row(/Sketch · Face/)).getByRole('button', { name: removed ? 'Show' : 'Hide' })).toBeDefined();
 });
 
 it('searches the studio’s own commands with Alt+C outside a sketch', async () => {

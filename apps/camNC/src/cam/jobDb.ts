@@ -207,20 +207,24 @@ export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV
   });
 }
 
-/** Start a carving: lettering on a board, ready to edit on the Carve step. */
-export async function createCarvingJob(name = 'Untitled carving'): Promise<CamJobV1> {
+/**
+ * Start a carving: an empty board, ready to add lettering, a file or AI artwork on the Carve step. `lettering` starts it
+ * with that text centred on the board instead.
+ */
+export async function createCarvingJob(name = 'Untitled carving', { lettering }: { lettering?: string } = {}): Promise<CamJobV1> {
   const context = captureStorageContext();
   const now = Date.now();
   const title = uniqueJobName(
     name,
     (await listJobsIn(context)).map(j => j.name)
   );
-  const art = { kind: 'text' as const, text: 'Welcome', font: 'serif' as const };
-  const height = 30;
-  const x = kCarvingBoard.w / 2,
-    y = kCarvingBoard.h / 2;
-  const { region } = await outlineArt(art, height);
-  const items = [{ id: crypto.randomUUID(), art, height, x, y, rotation: 0, outline: region }];
+  const items: CarvingV1['items'] = [];
+  if (lettering) {
+    const art = { kind: 'text' as const, text: lettering, font: 'serif' as const };
+    const height = 30;
+    const { region } = await outlineArt(art, height);
+    items.push({ id: crypto.randomUUID(), art, height, x: kCarvingBoard.w / 2, y: kCarvingBoard.h / 2, rotation: 0, outline: region });
+  }
   return saveJobIn(context, {
     v: 1,
     id: crypto.randomUUID(),

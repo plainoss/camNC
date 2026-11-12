@@ -1,16 +1,10 @@
-import {
-  addCopyFaceSketch,
-  addFaceSketch,
-  cadFaceSketches,
-  rotateVector,
-  type CadDocument,
-  type CadPart,
-  type CadFaceRef,
-} from '@wbcnc/cad';
+import { addCopyFaceSketch, addFaceSketch, cadFaceSketches, type CadDocument, type CadPart, type CadFaceRef } from '@wbcnc/cad';
 import { hasOutline } from './editorHelpers';
 import { faceSketchScene, partViewSnapshot, type FaceSketchScene, type PartViewSnapshot } from './faceSketchScene';
 import type { StudioCameraRef } from './studioCamera';
 import { assemblyModel } from './assemblyModel';
+import { physicalCopyMirrored } from './studioGeometryReaders';
+import { partCameraFromAssembly } from './partAssemblyCamera';
 
 /** All routed face-editor entry points must transfer the visible camera, including editing an existing sketch. */
 export function faceSketchHost(context: {
@@ -33,21 +27,7 @@ export function faceSketchHost(context: {
     if (!camera || !bounds?.height) return;
     // Include the visible row placement of parts not yet attached to an assembly plane.
     const placement = assemblyModel(document).placements.get(copyId ? `${partId}/${copyId}` : partId);
-    const inverse =
-      placement &&
-      ([-placement.rotation[0], -placement.rotation[1], -placement.rotation[2], placement.rotation[3]] as [number, number, number, number]);
-    const local =
-      placement && inverse
-        ? {
-            ...camera,
-            center: rotateVector(
-              inverse,
-              camera.center.map((value, axis) => value - placement.position[axis]!) as [number, number, number]
-            ),
-            back: rotateVector(inverse, camera.back),
-            up: rotateVector(inverse, camera.up),
-          }
-        : camera;
+    const local = placement ? partCameraFromAssembly(camera, placement, physicalCopyMirrored(document, partId, copyId)) : camera;
     context.partCamera.current = { ...local, key: partId, seq: undefined };
     return { cameraState: context.partCamera, aspect: bounds.width / bounds.height };
   };

@@ -112,7 +112,7 @@ export function cadFolderVariableUses(document: CadDocument, id: string): CadFol
   const folder = document.folders?.find(candidate => candidate.id === id);
   if (!folder) return [];
   const uses: CadFolderVariableUse[] = [];
-  const empty: CadDocument = { ...document, variables: [], parts: [], partCuts: [], planes: [] };
+  const empty: CadDocument = { ...document, variables: [], parts: [], partCuts: [], planes: [], copyTransforms: [] };
   for (const variable of document.variables?.filter(candidate => candidate.folderId === id) ?? []) {
     const record = (ownerId: string, ownerName: string, source: CadDocument) => {
       const count = cadVariableUses(source, variable.name);
@@ -124,6 +124,7 @@ export function cadFolderVariableUses(document: CadDocument, id: string): CadFol
       record(cut.id, `Cut parts ${cut.id}`, { ...empty, partCuts: [cut] });
     for (const plane of document.planes?.filter(plane => !folder.planeIds?.includes(plane.id)) ?? [])
       record(plane.id, plane.name, { ...empty, planes: [plane] });
+    for (const move of document.copyTransforms ?? []) record(move.id, 'Copy transform', { ...empty, copyTransforms: [move] });
     for (const other of document.variables?.filter(candidate => candidate.folderId !== id) ?? [])
       record(other.id, other.name, { ...empty, variables: [other] });
   }
@@ -148,6 +149,8 @@ export function deleteCadFolder(document: CadDocument, id: string): Change {
       variables: document.variables?.filter(variable => variable.folderId !== id),
       parts: document.parts.filter(part => !folder.partIds.includes(part.id)),
       partCuts: document.partCuts?.filter(cut => !folder.partCutIds?.includes(cut.id)),
+      ...(document.operationOrder && { operationOrder: document.operationOrder.filter(id => !folder.partCutIds?.includes(id)) }),
+      ...(document.legacyPartCutIds && { legacyPartCutIds: document.legacyPartCutIds.filter(id => !folder.partCutIds?.includes(id)) }),
       planes: document.planes?.filter(plane => !folder.planeIds?.includes(plane.id)),
     }),
   };

@@ -1,16 +1,8 @@
-import {
-  addLine,
-  addPoint,
-  cadCornerSources,
-  cornerKey,
-  type CadSketch,
-  type CadDocument,
-  type cadSketchFrame,
-  type CadPointEntity,
-} from '@wbcnc/cad';
+import { addLine, addPoint, cornerKey, type CadSketch, type CadDocument, type cadSketchFrame, type CadPointEntity } from '@wbcnc/cad';
 import type { PartEdge } from './partEdges';
 import { partVertices } from './partVertices';
 import { partEdgeSourceKey, type PartEdgeSource } from './partWorldEdges';
+import { physicalCornerSources as cadCornerSources } from './studioGeometryReaders';
 
 interface UsedPartEdges {
   sketch: CadSketch;
