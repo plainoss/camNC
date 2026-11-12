@@ -256,6 +256,20 @@ test('Mergify batches retain the required gate, branch protections and explicit 
     'distinct merge conditions must require all browser/spec checks, preventing direct merge after only light PR CI');
 });
 
+test('only merge-queue browser shards retry a failed test, and the flaky-test reporter reads what they retried', () => {
+  const { jobs } = parse(read('.github/workflows/ci.yml'));
+  const expression = jobs.test.steps.find(step => step.name === 'Run tests').env.VITEST_RETRY.slice(3, -3);
+  const retry = (head_ref, suite, event_name = 'pull_request') =>
+    new Function('github', 'matrix', 'startsWith', `return (${expression});`)(
+      { event_name, head_ref }, { suite }, (value, prefix) => (value ?? '').startsWith(prefix));
+  assert.equal(retry('mergify/merge-queue/main/batch-1', 'app-browser-2'), '1');
+  assert.equal(retry('mergify/merge-queue/main/batch-1', 'headless'), '0');
+  assert.equal(retry('feature/example', 'app-browser-1'), '0', 'PR and full-ci runs must fail on a flaky try');
+  assert.equal(retry('', 'app-browser-1', 'schedule'), '0', 'scheduled runs feed flaky detection and retry nothing');
+  assert.match(read('apps/camNC/vitest.config.ts'), /retry: Number\(process\.env\.VITEST_RETRY\) \|\| 0/);
+  assert.match(read('scripts/test-timings.mjs'), /RETRIED/);
+});
+
 test('Mergify draft batch PRs trigger all validation without needing merge_group events', () => {
   const workflow = parse(read('.github/workflows/ci.yml'));
   const trigger = workflow.on.pull_request;

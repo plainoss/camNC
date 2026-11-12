@@ -86,8 +86,11 @@
       "outputs": [
         "test-results/browser*.json"
       ],
+      // Hashed, so a batch shard that passed only on a retry (VITEST_RETRY=1) never replays as a pass for a run
+      // without retries, such as a `full-ci` PR.
       "env": [
-        "CI"
+        "CI",
+        "VITEST_RETRY"
       ],
       "passThroughEnv": [
         "PLAYWRIGHT_BROWSERS_PATH"
