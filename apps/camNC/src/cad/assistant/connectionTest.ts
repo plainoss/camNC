@@ -46,8 +46,14 @@ export async function testAssistantConnection(
   const provider = connectionPreset(config).id;
   const wantsImageModel = provider !== 'anthropic' && config.imageModel === undefined;
   if (!config.model.trim() || wantsImageModel) {
-    const available = await listProviderModels(config, key, signal, fetcher);
     const fallback = connectionPreset(config).models[0]?.id;
+    let available: string[] | null = null;
+    try {
+      available = await listProviderModels(config, key, signal, fetcher);
+    } catch (cause) {
+      // With a model to try anyway, the tool request below gives the same explanation; without one, give it here.
+      if (!config.model.trim() && !fallback) throw new Error(explain(cause));
+    }
     const text = config.model.trim() || (available && defaultTextModel(provider, available)) || fallback;
     if (!text) throw new Error("This provider didn't list its models. Enter a model ID under Models.");
     const image = wantsImageModel && available ? defaultImageModel(provider, available) : config.imageModel;

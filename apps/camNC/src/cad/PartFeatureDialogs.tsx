@@ -5,6 +5,8 @@ import { CadPartPatternField } from './CadPartPatternField';
 import { FeatureDialog } from './FeatureDialog';
 import { CircularPartPatternField } from './CircularPartPatternField';
 import { partPatternForKind } from './partPatternKind';
+import { DialogPartField } from './DialogPartField';
+import type { useDialogPartPick } from './useDialogPartPick';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -34,6 +36,7 @@ export function PartPatternDialog({
   pickPoint,
   blockedReason,
   initiallyPatterned,
+  partPick,
 }: PartDialogProps & {
   pickDirection?: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
   /** Starts picking in the view, for an edge to pattern along. Null stops it. */
@@ -42,6 +45,8 @@ export function PartPatternDialog({
   blockedReason?: string | null;
   /** The opening source can have no pattern even when a studio draft starts in the requested kind. */
   initiallyPatterned?: boolean;
+  /** A new pattern's part, which a part clicked while its field is active replaces. */
+  partPick?: ReturnType<typeof useDialogPartPick> | null;
 }) {
   const id = useId();
   const hadPattern = useRef(initiallyPatterned ?? !!part.pattern);
@@ -84,16 +89,29 @@ export function PartPatternDialog({
           </select>
         </span>
       </label>
-      <div className="cad-feature-selection">
-        <small>Part to pattern</small>
-        <span>{part.name}</span>
-      </div>
+      <DialogPartField
+        label="Part to pattern"
+        name={part.name}
+        pick={partPick ?? null}
+        onActivate={() => {
+          pickPoint?.(null);
+          pickDirection?.(null);
+          partPick?.activate();
+        }}
+      />
       {circular && part.pattern ? (
         <CircularPartPatternField
           key={`${part.id}:circular-pattern`}
           pattern={{ ...part.pattern, circular }}
           variables={variables}
-          pickPoint={pickPoint}
+          // Starting another pick in the view takes it away from the part field.
+          pickPoint={
+            pickPoint &&
+            (picked => {
+              if (picked) partPick?.deactivate();
+              pickPoint(picked);
+            })
+          }
           onValidityChange={setProblem}
           onChange={pattern => onChange(document => setPartPattern(document, part.id, pattern))}
         />
@@ -107,6 +125,7 @@ export function PartPatternDialog({
             pickDirection &&
             (picked => {
               pickPoint?.(null);
+              partPick?.deactivate();
               pickDirection(picked);
             })
           }
@@ -114,10 +133,12 @@ export function PartPatternDialog({
             pickPoint &&
             (picked => {
               pickDirection?.(null);
+              partPick?.deactivate();
               pickPoint(pick => picked(pick.edge ?? null));
             })
           }
           variables={variables}
+          onValidityChange={setProblem}
           onChange={pattern => onChange(document => setPartPattern(document, part.id, pattern))}
         />
       )}

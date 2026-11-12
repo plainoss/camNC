@@ -48,12 +48,29 @@ describe('provider defaults from a key alone', () => {
     expect(await listProviderModels(config, 'sk-x', new AbortController().signal, fetcher)).toEqual(['gpt-6']);
     expect(String(fetcher.mock.calls[0]![0])).toBe('https://api.openai.com/v1/models');
     expect((fetcher.mock.calls[0]![1]!.headers as Record<string, string>).authorization).toBe('Bearer sk-x');
-    expect(await listProviderModels(config, 'sk-x', new AbortController().signal, async () => json(403, {}))).toBeNull();
-    expect(
-      await listProviderModels(config, 'sk-x', new AbortController().signal, async () => {
+    await expect(listProviderModels(config, 'sk-x', new AbortController().signal, async () => json(403, {}))).rejects.toThrow('rejected');
+    expect(await listProviderModels(config, 'sk-x', new AbortController().signal, async () => json(404, {}))).toBeNull();
+    await expect(
+      listProviderModels(config, 'sk-x', new AbortController().signal, async () => {
         throw new TypeError('Failed to fetch');
       })
-    ).toBeNull();
+    ).rejects.toThrow('could not reach');
+  });
+
+  it('reports a rejected key or an unreachable provider for a test without a model to fall back on', async () => {
+    const signal = new AbortController().signal;
+    for (const preset of [connectionPresets[1]!, connectionPresets.find(item => item.id === 'gemini')!]) {
+      const config = { ...preset.config, model: '' };
+      await expect(testAssistantConnection(config, 'k', signal, async () => json(401, {}))).rejects.toThrow('rejected this key');
+      await expect(testAssistantConnection(config, 'k', signal, async () => json(400, { error: 'API key not valid' }))).rejects.toThrow(
+        'rejected this key'
+      );
+      await expect(
+        testAssistantConnection(config, 'k', signal, async () => {
+          throw new TypeError('Failed to fetch');
+        })
+      ).rejects.toThrow('could not reach this provider');
+    }
   });
 
   it('lists Gemini models by bare ID with a bearer key', async () => {
