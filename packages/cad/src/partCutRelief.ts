@@ -26,10 +26,13 @@ export const effectivePartCutRelief = (step: CadPartCut, target: CadPart) =>
  */
 export function smallestCornerRelief(document: CadDocument, partId: string): number | undefined {
   const ofPart = (id: string) => id.split(':')[0] === partId;
+  // Steps switched off on their own or in a suppressed folder cut nothing.
+  const folderCuts = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partCutIds ?? []));
   const diameters = [
     document.parts.find(part => part.id === partId)?.cornerRelief?.diameter,
     ...(document.partCuts ?? [])
-      .filter(step => !step.suppressed && (step.targets.some(ofPart) || (step.split !== undefined && step.tools.some(ofPart))))
+      .filter(step => !step.suppressed && !folderCuts.has(step.id))
+      .filter(step => step.targets.some(ofPart) || (step.split !== undefined && step.tools.some(ofPart)))
       .map(step => step.cornerRelief?.diameter),
   ].filter((diameter): diameter is number => diameter !== undefined);
   return diameters.length ? Math.min(...diameters) : undefined;
