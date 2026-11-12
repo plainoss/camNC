@@ -44,6 +44,8 @@ export async function requestNativeImage(
   fetcher: typeof fetch
 ): Promise<string> {
   const url = nativeImageUrl(config);
+  if (format === 'svg' && isGeminiEndpoint(config.endpoint))
+    throw new Error('Gemini image models make PNG images only. Set Image output to "Monochrome image (PNG), traced locally".');
   if (request.signal.aborted) throw new DOMException('Stopped', 'AbortError');
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;

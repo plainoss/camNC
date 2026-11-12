@@ -1,9 +1,7 @@
-import { Edges, Html, Line } from '@react-three/drei';
-import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Html, Line } from '@react-three/drei';
+import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
-import { kPlaneMarker, planeGivesWay } from './planePicking';
 import type { BodyMesh, CamPartInfo } from '../camTypes';
 import { ViewCube } from './ViewCube';
 import { ModelBody } from './ModelBody';
@@ -27,89 +25,13 @@ import { centerAssembled, explodeAssembled, interpolateExplosion, layoutFlat } f
 import type { StudioCameraRef } from '@/cad/studioCamera';
 import type { MeasureEntity } from '@/cad/measureGeometry';
 
+import { FitCamera, SketchCamera, type SketchView, type ViewRequest } from './ViewCameras';
+import { kPlane, Plane, Region, type ViewPlane, type ViewRegion } from './ViewPlanes';
+
+export { FitCamera, SketchCamera, type SketchView, type ViewRequest } from './ViewCameras';
+export type { ViewPlane, ViewRegion } from './ViewPlanes';
+
 export type ModelView = 'assembled' | 'exploded' | 'flat';
-export interface ViewRequest {
-  name: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'fit' | 'normal';
-  seq: number;
-  /** For `normal`: the way the camera looks from, out of a plane or face, and which way is up on it. For a cube edge or corner: the way it looks from, with Z up. */
-  direction?: [number, number, number];
-  up?: [number, number, number];
-}
-
-const kViewDirections = {
-  front: [0, -1, 0],
-  back: [0, 1, 0],
-  left: [-1, 0, 0],
-  right: [1, 0, 0],
-  top: [0, 0, 1],
-  bottom: [0, 0, -1],
-  iso: [0.2, -0.75, 1],
-} satisfies Record<Exclude<ViewRequest['name'], 'fit' | 'normal'>, [number, number, number]>;
-
-/** A plane shown in the view to draw on, as a translucent square with its name at a corner. */
-export interface ViewPlane {
-  id: string;
-  label: string;
-  origin: [number, number, number];
-  x: [number, number, number];
-  y: [number, number, number];
-  normal: [number, number, number];
-  /** Drawn stronger, as when it's picked or its row in the feature list is. */
-  highlighted?: boolean;
-}
-
-/** A region of a sketch shown to be picked for an extrude, on the sketch's plane. */
-export interface ViewRegion {
-  id: string;
-  /** The sketch's plane: points of the region are in its x and y. */
-  frame: { origin: [number, number, number]; x: [number, number, number]; y: [number, number, number]; normal: [number, number, number] };
-  outline: { x: number; y: number }[];
-  holes: { x: number; y: number }[][];
-  picked: boolean;
-}
-
-function Region({ region, model, onPick }: { region: ViewRegion; model: THREE.Matrix4; onPick: () => void }) {
-  const [hovered, setHovered] = useState(false);
-  const geometry = useMemo(() => {
-    const shape = new THREE.Shape(region.outline.map(p => new THREE.Vector2(p.x, p.y)));
-    shape.holes = region.holes.map(hole => new THREE.Path(hole.map(p => new THREE.Vector2(p.x, p.y))));
-    return new THREE.ShapeGeometry(shape);
-  }, [region]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
-  const matrix = useMemo(() => {
-    const v = (a: [number, number, number]) => new THREE.Vector3(...a);
-    const { frame } = region;
-    return model.clone().multiply(new THREE.Matrix4().makeBasis(v(frame.x), v(frame.y), v(frame.normal)).setPosition(v(frame.origin)));
-  }, [region, model]);
-  return (
-    <mesh
-      geometry={geometry}
-      userData={kOrbitSurface}
-      matrixAutoUpdate={false}
-      matrix={matrix}
-      renderOrder={2}
-      onPointerOver={event => {
-        event.stopPropagation();
-        setHovered(true);
-      }}
-      onPointerOut={() => setHovered(false)}
-      onClick={event => {
-        event.stopPropagation();
-        if (event.delta <= 4) onPick();
-      }}>
-      <meshBasicMaterial
-        color={region.picked ? '#2f80ed' : '#1f6fc5'}
-        transparent
-        opacity={region.picked ? 0.45 : hovered ? 0.3 : 0.12}
-        side={THREE.DoubleSide}
-        depthWrite={false}
-      />
-    </mesh>
-  );
-}
-
-// Planes are a pale blue, and turn orange when hovered or picked.
-const kPlane = '#7aa6d8';
 /** A finished sketch's curve in the model, by the sketch's part. */
 /** How parts are drawn in the view. */
 export type ModelDisplay = 'edges' | 'shaded' | 'translucent';
@@ -119,63 +41,6 @@ export interface SketchLine {
   points: [number, number, number][];
 }
 const kNoLines: SketchLine[] = [];
-const kPlaneHighlight = '#f0a020';
-
-function Plane({ plane, size, model, onPick }: { plane: ViewPlane; size: number; model: THREE.Matrix4; onPick?: () => void }) {
-  const [hovered, setHovered] = useState(false);
-  const matrix = useMemo(() => {
-    const v = (a: [number, number, number]) => new THREE.Vector3(...a);
-    // A square centred on the plane's origin, the size of the model or a little more.
-    return model.clone().multiply(new THREE.Matrix4().makeBasis(v(plane.x), v(plane.y), v(plane.normal)).setPosition(v(plane.origin)));
-  }, [plane, model]);
-  // Hovered, only the outline lights up; picked, the whole plane does.
-  const color = plane.highlighted ? kPlaneHighlight : kPlane;
-  return (
-    <mesh
-      matrixAutoUpdate={false}
-      matrix={matrix}
-      renderOrder={1}
-      userData={{ ...kPlaneMarker, ...kOrbitSurface }}
-      onPointerOver={event => {
-        if (planeGivesWay(event.intersections)) return;
-        event.stopPropagation();
-        if (onPick) setHovered(true);
-      }}
-      onPointerMove={event => {
-        // A face or region under the pointer, even behind the plane, is what's hovered.
-        if (planeGivesWay(event.intersections)) return setHovered(false);
-        event.stopPropagation();
-        if (onPick) setHovered(true);
-      }}
-      onPointerOut={() => setHovered(false)}
-      onClick={event => {
-        if (planeGivesWay(event.intersections)) return;
-        event.stopPropagation();
-        if (event.delta <= 4) onPick?.();
-      }}>
-      <planeGeometry args={[size, size]} />
-      {/* Pushed back in depth, so a part's face lying on the plane covers it evenly instead of flickering through. */}
-      <meshBasicMaterial
-        color={color}
-        transparent
-        opacity={plane.highlighted ? 0.2 : 0.07}
-        side={THREE.DoubleSide}
-        depthWrite={false}
-        polygonOffset
-        polygonOffsetFactor={2}
-        polygonOffsetUnits={2}
-      />
-      <Edges key={size} color={hovered ? kPlaneHighlight : color} />
-      <Html
-        // Under the dialogs and panels over the view, not on top of everything.
-        zIndexRange={[5, 0]}
-        position={[-size / 2, size / 2, 0]}
-        style={{ pointerEvents: 'none', color, font: '11px system-ui, sans-serif', whiteSpace: 'nowrap', userSelect: 'none' }}>
-        {plane.label}
-      </Html>
-    </mesh>
-  );
-}
 /** A face clicked on a part, in the model's own space: its nearest corner or its middle, and the way it faces. */
 export interface ModelFacePick {
   partId: string;
@@ -200,175 +65,6 @@ const kClash = '#dc2626';
 // The studio's parts, as the reference shows them: a neutral grey, picked in orange, with no colour for overlaps.
 const kStudioPart = '#b8c0c9';
 const kStudioPicked = '#f39c2c';
-
-/**
- * Point the camera at the box from the front-right, above (Z up), and orbit around its center. It does so once there's
- * something to see and again when `fitKey` changes, such as on switching to the exploded view, but never because what's
- * shown changed: hiding a part or editing one leaves the camera where it is. Explicit view requests also refit it.
- */
-export function FitCamera({
-  box,
-  fitKey,
-  viewRequest,
-  cameraState,
-  initialDirection,
-}: {
-  box: THREE.Box3;
-  fitKey?: string;
-  viewRequest?: ViewRequest;
-  cameraState?: StudioCameraRef;
-  initialDirection?: [number, number, number];
-}) {
-  const camera = useThree(s => s.camera) as THREE.PerspectiveCamera | THREE.OrthographicCamera;
-  const controls = useThree(s => s.controls) as OrbitControlsImpl | null;
-  const aspect = useThree(s => s.size.width / s.size.height);
-  const invalidate = useThree(s => s.invalidate);
-  const fitted = useRef<{ key?: string; seq?: number; controls: OrbitControlsImpl | null } | null>(null);
-  useFrame(() => {
-    if (!cameraState || !fitted.current || !controls || !('isOrthographicCamera' in camera)) return;
-    cameraState.current = {
-      center: controls.target.toArray(),
-      back: camera.getWorldDirection(new THREE.Vector3()).negate().toArray(),
-      up: new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).toArray(),
-      height: (camera.top - camera.bottom) / camera.zoom,
-      aspect,
-      key: fitKey,
-      seq: viewRequest?.seq,
-    };
-  });
-  useEffect(() => {
-    // Nothing to see yet, or no size to see it at.
-    if (box.isEmpty() || !(aspect > 0) || !Number.isFinite(aspect)) return;
-    // Fitted already, for this key and with the controls that orbit it.
-    if (fitted.current && fitted.current.key === fitKey && fitted.current.controls === controls && fitted.current.seq === viewRequest?.seq)
-      return;
-    const saved = (!fitted.current || !fitted.current.controls) && cameraState?.current;
-    fitted.current = { key: fitKey, controls, seq: viewRequest?.seq };
-    if (saved && saved.key === fitKey && saved.seq === viewRequest?.seq && 'isOrthographicCamera' in camera) {
-      const center = new THREE.Vector3(...saved.center);
-      camera.position.copy(center).addScaledVector(new THREE.Vector3(...saved.back), 20000);
-      camera.up.set(...saved.up);
-      camera.lookAt(center);
-      camera.zoom = (camera.top - camera.bottom) / saved.height;
-      camera.near = 1;
-      camera.far = 40000;
-      camera.updateProjectionMatrix();
-      controls?.target.copy(center);
-      controls?.update();
-      invalidate();
-      return;
-    }
-    if (controls?.enableDamping) {
-      // Finish any orbit or pan still easing out, so it doesn't carry on from the view placed here.
-      controls.enableDamping = false;
-      controls.update();
-      controls.enableDamping = true;
-    }
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const radius = Math.max(size.x / Math.min(aspect, 1.6), size.y, size.z) * 0.62;
-    const ortho = 'isOrthographicCamera' in camera;
-    const tan = ortho ? 1 : Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    let dist = radius / tan;
-    if (ortho && !viewRequest) dist = Math.max(dist, 105);
-    const name = viewRequest?.name ?? 'iso';
-    const direction =
-      name === 'fit'
-        ? camera.getWorldDirection(new THREE.Vector3()).negate()
-        : name === 'normal' || viewRequest?.direction
-          ? new THREE.Vector3(...(viewRequest?.direction ?? [0, 0, 1])).normalize()
-          : new THREE.Vector3(...(ortho && !viewRequest ? (initialDirection ?? [0.77, -1, 0.17]) : kViewDirections[name])).normalize();
-    if (name === 'normal') camera.up.set(...(viewRequest?.up ?? [0, 1, 0]));
-    else if (name !== 'fit') {
-      const vertical = Math.abs(direction.z) > 1 - 1e-10;
-      camera.up.set(0, vertical ? 1 : 0, vertical ? 0 : 1);
-    }
-    if (viewRequest) {
-      // Fit every corner in the requested camera frame, including its depth toward the camera.
-      const right = new THREE.Vector3().crossVectors(camera.up, direction).normalize();
-      const up = new THREE.Vector3().crossVectors(direction, right);
-      dist = 0;
-      for (const x of [box.min.x, box.max.x])
-        for (const y of [box.min.y, box.max.y])
-          for (const z of [box.min.z, box.max.z]) {
-            const corner = new THREE.Vector3(x, y, z).sub(center);
-            dist = Math.max(
-              dist,
-              (ortho ? 0 : corner.dot(direction)) + Math.max(Math.abs(corner.dot(right)) / (tan * aspect), Math.abs(corner.dot(up)) / tan)
-            );
-          }
-      dist = Math.max(dist * 1.1, 1);
-    }
-    if (ortho) camera.zoom = (camera.top - camera.bottom) / (dist * 2);
-    const reach = ortho ? 20000 : dist;
-    camera.position.copy(center).addScaledVector(direction, reach);
-    camera.near = ortho ? 1 : dist / 100;
-    camera.far = ortho ? 40000 : dist * 20;
-    camera.lookAt(center);
-    camera.updateProjectionMatrix();
-    if (controls) {
-      controls.target.copy(center);
-      controls.update();
-    }
-    // The view draws only when something changes, and moving the camera is a change.
-    invalidate();
-  }, [box, camera, controls, aspect, fitKey, viewRequest, invalidate, cameraState, initialDirection]);
-  return null;
-}
-
-/** A camera looking straight at a sketch's plane, showing exactly what the sketch's drawing shows, as in a sketch's normal view. */
-export interface SketchView {
-  /** The sketch's frame in the model: its origin, its x and y, and the way its plane faces (the camera's side). */
-  origin: [number, number, number];
-  x: [number, number, number];
-  y: [number, number, number];
-  normal: [number, number, number];
-  /** The middle of what's shown, and how wide and high, in the sketch's own mm. */
-  center: [number, number];
-  width: number;
-  height: number;
-  /** Screen-plane offset in mm when the camera's centre ray doesn't intersect an edge-on sketch plane. */
-  shift?: [number, number];
-  /** The view's right, up and toward-the-viewer directions in the sketch's frame, once it's turned off straight on. */
-  turned?: { right: [number, number, number]; up: [number, number, number]; back: [number, number, number] };
-}
-
-export function SketchCamera({ view, model }: { view: SketchView; model: THREE.Matrix4 }) {
-  const set = useThree(s => s.set);
-  const size = useThree(s => s.size);
-  const invalidate = useThree(s => s.invalidate);
-  const camera = useMemo(() => new THREE.OrthographicCamera(), []);
-  useEffect(() => {
-    set({ camera });
-  }, [camera, set]);
-  useEffect(() => {
-    const v = (a: [number, number, number]) => new THREE.Vector3(...a);
-    const at = v(view.origin).addScaledVector(v(view.x), view.center[0]).addScaledVector(v(view.y), view.center[1]).applyMatrix4(model);
-    // Far enough out along the plane's normal to see everything in front of it, looking back at it.
-    const reach = 20000;
-    // A direction given in the sketch's frame, in the model's.
-    const along = ([a, b, c]: [number, number, number]) =>
-      v(view.x).multiplyScalar(a).addScaledVector(v(view.y), b).addScaledVector(v(view.normal), c);
-    const right = view.turned ? along(view.turned.right) : v(view.x);
-    const up = view.turned ? along(view.turned.up) : v(view.y);
-    if (view.shift) at.addScaledVector(right, -view.shift[0]).addScaledVector(up, view.shift[1]);
-    camera.position.copy(at).addScaledVector(view.turned ? along(view.turned.back) : v(view.normal), reach);
-    camera.up.copy(view.turned ? along(view.turned.up) : v(view.y));
-    camera.lookAt(at);
-    // A face's frame can be mirrored, its x × y facing away from its normal: the picture is mirrored with it, as its
-    // drawing is.
-    const mirrored = v([1, 0, 0]).applyQuaternion(camera.quaternion).dot(right) < 0;
-    camera.left = ((mirrored ? 1 : -1) * view.width) / 2;
-    camera.right = ((mirrored ? -1 : 1) * view.width) / 2;
-    camera.top = view.height / 2;
-    camera.bottom = -view.height / 2;
-    camera.near = 1;
-    camera.far = reach * 2;
-    camera.updateProjectionMatrix();
-    invalidate();
-  }, [camera, view, model, size, invalidate]);
-  return null;
-}
 
 function boundsOf(meshes: BodyMesh[], matrices: THREE.Matrix4[]) {
   const box = new THREE.Box3();

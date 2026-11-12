@@ -41,9 +41,16 @@ export interface CarvingGenerationOptions {
   previous?: Pick<GeneratedCarvingAsset, 'id' | 'svg' | 'prompt'>;
   request?: typeof requestAssistant;
   onUsage?: (usage: AssistantRunUsage) => void;
+  /**
+   * Set when the SVG is this app's own trace of a generated image rather than markup a model wrote. The trace is
+   * bounded by its own encoded-geometry budget, so only the sanitizer's limit applies.
+   */
+  locallyTraced?: boolean;
 }
 
 const kMaxSvgCharacters = 48_000;
+/** A local trace's path data is capped at 110,000 characters; the sanitizer accepts up to 120,000. */
+const kMaxTracedSvgCharacters = 120_000;
 const tool: AssistantTool = {
   name: 'submit_carving_svg',
   description:
@@ -142,10 +149,15 @@ export async function generateCarvingAsset(options: CarvingGenerationOptions): P
   if (answer.calls?.length !== 1 || answer.calls[0].name !== tool.name)
     throw new Error('The provider did not return one SVG artwork. Try again with a tool-capable model.');
   const { svg, title, summary } = answer.calls[0].arguments;
+  if (typeof svg === 'string' && svg.length > (options.locallyTraced ? kMaxTracedSvgCharacters : kMaxSvgCharacters))
+    throw new Error(
+      options.locallyTraced
+        ? 'The traced artwork is too large. Choose Simple detail or request simpler art.'
+        : 'The provider returned oversized artwork. Request simpler art.'
+    );
   if (
     typeof svg !== 'string' ||
     !svg.trim() ||
-    svg.length > kMaxSvgCharacters ||
     typeof title !== 'string' ||
     !title.trim() ||
     title.length > 100 ||

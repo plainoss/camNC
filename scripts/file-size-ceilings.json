@@ -5,7 +5,6 @@
   ],
   "ceilings": {
     "apps/camNC/src/cad/CadEditor.tsx": 3666,
-    "apps/camNC/src/cam/boards.ts": 1200,
     "packages/cad/src/solver.ts": 1080
   }
 }

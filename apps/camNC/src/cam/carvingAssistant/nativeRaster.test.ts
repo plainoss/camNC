@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import imagegenReadingOwlUrl from './fixtures/owl-imagegen-reading.png?url';
 import { generateNativeRasterAsset } from './nativeRaster';
 import { boundedCarvingRasterPreview, traceCarvingPng, traceCarvingPngFile } from './rasterSource';
 import { sanitizeCarvingSvg } from './sanitize';
@@ -63,6 +64,20 @@ describe('native monochrome generation and tracing', () => {
     expect(sanitizeCarvingSvg(result.asset.svg)).toContain('<path');
     expect(result.asset.warnings?.join(' ')).toContain('Shading, color and anti-aliasing are discarded');
     expect(result.usage).toMatchObject({ calls: 1, costUsd: null });
+  });
+
+  it('accepts its own trace of a generated image above the size cap for model-written SVG', async () => {
+    const bytes = new Uint8Array(await (await fetch(imagegenReadingOwlUrl)).arrayBuffer());
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ data: [{ b64_json: btoa(binary) }] })));
+    const result = await generateNativeRasterAsset(
+      { ...options(), constraints: { widthMm: 100, heightMm: 98, detail: 'balanced', minFeatureMm: 0.6 } },
+      native,
+      fetcher
+    );
+    expect(result.asset.svg.length).toBeGreaterThan(48_000);
+    expect(sanitizeCarvingSvg(result.asset.svg)).toContain('<path');
   });
 
   it("asks Gemini's compatible image API for base64 PNG without OpenAI-only options", async () => {
