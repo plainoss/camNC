@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { attemptToRead, batchPullRequests, clearsBatches, coveredBy, duplicatesOf, issueTitle, parseFailures, testedHead } from './flaky-tests.mjs';
+import { attemptToRead, batchPullRequests, clearsBatches, coveredBy, duplicatesOf, issueFor, issueTitle, parseFailures, parseRetries, testedHead } from './flaky-tests.mjs';
 
 test('reads failed specs and Vitest tests from a job log, each once', () => {
   const log = [
@@ -77,4 +77,31 @@ test('a failed batch counts as flaky only when a passing batch tested each of it
   assert.equal(coveredBy(failed, new Map([[376, '0b95']])), false);
   assert.equal(coveredBy(new Map([[375, null]]), new Map([[375, null]])), false);
   assert.equal(coveredBy(new Map(), new Map([[375, '308b']])), false);
+});
+
+test('reads the tests that passed only on a retry from a job log, each once', () => {
+  const log = [
+    '2026-11-12T10:00:00.0000000Z @wbcnc/camNC:test:browser: RETRIED [run 42] src/cad/CadEditor.studio.test.tsx > moves a part',
+    '2026-11-12T10:00:01.0000000Z \x1b[33mRETRIED [run 42] src/cad/CadEditor.studio.test.tsx > moves a part\x1b[39m',
+    '2026-11-12T10:00:02.0000000Z  ✓ src/cad/other.test.tsx > passes',
+    // A turbo cache replay of an earlier run's log was reported when that run passed.
+    '2026-11-12T10:00:03.0000000Z @wbcnc/camNC:test:browser: RETRIED [run 17] src/cad/old.test.tsx > flaked before',
+  ].join('\n');
+  assert.deepEqual(parseRetries(log, 42), ['src/cad/CadEditor.studio.test.tsx > moves a part']);
+});
+
+test('a flake goes to its open issue, else reopens its closed one, else files a new issue', () => {
+  const title = 'Flaky test: a > b';
+  assert.deepEqual(issueFor([{ number: 3, title, state: 'CLOSED' }, { number: 9, title, state: 'OPEN' }], title),
+    { action: 'comment', number: 9 });
+  assert.deepEqual(issueFor([
+    { number: 3, title, state: 'CLOSED', stateReason: 'COMPLETED' },
+    { number: 5, title, state: 'CLOSED', stateReason: 'NOT_PLANNED' },
+    { number: 7, title: 'Flaky test: other', state: 'OPEN' },
+  ], title), { action: 'reopen', number: 3 });
+  assert.deepEqual(issueFor([
+    { number: 3, title, state: 'CLOSED', stateReason: 'NOT_PLANNED' },
+    { number: 5, title, state: 'CLOSED', stateReason: 'DUPLICATE' },
+  ], title), { action: 'reopen', number: 3 }, 'with only duplicates closed, the oldest is the original');
+  assert.deepEqual(issueFor([{ number: 7, title: 'Flaky test: other', state: 'OPEN' }], title), { action: 'create' });
 });
