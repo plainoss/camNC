@@ -22,7 +22,8 @@ it('edits circular axis origins in inches without rounding untouched coordinates
     </DesignUnitContext>
   );
   fireEvent.click(screen.getByText('Axis origin', { selector: 'summary' }));
-  expect(screen.getByLabelText('Axis origin X')).toHaveValue(String(pattern.circular.origin[0] / 25.4));
+  // Shown rounded, while the untouched coordinate keeps every digit below.
+  expect(screen.getByLabelText('Axis origin X')).toHaveValue('1.23457');
   fireEvent.change(screen.getByLabelText('Axis origin Y'), { target: { value: '2.125' } });
   fireEvent.blur(screen.getByLabelText('Axis origin Y'));
   const next = change.mock.lastCall![0] as CadPartPattern;

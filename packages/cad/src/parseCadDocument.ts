@@ -11,6 +11,7 @@ import { cadFolderIssue, cadFolderStepIssue } from './folderModel';
 import { designSteps } from './designSteps';
 import { cadDocumentVersion } from './documentVersion';
 import { validCircularPartPattern } from './circularPartPattern';
+import { migrateDesignUnitNumbers } from './lengthUnits';
 import { partCutReliefIssue } from './partCutRelief';
 import { unsupportedCadSourceIssue } from './unsupportedCadSource';
 import { copyOperationSourceIssue } from './copyOperationSource';
@@ -533,5 +534,5 @@ export function parseCadDocument(input: unknown): CadDocument {
     part.sketch = withSplineHandleSegments(part.sketch);
     for (const feature of part.features ?? []) if (feature.type === 'sketch') feature.sketch = withSplineHandleSegments(feature.sketch);
   }
-  return parsed;
+  return migrateDesignUnitNumbers(parsed);
 }
