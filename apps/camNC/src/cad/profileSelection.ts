@@ -5,6 +5,7 @@ import {
   newExtrudeOnFace,
   sketchOwnerId,
   sketchRegions,
+  solidSketchRegionIds,
   resolveDrawnPlacements,
   type CadDocument,
   type CadDrawnOn,
@@ -12,7 +13,7 @@ import {
 } from '@wbcnc/cad';
 import type { ViewRegion } from '@/cam/model/ModelViewport';
 import { withRegionToggled } from './extrudeRegionViews';
-import { wholeSketch } from './editorHelpers';
+import { replacePart, wholeSketch } from './editorHelpers';
 
 /** Closed visible sketch areas are selectable even when a solid face sits immediately underneath. */
 export function sketchSelectionRegions(document: CadDocument, shown: (id: string) => boolean, selected: string | null): ViewRegion[] {
@@ -73,6 +74,15 @@ export function replaceExtrudeProfile(
     return { ...document, revision: document.revision + 1, parts: document.parts.map(p => (p.id === targetId ? entireSketch : p)) };
   }
   if (reference === targetId) throw new Error('Choose a face of another part.');
+  // A region of the sketch this extrude already takes is picked into it, or taken back out, beside the others.
+  // One that takes the whole sketch starts from each of its solid regions, so the first click takes that one out.
+  if (owner && target.sketchOf === owner.id && 'sketch' in selection && selection.region) {
+    const starting =
+      target.regions || target.remove
+        ? document
+        : replacePart(document, targetId, p => ({ ...p, regions: solidSketchRegionIds(p.sketch) }));
+    return withRegionToggled(starting, targetId, selection.region);
+  }
   let parts = document.parts;
   if (!target.sketchOf && !target.faceProfile) {
     // The authored sketch remains a distinct feature when its original extrusion chooses another profile.

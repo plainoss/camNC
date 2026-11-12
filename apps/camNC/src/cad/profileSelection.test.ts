@@ -107,3 +107,30 @@ it('picks every closed shape of a sketch of shapes apart, each a part on OK, rat
   expect(split).toHaveLength(3);
   for (const part of split) expect(evaluateCadPart(part).part).toBeDefined();
 });
+
+it('picks several regions of the sketch an extrude shares, and takes one back out when it is picked again', () => {
+  const document = parseCadDocument(structuredClone(apart));
+  const selectme = document.parts.find(p => p.sketchName === 'selectme')!;
+  const target = document.parts.find(p => p.sketchOf === selectme.id)!;
+  const [a, b, c] = sketchRegions(selectme.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+  const pick = (doc: typeof document, region: string) => replaceExtrudeProfile(doc, target.id, { sketch: selectme.id, region });
+  const regionsOf = (doc: typeof document) => doc.parts.find(p => p.id === target.id)!.regions;
+  // Start from one region, as the dialog does once one is picked.
+  const first = { ...document, parts: document.parts.map(p => (p.id === target.id ? { ...p, regions: [a!] } : p)) };
+  const three = pick(pick(first, b!), c!);
+  expect(regionsOf(three)).toEqual([a, b, c]);
+  expect(three.parts.filter(p => p.sketchOf === selectme.id)).toHaveLength(1);
+  expect(regionsOf(pick(three, b!))).toEqual([a, c]);
+  // On OK, New makes each region apart a part of its own.
+  expect(splitApartRegions(three, target.id).parts.filter(p => p.sketchOf === selectme.id)).toHaveLength(3);
+});
+
+it('takes a region out of an extrude of the whole shared sketch when it is picked, keeping the others', () => {
+  const document = parseCadDocument(structuredClone(apart));
+  const selectme = document.parts.find(p => p.sketchName === 'selectme')!;
+  const target = document.parts.find(p => p.sketchOf === selectme.id)!;
+  expect(target.regions).toBeUndefined();
+  const [a, b, c] = sketchRegions(selectme.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
+  const next = replaceExtrudeProfile(document, target.id, { sketch: selectme.id, region: b! });
+  expect(next.parts.find(p => p.id === target.id)!.regions).toEqual([a, c]);
+});
