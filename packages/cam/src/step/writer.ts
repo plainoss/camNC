@@ -1,5 +1,6 @@
 import type { Vec3 } from '../geom';
 import type { Brep } from './brep';
+import { brepShells } from './shells';
 
 export type StepLengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 /** A named part: its solids, each with the column-major 4x4 matrix that places it (rigid, in mm). */
@@ -61,8 +62,10 @@ export function writeStep(products: readonly StepProduct[], options: StepOptions
   );
 
   for (const product of products) {
-    const solids = product.solids.map(({ brep, matrix }, index) =>
-      solid(brep, matrix, product.solids.length > 1 ? `${product.name} ${index + 1}` : product.name)
+    // One solid per piece of material: a piece in another's shell reads as a void in it.
+    const pieces = product.solids.flatMap(({ brep, matrix }) => brepShells(brep).map(shell => ({ brep: shell, matrix })));
+    const solids = pieces.map(({ brep, matrix }, index) =>
+      solid(brep, matrix, pieces.length > 1 ? `${product.name} ${index + 1}` : product.name)
     );
     const origin = add(`AXIS2_PLACEMENT_3D('',${point([0, 0, 0])},${direction([0, 0, 1])},${direction([1, 0, 0])})`);
     const representation = add(

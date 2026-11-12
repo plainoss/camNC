@@ -2,6 +2,7 @@ import type { PathsD } from 'clipper2-ts';
 import type { PartFeatures } from '../features';
 import { difference, intersect, union, type Pt, type Vec3 } from '../geom';
 import { ON_CIRCLE, pathCircles, type Circle } from './arcs';
+import { pairEdgeUses } from './edgePairs';
 import { stackedWalls, withoutSeams, withUsedPoints } from './walls';
 
 /** A closed solid as faces bounded by shared edges, in the part's local frame (mm, z up). */
@@ -70,12 +71,43 @@ function cleanPath(path: Path): Path {
   return cycle;
 }
 
+/**
+ * The path as the simple loops it passes through: where it comes back to a vertex it was at, as where two pieces of a
+ * cut-up face touch at a corner, the loop it made since is one of its own. Each piece is then a face of its own.
+ */
+function splitPinches(path: Path): Path[] {
+  const key = (p: Pt) => `${p.x},${p.y}`;
+  const loops: Path[] = [],
+    stack: Pt[] = [],
+    at = new Map<string, number>();
+  for (const p of path) {
+    const seen = at.get(key(p));
+    if (seen === undefined) {
+      at.set(key(p), stack.push(p) - 1);
+      continue;
+    }
+    const loop = stack.splice(seen + 1);
+    for (const q of loop) at.delete(key(q));
+    if (loop.length >= 2) loops.push([stack[seen]!, ...loop]);
+  }
+  return [...loops, stack];
+}
+
 /** Clipper's paths as outer loops with the holes inside each. */
 function shapes(region: PathsD) {
-  const outers = region.filter(path => signedArea(path) > 0).sort((a, b) => signedArea(a) - signedArea(b)),
+  const paths = region.flatMap(path => splitPinches(cleanPath(path))).filter(path => path.length >= 3);
+  const outers = paths.filter(path => signedArea(path) > 0).sort((a, b) => signedArea(a) - signedArea(b)),
     groups = outers.map(outer => ({ outer, holes: [] as Path[] }));
-  for (const hole of region.filter(path => signedArea(path) < 0)) groups.find(group => contains(group.outer, hole[0]!))?.holes.push(hole);
-  return groups.map(({ outer, holes }) => ({ outer: cleanPath(outer), holes: holes.map(cleanPath) }));
+  for (const hole of paths.filter(path => signedArea(path) < 0)) {
+    // A hole can touch its outer loop at a vertex, which is on both: it's tested by one it doesn't share.
+    const group = groups.find(({ outer }) => {
+      const corners = new Set(outer.map(p => `${p.x},${p.y}`));
+      const point = hole.find(p => !corners.has(`${p.x},${p.y}`)) ?? hole[0]!;
+      return contains(outer, point);
+    });
+    group?.holes.push(hole);
+  }
+  return groups;
 }
 
 /**
@@ -331,20 +363,7 @@ function withEdges(
       return used;
     }),
   }));
-  // Where two pieces of material touch along one line, four faces meet at its edge. Each pair facing each other gets an
-  // edge of its own, so the shell stays one where every edge has two faces.
-  const uses = new Map<number, { forward: { edge: number; forward: boolean }[]; backward: { edge: number; forward: boolean }[] }>();
-  for (const face of faces)
-    for (const loop of face.loops)
-      for (const use of loop) {
-        const entry = uses.get(use.edge) ?? uses.set(use.edge, { forward: [], backward: [] }).get(use.edge)!;
-        entry[use.forward ? 'forward' : 'backward'].push(use);
-      }
-  for (const [edge, { forward, backward }] of uses)
-    for (let pair = 1; pair < Math.min(forward.length, backward.length); pair++) {
-      const copy = edges.push({ ...edges[edge]! }) - 1;
-      forward[pair]!.edge = backward[pair]!.edge = copy;
-    }
+  pairEdgeUses(edges, faces, points);
   return { points, edges, faces, ...(partial && { partialArcs: partial }) };
 }
 
