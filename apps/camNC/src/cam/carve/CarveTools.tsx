@@ -107,13 +107,25 @@ export function CarveEmptyStart({ onText, onFile, onAssistant }: { onText: () =>
   );
 }
 
-export function CarvePanelHeader({ title, icon, onClose }: { title: string; icon?: ReactNode; onClose: () => void }) {
+export function CarvePanelHeader({
+  title,
+  icon,
+  actions,
+  onClose,
+}: {
+  title: string;
+  icon?: ReactNode;
+  /** Buttons beside Close, such as a panel's settings. */
+  actions?: ReactNode;
+  onClose: () => void;
+}) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <h3 className="flex items-center gap-1.5 font-medium">
+      <h3 className="flex flex-1 items-center gap-1.5 font-medium">
         {icon}
         {title}
       </h3>
+      {actions}
       <Button variant="ghost" size="icon" aria-label={`Close ${title}`} onClick={onClose}>
         <X />
       </Button>
