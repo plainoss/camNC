@@ -24,7 +24,8 @@ import {
   smallestCornerRelief,
 } from '@wbcnc/cad';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, nestRects, planBoard, profileFeatures, type BoardRequest } from '@wbcnc/cam';
-import { inspectCadDocument, planSummary, shortHandles, type CadReport, type CadReportPart } from './inspect';
+import { inspectCadDocument, planSummary, shortHandles, type CadInspection, type CadReport, type CadReportPart } from './inspect';
+import { reportGeometry, reportPrefix } from './reportGeometry';
 import { renderCadViews, type CadDrawing } from './views/render';
 import { renderCadSection, type CadSectionDrawing, type CadSectionRequest } from './views/section';
 
@@ -135,6 +136,8 @@ export interface CadFullReport {
   /** Optional evaluated geometry drawings, shared by the CLI, MCP and browser assistant. */
   views?: CadDrawing[];
   section?: CadSectionDrawing;
+  /** V4's explicit after-generation operation history and final physical state. */
+  spatial?: CadReport['spatial'];
 }
 
 const kAxes: [string, number[]][] = [
@@ -308,10 +311,12 @@ function sketchKey(part: CadPart, ref: string) {
 export async function fullCadReport(
   input: CadDocument,
   /** The check of `input`, when it's been made already, so it isn't solved and planned twice, with why its script stopped, if it did. */
-  inspected?: { document: CadDocument; report: CadReport; parts: EvaluatedCadPart[]; scriptError?: string },
+  inspected?: CadInspection & { scriptError?: string },
   drawings: { views?: boolean; section?: CadSectionRequest } = {}
 ): Promise<CadFullReport> {
-  const { document, report, parts } = inspected ?? (await inspectCadDocument(input));
+  const { document, report, parts, evaluation } = inspected ?? (await inspectCadDocument(input));
+  const geometry = reportGeometry(document, parts, evaluation),
+    generation = reportPrefix(document);
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const partName = (id: string) => byId.get(id)?.name ?? 'a part that is gone';
   const reportOf = new Map(document.parts.map((part, i) => [part.id, report.parts[i]!]));
@@ -398,7 +403,7 @@ export async function fullCadReport(
           : { error: 'What the plane is on is gone.' },
       };
     }),
-    ...designSteps(document).map((step): CadFullFeature => {
+    ...designSteps(generation).map((step): CadFullFeature => {
       const part = byId.get(step.partId)!;
       const base = {
         id: step.id,
@@ -610,9 +615,10 @@ export async function fullCadReport(
                 ? 'part'
                 : 'other';
     const handles = shortHandles(part.sketch.entities.map(entity => entity.id));
+    const physicalPart = geometry.document.parts.find(candidate => candidate.id === part.id);
     const faces =
-      kind === 'part'
-        ? cadPartFaces(document, part)?.map(({ face, frame }) => ({
+      kind === 'part' && physicalPart
+        ? cadPartFaces(geometry.document, physicalPart)?.map(({ face, frame }) => ({
             face: typeof face === 'object' ? `edge ${handles.get(face.edge) ?? face.edge}` : face,
             looks: axisName(frame.normal),
             origin: vector(frame.origin),
@@ -620,7 +626,7 @@ export async function fullCadReport(
         : undefined;
     return { kind, ...body, ...(faces && { faces }) };
   });
-  const { boards, unplanned } = planBoards(document, parts, partId => smallestCornerRelief(document, partId));
+  const { boards, unplanned } = planBoards(geometry.document, geometry.parts, partId => smallestCornerRelief(document, partId));
   return {
     design: { name: document.name, revision: document.revision, version: document.version },
     ok: report.ok && !inspected?.scriptError,
@@ -634,7 +640,8 @@ export async function fullCadReport(
     ...(report.assembly && { assembly: report.assembly }),
     boards,
     ...(unplanned.length && { unplanned }),
-    ...(drawings.views && { views: renderCadViews(document, parts) }),
-    ...(drawings.section && { section: renderCadSection(document, parts, drawings.section) }),
+    ...(report.spatial && { spatial: report.spatial }),
+    ...(drawings.views && { views: renderCadViews(document, parts, true, evaluation) }),
+    ...(drawings.section && { section: renderCadSection(document, parts, drawings.section, evaluation) }),
   };
 }
