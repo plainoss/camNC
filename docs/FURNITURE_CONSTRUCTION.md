@@ -109,7 +109,10 @@ This document records the proposed approach, not completion of those checks.
 builds the frame pattern: two `legLayer` laminations per leg, aprons and staggered
 footrests with tenons shouldered top and bottom, and two seat cleats tenoned into
 the side aprons in closed mortises. Four purchased 5 × 40 mm screws drive up through
-the cleats into blind pilots in an 18 mm plywood seat. Both builders refuse sizes
+the cleats into blind pilots in an 18 mm plywood seat. The mortises and shoulders
+are relieved for their own `mortiseCutter` (6 mm by default), so the deepest
+leg mortise is about four times its diameter; the small `cutter` mills the
+pilots. Both builders refuse sizes
 or stock outside their stated bounds, take an `at` origin, and save their
 construction plan.
 

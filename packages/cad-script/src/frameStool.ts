@@ -19,7 +19,10 @@ export interface FrameStoolOptions {
   apronHeight?: string;
   footrestHeight?: string;
   footrestZ?: string;
+  /** Mills the seat-screw pilots; up to 3.4 mm. */
   cutter?: string;
+  /** Mills the mortises and tenon shoulders, and sizes their corner relief: a wider bit keeps deep mortises short for it. */
+  mortiseCutter?: string;
   fit?: string;
   measuredStock?: boolean;
   /** Assembly origin in mm, so the stool can sit beside existing work. */
@@ -60,6 +63,7 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
         footrestHeight: options.footrestHeight ?? '50mm',
         footrestZ: options.footrestZ ?? '250mm',
         cutter: options.cutter ?? '3.175mm',
+        mortiseCutter: options.mortiseCutter ?? '6mm',
         fit: options.fit ?? '0.1mm',
         leg: '2*legLayer',
         // A 7 mm nominal web stays between perpendicular mortises; the check measures the relieved one.
@@ -92,12 +96,15 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
           v('cutter') > 0 &&
           // The cutter also mills the 3.5 mm seat-screw pilots.
           v('cutter') <= 3.4 &&
+          // The mortise cutter must fit the narrowest mortise, the rail stock, with room to move.
+          v('mortiseCutter') >= 3 &&
+          v('board - mortiseCutter') >= 8 &&
           v('fit') >= 0 &&
           v('fit') <= 0.2
         )
       )
         return fail(
-          'This frame-stool pattern needs 16–24 mm rail stock, 30–60 mm leg laminations, 15–25 mm seat board, at least 20 mm tenon engagement with a 5 mm web between perpendicular mortises, 25 mm apron and 20 mm footrest tenons, 150 mm between legs, room for staggered footrests below the aprons, cutter up to 3.4 mm and fit 0–0.2 mm. Change the layout or stock before completing it.'
+          'This frame-stool pattern needs 16–24 mm rail stock, 30–60 mm leg laminations, 15–25 mm seat board, at least 20 mm tenon engagement with a 5 mm web between perpendicular mortises, 25 mm apron and 20 mm footrest tenons, 150 mm between legs, room for staggered footrests below the aprons, cutter up to 3.4 mm, a mortise cutter from 3 mm to 8 mm under the rail stock, and fit 0–0.2 mm. Change the layout or stock before completing it.'
         );
       // A layout bound for this pattern, not a tipping or load rating.
       if (v('min(width; depth)') < v('height/2'))
@@ -106,7 +113,7 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
       const layers: PartEdit[] = [];
       for (const [corner, i, j] of corners) {
         const roles = ['a', 'b'].map((layer, k) => {
-          const p = d.newPart(`${corner} leg ${layer}`, { thickness: 'legLayer', relief: 'cutter' });
+          const p = d.newPart(`${corner} leg ${layer}`, { thickness: 'legLayer', relief: 'mortiseCutter' });
           p.profile.rect({ at: [0, 0], w: 'leg', h: 'frameTop' });
           p.place(at({ at: [`${i ? 'width - leg' : '0mm'} + ${k}*legLayer`, j ? 'depth - leg' : 0, 0], x: '+y', y: '+z' }));
           const role = `${corner}-leg-${layer}`;
@@ -123,7 +130,7 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
       const rails: PartEdit[] = [];
       const rail = (name: string, alongX: boolean, low: string, line: string, high: string, ends: readonly [string, string]) => {
         const span = alongX ? 'width' : 'depth';
-        const p = d.newPart(name, { thickness: 'board', relief: 'cutter' });
+        const p = d.newPart(name, { thickness: 'board', relief: 'mortiseCutter' });
         p.profile
           .path(['leg', low])
           .lineTo([`${span} - leg`, low])
@@ -177,7 +184,7 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
         const y = `depth/2 ${sign} (depth/2 - leg)/2`;
         const low = `${y} - cleatWidth/2`,
           high = `${y} + cleatWidth/2`;
-        const p = d.newPart(name, { thickness: 'board', relief: 'cutter' });
+        const p = d.newPart(name, { thickness: 'board', relief: 'mortiseCutter' });
         p.profile
           .path(['legLayer + board/2', low])
           .lineTo(['width - legLayer - board/2', low])

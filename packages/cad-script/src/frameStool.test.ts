@@ -141,8 +141,20 @@ describe('frame stool pattern', () => {
     expect(report.errors.filter(error => error.code === 'construction-check')).toEqual([]);
   }, 60_000);
 
+  it('relieves the mortises for their own wider cutter, so the deepest is at most 4 times its diameter', () => {
+    const relieved = reloaded.parts.filter(part => part.cornerRelief);
+    expect(relieved.length).toBeGreaterThan(0);
+    expect(relieved.every(part => part.cornerRelief!.diameter === 6 && part.cornerRelief!.diameterExpression === 'mortiseCutter')).toBe(
+      true
+    );
+    const deepest = Math.max(...result.parts.flatMap(part => (part.cuts ?? []).filter(cut => !cut.through).map(cut => cut.to - cut.from)));
+    expect(deepest).toBeGreaterThan(20);
+    expect(deepest).toBeLessThanOrEqual(4 * 6 + 0.5);
+  });
+
   it('refuses a cutter too wide for the seat-screw pilots', async () => {
     expect((await editCad(null, frameStool({ cutter: '4mm' }))).scriptError).toContain('cutter up to 3.4 mm');
+    expect((await editCad(null, frameStool({ board: '16mm', mortiseCutter: '10mm' }))).scriptError).toContain('mortise cutter');
   });
 
   it('refuses layouts that cannot hold the pattern', async () => {
