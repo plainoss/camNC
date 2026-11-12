@@ -21,6 +21,7 @@ import {
   type CadSketch,
   type CadSketchRegion,
   type EvaluatedCadPart,
+  smallestCornerRelief,
 } from '@wbcnc/cad';
 import { DEFAULT_SETTINGS, DEFAULT_TABS, nestRects, planBoard, profileFeatures, type BoardRequest } from '@wbcnc/cam';
 import { inspectCadDocument, planSummary, shortHandles, type CadReport, type CadReportPart } from './inspect';
@@ -619,7 +620,7 @@ export async function fullCadReport(
         : undefined;
     return { kind, ...body, ...(faces && { faces }) };
   });
-  const { boards, unplanned } = planBoards(document, parts, partId => byId.get(partId)?.cornerRelief?.diameter);
+  const { boards, unplanned } = planBoards(document, parts, partId => smallestCornerRelief(document, partId));
   return {
     design: { name: document.name, revision: document.revision, version: document.version },
     ok: report.ok && !inspected?.scriptError,

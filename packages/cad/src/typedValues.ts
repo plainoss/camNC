@@ -109,6 +109,12 @@ export const kPartCutClearance: TypedValueKind = {
   check: value => (value >= 0 ? null : 'a clearance can’t be less than nothing.'),
   quiet: true,
 };
+export const kPartCutCornerRelief: TypedValueKind = {
+  label: 'Cutter diameter',
+  unit: 'mm',
+  check: value => (value > 0 ? null : 'a cutter diameter must be greater than zero.'),
+  quiet: true,
+};
 export const kPartCutFingers: TypedValueKind = {
   label: 'Finger count',
   unit: 'scalar',
@@ -253,8 +259,12 @@ export function mapTypedValues(document: CadDocument, edit: TypedValueEdit): Cad
   const partCuts =
     document.partCuts &&
     each(document.partCuts, step =>
-      within(typed(step, 'clearance', kPartCutClearance), 'split', split =>
-        typeof split === 'object' ? typed(split, 'fingers', kPartCutFingers) : split
+      within(
+        within(typed(step, 'clearance', kPartCutClearance), 'split', split =>
+          typeof split === 'object' ? typed(split, 'fingers', kPartCutFingers) : split
+        ),
+        'cornerRelief',
+        relief => typed(relief, 'diameter', kPartCutCornerRelief)
       )
     );
   if (parts === document.parts && planes === document.planes && partCuts === document.partCuts) return document;

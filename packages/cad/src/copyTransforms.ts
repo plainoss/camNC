@@ -8,7 +8,12 @@ import type { CadCopyTransform, CadDocument } from './types';
 /** Fresh ordered documents use current tool material. This explicit conversion opts into ordered cut semantics. */
 export function orderedCadDocument(document: CadDocument): CadDocument {
   if (document.operationOrder !== undefined) return document;
-  return { ...document, version: 4, operationOrder: document.partCuts?.map(cut => cut.id) ?? [] };
+  // Never lower a later reader floor, such as 5 for Cut parts corner relief.
+  return {
+    ...document,
+    version: Math.max(4, document.version) as CadDocument['version'],
+    operationOrder: document.partCuts?.map(cut => cut.id) ?? [],
+  };
 }
 
 /** Upgrading an existing file preserves its old cut batch by source identity, never by cached candidate geometry. */

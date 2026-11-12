@@ -83,5 +83,6 @@ export * from './lengthUnits';
 export * from './replaceFilletedSketch';
 
 export * from './copyTransforms';
+export { smallestCornerRelief } from './partCutRelief';
 export * from './physicalCadView';
 export * from './copyOperationHistory';
