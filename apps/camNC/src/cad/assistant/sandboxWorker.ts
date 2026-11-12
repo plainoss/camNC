@@ -1,7 +1,11 @@
 import { initializeCadSolver, parseCadDocument } from '@wbcnc/cad';
 import { cupboard } from '../../../../../packages/cad-script/src/cupboard';
+import { frameStool } from '../../../../../packages/cad-script/src/frameStool';
+import { panelChair } from '../../../../../packages/cad-script/src/panelChair';
 import { editCad, type CadScript } from '../../../../../packages/cad-script/src/edit';
 
+/** Whole-piece builders a script may import, in the order the module wrapper passes them. */
+const kPatterns = { cupboard, panelChair, frameStool };
 /** Lines are kept in place (stripped imports become blank lines), so a stack line maps straight back to the source. */
 const keepLines = (match: string) => '\n'.repeat(match.split('\n').length - 1);
 let scriptUrl = '';
@@ -20,20 +24,22 @@ async function scriptFrom(source: string): Promise<CadScript> {
   if (typeof source !== 'string' || source.length > 256_000) throw new Error('A script must be JavaScript text of at most 256 KB.');
   const expression = source
     .replace(/^\s*import\s*\{([^}]+)\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/, (_line, names: string) => {
-      if (names.split(',').some(name => !['design', 'cupboard'].includes(name.trim())))
-        throw new Error('Only design and cupboard may be imported in a browser script.');
+      if (names.split(',').some(name => !['design', ...Object.keys(kPatterns)].includes(name.trim())))
+        throw new Error(`Only design, ${Object.keys(kPatterns).join(', ')} may be imported in a browser script.`);
       return keepLines(_line);
     })
-    .replace(/^\s*export\s*\{\s*cupboard\s*\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/m, keepLines)
+    .replace(/^\s*export\s*\{\s*(?:cupboard|panelChair|frameStool)\s*\}\s*from\s*['"]@wbcnc\/cad-script['"];?\s*/m, keepLines)
     .replace(/^\s*export\s+default\s+/m, keepLines)
     .replace(/;\s*$/, '');
   // Native module parsing keeps string evaluation disabled by CSP. This module still runs only inside the disposable
   // opaque worker; importing it never grants application storage, network access, provider keys or an Apply capability.
-  const url = URL.createObjectURL(new Blob([`export default (design, cupboard) => (\n${expression}\n);`], { type: 'text/javascript' }));
+  const url = URL.createObjectURL(
+    new Blob([`export default (design, ${Object.keys(kPatterns).join(', ')}) => (\n${expression}\n);`], { type: 'text/javascript' })
+  );
   scriptUrl = url;
   try {
     const loaded = await import(/* @vite-ignore */ url);
-    const script = loaded.default((fn: CadScript) => fn, cupboard) as unknown;
+    const script = loaded.default((fn: CadScript) => fn, ...Object.values(kPatterns)) as unknown;
     if (typeof script !== 'function') throw new Error('Export default design(d => { ... }) or pass a JavaScript function.');
     return script as CadScript;
   } finally {

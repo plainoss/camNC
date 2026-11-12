@@ -604,7 +604,9 @@
       "steps": 18
      }
     ],
-    "warnings": [],
+    "warnings": [
+     "Part 3: bit D=3.175 cuts 27.94 mm deep from the stock top, over 7 times its diameter: check its flute length"
+    ],
     "blocked": [],
     "cornerReach": [
      {
@@ -788,7 +790,9 @@
      "steps": 18
     }
    ],
-   "warnings": [],
+   "warnings": [
+    "Part 3: bit D=3.175 cuts 27.94 mm deep from the stock top, over 7 times its diameter: check its flute length"
+   ],
    "blocked": []
   }
  ]

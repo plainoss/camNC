@@ -799,7 +799,9 @@
       "steps": 17
      }
     ],
-    "warnings": [],
+    "warnings": [
+     "Panel: bit D=3.175 cuts 25.3 mm deep from the stock top, over 7 times its diameter: check its flute length"
+    ],
     "blocked": []
    },
    "faces": [
@@ -890,7 +892,9 @@
       "steps": 42
      }
     ],
-    "warnings": [],
+    "warnings": [
+     "Shelf: bit D=3.175 cuts 66 mm deep from the stock top, over 7 times its diameter: check its flute length"
+    ],
     "blocked": []
    },
    "faces": [
@@ -1225,7 +1229,10 @@
      "steps": 17
     }
    ],
-   "warnings": [],
+   "warnings": [
+    "Panel: bit D=3.175 cuts 25.3 mm deep from the stock top, over 7 times its diameter: check its flute length",
+    "Face extension: bit D=3.175 cuts 25.3 mm deep from the stock top, over 7 times its diameter: check its flute length"
+   ],
    "blocked": []
   },
   {
@@ -1268,7 +1275,9 @@
      "steps": 42
     }
    ],
-   "warnings": [],
+   "warnings": [
+    "Shelf: bit D=3.175 cuts 66 mm deep from the stock top, over 7 times its diameter: check its flute length"
+   ],
    "blocked": []
   }
  ]

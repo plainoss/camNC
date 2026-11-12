@@ -103,6 +103,31 @@ cyclic-racking test.
 
 This document records the proposed approach, not completion of those checks.
 
+## Implemented patterns
+
+`panelChair(options)` builds the keyed panel pattern above. `frameStool(options)`
+builds the frame pattern: two `legLayer` laminations per leg, aprons and staggered
+footrests with tenons shouldered top and bottom, and two seat cleats tenoned into
+the side aprons in closed mortises. Four purchased 5 × 40 mm screws drive up through
+the cleats into blind pilots in an 18 mm plywood seat. The mortises and shoulders
+are relieved for their own `mortiseCutter` (6 mm by default), so the deepest
+leg mortise is about four times its diameter; the small `cutter` mills the
+pilots. Both builders refuse sizes
+or stock outside their stated bounds, take an `at` origin, and save their
+construction plan.
+
+`checkFurnitureConstruction(document, parts, plan)` measures each plan on the
+evaluated geometry. For every glued shouldered tenon it measures engagement,
+shoulders, the closed mortise walls, that the receiver is actually empty where
+the tenon sits, and the web left between relieved mortise cells in one receiver.
+It also checks lamination contact, the fastened seat and the purchased hardware.
+Inspection reports each failure as a `construction-check` error, so a design whose
+edit makes a joint shallow, intersects two mortises, suppresses a mortise step or
+shortens a seat screw no longer checks as complete. The design assistant builds
+chairs and stools from these patterns by default, and the saved `stool` task only
+passes a built stool whose measured construction checks pass. These are geometric
+pattern bounds, not load ratings.
+
 ## Bounded feasibility results
 
 `furniturePrototype.test.ts` exercises two partial joints, not whole furniture:

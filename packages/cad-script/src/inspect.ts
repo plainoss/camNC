@@ -30,6 +30,7 @@ import {
   physicalJoinedCopies,
   smallestCornerRelief,
 } from '@wbcnc/cad';
+import { checkFurnitureConstruction } from './furnitureJoints';
 import {
   DEFAULT_SETTINGS,
   DEFAULT_TABS,
@@ -697,6 +698,16 @@ export async function inspectCadDocument(
   const steps = cadStepReport(generation, generationParts).map(step =>
     step.kind === 'drawnOn' && !('error' in step.frame) ? { ...step, frameInWords: frameInWords(step.on, step.frame) } : step
   );
+  // A furniture construction is complete only while its measured joints and hardware still hold on this geometry.
+  // A plan whose folder is switched off describes material that isn't built, so it has nothing to measure.
+  const parked = new Set(solved.document.folders?.filter(folder => folder.suppressed).map(folder => folder.id));
+  for (const plan of (solved.document.constructions ?? []).filter(plan => !parked.has(plan.folderId)))
+    for (const check of checkFurnitureConstruction(solved.document, solved.parts, plan))
+      if (!check.passed)
+        errors.push({
+          code: 'construction-check',
+          message: `${plan.recipe} ${check.id}: ${check.check}${check.actual === undefined ? '' : ` Measured ${round(check.actual)}, needs ${check.expected === undefined ? 'more' : round(check.expected)}.`}`,
+        });
   for (const collision of assembly?.collisions ?? [])
     errors.push({
       code: 'parts-collide',

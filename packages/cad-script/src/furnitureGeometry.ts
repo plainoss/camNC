@@ -154,8 +154,8 @@ export function furnitureVoidRadius(shape: EvaluatedCadPart, point: CadPoint, z:
   return Math.max(0, ...candidates);
 }
 
-/** Clip a simple profile against a convex rectangle; use local coordinates for the area sum. */
-function clippedProfileArea(loop: readonly CadPoint[], low: CadPoint, high: CadPoint) {
+/** Clip a simple profile against an axis-aligned rectangle. */
+export function clipLoopToBox(loop: readonly CadPoint[], low: CadPoint, high: CadPoint): CadPoint[] {
   let points = loop.map(p => ({ ...p }));
   const borders = [
     { axis: 'x', value: low.x, sign: 1 },
@@ -177,8 +177,14 @@ function clippedProfileArea(loop: readonly CadPoint[], low: CadPoint, high: CadP
       }
     }
     points = next;
-    if (!points.length) return 0;
+    if (!points.length) return [];
   }
+  return points;
+}
+
+/** Use local coordinates for the area sum. */
+function clippedProfileArea(loop: readonly CadPoint[], low: CadPoint, high: CadPoint) {
+  const points = clipLoopToBox(loop, low, high);
   return (
     Math.abs(
       points.reduce((area, a, i) => {
