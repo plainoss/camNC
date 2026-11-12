@@ -220,7 +220,8 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { asHole, editable, hasOutline, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { editable, hasOutline, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { startHole } from './holeSource';
 import { useFeaturePreview } from './useFeaturePreview';
 import { SketchProblems } from './SketchProblems';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
@@ -231,7 +232,8 @@ import { useAssistantProposal } from './assistant/useAssistantProposal';
 import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
 import { useProfileSelection } from './useProfileSelection';
-import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
+import { basePlaneViews, pickedPlane, planeOffsetFrom } from './basePlanes';
+import { studioNormalView } from './studioNormalView';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
@@ -1185,21 +1187,11 @@ export function CadEditor({
       }
       // N looks straight at the picked plane or face, or the selected part's sketch plane; again, from its other side.
       if (!event.shiftKey && event.key.toLowerCase() === 'n') {
-        const on = selectedFace ?? (part ? (part.drawnOn?.on ?? { plane: 'top' as const }) : null);
-        const frame = selectedPlane ? pickedPlaneFrame(documentRef.current, selectedPlane) : on && cadFaceFrame(documentRef.current, on);
-        if (!frame || 'error' in frame) return;
+        const request = studioNormalView(documentRef.current, selectedPlane, selectedFace, part);
+        if (!request) return;
         event.preventDefault();
         if (event.repeat) return;
-        setViewRequest(previous => {
-          const same =
-            previous?.name === 'normal' && previous.direction?.every((value, axis) => Math.abs(value - frame.normal[axis]!) < 1e-9);
-          return {
-            name: 'normal',
-            seq: (previous?.seq ?? 0) + 1,
-            direction: same ? (frame.normal.map(value => -value) as [number, number, number]) : frame.normal,
-            up: frame.y,
-          };
-        });
+        setViewRequest(request);
         return;
       }
     }
@@ -2050,10 +2042,9 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
-    } else if (command === 'hole' && part?.extrude === false) {
-      const before = documentRef.current;
-      commit(replacePart(before, part.id, asHole));
-      openFeature('hole', part.id, before);
+    } else if (command === 'hole') {
+      const at = { partId: part?.id, copyId: cutSelection.pickedCopyId, cancel: () => featureDialog && closeFeature(false) };
+      startHole({ ...at, rolledTo: userRollback, read: () => documentRef.current, commit, open: openFeature, refuse: setStudioRefusal });
     } else if (command === 'fillet') setFilletDialog({});
     else if (command === 'mirror') {
       if (part) setMirrorDialog({ partId: part.id });

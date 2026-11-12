@@ -1,5 +1,6 @@
 import { resolveDatumPlanes } from './datumPlanes';
 import { newCadId } from './document';
+import { copyTransformValue, editCopyTransformExpressions } from './copyTransformValues';
 import { partCutVariableErrors } from './partCutVariables';
 import {
   mapTypedExpressions,
@@ -170,8 +171,18 @@ export function applyCadVariables(document: CadDocument): CadDocument {
       return outcome && 'pattern' in outcome && JSON.stringify(outcome.pattern) !== JSON.stringify(pattern) ? outcome.pattern : pattern;
     },
   });
+  const moved = withCopyTransformValues(next, scope);
   // What's drawn on a plane that moved goes with it.
-  return next.planes === document.planes ? next : resolveDatumPlanes(next);
+  return moved.planes === document.planes ? moved : resolveDatumPlanes(moved);
+}
+
+/** Copy moves keep their last good values, like other typed values; their operation IDs never change. */
+function withCopyTransformValues(document: CadDocument, scope: ReturnType<typeof cadVariableValues>['scope']): CadDocument {
+  const copyTransforms = document.copyTransforms?.map(move => {
+    const value = copyTransformValue(move, scope);
+    return 'move' in value ? value.move : move;
+  });
+  return copyTransforms?.some((move, index) => move !== document.copyTransforms![index]) ? { ...document, copyTransforms } : document;
 }
 
 /** Variables that can't be worked out, and values on parts that can't follow their variables. */
@@ -205,13 +216,22 @@ export function cadVariableProblems(document: CadDocument): CadDiagnostic[] {
   // On each part the step joins, so its row shows why; a step whose parts are all gone still says so once.
   for (const { partIds, message } of partCutVariableErrors(document, scope, covered))
     for (const partId of partIds.length ? partIds : [undefined]) problem({ partId }, message);
+  for (const move of document.copyTransforms ?? []) {
+    if (move.suppressed) continue;
+    const value = copyTransformValue(move, scope);
+    if ('error' in value) problem({ partId: move.partId }, value.error);
+  }
   return problems;
 }
 
 /** Every expression in the document, the variables' own included, rewritten by `edit`. */
 function mapExpressions(document: CadDocument, edit: (expression: string) => string): CadDocument {
   return mapTypedExpressions(
-    { ...document, variables: document.variables?.map(variable => ({ ...variable, expression: edit(variable.expression) })) },
+    {
+      ...document,
+      variables: document.variables?.map(variable => ({ ...variable, expression: edit(variable.expression) })),
+      ...(document.copyTransforms && { copyTransforms: document.copyTransforms.map(move => editCopyTransformExpressions(move, edit)) }),
+    },
     expression => edit(expression)
   );
 }
@@ -224,6 +244,8 @@ export function cadVariableUses(document: CadDocument, name: string): number {
     value: typed => void (count += uses(typed.expression)),
     pattern: pattern => void Object.values(pattern.expressions).forEach(expression => (count += uses(expression))),
   });
+  for (const move of document.copyTransforms ?? [])
+    for (const expression of [...(move.byExpressions ?? []), move.turn?.degreesExpression]) count += uses(expression ?? undefined);
   return count;
 }
 

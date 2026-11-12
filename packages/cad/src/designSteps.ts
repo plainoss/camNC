@@ -6,6 +6,7 @@ import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import type { CadDocument, CadLengthUnit, CadPart } from './types';
 import { cadLengthUnitMm } from './sketchExport';
 import { trimCadFolders } from './folderModel';
+import { copyOperationPrefix } from './copyTransforms';
 import { partCutLabel, partCutVariableErrors } from './partCutVariables';
 import { cadVariableScope } from './variables';
 
@@ -286,6 +287,12 @@ function listedSteps(document: CadDocument): DesignStep[] {
  * parts made after it are gone, and so are later cuts, copies, patterns and cut-parts steps.
  */
 export function rolledBackTo(document: CadDocument, stepId: string): CadDocument {
+  if (document.operationOrder !== undefined) {
+    if (document.operationOrder.includes(stepId)) return copyOperationPrefix(document, stepId);
+    if (!designSteps(document).some(step => step.id === stepId)) return document;
+    // Generation precedes the ordered spatial stream. A generation rollback removes that complete later stream.
+    document = copyOperationPrefix(document);
+  }
   const steps = designSteps(document);
   const at = steps.findIndex(step => step.id === stepId);
   if (at < 0 || at === steps.length - 1) return document;
