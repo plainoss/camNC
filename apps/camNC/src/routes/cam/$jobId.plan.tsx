@@ -725,7 +725,7 @@ function Checks({
         <p key={h.id ?? h.part} className="flex gap-2 text-destructive">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           {h.part}: {h.anchored === 0 ? 'none' : `only ${h.anchored}`} of its {h.tabs.length} tabs would hold it, so it would come loose. On
-          the Boards step, switch the board to a bottom skin, or give it more room.
+          the Boards step, widen the gap or margin between parts, switch the board to a bottom skin, or use a smaller bit.
         </p>
       ))}
       {(board.holdClash ?? []).length > 0 && (

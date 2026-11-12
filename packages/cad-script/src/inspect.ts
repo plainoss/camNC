@@ -1,6 +1,7 @@
 import {
   cadFaceSketches,
   cadVariableProblems,
+  partCutInputProblems,
   cadVariableScope,
   cadSketchRegions,
   patternMaster,
@@ -31,6 +32,7 @@ import {
 import {
   DEFAULT_SETTINGS,
   DEFAULT_TABS,
+  DEFAULT_TOOL,
   planBoard,
   profileFeatures,
   type BoardRequest,
@@ -41,6 +43,7 @@ import {
 import { nativeCurveReport, sketchCurveDetails } from './curveReport';
 import { curveExtremaPoints } from './curveBounds';
 import { isEdgeNotch } from './notch';
+import { cutPartsCornerReach, type CadCornerReach } from './cornerReach';
 import { narrowFingersWarnings, notchesBesideBones } from './narrowFingers';
 
 export interface CadExpectation {
@@ -123,6 +126,8 @@ export interface CadToolpathSummary {
   warnings: string[];
   /** What would stop the job in the app: broken safety rules, or something coming loose. */
   blocked: string[];
+  /** Openings "cut parts" makes from the top or through, and whether the bit reaches the corners of the tool fitting each. */
+  cornerReach?: CadCornerReach[];
   /** Notches and sharp corners the outline and hole paths can't reach, side A's, in the planner's part coordinates. */
   uncut?: Omit<OutlineNotches, 'part'>[];
 }
@@ -249,25 +254,36 @@ const BOARD_MARGIN = 20;
 const plannedSummaries = new Map<string, CadToolpathSummary>();
 const kPlannedSummaries = 256;
 
-function toolpathSummary(source: EvaluatedCadPart, profile: ReturnType<typeof profileFeatures>, cornerRelief?: number): CadToolpathSummary {
+function toolpathSummary(
+  source: EvaluatedCadPart,
+  profile: ReturnType<typeof profileFeatures>,
+  options: { cornerRelief?: number; bit?: number; cutName: (id: string) => string }
+): CadToolpathSummary {
+  const { cornerRelief, bit } = options;
   // `profile` is derived from these fields alone, and the board from them and the profile.
   const { partId, name, thickness, outline, holes, cuts } = source;
-  const key = JSON.stringify({ partId, name, thickness, outline, holes, cuts, cornerRelief });
+  const key = JSON.stringify({ partId, name, thickness, outline, holes, cuts, cornerRelief, bit });
   let summary = plannedSummaries.get(key);
   if (!summary) {
-    summary = planToolpathSummary(source, profile, cornerRelief);
+    summary = planToolpathSummary(source, profile, cornerRelief, bit);
     if (plannedSummaries.size >= kPlannedSummaries) plannedSummaries.delete(plannedSummaries.keys().next().value!);
     plannedSummaries.set(key, summary);
   }
   // Each report gets its own copy, so a caller changing one can't change what a later inspection returns.
-  return structuredClone(summary);
+  const copy = structuredClone(summary);
+  // Openings are named after the parts that cut them, which can be renamed without changing this part, so the
+  // cached summary keeps cut IDs and each report names them.
+  if (copy.cornerReach) copy.cornerReach = copy.cornerReach.map(reach => ({ ...reach, ref: options.cutName(reach.ref) }));
+  return copy;
 }
 
 function planToolpathSummary(
   source: EvaluatedCadPart,
   profile: ReturnType<typeof profileFeatures>,
-  cornerRelief?: number
+  cornerRelief: number | undefined,
+  requestedBit: number | undefined
 ): CadToolpathSummary {
+  const bit = requestedBit ?? DEFAULT_SETTINGS.tools[0]!.diameter;
   const [w, h] = profile.size;
   const board: BoardRequest = {
     id: 'check',
@@ -283,15 +299,13 @@ function planToolpathSummary(
     // Cuts from below come from a second side, after turning the board over, lined up by the camera as the app's default.
     ...(profile.turned && { flip: { registration: 'camera' as const } }),
   };
-  const plan = planBoard(
-    board,
-    {},
-    {
-      part: () => ({ size: profile.size, features: profile.features, ...(cornerRelief && { cornerRelief }) }),
-      underside: (_, rotated) => profile.turned?.(rotated ? 'y' : 'x') ?? profile.features,
-    }
-  );
-  return { bit: DEFAULT_SETTINGS.tools[0]!.diameter, ...planSummary(plan) };
+  const plan = planBoard(board, requestedBit === undefined ? {} : { tools: [{ ...DEFAULT_TOOL, diameter: requestedBit }] }, {
+    part: () => ({ size: profile.size, features: profile.features, ...(cornerRelief && { cornerRelief }) }),
+    underside: (_, rotated) => profile.turned?.(rotated ? 'y' : 'x') ?? profile.features,
+  });
+  const toBoard = (p: CadPoint) => ({ x: p.x - profile.offset.x + BOARD_MARGIN, y: p.y - profile.offset.y + BOARD_MARGIN });
+  const cornerReach = cutPartsCornerReach(source, plan.path, toBoard, bit, id => id);
+  return { bit, ...planSummary(plan), ...(cornerReach.length && { cornerReach }) };
 }
 
 /** A planned board's operations, time, CAM warnings, and what would block the job, side B included. */
@@ -325,7 +339,7 @@ function checkExpectation(want: CadExpectation, part: CadReportPart, freedom: nu
   const failures: string[] = [];
   const value = (input: number | string, field: string): number => {
     if (typeof input === 'number') return input;
-    const parsed = parseCadValue(input, { unit: 'mm', variables: cadVariableScope(document) });
+    const parsed = parseCadValue(input, { unit: 'mm', variables: cadVariableScope(document), lengthUnit: 'mm' });
     if ('error' in parsed) {
       failures.push(`${field}: invalid expression "${input}": ${parsed.error}`);
       return NaN;
@@ -357,8 +371,12 @@ function checkExpectation(want: CadExpectation, part: CadReportPart, freedom: nu
 export async function inspectCadDocument(
   input: CadDocument,
   expectations: ReadonlyMap<string, readonly CadExpectation[]> = new Map(),
-  options: { toolpaths?: boolean } = {}
+  /** `bit`: plan the toolpath summary with a flat bit of this diameter, mm, instead of the default one. */
+  options: { toolpaths?: boolean; bit?: number } = {}
 ): Promise<{ document: CadDocument; report: CadReport; parts: EvaluatedCadPart[] }> {
+  // A bit of no width would measure every corner as reached.
+  if (options.bit !== undefined && !(Number.isFinite(options.bit) && options.bit > 0))
+    throw new Error(`The bit to plan with needs a diameter greater than zero, not ${options.bit}.`);
   const solved = await solveCadDocument(input);
   const nameOf = (partId?: string) => solved.document.parts.find(part => part.id === partId)?.name;
   const errors: CadReportIssue[] = [],
@@ -371,7 +389,8 @@ export async function inspectCadDocument(
     return ids.map(id => handles.get(id) ?? id);
   };
   // A value that can't follow its variables keeps its last good one, so the design the check solved disagrees with them.
-  for (const d of [...solved.diagnostics, ...cadVariableProblems(input)]) {
+  // A Cut parts step whose tool or target isn't built is left out of the built design, so the solve can't say it.
+  for (const d of [...solved.diagnostics, ...cadVariableProblems(input), ...partCutInputProblems(input)]) {
     const part = solved.document.parts.find(part => part.id === d.partId);
     const constraints = part && [part.sketch, ...cadFaceSketches(part).map(face => face.sketch)].flatMap(sketch => sketch.constraints);
     const ids =
@@ -587,7 +606,11 @@ export async function inspectCadDocument(
             part: part.name,
           });
         else if (options.toolpaths !== false) {
-          toolpaths = toolpathSummary(evaluated, profile, smallestCornerRelief(solved.document, part.id));
+          toolpaths = toolpathSummary(evaluated, profile, {
+            cornerRelief: smallestCornerRelief(solved.document, part.id),
+            bit: options.bit,
+            cutName: cutHandle,
+          });
           // CAM leaves out what no tool fits, so the part wouldn't come out as drawn.
           const dropped = toolpaths.warnings.find(warning => warning.includes('no tool fits'));
           if (dropped) warnings.push({ code: 'toolpath-missing', message: `A cut wouldn't be machined: ${dropped}`, part: part.name });
@@ -599,6 +622,13 @@ export async function inspectCadDocument(
           for (const message of narrowFingersWarnings(solved.document, evaluated, uncut, profile.offset, nameOf))
             warnings.push({ code: 'toolpath-missing', message, part: part.name });
           if (reliefNote) warnings.push({ code: 'relief-bit', message: reliefNote, part: part.name });
+          for (const reach of toolpaths.cornerReach ?? [])
+            if (reach.unreached)
+              warnings.push({
+                code: 'corner-unreachable',
+                message: `The ⌀${toolpaths.bit} bit doesn't reach ${reach.unreached} of the ${reach.corners} corners of the opening ${reach.ref} cuts in ${part.name}${reach.short === undefined ? '' : `, missing by up to ${reach.short} mm`}, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.`,
+                part: part.name,
+              });
           if (toolpaths.blocked.length)
             warnings.push({
               code: 'toolpath-blocked',

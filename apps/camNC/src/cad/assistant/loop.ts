@@ -79,6 +79,11 @@ export const assistantTools: AssistantTool[] = [
           description:
             'Choose only useful views, e.g. ["top"] for a flat tray outline. true sends all three; false sends none. Required for visual requests.',
         },
+        bit: {
+          type: 'number',
+          description:
+            'Diameter in mm of the flat bit the user cuts with. The full check (finalize_design, when offered) plans toolpaths and joint corner reach with it; omitted, the default 3.175 mm bit.',
+        },
       },
       []
     ),
@@ -135,6 +140,7 @@ For thin requests such as "a stool", ask for sizes and joints or state your prop
 When the answer is a number, add fields to ask_user, prefilled with your proposal; name a field after a requirement (for example width, thickness, minimumWall) when the app should check it on every later proposal.
 Remember earlier constraints in the conversation. If a request conflicts with them or the design, ask a question.
 Select useful views in check_design when matching a reference image or reviewing appearance: views:["top"] for flat outlines, adding front/right only for relevant construction. For visual requests inspect the returned cut-aware views, describe what matches and what needs a person's review.
+For CNC joints a square part fits into (mortises, stopped dados, finger slots), use the user's cutter diameter: pass it as bit to check_design and set cornerRelief: { dogbone: diameter } with a fit clearance such as 0.2mm on that cutParts step. Each corner-unreachable warning in the full check names a mortise whose corners the bit misses; fix it or name it in the proposal. Only Cut parts openings cut from the top or through are checked: say that blind openings from the underside, openings only a copy has, and Extrude pockets were not checked for corner reach. If the user gave no cutter, say the corners were checked only for the default bit and ask which one they use.
 Treat agreed dimensions and construction as acceptance criteria. Use part.expect for requested finished sizes, thickness and pocket depths; inspect actual reported geometry rather than only script parameters.
 Prefer compact deterministic construction and worked examples over bespoke random or grid searches. Once a checked candidate matches the request and its views have been inspected when needed, offer it; do not redesign it without a specific unmet requirement.
 Prefer the pebble-tray or cupboard recipe with numeric millimetre parameters when it fits the agreed construction. Recipes produce editable geometry. After checking, reuse its scriptId; repair with expectedHash and short exact oldText/newText patches instead of resending the full script. Every revision starts from the original open design.
@@ -172,6 +178,8 @@ export interface AssistantCheck {
   parts?: EvaluatedCadPart[];
   trustedReport?: CadReport;
   asset?: unknown;
+  /** The flat bit diameter the check was asked for, mm; the full check plans toolpaths with it. */
+  bit?: number;
 }
 export interface AssistantRunOptions {
   base: CadDocument;
@@ -192,7 +200,7 @@ export interface AssistantRunOptions {
     source: string,
     base: CadDocument,
     signal: AbortSignal,
-    options?: { views: boolean | readonly CadViewName[] }
+    options?: { views: boolean | readonly CadViewName[]; bit?: number }
   ): Promise<AssistantCheck>;
   /** When supplied, check is the cheap geometry lane; only this full trusted check can produce a proposal. */
   finalize?(checked: AssistantCheck, signal: AbortSignal): Promise<AssistantCheck>;
@@ -220,6 +228,8 @@ export interface AssistantRunResult {
   messages: AssistantMessage[];
   proposal?: CadProposal;
   origin?: AssistantProposalOrigin;
+  /** The trusted report of the check the proposal came from: the final verification when there is one. */
+  report?: CadReport;
   checks: number;
   usage: AssistantRunUsage;
   stopReason?: string;
@@ -287,6 +297,10 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     ...(stopReason && { stopReason }),
     ...(status === 'proposal' && proposal && { proposal }),
     ...(status === 'proposal' && proposal && latestCandidate && origins.has(latestCandidate) && { origin: origins.get(latestCandidate) }),
+
+    ...(status === 'proposal' &&
+      proposal &&
+      latestCandidate && { report: (finalized.get(latestCandidate) ?? latestCandidate).trustedReport }),
   });
   const emit = (message: AssistantMessage) => {
     messages.push(message);
@@ -409,7 +423,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     if (!answer.calls?.length) {
       if (/^\s*Proposal:\s*\S/i.test(answer.text) && proposal) return finish('proposal');
       if (/^\s*Question:\s*\S/i.test(answer.text)) return finish('question');
-      stopReason = 'The assistant did not return a complete Proposal: or Question: response.';
+      stopReason = /^\s*Proposal:/i.test(answer.text)
+        ? 'The assistant offered a proposal, but no check of it passed, so there is nothing to review. Ask it to fix the failed check.'
+        : 'The assistant did not return a complete Proposal: or Question: response.';
       return finish('exhausted');
     }
     if (finalResponse) {
@@ -514,7 +530,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
           else {
             proposal = undefined;
             latestCandidate = undefined;
-            const { views: _views, ...scriptInput } = call.arguments;
+            const { views: _views, bit, ...scriptInput } = call.arguments;
+            if (bit !== undefined && (call.name !== 'check_design' || !(typeof bit === 'number' && bit >= 0.5 && bit <= 25)))
+              throw new Error('check_design bit is a flat bit diameter in mm, from 0.5 to 25.');
             const script = call.name === 'check_design' ? await scripts.resolve(scriptInput) : undefined;
             source = script?.source ?? '';
             const requestedViews = normalizeAssistantViews(call.arguments.views ?? (referenceImages ? true : false));
@@ -523,7 +541,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
                 ? requestedViews
                 : requestedViews.length > 0
               : false;
-            const cacheKey = `${call.name}:${views}:${script ? source : JSON.stringify(scriptInput)}`;
+            const cacheKey = `${call.name}:${views}:${bit ?? ''}:${script ? source : JSON.stringify(scriptInput)}`;
             let checked = cache.get(cacheKey);
             if (checked) usage.reusedChecks++;
             else {
@@ -531,8 +549,10 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
               usage.checks = checks;
               options.onActivity?.(`Checking attempt ${checks} of ${maxChecks}…`);
               checked = script
-                ? await options.check(source, structuredClone(base), runSignal, { views })
+                ? await options.check(source, structuredClone(base), runSignal, { views, ...(bit !== undefined && { bit }) })
                 : await options.svg!.check(scriptInput, runSignal, { views });
+              // finalize_design plans toolpaths for this candidate, with the bit it was checked for.
+              if (bit !== undefined) checked = { ...checked, bit };
               if (!options.signal.aborted) cache.set(cacheKey, checked);
             }
             latestReport = checked.detailReport ?? checked.report;

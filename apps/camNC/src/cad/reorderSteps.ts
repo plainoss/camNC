@@ -61,10 +61,12 @@ export function reorderedSteps(
     // Moving one member out, or inserting into the middle, would split a saved contiguous group.
     if (sourceFolder?.id !== targetFolder?.id && (sourceFolder || (targetFolder?.partIds[0] !== target.partId && targetFolder)))
       return { error: 'Move the folder as a group, or unpack it before moving its parts.' };
-    const moving = document.parts.find(part => part.id === dragged.partId)!;
-    const rest = document.parts.filter(part => part.id !== moving.id);
+    // The parts its extrude made too move with it.
+    const moving = document.parts.filter(part => part.id === dragged.partId || part.extrudedWith === dragged.partId);
+    const rest = document.parts.filter(part => !moving.includes(part));
     const at = rest.findIndex(part => part.id === target.partId);
-    const parts = [...rest.slice(0, at), moving, ...rest.slice(at)];
+    if (at < 0) return { document };
+    const parts = [...rest.slice(0, at), ...moving, ...rest.slice(at)];
     const index = new Map(parts.map((part, i) => [part.id, i]));
     for (const part of parts)
       for (const base of builtOn(part))

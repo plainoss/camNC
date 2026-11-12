@@ -26,6 +26,15 @@ describe('reordering steps', () => {
     expect(result.document.parts.map(part => part.name)).toEqual(['B', 'A']);
   });
 
+  it('moves the parts an extrude made too along with it', () => {
+    const [a, b] = [plate('A'), plate('B')];
+    const c: CadPart = { ...plate('C'), sketchOf: b.id, extrudedWith: b.id };
+    const document: CadDocument = { ...createCadDocument(), parts: [a, b, c] };
+    const result = reorderedSteps(document, step(document, `${b.id}:extrude`), step(document, `${a.id}:sketch`));
+    if ('error' in result) throw new Error(result.error);
+    expect(result.document.parts.map(part => part.name)).toEqual(['B', 'C', 'A']);
+  });
+
   it('won’t put a part ahead of the part it’s drawn on', () => {
     const a = plate('A');
     const b = { ...plate('B'), drawnOn: { on: { partId: a.id, face: 'top' as const }, offset: 0 } };

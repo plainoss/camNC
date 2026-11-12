@@ -3,8 +3,11 @@ import { useEffect, useSyncExternalStore } from 'react';
 /** The design's variables, as a value field offers them after `#`, and a way to make or change one from a field. */
 export interface CadVariableFields {
   variables: { name: string; shown: string }[];
-  /** Sets `#name = expression` as typed in a field: the variable is made, or changed if it's there. Returns why not. */
-  define: (name: string, expression: string) => string | null;
+  /**
+   * Sets `#name = expression` as typed in a field of `unit`: the variable is made, or changed if it's there. Returns why
+   * not.
+   */
+  define: (name: string, expression: string, unit?: 'mm' | 'deg' | 'scalar') => string | null;
 }
 
 // The open editor's variables. One editor is open at a time; fields outside one get none.

@@ -373,6 +373,7 @@ export function applyPartCuts(
           outline: relief.points,
           islands: [],
           opening: { x0, y0, x1, y1 },
+          tool: { x0: lo[0], y0: lo[1], x1: hi[0], y1: hi[1] },
         };
         target.shape = { ...current, cuts: [...(current.cuts ?? []), cut] };
         made++;

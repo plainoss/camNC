@@ -207,3 +207,49 @@ describe('studio toolbar overflow', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Plane' })).not.toHaveAttribute('aria-current');
   });
 });
+
+describe('studio toolbar search highlight', () => {
+  function toolbar(props: { searchHighlight?: StudioCommand | null; disabled?: Partial<Record<StudioCommand, string>>; busy?: boolean }) {
+    return (
+      <div className="cad-editor" style={{ width: 600 }}>
+        <StudioToolbar
+          busy={props.busy ?? false}
+          disabled={props.disabled ?? {}}
+          active={null}
+          searchHighlight={props.searchHighlight}
+          canUndo={false}
+          canRedo={false}
+          canFinish={true}
+          onCommand={() => {}}
+          onUndo={() => {}}
+          onRedo={() => {}}
+          onCancel={() => {}}
+          onFinish={() => {}}
+        />
+      </div>
+    );
+  }
+
+  it('does not open More for a highlighted command that needs something first, or while busy', async () => {
+    const view = render(toolbar({}));
+    await screen.findByRole('button', { name: /^More/ });
+    view.rerender(toolbar({ searchHighlight: 'variable', disabled: { variable: 'Not now' } }));
+    expect(screen.queryByRole('menu')).toBeNull();
+    view.rerender(toolbar({ searchHighlight: 'variable', busy: true }));
+    expect(screen.queryByRole('menu')).toBeNull();
+    view.rerender(toolbar({ searchHighlight: 'variable' }));
+    const item = within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Variable' });
+    expect(item).toHaveAttribute('data-command-highlight', 'true');
+  });
+
+  it('leaves a More menu the user opened open when the search highlight moves on', async () => {
+    const view = render(toolbar({}));
+    await userEvent.click(await screen.findByRole('button', { name: /^More/ }));
+    const menu = await screen.findByRole('menu');
+    view.rerender(toolbar({ searchHighlight: 'variable' }));
+    expect(within(menu).getByRole('menuitem', { name: 'Variable' })).toHaveAttribute('data-command-highlight', 'true');
+    view.rerender(toolbar({ searchHighlight: null }));
+    expect(screen.getByRole('menu')).toBeVisible();
+    expect(within(menu).getByRole('menuitem', { name: 'Variable' })).not.toHaveAttribute('data-command-highlight');
+  });
+});

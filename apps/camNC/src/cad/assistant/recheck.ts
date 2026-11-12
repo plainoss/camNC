@@ -6,6 +6,7 @@ import { checkAssistantRequirements } from './requirements';
 import { bindProposalRequirements, readRequirements } from './requirementStore';
 import { checkScriptInBrowser } from './scriptCheck';
 import { finalizeBrowserCandidate } from './finalizeCandidate';
+import { bindProposalWarnings } from './proposalWarnings';
 
 const origins = new WeakMap<CadProposal, AssistantProposalOrigin>();
 
@@ -46,6 +47,7 @@ export async function recheckAssistantCandidate(
   }
   const proposal = cadProposal(base, full.document);
   bindProposalRequirements(proposal, brief.revision);
+  bindProposalWarnings(proposal, full.report);
   bindProposalOrigin(proposal, recipe ? { source, recipe: { name: recipe.recipe, parameters: recipe.parameters } } : { ...origin, source });
   return proposal;
 }

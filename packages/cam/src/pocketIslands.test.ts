@@ -41,10 +41,12 @@ function referenceWork() {
   return sum;
 }
 /**
- * Planning takes about 200 reference runs, 180 before lobes were roughed one at a time. Checking each link against every
- * sweep cut so far, rather than the ones near it, took 320.
+ * Planning takes about 190 reference runs locally and 220-250 on CI runners, 180 before lobes were roughed one at a
+ * time. Checking each link against every sweep cut so far, rather than the ones near it, took 320 locally: 290 leaves
+ * CI noise room and still fails that.
  */
-const kIslandsRatio = 260;
+const kIslandsRatio = 290;
+const kReferenceRepeats = 5;
 
 describe('pocket with many islands', () => {
   it('[performance] plans within a fixed multiple of reference work', () => {
@@ -54,16 +56,20 @@ describe('pocket with many islands', () => {
       return performance.now() - t;
     };
     const work = () => camPart(manyIslands, { cutThrough: false });
-    // Alternating order, median ratio: changing runner load favours neither.
-    const ratios = Array.from({ length: 3 }, (_, i) => {
+    // One reference run is about 1/200 of the planning: average several, so one short pause doesn't swing the ratio.
+    const reference = () => timed(() => Array.from({ length: kReferenceRepeats }, referenceWork)) / kReferenceRepeats;
+    // Alternating order, median of 5 pairs: changing runner load favours neither, and no single noisy pair decides.
+    const ratios = Array.from({ length: 5 }, (_, i) => {
       if (i % 2) {
-        const r = timed(referenceWork);
+        const r = reference();
         return timed(work) / r;
       }
       const w = timed(work);
-      return w / timed(referenceWork);
+      return w / reference();
     }).sort((a, b) => a - b);
-    console.info(`pocket with many islands: median ratio ${ratios[1].toFixed(2)} of reference work`);
-    expect(ratios[1]).toBeLessThan(kIslandsRatio);
+    console.info(
+      `pocket with many islands: median ratio ${ratios[2].toFixed(2)} of reference work, samples ${ratios.map(r => r.toFixed(0)).join(' ')}`
+    );
+    expect(ratios[2]).toBeLessThan(kIslandsRatio);
   });
 });
