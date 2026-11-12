@@ -211,6 +211,9 @@ change a variable or a dimension, or a step's settings. So:
   its variables (`variable-value`, such as a thickness below 0.1 mm or a finger count that
   isn't a whole number of at least 2) are errors, and fail the check. The design keeps its
   last good value meanwhile, so its parts and report disagree with the variable until it's fixed.
+- A Cut parts step whose tool or target is deleted, suppressed or only a sketch (its Extrude
+  deleted) cuts without it, and fails the check (`part-cut-input`) on the parts it joins,
+  naming that tool or target.
 
 ### Native curves, offsets and measured fitting
 
@@ -367,6 +370,10 @@ by the parts that fit them.
   shouldered tenon cuts only its tenon, and a comb of fingers cuts one slot per finger
   into a plain board. A tool with `relief` has bones on its own shoulders, so it can't
   cut.
+- `cornerRelief: { dogbone: 'cutter' }` on `d.cutParts` puts bones for that cutter diameter
+  in only that step's openings; `'off'` keeps them square even when the target has
+  `relief`. Give the cutter you will mill with, and a fit clearance: a bone the bit's own
+  size only touches the tenon corner, and the planned pass stops about 0.1 mm short.
 - `d.cutParts(a, { with: b, split: 'half' })` makes a half-lap where two parts cross,
   each losing half its height, and `split: { fingers: 5 }` a finger joint at a corner.
   Both parts are kept. A strip sketched on a board's face and extruded across it can
@@ -396,7 +403,14 @@ Each part is planned alone on a board the way the app plans it, with the default
 bit and settings and tabs holding it: its operations, time, CAM warnings, and anything
 that would block the job. CAM's own warnings, such as material left in corners, stay in
 each part's `toolpaths.warnings`. Only a blocked job, or a cut no tool fits, adds a
-top-level warning. Pass `{ toolpaths: false }` to `inspectCadDocument` to skip it.
+top-level warning. Pass `{ toolpaths: false }` to `inspectCadDocument` to skip it, or
+`{ bit: 6 }` to plan with a flat bit of that diameter.
+
+For each opening `cutParts` makes from the top or through the part, `toolpaths.cornerReach` says how many
+corners of the tool fitting it lie inside the part and how many the planned bit's floor
+pass misses, with `short` the worst miss in mm. A miss adds `corner-unreachable`, naming
+the opening and the part: the tool's square corners wouldn't seat. Blind openings cut
+from the underside, and openings only a copy has, aren't checked yet.
 
 ## What the report doesn't cover
 

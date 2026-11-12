@@ -6,8 +6,10 @@ import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import type { CadDocument, CadPart } from './types';
 import { trimCadFolders } from './folderModel';
 import { copyOperationPrefix } from './copyTransforms';
+import { partCutInputErrors } from './partCutInputs';
 import { partCutLabel, partCutVariableErrors } from './partCutVariables';
 import { cadVariableScope } from './variables';
+import { missingRegionProblem } from './regionProfile';
 
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
@@ -26,7 +28,10 @@ export interface DesignStep {
   copyId?: string;
   /** Switched off in the feature list. */
   suppressed?: boolean;
-  /** Why the step can't be built as it stands: what it was drawn on or adds to is suppressed, deleted or not extruded. */
+  /**
+   * Why the step can't be built as it stands: what it was drawn on or adds to is suppressed, deleted or not extruded,
+   * or the regions an Extrude picked are gone from its sketch.
+   */
   broken?: string;
 }
 
@@ -63,8 +68,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
   const partCutProblems = new Map<string, string>();
+  // A tool or target that isn't built comes first: the step cuts less than it says whatever its values are.
   if (document.partCuts?.length)
-    for (const { stepId, message } of partCutVariableErrors(document, cadVariableScope(document)))
+    for (const { stepId, message } of [...partCutInputErrors(document), ...partCutVariableErrors(document, cadVariableScope(document))])
       if (!partCutProblems.has(stepId)) partCutProblems.set(stepId, message);
   return listedSteps(document).map(step => {
     const own = broken.get(step.partId);
@@ -76,7 +82,9 @@ export function designSteps(document: CadDocument): DesignStep[] {
           ? `It’s on ${part.name}, which is suppressed.`
           : own && `It’s on ${part.name}, which can’t be built.`
         : null;
-    const reason = (step.kind === 'sketch' || step.kind === 'extrude') && own ? own : onFace;
+    // An Extrude whose picked regions an edit of its sketch took away waits for them to be picked again.
+    const regions = step.kind === 'extrude' && part && !own ? missingRegionProblem(part) : null;
+    const reason = (step.kind === 'sketch' || step.kind === 'extrude') && own ? own : (regions ?? onFace);
     // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
     const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;
     // A Fillet step that can't round some of its corners leaves them sharp, and says so on its row. A part that's
@@ -102,7 +110,7 @@ export function brokenParts(document: CadDocument): Map<string, string> {
     if (!host) return 'a deleted part';
     if (host.suppressed || masked.has(host.id)) return `${host.name}, which is suppressed`;
     if (host.extrude === false) return `${host.name}, which isn’t extruded`;
-    if (broken.has(id)) return `${host.name}, which can’t be built`;
+    if (broken.has(id) || missingRegionProblem(host)) return `${host.name}, which can’t be built`;
     return null;
   };
   // In order, so a part built on a broken one is broken too.

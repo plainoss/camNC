@@ -3,6 +3,7 @@ export * from './document';
 export * from './partCutSplit';
 export * from './partReferences';
 export * from './partCutTargetSelection';
+export * from './partCutInputs';
 export * from './geometry';
 export * from './solver';
 export * from './fillet';

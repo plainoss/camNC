@@ -3,6 +3,22 @@ import { regionInteriorPoint, sketchRegions } from './sketchRegions';
 import type { CadSketchRegion } from './sketchRegions';
 import type { CadDiagnostic, CadPart, CadSketch, EvaluatedCadPart } from './types';
 
+const regionIdsBySketch = new WeakMap<CadSketch, Set<string>>();
+
+/**
+ * Why an extruded part's picked regions can't all be found in its sketch any more, as when the lines around one were
+ * redrawn or rounded, or null when they can. The Extrude is broken until they're picked again; the sketch is fine.
+ */
+export function missingRegionProblem(part: CadPart): string | null {
+  const wanted = [...(part.regions ?? []), ...(part.addedRegions ?? [])];
+  if (!part.regions || !wanted.length || part.thin) return null;
+  let ids = regionIdsBySketch.get(part.sketch);
+  if (!ids) regionIdsBySketch.set(part.sketch, (ids = new Set(sketchRegions(part.sketch, CAD_CHORD_TOLERANCE).map(region => region.id))));
+  return wanted.every(id => ids.has(id)) ? null : missingRegionMessage(part);
+}
+
+const missingRegionMessage = (part: CadPart) => `A region picked for ${part.name} is no longer in its sketch. Pick its regions again.`;
+
 /**
  * A part extruded from the regions picked in its sketch, as the reference's Extrude takes them: the sketch can hold
  * other lines, crossing or open, and only the picked regions are the part, with those Extrude → Add steps join to it.
@@ -15,8 +31,7 @@ export function regionProfile(part: CadPart & { regions: string[] }): { part?: E
   const wanted = [...new Set([...part.regions, ...(part.addedRegions ?? [])])];
   if (!wanted.length) return problem('region-count', 'Pick the regions of the sketch to extrude in the view.');
   const picked = regions.filter(region => wanted.includes(region.id));
-  if (picked.length < wanted.length)
-    return problem('region-missing', `A region picked for ${part.name} is no longer in its sketch. Pick its regions again.`);
+  if (picked.length < wanted.length) return problem('region-missing', missingRegionMessage(part));
   const region = picked.length === 1 ? picked[0]! : joinedRegions(part.sketch, picked);
   if (!region) return problem('region-count', 'The picked regions don’t touch. Extrude each into a part of its own.');
   // Each island is another region's outline: its curves name the hole, as a whole sketch's loops do, so a pocket set on

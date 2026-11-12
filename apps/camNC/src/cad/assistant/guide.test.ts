@@ -11,6 +11,8 @@ it('keeps the default model guide small and retrieves API-specific detail from t
   expect(readAssistantGuide('editing')).toContain("d.detachCopy('Shelf 2', 'Cable shelf')");
   expect(readAssistantGuide('editing')).toContain('mirrored detach');
   expect(readAssistantGuide('assembly')).toContain('split: { fingers: 5 }');
+  expect(readAssistantGuide('assembly')).toContain("cornerRelief: { dogbone: 'cutter' }");
+  expect(assistantGuide).toContain('cornerRelief: { dogbone: 6 }');
   expect(readAssistantGuide('folders')).toContain('globally unique');
   expect(readAssistantGuide('unknown')).toContain('Available: geometry, editing, variables, folders, assembly, reports');
 });

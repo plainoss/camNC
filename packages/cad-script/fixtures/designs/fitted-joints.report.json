@@ -7,7 +7,43 @@
  "ok": true,
  "status": "solved",
  "errors": [],
- "warnings": [],
+ "warnings": [
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Leg B cuts in Leg A, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg A"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Leg A cuts in Leg B, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Leg B"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Side cuts in Front, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Front"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Side#1 cuts in Front, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Front"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 1 of the 1 corners of the opening Front cuts in Side, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Side"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 2 of the 2 corners of the opening Front#1 cuts in Side, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Side"
+  },
+  {
+   "code": "corner-unreachable",
+   "message": "The ⌀3.175 bit doesn't reach 1 of the 1 corners of the opening Front#2 cuts in Side, missing by up to 0.66 mm, so a square-cornered part won't seat. Give that cut parts step cornerRelief: { dogbone: <bit diameter> } and a fit clearance, or plan with a smaller bit.",
+   "part": "Side"
+  }
+ ],
  "features": [
   {
    "id": "896ea31d-298b-4e9a-87a4-de346686100a",
@@ -904,7 +940,15 @@
      }
     ],
     "warnings": [],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Leg B",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {
@@ -1011,7 +1055,15 @@
      }
     ],
     "warnings": [],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Leg A",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {
@@ -1133,7 +1185,21 @@
      }
     ],
     "warnings": [],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Side",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.66
+     },
+     {
+      "ref": "Side#1",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {
@@ -1270,7 +1336,27 @@
      }
     ],
     "warnings": [],
-    "blocked": []
+    "blocked": [],
+    "cornerReach": [
+     {
+      "ref": "Front",
+      "corners": 1,
+      "unreached": 1,
+      "short": 0.66
+     },
+     {
+      "ref": "Front#1",
+      "corners": 2,
+      "unreached": 2,
+      "short": 0.66
+     },
+     {
+      "ref": "Front#2",
+      "corners": 1,
+      "unreached": 1,
+      "short": 0.66
+     }
+    ]
    },
    "faces": [
     {
