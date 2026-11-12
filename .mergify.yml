@@ -29,7 +29,9 @@ queue_rules:
     # Required reviews/checks from GitHub must hold to merge, not to queue, so a fix can queue before its own CI ends.
     branch_protection_injection_mode: merge
     merge_method: squash
-    batch_size: 3
+    # Two while batches fail often (42% from Nov 9 to 12): a failed batch of two needs at most one split to find the
+    # PR at fault. Go back to three once fewer than about 1 in 10 batches fail.
+    batch_size: 2
     batch_max_wait_time: 30 seconds
     # Failed batches are bisected; do not hide failures with automatic CI retries.
     max_checks_retries: 0
