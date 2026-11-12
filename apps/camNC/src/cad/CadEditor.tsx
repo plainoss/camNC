@@ -119,6 +119,7 @@ import {
   restoreCadSession,
   undoCadSession,
   type CadCommandCheckpoint,
+  type CadHistoryMark,
 } from '@wbcnc/cad-editor/session';
 import { DimensionGraphics } from './DimensionGraphics';
 import {
@@ -503,12 +504,9 @@ export function CadEditor({
   }, [stepDialogOpen, studioSession, showWorkspace, focusViewIfIdle]);
   // The design as it was when the open sketch was opened from the studio, to go back to if it's cancelled.
   // A sketch open from the start, such as a new design's first, goes back to the design as it opened.
-  const sketchBefore = useRef<CadDocument | null>(studioSession && !showWorkspace ? doc : null);
-  const [cancelledSketch, setCancelledSketch] = useState<{
-    document: CadDocument;
-    partId: string;
-    before: CadDocument;
-  } | null>(null);
+  // A mark rather than a document: Cancel puts undo history back too, so the cancelled sketch isn't left for Undo.
+  const sketchBefore = useRef(useState(() => (studioSession && !showWorkspace ? markCadSession(session) : null))[0]);
+  const [cancelledSketch, setCancelledSketch] = useState<{ document: CadDocument; partId: string; before: CadHistoryMark } | null>(null);
   useEffect(() => {
     if (!cancelledSketch) return;
     const timer = setTimeout(() => setCancelledSketch(null), 12_000);
@@ -1780,7 +1778,7 @@ export function CadEditor({
     setFeatureDialog(null);
   };
   /** Opens a part's sketch from the studio, remembering the design to go back to if it's cancelled. */
-  const openSketch = (stepPartId: string, before = documentRef.current) => {
+  const openSketch = (stepPartId: string, before = markCadSession(session)) => {
     setSelectedFace(null);
     setCancelledSketch(null);
     // A shared sketch is edited where it's drawn, and every extrude of it follows.
@@ -1819,7 +1817,7 @@ export function CadEditor({
     captureSketchCamera(documentRef.current, part, studioCamera, view, sketchTurn, sketchCameraShift, canvasBox);
     if (!keep && sketchBefore.current) {
       const cancelled = { document: structuredClone(documentRef.current), partId: part!.id, before: sketchBefore.current };
-      commit(sketchBefore.current);
+      publish(restoreCadSession(session, sketchBefore.current));
       if (studioSession) setCancelledSketch(cancelled);
     }
     sketchBefore.current = null;
@@ -1859,7 +1857,7 @@ export function CadEditor({
     }
     if (studioSession && (step.kind === 'pattern' || step.kind === 'copy')) return openFeature('pattern', step.partId);
     // A cut opens its part's sketch view from the studio: cancelling there goes back to the design as it is now.
-    if (studioSession && step.kind === 'cut') sketchBefore.current = documentRef.current;
+    if (studioSession && step.kind === 'cut') sketchBefore.current = markCadSession(session);
     setPartId(step.partId);
     setSelected([]);
     chooseTool('select');
@@ -1974,8 +1972,8 @@ export function CadEditor({
   };
   /** Starts a new part drawn on a base plane or a part's face, or on one of the design's planes, and opens its sketch. */
   const newPartOn = (on: CadDrawnOn['on'], datum?: string) => {
-    const before = documentRef.current;
-    const made = newSketchPart(before, on, {
+    const before = markCadSession(session);
+    const made = newSketchPart(before.document, on, {
       variables: variableScope,
       studio: studioSession,
       thickness: part?.thickness,
