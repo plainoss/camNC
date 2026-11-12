@@ -19,14 +19,14 @@ import {
   type SettlePart,
   type Spots,
 } from '@wbcnc/cam/settle';
-import { autoNest, type NestObjective, type SheetPacker } from './autoNest';
 import type { BoardRequest, CamPartInfo } from './camTypes';
 import { kDefaultHardware, type HoldHardware } from '@wbcnc/cam-settings';
 import type { MaterialKey } from './planSettings';
 import { holeChoicesForPart, type HoleChoices } from './holeChoices';
 import { fitCompact, fitOnMachine, fitsAsIs, nestOnSize, wholeMm, wideMachine } from './boards/fitBoard';
 import { fixtureOf, fixturesNeed, fixturesOn, holdPointOf } from './boards/fixtures';
-import { apart, clearOfHolds, insideMargin, placedRect } from './boards/placement';
+import { apart, insideMargin, placedRect } from './boards/placement';
+import { letter, onlyFor, thicknessKey } from './boards/keys';
 
 export interface StockBoardV1 {
   id: string;
@@ -258,8 +258,6 @@ export const stockTopOf = (board: Pick<BoardV1, 'thickness' | 'measuredThickness
   board.measuredThickness ?? +(board.thickness + kStockAllowance).toFixed(2);
 export const kDefaultTabs = { width: 5, height: 2, minCount: 3 };
 
-const thicknessKey = (t: number) => +t.toFixed(1);
-
 export function instancesOf(parts: CamPartInfo[], milled: (partId: string) => boolean): PartInstance[] {
   return (
     parts
@@ -279,8 +277,6 @@ export function instancesOf(parts: CamPartInfo[], milled: (partId: string) => bo
       )
   );
 }
-
-const letter = (i: number) => (i < 26 ? String.fromCharCode(65 + i) : `B${i + 1}`);
 
 /** What a board is called: "Board A" until it's given a name of its own. */
 export const boardLabel = (board: Pick<BoardV1, 'name'>) => (/^([A-Z]|B\d+)$/.test(board.name) ? `Board ${board.name}` : board.name);
@@ -316,19 +312,15 @@ export function newBoard(
   };
 }
 
+/** A new board's material: thin boards (back panels, drawer bottoms: 6 mm or less) are usually plywood or HDF. */
+export const defaultMaterial = (thickness: number, material: MaterialKey): MaterialKey =>
+  thickness <= 6 && material !== 'mdf' ? 'plywood' : material;
+
 /**
  * Keep the user's boards in sync with the parts to mill: drop bodies that are gone (or not milled any more), put new
  * ones on the first board of their thickness (making one if needed). Empty boards stay until deleted (the user may
  * be about to drag parts onto them).
  */
-/** The spots of these bodies only. */
-const onlyFor = (at: Record<string, PartPosition>, ids: string[]) =>
-  Object.fromEntries(Object.entries(at).filter(([id]) => ids.includes(id)));
-
-/** A new board's material: thin boards (back panels, drawer bottoms: 6 mm or less) are usually plywood or HDF. */
-export const defaultMaterial = (thickness: number, material: MaterialKey): MaterialKey =>
-  thickness <= 6 && material !== 'mdf' ? 'plywood' : material;
-
 export function reconcileBoards(
   boards: BoardV1[] | undefined,
   instances: PartInstance[],
@@ -835,120 +827,6 @@ export function fixtureAt(
   return { kind, side, at: Math.round(Math.max(half, Math.min((along ? h : w) - half, along ? p.y : p.x))) };
 }
 
-/** Where a dragged body would land on a board, and the board after dropping it there. */
-export interface PartDrop {
-  /** Lower left corner where it lands; null: it fits nowhere on this board. */
-  at: PartPosition | null;
-  /** Lands exactly at the drop point (stored as its position), or where the board's nest puts it. */
-  exact: boolean;
-  /** The board with the body on it (unchanged when it doesn't fit). */
-  board: BoardV1;
-}
-
-/**
- * The boards to save for an undo or redo: what is cut stays as it is now. A program can finish after the snapshot was taken,
- * and restoring that snapshot would forget the cut and offer the same program again.
- */
-export function restoreBoards(snapshot: BoardV1[], current: BoardV1[]): BoardV1[] {
-  const now = new Map(current.map(b => [b.id, b]));
-  const restored = snapshot.map(b => {
-    const latest = now.get(b.id);
-    return latest && isCut(latest) ? latest : b;
-  });
-  const kept = new Set(snapshot.map(b => b.id));
-  return [...restored, ...current.filter(b => isCut(b) && !kept.has(b.id))];
-}
-
-/** The board with this body no longer set aside: it's nested like the rest again. */
-export function notAside(board: BoardV1, item: string): BoardV1 {
-  const out = { ...board };
-  const rest = Object.entries(board.setAside ?? {}).filter(([id]) => id !== item);
-  if (rest.length) out.setAside = Object.fromEntries(rest);
-  else delete out.setAside;
-  return out;
-}
-
-/** The board with this body off it, on the table at `at`. */
-export function setAsidePart(board: BoardV1, item: string, at: PartPosition): BoardV1 {
-  const out: BoardV1 = { ...board, setAside: { ...board.setAside, [item]: at } };
-  if (board.layout) out.layout = { ...board.layout, at: Object.fromEntries(Object.entries(board.layout.at).filter(([id]) => id !== item)) };
-  return out;
-}
-
-/**
- * Drop a body (from this board or another one of the same thickness) with its lower left corner at `at`. Close to where
- * the nest would put it among the others (within `snap` mm), it goes there. Otherwise, when that spot is free (inside the
- * margin, `gap` away from the other parts, clear of the fixtures) it stays exactly there. Else it goes where the nest
- * puts it, or nowhere when it doesn't fit. Pinned either way; the other parts stay where they are.
- */
-export function dropPart(
-  board: BoardV1,
-  instances: PartInstance[],
-  bit: number,
-  item: string,
-  at: PartPosition,
-  snap = 0,
-  opts: NestOptions = {}
-): PartDrop {
-  const inst = instances.find(i => i.id === item);
-  if (!inst) return { at: null, exact: false, board };
-  if (board.setAside?.[item]) board = notAside(board, item);
-  const same = board.items.includes(item);
-  const now = nestBoard(board, instances, bit, opts);
-  const others = now.placements.filter(p => p.id !== item);
-  const rest = Object.fromEntries(others.map(p => [p.id, { x: p.x, y: p.y, rotated: p.rotated }]));
-  const pinned = (board.pinned ?? []).filter(id => id !== item);
-  const nested: BoardV1 = {
-    ...board,
-    items: same ? board.items : [...board.items, item],
-    pinned: same && !board.pinned?.includes(item) ? pinned : [...pinned, item],
-    ...(others.length && { layout: { w: now.board.w, h: now.board.h, at: rest } }),
-  };
-  if (!others.length) delete nested.layout;
-  const placedAt = nestBoard(nested, instances, bit, { ...opts, holds: false });
-  const nestAt = placedAt.placements.find(p => p.id === item);
-  const snapped = (): PartDrop =>
-    nestAt
-      ? {
-          at: { x: nestAt.x, y: nestAt.y, rotated: nestAt.rotated },
-          exact: false,
-          board: {
-            ...nested,
-            layout: {
-              w: placedAt.board.w,
-              h: placedAt.board.h,
-              at: { ...rest, [item]: { x: nestAt.x, y: nestAt.y, rotated: nestAt.rotated } },
-            },
-          },
-        }
-      : { at: null, exact: false, board };
-  if (nestAt && Math.hypot(nestAt.x - at.x, nestAt.y - at.y) <= snap && nestAt.rotated === at.rotated) return snapped();
-  const r = placedRect(at, inst);
-  const free =
-    insideMargin(r, now.margin, now.board) &&
-    others.every(p => apart(r, placedRect(p, instances.find(i => i.id === p.id)!), now.gap)) &&
-    clearOfHolds(now, inst, at);
-  if (free)
-    return {
-      at,
-      exact: true,
-      board: { ...nested, pinned: [...pinned, item], layout: { w: now.board.w, h: now.board.h, at: { ...rest, [item]: at } } },
-    };
-  return snapped();
-}
-
-/**
- * A body dragged to `at` on the board as nested: is that spot free (inside the margin, `gap` from the other parts, clear
- * of the fixtures)? A quick check while dragging; `dropPart` decides on the drop.
- */
-export function spotFree(nest: BoardNest, instances: PartInstance[], item: string, at: PartPosition): boolean {
-  const inst = instances.find(i => i.id === item);
-  if (!inst) return false;
-  const r = placedRect(at, inst);
-  const others = nest.placements.filter(p => p.id !== item).map(p => placedRect(p, instances.find(i => i.id === p.id)!));
-  return insideMargin(r, nest.margin, nest.board) && others.every(o => apart(r, o, nest.gap)) && clearOfHolds(nest, inst, at);
-}
-
 /** The board's second side: as chosen, else re-align with the camera when a part on it has features underneath. */
 export function flipOf(board: BoardV1, instances: PartInstance[]): FlipRegistration | 'off' {
   if (board.flip) return board.flip;
@@ -997,131 +875,6 @@ export function boardRequest(
         };
       }),
   };
-}
-
-/**
- * A stock board as much of it fits on the machine: whole when it fits (either way round), else cut down to the work
- * area, lying the way that keeps the most of it.
- */
-export function withinMachine<S extends { w: number; h: number }>(sheet: S, machine: { w: number; h: number }): S {
-  if (fitsMachine(machine, sheet.w, sheet.h)) return sheet;
-  const along = { w: Math.min(sheet.w, machine.w), h: Math.min(sheet.h, machine.h) };
-  const across = { w: Math.min(sheet.w, machine.h), h: Math.min(sheet.h, machine.w) };
-  const { w, h } = along.w * along.h >= across.w * across.h ? along : across;
-  return { ...sheet, w: Math.floor(w), h: Math.floor(h) };
-}
-
-/**
- * Put every body on boards from the stock list, per thickness, using as little stock as possible (see `autoNest`).
- * Bodies the user moved by hand (`pinned`) stay on their board (at their spot, if placed there), and free bodies fill the room left on such a board
- * first when it has a fixed size. Thicknesses without stock keep their boards. No board comes out bigger than the
- * stock (nor the machine, when given): bodies left when the stock runs out (`short`) go on more boards of the stock's
- * sizes, and bodies that fit on no stock board (`tooBig`) on one board of the biggest size, where they don't fit.
- */
-export function autoFillFromStock(
-  boards: BoardV1[],
-  instances: PartInstance[],
-  stock: StockBoardV1[],
-  bit: number,
-  material: MaterialKey,
-  objective: NestObjective = 'boards',
-  /** The machine's work area: stock boards bigger than it are used cut down to it. */
-  machine?: { w: number; h: number },
-  /** Names no board here may take: those of the boards that stay out of this (cut ones). */
-  reserved: string[] = []
-): { boards: BoardV1[]; tooBig: string[]; short: string[] } {
-  if (machine) stock = stock.map(s => withinMachine(s, machine));
-  const out: BoardV1[] = [];
-  const tooBig: string[] = [];
-  const short: string[] = [];
-  const byId = new Map(instances.map(i => [i.id, i]));
-  const thicknesses = [...new Set(instances.map(i => thicknessKey(i.thickness)))].sort((a, b) => b - a);
-  for (const t of thicknesses) {
-    const sheets = stock.filter(s => thicknessKey(s.thickness) === t);
-    const old = boards.filter(b => b.thickness === t);
-    const mine = instances.filter(i => thicknessKey(i.thickness) === t).map(i => i.id);
-    if (!sheets.length) {
-      out.push(...(old.length ? old : [newBoard(out, t, material, mine)]));
-      continue;
-    }
-    const template = { ...newBoard([], t, old[0]?.material ?? defaultMaterial(t, material)) };
-    if (old[0]) Object.assign(template, holdSettingsOf(old[0]));
-    const fresh = (items: string[], size: BoardV1['size']): BoardV1 => ({ ...template, id: crypto.randomUUID(), items, size });
-
-    const kept = old.flatMap(b => {
-      const pinned = (b.pinned ?? []).filter(id => b.items.includes(id) && mine.includes(id));
-      if (!pinned.length) return [];
-      const held: BoardV1 = { ...b, items: pinned, pinned, ...(b.layout && { layout: { ...b.layout, at: onlyFor(b.layout.at, pinned) } }) };
-      delete held.setAside;
-      return [held];
-    });
-    let free = mine.filter(id => !kept.some(b => b.items.includes(id)));
-    const left = new Map(sheets.map(s => [s.id, s.quantity ?? Infinity]));
-    for (const b of kept) {
-      if (b.size.fit) continue;
-      const { w, h } = b.size;
-      const sheet = sheets.find(s => s.w === w && s.h === h && left.get(s.id)! > 0);
-      if (sheet) left.set(sheet.id, left.get(sheet.id)! - 1);
-      if (!free.length) continue;
-      const placed = new Set(nestBoard({ ...b, items: [...b.items, ...free] }, instances, bit, { holds: false }).placements.map(p => p.id));
-      const items = [...b.items, ...free.filter(id => placed.has(id))];
-      if (!b.items.every(id => placed.has(id)) || nestBoard({ ...b, items }, instances, bit, { holds: false }).unplaced.length) continue;
-      b.items = items;
-      free = free.filter(id => !placed.has(id));
-    }
-
-    const pack: SheetPacker = (ids, sheet) => {
-      const nest = nestBoard(fresh(ids, { fit: false, w: sheet.w, h: sheet.h }), instances, bit, { holds: false });
-      return {
-        placed: nest.placements.map(p => p.id),
-        used: nest.placements.map(p => {
-          const r = placedRect(p, byId.get(p.id)!);
-          return { ...r, w: r.w + nest.gap, h: r.h + nest.gap };
-        }),
-      };
-    };
-    const res = autoNest(
-      free.map(id => ({ id, w: byId.get(id)!.size[0], h: byId.get(id)!.size[1] })),
-      sheets.map(s => ({ id: s.id, w: s.w, h: s.h, quantity: Number.isFinite(left.get(s.id)) ? left.get(s.id) : undefined })),
-      pack,
-      { objective }
-    );
-    const rebuiltFrom = out.length + kept.length;
-    out.push(...kept, ...res.boards.map(b => fresh(b.items, { fit: false, w: b.sheet.w, h: b.sheet.h })));
-    // Never a board bigger than the stock: parts left when the stock ran out go on more boards of the stock's sizes
-    // (to buy), and parts too big for any of them on one board of the biggest size, where they show as not fitting.
-    if (res.short.length) {
-      const more = autoNest(
-        res.short.map(id => ({ id, w: byId.get(id)!.size[0], h: byId.get(id)!.size[1] })),
-        sheets.map(s => ({ id: s.id, w: s.w, h: s.h })),
-        pack,
-        { objective }
-      );
-      out.push(...more.boards.map(b => fresh(b.items, { fit: false, w: b.sheet.w, h: b.sheet.h })));
-    }
-    if (res.tooBig.length) {
-      const biggest = sheets.reduce((a, s) => (s.w * s.h > a.w * a.h ? s : a));
-      out.push(fresh(res.tooBig, { fit: false, w: biggest.w, h: biggest.h }));
-    }
-    // The boards made here take over the names the user gave the ones they replace.
-    const names = old.filter(b => boardLabel(b) === b.name && !kept.some(k => k.id === b.id)).map(b => b.name);
-    out.slice(rebuiltFrom).forEach((b, i) => {
-      if (names[i]) b.name = names[i];
-    });
-    tooBig.push(...res.tooBig);
-    short.push(...res.short);
-  }
-  // A fresh layout: name the boards A, B, C… in order (kept boards of other thicknesses too, so names stay unique).
-  // Boards with parts placed by hand keep their name, and so do boards the user named, and none takes a name that's `reserved`.
-  const keepsName = (b: BoardV1) => !!b.pinned?.length || boardLabel(b) === b.name;
-  const taken = new Set([...reserved, ...out.filter(keepsName).map(b => b.name)]);
-  let k = 0;
-  const named = out.map(b => {
-    if (keepsName(b)) return b;
-    while (taken.has(letter(k))) k++;
-    return { ...b, name: letter(k++) };
-  });
-  return { boards: named, tooBig, short };
 }
 
 /** Do these holds stand around the middle of the placed parts? */
@@ -1186,6 +939,8 @@ export function layoutChange(
 }
 
 export { layoutSummary } from './boards/summary';
+export { dropPart, notAside, restoreBoards, setAsidePart, spotFree, type PartDrop } from './boards/partDrop';
+export { autoFillFromStock, withinMachine } from './boards/autoFill';
 
 export interface MissingPart {
   id: string;
