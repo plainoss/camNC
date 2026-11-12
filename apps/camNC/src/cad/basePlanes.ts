@@ -1,4 +1,5 @@
-import { cadDatumFrame, cadFaceFrame, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { cadDatumFrame, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { physicalFaceFrame as cadFaceFrame } from './studioGeometryReaders';
 import type { ViewPlane } from '@/cam/model/ModelViewport';
 
 /** The design's base planes, which every sketch can be drawn on. */

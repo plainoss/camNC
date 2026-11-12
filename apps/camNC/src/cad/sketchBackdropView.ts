@@ -2,6 +2,7 @@ import {
   CAD_IDENTITY_PLACEMENT,
   cadDrawnOnSupports,
   cadFaceFrame,
+  copyOperationPrefix,
   designSteps,
   rolledBackTo,
   type CadDocument,
@@ -19,6 +20,9 @@ export function sketchBackdropView(
   canvasBox: { width: number; height: number },
   shift?: [number, number]
 ) {
+  // Generation precedes the spatial stream. A legacy-listed Cut parts row must not bring later copy moves
+  // into an earlier sketch's geometry or give its Use references a final-pose source instead of its creation frame.
+  if (doc.operationOrder !== undefined) doc = copyOperationPrefix(doc);
   const frame = cadFaceFrame(doc, part.drawnOn?.on ?? { plane: 'top' });
   if ('error' in frame) return null;
   const offset = part.drawnOn?.offset ?? 0;
