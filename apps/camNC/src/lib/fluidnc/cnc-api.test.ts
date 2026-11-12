@@ -163,6 +163,25 @@ describe('CncApi', () => {
     await until(() => api.jobProgress.value?.percent === 50);
   });
 
+  it('keeps only the messages of the current job as the last message, not the connect-time $I reply (#915)', async () => {
+    const fake = new FakeFluidnc('v4');
+    fake.respond = line => (line === '$I' ? ['[VER:3.9 FluidNC v3.9.9:]', '[MSG: Machine: LowRider]', 'ok'] : undefined);
+    const api = await connected(fake);
+    expect(fake.received).toContain('$I');
+    expect(api.lastMessage.value).toBeNull();
+
+    fake.emit(['[MSG:Caution: Unlocked]']);
+    await until(() => api.lastMessage.value !== null);
+    expect(api.lastMessage.value).toContain('Unlocked');
+    // A new job starts with no message: one from before (an earlier job, an unlock) does not belong to its pauses.
+    await api.uploadGcode('G1 X1 F100\n', 'camnc.gcode', { fetchImpl: fake.fetch });
+    await api.runFile('camnc.gcode');
+    expect(api.lastMessage.value).toBeNull();
+    fake.emit(['[MSG:INFO: MSG, Change to the 3 mm bit]']);
+    await until(() => api.lastMessage.value !== null);
+    expect(api.lastMessage.value).toContain('Change to the 3 mm bit');
+  });
+
   it('tracks homing, Z zeroing and job start for the pre-job checklist', async () => {
     const fake = new FakeFluidnc('v4');
     const api = await connected(fake);

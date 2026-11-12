@@ -135,4 +135,150 @@ it('takes the smallest relief from the part and its active steps only', () => {
     smallestCornerRelief({ ...changed, partCuts: changed.partCuts!.map(step => ({ ...step, suppressed: true as const })) }, seat.id)
   ).toBe(6);
   expect(smallestCornerRelief(changed, changed.parts[1]!.id)).toBeUndefined();
+  // A step whose tool is switched off cuts nothing, so its relief doesn't count either.
+  const toolOff: CadDocument = {
+    ...changed,
+    parts: changed.parts.map(part => (second!.tools.includes(part.id) ? { ...part, suppressed: true as const } : part)),
+  };
+  expect(smallestCornerRelief(toolOff, seat.id)).toBe(4);
+});
+
+function seatWith(tenons: [number, number][], relief = 6) {
+  const seat = createCadPart('Seat', 18);
+  seat.sketch = addRectangle(seat.sketch, { x: 0, y: 0, width: 240, height: 200, dimensioned: true, positioned: true });
+  seat.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  const tools = tenons.map(([x, y], index) => {
+    const tool = createCadPart(`Tenon ${index + 1}`, 18);
+    tool.sketch = addRectangle(tool.sketch, { x, y, width: 40, height: 18, dimensioned: true, positioned: true });
+    tool.placement = structuredClone(seat.placement);
+    return tool;
+  });
+  let document = { ...createCadDocument('Bones near edges'), parts: [seat, ...tools] };
+  for (const tool of tools) document = addPartCut(document, [tool.id], [seat.id], { value: 0 }).document;
+  for (const step of document.partCuts!) document = updatePartCut(document, step.id, { cornerRelief: { diameter: relief } });
+  return evaluateCadDocument(document);
+}
+const skippedWarnings = (evaluated: ReturnType<typeof evaluateCadDocument>) =>
+  evaluated.diagnostics.filter(d => d.code === 'corner-relief-skipped');
+
+it('keeps a step corner square, and says where, when its bone would break out of the part edge', () => {
+  // The opening's left wall is 0.5 mm from the seat edge; a 6 mm bone bulges about 0.9 mm past it.
+  const evaluated = seatWith([[0.5, 60]]);
+  const cut = evaluated.parts[0]!.cuts![0]!;
+  expect(cut.outline.every(p => p.x >= 0)).toBe(true);
+  const [warning] = skippedWarnings(evaluated);
+  expect(warning?.message).toMatch(/^2 of the corners Tenon 1 cuts in Seat stay square/);
+  expect(warning?.points).toEqual(expect.arrayContaining([expect.objectContaining({ x: 0.5 })]));
+  expect(warning?.points).toHaveLength(2);
+  // With room to spare every corner gets its bone.
+  expect(skippedWarnings(seatWith([[20, 60]]))).toEqual([]);
+});
+
+it('keeps step corners square where their bones would break into a neighbouring opening', () => {
+  // Two mortises 0.5 mm apart: the second one's bones toward the first would cut through the web.
+  const evaluated = seatWith([
+    [20, 60],
+    [60.5, 60],
+  ]);
+  const [first, second] = evaluated.parts[0]!.cuts!;
+  // Each keeps the bones on its far side and leaves the two facing corners square.
+  expect(first!.outline.length).toBeGreaterThan(4);
+  expect(second!.outline.length).toBeGreaterThan(4);
+  expect(Math.max(...first!.outline.map(p => p.x))).toBeCloseTo(60, 6);
+  expect(Math.min(...second!.outline.map(p => p.x))).toBeCloseTo(60.5, 6);
+  const warnings = Object.fromEntries(skippedWarnings(evaluated).map(w => [w.message.slice(0, 24), w.points]));
+  expect(Object.keys(warnings).sort()).toEqual(['2 of the corners Tenon 1', '2 of the corners Tenon 2']);
+  expect(warnings['2 of the corners Tenon 1']!.every(p => p.x === 60)).toBe(true);
+  expect(warnings['2 of the corners Tenon 2']!.every(p => p.x === 60.5)).toBe(true);
+  expect(
+    skippedWarnings(
+      seatWith([
+        [20, 60],
+        [80, 60],
+      ])
+    )
+  ).toEqual([]);
+});
+
+it('says only the final count of square corners when a later step squares more of an earlier opening', () => {
+  // Tenon 1's right side is squared by Tenon 2's step, then its left side by Tenon 3's.
+  const evaluated = seatWith([
+    [60, 60],
+    [100.5, 60],
+    [19.5, 60],
+  ]);
+  const messages = skippedWarnings(evaluated).map(w => w.message.slice(0, 24));
+  expect(messages.sort()).toEqual(['2 of the corners Tenon 2', '2 of the corners Tenon 3', '4 of the corners Tenon 1']);
+});
+
+/** A seat with a 0.5 mm-walled mortise beside each of `tools`, given as [x, y, width, height, z offset, thickness]. */
+function seatCutBy(tools: [number, number, number, number, number, number][], order = tools.map((_, i) => i)) {
+  const seat = createCadPart('Seat', 18);
+  seat.sketch = addRectangle(seat.sketch, { x: 0, y: 0, width: 240, height: 200, dimensioned: true, positioned: true });
+  seat.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  const parts = tools.map(([x, y, width, height, z, thickness], index) => {
+    const tool = createCadPart(`T${index + 1}`, thickness);
+    tool.sketch = addRectangle(tool.sketch, { x, y, width, height, dimensioned: true, positioned: true });
+    tool.placement = { position: [0, 0, z], rotation: [0, 0, 0, 1] };
+    return tool;
+  });
+  let document = { ...createCadDocument('Bones and depths'), parts: [seat, ...parts] };
+  for (const index of order) {
+    const made = addPartCut(document, [parts[index]!.id], [seat.id], { value: 0 });
+    document = updatePartCut(made.document, made.id, { cornerRelief: { diameter: 6 } });
+  }
+  return { document, evaluated: evaluateCadDocument(document) };
+}
+const cutBy = (evaluated: ReturnType<typeof evaluateCadDocument>, name: string, part = 0) => {
+  const tool = evaluated.parts.find(p => p.name === name)!;
+  return evaluated.parts[part]!.cuts!.find(cut => cut.id.includes(`:${tool.partId}`))!;
+};
+
+it.each([[[0, 1]], [[1, 0]]])('keeps the bones of a through mortise inside a shallower dado (order %j)', order => {
+  // A 6 mm deep dado across the seat from the top, with a through mortise inside it.
+  const { evaluated } = seatCutBy(
+    [
+      [0, 50, 240, 40, 12, 6],
+      [100, 61, 40, 18, -1, 20],
+    ],
+    order
+  );
+  expect(cutBy(evaluated, 'T2').outline.length).toBeGreaterThan(4);
+  expect(skippedWarnings(evaluated)).toEqual([]);
+});
+
+it('keeps an earlier opening clear of a neighbour at another depth when a third opening revises it', () => {
+  const { evaluated } = seatCutBy([
+    // A through mortise; an underside pocket 0.5 mm beside it; a top pocket over the first.
+    [20, 60, 40, 18, -1, 20],
+    [60.5, 60, 40, 18, -12, 18],
+    [10, 55, 30, 30, 12, 6],
+  ]);
+  expect(Math.max(...cutBy(evaluated, 'T1').outline.map(p => p.x))).toBeCloseTo(60, 6);
+});
+
+it('keeps facing bones apart on a mirrored copy of an ordered design', () => {
+  const { document } = seatCutBy([
+    [20, 60, 40, 18, 0, 18],
+    [60.5, 60, 40, 18, 0, 18],
+  ]);
+  const seat = document.parts[0]!;
+  const mirrored = orderedCadDocument({
+    ...document,
+    parts: [
+      { ...seat, copies: [{ id: 'mirror', mirrored: true, placement: { position: [240, 0, 0], rotation: [0, 0, 0, 1] } }] },
+      ...document.parts.slice(1),
+    ],
+  });
+  const evaluated = evaluateCadDocument(mirrored);
+  expect(evaluated.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+  // The mirrored copy overlaps the original exactly, so both take both mortises.
+  const original = evaluated.parts.find(part => part.partId === seat.id)!;
+  const copyCuts = original.copyCuts?.mirror;
+  expect(copyCuts).toHaveLength(2);
+  for (const cuts of [original.cuts!, copyCuts!]) {
+    const [a, b] = [...cuts].sort((p, q) => Math.min(...p.outline.map(v => v.x)) - Math.min(...q.outline.map(v => v.x)));
+    const gap = Math.min(...b!.outline.map(p => p.x)) - Math.max(...a!.outline.map(p => p.x));
+    expect(gap).toBeCloseTo(0.5, 6);
+  }
 });

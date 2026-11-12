@@ -43,7 +43,7 @@ d.detachCopy('Shelf 2', 'Cable shelf') makes a separately editable part. Retriev
 cupboard({ name?, width?, height?, depth?, board?, shelves?, at? })(d) inserts a folder of editable parts/variables; lengths are expression strings, shelves a number, at XYZ mm. Defaults use pin rows.
 panelChair({ name?, width?, depth?, seatWidth?, seatDepth?, height?, seatHeight?, board?, cutter?, fit?, measuredStock?, at? })(d) inserts a sheet-stock chair with keyed, bolted through-tenons; width = seatWidth + 6*board.
 frameStool({ name?, width?, depth?, height?, overhang?, board?, legLayer?, seatBoard?, apronHeight?, footrestHeight?, footrestZ?, cutter?, fit?, measuredStock?, at? })(d) inserts a glued stool: laminated legs, tenoned rails, a seat screwed to cleats. width/depth: leg footprint; height: seat top.
-Both save a construction plan; a construction-check error means a joint, web or fastener no longer measures sound. Change options; don't redraw joints.
+Both save a construction plan; a construction-check error means a joint, web, fastener or insertion fails. Change options; don't redraw joints.
 p.expect({ size: [400, 300], thickness: 18, holes: 1, pockets: 1, depths: [6], freedom: 0 }) checks those facts, not hole diameters/positions.
 Read report cuts, placements, diagnostics and lost-cut/joint costs; a valid check does not prove visual resemblance, joint strength or machining acceptance.
 Use a relevant supplied example for curved shapes rather than searching for geometry. Keep agreed sizes checked with expect; derive coordinates from expressions when dimensions must remain editable.

@@ -19,8 +19,9 @@ export function RunSettings({
 }) {
   const count = (number: number | null) => (number === null ? 'unknown' : number.toLocaleString());
   return (
-    <details>
-      <summary>Usage and limits</summary>
+    // Shown as a settings dialog section, which already is the disclosure: the form is open as soon as it is picked.
+    <div className="cad-assistant-settings">
+      <h3>Usage and limits</h3>
       {usage && (
         <p aria-label="Last turn usage">
           {usage.calls} requests · {usage.checks} checks · input {count(usage.inputTokens)} tokens · output {count(usage.outputTokens)}{' '}
@@ -122,6 +123,6 @@ export function RunSettings({
         Token and USD limits are checked between requests; the last request can exceed the remaining total. Missing usage or prices are
         shown as unknown and stop a capped run. Prices and limits last until this dock closes; check prices after changing models.
       </p>
-    </details>
+    </div>
   );
 }

@@ -40,7 +40,8 @@ const kAtZ = 0.05;
  * - A hold camNC sent is a feed hold, wherever the job is.
  * - Every other M0 also needs the bit where the program put it before that M0: a hold from the machine's button or
  *   another client, with the reader blocked just before the M0 (at the M5, say), reports nearly the same position.
- *   That holds for M0s without a camNC marker (other posts) too: at or above the last Z before the M0.
+ *   That holds for M0s without a camNC marker (other posts) too: at or above the last Z before the M0, if the program
+ *   lifted to it (see {@link bitAtOrAbove}).
  * - A first M0 with no move before it (Fusion's "Turn ON 15000RPM") has no Z to compare with. It needs the reader to
  *   be short of the first move after it, or the bit not to have moved since camNC started the job: then nothing has
  *   been cut yet. Missing it would let a router switched by hand stay off for the cut.
@@ -133,16 +134,20 @@ const atZ = (at: ZBefore) => (at.units === 'mm' ? kAtZ : kAtZ / kMmPerInch);
  */
 function bitWhereThePauseLeftIt(lines: Line[], index: number, done: boolean, c: HoldContext) {
   const at = zBefore(lines, index);
-  if (!at || at.machine !== done) return false;
+  if (!at || at.machine !== done || at.atLeast) return false;
   const z = reportedZ(at, c);
   if (z === undefined) return false;
   return done ? Math.abs(z - at.z) <= atZ(at) : z >= at.z - atZ(at);
 }
 
-/** For an M0 of another post: the bit at or above the last Z the program moved to before it, in its coordinates. */
+/**
+ * For an M0 of another post: the bit at or above the last Z the program moved to before it, in its coordinates. Only
+ * evidence when that Z was a lift: a rapid (G0, G53 G0, G28/G30), or a feed move up to above every Z cut so far. Feed
+ * moves at that work Z after it are cuts there, so then only a Z above every cut before it counts. After a cut (an operator stop with the bit still down), a hold with the reader just before the M0 reports the same position.
+ */
 function bitAtOrAbove(lines: Line[], index: number, c: HoldContext) {
   const at = zBefore(lines, index);
-  const z = at ? reportedZ(at, c) : undefined;
+  const z = at?.lift ? reportedZ(at, c) : undefined;
   return !!at && z !== undefined && z >= at.z - atZ(at);
 }
 
@@ -151,12 +156,21 @@ interface ZBefore {
   /** G53: machine coordinates. */
   machine: boolean;
   units: 'mm' | 'inch';
+  /**
+   * After G28/G30: the bit is at the stored position, which the program does not tell. It counts as at least as high as
+   * the last G53 Z before it, so `z` is only a lower bound.
+   */
+  atLeast?: boolean;
+  /** The move to `z` was a lift (see {@link bitAtOrAbove}), not a cut. */
+  lift: boolean;
 }
 
 /**
  * The Z the program last moved to before line `index`, in which coordinates and units. `null` if unknown: no Z move
- * yet, no units (G20/G21) set, or since then an offset, homing, probe, tool length offset or coordinate system change
- * (G10, G28, G30, G38, G43, G49, G54–G59.3, G92), or relative moves (G91) at that point.
+ * yet, no units (G20/G21) set, or since then a probe, or relative moves (G91) at that point. A work Z also becomes
+ * unknown after an offset, tool length offset or coordinate system change (G10, G43, G49, G54–G59.3, G92); a machine Z
+ * (G53) does not, as these do not move the bit. After G28/G30 it is the last G53 Z as a lower bound, see
+ * {@link ZBefore.atLeast}.
  */
 function zBefore(lines: Line[], index: number) {
   // It reads the whole program up to the M0, and the machine view asks with every report while held.
@@ -167,19 +181,41 @@ function zBefore(lines: Line[], index: number) {
 }
 
 const zBeforeMemo = new WeakMap<Line[], Map<number, ZBefore | null>>();
-/** G codes after which the Z of an earlier move no longer says where the bit is in the current coordinates. */
+/** G codes after which the Z of an earlier work move no longer says where the bit is in the current coordinates. */
 // biome-ignore format: a list of G codes
-const kZFrameChanges = [10, 28, 28.1, 30, 30.1, 38.2, 38.3, 38.4, 38.5, 43, 43.1, 49, 54, 55, 56, 57, 58, 59, 59.1, 59.2, 59.3, 92, 92.1, 92.2, 92.3];
+const kZFrameChanges = [10, 28.1, 30.1, 43, 43.1, 49, 54, 55, 56, 57, 58, 59, 59.1, 59.2, 59.3, 92, 92.1, 92.2, 92.3];
+const kProbes = [38.2, 38.3, 38.4, 38.5];
+/** Motion modes (G0, G1, G2, G3, probes, G80), as their G number. */
+const kMotionModes = [0, 1, 2, 3, ...kProbes, 80];
+
+/**
+ * The highest cut after a probe or frame change: the Z of earlier cuts no longer compares with work Z moves after it.
+ * Before any cut there is nothing to compare, so a header's G54/G49/G92 or a Z probe keeps later lifts recognisable.
+ */
+const cutsUnknown = (highestCut: number) => (highestCut === -Infinity ? -Infinity : Infinity);
 
 function readZBefore(lines: Line[], index: number): ZBefore | null {
   let relative = false;
   let units: 'mm' | 'inch' | undefined;
   let last: ZBefore | null = null;
+  /** The motion mode in force, `undefined` until the program sets one. */
+  let motion: number | undefined;
+  /** The work Z (mm) the bit is at, `undefined` when not known. */
+  let workZ: number | undefined;
+  /** The highest work Z (mm) a feed move (or one of unknown motion) ended at or ran at: Infinity when not known. */
+  let highestCut = -Infinity;
+  /** The last work Z move went above every Z cut before it. */
+  let aboveCuts = false;
+  /** The last G53 Z move, the lower bound for G28/G30. */
+  let lastMachine: { z: number; units: 'mm' | 'inch' } | null = null;
+  const mm = (z: number, u: 'mm' | 'inch') => (u === 'mm' ? z : z * kMmPerInch);
   for (let i = 0; i < index; i++) {
     const words: Word[] | null = gcodeWords(lines[i]!.code);
     // FluidNC rejects such a line; what it would have done is unknown.
     if (!words) {
       last = null;
+      workZ = undefined;
+      highestCut = Infinity;
       continue;
     }
     // G90.1/G91.1 only set the arc centre mode: G90 and G91 exactly.
@@ -187,19 +223,71 @@ function readZBefore(lines: Line[], index: number): ZBefore | null {
     if (hasWord(words, 'G', 91)) relative = true;
     if (hasWord(words, 'G', 21)) units = 'mm';
     if (hasWord(words, 'G', 20)) units = 'inch';
-    // Their Z (G43.1 Z…, G10 L20 Z…, G92 Z…) is not a move either.
-    if (hasWord(words, 'G', ...kZFrameChanges)) {
-      last = null;
+    const mode = kMotionModes.find(m => hasWord(words, 'G', m));
+    if (mode !== undefined) motion = mode;
+    const z = words.find(w => w.letter === 'Z');
+    const axes = words.some(w => 'XYZABC'.includes(w.letter));
+    // G28/G30 go to a stored position: Z too when named, or with no axis named.
+    if (hasWord(words, 'G', 28, 30)) {
+      if (z || !axes) {
+        last = lastMachine ? { ...lastMachine, machine: true, atLeast: true, lift: true } : null;
+        workZ = undefined;
+      }
       continue;
     }
-    const z = words.find(w => w.letter === 'Z');
-    if (!z) continue;
+    // A probe moves the bit to wherever it touches.
+    if (hasWord(words, 'G', ...kProbes)) {
+      last = null;
+      workZ = undefined;
+      highestCut = cutsUnknown(highestCut);
+      continue;
+    }
+    // Their Z (G43.1 Z…, G10 L20 Z…, G92 Z…) is not a move either. The bit stays put, so a machine Z still holds.
+    if (hasWord(words, 'G', ...kZFrameChanges)) {
+      if (!last?.machine) last = null;
+      workZ = undefined;
+      highestCut = cutsUnknown(highestCut);
+      continue;
+    }
+    const feed = axes && motion !== 0;
+    if (!z) {
+      // A move at the current height: a feed move there cuts at it. Then a work Z reached by a rapid is a lift only if
+      // above every cut before it (a first G0 Z11 with feed moves at that height, not a rapid to an earlier depth).
+      if (feed) {
+        highestCut = Math.max(highestCut, workZ ?? Infinity);
+        if (!aboveCuts && last && last.lift && !last.machine) last = { ...(last as ZBefore), lift: false };
+      }
+      continue;
+    }
     const machine = hasWord(words, 'G', 53);
-    // A relative Z move leaves the height unknown; G53 is in machine coordinates either way.
+    if (machine) {
+      // G53 is in machine coordinates either way, also in G91.
+      lastMachine = units ? { z: z.value, units } : null;
+      last = units ? { z: z.value, machine, units, lift: motion === 0 } : null;
+      workZ = undefined;
+      // A feed move in machine coordinates: how high it cut in work coordinates is not known.
+      if (feed) highestCut = Infinity;
+      continue;
+    }
+    // A relative Z move leaves the height unknown.
     // The units in force at the move, not at the M0 (G20 / G0 Z0.6 / G21 / M0 is 0.6 inch). None set: unknown.
-    last = (relative && !machine) || !units ? null : { z: z.value, machine, units };
+    if (relative || !units) {
+      last = null;
+      workZ = undefined;
+      if (feed) highestCut = Infinity;
+      continue;
+    }
+    const to = mm(z.value, units);
+    // A feed move counts as a lift only going up from a known height, and above every cut: a plunge never is, also the
+    // first one of the program (nothing cut yet) or one shallower than earlier cuts.
+    const up = workZ !== undefined && to > workZ + kAtZ;
+    aboveCuts = to > highestCut + kAtZ;
+    last = { z: z.value, machine, units, lift: motion === 0 || (up && aboveCuts) };
+    workZ = to;
+    if (feed) highestCut = Math.max(highestCut, to);
   }
-  return relative ? null : last;
+  // A machine Z (G53, G28/G30) holds in G91 too.
+  return relative && !last?.machine ? null : last;
 }
 
 /** End byte of the line before the first move or probe after line `index`: the reader there has not moved the bit. */

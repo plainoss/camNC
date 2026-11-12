@@ -21,3 +21,4 @@ export * from './panelChair';
 export * from './frameStool';
 export * from './furnitureHardware';
 export * from './furnitureJoints';
+export * from './furnitureCoverage';

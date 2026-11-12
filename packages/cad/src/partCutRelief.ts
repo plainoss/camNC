@@ -1,3 +1,4 @@
+import { activeDesign } from './suppression';
 import type { CadDocument, CadPart, CadPartCut } from './types';
 
 /** Validate the bounded source setting before either loading or evaluating a design. */
@@ -25,13 +26,12 @@ export const effectivePartCutRelief = (step: CadPartCut, target: CadPart) =>
  * openings. A split joint relieves both of its parts. CAM warns when the board's bit is wider than this.
  */
 export function smallestCornerRelief(document: CadDocument, partId: string): number | undefined {
+  // Only what is built counts: suppressed steps, folders and parts, and steps cutting with suppressed sketches, drop out.
+  const active = activeDesign(document);
   const ofPart = (id: string) => id.split(':')[0] === partId;
-  // Steps switched off on their own or in a suppressed folder cut nothing.
-  const folderCuts = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partCutIds ?? []));
   const diameters = [
-    document.parts.find(part => part.id === partId)?.cornerRelief?.diameter,
-    ...(document.partCuts ?? [])
-      .filter(step => !step.suppressed && !folderCuts.has(step.id))
+    active.parts.find(part => part.id === partId)?.cornerRelief?.diameter,
+    ...(active.partCuts ?? [])
       .filter(step => step.targets.some(ofPart) || (step.split !== undefined && step.tools.some(ofPart)))
       .map(step => step.cornerRelief?.diameter),
   ].filter((diameter): diameter is number => diameter !== undefined);

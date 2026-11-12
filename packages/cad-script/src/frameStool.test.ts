@@ -26,7 +26,8 @@ const withVariable = (document: CadDocument, name: string, expression: string) =
   return changed.document;
 };
 
-describe('frame stool pattern', () => {
+// Each measured check also sweeps the whole assembly order, a few seconds per check under a parallel run.
+describe('frame stool pattern', { timeout: 90_000 }, () => {
   let result: CadEditResult, reloaded: CadDocument, plan: CadConstruction;
   beforeAll(async () => {
     result = await editCad(null, frameStool());

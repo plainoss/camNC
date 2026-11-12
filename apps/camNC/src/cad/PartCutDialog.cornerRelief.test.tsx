@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { cadVariableScope, createCadPart, createPlateDocument, type CadDocument, type CadPartCut } from '@wbcnc/cad';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PartCutDialog } from './PartCutDialog';
+import { ReliefBitContext } from './reliefBit';
 
 afterEach(cleanup);
 
@@ -81,4 +82,30 @@ it('previews a new step with an Off override at the raised reader version', asyn
       expect.objectContaining({ version: 5, partCuts: [expect.objectContaining({ cornerRelief: null })] })
     )
   );
+});
+
+it('starts a new dogbone at the bit the job is planned with', async () => {
+  const document = design(),
+    onSave = vi.fn();
+  const view = render(
+    <PartCutDialog document={document} step={step(document.parts[0]!.id)} reliefBit={8} onSave={onSave} onClose={() => {}} />
+  );
+  fireEvent.change(screen.getByRole('combobox', { name: 'Corner relief' }), { target: { value: 'dogbone' } });
+  expect((screen.getByRole('textbox', { name: 'Cutter diameter' }) as HTMLInputElement).value).toBe('8');
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ cornerRelief: { diameter: 8 } })));
+  view.unmount();
+  // The design route provides the job's planned bit.
+  const planned = render(
+    <ReliefBitContext.Provider value={6}>
+      <PartCutDialog document={document} step={step(document.parts[0]!.id)} onSave={() => {}} onClose={() => {}} />
+    </ReliefBitContext.Provider>
+  );
+  fireEvent.change(screen.getByRole('combobox', { name: 'Corner relief' }), { target: { value: 'dogbone' } });
+  expect((screen.getByRole('textbox', { name: 'Cutter diameter' }) as HTMLInputElement).value).toBe('6');
+  planned.unmount();
+  // Outside a job, the app's default bit.
+  render(<PartCutDialog document={document} step={step(document.parts[0]!.id)} onSave={() => {}} onClose={() => {}} />);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Corner relief' }), { target: { value: 'dogbone' } });
+  expect((screen.getByRole('textbox', { name: 'Cutter diameter' }) as HTMLInputElement).value).toBe('3.175');
 });

@@ -29,8 +29,9 @@ export function Requirements({
   useEffect(() => setDraft(value), [value]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(value);
   return (
-    <details>
-      <summary>Confirmed requirements{Object.keys(value).length ? ' · active' : ' · optional'}</summary>
+    // Shown as a settings dialog section, which already is the disclosure: the form is open as soon as it is picked.
+    <div className="cad-assistant-settings">
+      <h3>Confirmed requirements{Object.keys(value).length ? ' · active' : ' · optional'}</h3>
       <p>
         These application checks stay outside generated scripts. Enter agreed values in mm; blank fields add no requirement. Outline checks
         use one unambiguous part. Appearance and strength still need review.
@@ -87,6 +88,6 @@ export function Requirements({
         </button>
       </fieldset>
       {dirty && <p>Unconfirmed changes are not used by the assistant.</p>}
-    </details>
+    </div>
   );
 }

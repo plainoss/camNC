@@ -28,7 +28,12 @@
   .assistant-settings-body { flex-direction: column; }
   .assistant-settings-body > nav { width: auto; grid-auto-flow: column; border-right: 0; border-bottom: 1px solid #0001; }
 }
-.assistant-settings .cad-assistant-settings { border: 0; padding: 0; }
+/* A section's form looks the same wherever the dialog opens. These outrank the host panel's own rules for the same
+   classes (Carve boxes its forms, and the dock scopes its filled submit button to itself). */
+.assistant-settings .assistant-settings-body > section > .cad-assistant-settings { border: 0; border-radius: 0; padding: 0; }
+.assistant-settings .assistant-settings-body .cad-assistant-settings h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.025em; }
+.assistant-settings .assistant-settings-body .cad-assistant-settings button[type='submit'] { background: #176c61; color: #fff; border-color: #176c61; box-shadow: 0 2px 5px #17534818; }
+.assistant-settings .assistant-settings-body .cad-assistant-settings button[type='submit']:not(:disabled):hover { background: #10554c; border-color: #10554c; }
 /* The dock styles every button as a card; the section list stays plain. */
 .cad-editor .cad-assistant-dock .assistant-settings-body > nav button:not([aria-current]) { border-color: transparent; background: transparent; }
 .cad-editor .cad-assistant-dock .assistant-settings-body > nav button[aria-current] { border-color: transparent; background: #27756b1f; }

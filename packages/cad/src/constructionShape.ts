@@ -121,7 +121,7 @@ export function constructionShapeIssue(input: unknown): string | undefined {
       plan.assembly,
       128,
       s =>
-        object(s, ['action', 'roles', 'hardwareIds', 'axis']) &&
+        object(s, ['action', 'roles', 'hardwareIds', 'axis', 'moving']) &&
         oneOf(s.action, [
           'bond-laminations',
           'insert-crosspieces',
@@ -133,7 +133,11 @@ export function constructionShapeIssue(input: unknown): string | undefined {
         ]) &&
         roles(s.roles) &&
         roles(s.hardwareIds) &&
-        axis(s.axis),
+        axis(s.axis) &&
+        // Moving roles are some of the step's own roles, each once.
+        (s.moving === undefined ||
+          (list(s.moving, 512, item => text(item) && (s.roles as unknown[]).includes(item), 1) &&
+            new Set(s.moving as string[]).size === (s.moving as string[]).length)),
       1
     );
   });

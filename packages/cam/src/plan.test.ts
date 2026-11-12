@@ -174,6 +174,22 @@ describe('planBoard', () => {
     expect(asked[0]).toEqual(['plate', false]);
     expect(plan.sideB?.ops.find(op => op.kind === 'pocket')!.zBottom).toBeCloseTo(19 - 6, 3);
   });
+
+  it('leaves a cutout off side B even when its id is a part’s (#790)', () => {
+    const profile = profileFeatures({
+      thickness: 18,
+      outline: rect(0, 0, 200, 120),
+      holes: [],
+      cuts: [{ id: 'pocket', from: 0, to: 6, through: false, outline: rect(40, 30, 120, 60), islands: [] }],
+    });
+    const plan = planBoard(
+      board({ w: 400, flip: { registration: 'camera' }, cutouts: [{ id: 'one', name: 'Cutout', outline: rect(260, 40, 100, 80) }] }),
+      {},
+      source(profile)
+    );
+    expect(plan.ops.some(op => op.name.startsWith('Cutout'))).toBe(true);
+    expect(plan.sideB?.ops.filter(op => op.kind === 'pocket').map(op => op.name)).toEqual([expect.stringMatching(/^Plate/)]);
+  });
 });
 
 describe('two parts of the same name', () => {

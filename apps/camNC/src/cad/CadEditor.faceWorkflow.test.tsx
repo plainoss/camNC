@@ -15,6 +15,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { endCadSession } from '@wbcnc/cad-editor/session';
+import { settled } from '@/test/settled';
 import type { StudioCameraState } from './studioCamera';
 import { OrthographicCamera, Vector3 } from 'three';
 
@@ -44,8 +45,6 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
       />
     </div>
   );
-  const settled = () =>
-    waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20000 });
   const studioProps = () => vi.mocked(ModelViewport).mock.calls.findLast(([props]) => props.cameraState)![0];
   const camera = () => structuredClone(studioProps().cameraState!.current!);
   const unchanged = async (before: StudioCameraState) =>
@@ -129,19 +128,14 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
     pointer('pointermove', 0.5, 2);
     pointer('pointermove', 1, 2);
     pointer('pointerup', 1, 0);
-    await waitFor(() => expect(camera().back).not.toEqual(before.back));
-    // Damping must have settled before testing whether the next command moves the view.
-    let previous = camera();
-    await waitFor(
-      async () => {
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        const next = camera(),
-          drift = Math.hypot(...next.back.map((n, i) => n - previous.back[i]!));
-        previous = next;
-        expect(drift).toBeLessThan(1e-8);
-      },
-      { timeout: 10000 }
-    );
+    // Damping must have settled before testing whether the next command moves the view. The drag turns the camera on
+    // the next drawn frame, and damping eases the rest of the turn in over about 45 more, each requested by the
+    // controls; the view publishes its camera as it draws. The settled signal counts the view as pending while it has a
+    // frame requested, so it is quiet once the controls stop moving the camera (by less than 1e-7 still to come). A
+    // loaded CI page draws a frame in a few hundred ms, so the glide alone can outlast the default 10 s, as it did when
+    // this waited a fixed 10 s for a frame-to-frame drift below 1e-8 (#575).
+    await settled({ timeout: 30_000 });
+    expect(camera().back).not.toEqual(before.back);
   };
   const orbitTo = async (direction: [number, number, number]) => {
     const before = camera().back,
@@ -220,4 +214,6 @@ it('builds three parts with face sketches, then adds a face extrusion up to anot
     addTo: side,
     upTo: { partId: first, face: 'underside' },
   });
-}, 60000);
+  // About 20 s alone and 35–47 s with four pages on four CPUs, as a CI shard runs them: each orbit's glide is drawn
+  // frame by frame, and a loaded page draws one in a few hundred ms.
+}, 120_000);

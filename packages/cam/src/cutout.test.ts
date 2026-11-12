@@ -253,6 +253,12 @@ describe('a carving cut out of its board', () => {
     expect(all.slice(1).every(line => /leaves the board/.test(line))).toBe(true);
   });
 
+  it('plans a flipped board: the cutout is cut on side A, and side B has nothing of it to cut (#790)', () => {
+    const plan = planBoard(board({ flip: { registration: 'camera' }, cutouts: [{ id: 'cut', name: 'Cutout', outline }] }), {}, none);
+    expect(plan.ops.some(o => o.name.startsWith('Cutout'))).toBe(true);
+    expect(plan.sideB?.ops.some(o => o.name.startsWith('Cutout')) ?? false).toBe(false);
+  });
+
   it('reports nothing for a cut line on the board', () => {
     const plan = planBoard(board({ holdDown: 'fixture-tape', taped: true, cutouts: [{ id: 'cut', name: 'Cutout', outline }] }), {}, none);
     expect([...plan.safety, ...(plan.release ?? []).flatMap(r => r.safety)]).toEqual([]);
