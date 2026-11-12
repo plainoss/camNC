@@ -28,6 +28,14 @@ export function nativeImageUrl(config: NativeImageConfig): string {
   return `${chatUrl.slice(0, -'chat/completions'.length)}images/generations`;
 }
 
+function isGeminiEndpoint(endpoint: string): boolean {
+  try {
+    return new URL(endpoint).hostname === 'generativelanguage.googleapis.com';
+  } catch {
+    return false;
+  }
+}
+
 /** One bounded image request, shared by native SVG and monochrome PNG routes. Never returns provider error bodies. */
 export async function requestNativeImage(
   request: ProviderRequest,
@@ -66,15 +74,20 @@ export async function requestNativeImage(
         redirect: 'error',
         signal: controller.signal,
         headers: { 'content-type': 'application/json', authorization: `Bearer ${config.key}` },
-        body: JSON.stringify({
-          model: config.model,
-          prompt,
-          output_format: format,
-          n: 1,
-          quality: config.quality,
-          // Standard square output; local tracing downsamples within its one-million-working-pixel bound.
-          size: format === 'png' ? '1024x1024' : 'auto',
-        }),
+        body: JSON.stringify(
+          isGeminiEndpoint(config.endpoint)
+            ? // Gemini's compatible image API returns PNG as base64 and takes no OpenAI quality, format or size options.
+              { model: config.model, prompt, n: 1, response_format: 'b64_json' }
+            : {
+                model: config.model,
+                prompt,
+                output_format: format,
+                n: 1,
+                quality: config.quality,
+                // Standard square output; local tracing downsamples within its one-million-working-pixel bound.
+                size: format === 'png' ? '1024x1024' : 'auto',
+              }
+        ),
       });
     } catch {
       throw new Error('Could not reach the native image provider. Check browser access and the endpoint.');

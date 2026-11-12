@@ -65,6 +65,21 @@ describe('native monochrome generation and tracing', () => {
     expect(result.usage).toMatchObject({ calls: 1, costUsd: null });
   });
 
+  it("asks Gemini's compatible image API for base64 PNG without OpenAI-only options", async () => {
+    const fetcher = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ data: [{ b64_json: png() }] }))
+    );
+    const gemini = { ...native, endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'imagen-4.0-generate-001' };
+    await generateNativeRasterAsset(options(), gemini, fetcher);
+    const [url, request] = fetcher.mock.calls[0];
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/images/generations');
+    const body = JSON.parse(request!.body as string);
+    expect(body).toMatchObject({ model: 'imagen-4.0-generate-001', n: 1, response_format: 'b64_json' });
+    expect(body).not.toHaveProperty('quality');
+    expect(body).not.toHaveProperty('output_format');
+    expect(body).not.toHaveProperty('size');
+  });
+
   it.each([
     ['simple', 'Low'],
     ['balanced', 'Balanced'],
