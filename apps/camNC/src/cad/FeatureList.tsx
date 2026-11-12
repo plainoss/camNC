@@ -83,6 +83,7 @@ function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAc
 export function FeatureList({
   document,
   selectedPartId,
+  initialSelection,
   onSelect,
   onAction,
   onRename,
@@ -100,6 +101,8 @@ export function FeatureList({
 }: {
   document: CadDocument;
   selectedPartId: string | null;
+  /** The row selected when the list first shows, such as a step just finished elsewhere. */
+  initialSelection?: string;
   onSelect: (entry: FeatureEntry) => void;
   onAction: (entry: FeatureEntry, action: FeatureAction) => void;
   /** A step's new name, typed in place of its row. It names that feature only, never the part it makes. */
@@ -133,7 +136,7 @@ export function FeatureList({
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
   const entries = folderFeatureEntries(document);
-  const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<string | null>(initialSelection ?? null);
   const folders = useFolderControls({ document, onChange, onRollTo, selectedPartId });
   const select = (entry: FeatureEntry) => {
     setSelectedEntry(entry.kind === 'step' ? entry.step.id : entry.id);

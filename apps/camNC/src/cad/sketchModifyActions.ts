@@ -321,6 +321,8 @@ export function removeSketchSelection(editor: SketchEditorInput, entityIds: read
     });
     setSelectedConstraints([]);
     setDimension(null);
+    // Selecting a glyph said it was selected; once it's gone, so is that message.
+    setMessage('');
   }
   // Protection belongs to the command's original graph, even if deleting its
   // parent first leaves a handle point in use by an unselected curve.
