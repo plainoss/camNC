@@ -686,7 +686,7 @@
    },
    "toolpaths": {
     "bit": 3.175,
-    "minutes": 58.9,
+    "minutes": 56.1,
     "operations": [
      {
       "label": "2 edge grooves 8 deep",
@@ -1089,7 +1089,7 @@
      "ok": true
     }
    ],
-   "minutes": 155.6,
+   "minutes": 150.1,
    "operations": [
     {
      "label": "2 edge grooves 8 deep",

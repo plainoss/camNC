@@ -199,3 +199,36 @@ describe('context menu commands', () => {
     expect(busy.find(item => item.action === 'fit')!.disabled).not.toBe(true);
   });
 });
+
+describe('a constraint glyph’s menu', () => {
+  it('deletes the constraint right-clicked, or the selected glyphs it belongs to', () => {
+    const { line, circle, dimension, ...built } = fixture();
+    let sketch = built.sketch;
+    sketch = addConstraint(sketch, { type: 'horizontal', entityId: line.id });
+    const horizontal = sketch.constraints.at(-1)!;
+    sketch = addConstraint(sketch, { type: 'tangent', entityAId: line.id, entityBId: circle.id });
+    const tangent = sketch.constraints.at(-1)!;
+    const position = { x: 5, y: 5 };
+    const alone = createSketchContext(sketch, { kind: 'constraint', id: horizontal.id }, position, {
+      entityIds: [line.id],
+      constraintIds: [tangent.id],
+    });
+    expect(alone).toMatchObject({ target: { kind: 'constraint', id: horizontal.id }, entityIds: [], constraintIds: [horizontal.id] });
+    expect(sketchContextItems(sketch, alone).map(item => [item.label, item.shortcut])).toEqual([
+      ['Delete constraint', 'Delete'],
+      ['Clear selection', 'Space'],
+      ['Zoom to fit', 'F'],
+    ]);
+    const group = createSketchContext(sketch, { kind: 'constraint', id: horizontal.id }, position, {
+      entityIds: [],
+      constraintIds: [horizontal.id, tangent.id, dimension.id],
+    });
+    expect(group.constraintIds).toEqual([horizontal.id, tangent.id]);
+    expect(sketchContextItems(sketch, group)[0]).toMatchObject({ action: 'delete-dimensions', label: 'Delete constraints' });
+    expect(sketchContextItems(sketch, group, true)[0]!.disabled).toBe(true);
+    expect(selectedSketchContextTarget(sketch, { entityIds: [line.id], constraintIds: [tangent.id] })).toEqual({
+      kind: 'constraint',
+      id: tangent.id,
+    });
+  });
+});

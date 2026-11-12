@@ -17,8 +17,11 @@ export interface CurveContour {
 }
 type Point = { x: number; y: number };
 
+/** Flattened at 0.015 mm, a detailed 1024 px illustration carved at 300 mm needs about 21,000 points. */
+export const kMaxOutlinePoints = 24_000;
+
 /** Adaptive de Casteljau subdivision. Quadratic deviation from the endpoint chord is at most half its control distance. */
-export function flattenCurveContours(paths: CurveContour[], tolerance: number, maxPoints = 8000): Point[][] {
+export function flattenCurveContours(paths: CurveContour[], tolerance: number, maxPoints = kMaxOutlinePoints): Point[][] {
   let count = 0;
   const distance = (p: Point, a: Point, b: Point) => {
     const dx = b.x - a.x,
@@ -29,6 +32,7 @@ export function flattenCurveContours(paths: CurveContour[], tolerance: number, m
   };
   return paths.map(path => {
     const first = path.segments[0];
+    if (++count > maxPoints) throw new Error('Smooth curve CAM approximation exceeds its point budget.');
     const points: Point[] = [{ x: first.x1, y: first.y1 }];
     const add = (point: Point) => {
       if (++count > maxPoints) throw new Error('Smooth curve CAM approximation exceeds its point budget.');

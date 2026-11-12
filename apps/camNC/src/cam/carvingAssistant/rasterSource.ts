@@ -2,6 +2,7 @@ import type { CarvingGenerationConstraints } from './generation';
 import { smoothTrace } from './smoothTrace';
 import {
   closeTraceGaps,
+  openTraceSlivers,
   compareTraceMasks,
   fillTracePinholes,
   removeTraceSpecks,
@@ -179,6 +180,16 @@ export async function traceCarvingPng(
         : featurePx >= 2
           ? closeTraceGaps(ink, traceWidth, Math.max(noiseAreaPx, featurePx ** 2))
           : 0;
+    // The same for dark slivers about two pixels wide: hair-thin spike tips and necks where two strokes barely touch,
+    // which curve fitting rounds off or cuts. A removed piece as large as a feature the trace checks measure stays, so a
+    // whole thin stroke is never dropped. Opening can leave fragments below the noise threshold; drop those too.
+    const featureAreaPx = Math.max(noiseAreaPx, Math.min(featurePx ** 2, (3 * tolerancePx) ** 2));
+    const openedSliverPixels = featurePx >= 2 ? openTraceSlivers(ink, traceWidth, featureAreaPx) : 0;
+    if (openedSliverPixels) {
+      const fragments = removeTraceSpecks(ink, traceWidth, noiseAreaPx);
+      specks.components += fragments.components;
+      specks.pixels += fragments.pixels;
+    }
     // Give Stop a boundary before bounded polygon union. Subsequent physical preparation applies its own geometry limits.
     await new Promise(resolve => setTimeout(resolve, 0));
     abort(signal);
@@ -204,7 +215,6 @@ export async function traceCarvingPng(
     // Rasterizing two curves that nearly touch can leave a sliver or pinhole a few pixels across between them, and a
     // pinhole that small next to an edge cannot survive curve fitting at this tolerance. Match every other region by
     // position. The skip size is capped at the minimum feature area, below which preparation drops islands anyway.
-    const featureAreaPx = Math.max(noiseAreaPx, Math.min(featurePx ** 2, (3 * tolerancePx) ** 2));
     if (
       smooth.components !== topology.components ||
       smooth.holes !== topology.holes ||
@@ -215,8 +225,18 @@ export async function traceCarvingPng(
           ? 'Smooth tracing changed filled components or holes. The image has fewer than two pixels across this minimum feature: choose a coarser detail level or a smaller size.'
           : 'Smooth tracing changed filled components or holes. Use a larger size or finer detail level.'
       );
-    const coverage = compareTraceMasks(ink, checkedMask, traceWidth, Math.ceil(tolerancePx + 2));
-    if (coverage.intersectionOverUnion < 0.96 || coverage.boundaryErrorPx > tolerancePx + 1.5)
+    // Judge coverage by the average edge displacement, not overlap: a thin-stroke drawing loses overlap from the same
+    // sub-pixel edge shift that a filled shape barely notices (about 93% against 99% on 1024 px line art at Simple).
+    // The boundary limit leaves out a few isolated pixels at hair-thin tips, but none may be off by twice the limit.
+    const boundaryLimitPx = tolerancePx + 1.5;
+    const coverage = compareTraceMasks(ink, checkedMask, traceWidth, Math.ceil(2 * boundaryLimitPx));
+    if (
+      coverage.meanDeviationPx > 0.25 * tolerancePx + 0.25 ||
+      // A loose overlap floor still catches a gross failure that displaces every edge.
+      coverage.intersectionOverUnion < 0.85 ||
+      coverage.boundaryErrorPx > boundaryLimitPx ||
+      coverage.maxBoundaryErrorPx > 2 * boundaryLimitPx
+    )
       throw new Error('Smooth tracing exceeded its measured coverage or boundary-error budget. Use a larger source or simpler artwork.');
     const warnings = [
       'Raster tracing converts dark pixels to filled cut regions. Shading, color and anti-aliasing are discarded; compare the original image and traced contours.',
@@ -225,6 +245,9 @@ export async function traceCarvingPng(
       `Removed ${specks.components} isolated dark specks (${specks.pixels} tracing pixels) below the physical noise threshold. Small intended marks can also be removed.`,
       ...(closedGapPixels
         ? [`Closed light gaps at most two tracing pixels wide (${closedGapPixels} pixels), below half the minimum feature size.`]
+        : []),
+      ...(openedSliverPixels
+        ? [`Removed dark slivers about two tracing pixels wide (${openedSliverPixels} pixels), below half the minimum feature size.`]
         : []),
       ...(pinholes.components
         ? [`Filled ${pinholes.components} enclosed light pinholes (${pinholes.pixels} tracing pixels) below the physical noise threshold.`]

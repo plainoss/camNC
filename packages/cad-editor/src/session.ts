@@ -122,6 +122,30 @@ export function amendCadSession(session: CadSession, document: CadDocument, chec
   return session.document;
 }
 
+/** The document and both history stacks as a dialog found them, for Cancel to go back to. */
+export interface CadHistoryMark {
+  document: CadDocument;
+  past: CadDocument[];
+  future: CadDocument[];
+}
+
+export function markCadSession(session: CadSession): CadHistoryMark {
+  return { document: copy(session.document), past: [...session.past], future: [...session.future] };
+}
+
+/**
+ * Cancel puts the session back exactly as marked, history included: a cancelled edit's previews are neither undone
+ * nor redone, and Undo steps back from the last change kept before the dialog opened.
+ */
+export function restoreCadSession(session: CadSession, mark: CadHistoryMark): CadDocument {
+  if (mark.document.id !== session.document.id) throw new Error('Cannot restore a different CAD document into this session.');
+  session.past = [...mark.past];
+  session.future = [...mark.future];
+  session.document = { ...copy(mark.document), revision: session.document.revision + 1 };
+  session.resumeAccepted = false;
+  return session.document;
+}
+
 export function undoCadSession(session: CadSession): CadDocument {
   const previous = session.past.pop();
   if (!previous) return session.document;

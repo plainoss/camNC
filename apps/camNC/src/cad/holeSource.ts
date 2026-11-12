@@ -54,9 +54,10 @@ export function holeSource(document: CadDocument, pick: HolePick): { partId: str
  * Run the Hole command on the selected part: open the Hole step it drills with, or say why there is none. A step dialog
  * still open is cancelled first, as its Cancel does, so Hole starts from the design that leaves.
  */
-export function startHole({
+export function startHole<Before>({
   cancel,
   read,
+  mark,
   commit,
   open,
   refuse,
@@ -64,14 +65,17 @@ export function startHole({
 }: HolePick & {
   cancel: () => unknown;
   read: () => CadDocument;
+  /** What the Hole dialog's Cancel goes back to, taken before a sketch is made the hole so Cancel drops that too. */
+  mark: () => Before;
   commit: (next: CadDocument) => void;
-  open: (kind: 'hole', partId: string, before: CadDocument) => void;
+  open: (kind: 'hole', partId: string, before: Before) => void;
   refuse: (message: string) => void;
 }) {
   if (pick.copyId === undefined) cancel();
   const document = read();
   const source = holeSource(document, pick);
   if ('refusal' in source) return refuse(source.refusal);
+  const before = mark();
   if (source.convert) commit(replacePart(document, source.partId, asHole));
-  open('hole', source.partId, document);
+  open('hole', source.partId, before);
 }

@@ -20,6 +20,15 @@ const lit = () => {
   const { meshes, selectedIndexes, highlightIds = [] } = props();
   return meshes.flatMap((mesh, index) => (selectedIndexes?.includes(index) || highlightIds.includes(mesh.partId) ? [index] : []));
 };
+/**
+ * Moves the pointer onto a strip outside the editor and waits until no feature row counts as hovered. The pointer stays
+ * where the previous test or test file left it, and Chrome enters a row rendered under it without any pointer move, so a
+ * test can start with a row already hovered. `userEvent.unhover` is no way out: it moves to the middle of the page.
+ */
+async function restPointer() {
+  await userEvent.hover(screen.getByTestId('pointer-rest'));
+  await waitFor(() => expect(props().highlightIds).toBeUndefined());
+}
 
 /** A three-shelf pattern with a chase cutting the given copies, by their index among the pattern's copies. */
 async function mount(copies: number[]) {
@@ -43,20 +52,24 @@ async function mount(copies: number[]) {
   ).document;
   sessions.push(design.id);
   render(
-    <div style={{ height: 700, display: 'flex' }}>
-      <CadEditor
-        document={design}
-        startIn3D
-        onDraftChange={vi.fn<(d: CadDocument) => void>()}
-        onFinish={async () => {}}
-        onCancel={() => {}}
-      />
-    </div>
+    <>
+      <div data-testid="pointer-rest" style={{ height: 24 }} />
+      <div style={{ height: 700, display: 'flex' }}>
+        <CadEditor
+          document={design}
+          startIn3D
+          onDraftChange={vi.fn<(d: CadDocument) => void>()}
+          onFinish={async () => {}}
+          onCancel={() => {}}
+        />
+      </div>
+    </>
   );
   await settled();
   await screen.findByTestId('workspace-3d', undefined, { timeout: 15_000 });
   const keys = targets.map(copy => `${shelf.id}/${copy}`);
   await waitFor(() => expect(props().instanceIds).toEqual(expect.arrayContaining(keys)), { timeout: 15_000 });
+  await restPointer();
   return {
     indexes: keys.map(key => props().instanceIds!.indexOf(key)).sort((a, b) => a - b),
     chase: { id: chase.id, index: props().instanceIds!.indexOf(chase.id) },
@@ -72,7 +85,7 @@ it('lights only the targeted copy while its Cut parts row is hovered, and clears
   await waitFor(() => expect(lit()).toEqual([chase.index]));
   await userEvent.hover(row(/^Cut Shelf 3 with Chase/));
   await waitFor(() => expect(lit()).toEqual([chase.index, ...indexes].sort((a, b) => a - b)));
-  await userEvent.unhover(row(/^Cut Shelf 3 with Chase/));
+  await restPointer();
   await waitFor(() => expect(lit()).toEqual([chase.index]));
 }, 30_000);
 
@@ -85,14 +98,12 @@ it('keeps only the targeted copy lit once its Cut parts row is selected under th
 
 it('lights every targeted copy, and no others, for a Cut parts row on two copies', async () => {
   const { indexes, chase } = await mount([0, 1]);
-  // The pointer may still rest where an earlier test's row was, over this one.
-  await userEvent.unhover(row(/^Cut Shelf 2, Shelf 3 with Chase/));
   act(() => props().onSelect(chase.id, chase.index));
   await waitFor(() => expect(lit()).toEqual([chase.index]));
   await userEvent.hover(row(/^Cut Shelf 2, Shelf 3 with Chase/));
   await waitFor(() => expect(lit()).toEqual([chase.index, ...indexes].sort((a, b) => a - b)));
   await userEvent.click(row(/^Cut Shelf 2, Shelf 3 with Chase/));
-  await userEvent.unhover(row(/^Cut Shelf 2, Shelf 3 with Chase/));
+  await restPointer();
   // With the pointer gone, the selection alone still stands for both targets.
   await waitFor(() => expect(props().selectedIndexes).toEqual(indexes));
   expect(lit()).toEqual(indexes);

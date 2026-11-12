@@ -1,4 +1,3 @@
-import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { cn } from '@wbcnc/ui/lib/utils';
 import type { HoleChoice, HoleMiddle } from '@wbcnc/cam';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@wbcnc/ui/components/dropdown-menu';
@@ -32,8 +31,9 @@ import { SelectionBar } from './SelectionBar';
 import { bestColumns, fitScale, kBoardPad, kMaxScale, kMinScale, kTableGap, layoutTable, type TableBoard, type TableRect } from './table';
 import { PartBadges, PartMenuContent, type PartMenuProps } from './PartMenu';
 import { NestView } from './NestView';
-import { CutBadge } from './CutBadge';
 import { OffBoardPart } from './OffBoardPart';
+import { onBoardOnly } from './placement';
+import { BoardLabel } from './BoardLabel';
 import { tabSpots, toPartFrame } from './outline';
 import type { HoldEditing, HoldSizeKey } from './useHoldEditing';
 import { DropStatus, Ghost } from './DragFeedback';
@@ -163,7 +163,7 @@ export function BoardDrawings({
 
   // The selected board at a size being dragged to, as it would be laid out, with what it stays until the drop.
   const [sizing, setSizing] = useState<{ board: BoardV1; nest: BoardNest } | null>(null);
-  const nestOf = (b: JobBoard) => (sizing?.board.id === b.board.id ? sizing.nest : b.nest);
+  const nestOf = (b: JobBoard) => onBoardOnly(sizing?.board.id === b.board.id ? sizing.nest : b.nest);
   const tableBoards: TableBoard[] = boards.map(b => {
     const nest = nestOf(b);
     return {
@@ -444,7 +444,7 @@ export function BoardDrawings({
   // What's measured on the selected board, for its heading and its drawing.
   const selJob = boards.find(b => b.board.id === selectedId);
   const selEditing = edit?.board === selectedId ? edit : null;
-  const selNest = selJob && (selEditing?.nest ?? nestOf(selJob));
+  const selNest = selJob && (selEditing ? onBoardOnly(selEditing.nest) : nestOf(selJob));
   const selHere = !!selJob && !isCut(selJob.board);
   const selInput = selJob && selNest ? settleInputOf(sizing?.board ?? selJob.board, selNest, instances, bit, nestOptions) : null;
   const selFixtures = selEditing?.fixtures ?? sizing?.board.fixtures ?? selJob?.board.fixtures ?? [];
@@ -494,7 +494,7 @@ export function BoardDrawings({
               const { board } = b;
               const selected = board.id === selectedId;
               const editing = edit?.board === board.id ? edit : null;
-              const nest = editing?.nest ?? nestOf(b);
+              const nest = editing ? onBoardOnly(editing.nest) : nestOf(b);
               const here = selected && !isCut(board);
               const held = selectedHold?.board === board.id ? selectedHold.i : null;
               const shownFixtures = (selected && selFixtures) || (editing?.fixtures ?? board.fixtures ?? []);
@@ -513,8 +513,7 @@ export function BoardDrawings({
               const fits = dragInst && sameThickness(dragInst.thickness, board.thickness);
               const tabHeight = board.retention === 'tabs' ? board.tabs.height : undefined;
               // Only on tab boards: the badges are about parts whose tabs can't hold.
-              const holdingOf = (id: string) =>
-                board.retention === 'tabs' ? plans[i]?.holding?.find(h => h.name === byId.get(id)?.name)?.how : undefined;
+              const holdingOf = (id: string) => (board.retention === 'tabs' ? plans[i]?.holding?.find(h => h.id === id)?.how : undefined);
               const unheld = new Set(nest.placements.filter(p => holdingOf(p.id) === 'unheld').map(p => p.id));
               const nutHits = nest.nutAbove < 0;
               const padPx = kBoardPad * pxPerMm;
@@ -545,26 +544,18 @@ export function BoardDrawings({
                     target && fits && 'border-solid border-primary bg-primary/5 ring-2 ring-primary',
                     target && !target.drop?.at && 'border-red-500 ring-red-500'
                   )}>
-                  <div
-                    className="pointer-events-none absolute flex items-center gap-x-2 overflow-hidden text-xs whitespace-nowrap *:shrink-0"
-                    // Stops short of the next board's label.
-                    style={{ left: padPx, bottom: `calc(100% - ${padPx}px + 12px)`, maxWidth: (nest.board.w + 0.7 * kTableGap) * pxPerMm }}>
-                    <span className="font-medium">{boardLabel(board)}</span>
-                    {isCut(board) && <CutBadge board={board} />}
-                    <span className="!shrink truncate text-muted-foreground">
-                      {fmt(board.thickness)} mm ·{' '}
-                      <span className="font-mono text-[11px]">
-                        {boardSizeLabel(sizing?.board.id === board.id ? sizing.board : board, nest)}
-                      </span>
-                    </span>
-                    {nest.unplaced.length > 0 && (
-                      <span className="font-medium text-amber-600 dark:text-amber-400">{nest.unplaced.length} off it</span>
-                    )}
-                    {unheld.size > 0 && <span className="font-medium text-destructive">{unheld.size} can’t hold</span>}
-                    {nutHits && <span className="font-medium text-destructive">collet nut hits</span>}
-                    {fetching[i] && <LoadingSpinner className="size-3" />}
+                  <BoardLabel
+                    board={board}
+                    sized={sizing?.board.id === board.id ? sizing.board : board}
+                    nest={nest}
+                    unheld={unheld.size}
+                    nutHits={nutHits}
+                    fetching={!!fetching[i]}
+                    left={padPx}
+                    bottom={`calc(100% - ${padPx}px + 12px)`}
+                    maxWidth={(nest.board.w + 0.7 * kTableGap) * pxPerMm}>
                     <DropStatus dragging={!!dragging} fits={!!fits} target={target} from={dragging?.from === board.id} />
-                  </div>
+                  </BoardLabel>
                   <div className="relative shrink-0">
                     <NestView
                       nest={nest}
@@ -785,9 +776,9 @@ export function BoardDrawings({
                       !editing &&
                       selectedTab?.board === board.id &&
                       (() => {
-                        const hold = plans[i]?.hold?.find(h => h.part === selectedTab.part);
+                        const hold = plans[i]?.hold?.find(h => h.id === selectedTab.part);
                         const tab = hold?.tabs[selectedTab.i];
-                        const p = nest.placements.find(q => byId.get(q.id)?.name === selectedTab.part);
+                        const p = nest.placements.find(q => q.id === selectedTab.part);
                         const inst = p && byId.get(p.id);
                         if (!hold || !tab || !p || !inst) return null;
                         const spots = tabSpots(hold.tabs);
@@ -810,7 +801,7 @@ export function BoardDrawings({
                           <SelectionBar<'width' | 'height'>
                             key={`tab-${selectedTab.part}-${selectedTab.i}`}
                             id="tab"
-                            title={`Tab · ${selectedTab.part}`}
+                            title={`Tab · ${inst.name}`}
                             note="Size: all tabs on this board"
                             at={{ x: tab.at.x * pxPerMm + padPx, y: (nest.board.h - tab.at.y) * pxPerMm + padPx }}
                             fields={[
