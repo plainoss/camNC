@@ -1,6 +1,6 @@
 import type { ProviderConfig } from './provider';
 
-export type ConnectionPresetId = 'anthropic' | 'openai' | 'other';
+export type ConnectionPresetId = 'anthropic' | 'openai' | 'gemini' | 'other';
 export interface ConnectionPreset {
   id: ConnectionPresetId;
   label: string;
@@ -31,6 +31,20 @@ export const connectionPresets: ConnectionPreset[] = [
     keyPlaceholder: 'sk-…',
   },
   {
+    id: 'gemini',
+    label: 'Gemini',
+    // Gemini's OpenAI-compatible API: chat completions with tools and image input, plus image generation for Carve.
+    config: {
+      kind: 'compatible',
+      endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      protocol: 'chat',
+      tools: true,
+      images: true,
+    },
+    models: [],
+    keyPlaceholder: 'AIza…',
+  },
+  {
     id: 'other',
     label: 'Other…',
     config: { kind: 'compatible', endpoint: 'https://', protocol: 'chat', tools: true, images: false },
@@ -41,10 +55,11 @@ export const connectionPresets: ConnectionPreset[] = [
 
 export function connectionPreset(config: ProviderConfig | undefined): ConnectionPreset {
   if (!config) return connectionPresets[0]!;
+  const other = connectionPresets.find(preset => preset.id === 'other')!;
   return (
     connectionPresets.find(
       preset => preset.id !== 'other' && preset.config.kind === config.kind && preset.config.endpoint === config.endpoint.replace(/\/$/, '')
-    ) ?? connectionPresets[2]!
+    ) ?? other
   );
 }
 

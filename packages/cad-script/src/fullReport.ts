@@ -640,7 +640,7 @@ export async function fullCadReport(
     boards,
     ...(unplanned.length && { unplanned }),
     ...(report.spatial && { spatial: report.spatial }),
-    ...(drawings.views && { views: renderCadViews(document, parts, evaluation) }),
+    ...(drawings.views && { views: renderCadViews(document, parts, true, evaluation) }),
     ...(drawings.section && { section: renderCadSection(document, parts, drawings.section, evaluation) }),
   };
 }

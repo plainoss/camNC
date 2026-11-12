@@ -122,7 +122,7 @@ const finish = async (ok: boolean, output: object, document?: unknown, svg?: str
     if (ok && inspected) {
       await mkdir(options.views, { recursive: true });
       drawings = { ...drawings };
-      for (const view of renderCadViews(inspected.document, inspected.parts, inspected.evaluation)) {
+      for (const view of renderCadViews(inspected.document, inspected.parts, true, inspected.evaluation)) {
         const file = path.join(options.views, `${view.name}.svg`);
         await writeFile(file, view.svg);
         drawings[view.name] = file;

@@ -49,7 +49,7 @@ async function getMaxResolution(stream: MediaStream) {
 }
 
 export const createServer = (options: ServerOptions) => {
-  let peering = new RolePeering(options.accessToken, 'server', 'client');
+  const peering = new RolePeering(options.accessToken, 'server', 'client');
   let streamCache: MediaStream | null = null;
   let streamPromise: Promise<MediaStream> | null = null;
   const peers = new Map<string, Peer>();
@@ -119,10 +119,9 @@ export interface IConnectResult {
 }
 
 export const createClient = (options: ClientOptions) => {
-  let peering = new RolePeering(options.accessToken, 'client', 'server', {
+  const peering = new RolePeering(options.accessToken, 'client', 'server', {
     maxPeers: 1,
   });
-  let serverPeer: Peer | null = null;
 
   return {
     connect: async (): Promise<IConnectResult> => {
@@ -139,10 +138,8 @@ export const createClient = (options: ClientOptions) => {
         resolveRes = res;
       });
 
-      peering.on('peerConnected', async ({ peerId, peer }: { peerId: string; peer: Peer }) => {
-        serverPeer = peer;
+      peering.on('peerConnected', async ({ peer }: { peerId: string; peer: Peer }) => {
         peer.on('close', () => {
-          serverPeer = null;
           options.onStateChange?.(ClientState.CONNECTING);
         });
         const port = createChunkedPort(peer.dataChannel);
@@ -171,7 +168,6 @@ export const createClient = (options: ClientOptions) => {
     },
     disconnect: async () => {
       await peering.destroy();
-      serverPeer = null;
       options.onStateChange?.(ClientState.DISCONNECTED);
     },
   };
@@ -196,6 +192,9 @@ export function useTrysteroServer(options: ServerOptions) {
       serialize(() => srv.disconnect());
       if (serverRef.current === srv) serverRef.current = null;
     };
+    // Reconnect only for a new access token: callers pass a fresh options object on every render, and
+    // depending on it would tear the connection down and rebuild it each time.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [options.accessToken]);
 
   return {
@@ -230,6 +229,9 @@ export function useTrysteroClient(options: ClientOptions) {
       if (clientRef.current === cl) clientRef.current = null;
       setStream(null);
     };
+    // Reconnect only for a new access token: callers pass a fresh options object on every render, and
+    // depending on it would tear the connection down and rebuild it each time.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [options.accessToken]);
 
   return {

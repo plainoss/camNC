@@ -1,16 +1,21 @@
 # yaml-language-server: $schema=https://docs.mergify.com/mergify-configuration-schema.json
 merge_queue:
   mode: serial
-  # Check cumulative batches ahead, without filling the runners with speculative work.
-  max_parallel_checks: 2
+  # One batch at a time: a batch takes 11 jobs, and two of them plus PR CI overran the 20 runners the plan allows.
+  max_parallel_checks: 1
 
 queue_rules:
   - name: main
-    # Queue explicitly with @mergifyio queue; passing CI alone is not merge consent.
+    # Queue with @mergifyio queue, or label the PR `ready` (pull_request_rules below); passing CI alone is not merge
+    # consent.
     queue_conditions:
       - base = main
       - -draft
-      - check-success = Run tests
+      # A test or CI fix enters the queue straight away: the batch runs every check on it anyway.
+      - or:
+          - check-success = Run tests
+          - label = ci-fix
+          - label = flaky-test
     merge_conditions:
       - check-success = Run tests
       # Distinct merge conditions force batch validation after the lighter PR checks.
@@ -21,8 +26,8 @@ queue_rules:
       - check-success = Behaviour specs (2/4)
       - check-success = Behaviour specs (3/4)
       - check-success = Behaviour specs (4/4)
-    # Preserve required reviews/checks from GitHub in addition to the explicit CI gate.
-    branch_protection_injection_mode: queue
+    # Required reviews/checks from GitHub must hold to merge, not to queue, so a fix can queue before its own CI ends.
+    branch_protection_injection_mode: merge
     merge_method: squash
     batch_size: 3
     batch_max_wait_time: 30 seconds
@@ -31,12 +36,28 @@ queue_rules:
 
 # Fixes for failing tests and CI jump the queue: a red test ejects every batch it lands in, so it is fixed first.
 priority_rules:
+  # Batches running without a flaky-test fix are likely to fail on the same test, so stop them and test the fix first.
+  - name: fix-flaky-test
+    conditions:
+      - label = flaky-test
+    priority: high
+    allow_checks_interruption: true
+  # Other CI fixes go next, without discarding the batch already running: interrupting for every one of them threw
+  # away three batches in twenty minutes.
   - name: unblock-queue
     conditions:
       - or:
-          - label = flaky-test
           - label = ci-fix
           - title ~= ^fix\((ci|test)\)
     priority: high
-    # Batches running without the fix are likely to fail on the same test, so test the fix first.
-    allow_checks_interruption: true
+    allow_checks_interruption: false
+
+# The `ready` label is merge consent that doesn't need the author around: the PR queues once its queue conditions
+# hold (Run tests green, approved, no conflict), even if the session that opened it has stopped.
+pull_request_rules:
+  - name: queue PRs labelled ready
+    conditions:
+      - base = main
+      - label = ready
+    actions:
+      queue:

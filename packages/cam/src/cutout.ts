@@ -1,6 +1,7 @@
 import { areaD, type PathD, type PathsD } from 'clipper2-ts';
 import { profileFeatures } from './cutFeatures';
 import type { PartFeatures } from './features';
+import type { SafetyFilter } from './safety';
 import { offset, union } from './geom';
 import { simplifyLoop } from './simplifyLoop';
 
@@ -63,6 +64,48 @@ export function cutoutSilhouette(region: PathsD, shape: CutoutShape, margin: num
     { x: box.x0 + r, y: box.y1 - r },
   ];
   return r > 0 ? outer(offset([inner], r)) : [inner];
+}
+
+/**
+ * Whether a cutout's outline (board frame, mm, X0 Y0 at the board's lower left) runs past the board's edge: the piece
+ * would come out cut short there, and the bit's path round it leaves the board.
+ */
+export function cutoutPastBoard(outline: PathsD, size: { w: number; h: number }): boolean {
+  // Rounding in the offsets: a line laid exactly along the edge is on the board.
+  const e = 1e-3;
+  return outline.some(loop => loop.some(p => p.x < -e || p.y < -e || p.x > size.w + e || p.y > size.h + e));
+}
+
+/** How far past the bit's radius a move off the board may be from a cut line and still be the bit going round it, mm. */
+const kNearCutLine = 1;
+
+const toLoop = (q: { x: number; y: number }, loop: PathD) =>
+  Math.min(
+    ...loop.map((a, i) => {
+      const b = loop[(i + 1) % loop.length];
+      const dx = b.x - a.x,
+        dy = b.y - a.y,
+        l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((q.x - a.x) * dx + (q.y - a.y) * dy) / l2)) : 0;
+      return Math.hypot(q.x - a.x - t * dx, q.y - a.y - t * dy);
+    })
+  );
+
+/**
+ * Leaves out the moves off the board that go round `cutouts` (board frame; `flipH`: the program runs with the board
+ * turned over, Y mirrored about this height), so a cut line past the edge is said once, not once per move. Every other
+ * issue is kept: moves off the board elsewhere (a V-carve, another part, a dowel) still show. `dropped()`: whether any was.
+ */
+export function cutLineFilter(cutouts: BoardCutout[], flipH?: number): { keep: SafetyFilter; dropped: () => boolean } {
+  let dropped = false;
+  const keep: SafetyFilter = (issue, toolRadius) => {
+    if (issue.rule !== 'outside-board' || !issue.at || !cutouts.length) return true;
+    const at = flipH === undefined ? issue.at : { x: issue.at.x, y: flipH - issue.at.y };
+    const round = cutouts.some(c => toLoop(at, c.outline) <= toolRadius + kNearCutLine);
+    dropped ||= round;
+    return !round;
+  };
+  return { keep, dropped: () => dropped };
 }
 
 /** A cutout as CAM takes a part: its features, size and lower left corner on the board. */

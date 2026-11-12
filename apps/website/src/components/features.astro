@@ -38,9 +38,9 @@ const features: Array<FeatureItem> = [
   <ul class="grid w-full max-w-6xl grid-cols-1 gap-6 md:grid-cols-3">
     {
       features.map(({ title, description, detail, icon }) => (
-        <li class="flex h-full flex-col gap-4 rounded-2xl border border-default bg-offset p-6 text-left shadow-lg backdrop-blur">
+        <li class="flex h-full flex-col gap-4 rounded-xl border border-default bg-offset p-6 text-left">
           {icon && (
-            <div class="size-14 rounded-full border border-white/30 bg-white/10 p-3 text-secondary">
+            <div class="size-12 rounded-lg border border-default bg-default p-2.5 text-primary">
               <Icon name={icon} class="size-full" />
             </div>
           )}

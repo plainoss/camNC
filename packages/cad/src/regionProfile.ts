@@ -66,9 +66,6 @@ export function regionProfile(part: CadPart & { regions: string[] }): { part?: E
   };
 }
 
-const regionArea = (region: Pick<CadSketchRegion, 'points' | 'holes'>) =>
-  Math.abs(polygonArea(region.points)) - region.holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0);
-
 type Point = { x: number; y: number };
 
 /**

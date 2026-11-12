@@ -12,7 +12,8 @@
   "scripts": {
     "test": "vitest",
     "check-types": "tsc --noEmit",
-    "sim": "node scripts/sim.mjs"
+    "sim": "node scripts/sim.mjs",
+    "lint": "oxlint --max-warnings 0"
   },
   "license": "Apache-2.0",
   "dependencies": {
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@mergifyio/vitest": "catalog:",
     "@types/node": "catalog:",
+    "@wbcnc/cam": "workspace:*",
     "@wbcnc/typescript-config": "workspace:*",
     "vitest": "catalog:",
     "ws": "^8.18.3"

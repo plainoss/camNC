@@ -189,7 +189,7 @@ it.each([false, true])(
     const f = spatialReportFixture(),
       generation = evaluateCadDocument(copyOperationPrefix(f.source)),
       final = evaluateCadDocument(f.source);
-    const view = renderCadViews(f.source, generation.parts, supplied ? final : undefined)[0]!;
+    const view = renderCadViews(f.source, generation.parts, true, supplied ? final : undefined)[0]!;
     expect(view.svg).toContain(`data-cut="cut-parts:${f.second}:`);
     expect(view.svg).not.toContain('data-body="Knife A"');
     const body = cadViewBodies(f.source, generation.parts, supplied ? final : undefined).find(body => body.id === f.reference)!;

@@ -1,7 +1,9 @@
 import { useDesignUnits } from './designUnits';
-import { edgeFilletProblems, type CadFolder, type CadPart } from '@wbcnc/cad';
+import { edgeFilletProblems, type CadDocument, type CadFolder, type CadPart } from '@wbcnc/cad';
 import { useCallback, useState } from 'react';
 import { PartRowMenu } from './PartRowMenu';
+import { ExportDialog, type ExportTarget } from './export/ExportDialog';
+import { shownPartsTarget } from './export/shownPartsTarget';
 
 export interface PartsListRow {
   /** A part's ID, or `part/copy` for one of its copies. */
@@ -24,7 +26,9 @@ export function PartsList({
   trouble,
   onPick,
   onRename,
-  folders,
+  document,
+  rolledTo,
+  folders = document?.folders,
   onSketchCopy,
   onDetachCopy,
 }: {
@@ -32,6 +36,10 @@ export function PartsList({
   folders?: CadFolder[];
   onSketchCopy?: (partId: string, copyId: string, face: 'top' | 'underside') => void;
   onDetachCopy?: (partId: string, copyId: string) => void;
+  /** The design: its folders, unless given, and in the studio what a row's Export… writes from. */
+  document?: CadDocument;
+  /** The step the view's rollback bar sits after, or null at the end: Export… writes the design as it is there. */
+  rolledTo?: string | null;
   hidden: boolean;
   studio: boolean;
   selectedKey: string | undefined;
@@ -46,6 +54,7 @@ export function PartsList({
   const { formatLength, lengthUnit } = useDesignUnits();
   const [menu, setMenu] = useState<{ key: string; name: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<ExportTarget | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   // A Fillet step that leaves corners sharp is a problem with the part too, as the check reports it.
   const problemOf = (part: CadPart) => trouble(part.id) || edgeFilletProblems(part)[0]?.message;
@@ -141,6 +150,19 @@ export function PartsList({
             { label: hiddenParts.has(menu.key) ? 'Show' : 'Hide', onSelect: () => onToggleHidden(menu.key) },
             ...(() => {
               const row = rows.find(row => row.key === menu.key);
+              const exportDocument = studio ? document : undefined;
+              if (!row || !exportDocument) return [];
+              const copyId = menu.key !== row.part.id ? menu.key.slice(row.part.id.length + 1) : undefined;
+              const only = { partId: row.part.id, ...(copyId && { copyId }) };
+              return [
+                {
+                  label: 'Export…',
+                  onSelect: () => setExporting(shownPartsTarget(exportDocument, rolledTo, { name: menu.name, only })),
+                },
+              ];
+            })(),
+            ...(() => {
+              const row = rows.find(row => row.key === menu.key);
               const copyId = row && menu.key !== row.part.id ? menu.key.slice(row.part.id.length + 1) : null;
               if (!row || !copyId) return [];
               return [
@@ -156,6 +178,7 @@ export function PartsList({
           ]}
         />
       )}
+      <ExportDialog target={exporting} unit={lengthUnit} onClose={() => setExporting(null)} />
     </>
   );
 }

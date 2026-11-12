@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import imagegenReadingOwlUrl from './fixtures/owl-imagegen-reading.png?url';
 import { generateNativeRasterAsset } from './nativeRaster';
 import { boundedCarvingRasterPreview, traceCarvingPng, traceCarvingPngFile } from './rasterSource';
 import { sanitizeCarvingSvg } from './sanitize';
@@ -63,6 +64,35 @@ describe('native monochrome generation and tracing', () => {
     expect(sanitizeCarvingSvg(result.asset.svg)).toContain('<path');
     expect(result.asset.warnings?.join(' ')).toContain('Shading, color and anti-aliasing are discarded');
     expect(result.usage).toMatchObject({ calls: 1, costUsd: null });
+  });
+
+  it('accepts its own trace of a generated image above the size cap for model-written SVG', async () => {
+    const bytes = new Uint8Array(await (await fetch(imagegenReadingOwlUrl)).arrayBuffer());
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ data: [{ b64_json: btoa(binary) }] })));
+    const result = await generateNativeRasterAsset(
+      { ...options(), constraints: { widthMm: 100, heightMm: 98, detail: 'balanced', minFeatureMm: 0.6 } },
+      native,
+      fetcher
+    );
+    expect(result.asset.svg.length).toBeGreaterThan(48_000);
+    expect(sanitizeCarvingSvg(result.asset.svg)).toContain('<path');
+  });
+
+  it("asks Gemini's compatible image API for base64 PNG without OpenAI-only options", async () => {
+    const fetcher = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ data: [{ b64_json: png() }] }))
+    );
+    const gemini = { ...native, endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'imagen-4.0-generate-001' };
+    await generateNativeRasterAsset(options(), gemini, fetcher);
+    const [url, request] = fetcher.mock.calls[0];
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/images/generations');
+    const body = JSON.parse(request!.body as string);
+    expect(body).toMatchObject({ model: 'imagen-4.0-generate-001', n: 1, response_format: 'b64_json' });
+    expect(body).not.toHaveProperty('quality');
+    expect(body).not.toHaveProperty('output_format');
+    expect(body).not.toHaveProperty('size');
   });
 
   it.each([
@@ -148,6 +178,22 @@ describe('native monochrome generation and tracing', () => {
     expect(context.isPointInPath(path, 20.1, 20.1, 'evenodd')).toBe(true);
     expect(context.isPointInPath(path, 19.9, 20.1, 'evenodd')).toBe(false);
     expect(context.isPointInPath(path, 40.5, 40.5, 'evenodd')).toBe(false);
+  });
+
+  it('keeps a two-pixel wall of at least half the minimum feature, and closes it only when narrower', async () => {
+    const letters = png(context => {
+      context.fillStyle = 'black';
+      context.fillRect(10, 30, 38, 40);
+      context.fillRect(50, 30, 40, 40);
+    });
+    // 80 px across 32 mm is 2.5 px/mm: the 2 px wall is 0.8 mm, most of a 1 mm feature.
+    const kept = await traceCarvingPng(letters, { widthMm: 32, heightMm: 32, detail: 'simple', minFeatureMm: 1 });
+    expect(kept.traceReport).toMatchObject({ components: 2, holes: 0 });
+    expect(kept.warnings.join(' ')).not.toContain('Closed light gaps');
+    // With a 2 mm feature the same wall is 0.4 mm, below half a feature, so the letters merge and that is reported.
+    const merged = await traceCarvingPng(letters, { widthMm: 32, heightMm: 32, detail: 'simple', minFeatureMm: 2 });
+    expect(merged.traceReport).toMatchObject({ components: 1, holes: 0 });
+    expect(merged.warnings.join(' ')).toContain('Closed light gaps');
   });
 
   it('rejects blank or inverted backgrounds instead of carving a background panel', async () => {

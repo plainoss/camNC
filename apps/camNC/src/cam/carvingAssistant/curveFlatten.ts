@@ -18,7 +18,7 @@ export interface CurveContour {
 type Point = { x: number; y: number };
 
 /** Adaptive de Casteljau subdivision. Quadratic deviation from the endpoint chord is at most half its control distance. */
-export function flattenCurveContours(paths: CurveContour[], tolerance: number, maxPoints = 4000): Point[][] {
+export function flattenCurveContours(paths: CurveContour[], tolerance: number, maxPoints = 8000): Point[][] {
   let count = 0;
   const distance = (p: Point, a: Point, b: Point) => {
     const dx = b.x - a.x,

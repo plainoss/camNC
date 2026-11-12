@@ -11,6 +11,12 @@ export type Loop = { x: number; y: number }[];
 export type CarvingDetail = 'simple' | 'balanced' | 'detailed';
 /** Visual preparation thresholds, not a material or machine accuracy certificate. */
 export const carvingDetailMm: Record<CarvingDetail, number> = { simple: 1, balanced: 0.6, detailed: 0.3 };
+/**
+ * Share of the requested envelope that is carved (black). Above these a V-carve stops reading as a drawing and
+ * turns into a slow, nearly solid pocket; live generations occasionally returned such near-solid art.
+ */
+export const kCarvedFractionWarn = 0.6;
+export const kCarvedFractionError = 0.85;
 export interface CarvingPreparationReport {
   ok: boolean;
   errors: string[];
@@ -25,6 +31,8 @@ export interface CarvingPreparationReport {
   narrowLandAreaMm2: number;
   sourceCutAreaMm2?: number;
   removedCutAreaFraction?: number;
+  /** Carved (black) area of the accepted outline divided by the requested width × height envelope, 0–1. */
+  carvedFraction?: number;
 }
 export interface PreparedCarvingArt {
   art: CarvingArt;
@@ -89,6 +97,9 @@ export function carvingOutlineSvg(outline: Loop[]): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box.x0} ${-box.y1} ${box.w} ${box.h}"><path fill="black" fill-rule="nonzero" d="${path}"/></svg>`;
 }
 
+// Smooth traces are flattened at 0.015 mm, so a 1024 px generated illustration carved at 300 mm needs about 5000 points.
+const kMaxOutlinePoints = 8000;
+
 /** Prepare a fresh candidate. The caller keeps original source for future size/detail changes. No job is mutated. */
 export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Promise<PreparedCarvingArt> {
   const { art, width, height, detail, carving, board, signal } = options;
@@ -102,7 +113,7 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   if (
     options.sourceOutline &&
     (options.sourceOutline.length > 500 ||
-      options.sourceOutline.reduce((sum, loop) => sum + loop.length, 0) > 4000 ||
+      options.sourceOutline.reduce((sum, loop) => sum + loop.length, 0) > kMaxOutlinePoints ||
       options.sourceOutline.some(
         loop =>
           loop.length < 3 ||
@@ -116,7 +127,7 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
   abort(signal);
   const box = bounds(drawn.region);
   if (!Number.isFinite(box.w) || box.w <= 0 || box.h <= 0) throw new Error('Artwork has no dark filled shapes to carve.');
-  if (drawn.region.length > 500 || drawn.region.reduce((sum, loop) => sum + loop.length, 0) > 4000)
+  if (drawn.region.length > 500 || drawn.region.reduce((sum, loop) => sum + loop.length, 0) > kMaxOutlinePoints)
     throw new Error('Artwork is too complex. Request fewer details or simpler filled shapes.');
   const scale = Math.min(width / box.w, height / box.h);
   let outline = drawn.region.map(loop =>
@@ -190,6 +201,10 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
     report.errors.push(
       'This size and detail level remove more than half of the original artwork. Choose a larger size or finer detail level.'
     );
+  report.carvedFraction = Math.min(1, Math.max(0, polyArea(outline)) / (width * height));
+  const carvedMessage = carvedFractionMessage(report.carvedFraction);
+  if (report.carvedFraction > kCarvedFractionError) report.errors.push(carvedMessage);
+  else if (report.carvedFraction > kCarvedFractionWarn) report.warnings.push(carvedMessage);
   if (report.narrowLandAreaMm2 > 0.01)
     report.warnings.push(
       `Approximately ${report.narrowLandAreaMm2.toFixed(2)} mm² of narrow remaining gaps or lands need review at the ${report.minFeatureMm} mm threshold. They were not filled automatically.`
@@ -271,6 +286,11 @@ export async function prepareCarvingArt(options: PrepareCarvingArtOptions): Prom
     operations,
     problemAreas,
   };
+}
+
+function carvedFractionMessage(fraction: number): string {
+  const limit = fraction > kCarvedFractionError ? kCarvedFractionError : kCarvedFractionWarn;
+  return `Most of the drawing is carved away (${Math.round(fraction * 100)}%, limit ${Math.round(limit * 100)}%). Ask for an outline or line-art style, or use white for the background.`;
 }
 
 /**

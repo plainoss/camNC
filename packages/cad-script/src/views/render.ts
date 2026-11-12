@@ -1,7 +1,8 @@
 import type { CadDocument, CadEvaluation, EvaluatedCadPart } from '@wbcnc/cad';
 import { cadViewBodies, cadViewLines, svgNumber as n, svgText, type CadViewLine } from './geometry';
 
-export type CadViewName = 'top' | 'front' | 'right';
+import { normalizeCadViewSelection, type CadViewName, type CadViewSelection } from './selection';
+export { normalizeCadViewSelection, type CadViewName, type CadViewSelection } from './selection';
 export interface CadDrawing {
   name: CadViewName;
   svg: string;
@@ -28,27 +29,37 @@ function projectedPaths(lines: readonly CadViewLine[], u: number, v: number): st
 }
 
 /** Orthographic line drawings of real evaluated contours, including pockets and holes on all physical copies. */
-export function renderCadViews(document: CadDocument, parts: readonly EvaluatedCadPart[], evaluation?: CadEvaluation): CadDrawing[] {
+export function renderCadViews(
+  document: CadDocument,
+  parts: readonly EvaluatedCadPart[],
+  selection: CadViewSelection = true,
+  evaluation?: CadEvaluation
+): CadDrawing[] {
+  const selected = normalizeCadViewSelection(selection);
+  // Skip contour projection entirely when the caller requests no images.
+  if (!selected.length) return [];
   const bodies = cadViewBodies(document, parts, evaluation);
   const byBody = bodies.map(body => ({ body, lines: cadViewLines(body) }));
   const points = byBody.flatMap(body => body.lines.flatMap(line => line.points));
-  return projections.map(({ name, axes, u, v }): CadDrawing => {
-    const xs = points.map(point => point[u]),
-      ys = points.map(point => point[v]);
-    const low: [number, number] = points.length ? [Math.min(...xs), Math.min(...ys)] : [0, 0];
-    const high: [number, number] = points.length ? [Math.max(...xs), Math.max(...ys)] : [1, 1];
-    const width = high[0] - low[0],
-      height = high[1] - low[1],
-      unit = Math.max(width, height) / 40;
-    const margin = 3 * unit,
-      title = `${name.toUpperCase()} · ${axes[0]} right, ${axes[1]} up · ${n(width)} × ${n(height)} mm`;
-    const caption = 'Evaluated outlines and cuts · transparent line drawing · mm';
-    const groups = byBody
-      .map(
-        ({ body, lines }) => `<g data-body="${svgText(body.name)}"><title>${svgText(body.name)}</title>${projectedPaths(lines, u, v)}</g>`
-      )
-      .join('\n');
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${svgText(title)}" viewBox="${n(low[0] - margin)} ${n(-high[1] - 3 * unit)} ${n(width + 2 * margin)} ${n(height + 6 * unit)}" font-family="sans-serif"><rect x="${n(low[0] - margin)}" y="${n(-high[1] - 3 * unit)}" width="${n(width + 2 * margin)}" height="${n(height + 6 * unit)}" fill="white"/><text x="${n(low[0])}" y="${n(-high[1] - 1.2 * unit)}" font-size="${n(unit)}">${svgText(title)}</text>${groups}<text x="${n(low[0])}" y="${n(-low[1] + 2 * unit)}" font-size="${n(unit * 0.7)}">${caption}</text></svg>\n`;
-    return { name, svg, axes, bounds: { at: low, size: [width, height] } };
-  });
+  return selected
+    .map(view => projections.find(projection => projection.name === view)!)
+    .map(({ name, axes, u, v }): CadDrawing => {
+      const xs = points.map(point => point[u]),
+        ys = points.map(point => point[v]);
+      const low: [number, number] = points.length ? [Math.min(...xs), Math.min(...ys)] : [0, 0];
+      const high: [number, number] = points.length ? [Math.max(...xs), Math.max(...ys)] : [1, 1];
+      const width = high[0] - low[0],
+        height = high[1] - low[1],
+        unit = Math.max(width, height) / 40;
+      const margin = 3 * unit,
+        title = `${name.toUpperCase()} · ${axes[0]} right, ${axes[1]} up · ${n(width)} × ${n(height)} mm`;
+      const caption = 'Evaluated outlines and cuts · transparent line drawing · mm';
+      const groups = byBody
+        .map(
+          ({ body, lines }) => `<g data-body="${svgText(body.name)}"><title>${svgText(body.name)}</title>${projectedPaths(lines, u, v)}</g>`
+        )
+        .join('\n');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${svgText(title)}" viewBox="${n(low[0] - margin)} ${n(-high[1] - 3 * unit)} ${n(width + 2 * margin)} ${n(height + 6 * unit)}" font-family="sans-serif"><rect x="${n(low[0] - margin)}" y="${n(-high[1] - 3 * unit)}" width="${n(width + 2 * margin)}" height="${n(height + 6 * unit)}" fill="white"/><text x="${n(low[0])}" y="${n(-high[1] - 1.2 * unit)}" font-size="${n(unit)}">${svgText(title)}</text>${groups}<text x="${n(low[0])}" y="${n(-low[1] + 2 * unit)}" font-size="${n(unit * 0.7)}">${caption}</text></svg>\n`;
+      return { name, svg, axes, bounds: { at: low, size: [width, height] } };
+    });
 }
