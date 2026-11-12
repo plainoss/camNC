@@ -5,6 +5,7 @@ import type { CadSession } from '@wbcnc/cad-editor/session';
 import './proposal.css';
 import { requirementProposalRefusal, subscribeRequirements } from './assistant/requirementStore';
 import { ProposalTweaks } from './ProposalTweaks';
+import { proposalCheckWarnings } from './assistant/proposalWarnings';
 import type { ViewRequest } from '@/cam/model/ViewCameras';
 
 const WorkspaceView = lazy(() => import('./WorkspaceView'));
@@ -52,6 +53,8 @@ export function ProposalReview({
   useEffect(() => subscribeRequirements(proposal.base.id, () => refreshRequirements(value => value + 1)), [proposal]);
   const comparison = useMemo(() => compareCadProposal(proposal), [proposal]);
   const highlighted = useMemo(() => changedParts(proposal), [proposal]);
+  // Geometry notices from the comparison and the final check's own warnings, such as a cut no tool can machine.
+  const warnings = useMemo(() => [...new Set([...proposalCheckWarnings(proposal), ...comparison.newWarnings])], [proposal, comparison]);
   const stale = JSON.stringify(currentDocument) !== JSON.stringify(proposal.base);
   const refusal = disabled
     ? 'Finish or cancel the current edit before applying this design.'
@@ -108,11 +111,11 @@ export function ProposalReview({
           ) : (
             <p>No lost cuts or joints detected.</p>
           )}
-          {comparison.newWarnings.length > 0 && (
+          {warnings.length > 0 && (
             <>
-              <h3>New warnings</h3>
-              <ul>
-                {comparison.newWarnings.map(warning => (
+              <h3>Warnings ({warnings.length})</h3>
+              <ul className="cad-proposal-warnings">
+                {warnings.map(warning => (
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
@@ -160,7 +163,10 @@ export function ProposalReview({
             </button>
           ))}
         </div>
-        <span className="cad-proposal-summary">{summary || 'No step changes'}</span>
+        <span className="cad-proposal-summary">
+          {summary || 'No step changes'}
+          {warnings.length > 0 && ` · ⚠ ${warnings.length} ${warnings.length === 1 ? 'warning' : 'warnings'}`}
+        </span>
         {(refusal || error) && <p role="status">{refusal || error}</p>}
         <span className="cad-proposal-spacer" />
         {onDiscard && (

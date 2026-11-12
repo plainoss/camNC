@@ -39,7 +39,8 @@ export function checkNextStep(checked: {
   const report = (checked.report ?? {}) as { errors?: unknown; warnings?: unknown };
   const unmet = (checked.requirements ?? []).filter(check => !check.passed);
   if (checked.ok) {
-    const warnings = [...new Set(issues(report.warnings).map(issue => String(issue.code)))];
+    // The empty first sketch of a new studio is no warning about the candidate.
+    const warnings = [...new Set(issues(report.warnings).map(issue => String(issue.code)))].filter(code => code !== 'empty-sketch');
     const then =
       checked.stage === 'geometry-only'
         ? 'call finalize_design for this candidate before any Proposal:.'

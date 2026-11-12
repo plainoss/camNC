@@ -5,6 +5,7 @@ import { render } from 'vitest-browser-react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProposalReview } from './ProposalReview';
 import { bindProposalOrigin } from './assistant/recheck';
+import { bindProposalWarnings } from './assistant/proposalWarnings';
 
 vi.mock('./assistant/recheck', async original => ({
   ...(await original<typeof import('./assistant/recheck')>()),
@@ -35,6 +36,25 @@ describe('proposal preview', () => {
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(session.past).toHaveLength(1);
     expect(undoCadSession(session).name).toBe('Original');
+    endCadSession(base.id);
+  });
+
+  it("lists the final check's warnings before Apply, without notices about unused sketches", async () => {
+    const base = createPlateDocument({ name: 'Original' });
+    const proposal = cadProposal(base, { ...base, name: 'Candidate' });
+    bindProposalWarnings(proposal, {
+      warnings: [
+        { code: 'toolpath-missing', message: 'No tool in the library can cut the 3 mm slot.' },
+        { code: 'empty-sketch', message: 'Sketch 2 has no closed shape.' },
+      ],
+    });
+    const screen = render(
+      <ProposalReview proposal={proposal} session={cadSession(base)} currentDocument={base} onApply={() => {}} onClose={() => {}} />
+    );
+    await expect.element(screen.getByRole('heading', { name: 'Warnings (1)' })).toBeVisible();
+    await expect.element(screen.getByText('No tool in the library can cut the 3 mm slot.')).toBeVisible();
+    await expect.element(screen.getByText(/⚠ 1 warning/)).toBeVisible();
+    expect(screen.container.textContent).not.toContain('Sketch 2');
     endCadSession(base.id);
   });
 

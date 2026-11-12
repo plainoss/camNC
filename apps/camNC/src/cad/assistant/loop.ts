@@ -220,6 +220,8 @@ export interface AssistantRunResult {
   messages: AssistantMessage[];
   proposal?: CadProposal;
   origin?: AssistantProposalOrigin;
+  /** The trusted report of the check the proposal came from: the final verification when there is one. */
+  report?: CadReport;
   checks: number;
   usage: AssistantRunUsage;
   stopReason?: string;
@@ -287,6 +289,10 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     ...(stopReason && { stopReason }),
     ...(status === 'proposal' && proposal && { proposal }),
     ...(status === 'proposal' && proposal && latestCandidate && origins.has(latestCandidate) && { origin: origins.get(latestCandidate) }),
+
+    ...(status === 'proposal' &&
+      proposal &&
+      latestCandidate && { report: (finalized.get(latestCandidate) ?? latestCandidate).trustedReport }),
   });
   const emit = (message: AssistantMessage) => {
     messages.push(message);
@@ -409,7 +415,9 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     if (!answer.calls?.length) {
       if (/^\s*Proposal:\s*\S/i.test(answer.text) && proposal) return finish('proposal');
       if (/^\s*Question:\s*\S/i.test(answer.text)) return finish('question');
-      stopReason = 'The assistant did not return a complete Proposal: or Question: response.';
+      stopReason = /^\s*Proposal:/i.test(answer.text)
+        ? 'The assistant offered a proposal, but no check of it passed, so there is nothing to review. Ask it to fix the failed check.'
+        : 'The assistant did not return a complete Proposal: or Question: response.';
       return finish('exhausted');
     }
     if (finalResponse) {
