@@ -400,6 +400,9 @@ export function throughCuts(features: PartFeatures, settings: Partial<CamSetting
   ];
 }
 
+/** A cut deeper than this many bit diameters gets a warning when the bit has no flute length: a long 1/8" bit has about 22 mm of flute. */
+const kDeepCutDiameters = 7;
+
 /**
  * Bits that go deeper than their flutes are long (from the stock top, the deepest cut of all their operations): the
  * shank would rub. A warning, not a stop: a library's flute length may be conservative.
@@ -407,11 +410,17 @@ export function throughCuts(features: PartFeatures, settings: Partial<CamSetting
 export function fluteWarnings(ops: Operation[], stockTop: number): string[] {
   const out: string[] = [];
   for (const tool of new Set(ops.map(o => o.tool))) {
-    if (!tool.fluteLength) continue;
     const zs = ops.filter(o => o.tool === tool).flatMap(o => o.passes.flatMap(p => p.pts.map(q => q[2])));
+    if (!zs.length) continue;
     const depth = stockTop - minOf(zs);
-    if (depth > tool.fluteLength + 1e-6)
-      out.push(`bit D=${tool.diameter} cuts ${round2(depth)} mm deep from the stock top, its flutes are ${tool.fluteLength} mm long`);
+    if (tool.fluteLength) {
+      if (depth > tool.fluteLength + 1e-6)
+        out.push(`bit D=${tool.diameter} cuts ${round2(depth)} mm deep from the stock top, its flutes are ${tool.fluteLength} mm long`);
+    } else if (depth > kDeepCutDiameters * tool.diameter + 1e-6)
+      // Without a flute length, a cut many diameters deep is still worth a look: small bits rarely reach that far.
+      out.push(
+        `bit D=${tool.diameter} cuts ${round2(depth)} mm deep from the stock top, over ${kDeepCutDiameters} times its diameter: check its flute length`
+      );
   }
   return out;
 }

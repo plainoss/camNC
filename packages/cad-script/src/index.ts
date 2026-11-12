@@ -17,3 +17,7 @@ export * from './tasks/run';
 export * from './views/render';
 export * from './views/section';
 export * from './cupboard';
+export * from './panelChair';
+export * from './frameStool';
+export * from './furnitureHardware';
+export * from './furnitureJoints';
