@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PartFeatures } from './features';
 import { DepthMap, readGcode, type Move } from './analyze';
-import { difference, polyArea, union, type PathD, type PathsD } from './geom';
+import { pointInPolygonD, PointInPolygonResult } from 'clipper2-ts';
+import { difference, intersect, offset, polyArea, union, type PathD, type PathsD } from './geom';
 import { toGcode } from './gcode';
 import { forEachRegion, regionLinks, type RegionNode } from './pocketRegionOrder';
 import { camPart, DEFAULT_SETTINGS, stepdownFor } from './toolpaths';
@@ -46,15 +47,33 @@ function travel(moves: Move[], side: (x: number, y: number) => boolean) {
   };
 }
 
-/** The deepest any feed move cuts below the floor already cut under the bit's centre (stock top where none is). */
-function deepestFreshCut(moves: Move[], top: number, radius: number) {
+/**
+ * The deepest any feed move cuts below the highest material left within the bit's radius, counting only the material
+ * the pocket removes (`waste`): the walls around it stay at the stock top.
+ */
+function deepestFreshCut(moves: Move[], top: number, radius: number, waste: PathsD) {
   const xs = moves.flatMap(move => [move.from[0], move.to[0]]),
     ys = moves.flatMap(move => [move.from[1], move.to[1]]);
   const map = new DepthMap(Math.min(...xs) - 5, Math.min(...ys) - 5, Math.max(...xs) + 5, Math.max(...ys) + 5, 0.25);
-  const floorAt = (x: number, y: number) => {
-    const i = Math.round((x - map.x0) / map.res),
-      j = Math.round((y - map.y0) / map.res);
-    return Math.min(top, map.data[j * map.w + i]);
+  const inside = new Uint8Array(map.w * map.h);
+  for (let j = 0; j < map.h; j++)
+    for (let i = 0; i < map.w; i++) {
+      const p = { x: map.x0 + i * map.res, y: map.y0 + j * map.res };
+      inside[j * map.w + i] = waste.filter(path => pointInPolygonD(p, path) === PointInPolygonResult.IsInside).length % 2;
+    }
+  const span = Math.ceil(radius / map.res);
+  /** Top of the highest waste material left under the bit at (x, y). */
+  const highestAt = (x: number, y: number) => {
+    const ci = Math.round((x - map.x0) / map.res),
+      cj = Math.round((y - map.y0) / map.res);
+    let high = -Infinity;
+    for (let j = Math.max(0, cj - span); j <= Math.min(map.h - 1, cj + span); j++)
+      for (let i = Math.max(0, ci - span); i <= Math.min(map.w - 1, ci + span); i++) {
+        const dx = map.x0 + i * map.res - x,
+          dy = map.y0 + j * map.res - y;
+        if (dx * dx + dy * dy <= radius * radius && inside[j * map.w + i]) high = Math.max(high, Math.min(top, map.data[j * map.w + i]));
+      }
+    return high;
   };
   let deepest = 0;
   for (const move of moves) {
@@ -63,12 +82,15 @@ function deepestFreshCut(moves: Move[], top: number, radius: number) {
     for (let k = 1; k <= n; k++) {
       const t = k / n;
       const [x, y, z] = [0, 1, 2].map(a => move.from[a] + t * (move.to[a] - move.from[a]));
-      deepest = Math.max(deepest, floorAt(x, y) - z);
+      deepest = Math.max(deepest, highestAt(x, y) - z);
       map.stamp(x, y, z, radius);
     }
   }
   return deepest;
 }
+
+/** What the pocket of `part` removes from it, kept off its walls by a cell. */
+const wasteOf = (part: PartFeatures) => intersect(offset(part.pockets[0].region, -0.3), part.outlines);
 
 describe('pocket roughing order across regions that split', () => {
   const tool = DEFAULT_SETTINGS.tools[0];
@@ -81,7 +103,7 @@ describe('pocket roughing order across regions that split', () => {
     const { rapidLength, crossings } = travel(moves, (_, y) => y > 360);
     expect(crossings).toBeLessThanOrEqual(12);
     expect(rapidLength).toBeLessThan(10_000);
-    expect(deepestFreshCut(moves, 18, tool.diameter / 2)).toBeLessThanOrEqual(stepdown + 1e-3);
+    expect(deepestFreshCut(moves, 18, tool.diameter / 2, wasteOf(edgeGroove))).toBeLessThanOrEqual(stepdown + 1e-3);
   });
 
   // Ring by ring across both lobes, the bit changed lobe on 160 rapids, 19.9 m of travel. Lobe by lobe it crosses once.
@@ -90,7 +112,7 @@ describe('pocket roughing order across regions that split', () => {
     const { rapidLength, crossings } = travel(moves, x => x > 200);
     expect(crossings).toBeLessThanOrEqual(2);
     expect(rapidLength).toBeLessThan(1_000);
-    expect(deepestFreshCut(moves, 18, tool.diameter / 2)).toBeLessThanOrEqual(stepdown + 1e-3);
+    expect(deepestFreshCut(moves, 18, tool.diameter / 2, wasteOf(dumbbell))).toBeLessThanOrEqual(stepdown + 1e-3);
   });
 });
 
@@ -122,6 +144,16 @@ describe('pocket regions', () => {
       ['0.1', '1.1'],
       ['0.0', '1.0'],
       ['2.0', '3.0'],
+    ]);
+  });
+
+  it('links a path to the nearest earlier group that has a path next to it, however far back', () => {
+    const groups = [[square(0, 0, 1), square(100, 0, 1)], [square(100, 0, 3)], [square(100, 0, 5)], [square(100, 0, 7), square(0, 0, 3)]];
+    const links = regionLinks(groups, 3, true);
+    expect(links.preds[links.id(3, 1)]).toEqual([links.id(0, 0)]);
+    expect(regions(groups)).toEqual([
+      ['0.0', '3.1'],
+      ['0.1', '1.0', '2.0', '3.0'],
     ]);
   });
 

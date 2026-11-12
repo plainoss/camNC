@@ -23,7 +23,8 @@ export interface RegionLinks {
  *
  * The links say which earlier path each path clears next to: any part of the two within `reach`. Missing a link would
  * let a path be cut before the one it follows, so `reach` is generous and a path that finds nothing in the group just
- * before also looks one further back. An extra link only keeps two regions in their old order.
+ * before keeps looking further back until a group has a path near it. An extra link only keeps two regions in their
+ * old order.
  */
 export function regionLinks(groups: PathD[][], reach: number, closed: boolean): RegionLinks {
   const nodes: RegionNode[] = groups.flatMap((paths, group) => paths.map((_, index) => ({ group, index })));
@@ -35,19 +36,19 @@ export function regionLinks(groups: PathD[][], reach: number, closed: boolean): 
     preds[to].push(from);
     succs[from].push(to);
   };
-  const step = reach / 2;
+  const step = reach / 2,
+    within = reach + step;
   const grids: (Grid | undefined)[] = [];
-  const gridOf = (g: number) => (grids[g] ??= sampleGrid(groups[g], closed, step, reach));
+  const gridOf = (g: number) => (grids[g] ??= sampleGrid(groups[g], closed, step, within));
   for (let g = 1; g < groups.length; g++)
     groups[g].forEach((path, i) => {
-      for (const back of [g - 1, g - 2]) {
-        if (back < 0) break;
+      for (let back = g - 1; back >= 0; back--) {
         // A single path following a single path: nothing else it could follow.
         if (groups[back].length === 1 && groups[g].length === 1) {
           link(id(back, 0), id(g, i));
           return;
         }
-        const near = nearPaths(gridOf(back), path, closed, step, reach + step);
+        const near = nearPaths(gridOf(back), path, closed, step);
         for (const j of near) link(id(back, j), id(g, i));
         if (near.length) return;
       }
@@ -127,6 +128,8 @@ export function forEachRegion(
         }
       }
     });
+    // Regions only wait on regions in earlier groups, so one is always ready; this guards a broken link graph.
+    if (best < 0) throw new Error('Pocket regions wait on each other: no region is ready to cut');
     done.add(best);
     pos = cut(regions[best].flatMap(b => bands[b].map(n => nodes[n]))) ?? pos;
   }
@@ -148,32 +151,52 @@ function samples(path: PathD, closed: boolean, step: number): Pt[] {
   return out;
 }
 
-type Grid = { cell: number; at: Map<string, { p: Pt; path: number }[]> };
+/** A grid cell's key; cells are at least the link reach wide, so this covers any plan a pocket has. */
+const cellKey = (i: number, j: number) => (i + 0x100000) * 0x200000 + (j + 0x100000);
+
+/** Samples of a group's paths by grid cell, with the group's bounding box. */
+type Grid = { cell: number; paths: number; box: Box; at: Map<number, { p: Pt; path: number }[]> };
+type Box = { x0: number; y0: number; x1: number; y1: number };
+
+const boxOf = (points: Pt[]): Box =>
+  points.reduce((b, p) => ({ x0: Math.min(b.x0, p.x), y0: Math.min(b.y0, p.y), x1: Math.max(b.x1, p.x), y1: Math.max(b.y1, p.y) }), {
+    x0: Infinity,
+    y0: Infinity,
+    x1: -Infinity,
+    y1: -Infinity,
+  });
 
 function sampleGrid(paths: PathD[], closed: boolean, step: number, cell: number): Grid {
-  const at = new Map<string, { p: Pt; path: number }[]>();
+  const at = new Map<number, { p: Pt; path: number }[]>();
+  const all: Pt[] = [];
   paths.forEach((path, i) =>
     samples(path, closed, step).forEach(p => {
-      const key = `${Math.floor(p.x / cell)},${Math.floor(p.y / cell)}`;
+      all.push(p);
+      const key = cellKey(Math.floor(p.x / cell), Math.floor(p.y / cell));
       const list = at.get(key);
       if (list) list.push({ p, path: i });
       else at.set(key, [{ p, path: i }]);
     })
   );
-  return { cell, at };
+  return { cell, paths: paths.length, box: boxOf(all), at };
 }
 
-/** The paths of `grid` with a sample within `within` of a sample of `path`. */
-function nearPaths(grid: Grid, path: PathD, closed: boolean, step: number, within: number): number[] {
+/** The paths of `grid` with a sample within one cell width of a sample of `path`. */
+function nearPaths(grid: Grid, path: PathD, closed: boolean, step: number): number[] {
   const found = new Set<number>();
-  const w2 = within * within;
-  const span = Math.ceil(within / grid.cell);
-  for (const q of samples(path, closed, step)) {
+  const within = grid.cell,
+    w2 = within * within;
+  const query = samples(path, closed, step);
+  const box = boxOf(query);
+  if (box.x0 > grid.box.x1 + within || box.x1 < grid.box.x0 - within || box.y0 > grid.box.y1 + within || box.y1 < grid.box.y0 - within)
+    return [];
+  for (const q of query) {
     const cx = Math.floor(q.x / grid.cell),
       cy = Math.floor(q.y / grid.cell);
-    for (let dx = -span; dx <= span; dx++)
-      for (let dy = -span; dy <= span; dy++)
-        for (const { p, path: i } of grid.at.get(`${cx + dx},${cy + dy}`) ?? []) if (!found.has(i) && dist2(p, q) <= w2) found.add(i);
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (const { p, path: i } of grid.at.get(cellKey(cx + dx, cy + dy)) ?? []) if (!found.has(i) && dist2(p, q) <= w2) found.add(i);
+    if (found.size === grid.paths) break;
   }
   return [...found].sort((a, b) => a - b);
 }
