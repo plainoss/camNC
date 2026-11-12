@@ -80,6 +80,19 @@ describe('durable construction source and compatibility', () => {
     expect(parseCadDocument(JSON.parse(JSON.stringify(replaced))).constructions).toHaveLength(1);
   });
 
+  it('keeps the moving roles of an assembly step across reload, and refuses roles the step does not name', () => {
+    const { document, plan } = fixture();
+    const roles = plan.assembly[0]!.roles;
+    const moved = setCadConstruction(document, { ...plan, assembly: [{ ...plan.assembly[0]!, moving: [roles[0]!] }] });
+    expect(parseCadDocument(JSON.parse(JSON.stringify(moved))).constructions![0]!.assembly[0]!.moving).toEqual([roles[0]]);
+    // A plan saved before steps said what moves still opens.
+    expect(
+      parseCadDocument(JSON.parse(JSON.stringify(setCadConstruction(document, plan)))).constructions![0]!.assembly[0]
+    ).not.toHaveProperty('moving');
+    for (const moving of [['not-a-role'], [], [roles[0]!, roles[0]!]])
+      expect(() => setCadConstruction(document, { ...plan, assembly: [{ ...plan.assembly[0]!, moving }] })).toThrow(/Invalid/);
+  });
+
   it('opts only construction-bearing documents into v6 and preserves facts across JSON reload', () => {
     const { document, plan } = fixture();
     expect(document.version).toBe(3);

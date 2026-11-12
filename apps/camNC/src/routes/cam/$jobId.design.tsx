@@ -1,3 +1,5 @@
+import { plannedReliefBit } from '@/cam/planSettings';
+import { ReliefBitContext } from '@/cad/reliefBit';
 import { DesignName, DesignSettings, type DesignSettingsValue } from '@/cam/DesignSettings';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -325,92 +327,94 @@ function DesignSession({ initialJob, context }: { initialJob: CamJobV1; context:
         ? evaluateCadFeatures(facePartSource, facePart).part.cuts?.find(cut => cut.id === (faceOn as { floorOf: string }).floorOf)?.outline
         : undefined;
   return (
-    <CamPage className="h-app">
-      <CamJobBar
-        job={initialJob}
-        title={<DesignName name={settings.name} onRename={name => updateSettings({ ...settings, name })} />}
-        onStageNavigate={destination => void navigateStage(destination)}
-        navigationPending={navigationPending}
-        tools={
-          <>
-            <DesignSettings value={settings} onSave={updateSettings} />
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-muted-foreground"
-              title="Save the whole design, with its sketches and features, as a .json file. Open it again from Projects."
-              onClick={saveToFile}>
-              <Download /> Save to file
-            </Button>
-            <StudioExportButton design={currentDesign} rolledTo={() => editor.current?.rolledTo() ?? null} />
-          </>
-        }
-      />
-      <div className="relative min-h-0 flex-1">
-        {conflicted && (
-          <div
-            role="alert"
-            className="absolute left-4 right-4 top-12 z-50 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-background p-3 shadow-md">
-            <p className="flex-1 text-sm">{error ?? draftConflictMessage}</p>
-            <Button size="sm" disabled={recovering} onClick={() => void recoverCopy()}>
-              Save sketch copy
-            </Button>
-            <Button size="sm" variant="outline" disabled={recovering} onClick={() => void restoreSaved()}>
-              Use saved sketch
-            </Button>
-          </div>
-        )}
-        {faceEdit && facePart ? (
-          <CadEditor
-            key={`${faceEdit.sketchId}:${editorEpoch}`}
-            document={faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId)}
-            faceSketch={{
-              outline: faceBelow ? flipUnderside(facePart.outline) : facePart.outline,
-              floor: faceBelow && faceFloor ? flipUnderside(faceFloor) : faceFloor,
-              label: `${faceFloor ? 'Pocket floor' : faceBelow ? 'Underside' : 'Top face'}${faceBelow ? ', seen from below' : ''}`,
-              below: faceBelow,
-              scene: faceEdit.scene,
-            }}
-            onDraftChange={edited => {
-              const merged = withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited);
-              if (activeSession.current === session) syncCadSession(session, merged);
-              draft(merged);
-            }}
-            onFinish={edited => leaveFaceSketch(withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited))}
-            onCancel={() => {
-              const { base } = faceEdit;
-              // Cancel first saves the sketch as it was. Carrying on from that saved draft, rather than the copy taken on
-              // entry, keeps the next save's checkpoint in step with what's stored.
-              void queue.current.then(() => leaveFaceSketch(failure.current ? base : persisted.current.design!.draft));
-            }}
-            saveStatus={status}
-            notice={conflicted ? null : error}
-            controller={editor}
-          />
-        ) : (
-          <CadEditor
-            key={editorEpoch}
-            document={editorDocument}
-            editSession={session}
-            partCameraState={partCameraState}
-            studioCameraState={studioCameraState}
-            startIn3D={returnTo && !returnTo.studio ? 'part' : true}
-            {...(returnTo?.studio && returnTo.stepId && { selectedStepId: returnTo.stepId })}
-            onEditFaceSketch={(base, partId, sketchId, scene, fromStudio) => {
-              draft(base);
-              setFaceEdit({ base, partId, sketchId, scene, fromStudio });
-            }}
-            preferredPartId={returnTo?.partId ?? context.part}
-            onDraftChange={draft}
-            onFinish={finish}
-            onCancel={cancel}
-            onFinishBlocked={reason => setError(draftKeptNotice(reason))}
-            saveStatus={status}
-            notice={conflicted ? null : error}
-            controller={editor}
-          />
-        )}
-      </div>
-    </CamPage>
+    <ReliefBitContext.Provider value={plannedReliefBit(initialJob.plan)}>
+      <CamPage className="h-app">
+        <CamJobBar
+          job={initialJob}
+          title={<DesignName name={settings.name} onRename={name => updateSettings({ ...settings, name })} />}
+          onStageNavigate={destination => void navigateStage(destination)}
+          navigationPending={navigationPending}
+          tools={
+            <>
+              <DesignSettings value={settings} onSave={updateSettings} />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground"
+                title="Save the whole design, with its sketches and features, as a .json file. Open it again from Projects."
+                onClick={saveToFile}>
+                <Download /> Save to file
+              </Button>
+              <StudioExportButton design={currentDesign} rolledTo={() => editor.current?.rolledTo() ?? null} />
+            </>
+          }
+        />
+        <div className="relative min-h-0 flex-1">
+          {conflicted && (
+            <div
+              role="alert"
+              className="absolute left-4 right-4 top-12 z-50 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-background p-3 shadow-md">
+              <p className="flex-1 text-sm">{error ?? draftConflictMessage}</p>
+              <Button size="sm" disabled={recovering} onClick={() => void recoverCopy()}>
+                Save sketch copy
+              </Button>
+              <Button size="sm" variant="outline" disabled={recovering} onClick={() => void restoreSaved()}>
+                Use saved sketch
+              </Button>
+            </div>
+          )}
+          {faceEdit && facePart ? (
+            <CadEditor
+              key={`${faceEdit.sketchId}:${editorEpoch}`}
+              document={faceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId)}
+              faceSketch={{
+                outline: faceBelow ? flipUnderside(facePart.outline) : facePart.outline,
+                floor: faceBelow && faceFloor ? flipUnderside(faceFloor) : faceFloor,
+                label: `${faceFloor ? 'Pocket floor' : faceBelow ? 'Underside' : 'Top face'}${faceBelow ? ', seen from below' : ''}`,
+                below: faceBelow,
+                scene: faceEdit.scene,
+              }}
+              onDraftChange={edited => {
+                const merged = withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited);
+                if (activeSession.current === session) syncCadSession(session, merged);
+                draft(merged);
+              }}
+              onFinish={edited => leaveFaceSketch(withFaceSketchDocument(faceEdit.base, faceEdit.partId, faceEdit.sketchId, edited))}
+              onCancel={() => {
+                const { base } = faceEdit;
+                // Cancel first saves the sketch as it was. Carrying on from that saved draft, rather than the copy taken on
+                // entry, keeps the next save's checkpoint in step with what's stored.
+                void queue.current.then(() => leaveFaceSketch(failure.current ? base : persisted.current.design!.draft));
+              }}
+              saveStatus={status}
+              notice={conflicted ? null : error}
+              controller={editor}
+            />
+          ) : (
+            <CadEditor
+              key={editorEpoch}
+              document={editorDocument}
+              editSession={session}
+              partCameraState={partCameraState}
+              studioCameraState={studioCameraState}
+              startIn3D={returnTo && !returnTo.studio ? 'part' : true}
+              {...(returnTo?.studio && returnTo.stepId && { selectedStepId: returnTo.stepId })}
+              onEditFaceSketch={(base, partId, sketchId, scene, fromStudio) => {
+                draft(base);
+                setFaceEdit({ base, partId, sketchId, scene, fromStudio });
+              }}
+              preferredPartId={returnTo?.partId ?? context.part}
+              onDraftChange={draft}
+              onFinish={finish}
+              onCancel={cancel}
+              onFinishBlocked={reason => setError(draftKeptNotice(reason))}
+              saveStatus={status}
+              notice={conflicted ? null : error}
+              controller={editor}
+            />
+          )}
+        </div>
+      </CamPage>
+    </ReliefBitContext.Provider>
   );
 }

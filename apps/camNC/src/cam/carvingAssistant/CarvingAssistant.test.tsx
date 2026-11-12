@@ -462,7 +462,6 @@ it('asks one variant at a time when a spending limit is set', async () => {
   variants(2);
   fireEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
   fireEvent.click(screen.getByRole('button', { name: 'Cost and limits' }));
-  fireEvent.click(screen.getByText('Usage and limits'));
   fireEvent.change(screen.getByLabelText('USD limit (optional)'), { target: { value: '0.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
   await waitFor(() => expect(generateCarvingAsset).toHaveBeenCalledTimes(2));

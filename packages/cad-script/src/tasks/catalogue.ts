@@ -152,6 +152,32 @@ export const cadSavedTasks: readonly CadSavedTask[] = [
     review: ['A person accepts the proposed dimensions and joints before a candidate counts as a completed stool.'],
   },
   {
+    id: 'rebuild-panel-chair',
+    request:
+      "This chair's seat, back and lower rail sit in open housings with nothing holding them, and the seat and back can pull out. Rebuild it so it holds together: keep the 404 mm clear seat between the sides, the 450 mm seat height and the 900 mm overall height, in 18 mm sheet.",
+    start: '../designs/furniture-original-panel-chair.json',
+    source: 'issue-input',
+    outcomes: [
+      'The chair is built from the retained keyed panel-chair pattern, and every measured joint, fit and hardware check passes.',
+      'No open, unretained housing or loose original piece remains: every wooden piece is a member of the construction plan.',
+      'The seat top is at 450 mm, the chair is 900 mm tall and 404 mm stays clear between the sides; nothing collides.',
+    ],
+    review: ['A person accepts the keyed envelope and hardware before the chair counts as complete; no load rating is claimed.'],
+  },
+  {
+    id: 'rebuild-frame-stool',
+    request:
+      "This stool's rails sit in 10 mm notches cut from the legs and its seat isn't fastened to anything. Rebuild it with sound joints and a fastened seat, keeping the 650 mm seat height.",
+    start: '../designs/furniture-original-frame-stool.json',
+    source: 'issue-input',
+    outcomes: [
+      'The stool is built from the glued frame-stool pattern, and every measured tenon, web, fit and seat-fastening check passes.',
+      'No shallow whole-rail notch or loose seat remains: every wooden piece is a member of the construction plan.',
+      'The seat top is at 650 mm and nothing collides.',
+    ],
+    review: ['A person accepts the changed footprint and stock before the stool counts as complete; no load rating is claimed.'],
+  },
+  {
     id: 'shelf-description',
     request:
       'Build a small shelf with two tall sides, an open front and back, and three evenly spaced horizontal shelves. Make it 600 mm wide, 800 mm tall and 220 mm deep in 18 mm plywood; use housed joints.',

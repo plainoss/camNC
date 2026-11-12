@@ -47,7 +47,6 @@ it('shows image-only history and preserves constraints when moving to a text-onl
   expect(screen.getByText('Question: What diameter?')).toBeDefined();
   await userEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
   await userEvent.click(screen.getByRole('button', { name: 'Cost and limits' }));
-  await userEvent.click(screen.getByText('Usage and limits'));
   expect(screen.getByLabelText('Last turn usage').textContent).toContain('input 123 tokens');
   expect(screen.getByLabelText('Last turn usage').textContent).toContain('cost unknown');
   expect(readConversation(document.id)[1].images).toHaveLength(1);

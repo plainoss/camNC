@@ -243,6 +243,8 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
     });
     const sideRails = (corner: 'left' | 'right') => [`${corner}-apron`, `${corner}-footrest`];
     const side = (corner: 'left' | 'right') => [...legRoles.filter(r => r.includes(`-${corner}-`)), ...sideRails(corner)];
+    const legOf = (corner: string) => [`${corner}-leg-a`, `${corner}-leg-b`];
+    const crossRails = ['front-apron', 'back-apron', 'front-footrest', 'back-footrest'];
     root.construction({
       folderId: folder.id,
       recipe: 'frame-stool-glued-v1',
@@ -272,18 +274,49 @@ export function frameStool(options: FrameStoolOptions = {}): CadScript {
         clampingAndCure:
           'Clamp laminations flat across their full faces, and each frame square, at the adhesive maker’s stated pressure; leave clamped for its full stated cure before loading or attaching the seat.',
       },
+      // Each leg's second lamination closes its split mortises. A side frame is its rails glued into the front leg,
+      // then the back leg brought on from behind. The cross rails and cleats go into the left frame, and the right
+      // frame comes on from the right. The seat is lowered on last and screwed up from below.
       assembly: [
-        { action: 'bond-laminations', roles: legRoles, hardwareIds: [], axis: '+x' },
-        { action: 'insert-crosspieces', roles: side('left'), hardwareIds: [], axis: '+y' },
-        { action: 'insert-crosspieces', roles: side('right'), hardwareIds: [], axis: '+y' },
+        ...corners.map(([corner]) => ({
+          action: 'bond-laminations' as const,
+          roles: legOf(corner),
+          moving: [`${corner}-leg-b`],
+          hardwareIds: [],
+          axis: '-x' as const,
+        })),
+        ...(['left', 'right'] as const).flatMap(corner => [
+          {
+            action: 'insert-crosspieces' as const,
+            roles: [...legOf(`front-${corner}`), ...sideRails(corner)],
+            moving: sideRails(corner),
+            hardwareIds: [],
+            axis: '-y' as const,
+          },
+          {
+            action: 'insert-crosspieces' as const,
+            roles: [...legOf(`back-${corner}`), ...sideRails(corner)],
+            moving: legOf(`back-${corner}`),
+            hardwareIds: [],
+            axis: '-y' as const,
+          },
+        ]),
+        {
+          action: 'insert-crosspieces',
+          roles: [...side('left'), ...crossRails, ...cleatRoles],
+          moving: [...crossRails, ...cleatRoles],
+          hardwareIds: [],
+          axis: '-x',
+        },
         {
           action: 'fit-second-side',
-          roles: [...side('right'), 'front-apron', 'back-apron', 'front-footrest', 'back-footrest', ...cleatRoles],
+          roles: [...side('right'), ...crossRails, ...cleatRoles],
+          moving: side('right'),
           hardwareIds: [],
           axis: '-x',
         },
         { action: 'square-and-cure', roles: [...legRoles, ...railRoles, ...cleatRoles], hardwareIds: [], axis: '+z' },
-        { action: 'attach-seat', roles: ['seat'], hardwareIds: [], axis: '-z' },
+        { action: 'attach-seat', roles: ['seat'], moving: ['seat'], hardwareIds: [], axis: '-z' },
         { action: 'install-hardware', roles: [...cleatRoles, 'seat'], hardwareIds: hardware.map(h => h.id), axis: '+z' },
       ],
     });

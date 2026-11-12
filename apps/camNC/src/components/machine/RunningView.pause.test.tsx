@@ -67,6 +67,21 @@ const pause = async () => {
 };
 
 describe('the hold card, from the controller through CncApi', () => {
+  it('a Pause does not show the connect-time $I message as the controller reason (#915)', async () => {
+    h.api.disconnect();
+    fake.respond = line => (line === '$I' ? ['[VER:4.0 FluidNC v4.0.0:]', '[MSG: Machine: LowRider]', 'ok'] : undefined);
+    h.api = new CncApi(fake.WebSocket);
+    h.api.connect(fake.host);
+    await until(() => h.api.connection.value === 'connected');
+    view = render(<RunningView />);
+    await report('Run', 11_000, -36);
+    await pause();
+    await report('Hold:0', 11_664, -36);
+    expect(card()).toContain(generic);
+    expect(card()).not.toContain('Controller:');
+    expect(card()).not.toContain('LowRider');
+  });
+
   it('a Pause late in the cut says Paused with Hold, not Program done', async () => {
     view = render(<RunningView />);
     await report('Run', 11_000, -36);

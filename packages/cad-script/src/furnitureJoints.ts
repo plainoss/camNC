@@ -1,6 +1,7 @@
 import { cadVariableValues, type CadConstruction, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
 import { clipLoopToBox, furnitureMaterial, furnitureMembers, type FurnitureMember, type FurniturePoint } from './furnitureGeometry';
 import { checkFurnitureHardware } from './furnitureHardware';
+import { checkFurnitureAssembly } from './furnitureAssembly';
 
 export interface FurnitureJointCheck {
   connectionId: string;
@@ -288,5 +289,6 @@ export function checkFurnitureConstruction(
   return [
     ...checkFurnitureJoints(document, parts, plan).map(({ connectionId, ...c }) => ({ id: connectionId, ...c })),
     ...checkFurnitureHardware(document, parts, plan, cutter).map(({ hardwareId, ...c }) => ({ id: hardwareId, ...c })),
+    ...checkFurnitureAssembly(document, parts, plan),
   ];
 }

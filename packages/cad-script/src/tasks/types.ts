@@ -6,7 +6,8 @@ export interface CadSavedTask {
   request: string;
   /** The exact starting design, independent of any candidate produced during this run. */
   start: string | null;
-  source: 'chat-trial' | 'whole-piece-requirement';
+  /** issue-input: a supplied design to repair, kept byte for byte. */
+  source: 'chat-trial' | 'whole-piece-requirement' | 'issue-input';
   /** An earlier request can constrain the outcome even when this turn does not repeat it. */
   history?: { role: 'user' | 'assistant'; content: string }[];
   attachments?: { file: string; mediaType: 'image/svg+xml' | 'image/png' | 'image/jpeg'; description: string }[];

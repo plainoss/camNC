@@ -1,4 +1,4 @@
-import { standaloneSketchPoints, type CadSketch, type CadSketchSolveStatus, type CadSolveResult } from '@wbcnc/cad';
+import { standaloneSketchPoints, type CadDocument, type CadSketch, type CadSketchSolveStatus, type CadSolveResult } from '@wbcnc/cad';
 
 export function constraintColorNotice(status?: CadSketchSolveStatus): string | undefined {
   if (status?.status !== 'solved' || status.entityAnalysis?.complete !== false) return;
@@ -37,7 +37,7 @@ export function sketchFeedback(result: CadSolveResult) {
   // Each part's profile comes first. Its face sketches are hidden here, so their freedom isn't reported as the profile's.
   const profiles = result.sketches.filter((s, i, all) => all.findIndex(other => other.partId === s.partId) === i);
   const free = profiles.reduce((sum, s) => sum + s.dof, 0);
-  const empty = result.document.parts.every(p => isEmptySketch(p.sketch));
+  const empty = isEmptyDesign(result.document);
   const status = issues.some(issue => issue.code === 'solver-restarted')
     ? 'Sketch solver reset'
     : result.status === 'conflict'
@@ -74,6 +74,11 @@ export interface SketchProblemLists {
 /** Whether a sketch holds nothing drawn: points on their own count, as they're what a sketch for Hole holds. */
 export function isEmptySketch(sketch: CadSketch | undefined): boolean {
   return !sketch?.entities.some(e => e.type !== 'point' && !e.construction) && !(sketch && standaloneSketchPoints(sketch).length);
+}
+
+/** Whether no part of the design has anything drawn yet. */
+export function isEmptyDesign(document: Pick<CadDocument, 'parts'>): boolean {
+  return document.parts.every(p => isEmptySketch(p.sketch));
 }
 
 export function sketchDofStatus(dof: number, empty: boolean): string {

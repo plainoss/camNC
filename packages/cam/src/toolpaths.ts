@@ -33,6 +33,7 @@ import {
 } from './passPlanning';
 import { pocketOperation } from './pocketOperation';
 import { loopNotches } from './outlineReach';
+import { roughAroundNotches } from './roughNotches';
 
 export { DEFAULT_SETTINGS, DEFAULT_TOOL } from './toolpathTypes';
 export type { CamSettings, HoleChoice, HoleMiddle, Operation, OutlineNotches, PartCam, Pass, Tool } from './toolpathTypes';
@@ -225,7 +226,9 @@ export function profileOperation(
     const finalRaw = one(offset(shape, sign * r, offsetTolerance));
     const roughRaw = one(offset(shape, sign * (r + s.leaveStock), offsetTolerance));
     // A hole hardly wider than the bit has no room for the allowance: rough on the final path.
-    const roughPath = roughRaw ?? finalRaw;
+    // A notch just wider than the bit has no room for it either: rough on the final path there.
+    const roughPath =
+      roughRaw && finalRaw ? roughAroundNotches(finalRaw, roughRaw, s.leaveStock, inside, offsetTolerance) : (roughRaw ?? finalRaw);
     const rough = roughPath && rotateToLongestEdge(orient(roughPath));
     loops = rough && finalRaw ? { rough, final: rotateToNearest(orient(finalRaw), rough[0]) } : null;
     if (!loopCache.has(loopShape)) loopCache.set(loopShape, new Map());

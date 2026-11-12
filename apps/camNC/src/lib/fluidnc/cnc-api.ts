@@ -83,6 +83,11 @@ export class CncApi {
   public readonly firmware = signal<BuildInfo | null>(null);
   public readonly status = signal<MachineStatus | null>(null);
   public readonly alarm = signal<{ code: number; message: string } | null>(null);
+  /**
+   * The controller's last message of the current job, for the pause card. Cleared when a job starts; replies to the
+   * queries camNC sends while connecting (`$I`'s "Machine: …", the report interval) are left out, as they belong to no
+   * job and would read as the reason for a pause.
+   */
   public readonly lastMessage = signal<string | null>(null);
   /**
    * The last alarm with its context (messages, position, job), kept per host for this tab so that it survives a
@@ -172,6 +177,7 @@ export class CncApi {
     this.jobReadTo.value = null;
     this.jobStartPos.value = null;
     this.awaitingJobStart = null;
+    this.lastMessage.value = null;
     this.lastAlarm.value = loadLastAlarm(host);
     this.host.value = host;
     this.connection.value = 'connecting';
@@ -344,7 +350,8 @@ export class CncApi {
     });
     protocol.on('reset', () => (this.homed.value = false));
     protocol.on('message', message => {
-      this.lastMessage.value = message;
+      // Until 'connected', messages answer camNC's connect-time queries (see lastMessage).
+      if (this.connection.value === 'connected') this.lastMessage.value = message;
       const now = Date.now();
       this.recentMessages = [...this.recentMessages.filter(m => now - m.at < kAlarmContextBeforeMs), { text: message, at: now }];
       // Messages right after the alarm belong to it too, except the program's own (MSG, …) texts: FluidNC still prints
@@ -607,8 +614,9 @@ export class CncApi {
 
   async runFile(filename: string) {
     const api = this.api;
-    // A new job: no Pause of ours yet, nothing of it read.
+    // A new job: no Pause of ours yet, nothing of it read, no message of it yet.
     batch(() => {
+      this.lastMessage.value = null;
       this.holdRequested.value = false;
       this.jobReadTo.value = null;
       this.jobStartPos.value = null;

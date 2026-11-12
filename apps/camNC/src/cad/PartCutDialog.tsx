@@ -17,6 +17,7 @@ import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
 import './partCutDialog.css';
 import { CadValueInput } from './CadValueInput';
+import { useReliefBit } from './reliefBit';
 
 const kDefaultClearance = '0.2';
 
@@ -45,6 +46,7 @@ export function PartCutDialog({
   step,
   tool,
   variables,
+  reliefBit,
   pick,
   onPicked,
   onSave,
@@ -58,6 +60,8 @@ export function PartCutDialog({
   /** The part a new step starts out cutting with, such as the selected one. */
   tool?: string;
   variables?: CadValueScope;
+  /** Diameter, mm, a new Dogbone starts at; by default the bit the job is planned with. */
+  reliefBit?: number;
   /** The last part clicked, added to the box being filled or taken out of it. `seq` tells two clicks apart. */
   pick?: { partId: string; seq: number } | null;
   /** The parts in both boxes, for the view to show. */
@@ -86,8 +90,11 @@ export function PartCutDialog({
   const [relief, setRelief] = useState<Relief>(
     step?.cornerRelief === undefined ? 'inherit' : step.cornerRelief === null ? 'off' : 'dogbone'
   );
+  const plannedBit = useReliefBit();
   const [diameterText, setDiameterText] = useState(
-    step?.cornerRelief ? (step.cornerRelief.diameterExpression ?? lengthText(step.cornerRelief.diameter)) : lengthText(6)
+    step?.cornerRelief
+      ? (step.cornerRelief.diameterExpression ?? lengthText(step.cornerRelief.diameter))
+      : lengthText(reliefBit ?? plannedBit)
   );
   const fingers = useMemo(() => parseCadValue(fingersText, { unit: 'scalar', variables }), [fingersText, variables, parseCadValue]);
   const fingersError =
