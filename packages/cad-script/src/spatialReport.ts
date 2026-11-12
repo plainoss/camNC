@@ -7,6 +7,7 @@ import {
   evaluateCadDocument,
   placePoint,
   type CadCopyTransform,
+  type CadSeedTransform,
   type CadDocument,
   type CadEvaluation,
   type CadPartCut,
@@ -36,10 +37,12 @@ interface SpatialStage {
   diagnosticCodes: string[];
   openings?: CutReport['cuts'];
 }
-export type CadSpatialReportOperation = (
-  | { id: string; kind: 'copyTransform'; legacy: false; settings: Omit<CadCopyTransform, 'id'> }
-  | { id: string; kind: 'partCut'; legacy: boolean; label: string; broken?: string; settings: Omit<CadPartCut, 'id'> }
-) & { after: SpatialStage };
+export type CadSpatialReportOperation =
+  // A seed move transforms a root's original instance; it is listed with the copy moves it is ordered among.
+  (
+    | { id: string; kind: 'copyTransform'; legacy: false; settings: Omit<CadCopyTransform, 'id'> | Omit<CadSeedTransform, 'id'> }
+    | { id: string; kind: 'partCut'; legacy: boolean; label: string; broken?: string; settings: Omit<CadPartCut, 'id'> }
+  ) & { after: SpatialStage };
 export interface CadSpatialReport {
   /** Draft source contract: part/face generation precedes this ordered cut/pose stream. */
   scope: 'generation-before-spatial';
