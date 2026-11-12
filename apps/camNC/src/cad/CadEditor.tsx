@@ -183,7 +183,7 @@ import { cadViewState, saveCadViewState } from '@wbcnc/cad-editor/viewState';
 import { loadShownState, saveShownState } from './shownState';
 import { type CadSelectionBox } from './boxSelection';
 import { chainGeometry, type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture } from './editorGestures';
-import { constraintColorNotice, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
+import { constraintColorNotice, isEmptySketch, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
 import { isDemoMode } from '@/lib/demo/demo-mode';
 import { CommandSearch, type SearchCommand } from './CommandSearch';
 import { SketchToolbar } from './SketchToolbar';
@@ -212,7 +212,7 @@ import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
 import { FeatureDialog } from './FeatureDialog';
 import { StudioSketchDialog } from './StudioSketchDialog';
-import { sketchPendingFinishReason } from './sketchPendingFinishReason';
+import { openSketchFinishReason, sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
 import { toggledKey } from './toggledKey';
 import { usePointPicker } from './pointPicker';
@@ -239,7 +239,7 @@ import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, normalTurn, straightOn, type SketchTurn } from './sketchOrbit';
-import { captureSketchCamera, carriedSketchCamera, type StudioCameraState } from './studioCamera';
+import { captureSketchCamera, carriedSketchCamera, useEditorCameras } from './studioCamera';
 import { studioViewShortcut } from './studioViewShortcut';
 import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
@@ -281,8 +281,10 @@ export function CadEditor({
   controller,
   onEditFaceSketch,
   partCameraState: suppliedPartCamera,
+  studioCameraState: suppliedStudioCamera,
   faceSketch,
   startIn3D,
+  selectedStepId,
 }: CadEditorProps) {
   const [session] = useState(() => editSession ?? cadSession(initialDocument));
   const [doc, setDocument] = useState(session.document);
@@ -437,9 +439,7 @@ export function CadEditor({
   const [canvasBox, setCanvasBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // How far the open sketch's view is turned off straight at its plane, by right-dragging; `n` turns it back.
   const [sketchTurn, setSketchTurn] = useState<SketchTurn>(faceOpening?.turn ?? straightOn);
-  const studioCamera = useRef<StudioCameraState | null>(null);
-  const ownPartCamera = useRef<StudioCameraState | null>(null);
-  const partCameraState = suppliedPartCamera ?? ownPartCamera;
+  const { studioCamera, partCameraState } = useEditorCameras(suppliedStudioCamera, suppliedPartCamera);
   const [sketchCameraShift, setSketchCameraShift] = useState<[number, number]>(faceOpening?.shift ?? [0, 0]);
   // The edges of the parts behind a studio sketch, laid on its plane, and those picked to use in it with `u`.
   const [partEdges, setPartEdges] = useState<PartEdge[]>([]);
@@ -1869,7 +1869,7 @@ export function CadEditor({
       setShowWorkspace(false);
       setShow3D(hasOutline(documentRef.current, step.partId));
     } else if (step.kind === 'faceSketch' && onEditFaceSketch && step.sketchId) {
-      faceEditor.edit(step.partId, step.sketchId);
+      faceEditor.edit(step.partId, step.sketchId, true);
     }
   };
   /** A row of the studio's feature list: edited, deleted, suppressed, or its sketch opened. */
@@ -2114,7 +2114,7 @@ export function CadEditor({
     (sketchStatuses[id]?.status === 'conflict' ? 'This part’s sketch can’t be solved with its current values.' : null);
   const displayStatus =
     activeSketchStatus?.status === 'solved' && (inProgress || !problems.length)
-      ? sketchDofStatus(activeSketchStatus.dof, !sketch?.entities.some(e => e.type !== 'point' && !e.construction))
+      ? sketchDofStatus(activeSketchStatus.dof, isEmptySketch(sketch))
       : status;
   const currentSolverResult = !solving && lastCheckedRevision.current === `${doc.id}:${doc.revision}`;
   const colorNotice = currentSolverResult ? constraintColorNotice(activeSketchStatus) : undefined;
@@ -2131,7 +2131,6 @@ export function CadEditor({
   const stroke = sketchStrokeColor(activeSketchStatus, currentSolverResult);
   const grid = Math.max(1, 10 ** Math.floor(Math.log10(view.w / 20)));
   const chainPreview = sketch && chainGeometry(sketch, chain);
-  const numberOfShapes = sketch?.entities.filter(e => e.type !== 'point' && !e.construction).length ?? 0;
   const acceptanceNotice = notice ?? useNotice ?? finishError;
   const profiles = useProfileSelection(doc, featureDialog, commit, setStudioRefusal);
   const faceBackdrop = useFaceSketchCamera(faceSketch?.scene, view, sketchTurn, sketchCameraShift, canvasBox);
@@ -2161,20 +2160,14 @@ export function CadEditor({
   };
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
-  // Whether the open sketch can be finished: closed back to the studio, or the whole design accepted outside one.
-  const sketchFinishReason =
-    busy || solving
-      ? 'Wait for the current sketch check to finish.'
-      : (pendingFinishReason ??
-        (edgeOnBoard
-          ? null
-          : !faceSketch && !thicknessValid
-            ? 'Enter a valid part thickness before finishing the sketch.'
-            : problems.length
-              ? problems.join(' ')
-              : !faceSketch && numberOfShapes === 0
-                ? 'Draw an outline before finishing the sketch.'
-                : null));
+  const sketchFinishReason = openSketchFinishReason(sketch, problems, {
+    checking: busy || solving,
+    pending: pendingFinishReason,
+    edgeOnBoard,
+    thickness: thicknessValid,
+    face: !!faceSketch,
+    studio: studioSession,
+  });
   const sketchCanFinish = sketchFinishReason === null;
   // The studio's Parts list shows each physical instance, with an eye to show or hide it in the view.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
@@ -2361,6 +2354,7 @@ export function CadEditor({
               workspace={showWorkspace}
               document={doc}
               selectedPartId={part?.id ?? null}
+              initialSelection={selectedStepId}
               onSelect={selectStudioFeature(doc, profiles.pickSketch, {
                 sketch: setSketchRowPicked,
                 face: () => setSelectedFace(null),
@@ -2482,7 +2476,7 @@ export function CadEditor({
                 }}>
                 Delete part
               </button>
-              {(!!part.features?.length || onEditFaceSketch) && (
+              {(!!part.features?.length || (onEditFaceSketch && part.extrude !== false)) && (
                 <PartFeatureList
                   part={part}
                   onRemove={featureId => commit(removeCadFeature(documentRef.current, part.id, featureId))}
