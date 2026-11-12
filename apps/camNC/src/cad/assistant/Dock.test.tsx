@@ -267,3 +267,17 @@ it('confirms typed answers as the brief, sends them in words and lets a chip be 
   await waitFor(() => expect(within(screen.getByRole('region', { name: 'Brief' })).queryByText('Wall ≥ 20 mm')).toBeNull());
   expect(screen.getByText('Width 280 mm')).toBeDefined();
 });
+
+it('keeps a key typed in settings but not yet saved across a section switch and closing the dialog', async () => {
+  dock();
+  await userEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
+  const key = screen.getByLabelText('API key');
+  await userEvent.clear(key);
+  await userEvent.type(key, 'sk-ant-unsaved');
+  await userEvent.click(screen.getByRole('button', { name: 'Brief' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Connection' }));
+  expect(screen.getByLabelText('API key')).toHaveProperty('value', 'sk-ant-unsaved');
+  await userEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
+  expect(screen.getByLabelText('API key')).toHaveProperty('value', 'sk-ant-unsaved');
+});

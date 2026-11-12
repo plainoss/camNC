@@ -8,6 +8,7 @@ import { generateCarvingAsset, type CarvingGenerationOptions, type GeneratedCarv
 import { generateNativeSvgAsset } from './nativeSvg';
 import { generateNativeRasterAsset } from './nativeRaster';
 import { readCarvingPngAsset } from './pngImport';
+import { carvingPngFromImage } from './externalImage';
 import { carvingDetailMm, type CarvingDetail } from './prepare';
 import type { NativeSvgConnection } from './NativeSvgSettings';
 import type { CarvingProposal } from './proposal';
@@ -296,7 +297,9 @@ export function useCarvingAssistant({
     setStatus('Tracing the image on this device…');
     const constraints = { widthMm: target.w, heightMm: target.h, detail, minFeatureMm: carvingDetailMm[detail] };
     try {
-      const asset = await readCarvingPngAsset(file, constraints, abort.signal);
+      const png = await carvingPngFromImage(file);
+      if (abort.signal.aborted || !mounted.current) return;
+      const asset = await readCarvingPngAsset(png, constraints, abort.signal);
       if (abort.signal.aborted || !mounted.current) return;
       const variant: CarvingVariant = {
         id: crypto.randomUUID(),

@@ -10,6 +10,8 @@ import { assistantQuestion, resumeAssistantMessages, runDesignAssistant } from '
 import { BriefChips } from './BriefChips';
 import { Composer } from './Composer';
 import { Transcript } from './Transcript';
+import { AssistantSettingsDialog } from './SettingsDialog';
+import { useAssistantSettings } from './useAssistantSettings';
 import { bindProposalOrigin } from './recheck';
 import { connectionLabel } from './connectionPresets';
 import type { AssistantRequirements } from './requirements';
@@ -62,7 +64,7 @@ export function AssistantDock({
   onClose: () => void;
 }) {
   const [credentials, setCredentials] = useState<AssistantCredentials | null>(() => readAssistantCredentials());
-  const [view, setView] = useState<'chat' | 'connection' | 'settings'>(credentials ? 'chat' : 'connection');
+  const settingsDialog = useAssistantSettings();
   const [messages, setMessages] = useState<AssistantMessage[]>(() => readConversation(document.id));
   const [runSettings, setRunSettings] = useState<AssistantRunSettings>({ limits: {} });
   const [usage, setUsage] = useState<AssistantRunUsage | null>(null);
@@ -278,19 +280,7 @@ export function AssistantDock({
     setText('');
     setImages([]);
     setError('');
-    setView('chat');
   };
-  const menuItem = (label: string, action: () => void) => (
-    <button
-      type="button"
-      disabled={running}
-      onClick={event => {
-        event.currentTarget.closest('details')?.removeAttribute('open');
-        action();
-      }}>
-      {label}
-    </button>
-  );
   return (
     <aside className="cad-assistant-dock" aria-label="Design assistant" onKeyDown={event => event.stopPropagation()}>
       <header>
@@ -300,40 +290,70 @@ export function AssistantDock({
             ${usage.costUsd.toFixed(3)}
           </span>
         )}
-        <details className="cad-assistant-menu">
-          <summary aria-label="Assistant menu">⋯</summary>
-          {/* A disclosure of buttons, not an ARIA menu: it has no menu keyboard model, and toolbars own role="menu". */}
-          <div>
-            {menuItem('New conversation', newConversation)}
-            {menuItem(credentials ? `Connection · ${connectionLabel(credentials.config)}` : 'Connection', () => setView('connection'))}
-            {menuItem('Usage, limits and brief', () => setView('settings'))}
-          </div>
-        </details>
+        <button
+          type="button"
+          className="cad-assistant-icon"
+          aria-label="New conversation"
+          title="New conversation"
+          disabled={running || !messages.length}
+          onClick={newConversation}>
+          ＋
+        </button>
+        <button
+          type="button"
+          className="cad-assistant-icon"
+          aria-label="Assistant settings"
+          title={credentials ? `Settings · ${connectionLabel(credentials.config)}` : 'Settings'}
+          disabled={running}
+          onClick={() => settingsDialog.show()}>
+          ⚙
+        </button>
         <button type="button" className="cad-assistant-close" onClick={onClose} aria-label="Close assistant">
           ✕
         </button>
       </header>
-      {view !== 'chat' && credentials && (
-        <button type="button" className="cad-assistant-back" disabled={running} onClick={() => setView('chat')}>
-          ← Conversation
-        </button>
-      )}
-      {view === 'connection' || !credentials ? (
-        <ProviderSettings
-          value={credentials}
-          onSave={value => {
-            setCredentials(value);
-            if (value) setView('chat');
-          }}
-        />
-      ) : view === 'settings' ? (
-        <div className="cad-assistant-settings-view">
-          <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />
-          <Requirements value={confirmed.requirements} disabled={running} onConfirm={confirmBrief} />
-        </div>
+      <AssistantSettingsDialog
+        open={settingsDialog.open}
+        section={settingsDialog.section}
+        onSection={settingsDialog.setSection}
+        onClose={settingsDialog.close}
+        sections={[
+          {
+            id: 'connection',
+            label: 'Connection',
+            content: (
+              <ProviderSettings
+                value={credentials}
+                onSave={value => {
+                  setCredentials(value);
+                  if (value) settingsDialog.close();
+                }}
+              />
+            ),
+          },
+          {
+            id: 'brief',
+            label: 'Brief',
+            content: <Requirements value={confirmed.requirements} disabled={running} onConfirm={confirmBrief} />,
+          },
+          {
+            id: 'usage',
+            label: 'Cost and limits',
+            content: <RunSettings value={runSettings} usage={usage} disabled={running} onChange={setRunSettings} />,
+          },
+        ]}
+      />
+      {!credentials ? (
+        // First run: connecting is the only thing to do, so it is the dock's content rather than a dialog.
+        <ProviderSettings value={credentials} onSave={setCredentials} />
       ) : (
         <>
-          <BriefChips value={confirmed.requirements} disabled={running} onRemove={removeRequirement} onEdit={() => setView('settings')} />
+          <BriefChips
+            value={confirmed.requirements}
+            disabled={running}
+            onRemove={removeRequirement}
+            onEdit={() => settingsDialog.show('brief')}
+          />
           <Transcript
             messages={messages}
             running={running}

@@ -1,8 +1,8 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo } from 'react';
 import { Button } from '@wbcnc/ui/components/button';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { cn } from '@wbcnc/ui/lib/utils';
-import { Sparkles } from 'lucide-react';
+import { Settings, Sparkles } from 'lucide-react';
 import type { CamJobV1 } from '../jobDb';
 import { NumberInput } from '../NumberInput';
 import { CarvePanelHeader } from '../carve/CarveTools';
@@ -15,6 +15,9 @@ import { sanitizeCarvingSvg } from './sanitize';
 import { kVariantCounts, type CarvingStyle } from './session';
 import type { CarvingAssistantSession } from './useCarvingAssistant';
 import { VariantGrid } from './VariantGrid';
+import { ExternalChatImage } from './ExternalChatImage';
+import { AssistantSettingsDialog } from '../../cad/assistant/SettingsDialog';
+import { useAssistantSettings } from '../../cad/assistant/useAssistantSettings';
 import './panel.css';
 
 const kDetails: CarvingDetail[] = ['simple', 'balanced', 'detailed'];
@@ -31,9 +34,7 @@ const kSeg =
 export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; session: CarvingAssistantSession; onClose: () => void }) {
   const id = useId();
   const { connection, current, shown, request } = session;
-  const [settings, setSettings] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
-  const pngInput = useRef<HTMLInputElement>(null);
+  const settings = useAssistantSettings();
   const prepared = current?.prepared;
   const report = prepared?.report;
   const problems = prepared?.problemAreas?.length ?? 0;
@@ -49,7 +50,21 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
   const applyLabel = session.applied ? 'Applied' : session.replace.on ? 'Replace on board' : 'Add to board';
   return (
     <div className="carving-assistant flex flex-1 flex-col gap-4">
-      <CarvePanelHeader title="AI artwork" icon={<Sparkles className="size-4 text-violet-500" />} onClose={onClose} />
+      <CarvePanelHeader
+        title="AI artwork"
+        icon={<Sparkles className="size-4 text-violet-500" />}
+        onClose={onClose}
+        actions={
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Assistant settings"
+            title={connection.credentials ? `Settings · ${connectionLabel(connection.credentials.config)}` : 'Settings'}
+            onClick={() => settings.show()}>
+            <Settings />
+          </Button>
+        }
+      />
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-violet-500 p-2 text-xs text-muted-foreground">
         <span className="min-w-0 flex-1" title="Drag the box on the board to move it, or its corner to resize it.">
           Dashed box on the board
@@ -76,50 +91,26 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           mm
         </span>
       </div>
-      {connection.credentials && !settings ? (
-        <div className="flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-xs">
-          <span className="size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
-          <span className="min-w-0 flex-1 truncate">
-            Connected · {connectionLabel(connection.credentials.config)}
-            {connection.generationMode === 'native' && connection.sharedImageModel && !connection.separateImage
-              ? ` · images by ${connection.sharedImageModel}, traced here`
-              : ''}
-          </span>
-          <button type="button" className="underline" disabled={session.generating} onClick={() => setSettings(true)}>
-            Change
-          </button>
-        </div>
-      ) : (
-        <div className="grid gap-1">
-          <ProviderSettings
-            value={connection.credentials}
-            onSave={value => {
-              connection.setCredentials(value);
-              setSettings(!value);
-            }}
-          />
-          {connection.credentials && (
-            <Button variant="ghost" size="sm" className="justify-self-start" onClick={() => setSettings(false)}>
-              Keep the current connection
-            </Button>
-          )}
-        </div>
+      {!connection.credentials && (
+        <p className="text-xs text-muted-foreground">
+          <button type="button" className="underline" onClick={() => settings.show('connection')}>
+            Connect an AI provider
+          </button>{' '}
+          to generate here, or use another chat below.
+        </p>
       )}
       {connection.credentials && connection.needsImageProvider && (
-        <div className="grid gap-1.5 text-xs text-amber-700 dark:text-amber-300">
-          <p>
-            This connection can&rsquo;t make images. Connect an OpenAI key, or add an image provider under Advanced. Or draw the artwork as
-            vectors with Text SVG.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setAdvanced(true)}>
-              Add an image provider
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => connection.setGenerationMode('text')}>
-              Use Text SVG
-            </Button>
-          </div>
-        </div>
+        <p className="text-xs text-amber-700 dark:text-amber-300">
+          This connection can&rsquo;t make images:{' '}
+          <button type="button" className="underline" onClick={() => settings.show('images')}>
+            add an image provider
+          </button>
+          ,{' '}
+          <button type="button" className="underline" onClick={() => connection.setGenerationMode('text')}>
+            use Text SVG
+          </button>
+          , or use another chat below.
+        </p>
       )}
       <form
         aria-label="Describe carving artwork"
@@ -211,25 +202,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
             ))}
           </select>
         </div>
-        <p className="text-xs text-muted-foreground">
-          or{' '}
-          <button type="button" className="underline" disabled={session.generating} onClick={() => pngInput.current?.click()}>
-            trace your own image
-          </button>{' '}
-          (black and white PNG up to 2 MB, traced on this device)
-        </p>
-        <input
-          ref={pngInput}
-          type="file"
-          accept="image/png,.png"
-          aria-label="PNG image to trace"
-          hidden
-          onChange={event => {
-            const file = event.target.files?.[0];
-            event.target.value = '';
-            if (file) void request.importPng(file);
-          }}
-        />
+        <ExternalChatImage session={session} />
       </form>
       {session.replace.available && (
         <label className="flex items-start gap-2 text-sm">
@@ -278,9 +251,11 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
             </details>
           )}
           {!!prepared.operations.length && <Toolpaths prepared={prepared} />}
-          <p className="text-xs text-muted-foreground">
-            Check the cut in Plan afterwards; the checks don&rsquo;t judge the subject or the wood.
-          </p>
+          {sourceVector && (
+            <a className="inline-block text-xs text-muted-foreground underline" href={sourceVector} download="carving-source.svg">
+              Download the source SVG
+            </a>
+          )}
           <div className="flex flex-wrap gap-2">
             <Button className="flex-1" disabled={!session.canApply} onClick={session.apply}>
               {applyLabel}
@@ -291,66 +266,91 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
           </div>
         </div>
       )}
-      <details className="mt-auto" open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}>
-        <summary className="cursor-pointer text-sm">Advanced</summary>
-        <div className="space-y-3 pt-2">
-          <fieldset disabled={session.generating} className="flex flex-wrap gap-x-4">
-            <legend className="text-sm">Method</legend>
-            <label>
-              <input
-                type="radio"
-                name={`${id}-generator`}
-                checked={connection.generationMode === 'native'}
-                onChange={() => connection.setGenerationMode('native')}
-              />{' '}
-              {connection.sharedImageModel ? `Image model · ${connection.sharedImageModel}` : 'Image generation'}
-            </label>
-            <label>
-              <input
-                type="radio"
-                name={`${id}-generator`}
-                checked={connection.generationMode === 'text'}
-                onChange={() => connection.setGenerationMode('text')}
-              />{' '}
-              Text SVG
-            </label>
-          </fieldset>
-          {connection.generationMode === 'native' && (
-            <>
-              <p className="text-xs text-muted-foreground">
-                {connection.sharedImageModel
-                  ? 'Uses your connected key. The image is traced into filled regions on this device.'
-                  : 'Your connection has no image model. Connect an OpenAI key, or enter an image provider below.'}
-              </p>
-              {connection.sharedImageModel && (
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={connection.separateImage}
-                    disabled={session.generating}
-                    onChange={event => connection.setSeparateImage(event.target.checked)}
-                  />
-                  Use a different image provider
-                </label>
-              )}
-              {connection.separateImage && (
-                <NativeSvgSettings value={connection.native} disabled={session.generating} onChange={connection.setNative} />
-              )}
-            </>
-          )}
-          <RunSettings
-            value={connection.runSettings}
-            usage={connection.usage}
-            disabled={session.generating}
-            onChange={connection.setRunSettings}
-          />
-          {sourceVector && (
-            <a className="inline-block text-sm underline" href={sourceVector} download="carving-source.svg">
-              Download the source SVG
-            </a>
-          )}
-        </div>
-      </details>
+      <AssistantSettingsDialog
+        open={settings.open}
+        section={settings.section}
+        onSection={settings.setSection}
+        onClose={settings.close}
+        sections={[
+          {
+            id: 'connection',
+            label: 'Connection',
+            content: (
+              <ProviderSettings
+                value={connection.credentials}
+                onSave={value => {
+                  connection.setCredentials(value);
+                  if (value) settings.close();
+                }}
+              />
+            ),
+          },
+          {
+            id: 'images',
+            label: 'Images',
+            content: (
+              <>
+                <fieldset disabled={session.generating} className="flex flex-wrap gap-x-4">
+                  <legend className="text-sm">Method</legend>
+                  <label>
+                    <input
+                      type="radio"
+                      name={`${id}-generator`}
+                      checked={connection.generationMode === 'native'}
+                      onChange={() => connection.setGenerationMode('native')}
+                    />{' '}
+                    {connection.sharedImageModel ? `Image model · ${connection.sharedImageModel}` : 'Image generation'}
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name={`${id}-generator`}
+                      checked={connection.generationMode === 'text'}
+                      onChange={() => connection.setGenerationMode('text')}
+                    />{' '}
+                    Text SVG
+                  </label>
+                </fieldset>
+                {connection.generationMode === 'native' && (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      {connection.sharedImageModel
+                        ? 'Uses your connected key. The image is traced into filled regions on this device.'
+                        : 'Your connection has no image model. Connect an OpenAI key, or enter an image provider below.'}
+                    </p>
+                    {connection.sharedImageModel && (
+                      <label className="flex items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={connection.separateImage}
+                          disabled={session.generating}
+                          onChange={event => connection.setSeparateImage(event.target.checked)}
+                        />
+                        Use a different image provider
+                      </label>
+                    )}
+                    {connection.separateImage && (
+                      <NativeSvgSettings value={connection.native} disabled={session.generating} onChange={connection.setNative} />
+                    )}
+                  </>
+                )}
+              </>
+            ),
+          },
+          {
+            id: 'usage',
+            label: 'Cost and limits',
+            content: (
+              <RunSettings
+                value={connection.runSettings}
+                usage={connection.usage}
+                disabled={session.generating}
+                onChange={connection.setRunSettings}
+              />
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

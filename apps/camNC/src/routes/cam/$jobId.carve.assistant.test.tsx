@@ -109,7 +109,7 @@ async function generate() {
   fireEvent.change(screen.getByLabelText('Variants'), { target: { value: '1' } });
   setBox(30, 30);
   // The recorded connection can't make images, so draw vectors.
-  fireEvent.click(screen.getByRole('button', { name: 'Use Text SVG' }));
+  fireEvent.click(screen.getByRole('button', { name: 'use Text SVG' }));
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
   await ready();
   await waitFor(() => expect(screen.getByRole('button', { name: kApply })).toHaveProperty('disabled', false));
