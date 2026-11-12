@@ -110,9 +110,20 @@ function relieveLoop(
   return { points: counterclockwise ? out : out.reverse(), skipped };
 }
 
-/** One cut-away loop with bones in its corners, leaving corners on the part's `outline` square. */
-export function relieveLoopCorners(points: CadPoint[], cutInside: boolean, diameter: number, outline: CadPoint[]) {
-  return relieveLoop(points, cutInside, diameter / 2, p => onLoop(p, outline));
+/**
+ * One cut-away loop with bones in its corners, leaving corners on the part's `outline` square. A bone bulges past the
+ * walls by about 0.29 of the bit's radius; one that would break out of the `outline` or into one of the `others`
+ * (openings already cut at the same depth) isn't cut, and its corner is counted as skipped.
+ */
+export function relieveLoopCorners(
+  points: CadPoint[],
+  cutInside: boolean,
+  diameter: number,
+  outline: CadPoint[],
+  others: readonly CadPoint[][] = []
+) {
+  const fits = (bone: CadPoint[]) => bone.every(p => pointInPolygon(p, outline) && !others.some(other => pointInPolygon(p, other)));
+  return relieveLoop(points, cutInside, diameter / 2, p => onLoop(p, outline), fits);
 }
 
 /**

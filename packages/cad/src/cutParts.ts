@@ -1,5 +1,5 @@
 import { applyExtrudeRemovals } from './extrudeRemoval';
-import { relieveLoopCorners } from './cornerRelief';
+import { relieveStepOpening } from './stepReliefFit';
 import { effectivePartCutRelief, partCutReliefIssue } from './partCutRelief';
 import { cadDocumentVersion } from './documentVersion';
 import { newCadId } from './document';
@@ -354,13 +354,28 @@ export function applyPartCuts(
         const reach = Math.min(t, (fromTop && fromBelow ? t : fromTop ? t - lo[2] : hi[2]) + c),
           through = reach >= t - kSquare;
         const setting = effectivePartCutRelief(step, intoSource);
-        const relief = setting ? relieveLoopCorners(outline, true, setting.diameter, into.outline) : { points: outline, skipped: [] };
-        if (relief.skipped.length)
-          warn(
-            `${relief.skipped.length} of the corners ${name} cuts in ${intoSource.name} stay square: a bone there would cut into another edge.`,
-            'corner-relief-skipped'
-          );
         const current = target.shape;
+        const z0 = through || fromBelow ? 0 : t - reach,
+          z1 = through || fromTop ? t : reach;
+        // This tool's own pieces join this opening, so their bones may meet it.
+        const relief = relieveStepOpening(
+          current,
+          outline,
+          setting?.diameter,
+          [z0, z1],
+          other => other.id === prefix || other.id.startsWith(`${prefix}#`)
+        );
+        const square = (count: number, cutBy: string, points: CadPoint[]) => {
+          const message = `${count} of the corners ${cutBy} cuts in ${intoSource.name} stay square: a bone there would cut into another edge or opening.`;
+          if (!said.has(message)) diagnostics.push({ code: 'corner-relief-skipped', severity: 'warning', message, points });
+          said.add(message);
+        };
+        if (relief.skipped.length) square(relief.skipped.length, name, relief.skipped);
+        for (const { cut, skipped } of relief.revised)
+          if (skipped.length) {
+            const toolId = /^cut-parts:[^:]+:([^:#]+)/.exec(cut.id)?.[1];
+            square(skipped.length, document.parts.find(part => part.id === toolId)?.name ?? 'another part', skipped);
+          }
         // The first piece keeps the ID a tool's one cut always had.
         const id = `${prefix}${index ? `#${index}` : ''}`;
         const cut: EvaluatedCadCut = {
@@ -374,7 +389,8 @@ export function applyPartCuts(
           islands: [],
           opening: { x0, y0, x1, y1 },
         };
-        target.shape = { ...current, cuts: [...(current.cuts ?? []), cut] };
+        relief.remember(cut);
+        target.shape = { ...current, cuts: [...relief.cuts, cut] };
         made++;
       });
     };
