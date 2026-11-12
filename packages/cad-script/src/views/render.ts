@@ -1,4 +1,4 @@
-import type { CadDocument, EvaluatedCadPart } from '@wbcnc/cad';
+import type { CadDocument, CadEvaluation, EvaluatedCadPart } from '@wbcnc/cad';
 import { cadViewBodies, cadViewLines, svgNumber as n, svgText, type CadViewLine } from './geometry';
 
 import { normalizeCadViewSelection, type CadViewName, type CadViewSelection } from './selection';
@@ -32,12 +32,13 @@ function projectedPaths(lines: readonly CadViewLine[], u: number, v: number): st
 export function renderCadViews(
   document: CadDocument,
   parts: readonly EvaluatedCadPart[],
-  selection: CadViewSelection = true
+  selection: CadViewSelection = true,
+  evaluation?: CadEvaluation
 ): CadDrawing[] {
   const selected = normalizeCadViewSelection(selection);
   // Skip contour projection entirely when the caller requests no images.
   if (!selected.length) return [];
-  const bodies = cadViewBodies(document, parts);
+  const bodies = cadViewBodies(document, parts, evaluation);
   const byBody = bodies.map(body => ({ body, lines: cadViewLines(body) }));
   const points = byBody.flatMap(body => body.lines.flatMap(line => line.points));
   return selected
