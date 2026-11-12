@@ -486,7 +486,8 @@ it('traces a local PNG without a provider, keeps its original and prepares it at
   const { file, dataUri } = pngFile();
   fireEvent.change(screen.getByLabelText('Image to trace'), { target: { files: [file] } });
   await ready();
-  expect(screen.getByLabelText('What should it show?')).toHaveProperty('value', 'Line art from tiny-owl');
+  // The description stays empty: a file name is not a motif.
+  expect(screen.getByLabelText('What should it show?')).toHaveProperty('value', '');
   expect(prepareCarvingArt).toHaveBeenCalledTimes(1);
   expect(vi.mocked(prepareCarvingArt).mock.calls[0][0].sourceOutline).toBeDefined();
   fireEvent.click(applyButton());
@@ -591,4 +592,33 @@ it('turns a pasted JPEG into a traceable PNG', async () => {
   expect(png.type).toBe('image/png');
   expect(png.name).toBe('from-chat.png');
   await expect(carvingPngFromImage(new File(['x'], 'notes.txt', { type: 'text/plain' }))).rejects.toThrow('Drop or paste an image');
+});
+
+it('takes an image dropped anywhere on the panel, without the page-wide file drop seeing it', async () => {
+  rememberAssistantCredentials(null);
+  await open({ method: 'default' });
+  const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+  const { file } = pngFile();
+  const data = new DataTransfer();
+  data.items.add(file);
+  const pageDrop = vi.fn();
+  window.addEventListener('drop', pageDrop);
+  try {
+    const field = screen.getByLabelText('What should it show?');
+    const drag = (type: string) => field.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: data }));
+    act(() => void drag('dragenter'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Drop, paste or choose the image' }).textContent).toContain('Drop to trace')
+    );
+    act(() => void drag('drop'));
+    await ready();
+    expect(pageDrop).not.toHaveBeenCalled();
+  } finally {
+    window.removeEventListener('drop', pageDrop);
+  }
+  // Copy prompt after an import describes a motif, never the imported file's name.
+  fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
+  await waitFor(() => expect(writeText).toHaveBeenCalled());
+  expect(writeText.mock.calls[0]![0]).toContain('line art of a simple motif');
+  expect(writeText.mock.calls[0]![0]).not.toContain('tiny-owl');
 });

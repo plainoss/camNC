@@ -2,6 +2,7 @@ import type { CadConstruction } from './constructionTypes';
 import type { CadDiagnostic, CadDocument } from './types';
 import { constructionShapeIssue } from './constructionShape';
 import { cadDocumentVersion } from './documentVersion';
+import { validateCadDocument } from './geometry';
 
 /** Replace one complete declaration atomically; validation never stores a pass result. */
 export function setCadConstruction(document: CadDocument, construction: CadConstruction): CadDocument {
@@ -11,7 +12,11 @@ export function setCadConstruction(document: CadDocument, construction: CadConst
   const issue = constructionShapeIssue(constructions);
   if (issue) throw new Error(issue);
   const next = { ...document, constructions, revision: document.revision + 1 };
-  return { ...next, version: cadDocumentVersion(next) };
+  const result = { ...next, version: cadDocumentVersion(next) };
+  // Loading refuses a design whose IDs repeat, so a plan reusing a part, folder or other plan's ID could never reopen.
+  const duplicates = (value: CadDocument) => validateCadDocument(value).filter(issue => issue.code === 'duplicate-id').length;
+  if (duplicates(result) > duplicates(document)) throw new Error('Construction, connection and hardware IDs must be unique in the design.');
+  return result;
 }
 
 /** Removing construction intent is explicit; removing its members never silently removes it. */

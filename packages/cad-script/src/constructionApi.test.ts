@@ -101,6 +101,43 @@ it('binds scoped variables and exact mirrored physical copies without alias or i
   expect(refused.document).toEqual(reloaded);
 });
 
+it('refuses a folder replacing another folder’s plan by its ID', async () => {
+  const result = await editCad(null, d => {
+    d.variable('stock', '18mm');
+    d.variable('boltLength', '30mm');
+    for (const name of ['First', 'Second']) {
+      d.folder(name, scope => {
+        const part = scope.newPart('Key', { thickness: 'stock' });
+        part.profile.rect({ at: [0, 0], w: 40, h: 60 });
+        part.profile.circle({ at: [20, 20], d: 4.5 });
+      });
+    }
+  });
+  const document = result.document;
+  const member = (folder: number) => {
+    const part = document.parts.find(p => document.folders![folder]!.partIds.includes(p.id))!;
+    return { part, hole: part.sketch.entities.find(e => e.type === 'circle')!.id };
+  };
+  const first = member(0);
+  const declared = await editCad(document, d =>
+    d.existingFolder('First', scope =>
+      scope.construction({ ...declaration(document.folders![0]!.id, { id: first.part.id }, first.part.sketch.id, first.hole), id: 'plan' })
+    )
+  );
+  expect(declared.scriptError).toBeUndefined();
+  const second = member(1);
+  const refused = await editCad(declared.document, d =>
+    d.existingFolder('Second', scope =>
+      scope.construction({
+        ...declaration(document.folders![1]!.id, { id: second.part.id }, second.part.sketch.id, second.hole),
+        id: 'plan',
+      })
+    )
+  );
+  expect(refused.scriptError).toContain('belongs to another folder');
+  expect(refused.document).toEqual(declared.document);
+});
+
 it('rolls malformed declarations back as script errors without changing source', async () => {
   const base = await editCad(null, d => d.newPart('Panel').profile.rect({ at: [0, 0], w: 100, h: 80 }));
   for (const malformed of [null, {}, { members: [null] }, { parameters: Array(65).fill({}) }]) {
