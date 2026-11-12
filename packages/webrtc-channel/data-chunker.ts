@@ -29,7 +29,7 @@ const LAST = 1 << 0;
 const JSON_FLAG = 1 << 1; // always 1 for now, but kept for future binary upgrade
 
 const HEADER = 2; // id + tag
-const CHUNK_SIZE = 16 * 1024 - HEADER; // 16 KiB minus header
+const CHUNK_SIZE = 16 * 1024 - HEADER; // 16 KiB minus header
 
 // ----------------------------------------------------------------------------
 export default function createChunkedPort(

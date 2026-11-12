@@ -150,8 +150,8 @@ describe('spike 3/4: toolpaths + gcode', () => {
     expect(() => toGcode(cam)).toThrow(/One program per bit/);
     const programs = splitByBit(cam).map(p => toGcode(p));
     expect(programs).toHaveLength(2);
-    expect(programs[0]).toMatch(/^\(  T3 D=3 /m);
-    expect(programs[1]).toMatch(/^\(  T1 D=3.175 /m);
+    expect(programs[0]).toMatch(/^\( {2}T3 D=3 /m);
+    expect(programs[1]).toMatch(/^\( {2}T1 D=3.175 /m);
     // Each: the confirmation before the spindle starts, and the one when parked. No bit swap inside a program.
     for (const g of programs) expect(g.match(/^M0 \(MSG [A-Z][a-z]+/gm)).toEqual(['M0 (MSG Spindle', 'M0 (MSG Program']);
   });
@@ -308,7 +308,7 @@ describe('spike 3/4: toolpaths + gcode', () => {
   it('emits FluidNC gcode that reads back to the same depths', () => {
     const cam = camPart(board(), { tabs: DEFAULT_TABS });
     const gcode = toGcode(cam, { partName: 'test board', stockSize: [200, 100, 8] });
-    expect(gcode).toMatch(/^\(  T1 D=3\.175 CR=0 - ZMIN=-0\.3 - flat end mill \)$/m);
+    expect(gcode).toMatch(/^\( {2}T1 D=3\.175 CR=0 - ZMIN=-0\.3 - flat end mill \)$/m);
     expect(gcode).toContain('(X0 Y0 = lower left corner of the stock, 200 x 100 mm. Z0 = stock bottom)');
     // Confirm, then the spindle starts and comes up to speed before the first move; off and end of program at the end.
     const lines = gcode.trim().split('\n');

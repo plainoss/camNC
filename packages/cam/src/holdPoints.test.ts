@@ -2,17 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { camBoard, type BoardSpec } from './board';
 import type { PartFeatures } from './features';
 import { holdTimeline } from './hold';
-import {
-  heldByPoints,
-  holdBox,
-  holdClashes,
-  kClampWidth,
-  kColletClearance,
-  kHoldDefaults,
-  kHoldHeights,
-  nutReaches,
-  snapClamp,
-} from './holdPoints';
+import { heldByPoints, holdBox, holdClashes, kClampWidth, kHoldDefaults, kHoldHeights, nutReaches, snapClamp } from './holdPoints';
 import { DEFAULT_TABS, freePartsProgram } from './index';
 
 const rect = (x0: number, y0: number, x1: number, y1: number) => [

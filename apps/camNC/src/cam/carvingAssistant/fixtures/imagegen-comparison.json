@@ -1,0 +1,70 @@
+{
+  "date": "2026-11-10",
+  "origin": "built-in imagegen tool",
+  "prompt": "Generate a black and white, monochrome line art owl reading a book, low level of detail such as if suitable for carving. Plain white background. No shading or text.",
+  "source": "owl-imagegen-line-art.png",
+  "sourceWidth": 1312,
+  "sourceHeight": 1199,
+  "model": null,
+  "costUsd": null,
+  "costNote": "The built-in imagegen tool did not report API usage or cost. Separate Sonnet API experiments are recorded in live-generation-metrics.json.",
+  "comparison": {
+    "directSvg": "owl-reading.svg",
+    "physicalEnvelopeMm": [
+      150,
+      150
+    ],
+    "detail": "simple",
+    "minimumFeatureMm": 1,
+    "note": "Both original sources run through the production tracer/preparer and CAM checker. This is a qualitative workflow comparison; prompts and models differ, so it is not a controlled model or cost benchmark. Numeric checks do not grade illustration quality."
+  },
+  "measuredPreparation": {
+    "traceWarnings": [
+      "Raster tracing converts dark pixels to filled cut regions. Shading, color and anti-aliasing are discarded; compare the original image and traced contours.",
+      "Smooth tracing uses 825 cubic curves and 14 lines; 4 filled components and 12 holes remain. Gentle curve joins have aligned tangents; sharp corners and straight edges are retained.",
+      "Measured raster contour boundary error is 0.228 mm; coverage overlap 97.46%; enlargement cannot recover image detail. Compare the source and smooth trace.",
+      "Removed 0 isolated dark specks (0 tracing pixels) below the physical noise threshold. Small intended marks can also be removed.",
+      "Curve-fitting microcorners spanning less than 1 mm are smoothed; original long corners remain pinned.",
+      "Near-elliptical contours were fitted as smooth ellipses, including round pupils or counters, and checked against the original pixel coverage.",
+      "The 1312 \u00d7 1199 pixel source was downsampled to a 1046 \u00d7 955 tracing grid. The original image is retained."
+    ],
+    "traceReport": {
+      "intersectionOverUnion": 0.9745865574267941,
+      "removedFraction": 0.012172910108849749,
+      "addedFraction": 0.013585794266765984,
+      "boundaryErrorPx": 1.4142135623730951,
+      "boundaryErrorMm": 0.22809896167307986,
+      "curves": 825,
+      "lines": 14,
+      "components": 4,
+      "holes": 12,
+      "removedSpecks": 0,
+      "removedSpeckPixels": 0,
+      "roundRegularized": true
+    },
+    "preparationReport": {
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "Detail preparation removed 10.79 mm\u00b2 of cut area, including narrow branches or corners. Compare the artwork before applying.",
+        "Approximately 4.63 mm\u00b2 of narrow remaining gaps or lands need review at the 1 mm threshold. They were not filled automatically.",
+        "Contours are simplified within 0.025 mm after physical detail preparation. Smooth-source CAM chord approximation stays within 0.05 mm; detail cleanup is reported separately.",
+        "Geometric checks do not establish material strength, visual fidelity or machine acceptance. Review Plan before cutting.",
+        "Strokes wider than 2.3 mm get a flat bottom at 2.0 mm deep"
+      ],
+      "detail": "simple",
+      "minFeatureMm": 1,
+      "removedComponents": 0,
+      "sourceComponents": 4,
+      "points": 1886,
+      "camPasses": 718,
+      "removedCutAreaMm2": 10.793433729999487,
+      "narrowLandAreaMm2": 4.627571769999862,
+      "sourceCutAreaMm2": 5413.601886052698,
+      "removedCutAreaFraction": 0.001993762001193159
+    },
+    "width": 128.1644,
+    "height": 149.985
+  },
+  "traceSvg": "owl-imagegen-smooth.svg"
+}

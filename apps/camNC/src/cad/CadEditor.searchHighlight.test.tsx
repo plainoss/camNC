@@ -142,36 +142,64 @@ it('clears studio highlighting on light dismiss and context change, retaining th
   unchanged();
 });
 
-it('reveals the actual highlighted command in an overflowed toolbar without moving keyboard focus', async () => {
-  const { unchanged } = await setup(700);
-  const input = await search('circular pattern');
-  const pattern = studioToolbar().getByRole('button', { name: 'Pattern' });
-  const strip = pattern.closest('.cad-drawing-tools')!;
-  expect(strip.scrollWidth).toBeGreaterThan(strip.clientWidth);
-  await waitFor(() => {
-    const button = pattern.getBoundingClientRect(),
-      visible = strip.getBoundingClientRect();
-    expect(button.left).toBeGreaterThanOrEqual(visible.left);
-    expect(button.right).toBeLessThanOrEqual(visible.right);
-  });
-  expect(strip.scrollLeft).toBeGreaterThan(0);
-  expect(pattern).toHaveAttribute('data-command-highlight', 'true');
+const moreMenu = () => screen.queryByRole('menu');
+const moreButton = () => studioToolbar().getByRole('button', { name: /^More/ });
+
+it('opens More to mark a highlighted command that does not fit, keeping focus in search, and closes it with the search', async () => {
+  const { unchanged } = await setup(600);
+  expect(studioToolbar().queryByRole('button', { name: 'Variable' })).toBeNull();
+  const input = await search('variable');
+  const menu = await screen.findByRole('menu');
+  const item = within(menu).getByRole('menuitem', { name: 'Variable' });
+  expect(item).toHaveAttribute('data-command-highlight', 'true');
+  expect(item).not.toHaveAttribute('data-active');
+  expect(getComputedStyle(item).outlineWidth).toBe('2px');
+  expect(highlighted()).toHaveLength(1);
   expect(document.activeElement).toBe(input);
+  // Typing keeps going to search while the menu shows the match.
+  await userEvent.keyboard('{Backspace}');
+  expect(input).toHaveValue('variabl');
+  expect(document.activeElement).toBe(input);
+  // A match that fits closes the menu search opened.
+  await userEvent.fill(input, 'sketch');
+  await waitFor(() => expect(moreMenu()).toBeNull());
+  expect(studioToolbar().getByRole('button', { name: 'Sketch' })).toHaveAttribute('data-command-highlight', 'true');
+  expect(document.activeElement).toBe(input);
+  await userEvent.fill(input, 'variable');
+  expect(await screen.findByRole('menu')).toBeVisible();
+  expect(document.activeElement).toBe(input);
+  await userEvent.click(screen.getByRole('button', { name: 'Close search' }));
+  await waitFor(() => expect(moreMenu()).toBeNull());
+  expect(highlighted()).toHaveLength(0);
+  expect(document.activeElement).not.toBe(moreButton());
+  expect(document.activeElement).toBe(screen.getByTestId('workspace-3d'));
   unchanged();
 });
 
-it('keeps the highlighted command visible when the toolbar narrows while search is open', async () => {
-  const { host, unchanged } = await setup();
-  const input = await search('circular pattern');
-  const pattern = studioToolbar().getByRole('button', { name: 'Pattern' });
-  host.style.width = '700px';
-  await waitFor(() => {
-    const button = pattern.getBoundingClientRect(),
-      visible = pattern.closest('.cad-drawing-tools')!.getBoundingClientRect();
-    expect(button.left).toBeGreaterThanOrEqual(visible.left);
-    expect(button.right).toBeLessThanOrEqual(visible.right);
-  });
+it('runs a command chosen from search while More shows it, without pulling focus back to More', async () => {
+  await setup(600);
+  await search('variable');
+  expect(await screen.findByRole('menu')).toBeVisible();
+  await userEvent.keyboard('{Enter}');
+  await waitFor(() => expect(moreMenu()).toBeNull());
+  expect(highlighted()).toHaveLength(0);
+  expect(moreButton()).toHaveAttribute('data-active', 'true');
+  expect(document.activeElement).not.toBe(moreButton());
+  expect(document.activeElement).not.toBe(document.body);
+});
+
+it('follows the highlighted command into and out of More as the toolbar narrows and widens while search is open', async () => {
+  const { host, unchanged } = await setup(1800);
+  const input = await search('variable');
+  expect(studioToolbar().getByRole('button', { name: 'Variable' })).toHaveAttribute('data-command-highlight', 'true');
+  expect(moreMenu()).toBeNull();
+  host.style.width = '600px';
+  const menu = await screen.findByRole('menu');
+  expect(within(menu).getByRole('menuitem', { name: 'Variable' })).toHaveAttribute('data-command-highlight', 'true');
   expect(document.activeElement).toBe(input);
-  expect(pattern).toHaveAttribute('aria-pressed', 'false');
+  host.style.width = '1800px';
+  await waitFor(() => expect(moreMenu()).toBeNull());
+  expect(studioToolbar().getByRole('button', { name: 'Variable' })).toHaveAttribute('data-command-highlight', 'true');
+  expect(document.activeElement).toBe(input);
   unchanged();
 });

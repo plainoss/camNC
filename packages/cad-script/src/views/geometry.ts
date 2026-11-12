@@ -7,6 +7,7 @@ import {
   evaluatedPartCopy,
   isCadBody,
   placePoint,
+  physicalJoinedCopies,
   type CadDocument,
   type CadPlacement,
   type CadPoint,
@@ -31,7 +32,7 @@ export interface CadViewLine {
 
 /** Physical pieces, with each copy's own evaluated cuts, in the same places CAM names them. */
 export function cadViewBodies(given: CadDocument, parts: readonly EvaluatedCadPart[]): CadViewBody[] {
-  const document = activeDesign(given);
+  const document = physicalJoinedCopies(activeDesign(given));
   const supports = cadDrawnOnSupports(document),
     consumed = consumedTools(document);
   return document.parts.flatMap(source => {

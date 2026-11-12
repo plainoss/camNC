@@ -306,6 +306,14 @@ function PlanStep() {
   );
   return (
     <Shell bar={bar}>
+      {layoutProblems.find(problem => problem.startsWith('Generated artwork')) && (
+        <p role="alert" className="border-b border-destructive/40 bg-destructive/5 px-4 py-2 text-sm text-destructive">
+          {layoutProblems.find(problem => problem.startsWith('Generated artwork'))}{' '}
+          <Link to="/cam/$jobId/carve" params={{ jobId: job.id }}>
+            Recheck artwork
+          </Link>
+        </p>
+      )}
       {layoutProblems.some(problem => problem.includes('earlier design')) && (
         <p role="alert" className="border-b border-destructive/40 bg-destructive/5 px-4 py-2 text-sm text-destructive">
           A board was cut from an earlier design. Start over on Boards with a new physical sheet before using the changed design.

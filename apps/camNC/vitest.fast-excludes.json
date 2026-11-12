@@ -3,6 +3,7 @@
   "src/cad/CadEditor.dimensions.test.tsx",
   "src/cad/CadEditor.splineHandleConstraints.test.tsx",
   "src/cad/CadEditor.test.tsx",
+  "src/cad/export/studioStep.test.ts",
   "src/cam/machine/CamQueueCard.job.test.tsx",
   "src/cam/model/modelGeometry.test.ts",
   "src/cam/samples/createSampleJob.test.ts",

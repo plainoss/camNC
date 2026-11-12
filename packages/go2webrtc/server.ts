@@ -28,16 +28,6 @@ interface TrackerAnnounceRequest extends TrackerMessageBase {
   event?: 'started' | 'stopped' | 'completed';
 }
 
-interface TrackerAnnounceResponse extends TrackerMessageBase {
-  action: 'announce';
-  interval?: number;
-  complete?: number;
-  incomplete?: number;
-  offer?: TrackerOfferDetails;
-  offer_id?: string;
-  peer_id: string;
-}
-
 interface TrackerOfferMessage {
   action?: string;
   info_hash: string;
