@@ -1,6 +1,13 @@
 import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import type { CadDocument, CadPartCut } from './types';
-import { kPartCutClearance, kPartCutCornerRelief, kPartCutFingers, usesVariables, workOutTypedValue, type TypedValueKind } from './typedValues';
+import {
+  kPartCutClearance,
+  kPartCutCornerRelief,
+  kPartCutFingers,
+  usesVariables,
+  workOutTypedValue,
+  type TypedValueKind,
+} from './typedValues';
 import type { CadValueScope } from './valueExpressions';
 
 const names = (document: CadDocument, ids: string[]) => ids.map(id => cadPartReferenceName(document, id) ?? 'a removed part').join(', ');

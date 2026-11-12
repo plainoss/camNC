@@ -16,7 +16,6 @@ export function partCutReliefIssue(value: unknown): string | null {
   return null;
 }
 
-
 /** An explicit Off must not fall back to the part-wide setting. */
 export const effectivePartCutRelief = (step: CadPartCut, target: CadPart) =>
   step.cornerRelief === undefined ? target.cornerRelief : step.cornerRelief;
