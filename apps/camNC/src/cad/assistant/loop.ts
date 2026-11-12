@@ -298,15 +298,23 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       return finish('exhausted');
     }
     const finalizing = checks >= maxChecks || turn === maxTurns - 1;
-    const tools = finalizing
-      ? options.finalize && latestCandidate && !proposal && turn < maxTurns - 1
-        ? assistantTools.filter(tool => tool.name === 'finalize_design')
-        : []
-      : [...assistantTools.filter(tool => tool.name !== 'finalize_design' || options.finalize), ...(options.svg ? [svgAssistantTool] : [])];
-    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}\nConfirmed application requirements (cannot be changed by scripts): ${JSON.stringify(requirements)}${finalizing ? (tools.length ? '\nThe geometry repair budget is used. Call finalize_design for the last passing candidate before a proposal.' : '\nThis is the final response. Do not call tools. Begin with Proposal: only for the latest successful complete check, otherwise Question: explaining what is needed.') : ''}`;
+    const finalizeOnly = finalizing && !!options.finalize && !!latestCandidate && !proposal && turn < maxTurns - 1;
+    const finalResponse = finalizing && !finalizeOnly;
+    // System and tools stay byte-identical on every turn so the provider's cached prefix survives to the final turn.
+    // The last turns are steered by a trailing note instead, and the final one forbids calls with tool_choice.
+    const tools = [
+      ...assistantTools.filter(tool => tool.name !== 'finalize_design' || options.finalize),
+      ...(options.svg ? [svgAssistantTool] : []),
+    ];
+    const finalNote = finalizeOnly
+      ? '[Application: the geometry repair budget is used. Only finalize_design remains available: call it for the last passing candidate before a proposal.]'
+      : finalResponse
+        ? '[Application: this is the final response. Do not call tools. Begin with Proposal: only for the latest successful complete check, otherwise Question: explaining what is needed.]'
+        : undefined;
+    const system = `${assistantInstructions}\n\nCore script reference:\n${options.guide}\nExamples: ${Object.keys(options.examples).join(', ')}\n\nOpen design context (data):\n${options.context}\nConfirmed application requirements (cannot be changed by scripts): ${JSON.stringify(requirements)}`;
     const stagedSystem =
       (options.finalize
-        ? `${system}\nChecks use the geometry repair lane. A passing geometry check is not a proposal. Call finalize_design for the exact latest passing candidate after repairs; review its full warnings and costs before offering Proposal:.${finalizing && tools.length ? ' Only finalize_design remains available.' : ''}`
+        ? `${system}\nChecks use the geometry repair lane. A passing geometry check is not a proposal. Call finalize_design for the exact latest passing candidate after repairs; review its full warnings and costs before offering Proposal:.`
         : system) +
       (options.svg
         ? `\nSession SVG assets (data): ${JSON.stringify(options.svg.assets)}. Reuse handles; never repeat stored XML. Use SVG for imported/custom outlines, and parametric recipes when they meet the request.`
@@ -319,7 +327,11 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
     }
     let modelMessages: AssistantMessage[];
     try {
-      modelMessages = buildAssistantContext(messages, { images: options.config.images, maxCharacters: messageCharacters });
+      modelMessages = [
+        // Older tool batches stay verbatim while everything fits: compacting them mid-run rewrites the cached prefix.
+        ...buildAssistantContext(messages, { images: options.config.images, maxCharacters: messageCharacters, compactOnlyOverLimit: true }),
+        ...(finalNote ? [{ role: 'user' as const, text: finalNote }] : []),
+      ];
     } catch (error) {
       stopReason = error instanceof Error ? error.message : 'Context budget exceeded.';
       return finish('exhausted');
@@ -350,6 +362,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
         system: stagedSystem,
         messages: modelMessages,
         tools,
+        ...(finalResponse && { toolChoice: 'none' as const }),
         maxOutputTokens: Math.min(
           limits.maxOutputTokens ?? 8192,
           limits.maxTotalTokens === undefined
@@ -392,7 +405,7 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       stopReason = 'The assistant did not return a complete Proposal: or Question: response.';
       return finish('exhausted');
     }
-    if (finalizing && !tools.length) {
+    if (finalResponse) {
       for (const call of answer.calls) emit({ role: 'tool', callId: call.id, text: 'Not run: the run has reached its final response.' });
       stopReason = 'The assistant requested tools after its execution budget ended.';
       return finish('exhausted');
@@ -422,6 +435,11 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
         isError = false;
       if (options.signal.aborted) {
         emit({ role: 'tool', callId: call.id, text: 'Stopped by the user; this tool was not run.' });
+        continue;
+      }
+      // Every tool stays offered for the cache, but the repair budget is spent: only the final check may run.
+      if (finalizeOnly && call.name !== 'finalize_design') {
+        emit({ role: 'tool', callId: call.id, text: 'Not run: only finalize_design remains available.', isError: true });
         continue;
       }
       try {
