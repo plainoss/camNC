@@ -1,5 +1,4 @@
 import {
-  cadPartsToCut,
   closestCurvePoint,
   evaluateCurvePoint,
   isNurbsCurve,
@@ -14,6 +13,7 @@ import {
 import { isCut, type BoardV1 } from './boards';
 import { designGeometryFingerprint } from './designGeometry';
 import { asMilled, millsUndersideUp } from './millSide';
+import { studioCutParts } from '@/cad/studioGeometry';
 
 type Curve = Exclude<CadEntity, { type: 'point' }>;
 const tau = Math.PI * 2;
@@ -103,7 +103,7 @@ export function carryDesignTabs(
   const oldShapes = new Map(before.parts.map(p => [p.partId, p]));
   const newShapes = new Map(after.parts.map(p => [p.partId, p]));
   // Each piece CAM cuts, with its own cuts: a copy whose cuts differ is a piece of its own and can lie another way up.
-  const pieces = (result: CadSolveResult) => new Map(cadPartsToCut(result.document, result.parts).map(({ part }) => [part.partId, part]));
+  const pieces = (result: CadSolveResult) => new Map(studioCutParts(result).map(({ part }) => [part.partId, part]));
   const oldPieces = pieces(before),
     newPieces = pieces(after);
   return boards.map(board => {

@@ -135,7 +135,13 @@ export function PartCutDialog({
   const candidate = useMemo(() => {
     if ('error' in result) return null;
     if (step) return updatePartCut(document, step.id, result.change);
-    return { ...document, revision: document.revision + 1, partCuts: [...(document.partCuts ?? []), { id: featureId, ...result.change }] };
+    return {
+      ...document,
+      revision: document.revision + 1,
+      partCuts: [...(document.partCuts ?? []), { id: featureId, ...result.change }],
+      // An ordered document lists every operation; a preview step missing from it would make the whole design invalid.
+      ...(document.operationOrder && { operationOrder: [...document.operationOrder, featureId] }),
+    };
   }, [document, result, step, featureId]);
   useDialogPreview(candidate, onPreview);
   const save = () => {
