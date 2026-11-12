@@ -270,7 +270,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
               Download the source SVG
             </a>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button className="flex-1" disabled={!session.canApply} onClick={session.apply}>
               {applyLabel}
             </Button>

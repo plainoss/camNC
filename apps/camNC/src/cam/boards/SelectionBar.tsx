@@ -81,6 +81,7 @@ export function SelectionBar<K extends string>({
     const avoid = { left: avoidLeft, top: avoidTop, right: avoidRight, bottom: avoidBottom };
     const clear = (p: { left: number; top: number }) =>
       p.top >= 0 &&
+      p.top + h <= parent.clientHeight &&
       p.left >= 0 &&
       p.left + w <= parent.clientWidth &&
       (p.left + w <= avoid.left || p.left >= avoid.right || p.top + h <= avoid.top || p.top >= avoid.bottom);
