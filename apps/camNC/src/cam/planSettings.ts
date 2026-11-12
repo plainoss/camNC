@@ -51,6 +51,12 @@ export const kDefaultPlan: PlanSettingsV1 = {
   tabs: false,
 };
 
+/**
+ * The bit new corner relief starts at: the job's main bit. CAM warns when a board's widest bit is wider than a part's
+ * relief, so relief sized for the optional small bit would come out rounded.
+ */
+export const plannedReliefBit = (plan: Pick<PlanSettingsV1, 'bit' | 'smallBit'> = kDefaultPlan): number => plan.bit.diameter;
+
 /** This job's overrides for the main bit. */
 export const jobCutting = (p: PlanSettingsV1): Partial<CuttingData> => p.cutting ?? {};
 

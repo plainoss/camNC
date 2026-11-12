@@ -42,7 +42,7 @@ function onSegment(p: CadPoint, a: CadPoint, b: CadPoint): boolean {
     t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / dot(ab, ab)));
   return Math.hypot(p.x - a.x - t * ab.x, p.y - a.y - t * ab.y) < 1e-6;
 }
-const onLoop = (p: CadPoint, loop: CadPoint[]) => loop.some((a, i) => onSegment(p, a, loop[(i + 1) % loop.length]!));
+export const onLoop = (p: CadPoint, loop: CadPoint[]) => loop.some((a, i) => onSegment(p, a, loop[(i + 1) % loop.length]!));
 
 /**
  * One loop with a bone at each corner a round bit of `radius` can't reach: every corner whose angle on the cut-away
@@ -55,7 +55,7 @@ function relieveLoop(
   cutInside: boolean,
   radius: number,
   keep: (p: CadPoint) => boolean,
-  fits: (bone: CadPoint[]) => boolean = () => true
+  fits: (bone: CadPoint[], corner: CadPoint) => boolean = () => true
 ) {
   const counterclockwise = polygonArea(points) > 0,
     loop = counterclockwise ? points : [...points].reverse(),
@@ -101,7 +101,7 @@ function relieveLoop(
     }
     bone.push(to);
     // A bone that would break into another contour, such as a hole's bone through a nearby edge, isn't cut.
-    if (!fits(bone)) {
+    if (!fits(bone, p)) {
       skipped.push(p);
       return out.push(p);
     }
@@ -110,9 +110,18 @@ function relieveLoop(
   return { points: counterclockwise ? out : out.reverse(), skipped };
 }
 
-/** One cut-away loop with bones in its corners, leaving corners on the part's `outline` square. */
-export function relieveLoopCorners(points: CadPoint[], cutInside: boolean, diameter: number, outline: CadPoint[]) {
-  return relieveLoop(points, cutInside, diameter / 2, p => onLoop(p, outline));
+/**
+ * One cut-away loop with bones in its corners, leaving corners on the part's `outline` square. `fits` can refuse a bone
+ * for its corner, which then stays square and is counted as skipped.
+ */
+export function relieveLoopCorners(
+  points: CadPoint[],
+  cutInside: boolean,
+  diameter: number,
+  outline: CadPoint[],
+  fits?: (bone: CadPoint[], corner: CadPoint) => boolean
+) {
+  return relieveLoop(points, cutInside, diameter / 2, p => onLoop(p, outline), fits);
 }
 
 /**
