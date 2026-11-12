@@ -2,6 +2,7 @@ import type { CadDocument } from '@wbcnc/cad';
 import type { CadReport } from '@wbcnc/cad-script';
 import type { EvaluatedCadPart } from '@wbcnc/cad';
 import { checkNextStep } from './checkHints';
+import { compactCheckReport } from './compactCheck';
 import { checkAssistantRequirements, validateAssistantRequirements, type AssistantRequirements } from './requirements';
 import { assistantRecipeCatalog, type AssistantRecipeName, type AssistantRecipeParameters } from './recipeCatalog';
 import { createAssistantScriptSession } from './scriptSession';
@@ -553,7 +554,8 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
               text = JSON.stringify({
                 ok: checked.ok && acceptance.ok,
                 stage,
-                ...(!checked.scriptError && { report: checked.report }),
+                // Only what changed against the open design; read_design_report keeps the full detail.
+                ...(!checked.scriptError && { report: compactCheckReport(checked.detailReport ?? checked.report, options.report) }),
                 ...(script && { scriptId: script.scriptId, hash: script.hash }),
                 ...(script?.recipe && { recipe: script.recipe, parameters: script.parameters }),
                 ...(checked.asset !== undefined && { asset: checked.asset }),
