@@ -232,3 +232,21 @@ it('displays millimeter stock in cm and commits a bare centimeter thickness with
   fireEvent.keyDown(input, { key: 'Enter' });
   expect(commit).toHaveBeenLastCalledWith(25, undefined);
 });
+
+it('shows an inch thickness rounded, says its minimum in inches, and reads a plain number added to a variable in inches', () => {
+  const commit = vi.fn();
+  render(
+    <DesignUnitContext value="in">
+      <CadThicknessField value={18} variables={{ t: { value: 19.05, kind: 'length' } }} onCommit={commit} />
+    </DesignUnitContext>
+  );
+  const input = screen.getByRole('textbox', { name: 'Thickness' }) as HTMLInputElement;
+  expect(input.value).toBe('0.70866');
+  expect(screen.getByText(/minimum/).textContent).toBe('0.004 in minimum. Units, arithmetic and variables accepted.');
+  fireEvent.change(input, { target: { value: 't + 0.125' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  expect(commit).toHaveBeenLastCalledWith(22.225, 't + 0.125 in');
+  fireEvent.change(input, { target: { value: '0.001' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  expect(screen.getByRole('alert').textContent).toBe('Thickness must be at least 0.004 in.');
+});

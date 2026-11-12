@@ -33,7 +33,7 @@ import {
   constrainSketch,
   sketchContextAction,
 } from './sketchModifyActions';
-import { DesignUnitContext, useDesignUnits } from './designUnits';
+import { cadFieldText, DesignUnitContext, useDesignUnits } from './designUnits';
 import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
 import { previewSlot } from './slotPreview';
 import { SketchCircularPatternControls, SketchCircularPatternManipulator } from './SketchCircularPatternControls';
@@ -1021,7 +1021,7 @@ export function CadEditor({
     const current = creationValueAt(creationValues, sketch);
     if (!current) return rejectValue('This drawing value no longer applies. Select its geometry again.', creationInput.current);
     const parsed = parseCadValue(
-      creationValues.editing ? (creationInput.current?.value ?? creationValues.text) : lengthText(current.constraint.value),
+      creationValues.editing ? cadFieldText(creationInput.current, creationValues.text) : lengthText(current.constraint.value),
       { unit: 'mm', variables: variableScope }
     );
     if ('error' in parsed) return rejectValue(parsed.error, creationInput.current);

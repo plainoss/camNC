@@ -339,7 +339,7 @@ function checkExpectation(want: CadExpectation, part: CadReportPart, freedom: nu
   const failures: string[] = [];
   const value = (input: number | string, field: string): number => {
     if (typeof input === 'number') return input;
-    const parsed = parseCadValue(input, { unit: 'mm', variables: cadVariableScope(document) });
+    const parsed = parseCadValue(input, { unit: 'mm', variables: cadVariableScope(document), lengthUnit: 'mm' });
     if ('error' in parsed) {
       failures.push(`${field}: invalid expression "${input}": ${parsed.error}`);
       return NaN;

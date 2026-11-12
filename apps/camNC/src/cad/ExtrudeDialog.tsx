@@ -76,7 +76,7 @@ export function ExtrudeDialog({
   /** Starts picking a plane or a face, for Up to face; the pick comes back once. Null stops a pick under way. */
   pickFace?: (picked: ((on: CadDrawnOn['on'], datum?: string) => void) | null) => void;
 }) {
-  const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
+  const { parseCadValue, lengthText, formatLength, lengthUnit } = useDesignUnits();
   const [pickingFace, setPickingFace] = useState(false);
   /** Blind to a thickness, or up to a plane or face: its thickness then follows that face. */
   const setUpTo = (upTo: CadDrawnOn['on'] | null, datum?: string) =>
@@ -477,7 +477,7 @@ export function ExtrudeDialog({
               <small>Up to</small>
               <span>
                 {part.upTo
-                  ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${lengthText(part.thickness)} ${lengthUnit} away`
+                  ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${formatLength(part.thickness)} ${lengthUnit} away`
                   : 'Pick a plane or a face'}
               </span>
             </button>
