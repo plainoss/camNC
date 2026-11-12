@@ -10,3 +10,4 @@ export * from './views/section';
 export * from './cupboard';
 export * from './panelChair';
 export * from './frameStool';
+export * from './furnitureCoverage';

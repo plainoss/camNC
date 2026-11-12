@@ -2,6 +2,13 @@ import { cadCopyName, evaluateCadDocument, evaluatedPartCopy, pointInPolygon, ty
 import type { CadReport } from '../inspect';
 import type { CadSavedTask, CadTaskAssessment, CadTaskCandidate, CadTaskCheck } from './types';
 import { cadTaskFamilyMaterial, cadTaskMaterial } from './material';
+import { assessFurnitureRebuild, checkPlannedFurniture, type FurnitureRebuild } from './furnitureAssess';
+
+/** #585's two original seating designs, rebuilt: what each rebuild must measure. */
+const furnitureRebuilds: Record<string, FurnitureRebuild> = {
+  'rebuild-panel-chair': { recipe: 'panel-chair-keyed-v1', seatHeight: 450, height: 900, clearSeatWidth: 404 },
+  'rebuild-frame-stool': { recipe: 'frame-stool-glued-v1', seatHeight: 650, height: 650 },
+};
 
 const close = (a: number, b: number) => Number.isFinite(a) && Math.abs(a - b) < 0.05;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -267,6 +274,9 @@ export function assessCadTask(
       !!document.constructions?.some(plan => folders.some(folder => plan.folderId === folder.id)) &&
         !report.errors.some(error => error.code === 'construction-check')
     );
+    checkPlannedFurniture(candidate, check);
+  } else if (furnitureRebuilds[task.id]) {
+    assessFurnitureRebuild(furnitureRebuilds[task.id]!, candidate, check);
   } else if (task.id === 'shelf-description' || task.id === 'shelf-picture') {
     overall([600, 220, 800]);
     structuralBoard(18);
