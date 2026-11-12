@@ -4,7 +4,8 @@ import type { EvaluatedCadPart } from '@wbcnc/cad';
 import { checkNextStep } from './checkHints';
 import { compactCheckReport } from './compactCheck';
 import { checkAssistantRequirements, validateAssistantRequirements, type AssistantRequirements } from './requirements';
-import { seatingConstructionCheck } from './seatingGate';
+import { seatingConstructionCheck, openRequests } from './seatingGate';
+import { cutterCheck, cutterFitNotes } from './cutterFit';
 import { assistantRecipeCatalog, type AssistantRecipeName, type AssistantRecipeParameters } from './recipeCatalog';
 import { createAssistantScriptSession } from './scriptSession';
 import { normalizeAssistantViews } from './designViews';
@@ -142,7 +143,7 @@ Load-bearing seating starts from a construction pattern: frameStool for a leg-an
 When the answer is a number, add fields to ask_user, prefilled with your proposal; name a field after a requirement (for example width, thickness, minimumWall) when the app should check it on every later proposal.
 Remember earlier constraints in the conversation. If a request conflicts with them or the design, ask a question.
 Select useful views in check_design when matching a reference image or reviewing appearance: views:["top"] for flat outlines, adding front/right only for relevant construction. For visual requests inspect the returned cut-aware views, describe what matches and what needs a person's review.
-For CNC joints a square part fits into (mortises, stopped dados, finger slots), use the user's cutter diameter: pass it as bit to check_design and set cornerRelief: { dogbone: diameter } with a fit clearance such as 0.2mm on that cutParts step. Each corner-unreachable warning in the full check names a mortise whose corners the bit misses; fix it or name it in the proposal. Only Cut parts openings cut from the top or through are checked: say that blind openings from the underside, openings only a copy has, and Extrude pockets were not checked for corner reach. If the user gave no cutter, say the corners were checked only for the default bit and ask which one they use.
+For CNC joints a square part fits into (mortises, stopped dados, finger slots), use the user's cutter diameter: pass it as bit to check_design and set cornerRelief: { dogbone: diameter } with a fit clearance such as 0.2mm on that cutParts step. Each corner-unreachable warning in the full check names a mortise whose corners the bit misses; fix it or name it in the proposal. Only Cut parts openings cut from the top or through are checked: say that blind openings from the underside, openings only a copy has, and Extrude pockets were not checked for corner reach. If the user gave no cutter, say the corners were checked only for the default bit and ask which one they use. A mortise check without the cutter the user named fails, and the app adds the cutter it checked and each unreached mortise to your proposal.
 Treat agreed dimensions and construction as acceptance criteria. Use part.expect for requested finished sizes, thickness and pocket depths; inspect actual reported geometry rather than only script parameters.
 Prefer compact deterministic construction and worked examples over bespoke random or grid searches. Once a checked candidate matches the request and its views have been inspected when needed, offer it; do not redesign it without a specific unmet requirement.
 Prefer the pebble-tray or cupboard recipe with numeric millimetre parameters when it fits the agreed construction. Recipes produce editable geometry. After checking, reuse its scriptId; repair with expectedHash and short exact oldText/newText patches instead of resending the full script. Every revision starts from the original open design.
@@ -271,11 +272,15 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
   let latestCandidate: AssistantCheck | undefined;
   const origins = new WeakMap<AssistantCheck, AssistantProposalOrigin>();
   const finalized = new WeakMap<AssistantCheck, AssistantCheck>();
-  const requests = messages.filter(message => message.role === 'user' && !message.event).map(message => message.text);
+  // Only the request still open counts: one before an applied proposal is done, so a later shelf isn't held to it.
+  const requests = openRequests(messages);
   const acceptanceOf = (checked: AssistantCheck) => {
     const accepted = confirmedAcceptance(checked);
-    const seating = seatingConstructionCheck(base, checked.document, requests);
-    return seating ? { ok: false, checks: [...accepted.checks, seating] } : accepted;
+    const failed = [
+      seatingConstructionCheck(base, checked.document, requests),
+      cutterCheck(requests, base, checked.document, checked.bit),
+    ].filter(check => check !== undefined);
+    return failed.length ? { ok: false, checks: [...accepted.checks, ...failed] } : accepted;
   };
   const confirmedAcceptance = (checked: AssistantCheck) =>
     Object.keys(requirements).length
@@ -422,6 +427,12 @@ export async function runDesignAssistant(options: AssistantRunOptions): Promise<
       // Partial provider items may contain a truncated call without a matching tool result. Never replay them.
       const { responseItems: _items, anthropicContent: _content, calls: _calls, ...terminal } = answer;
       answer = terminal;
+    }
+    // The application, not the model, says what a proposal's mortises were checked for and which ones won't seat.
+    if (!answer.calls?.length && proposal && latestCandidate && /^\s*Proposal:\s*\S/i.test(answer.text)) {
+      const notes = cutterFitNotes(requests, base, proposal.document, (finalized.get(latestCandidate) ?? latestCandidate).trustedReport);
+      if (notes.length)
+        answer = { ...answer, text: `${answer.text}\n\nCutter fit, checked by the app:\n${notes.map(note => `- ${note}`).join('\n')}` };
     }
     emit(answer);
     if (answer.completion === 'incomplete' || answer.completion === 'refused') {

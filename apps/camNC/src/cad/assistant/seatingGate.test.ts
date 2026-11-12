@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { defaultProvider } from './keyStore';
 import { runDesignAssistant, type AssistantRunOptions } from './loop';
 import type { AssistantMessage } from './provider';
-import { seatingConstructionCheck } from './seatingGate';
+import { seatingConstructionCheck, openRequests } from './seatingGate';
 
 const board = (name: string, z: number) => {
   const part = createCadPart(name, 18);
@@ -68,6 +68,30 @@ describe('seating construction gate', () => {
     expect(seatingConstructionCheck(base, looseStool(base), ['Build a shelf.'])).toBeUndefined();
     const existing = looseStool(base);
     expect(seatingConstructionCheck(existing, existing, ['Make the stool taller.'])).toBeUndefined();
+    // Saying what a piece is not doesn't ask for seating.
+    expect(seatingConstructionCheck(base, looseStool(base), ["It's a plant stand, not a stool."])).toBeUndefined();
+    expect(seatingConstructionCheck(base, looseStool(base), ['A low table, no chair.'])).toBeUndefined();
+    expect(seatingConstructionCheck(base, looseStool(base), ['Not a chair: a stool, please.'])?.passed).toBe(false);
+  });
+
+  it('holds only the requests since the last applied proposal to the seating rule', () => {
+    const user = (text: string): AssistantMessage => ({ role: 'user', text });
+    const applied: AssistantMessage = { role: 'user', event: true, proposalOutcome: 'applied', text: 'Application event (data): applied.' };
+    const discarded: AssistantMessage = { ...applied, proposalOutcome: 'discarded' };
+    // A stool applied earlier doesn't make a later shelf a seating request.
+    const later = openRequests([
+      user('Build a stool.'),
+      { role: 'assistant', text: 'Proposal: a stool.' },
+      applied,
+      user('Now add a shelf.'),
+    ]);
+    expect(later).toEqual(['Now add a shelf.']);
+    expect(seatingConstructionCheck(base, looseStool(base), later)).toBeUndefined();
+    // While the stool is still being worked out, the answers to its questions stay part of it.
+    const open = openRequests([user('Build a stool.'), { role: 'assistant', text: 'Question: how tall?' }, user('650 mm.')]);
+    expect(seatingConstructionCheck(base, looseStool(base), open)?.passed).toBe(false);
+    // A discarded proposal leaves the request open.
+    expect(openRequests([user('Build a stool.'), discarded, user('Taller.')])).toEqual(['Build a stool.', 'Taller.']);
   });
 
   it('keeps the assistant from proposing a loose stool, and proposes it once a plan joins every piece', async () => {
