@@ -207,14 +207,45 @@ export function closeTraceGaps(ink: Uint8Array, width: number, keepFeaturesAreaP
 
 /**
  * Morphological opening with a 3 × 3 square, the dark counterpart of `closeTraceGaps`: removes dark slivers about two
- * pixels wide (up to 2.8 on a diagonal), such as the hair-thin tip of a pointed feather or a neck where two strokes barely touch. Curve fitting
- * rounds such a tip off or cuts such a neck, so the source would never match its trace; no carving tool resolves them.
- * With `keepFeaturesAreaPx`, nothing is removed when opening would split or remove a region of at least that area.
+ * pixels wide (up to 2.8 on a diagonal), such as the hair-thin tip of a pointed feather or a neck where two strokes
+ * barely touch. Curve fitting rounds such a tip off or cuts such a neck, so the source would never match its trace.
+ * Each connected piece it would remove of at least `keepAreaPx` stays, so a whole thin stroke, whisker or dot of that
+ * size is never dropped here; the trace checks then measure it like any other feature.
  */
-export function openTraceSlivers(ink: Uint8Array, width: number, keepFeaturesAreaPx = 0): number {
+export function openTraceSlivers(ink: Uint8Array, width: number, keepAreaPx: number): number {
+  const height = ink.length / width;
   const opened = grow3(grow3(ink, width, 0), width, 1);
-  for (let i = 0; i < ink.length; i++) opened[i] &&= ink[i];
-  return applyMorphology(ink, opened, width, keepFeaturesAreaPx);
+  const removed = new Uint8Array(ink.length);
+  for (let i = 0; i < ink.length; i++) removed[i] = ink[i] && !opened[i] ? 1 : 0;
+  const queue = new Uint32Array(ink.length);
+  let changed = 0;
+  for (let first = 0; first < ink.length; first++) {
+    if (removed[first] !== 1) continue;
+    // Eight-connected: a diagonal stroke's removed pixels touch only at corners.
+    let end = 1;
+    queue[0] = first;
+    removed[first] = 2;
+    for (let at = 0; at < end; at++) {
+      const i = queue[at],
+        x = i % width,
+        y = (i - x) / width;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx,
+            ny = y + dy;
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+          const next = ny * width + nx;
+          if (removed[next] === 1) {
+            removed[next] = 2;
+            queue[end++] = next;
+          }
+        }
+    }
+    if (end >= keepAreaPx) continue;
+    for (let at = 0; at < end; at++) ink[queue[at]] = 0;
+    changed += end;
+  }
+  return changed;
 }
 
 /** Four-connected labels of both dark and light regions, with each label's area and whether it touches the border. */

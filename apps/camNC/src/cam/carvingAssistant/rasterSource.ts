@@ -180,14 +180,11 @@ export async function traceCarvingPng(
         : featurePx >= 2
           ? closeTraceGaps(ink, traceWidth, Math.max(noiseAreaPx, featurePx ** 2))
           : 0;
-    // The same for dark slivers about two pixels wide (up to 2.8 on a diagonal): hair-thin spike tips and necks where two strokes barely touch,
-    // which curve fitting rounds off or cuts. Opening can leave fragments below the noise threshold; drop those too.
-    const openedSliverPixels =
-      featurePx >= 4
-        ? openTraceSlivers(ink, traceWidth)
-        : featurePx >= 2
-          ? openTraceSlivers(ink, traceWidth, Math.max(noiseAreaPx, featurePx ** 2))
-          : 0;
+    // The same for dark slivers about two pixels wide: hair-thin spike tips and necks where two strokes barely touch,
+    // which curve fitting rounds off or cuts. A removed piece as large as a feature the trace checks measure stays, so a
+    // whole thin stroke is never dropped. Opening can leave fragments below the noise threshold; drop those too.
+    const featureAreaPx = Math.max(noiseAreaPx, Math.min(featurePx ** 2, (3 * tolerancePx) ** 2));
+    const openedSliverPixels = featurePx >= 2 ? openTraceSlivers(ink, traceWidth, featureAreaPx) : 0;
     if (openedSliverPixels) {
       const fragments = removeTraceSpecks(ink, traceWidth, noiseAreaPx);
       specks.components += fragments.components;
@@ -218,7 +215,6 @@ export async function traceCarvingPng(
     // Rasterizing two curves that nearly touch can leave a sliver or pinhole a few pixels across between them, and a
     // pinhole that small next to an edge cannot survive curve fitting at this tolerance. Match every other region by
     // position. The skip size is capped at the minimum feature area, below which preparation drops islands anyway.
-    const featureAreaPx = Math.max(noiseAreaPx, Math.min(featurePx ** 2, (3 * tolerancePx) ** 2));
     if (
       smooth.components !== topology.components ||
       smooth.holes !== topology.holes ||

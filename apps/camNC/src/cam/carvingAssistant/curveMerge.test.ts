@@ -59,23 +59,24 @@ describe('merging traced curve runs', () => {
 });
 
 describe('trace cleanup and coverage', () => {
-  it('removes dark slivers up to two pixels wide, and keeps a wall that splits a region', () => {
-    const width = 30,
-      ink = new Uint8Array(width * width);
+  it('removes dark slivers about two pixels wide, but keeps a whole thin stroke as large as a feature', () => {
+    const width = 60,
+      ink = new Uint8Array(width * 40);
     for (let y = 5; y < 25; y++) for (let x = 5; x < 15; x++) ink[y * width + x] = 1;
-    // A two-pixel spike off the block, and a three-pixel bar.
+    // A short two-pixel spike off the block, and a three-pixel bar.
     for (let x = 15; x < 25; x++) ink[10 * width + x] = ink[11 * width + x] = 1;
     for (let x = 15; x < 25; x++) ink[20 * width + x] = ink[21 * width + x] = ink[22 * width + x] = 1;
-    expect(openTraceSlivers(ink, width)).toBe(20);
+    // A separate two-pixel stroke, 40 long, and a diagonal one, 30 long, touching only at corners.
+    for (let x = 5; x < 45; x++) ink[32 * width + x] = ink[33 * width + x] = 1;
+    for (let k = 0; k < 30; k++) ink[(5 + k) * width + 28 + k] = ink[(5 + k) * width + 29 + k] = 1;
+    expect(openTraceSlivers(ink, width, 50)).toBe(20);
     expect(ink[10 * width + 20]).toBe(0);
     expect(ink[21 * width + 20]).toBe(1);
     expect(ink[15 * width + 10]).toBe(1);
-    // Two blocks joined by a two-pixel neck: removing it splits a region at least this large, so nothing changes.
-    const joined = new Uint8Array(width * width);
-    for (let y = 5; y < 15; y++) for (let x = 2; x < 12; x++) joined[y * width + x] = joined[y * width + x + 16] = 1;
-    for (let x = 12; x < 18; x++) joined[9 * width + x] = joined[10 * width + x] = 1;
-    expect(openTraceSlivers(joined.slice(), width)).toBeGreaterThan(0);
-    expect(openTraceSlivers(joined, width, 50)).toBe(0);
+    expect(ink[32 * width + 25]).toBe(1);
+    expect(ink[20 * width + 44]).toBe(1);
+    // Below a larger feature area, those strokes go as slivers too.
+    expect(openTraceSlivers(ink, width, 200)).toBe(80 + 60);
   });
 
   it('leaves an isolated tip pixel out of the boundary error, and measures thin strokes by edge displacement', () => {
