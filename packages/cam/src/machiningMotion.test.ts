@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { machiningCases, circle, rectangle } from '../test/machining-fixtures';
+import { machiningCases, rectangle } from '../test/machining-fixtures';
 import { DepthMap, readGcode } from './analyze';
 import { toGcode } from './gcode';
-import { camPart, DEFAULT_SETTINGS, pocketOperation, profileOperation, type PartCam, type Pass } from './toolpaths';
-import { checkGcodeSafety } from './safety';
+import { camPart, DEFAULT_SETTINGS, pocketOperation, profileOperation, type PartCam } from './toolpaths';
 import { tabRemovalProgram } from './tabRemoval';
 
-const minimum = (pass: Pass) => Math.min(...pass.pts.map(p => p[2]));
 const program = (op: ReturnType<typeof profileOperation>): PartCam => ({ stockTop: 12, warnings: [], operations: [op] });
 
 describe('machining motion invariants', () => {

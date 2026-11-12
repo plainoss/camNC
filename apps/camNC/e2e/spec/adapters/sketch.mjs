@@ -279,10 +279,44 @@ export async function createAdapter(page, url) {
       return (await getJob(id))?.design?.[key] ?? null;
     }, [jobId, which]);
 
+  /**
+   * Runs a machine step and, when it fails, adds the controller's state and its last console lines to the error, which
+   * the runner writes to results.json. Only its first lines are kept there, so all of this goes on two lines after the
+   * first. The module is imported by its path: the resource timing list stops at 250 entries.
+   */
+  const withMachineState = async fn => {
+    try {
+      return await fn();
+    } catch (error) {
+      const summary = await page
+        .evaluate(async () => {
+          const { getCncApi } = await import('/src/lib/fluidnc/machine.ts');
+          const api = getCncApi();
+          const lines = api.consoleLines.value.slice(-40).map(line => `${line.kind} ${line.text}`);
+          const state = { connected: api.isConnected.value, state: api.state.value, homed: api.homed.value, zZeroedAt: api.zZeroedAt.value };
+          return `machine: ${JSON.stringify(state)}\nconsole (last ${lines.length}): ${lines.join(' ⏎ ')}`;
+        })
+        .catch(err => `machine: unavailable (${String(err?.message ?? err).split('\n')[0]})`);
+      if (error instanceof Error) {
+        const [first, ...rest] = String(error.message).split('\n');
+        error.message = [first, summary, ...rest].join('\n');
+      }
+      throw error;
+    }
+  };
+
   // Machine-only binding: the footer now homes, explicitly confirms the probe, then runs.
-  const prepareMachine = async () => {
-    const load = page.getByRole('button', { name: /^Load program/ }).first();
-    if (await load.isEnabled().catch(() => false)) await load.click();
+  const prepareMachineSteps = async () => {
+    // A CAM job's board program has to be in the machine view before homing and probing. Loading a program for another
+    // bit than the one loaded clears Z zero, so a load that lands after the probe would put the footer back on Probe Z
+    // and Run job never shows. Its Load button is disabled until the program is made and hides once it's loaded: wait
+    // for both rather than skipping a disabled button.
+    const load = page.getByRole('button', { name: /^Load (program|tab removal|parts freeing)$/ }).first();
+    if (await load.waitFor({ timeout: 8000 }).then(() => true, () => false)) {
+      await page.waitForFunction(element => !element.disabled, await load.elementHandle(), { timeout: 30_000 });
+      await load.click();
+    }
+    await load.waitFor({ state: 'hidden', timeout: 15_000 });
     const home = page.getByRole('button', { name: 'Home machine', exact: true });
     const probe = page.getByRole('button', { name: 'Probe Z', exact: true });
     const run = page.getByRole('button', { name: 'Run job', exact: true });
@@ -297,6 +331,7 @@ export async function createAdapter(page, url) {
     await run.waitFor({ timeout: 15000 });
     await page.waitForTimeout(900);
   };
+  const prepareMachine = () => withMachineState(prepareMachineSteps);
 
   const act = async text => {
     const space = text.indexOf(' ');
@@ -521,17 +556,17 @@ export async function createAdapter(page, url) {
         await page.getByRole('button', { name: /Done, next/ }).waitFor({ timeout: 240000 });
         await page.waitForTimeout(800);
         return;
-      case 'run': {
+      case 'run':
         // Only ever the demo's simulated controller: the adapter always enters demo mode above.
-        await prepareMachine();
-        await page.getByRole('button', { name: '16×', exact: true }).click();
-        await page.getByRole('button', { name: /^Run job/ }).click();
-        await page.getByRole('alertdialog').getByRole('button', { name: /^Run( anyway)?$/ }).click({ timeout: 8000 });
-        await page.getByText('Job started').first().waitFor({ timeout: 20000 });
-        await page.getByRole('button', { name: /Done, next/ }).waitFor({ timeout: 180000 });
-        await page.waitForTimeout(500);
-        return;
-      }
+        return withMachineState(async () => {
+          await prepareMachineSteps();
+          await page.getByRole('button', { name: '16×', exact: true }).click();
+          await page.getByRole('button', { name: /^Run job/ }).click();
+          await page.getByRole('alertdialog').getByRole('button', { name: /^Run( anyway)?$/ }).click({ timeout: 8000 });
+          await page.getByText('Job started').first().waitFor({ timeout: 20000 });
+          await page.getByRole('button', { name: /Done, next/ }).waitFor({ timeout: 180000 });
+          await page.waitForTimeout(500);
+        });
       case 'edit':
         await page.getByText('Edit design', { exact: true }).first().click();
         await flatView();

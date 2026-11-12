@@ -414,3 +414,60 @@ it('does not let suggested questions bypass the final response budget', async ()
   expect(options.request).toHaveBeenCalledTimes(1);
   expect(options.check).not.toHaveBeenCalled();
 });
+
+it('rejects questions and other tools while only finalize_design may run, then finalizes', async () => {
+  const options = setup();
+  options.maxChecks = 1;
+  options.finalize = vi.fn(async checked => checked);
+  const question = answer('ask_user');
+  question.calls![0].arguments = { question: 'Which thickness?', choices: ['18 mm', '24 mm'] };
+  const replies = [
+    answer('check_design', 'good'),
+    question,
+    answer('cad_script_guide'),
+    answer('finalize_design'),
+    { role: 'assistant' as const, text: 'Proposal: checked.' },
+  ];
+  options.request = vi.fn(async () => replies.shift()!);
+  const result = await runDesignAssistant(options);
+  // The question and the guide read were refused, so the run went on to the final check instead of stopping to ask.
+  expect(result.status).toBe('proposal');
+  expect(options.finalize).toHaveBeenCalledTimes(1);
+  const refused = result.messages.filter(message => message.role === 'tool' && message.text.includes('only finalize_design remains'));
+  expect(refused.map(message => message.callId)).toEqual([question.calls![0].id, expect.any(String)]);
+  expect(result.messages.some(message => message.text.includes('Question shown to the user'))).toBe(false);
+});
+
+it('budgets the final note before keeping history verbatim, compacting instead of stopping', async () => {
+  const options = setup();
+  options.maxChecks = 1;
+  // An earlier, already superseded check whose script is long; the history fits only without the final note.
+  const script = 'x'.repeat(2000);
+  const earlier = answer('check_design', script);
+  options.messages = [
+    { role: 'user', text: 'Make it wider.' },
+    earlier,
+    { role: 'tool', callId: earlier.calls![0].id, text: '{"ok":false}' },
+    { role: 'user', text: 'Try again.' },
+  ];
+  const sent: AssistantMessage[][] = [];
+  options.request = vi.fn(async request => {
+    sent.push(request.messages);
+    return request.toolChoice !== 'none' ? answer('check_design', 'good') : { role: 'assistant' as const, text: 'Proposal: checked.' };
+  });
+  // Measure a first run's fixed prompt, then set the limit so the verbatim history plus the note just overflows.
+  const probe = await runDesignAssistant({ ...options, request: options.request, limits: {} });
+  expect(probe.status).toBe('proposal');
+  const finalTurn = sent[1]!;
+  const verbatim = JSON.stringify(finalTurn.map(({ images: _images, ...message }) => message)).length;
+  const fixed =
+    vi.mocked(options.request).mock.calls[1][0].system.length + JSON.stringify(vi.mocked(options.request).mock.calls[1][0].tools).length;
+  sent.length = 0;
+  vi.mocked(options.request).mockClear();
+  const result = await runDesignAssistant({ ...options, limits: { maxInputCharacters: fixed + verbatim - 50 } });
+  expect(result.status).toBe('proposal');
+  expect(result.stopReason).toBeUndefined();
+  // The final turn compacted the superseded long script instead of ending with "Input character budget exceeded".
+  expect(JSON.stringify(sent[1])).not.toContain(script);
+  expect(sent[1]!.at(-1)?.text).toContain('final response');
+});

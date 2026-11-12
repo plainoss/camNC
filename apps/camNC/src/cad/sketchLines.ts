@@ -1,14 +1,15 @@
-import { cadFaceFrame, isCadPart, tessellateCurve, type CadDocument, type CadPoint } from '@wbcnc/cad';
+import { cadFaceFrame, tessellateCurve, type CadDocument, type CadPoint } from '@wbcnc/cad';
+import { sketchesShownByDefault } from './sketchShown';
 
 type Vec3 = [number, number, number];
 
 /**
- * The curves of the sketches shown, where they sit in the model, as lines on their planes. By default those not yet
- * extruded: a sketch hides once Extrude makes a part of it, and can be shown again from the feature list.
+ * The curves of the sketches shown, where they sit in the model, as lines on their planes. By default those no built
+ * Extrude uses (see `sketchesShownByDefault`); a hidden sketch can be shown again from the feature list.
  */
 export function sketchLinesInModel(
   document: CadDocument,
-  shown: (partId: string) => boolean = partId => !isCadPart(document.parts.find(part => part.id === partId)!)
+  shown: (partId: string) => boolean = partId => sketchesShownByDefault(document).has(partId)
 ): { partId: string; points: Vec3[] }[] {
   return document.parts
     .filter(part => !part.sketchOf && !part.faceProfile && shown(part.id))

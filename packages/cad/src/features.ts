@@ -8,6 +8,8 @@ import { cadCuts, cadFaceSketches, faceIsUnderside, flipUnderside } from './feat
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea, validateCadDocument } from './geometry';
 import { relieveCorners } from './cornerRelief';
 import { applyPartCuts } from './cutParts';
+import { evaluateCopyOperations } from './evaluateCopyOperations';
+import { copyOperationSourceIssue } from './copyOperationSource';
 import { patternInstanceOffset, patternMaster } from './pattern';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import { activeDesign } from './suppression';
@@ -16,6 +18,7 @@ import type {
   CadCutDepth,
   CadDiagnostic,
   CadDocument,
+  CadEvaluation,
   CadFaceRef,
   CadPart,
   CadPoint,
@@ -408,7 +411,9 @@ function cutFeatures(part: CadPart, profile: EvaluatedCadPart): { part: Evaluate
   };
 }
 
-export function evaluateCadDocument(given: CadDocument): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
+export function evaluateCadDocument(given: CadDocument, options: { through?: string } = {}): CadEvaluation {
+  const issue = copyOperationSourceIssue(given);
+  if (issue) return { parts: [], diagnostics: [{ code: 'invalid-copy-operations', severity: 'error', message: issue }] };
   // What's suppressed in the feature list isn't built.
   // Regenerate named face cuts before evaluating the sketches that reference their pocket floors.
   const document = activeDesign(given.parts.some(part => part.remove && !isSpatialRemoval(part)) ? resolveExtrudeSteps(given) : given);
@@ -438,7 +443,10 @@ export function evaluateCadDocument(given: CadDocument): { parts: EvaluatedCadPa
   // Remove geometry is part of a body's shape before a later cut-parts step uses it as a tool.
   const removed = applyExtrudeRemovals(document, parts);
   diagnostics.push(...removed.diagnostics);
-  const cut = applyPartCuts(document, removed.parts);
+  const cut =
+    given.operationOrder !== undefined
+      ? evaluateCopyOperations(document, removed.parts, options.through)
+      : applyPartCuts(document, removed.parts);
   diagnostics.push(...cut.diagnostics);
-  return { parts: diagnostics.some(d => d.severity === 'error') ? [] : cut.parts, diagnostics };
+  return { ...cut, parts: diagnostics.some(d => d.severity === 'error') ? [] : cut.parts, diagnostics };
 }

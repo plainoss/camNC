@@ -37,6 +37,14 @@ describe('optional native SVG generation', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it('explains that Gemini makes PNG only instead of sending an SVG request', async () => {
+    const fetcher = vi.fn();
+    await expect(
+      generateNativeSvgAsset(options(), { ...native, endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai' }, fetcher)
+    ).rejects.toThrow('PNG images only');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it('reports unsupported responses without echoing provider content', async () => {
     const fetcher = vi.fn(async () => new Response('secret-provider-body', { status: 403 }));
     await expect(generateNativeSvgAsset(options(), native, fetcher)).rejects.toThrow('HTTP 403');

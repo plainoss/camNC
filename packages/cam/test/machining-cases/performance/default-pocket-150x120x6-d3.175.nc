@@ -14,6 +14,7 @@ G40 G49 G80
 G0 Z17
 (CAMNC PAUSE start; rpm=15000)
 M0 (MSG Spindle starts at 15000 RPM next. Manual spindle: turn it on now)
+;------------------------------------------------------------------------------
 M3 S15000
 G4 P3
 (OP 1/1 Pocket 1 z=6 - T1 D=3.175)

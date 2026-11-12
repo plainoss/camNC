@@ -29,6 +29,8 @@ async function _ensureOpenCvIsLoaded() {
 }
 
 // Hack until we've a better way to re-export namespace.
+// A type-only namespace merged with the `cv2` value below, so `cv2.Mat` names the type and `cv2.imread` the function.
+// oxlint-disable-next-line typescript/no-namespace
 export namespace cv2 {
   export type AdaptiveThresholdTypes = cv.AdaptiveThresholdTypes;
   export type Mat = cv.Mat;

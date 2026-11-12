@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "camnc-website",
+  // plainoss account
+  "account_id": "60d502e306ecf0bdad0bb3719d83b30c",
+  "compatibility_date": "2026-03-01",
+  "routes": [
+    { "pattern": "www.camnc.app", "custom_domain": true },
+    { "pattern": "camnc.app", "custom_domain": true }
+  ],
+  // Static site only: `astro build` writes ./dist, served without a Worker script.
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "drop-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

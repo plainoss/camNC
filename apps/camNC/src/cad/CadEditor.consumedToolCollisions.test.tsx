@@ -5,6 +5,7 @@ import { endCadSession } from '@wbcnc/cad-editor/session';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import cabinet from '../../../../packages/cad-script/fixtures/designs/cabinet-consumed-cable-chase.json';
+import { closeStudioMenu, studioCommand } from './studioToolbarTesting';
 
 let session: string | undefined;
 afterEach(() => {
@@ -19,6 +20,7 @@ const ready = async () => {
   await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
 };
 
+// Five complete cabinet re-evaluations (load, Cancel, Keep tools, Save, Undo) take ~24 s locally and ~43 s on CI runners.
 it('keeps the complete cabinet collision footer consistent with consumed membership through Keep tools and Undo', async () => {
   const source = parseCadDocument(structuredClone(cabinet));
   session = source.id;
@@ -65,7 +67,6 @@ it('keeps the complete cabinet collision footer consistent with consumed members
   expect(latest().partCuts).toEqual(before.partCuts);
   // Source history remains reachable although the construction tool is no longer physical.
   await userEvent.click(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Extrude · Cable chase/ }));
-  expect(
-    within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Transform/ })
-  ).not.toBeDisabled();
-}, 40_000);
+  expect(await studioCommand(/Transform/)).not.toHaveAttribute('aria-disabled', 'true');
+  await closeStudioMenu();
+}, 75_000);

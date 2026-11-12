@@ -17,7 +17,19 @@ export {
   stepdownFor,
   MATERIALS,
 } from './toolpaths';
-export type { CamSettings, Tool, Material, TabSettings, Operation, Pass, PartCam, HoleMiddle, HoleChoice } from './toolpaths';
+export type {
+  CamSettings,
+  Tool,
+  Material,
+  TabSettings,
+  Operation,
+  Pass,
+  PartCam,
+  HoleMiddle,
+  HoleChoice,
+  OutlineNotches,
+} from './toolpaths';
+export { describeOutlineNotches } from './outlineNotchNote';
 export { MOTION_ROLES, applyFeedPolicy } from './motion';
 export type { MotionRole, CornerFeedSettings, MotionPath, FeedPolicy } from './motion';
 export { CamInputError, validateCamSettings, validateFeatures } from './validation';
@@ -98,6 +110,7 @@ export type { HoldOptions, PartHold, TabHold, HoldEvent } from './hold';
 export type { OnProgress } from './progress';
 export {
   camBoard,
+  camBoardParts,
   boardBits,
   holdOptionsOf,
   holdsOnParts,
@@ -116,3 +129,10 @@ export { tabRemovalProgram } from './tabRemoval';
 export type { TabStop } from './tabRemoval';
 export { planBoard, summarize as summarizePlan } from './plan';
 export type { BoardPartSource, BoardRequest, OpSummary, PlanResult, ReleaseProgram } from './plan';
+export { cutoutPastBoard, cutoutSilhouette } from './cutout';
+export { simplifyLoop } from './simplifyLoop';
+export type { BoardCutout, CutoutShape } from './cutout';
+export { partBrep, brepProblems } from './step/brep';
+export type { Brep } from './step/brep';
+export { writeStep } from './step/writer';
+export type { StepLengthUnit, StepOptions, StepProduct } from './step/writer';

@@ -34,12 +34,8 @@ export interface VideoSource {
   dispose: () => Promise<void>;
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
-  return Promise.race<T>([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))]);
-}
-
 function webtorrentVideoSource(params: WebtorrentConnectionParams): VideoSource {
-  let connectPromise = connectTorrent({
+  const connectPromise = connectTorrent({
     share: params.share,
     pwd: params.pwd,
     onStatusUpdate(status) {
@@ -55,7 +51,9 @@ function webtorrentVideoSource(params: WebtorrentConnectionParams): VideoSource 
       const { stream, pc } = await connectPromise;
       stream.getTracks().forEach(track => track.stop());
       pc.close();
-    } catch (error) {}
+    } catch {
+      // The connection never came up, so there is nothing to close.
+    }
   }
 
   return {
@@ -75,7 +73,7 @@ function webrtcVideoSource(params: WebrtcConnectionParams): VideoSource {
     },
   });
 
-  let streamPromise = client.connect();
+  const streamPromise = client.connect();
 
   return {
     connectedPromise: streamPromise.then(({ stream, maxResolution }) => ({
@@ -102,7 +100,9 @@ function go2rtcVideoSource(params: Go2rtcConnectionParams | RtspConnectionParams
       const { stream, pc } = await connectPromise;
       stream.getTracks().forEach(t => t.stop());
       pc.close();
-    } catch {}
+    } catch {
+      // The connection never came up, so there is nothing to close.
+    }
   }
 
   return {
@@ -142,21 +142,23 @@ function webcamVideoSource(params: WebcamConnectionParams): VideoSource {
       throw new Error('No video track found');
     }
     let maxResolution: VideoDimensions | undefined;
-    let width = videoTrack.getSettings().width;
-    let height = videoTrack.getSettings().height;
+    const width = videoTrack.getSettings().width;
+    const height = videoTrack.getSettings().height;
     if (width && height) {
       maxResolution = { width, height };
     }
     return { src: stream, maxResolution };
   }
 
-  let connectedPromise = connect();
+  const connectedPromise = connect();
 
   async function dispose() {
     try {
       const { src } = await connectedPromise;
       src.getTracks().forEach(track => track.stop());
-    } catch (error) {}
+    } catch {
+      // The camera never opened, so there is nothing to stop.
+    }
   }
 
   return {

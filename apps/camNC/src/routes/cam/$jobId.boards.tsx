@@ -11,14 +11,12 @@ import {
   dropPart,
   flipOf,
   freezeSpacing,
-  holdSettingsOf,
   holdVerdict,
   cutBoardWith,
   isCut,
   layoutSummary,
   nestBoard,
   newBoard,
-  notAside,
   relayoutBoard,
   resizedBoard,
   respaceBoard,
@@ -37,6 +35,17 @@ import { BoardInspector } from '@/cam/boards/BoardInspector';
 import { HoldSizesDialog } from '@/cam/boards/HoldSizesDialog';
 import { HoldTools } from '@/cam/boards/HoldTools';
 import { LayoutPanel } from '@/cam/boards/LayoutPanel';
+import {
+  placeOffBoard as placeOffBoardsOf,
+  placeOffBoardNote,
+  tooBigForMachine,
+  tooBigReason,
+  unpinned,
+  withoutPart as without,
+  freshBoardFor,
+  moveOnto,
+  moveRefusedNote,
+} from '@/cam/boards/placeOffBoard';
 import { applySetupToAll, prepareGlobalRelayout, restorePhysicalBoardSetup } from '@/cam/boards/globalSetup';
 import { useHoldEditing } from '@/cam/boards/useHoldEditing';
 import type { PartMenuProps } from '@/cam/boards/PartMenu';
@@ -63,7 +72,7 @@ import { z } from 'zod';
 import { Button } from '@wbcnc/ui/components/button';
 import { LoadingSpinner } from '@wbcnc/ui/components/loading-spinner';
 import { X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export const Route = createFileRoute('/cam/$jobId/boards')({
   component: BoardsStep,
@@ -347,18 +356,13 @@ function BoardsEditor({
       setNote(`${inst.name} is ${+inst.thickness.toFixed(1)} mm thick, board ${target.name} is ${target.thickness} mm.`);
       return false;
     }
-    // Moved by hand: pinned to the target board, so auto-fill leaves it there.
-    saveBoards(
-      boards.map(({ board }) =>
-        board.id === boardId
-          ? {
-              ...without(board, itemId),
-              items: [...board.items.filter(i => i !== itemId), itemId],
-              pinned: [...unpinned(board, itemId), itemId],
-            }
-          : without(board, itemId)
-      )
-    );
+    // Moved by hand: pinned to the target board, so auto-fill leaves it there. Onto a full board it stays put.
+    const moved = moveOnto(target, itemId, instances, plan.bit.diameter, nestOptions);
+    if ('full' in moved) {
+      setNote(moveRefusedNote(inst.name, target, moved.full));
+      return false;
+    }
+    saveBoards(boards.map(({ board }) => (board.id === boardId ? moved.board : without(board, itemId))));
     setSelectedId(boardId);
     return true;
   };
@@ -370,36 +374,13 @@ function BoardsEditor({
       setNote(`${byId.get(itemId)?.name ?? itemId} is off the board and won’t be cut.`);
   };
 
-  /** Every part off a board that isn't cut: onto a board of its thickness with room, or else a new one. */
+  /** Every part off a board that isn't cut, onto a board or a new one; a part too big for the machine stays. */
   const placeOffBoard = () => {
-    const bit = plan.bit.diameter;
     const before = boards.map(b => b.board);
-    let next = before;
-    const skipped = boards.filter(({ board }) => isCut(board)).flatMap(({ nest }) => nest.unplaced);
-    let placed = 0;
-    // No spot it could take: the nest decides.
-    const anywhere = { x: -1e6, y: -1e6, rotated: false };
-    for (const { board, nest } of boards) {
-      if (isCut(board)) continue;
-      for (const id of nest.unplaced.filter(id => !hasRepair(board, id))) {
-        const home = notAside(next.find(b => b.id === board.id)!, id);
-        const others = next.filter(b => b.id !== board.id && !isCut(b) && b.thickness === board.thickness);
-        const drop = [home, ...others].map(t => dropPart(t, instances, bit, id, anywhere, 0, nestOptions)).find(d => d.at);
-        const taker = drop?.board ?? {
-          ...newBoard(next, board.thickness, board.material, [id]),
-          ...holdSettingsOf(board),
-          pinned: [id],
-        };
-        const gone = next.map(b => (b.id === taker.id ? taker : without(b, id)));
-        next = gone.some(b => b.id === taker.id) ? gone : [...gone, taker];
-        placed++;
-      }
-    }
-    const skippedNote = skipped.length
-      ? `Not placed: ${skipped.map(id => byId.get(id)?.name ?? id).join(', ')} ${skipped.length === 1 ? 'is' : 'are'} on already-cut boards. Start over on a new sheet first.`
-      : '';
-    if (!placed) return setNote(skippedNote || 'No parts could be placed.');
-    if (saveBoards(next)) setNote(`Parts off the boards placed. ${skippedNote}`.trim(), undoTo(before));
+    const res = placeOffBoardsOf(boards, instances, plan.bit.diameter, nestOptions, hasRepair);
+    const text = placeOffBoardNote(res, instances, machine);
+    if (!res.placed.length) return setNote(text);
+    if (saveBoards(res.boards)) setNote(text, undoTo(before));
   };
 
   // One board per thickness to start with: a new board, with the body on it.
@@ -407,13 +388,16 @@ function BoardsEditor({
     const inst = byId.get(itemId);
     const from = boards.find(b => b.board.items.includes(itemId))?.board;
     if (!inst || !from) return;
-    const b = newBoard(
+    // A new board wouldn't hold it either: no empty board, the reason instead.
+    const big = tooBigForMachine(from, itemId, instances, plan.bit.diameter, nestOptions, inst.thickness);
+    if (big && machine) return setNote(`${tooBigReason(inst, machine, big.margin)} It stays where it is.`);
+    const b = freshBoardFor(
       boards.map(x => x.board),
-      inst.thickness,
-      from.material,
-      [itemId]
+      from,
+      itemId,
+      inst.thickness
     );
-    saveBoards([...boards.map(({ board }) => without(board, itemId)), { ...b, ...holdSettingsOf(from), pinned: [itemId] }]);
+    saveBoards([...boards.map(({ board }) => without(board, itemId)), b]);
     setSelectedId(b.id);
   };
 
@@ -558,6 +542,10 @@ function BoardsEditor({
         .filter(b => (b.board.id !== board.id || board.setAside?.[id]) && b.board.thickness === board.thickness)
         .map(b => b.board),
       onMoveTo: target => (target === 'new' ? toNewBoard(id) : void move(id, target)),
+      noRoom: target => {
+        const moved = moveOnto(target, id, instances, plan.bit.diameter, nestOptions);
+        return 'full' in moved ? moved.full : undefined;
+      },
       pinned: !!board.pinned?.includes(id),
       onUnpin: () => unpin(id),
       onTabsReset: board.tabsAt?.[id]
@@ -583,7 +571,31 @@ function BoardsEditor({
   // Removed parts, wrong thicknesses and broken tabs have their own repair messages.
   const hasRepair = (board: BoardV1, id: string) =>
     !!board.designIssues?.[id] || (!!job.design && (!byId.has(id) || +byId.get(id)!.thickness.toFixed(1) !== board.thickness));
-  const unplacedNames = boards.flatMap(b => b.nest.unplaced.filter(id => !hasRepair(b.board, id)).map(id => byId.get(id)?.name ?? id));
+  // Off the boards: a part that fits no board the machine holds says why, and "Place on boards" is for the others.
+  // Each is nested alone on a new board: only again when the boards, parts, bit or machine change.
+  const offBoard = useMemo(
+    () =>
+      boards.flatMap(({ board, nest }) =>
+        nest.unplaced
+          .filter(id => !hasRepair(board, id))
+          .map(id => ({ id, big: isCut(board) ? null : tooBigForMachine(board, id, instances, plan.bit.diameter, nestOptions) }))
+      ),
+    // hasRepair and nestOptions are made each render from job.design, the instances, the bit, hardware and machine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [boards, instances, job.design, plan.bit.diameter, plan.bit.stickout, hardware, machine]
+  );
+  // One line per reason: copies of a part (same name, same size) say it once.
+  const tooBigNotes = [
+    ...new Map(
+      offBoard.flatMap(({ id, big }) => {
+        const inst = byId.get(id);
+        if (!big || !machine || !inst) return [];
+        const text = tooBigReason(inst, machine, big.margin);
+        return [[text, { id, text }] as const];
+      })
+    ).values(),
+  ];
+  const unplacedNames = offBoard.filter(o => !o.big).map(({ id }) => byId.get(id)?.name ?? id);
   const cantHold = sel.retention === 'tabs' ? (planOf(sel)?.holding ?? []).filter(h => h.how === 'unheld').map(h => h.name) : [];
   const verdict = holdVerdict(sel, selNest, hardware, instances);
   const alerts = (
@@ -623,6 +635,11 @@ function BoardsEditor({
           </Button>
         </p>
       ))}
+      {tooBigNotes.map(({ id, text }) => (
+        <p key={id} role="alert" className="text-xs text-amber-700 dark:text-amber-400">
+          {`${text} It won’t be cut.`}
+        </p>
+      ))}
       {unplacedNames.length > 0 && (
         <p role="alert" className="flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
           {`${unplacedNames.join(', ')} ${unplacedNames.length === 1 ? 'is' : 'are'} off the boards and won’t be cut.`}
@@ -660,6 +677,7 @@ function BoardsEditor({
     changedThickness.length > 0 ||
     tabRepairs.length > 0 ||
     unplacedNames.length > 0 ||
+    tooBigNotes.length > 0 ||
     selNest.nutAbove < 0 ||
     cantHold.length > 0;
 
@@ -850,18 +868,6 @@ function BoardsEditor({
     </div>
   );
 }
-
-const unpinned = (board: BoardV1, itemId: string) => (board.pinned ?? []).filter(i => i !== itemId);
-/** The board's layout without this body. */
-const unpositioned = (board: BoardV1, itemId: string) =>
-  board.layout && { layout: { ...board.layout, at: Object.fromEntries(Object.entries(board.layout.at).filter(([id]) => id !== itemId)) } };
-/** The board without this body (nor its pin and spot). */
-const without = (board: BoardV1, itemId: string): BoardV1 => ({
-  ...notAside(board, itemId),
-  items: board.items.filter(i => i !== itemId),
-  ...(board.pinned && { pinned: unpinned(board, itemId) }),
-  ...unpositioned(board, itemId),
-});
 
 function Shell({
   bar,

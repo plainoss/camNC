@@ -407,6 +407,12 @@ export interface CadPartCopy {
   mirrored?: boolean;
   /** Its own name, rather than the part's with a number. */
   name?: string;
+  /**
+   * The number in its name, given when it's added so later copies and pattern changes don't renumber it. Copies saved
+   * without one are numbered by their order. A copy with its own name still holds its number, so clearing the name gives
+   * back the same one.
+   */
+  number?: number;
   /** The part pattern that made it, which places it and keeps it in step with the count. */
   pattern?: string;
   /**
@@ -495,8 +501,8 @@ export type CadLengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
-  /** 2 for face features, 3 for folders, so older builds refuse instead of losing source settings. */
-  version: 1 | 2 | 3;
+  /** Reader floor: 2 for face features, 3 for folders, 4 for ordered physical-copy operations. */
+  version: 1 | 2 | 3 | 4;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */
@@ -505,11 +511,34 @@ export interface CadDocument {
   variables?: CadVariable[];
   /** Steps that cut parts out of other parts, in order. */
   partCuts?: CadPartCut[];
+  /** Exact-copy moves remain source records even when their pattern slot is absent. */
+  copyTransforms?: CadCopyTransform[];
+  /** Version 4: ordered union of part-cut and copy-transform IDs. Generation features retain their existing semantics. */
+  operationOrder?: string[];
+  /** Source-ID prefix evaluated with legacy fixed-tool semantics when upgrading an existing design. */
+  legacyPartCutIds?: string[];
   /** Planes made to sketch on: a base plane or a part's face, moved out along its normal. */
   planes?: CadDatumPlane[];
   /** Named groups over neighbouring source steps. They never replace or regenerate their contents. */
   folders?: CadFolder[];
   parts: CadPart[];
+}
+/** A rigid move of one physical copy, applied to its pose at this operation, after earlier cuts and moves. */
+export interface CadCopyTransform {
+  id: string;
+  partId: string;
+  copyId: string;
+  by: [number, number, number];
+  byExpressions?: [string | null, string | null, string | null];
+  turn?: CadTurn;
+  suppressed?: true;
+}
+/** Derived world poses are separate from source creation placements; evaluating twice must not move a copy twice. */
+export interface CadEvaluation {
+  parts: EvaluatedCadPart[];
+  diagnostics: CadDiagnostic[];
+  placements?: Record<string, CadPlacement>;
+  available?: string[];
 }
 export interface CadFolder {
   id: string;
@@ -618,11 +647,9 @@ export interface CadSketchSolveStatus {
   entityStatus?: Record<string, CadEntityFreedom>;
   entityAnalysis?: { elapsedMs: number; probes: number; complete?: boolean; limitedBy?: 'budget' | 'failure' | 'engine-reset' };
 }
-export interface CadSolveResult {
+export interface CadSolveResult extends CadEvaluation {
   document: CadDocument;
   status: 'solved' | 'conflict' | 'invalid';
-  diagnostics: CadDiagnostic[];
-  parts: EvaluatedCadPart[];
   sketches: CadSketchSolveStatus[];
 }
 

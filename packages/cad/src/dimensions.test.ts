@@ -63,8 +63,7 @@ describe('dimension selection contract', () => {
 
   it('rejects unsupported pairs explicitly instead of dimensioning only the first entity', () => {
     const { sketch, line, point } = pointLineFixture();
-    const circular = addCircle(sketch, { x: 60, y: 40, radius: 10 }),
-      circle = circular.entities.at(-1)!;
+    const circular = addCircle(sketch, { x: 60, y: 40, radius: 10 });
     const unsupported = addBezier(circular, {
       points: [
         { x: 50, y: 30 },
