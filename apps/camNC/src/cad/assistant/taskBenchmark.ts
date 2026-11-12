@@ -23,7 +23,7 @@ export async function benchmarkAssistantTask(
       source: string,
       base: CadDocument,
       signal: AbortSignal,
-      options?: { views: boolean }
+      options?: { views: boolean | readonly import('@wbcnc/cad-script').CadViewName[] }
     ): Promise<CadTaskCandidate & { images?: import('./provider').AssistantImage[] }>;
     attachments?: import('./provider').AssistantImage[];
     /** Opt in only when check independently inspects the returned document in a trusted runtime and returns its matching report and parts. Defaults to false for arbitrary adapters. */
@@ -60,7 +60,7 @@ export async function benchmarkAssistantTask(
           })
         );
       const detailReport = compactCadReport(checked.document, checked.report);
-      return { ...checked, detailReport, report: summarizeAssistantReport(detailReport) };
+      return { ...checked, trustedReport: checked.report, detailReport, report: summarizeAssistantReport(detailReport) };
     },
   });
   const response = result.messages.at(-1)?.text ?? '';

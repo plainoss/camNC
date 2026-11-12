@@ -1,3 +1,6 @@
+// Packages that compile this file from source (the app imports @wbcnc/cam's src) do not include its types folder, so
+// the reference brings the occt-import-js module declaration along with it.
+// oxlint-disable-next-line typescript/triple-slash-reference
 /// <reference path="./types/occt-import-js.d.ts" />
 import occtimportjs, { type OcctModule, type OcctNode } from 'occt-import-js';
 import { cross, dot, length, meshBounds, normalize, scale, sub, triangle, triangleNormal2A, type Mesh, type Vec3 } from './geom';

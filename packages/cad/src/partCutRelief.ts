@@ -1,5 +1,4 @@
 import type { CadPart, CadPartCut } from './types';
-import { parseCadValue, type CadValueScope } from './valueExpressions';
 
 /** Validate the bounded source setting before either loading or evaluating a design. */
 export function partCutReliefIssue(value: unknown): string | null {
@@ -15,14 +14,6 @@ export function partCutReliefIssue(value: unknown): string | null {
   )
     return 'Cut parts corner relief needs a positive finite cutter diameter and a valid expression.';
   return null;
-}
-
-export function partCutReliefOutcome(step: CadPartCut, scope: CadValueScope): { value: number } | { error: string; got?: number } | null {
-  const expression = step.cornerRelief?.diameterExpression;
-  if (expression === undefined) return null;
-  const parsed = parseCadValue(expression, { unit: 'mm', variables: scope });
-  if ('error' in parsed) return parsed;
-  return parsed.value > 0 ? parsed : { error: 'a cutter diameter must be greater than zero.', got: parsed.value };
 }
 
 /** An explicit Off must not fall back to the part-wide setting. */

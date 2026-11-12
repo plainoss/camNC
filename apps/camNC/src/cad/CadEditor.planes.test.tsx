@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { endCadSession } from '@wbcnc/cad-editor/session';
 import { ModelViewport } from '@/cam/model/ModelViewport';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
 
@@ -36,7 +37,7 @@ it('makes a plane offset from a base plane, sketches on it, and what’s drawn o
   const features = screen.getByRole('region', { name: 'Features' });
   const geometry = within(features).getByRole('list', { name: 'Default geometry' });
 
-  await userEvent.click(within(toolbar).getByRole('button', { name: /^Plane/ }));
+  await userEvent.click(await studioCommand(/^Plane/));
   const dialog = screen.getByRole('dialog', { name: 'Plane' });
   // The selection box starts active, so the plane clicked next is what it's offset from.
   expect(within(dialog).getByRole('button', { name: 'Plane on' }).hasAttribute('data-active')).toBe(true);

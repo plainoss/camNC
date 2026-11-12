@@ -137,6 +137,26 @@ describe('carving artwork generation', () => {
     await expect(generateCarvingAsset(options({ request }))).rejects.toThrow();
   });
 
+  it('caps model-written SVG at 48,000 characters but lets a local trace use the sanitizer limit', async () => {
+    const large = svg.replace('H90V90H10Z', 'H90V90H10Z' + 'L10 10'.repeat(12_000));
+    const answer = () => {
+      const result = response();
+      result.calls![0].arguments.svg = large;
+      return result;
+    };
+    await expect(generateCarvingAsset(options({ request: vi.fn(async () => answer()) }))).rejects.toThrow(
+      'The provider returned oversized artwork'
+    );
+    const traced = await generateCarvingAsset(options({ request: vi.fn(async () => answer()), locallyTraced: true }));
+    expect(traced.asset.svg).toBe(large);
+    const huge = svg.replace('H90V90H10Z', 'H90V90H10Z' + 'L10 10'.repeat(20_000));
+    const tooLarge = response();
+    tooLarge.calls![0].arguments.svg = huge;
+    await expect(generateCarvingAsset(options({ request: vi.fn(async () => tooLarge), locallyTraced: true }))).rejects.toThrow(
+      'traced artwork is too large'
+    );
+  });
+
   it('rejects invalid local constraints before any provider call', async () => {
     const request = vi.fn(async () => response());
     await expect(

@@ -29,7 +29,12 @@ export interface SafetyIssue {
   /** Index of the offending move (arcs count once per chord); -1 for a line that isn't one. */
   move: number;
   message: string;
+  /** `outside-board`: where the move goes, board frame (turned back like the board lies), mm. */
+  at?: { x: number; y: number };
 }
+
+/** Which issues to keep: given the issue and the program's tool radius. */
+export type SafetyFilter = (issue: SafetyIssue, toolRadius: number) => boolean;
 
 /**
  * Rules every generated program must keep, whatever the settings: no rapid move into or through the stock (below its
@@ -80,7 +85,7 @@ export function checkGcodeSafety(gcode: string, limits: SafetyLimits): SafetyIss
     const y = m.to[0] * sin + m.to[1] * cos;
     const inside = x >= -reach && y >= -reach && x <= limits.size[0] + reach && y <= limits.size[1] + reach;
     if (!inside && lowest < limits.stockTop + clearance)
-      issues.push({ rule: 'outside-board', move: i, message: `move to (${fmt(m.to)}) leaves the board` });
+      issues.push({ rule: 'outside-board', move: i, message: `move to (${fmt(m.to)}) leaves the board`, at: { x, y } });
     if (m.to[2] < limits.minZ - 1e-3)
       issues.push({ rule: 'too-deep', move: i, message: `move to Z${+m.to[2].toFixed(3)} is below ${limits.minZ}` });
     if (m.spindle) spindleFlagged = false;

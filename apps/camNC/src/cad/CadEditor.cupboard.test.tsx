@@ -16,6 +16,7 @@ import { defaultProvider, rememberAssistantCredentials } from './assistant/keySt
 import { requestAssistant } from './assistant/provider';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import type { StudioCameraRef } from './studioCamera';
+import { settled } from '@/test/settled';
 
 vi.mock('./assistant/provider', { spy: true });
 // The last props the 3D view received: what it was asked to frame, and the camera it would report.
@@ -41,6 +42,7 @@ afterEach(() => {
 
 async function ready() {
   await waitFor(() => expect(document.querySelector('.cad-editor')?.getAttribute('aria-busy')).toBe('false'), { timeout: 30_000 });
+  await settled({ timeout: 30_000 });
 }
 
 async function insert(width: number) {
@@ -61,8 +63,13 @@ const originX = (document: CadDocument, folderId: string) =>
   document.variables?.find(variable => variable.folderId === folderId && variable.name === 'originX')?.expression;
 
 /** A top view of the assembled design, `height` mm tall and as wide, around `center`. */
-function lookFromTop(center: [number, number, number], height: number) {
-  workspace.props!.cameraState!.current = { center, back: [0, 0, 1], up: [0, 1, 0], height, aspect: 1, key: 'assembled' };
+async function lookFromTop(center: [number, number, number], height: number) {
+  // The 3D view is lazy and mocked, so the settled signal can't see it arrive: wait for the camera it reports to.
+  const camera = await vi.waitFor(() => {
+    if (!workspace.props?.cameraState) throw new Error('The 3D view has not mounted yet.');
+    return workspace.props.cameraState;
+  });
+  camera.current = { center, back: [0, 0, 1], up: [0, 1, 0], height, aspect: 1, key: 'assembled' };
 }
 
 function shelfPieces(document: CadDocument, folderId: string) {
@@ -121,14 +128,14 @@ it('inserts two cupboards, keeps one shelf hole through size/count changes, then
   let view = mount(source);
   await ready();
   // A view wide enough to hold the new cupboard is left as it was framed.
-  lookFromTop([0, 0, 0], 100_000);
+  await lookFromTop([0, 0, 0], 100_000);
   await insert(600);
   await waitFor(() => expect(current.folders).toHaveLength(1));
   // The plate is a real part, so the cupboard is offset 100 mm past the placed parts (none here, so from x = 0).
   expect(originX(current, current.folders![0].id)).toBe('100mm');
   expect(workspace.props?.viewRequest).toBeUndefined();
   // Zoomed in on the plate, the next cupboard would land outside the view, so the view fits the design.
-  lookFromTop([0, 0, 0], 50);
+  await lookFromTop([0, 0, 0], 50);
   await insert(400);
   await waitFor(() => expect(current.folders).toHaveLength(2));
   expect(workspace.props?.viewRequest).toEqual({ name: 'fit', seq: 1 });
@@ -150,10 +157,11 @@ it('inserts two cupboards, keeps one shelf hole through size/count changes, then
         text: '',
         calls: [{ id: `${prefix}-check`, name: 'check_design', arguments: { source: script } }],
       })
+      .mockResolvedValueOnce({ role: 'assistant', text: '', calls: [{ id: `${prefix}-finalize`, name: 'finalize_design', arguments: {} }] })
       .mockResolvedValueOnce({ role: 'assistant', text: 'Proposal: checked the requested cupboard change.' });
     await userEvent.type(within(dock).getByRole('textbox', { name: 'Message' }), message);
     await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
-    await waitFor(() => expect(requestAssistant).toHaveBeenCalledTimes(callNumber * 3), { timeout: 60_000 });
+    await waitFor(() => expect(requestAssistant).toHaveBeenCalledTimes(callNumber * 4), { timeout: 60_000 });
     const preview = await within(dock).findByRole('button', { name: 'Review proposal' }, { timeout: 60_000 });
     await waitFor(() => expect(preview).toHaveProperty('disabled', false));
     await userEvent.click(preview);

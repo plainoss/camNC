@@ -6,6 +6,8 @@ on:
     types: [completed]
   schedule:
     - cron: '0 6 * * *'
+  # After the Deploy workflow deploys production from GitHub Actions.
+  workflow_call:
   # Not on pull requests: they would run the branch's smoke script against production, which fails
   # whenever the script expects UI that has not been deployed yet.
   workflow_dispatch:

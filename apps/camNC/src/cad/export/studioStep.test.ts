@@ -56,12 +56,16 @@ describe('studio STEP export', () => {
     const expected = model.meshes.reduce((sum, mesh) => sum + volume(mesh.positions, mesh.indices), 0),
       read = bodies.reduce((sum, body) => sum + volume(body.mesh.positions, body.mesh.indices), 0);
     expect(read / expected).toBeCloseTo(1, 3);
+    // A loop rather than Math.min(...): a large design has more coordinates than a call can take as arguments.
     const bounds = (values: ArrayLike<number>[]) => {
-      const all = values.flatMap(v => Array.from(v));
-      return [0, 1, 2].map(axis => {
-        const along = all.filter((_, i) => i % 3 === axis);
-        return [Math.min(...along), Math.max(...along)];
-      });
+      const box = [0, 1, 2].map(() => [Infinity, -Infinity]);
+      for (const positions of values)
+        for (let i = 0; i < positions.length; i++) {
+          const range = box[i % 3]!;
+          range[0] = Math.min(range[0]!, positions[i]!);
+          range[1] = Math.max(range[1]!, positions[i]!);
+        }
+      return box;
     };
     const view = bounds(model.meshes.map(mesh => mesh.positions)),
       file = bounds(bodies.map(body => body.mesh.positions));
@@ -82,6 +86,37 @@ describe('studio STEP export', () => {
     expect(hidden.parts).not.toContain(first!.name);
     expect(hidden.parts).toHaveLength(new Set(model.instances.map(instanceKey)).size - 1);
     expect(hidden.text).toContain(`PRODUCT('${second!.name}'`);
+  });
+
+  it('reports only the exported part’s own trouble', async () => {
+    const document = await load('extrude-sketch-apart');
+    const all = studioStep(document);
+    expect(all.problems.length).toBeGreaterThan(0);
+    const broken = document.parts.find(part => all.problems.some(problem => problem.name === part.name))!;
+    const other = document.parts.find(part => part.id !== broken.id)!;
+    expect(studioStep(document, { only: { partId: other.id } }).problems).toEqual([]);
+    expect(studioStep(document, { only: { partId: broken.id } }).problems).toHaveLength(all.problems.length);
+  });
+
+  it('counts a joined body that can’t be built as trouble of the part it joins', async () => {
+    const source = await load('face-extrusion-bracket');
+    const joined = source.parts.find(part => part.addTo)!;
+    // Its sketch emptied, so the body can't be built.
+    const document = {
+      ...source,
+      parts: source.parts.map(part =>
+        part.id === joined.id ? { ...part, sketch: { ...part.sketch, entities: [], constraints: [] } } : part
+      ),
+    };
+    const only = studioStep(document, { only: { partId: joined.addTo! } });
+    expect(only.problems.map(problem => problem.name)).toContain(joined.name);
+  });
+
+  it('doesn’t report trouble with a hidden part', async () => {
+    const document = await load('extrude-sketch-apart');
+    const broken = studioStep(document).problems;
+    const part = document.parts.find(candidate => broken.some(problem => problem.name === candidate.name))!;
+    expect(studioStep(document, { hidden: new Set([part.id]) }).problems).toEqual([]);
   });
 
   it('writes the chosen unit', async () => {
