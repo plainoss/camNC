@@ -339,8 +339,13 @@ describe('CAM plan step', () => {
         <PlanStep />
       </QueryClientProvider>
     );
+    // The guidance names what gives tabs room: the spacing between parts, or a smaller bit.
     expect(
-      await screen.findByText(/back has no two opposite edges where tabs would hold it, so it would come loose/, {}, { timeout: 60_000 })
+      await screen.findByText(
+        /back has no two opposite edges where tabs would hold it, so it would come loose.*widen the gap or margin between parts.*use a smaller bit/,
+        {},
+        { timeout: 60_000 }
+      )
     ).toBeTruthy();
     expect(screen.getByRole('button', { name: /Take the job to the machine/ })).toHaveProperty('disabled', true);
     // The moves are fine, but no "passed" next to a part that comes loose.

@@ -67,7 +67,7 @@ export function PartBadges({ pinned, holding }: { pinned: boolean; holding?: Par
       {holding === 'unheld' && (
         <span
           className="rounded bg-destructive/15 px-1 text-[10px] text-destructive"
-          title="No edge where tabs would hold it: move it, or switch the board to a bottom skin">
+          title="No edge where tabs would hold it: widen the gap or margin between parts, move it, use a smaller bit, or switch the board to a bottom skin">
           can’t hold
         </span>
       )}
