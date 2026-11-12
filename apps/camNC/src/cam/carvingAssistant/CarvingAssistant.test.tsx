@@ -151,8 +151,15 @@ it('defaults to image generation and offers Text SVG when the connection cannot 
   fireEvent.click(screen.getByRole('button', { name: 'add an image provider' }));
   expect(screen.getByRole('radio', { name: 'Image generation' })).toHaveProperty('checked', true);
   expect(screen.getByLabelText('Image generator API key')).toBeTruthy();
+  // The link lands in the image provider's form, not on the dialog's close button.
+  const images = screen.getByRole('region', { name: 'Images' });
+  expect(images.contains(document.activeElement)).toBe(true);
+  expect(document.activeElement?.matches('input, select, textarea')).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Close settings' }));
   fireEvent.click(screen.getByRole('button', { name: 'use Text SVG' }));
-  expect(screen.getByRole('radio', { name: 'Text SVG' })).toHaveProperty('checked', true);
+  // The notice and its button go away; focus carries on in the prompt rather than dropping to the page.
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('What should it show?')));
+  expect(screen.getByRole('radio', { name: 'Text SVG', hidden: true })).toHaveProperty('checked', true);
   expect(screen.queryByText(/can.t make images/)).toBeNull();
   expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', false);
 });

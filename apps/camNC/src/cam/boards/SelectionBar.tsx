@@ -33,6 +33,7 @@ export function SelectionBar<K extends string>({
   deleteLabel,
   menu,
   children,
+  avoid,
 }: {
   /** Tells the fields of one selected thing from another's. */
   id: string;
@@ -51,6 +52,8 @@ export function SelectionBar<K extends string>({
   menu: { label: string; icon?: ReactNode; onSelect: () => void }[];
   /** Controls of its own, after the fields. */
   children?: ReactNode;
+  /** Another box on the drawing to keep clear of, px: the bar moves beside or above it rather than covering it. */
+  avoid?: { left: number; top: number; right: number; bottom: number } | null;
 }) {
   const bar = useRef<HTMLDivElement>(null);
   const [offer, setOffer] = useState<{ key: K; label: string; value: number } | null>(null);
@@ -71,11 +74,23 @@ export function SelectionBar<K extends string>({
     if (!el || !parent) return;
     const [w, h] = [el.offsetWidth, el.offsetHeight];
     const gap = 16;
-    setPlace({
-      left: Math.max(0, Math.min(parent.clientWidth - w, at.x - w / 2)),
-      top: at.y - h - gap >= 0 ? at.y - h - gap : at.y + gap,
-    });
-  }, [at.x, at.y, offer, title]);
+    const clampLeft = (left: number) => Math.max(0, Math.min(parent.clientWidth - w, left));
+    const usual = { left: clampLeft(at.x - w / 2), top: at.y - h - gap >= 0 ? at.y - h - gap : at.y + gap };
+    if (!avoid) return setPlace(usual);
+    const clear = (p: { left: number; top: number }) =>
+      p.top >= 0 &&
+      p.left >= 0 &&
+      p.left + w <= parent.clientWidth &&
+      (p.left + w <= avoid.left || p.left >= avoid.right || p.top + h <= avoid.top || p.top >= avoid.bottom);
+    const candidates = [
+      usual,
+      { left: avoid.right + 8, top: usual.top },
+      { left: avoid.left - 8 - w, top: usual.top },
+      { left: usual.left, top: avoid.top - h - 8 },
+      { left: usual.left, top: Math.max(at.y + gap, avoid.bottom + 8) },
+    ];
+    setPlace(candidates.find(clear) ?? usual);
+  }, [at.x, at.y, offer, title, avoid?.left, avoid?.top, avoid?.right, avoid?.bottom]);
   return (
     <div
       ref={bar}
