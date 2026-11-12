@@ -55,8 +55,14 @@ export interface CadConstructionAssemblyStep {
     | 'attach-seat';
   roles: string[];
   hardwareIds: string[];
-  /** A stated insertion/tool-access direction, not evidence that its sweep is clear. */
+  /** The insertion/tool-access direction: the way the moving members travel into place. */
   axis: '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
+  /**
+   * The roles, all among `roles`, that travel together along `axis` into their final place in this step; the others
+   * stay put. Left out on a step that moves nothing, such as curing or driving hardware. The assembly check sweeps
+   * them in and refuses an order in which they would pass through material already in place.
+   */
+  moving?: string[];
 }
 
 /**

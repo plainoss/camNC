@@ -162,7 +162,7 @@ export function panelChair(options: PanelChairOptions = {}): CadScript {
               roles: [`${side}-side`, role, keyRole],
               hardwareIds: [boltId],
             });
-            assembly.push({ action: 'install-keys', roles: [keyRole], hardwareIds: [], axis: horizontal ? '-z' : '-y' });
+            assembly.push({ action: 'install-keys', roles: [keyRole], moving: [keyRole], hardwareIds: [], axis: horizontal ? '-z' : '-y' });
             assembly.push({
               action: 'install-hardware',
               roles: [keyRole],
@@ -219,6 +219,8 @@ export function panelChair(options: PanelChairOptions = {}): CadScript {
         40
       );
     });
+    const crosspieces = ['Seat', 'Back', 'Rear rail', 'Front apron'];
+    const keyOrder = ['Front apron', 'Seat', 'Back', 'Rear rail'];
     root.construction({
       folderId: folder.id,
       recipe: 'panel-chair-keyed-v1',
@@ -235,9 +237,16 @@ export function panelChair(options: PanelChairOptions = {}): CadScript {
         service: 'conditioned-dry-interior',
       })),
       assembly: [
-        { action: 'insert-crosspieces', roles: ['left-side', 'Seat', 'Back', 'Rear rail', 'Front apron'], hardwareIds: [], axis: '-x' },
-        { action: 'fit-second-side', roles: ['right-side', 'Seat', 'Back', 'Rear rail', 'Front apron'], hardwareIds: [], axis: '-x' },
-        ...assembly,
+        {
+          action: 'insert-crosspieces',
+          roles: ['left-side', ...crosspieces],
+          moving: crosspieces,
+          hardwareIds: [],
+          axis: '-x',
+        },
+        { action: 'fit-second-side', roles: ['right-side', ...crosspieces], moving: ['right-side'], hardwareIds: [], axis: '-x' },
+        // The front apron's keys go in before the seat's: with thicker stock, a seat key in place would block their way.
+        ...keyOrder.flatMap(crosspiece => assembly.filter(step => step.roles[0]!.startsWith(`${crosspiece}-`))),
       ],
     });
   };

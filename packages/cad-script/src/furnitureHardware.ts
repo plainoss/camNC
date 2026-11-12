@@ -17,6 +17,7 @@ import {
   type FurnitureMember,
   type FurniturePoint,
 } from './furnitureGeometry';
+import { furniturePieces } from './furnitureCoverage';
 
 export interface FurnitureHardwareCheck {
   hardwareId: string;
@@ -96,6 +97,13 @@ export function checkFurnitureHardware(
 ): FurnitureHardwareCheck[] {
   const members = furnitureMembers(document, parts, plan),
     variables = cadVariableValues(document);
+  // Anything built can block a driver, not only the plan's own members: a block glued under the seat hides its screws.
+  const pieces = furniturePieces(document).map(({ partId, copyId }, index) => ({
+    role: `piece-${index}`,
+    partId,
+    ...(copyId && { copyId }),
+  }));
+  const obstacles = [...members.values(), ...furnitureMembers(document, parts, { ...plan, members: pieces }).values()];
   const checks: FurnitureHardwareCheck[] = [];
   // Relieved joint corners only clear when the cutter is no wider than the relief they were drawn for.
   const reliefs = [...members.values()]
@@ -213,15 +221,8 @@ export function checkFurnitureHardware(
           -hardware.washerThickness - hardware.headHeight,
           0,
           Math.max(hardware.washerDiameter, hardware.headDiameter) / 2,
-          members.values()
-        ) &&
-          clearEnvelope(
-            entry,
-            entry.member.shape.thickness,
-            length - hardware.washerThickness,
-            hardware.washerDiameter / 2,
-            members.values()
-          )
+          obstacles
+        ) && clearEnvelope(entry, entry.member.shape.thickness, length - hardware.washerThickness, hardware.washerDiameter / 2, obstacles)
       );
       record(
         'Both ends have the specified driver/socket installation access.',
@@ -230,14 +231,14 @@ export function checkFurnitureHardware(
           -hardware.washerThickness - hardware.headHeight - hardware.accessLength,
           -hardware.washerThickness - hardware.headHeight,
           hardware.accessRadius,
-          members.values()
+          obstacles
         ) &&
           clearEnvelope(
             entry,
             entry.member.shape.thickness + hardware.washerThickness + hardware.nutHeight,
             entry.member.shape.thickness + hardware.washerThickness + hardware.nutHeight + hardware.accessLength,
             hardware.accessRadius,
-            members.values()
+            obstacles
           )
       );
     } else {
@@ -290,7 +291,7 @@ export function checkFurnitureHardware(
           -hardware.headHeight - hardware.washerThickness - hardware.accessLength,
           0,
           Math.max(hardware.accessRadius, hardware.washerDiameter / 2),
-          members.values()
+          obstacles
         )
       );
     }

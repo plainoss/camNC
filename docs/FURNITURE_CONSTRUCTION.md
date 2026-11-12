@@ -139,7 +139,8 @@ wooden pieces (source instances and exact copies) that no active plan names.
   belongs to no plan (`apps/camNC/src/cad/assistant/seatingGate.ts`). The model
   then has to build the piece from `frameStool` or `panelChair`, or explain the
   constraint that stops it; a loose design is never offered as a proposal. Pieces
-  already in the open design are left alone.
+  already in the open design are left alone. Only the requests since the last
+  applied proposal count, and "not a chair" doesn't ask for one.
 - `rebuild-panel-chair` and `rebuild-frame-stool` are saved tasks that start from
   the two unchanged originals. A rebuild passes only when the right pattern's plan
   measures clean, every wooden piece is a plan member (no original housing or notch
@@ -150,6 +151,37 @@ wooden pieces (source instances and exact copies) that no active plan names.
   borrowed plan whose roles name every original piece: the joints don't measure on
   the weak geometry. A rebuild from each pattern passes, and still passes after
   reload and a stock or footrest-height edit.
+
+## Assembly order
+
+Each assembly step names its `roles`, its `axis` (the way pieces travel into place)
+and, for a step that brings pieces together, the `moving` roles. A plan saved
+before `moving` existed still opens; its insertion steps then fail the check until
+they say what moves. A member reaches its final place at the last step that moves
+it (earlier moves build a sub-assembly, such as a side frame), or at its first step
+if nothing moves it.
+
+`checkFurnitureAssembly` walks the order on the evaluated geometry. In each step the
+moving members travel together in a straight line from clear of everything into
+their final place, and must not pass through the material of the step's other
+members or of any member already in place (`assemblySweepCollisions` in
+`@wbcnc/cad`). Through each cell of the cross-section, both pieces' material along
+the axis is a set of runs, so the check finds a thin wall anywhere along the travel
+rather than at sampled offsets. Inspection reports a failure as a
+`construction-check` error, so the rebuild tasks and the assistant gate inherit it.
+
+- Frame stool: bond each leg's second lamination, glue each side's rails into its
+  front leg and bring the back leg on from behind, put the cross rails and cleats
+  into the left frame, bring the right frame on from the right, then lower the seat
+  and screw it up from below.
+- Panel chair: crosspieces into the left side, the right side on, then the keys,
+  the front apron's first. With 20 mm stock a seat key already in place blocks the
+  front apron's keys, so that order would fail the check (`furnitureAssembly.test.ts`).
+- Fastener access is the hardware check's. It now counts every built piece as an
+  obstacle, not only plan members, so a block glued under the seat hides its screws.
+
+This is a straight-line insertion check on the final geometry. It does not model
+flexing, clamps, glue squeeze-out or a person's hands.
 
 ## Bounded feasibility results
 
