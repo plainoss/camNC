@@ -1,4 +1,4 @@
-import { cadFolderForPart, cadFolderIssue, designSteps, isCadBody, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { cadFolderForPart, cadFolderIssue, designSteps, isCadBody, isSpatialRemoval, type CadDocument, type CadPart } from '@wbcnc/cad';
 import type { DesignStep } from '@wbcnc/cad';
 
 /** The parts a part is built on: drawn on, sketched from, added to or cut into. They come before it. */
@@ -14,13 +14,17 @@ function builtOn(part: CadPart): string[] {
 
 /**
  * Why a new part order would lose a cut: an Extrude → Remove with no picked scope cuts every body made before it (see
- * removalTargets), so a body taken from before it to after it would silently stop being cut.
+ * removalTargets), so a body taken from before it to after it would silently stop being cut. Removes that cut nothing
+ * don't hold a body back: suppressed ones or those in a suppressed folder, sketch-only ones, and holes or Removes with no
+ * plane or edge to cut from, which applyExtrudeRemovals leaves out too.
  */
 function lostRemoval(document: CadDocument, parts: CadPart[]): string | null {
   const before = new Map(document.parts.map((part, i) => [part.id, i]));
   const after = new Map(parts.map((part, i) => [part.id, i]));
   const label = (part: CadPart) => designSteps(document).find(step => step.id === `${part.id}:extrude`)?.label ?? part.name;
+  const masked = new Set(document.folders?.filter(folder => folder.suppressed).flatMap(folder => folder.partIds));
   for (const remover of document.parts) {
+    if (!isSpatialRemoval(remover) || remover.extrude === false || remover.suppressed || masked.has(remover.id)) continue;
     const on = remover.drawnOn?.on;
     if (!remover.remove || remover.remove.targets || (on && 'partId' in on)) continue;
     for (const body of document.parts)

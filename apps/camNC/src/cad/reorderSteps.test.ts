@@ -222,4 +222,19 @@ describe('reordering around a Remove', () => {
     // A body moved ahead of it is cut too, which is a move the Remove can take.
     expect(reorderDrop(document, `${shelf.id}:extrude`, `${pocket.id}:sketch`)).toEqual({ before: `${pocket.id}:sketch` });
   });
+
+  describe('lets a body past a Remove that cuts nothing', () => {
+    const [board, shelf] = [plate('Board'), plate('Shelf')];
+    const planePocket = { ...plate('Pocket'), drawnOn: { on: { plane: 'top' as const }, offset: 0 }, remove: { depth: 6 } };
+    const movesPast = (pocket: CadPart, extra: Partial<CadDocument> = {}) => {
+      const document: CadDocument = { ...createCadDocument(), parts: [board, pocket, shelf], ...extra };
+      expect(reorderDrop(document, `${board.id}:sketch`, `${shelf.id}:sketch`)).toEqual({ before: `${shelf.id}:sketch` });
+    };
+
+    it('when it’s suppressed', () => movesPast({ ...planePocket, suppressed: true }));
+    it('when its folder is suppressed', () =>
+      movesPast(planePocket, { folders: [{ id: 'off', name: 'Off', partIds: [planePocket.id], suppressed: true }] }));
+    it('when it’s only a sketch', () => movesPast({ ...planePocket, extrude: false }));
+    it('when it’s a Hole', () => movesPast({ ...planePocket, hole: { diameter: 5 } }));
+  });
 });
