@@ -1,8 +1,14 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { Vector3 } from 'three';
+import { Mesh, Vector3, type Object3D } from 'three';
 import { cubeViewRequest, ViewCube } from './ViewCube';
+import { turnViewCubeBottomLabel } from './viewCubeBottomLabel';
+
+vi.mock('./viewCubeBottomLabel', async original => {
+  const { turnViewCubeBottomLabel } = await original<typeof import('./viewCubeBottomLabel')>();
+  return { turnViewCubeBottomLabel: vi.fn(turnViewCubeBottomLabel) };
+});
 
 afterEach(cleanup);
 
@@ -84,4 +90,28 @@ it('requests Top without moving the camera or missing, and leaves scene clicks o
   expect(missed).not.toHaveBeenCalled();
   click(10, 290);
   expect(missed).toHaveBeenCalledTimes(1);
+});
+
+it('turns the BOTTOM label of the cube it shows (#698)', async () => {
+  let frames = 0;
+  function Probe() {
+    useFrame(() => frames++);
+    return null;
+  }
+  render(
+    <div style={{ width: 400, height: 300 }}>
+      <Canvas>
+        <ViewCube onViewRequest={() => {}} />
+        <Probe />
+      </Canvas>
+    </div>
+  );
+  await waitFor(() => expect(frames).toBeGreaterThan(2), { timeout: 10000 });
+  const root = vi.mocked(turnViewCubeBottomLabel).mock.lastCall![0] as Object3D;
+  const turned: Mesh[] = [];
+  root.traverse(object => {
+    if (object instanceof Mesh && object.geometry.userData.bottomLabelTurned) turned.push(object);
+  });
+  expect(turned).toHaveLength(1);
+  expect(turned[0]!.material).toHaveLength(6);
 });
