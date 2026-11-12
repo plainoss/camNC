@@ -26,6 +26,7 @@ import {
   acceptSketchCircularPattern,
   acceptSketchFillet,
   acceptSketchChamfer,
+  acceptSketchCornerPreview,
   acceptSketchOffset,
   applySketchConicRho,
   removeSketchSelection,
@@ -351,7 +352,7 @@ export function CadEditor({
   };
   const [searchHighlight, setSearchHighlight] = useState<SearchCommand['id'] | null>(null);
   const [status, setStatus] = useState('Checking sketch…');
-  const [problems, setProblems] = useState<string[]>([]);
+  const [{ problems, sketchProblems }, setProblems] = useState({ problems: [] as string[], sketchProblems: [] as string[] });
   const [inProgress, setInProgress] = useState(false);
   const [solving, setSolving] = useState(true);
   const [checkEpoch, setCheckEpoch] = useState(0);
@@ -894,7 +895,7 @@ export function CadEditor({
         lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
         setSolving(false);
         const feedback = sketchFeedback(solveFeedback(result));
-        setProblems(feedback.problems);
+        setProblems(feedback);
         setConflictedConstraints(feedback.conflictedConstraintIds);
         setInProgress(feedback.inProgress);
         // A part's profile comes first and is what the editor shows, whatever its face sketches report.
@@ -913,7 +914,8 @@ export function CadEditor({
         if (cancelled || sequence !== solveSequence.current) return;
         lastCheckedRevision.current = `${doc.id}:${doc.revision}`;
         setSolving(false);
-        setProblems([error instanceof Error ? error.message : String(error)]);
+        const problems = [error instanceof Error ? error.message : String(error)];
+        setProblems({ problems, sketchProblems: problems });
         setInProgress(false);
         setStatus('Sketch could not be checked');
       });
@@ -1657,7 +1659,15 @@ export function CadEditor({
     splitting: !!splitFirst,
     modification,
     drawing: !!pending.length && !lineContinuation,
+    cornerReady: !!cornerPreview?.ok,
   });
+  /** What's still being typed or previewed, such as a dimension or a fillet, is part of the sketch being kept. */
+  const applyPendingValues = () =>
+    acceptSketchCornerPreview(sketchEditorInput()) ||
+    acceptOffset() ||
+    applyDimensionValue() ||
+    applyConicRho() ||
+    (creationValues?.editing ? applyCreationValue({ advance: false }) : null);
   const prepareDocument = (): CadDocument | null => {
     const blocked = (reason: string) => {
       setFinishError(reason);
@@ -1671,16 +1681,8 @@ export function CadEditor({
       return blocked(reason);
     }
     try {
-      const offsetError = acceptOffset();
-      if (offsetError) return blocked(offsetError);
-      const dimensionError = applyDimensionValue();
-      if (dimensionError) return blocked(dimensionError);
-      const rhoError = applyConicRho();
-      if (rhoError) return blocked(rhoError);
-      if (creationValues?.editing) {
-        const creationError = applyCreationValue({ advance: false });
-        if (creationError) return blocked(creationError);
-      }
+      const error = applyPendingValues();
+      if (error) return blocked(error);
     } catch (error) {
       return blocked(error instanceof Error ? error.message : String(error));
     }
@@ -1802,12 +1804,7 @@ export function CadEditor({
   /** Back to the studio from a sketch: keeping it, or leaving the design as it was before it opened. */
   const closeSketch = (keep: boolean) => {
     if (keep) {
-      // A value still being typed, such as a dimension, is part of the sketch being kept.
-      const error =
-        acceptOffset() ||
-        applyDimensionValue() ||
-        applyConicRho() ||
-        (creationValues?.editing ? applyCreationValue({ advance: false }) : null);
+      const error = applyPendingValues();
       if (error) return setMessage(error);
     }
     captureSketchCamera(documentRef.current, part, studioCamera, view, sketchTurn, sketchCameraShift, canvasBox);
@@ -2112,8 +2109,10 @@ export function CadEditor({
   const partTrouble = (id: string) =>
     variableProblems.find(problem => problem.partId === id)?.message ??
     (sketchStatuses[id]?.status === 'conflict' ? 'This part’s sketch can’t be solved with its current values.' : null);
+  // A studio sketch closes whatever its edit did to the features built from it, which show as broken in the feature list.
+  const openSketchProblems = studioSession && !showWorkspace ? sketchProblems : problems;
   const displayStatus =
-    activeSketchStatus?.status === 'solved' && (inProgress || !problems.length)
+    activeSketchStatus?.status === 'solved' && (inProgress || !openSketchProblems.length)
       ? sketchDofStatus(activeSketchStatus.dof, isEmptySketch(sketch))
       : status;
   const currentSolverResult = !solving && lastCheckedRevision.current === `${doc.id}:${doc.revision}`;
@@ -2160,7 +2159,7 @@ export function CadEditor({
   };
   // One line drawn on a plane or face is a board drawn edge-on, as the reference's thin extrude: its sketch can close.
   const edgeOnBoard = !!(studioSession && part?.drawnOn && !part.thin && isSingleLine(part));
-  const sketchFinishReason = openSketchFinishReason(sketch, problems, {
+  const sketchFinishReason = openSketchFinishReason(sketch, openSketchProblems, {
     checking: busy || solving,
     pending: pendingFinishReason,
     edgeOnBoard,
@@ -3608,7 +3607,7 @@ export function CadEditor({
         />
       )}
       <footer className="cad-status">
-        <span className={problems.length && !inProgress ? 'cad-error' : ''}>
+        <span className={openSketchProblems.length && !inProgress ? 'cad-error' : ''}>
           {studioSession && showWorkspace ? (
             // In the studio, a sketch's freedom isn't what's being worked on.
             solving ? (
@@ -3644,7 +3643,7 @@ export function CadEditor({
         </span>
         <span>{saveStatus ?? 'Draft'}</span>
       </footer>
-      {!acceptanceNotice && <SketchProblems problems={problems} inProgress={inProgress} />}
+      {!acceptanceNotice && <SketchProblems problems={openSketchProblems} inProgress={inProgress} />}
     </div>
   );
   return <DesignUnitContext value={lengthUnit}>{content}</DesignUnitContext>;

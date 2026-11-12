@@ -157,6 +157,17 @@ export function acceptSketchFillet(editor: SketchEditorInput) {
   setMessage('Fillets created. Double-click the shared radius to edit the group.');
 }
 
+/**
+ * Finishing with a fillet or chamfer previewed keeps it as shown, so the sketch closes with its corners rounded. A
+ * preview that can't be applied holds the sketch open by itself, so there's never an error to report here.
+ */
+export function acceptSketchCornerPreview(editor: SketchEditorInput): null {
+  if (!editor.selected.length) return null;
+  if (editor.tool === 'fillet' && editor.filletPreview?.ok) acceptSketchFillet(editor);
+  else if (editor.tool === 'chamfer' && editor.chamferPreview?.ok) acceptSketchChamfer(editor);
+  return null;
+}
+
 export function acceptSketchChamfer(editor: SketchEditorInput) {
   const {
     chamferDistances,
