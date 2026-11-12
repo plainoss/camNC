@@ -36,7 +36,8 @@ async function setup(width = 1200) {
     </div>
   );
   await checked();
-  await waitFor(() => expect(vi.mocked(ModelViewport).mock.lastCall![0].instanceIds).toHaveLength(1));
+  // The first render after the browser starts can take seconds under a parallel run.
+  await waitFor(() => expect(vi.mocked(ModelViewport).mock.lastCall?.[0].instanceIds).toHaveLength(1), { timeout: 20_000 });
   const baseline = session.document;
   const past = [...session.past],
     future = [...session.future];
@@ -156,7 +157,11 @@ it('opens More to mark a highlighted command that does not fit, keeping focus in
   expect(getComputedStyle(item).outlineWidth).toBe('2px');
   expect(highlighted()).toHaveLength(1);
   expect(document.activeElement).toBe(input);
-  // Typing keeps going to search while the menu shows the match.
+  // Typing keeps going to search while the menu shows the match, even with the pointer over it.
+  await userEvent.hover(item);
+  expect(document.activeElement).toBe(input);
+  await userEvent.unhover(item);
+  expect(document.activeElement).toBe(input);
   await userEvent.keyboard('{Backspace}');
   expect(input).toHaveValue('variabl');
   expect(document.activeElement).toBe(input);
@@ -202,4 +207,20 @@ it('follows the highlighted command into and out of More as the toolbar narrows 
   expect(studioToolbar().getByRole('button', { name: 'Variable' })).toHaveAttribute('data-command-highlight', 'true');
   expect(document.activeElement).toBe(input);
   unchanged();
+});
+
+it('closes the search with Escape while More shows its match, also after the pointer crossed the menu', async () => {
+  await setup(600);
+  await search('variable');
+  expect(await screen.findByRole('menu')).toBeVisible();
+  await userEvent.keyboard('{Escape}');
+  await waitFor(() => expect(moreMenu()).toBeNull());
+  expect(screen.queryByRole('combobox', { name: 'Search tools' })).toBeNull();
+  await search('variable');
+  const menu = await screen.findByRole('menu');
+  await userEvent.hover(within(menu).getByRole('menuitem', { name: 'Variable' }));
+  await userEvent.keyboard('{Escape}');
+  await waitFor(() => expect(moreMenu()).toBeNull());
+  expect(screen.queryByRole('combobox', { name: 'Search tools' })).toBeNull();
+  expect(highlighted()).toHaveLength(0);
 });
