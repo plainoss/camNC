@@ -2,6 +2,7 @@ import {
   boardBits,
   boardWork,
   camBoard,
+  camBoardParts,
   holdOptionsOf,
   holdsOnParts,
   jobHoldClashes,
@@ -135,7 +136,7 @@ export interface PlanResult {
    * With tabs: per part, which tabs hold it once its outline is cut through (the stock beyond a tab must be wide
    * enough and reach the board's edge). A part with too few is not held: the job is blocked.
    */
-  hold?: { part: string; tabs: { at: { x: number; y: number }; anchored: boolean }[]; anchored: number; ok: boolean }[];
+  hold?: { part: string; id?: string; tabs: { at: { x: number; y: number }; anchored: boolean }[]; anchored: number; ok: boolean }[];
   /**
    * What comes loose during the job, at the step where it happens (see `holdTimeline`). `block`: the job is blocked
    * (stock that can turn or lift; a part that should be held but isn't). Without `block`: as the user chose (nothing
@@ -146,6 +147,8 @@ export interface PlanResult {
     after: string;
     kind: 'board' | 'pivot' | 'loose' | 'pocket';
     what: string;
+    /** The board part's id, for a part (names can repeat). */
+    id?: string;
     at: { x: number; y: number };
     block: boolean;
     message: string;
@@ -153,7 +156,7 @@ export interface PlanResult {
   /** Hold points the bit would hit (blocks the job). */
   holdClash?: { x: number; y: number }[];
   /** Per part: tabs placed (`tabs` of them; `wanted` when fewer fit than asked), a bottom skin, or nothing that holds it. */
-  holding?: { name: string; how: 'placed' | 'skin' | 'unheld'; tabs: number; wanted?: number; moved?: boolean }[];
+  holding?: { id: string; name: string; how: 'placed' | 'skin' | 'unheld'; tabs: number; wanted?: number; moved?: boolean }[];
   /** Bottom skin thickness, mm, for the parts that have one. */
   skin?: number;
   /** The board is taped down: the skin is the layer on the tape, cut for all parts in one go at the end. */
@@ -248,7 +251,7 @@ export function planBoard(
     else
       problem ??= `No room for two ⌀${diameter} dowel pins clear of the parts: make the board bigger, or re-align with the camera instead.`;
   }
-  const cam = camBoard(spec, settings, progress.step(sideA));
+  const { cam, partIds } = camBoardParts(spec, settings, progress.step(sideA));
   progress.done(sideA);
   // A cut line past the board's edge: the moves round it that leave the board are said once, as that.
   const pastEdge = (board.cutouts ?? []).filter(c => cutoutPastBoard([c.outline], { w: board.w, h: board.h }));
@@ -308,9 +311,13 @@ export function planBoard(
   }
   // The hold check runs on the board as laid out, before it's turned to lie like the stock on the bed.
   progress.done(postB);
-  const flat = board.rotationDeg ? camBoard({ ...spec, rotationDeg: 0 }, settings, progress.step(unturned)) : cam;
+  // With the board part each operation cuts: two parts of the same name are held, or come loose, each on its own.
+  const { cam: flat, partIds: flatIds } = board.rotationDeg
+    ? camBoardParts({ ...spec, rotationDeg: 0 }, settings, progress.step(unturned))
+    : { cam, partIds };
   progress.done(unturned);
   const holding = (cam.holding ?? []).map(h => ({
+    id: h.id,
     name: h.name,
     how: h.how,
     tabs: h.tabs.length,
@@ -335,7 +342,7 @@ export function planBoard(
         ].map(h => ({ x: h.x, y: h.y })),
       }
     : {};
-  plan = { ...plan, ...stability(flat, spec, settings), ...clashes, ...(release.length && { release }) };
+  plan = { ...plan, ...stability(flat, flatIds, spec, settings), ...clashes, ...(release.length && { release }) };
   if (cutLine.dropped() || releaseCutLine.dropped()) plan = withCutLineProblem(plan, pastEdge);
   progress.done(holds - kHoldCheckShare * work.parts);
   // A skin (or the layer on the tape) holds every part until the end.
@@ -347,7 +354,12 @@ export function planBoard(
       ...(board.holdDown === 'fixture-tape' && { taped: true }),
     };
   if (!usesTabs(board.holdDown)) return plan;
-  return { ...plan, hold: holdCheck(flat, board, holdOptionsOf(spec, settings)), holding, skin: board.skin ?? kDefaultSkin };
+  return {
+    ...plan,
+    hold: holdCheck(flat, { ...board, partIds: flatIds }, holdOptionsOf(spec, settings)),
+    holding,
+    skin: board.skin ?? kDefaultSkin,
+  };
 }
 
 /**
@@ -367,9 +379,14 @@ function withCutLineProblem(plan: PlanResult, past: BoardCutout[]): PlanResult {
  * Does everything stay put during the job? What comes loose at which step (stock with too few holds, parts cut free
  * with nothing holding them, tabs or skins a pocket cuts away). On the board as laid out (not turned on the bed).
  */
-function stability(flat: PartCam, spec: BoardSpec, settings: Partial<CamSettings>): Pick<PlanResult, 'timeline'> {
+function stability(
+  flat: PartCam,
+  partIds: readonly (string | undefined)[],
+  spec: BoardSpec,
+  settings: Partial<CamSettings>
+): Pick<PlanResult, 'timeline'> {
   if (spec.holdDown === 'fixture-tape') return {};
-  const how = (part: string) => flat.holding?.find(h => h.name === part)?.how;
+  const how = (ev: { what: string; id?: string }) => flat.holding?.find(h => (ev.id ? h.id === ev.id : h.name === ev.what))?.how;
   // Nothing holds the parts, as the user chose: say so, don't block.
   const watched = spec.holdDown === 'none';
   const after = (op: string) => {
@@ -377,7 +394,9 @@ function stability(flat: PartCam, spec: BoardSpec, settings: Partial<CamSettings
     return part ? `the outline of ${part}` : op;
   };
   // With no fixture at all, the one note about the board says it: not one more per piece of stock.
-  const events = holdTimeline(flat, spec, holdOptionsOf(spec, settings)).filter(ev => spec.holdPoints?.length || ev.kind !== 'pivot');
+  const events = holdTimeline(flat, { ...spec, partIds }, holdOptionsOf(spec, settings)).filter(
+    ev => spec.holdPoints?.length || ev.kind !== 'pivot'
+  );
   const timeline = events.map(ev => {
     // What can turn or lift is the user's call (tape, a hand on it): said, never blocked. A part with nothing holding it
     // and a pocket through its tabs or skin aren't.
@@ -403,7 +422,7 @@ function stability(flat: PartCam, spec: BoardSpec, settings: Partial<CamSettings
               ? `has ${ev.holds} screws or clamps, but all to one side of it`
               : `is held by ${ev.holds === 0 ? 'no' : `only ${ev.holds}`} screw${ev.holds === 1 ? '' : 's'} or clamp${ev.holds === 1 ? '' : 's'}`
           }, so it can turn or lift. Keep an eye on it, or add one (ringed on the board).`
-        : how(ev.what) === 'unheld'
+        : how(ev) === 'unheld'
           ? `${ev.what} has no two opposite edges where tabs would hold it, so it would come loose when its outline is cut through. On the Boards step, move it, or switch the board to a bottom skin.`
           : `${ev.what} comes loose when its outline is cut through${watched ? ', as you chose: nothing holds the parts. Keep an eye on it.' : ': no tabs into stock that is held.'}`;
     return { ...ev, block, message };
