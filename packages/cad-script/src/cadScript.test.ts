@@ -250,6 +250,13 @@ describe('corner relief', () => {
       /relieved for a ⌀2 bit, but this board is cut with a ⌀3\.175 bit/
     );
   });
+
+  it('says so once: bones too small for the bit are not also a cut left unmachined', async () => {
+    // Bones for a ⌀2.5 bit, cut with ⌀3.175: the corners CAM leaves are the ones the relief note names.
+    const { report } = await editCad(null, mortised(2.5));
+    expect(report.warnings.filter(warning => warning.part === 'Seat').map(warning => warning.code)).toContain('relief-bit');
+    expect(report.warnings.filter(warning => warning.code === 'toolpath-missing')).toEqual([]);
+  });
 });
 
 describe('paths', () => {
