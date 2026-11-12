@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { quarantineEntry, quarantinedTests } from './quarantine.mjs';
+
 export const LABEL = 'flaky-test';
 
 // Drops the runner's timestamp and colours.
@@ -180,8 +182,42 @@ async function reportRetries(repo, runId, attempt, branch) {
   if (!quarantined.size) return;
   const draft = JSON.parse(api(`repos/${repo}/pulls?head=${repo.split('/')[0]}:${branch}&state=all`, '[.[0] | {number, body}]'))[0];
   const prs = draft ? batchPullRequests(draft.body, draft.number).map(pr => `#${pr}`).join(', ') : 'its PRs';
-  await file(repo, quarantined, test =>
-    `\`${test}\` is quarantined, and failed its non-gating run in **${quarantined.get(test)}** of a Mergify batch for ${prs}: ${runUrl}. If it fails every time now, one of those PRs may have broken it. Batches run this test again (\`${LIFTED}\`) until it is fixed and this issue closes.\n`, { lift: true });
+  if (process.env.FLAKY_DRY_RUN) return console.log({ quarantineFailed: [...quarantined.keys()], prs });
+  // The failure goes on the issue that quarantined the test, which an older issue may name by its bare file name.
+  const open = JSON.parse(gh(['issue', 'list', '--repo', repo, '--label', LABEL, '--state', 'open', '--limit', '500',
+    '--json', 'number,title,updatedAt,labels'])).map(issue => ({ ...issue, updated_at: issue.updatedAt }));
+  const entries = quarantinedTests(open, Date.now());
+  const bodyFile = join(tmpdir(), 'flaky-test-quarantine.md');
+  for (const [test, job] of quarantined) {
+    const entry = quarantineEntry(test, entries);
+    if (!entry) continue;
+    writeFileSync(bodyFile, `\`${test}\` is quarantined, and ${NON_GATING_FAILURE} in **${job}** of a Mergify batch for ${prs}: ${runUrl}. ` +
+      `After ${LIFT_AFTER} such failures in a row, batches run this test again (\`${LIFTED}\`): one of those PRs may have broken it.\n`);
+    gh(['issue', 'comment', String(entry.issue), '--repo', repo, '--body-file', bodyFile]);
+    const comments = JSON.parse(gh(['issue', 'view', String(entry.issue), '--repo', repo, '--json', 'comments'])).comments;
+    if (!shouldLift(comments)) continue;
+    gh(['label', 'create', LIFTED, '--repo', repo, '--force', '--color', 'b60205',
+      '--description', 'A quarantined test that kept failing its non-gating run: merge-queue batches run it again']);
+    gh(['issue', 'edit', String(entry.issue), '--repo', repo, '--add-label', LIFTED]);
+  }
+}
+
+// The non-gating run already tries each quarantined test three times (VITEST_RETRY=2 in ci.yml), so a flaky test
+// rarely fails it; a broken one fails it in every batch.
+const NON_GATING_FAILURE = 'failed every try of its non-gating run';
+export const LIFT_AFTER = 2;
+
+/**
+ * Whether a quarantined test's issue shows LIFT_AFTER non-gating failures in a row: its latest comments, with no
+ * other report (a retried flake, a reopen) or anyone's comment since.
+ */
+export function shouldLift(comments) {
+  let streak = 0;
+  for (const comment of [...comments].reverse()) {
+    if (!comment.body.includes(NON_GATING_FAILURE)) break;
+    streak++;
+  }
+  return streak >= LIFT_AFTER;
 }
 
 /**
@@ -198,11 +234,11 @@ export function issueFor(issues, title) {
   return closed ? { action: 'reopen', number: closed.number } : { action: 'create' };
 }
 
-// A quarantined test that failed its non-gating run gates batches again: it may be broken rather than flaky, and every
-// batch's failure comment would otherwise keep its quarantine from expiring. Reopening the issue takes the label off.
+// A quarantined test that keeps failing its non-gating run gates batches again: it may be broken rather than flaky, and
+// every batch's failure comment would otherwise keep its quarantine from expiring. Reopening the issue takes it off.
 export const LIFTED = 'quarantine-lifted';
 
-async function file(repo, flakes, entryOf, { lift = false } = {}) {
+async function file(repo, flakes, entryOf) {
   if (!flakes.size) return;
   // FLAKY_DRY_RUN=1 lists what it would file, for trying the script on a past run.
   if (process.env.FLAKY_DRY_RUN) return console.log(Object.fromEntries([...flakes.keys()].map(test => [test, entryOf(test)])));
@@ -233,11 +269,6 @@ async function file(repo, flakes, entryOf, { lift = false } = {}) {
     }
     writeFileSync(bodyFile, target.action === 'reopen' ? `Flaky again after this issue was closed. ${entry}` : entry);
     gh(['issue', 'comment', String(target.number), '--repo', repo, '--body-file', bodyFile]);
-    if (lift) {
-      gh(['label', 'create', LIFTED, '--repo', repo, '--force', '--color', 'b60205',
-        '--description', 'A quarantined test that failed its non-gating run: merge-queue batches run it again']);
-      gh(['issue', 'edit', String(target.number), '--repo', repo, '--add-label', LIFTED]);
-    }
   }
 }
 
