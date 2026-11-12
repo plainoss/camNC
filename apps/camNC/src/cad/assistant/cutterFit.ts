@@ -12,7 +12,7 @@ const kCutterWord = String.raw`(?:flat\s+|end\s*|router\s+|spiral\s+|upcut\s+|do
 const kCutterPatterns: [RegExp, (match: RegExpExecArray) => number][] = [
   [new RegExp(String.raw`(\d+(?:[.,]\d+)?)\s*mm\s+${kCutterWord}`, 'gi'), m => Number(m[1]!.replace(',', '.'))],
   [
-    new RegExp(String.raw`${kCutterWord}\s*(?:of|is|:|=|diameter|⌀)?\s*⌀?\s*(\d+(?:[.,]\d+)?)\s*mm`, 'gi'),
+    new RegExp(String.raw`\b${kCutterWord}\s*(?:(?:of|is|:|=|diameter)\s*⌀?|⌀)\s*(\d+(?:[.,]\d+)?)\s*mm`, 'gi'),
     m => Number(m[1]!.replace(',', '.')),
   ],
   [new RegExp(String.raw`(\d+)\s*/\s*(\d+)\s*(?:"|in(?:ch)?)\s+${kCutterWord}`, 'gi'), m => (Number(m[1]) / Number(m[2])) * 25.4],

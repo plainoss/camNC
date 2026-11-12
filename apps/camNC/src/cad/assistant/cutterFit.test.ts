@@ -39,6 +39,9 @@ describe('cutter fit for mortise requests', () => {
     expect(requestedCutter(['Use a 3.175mm bit.', 'Actually the cutter is 4 mm.'])).toBe(4);
     expect(requestedCutter(['A 1/4" bit for the dados.'])).toBe(6.35);
     expect(requestedCutter(['Make the seat 18 mm thick with mortises.'])).toBeUndefined();
+    expect(requestedCutter(['Mortise the seat; 6 mm end mill.', 'Make the tenon a bit 2 mm longer.'])).toBe(6);
+    expect(requestedCutter(['Make the mortises a bit 1 mm wider'])).toBeUndefined();
+    expect(requestedCutter(['The bit ⌀6 mm.', 'Use a bit of 4 mm.'])).toBe(4);
   });
 
   it('counts a mortise check only when it was made with the named cutter', () => {
