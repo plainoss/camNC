@@ -1,3 +1,5 @@
+import type { CadConstruction } from './constructionTypes';
+
 /** CAD source is independent of the solver and the CAM tessellation. All lengths are mm. */
 export interface CadPoint {
   x: number;
@@ -507,8 +509,8 @@ export type CadLengthUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
-  /** Reader floor: 2 for face features, 3 for folders, 4 for ordered physical-copy operations, 5 for Cut parts corner relief. */
-  version: 1 | 2 | 3 | 4 | 5;
+  /** Minimum supported reader: 2 features, 3 folders, 4 ordered operations, 5 step relief, 6 construction intent. */
+  version: 1 | 2 | 3 | 4 | 5 | 6;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */
@@ -527,6 +529,8 @@ export interface CadDocument {
   planes?: CadDatumPlane[];
   /** Named groups over neighbouring source steps. They never replace or regenerate their contents. */
   folders?: CadFolder[];
+  /** Authored facts/assumptions, never stored geometry acceptance or strength claims. */
+  constructions?: CadConstruction[];
   parts: CadPart[];
 }
 /** A physical target is explicit; omitting copyId never turns a family reference into a seed selection. */
