@@ -45,3 +45,37 @@ export function narrowFingersWarnings(
     return `The fingers of the finger joint with ${partners.join(', ')} are about ${+n.width.toFixed(1)} mm wide, ${wide} the ⌀${n.diameter} mm bit: CAM runs the outline straight across ${across}, so the joint isn't cut. Use fewer fingers or a smaller bit.`;
   });
 }
+
+/** Every loop of a part, cuts and their islands included. */
+const partLoops = (part: EvaluatedCadPart) => [
+  part.outline,
+  ...part.holes,
+  ...(part.cuts ?? []).flatMap(cut => [cut.outline, ...cut.islands]),
+];
+
+/**
+ * The notches left once those in a corner relieved for a smaller bit are taken out: the relief note names them. A
+ * bone's points are the part's points that the part as drawn (`asDrawn`, without bones) doesn't have; a notch whose
+ * middle is within the bit's radius of one is in that corner. An entry keeps its other notches, its area shared out
+ * evenly among them.
+ */
+export function notchesBesideBones(
+  notches: readonly OutlineNotches[],
+  part: EvaluatedCadPart,
+  asDrawn: EvaluatedCadPart,
+  offset: CadPoint
+): OutlineNotches[] {
+  const key = (p: CadPoint) => `${p.x.toFixed(6)},${p.y.toFixed(6)}`;
+  const drawn = new Set(partLoops(asDrawn).flatMap(loop => loop.map(key)));
+  const bones = partLoops(part)
+    .flat()
+    .filter(p => !drawn.has(key(p)));
+  if (!bones.length) return [...notches];
+  return notches.flatMap(n => {
+    const near = (at: { x: number; y: number }) =>
+      bones.some(p => Math.hypot(p.x - (at.x + offset.x), p.y - (at.y + offset.y)) <= n.diameter / 2);
+    const at = n.at.filter(spot => !near(spot));
+    if (at.length === n.at.length) return [n];
+    return at.length ? [{ ...n, count: at.length, at, area: (n.area * at.length) / n.at.length }] : [];
+  });
+}

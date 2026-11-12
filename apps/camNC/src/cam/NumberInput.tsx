@@ -53,6 +53,8 @@ export function NumberInput({
         placeholder={placeholder}
         aria-label={ariaLabel}
         aria-invalid={problem ? true : undefined}
+        // Showing the saved value, the field has no typing of its own to undo: a step's ⌘Z can undo its last edit instead.
+        data-saved={draft === null ? '' : undefined}
         aria-describedby={[problem && errorId, describedBy].filter(Boolean).join(' ') || undefined}
         onChange={e => {
           setDraft(e.target.value);

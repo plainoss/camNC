@@ -149,7 +149,7 @@ describe('carving artwork generation', () => {
     );
     const traced = await generateCarvingAsset(options({ request: vi.fn(async () => answer()), locallyTraced: true }));
     expect(traced.asset.svg).toBe(large);
-    const huge = svg.replace('H90V90H10Z', 'H90V90H10Z' + 'L10 10'.repeat(20_000));
+    const huge = svg.replace('H90V90H10Z', 'H90V90H10Z' + 'L10 10'.repeat(32_000));
     const tooLarge = response();
     tooLarge.calls![0].arguments.svg = huge;
     await expect(generateCarvingAsset(options({ request: vi.fn(async () => tooLarge), locallyTraced: true }))).rejects.toThrow(

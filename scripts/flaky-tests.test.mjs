@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { attemptToRead, batchPullRequests, readsRetries, clearsBatches, coveredBy, duplicatesOf, issueFor, issueTitle, parseFailures, parseRetries, testedHead } from './flaky-tests.mjs';
+import { attemptToRead, batchPullRequests, readsRetries, clearsBatches, coveredBy, duplicatesOf, issueFor, issueTitle, parseFailures, quietIssues, QUIET_MS, parseRetries, testedHead } from './flaky-tests.mjs';
 
 test('reads failed specs and Vitest tests from a job log, each once', () => {
   const log = [
@@ -86,8 +86,10 @@ test('reads the tests that passed only on a retry from a job log, each once', ()
     '2026-11-12T10:00:02.0000000Z  ✓ src/cad/other.test.tsx > passes',
     // A turbo cache replay of an earlier run's log was reported when that run passed.
     '2026-11-12T10:00:03.0000000Z @wbcnc/camNC:test:browser: RETRIED [run 17] src/cad/old.test.tsx > flaked before',
+    '2026-11-12T10:05:00.0000000Z QUARANTINE FAILED [run 42] src/cad/quarantined.test.tsx > broke',
   ].join('\n');
   assert.deepEqual(parseRetries(log, 42), ['src/cad/CadEditor.studio.test.tsx > moves a part']);
+  assert.deepEqual(parseRetries(log, 42, 'QUARANTINE FAILED'), ['src/cad/quarantined.test.tsx > broke']);
 });
 
 test('a flake goes to its open issue, else reopens its closed one, else files a new issue', () => {
@@ -112,4 +114,21 @@ test('every finished batch reports its retried tests, also one that failed on an
   assert.equal(readsRetries({ ...batch, conclusion: 'failure' }), true);
   assert.equal(readsRetries({ ...batch, conclusion: 'cancelled' }), false);
   assert.equal(readsRetries({ event: 'pull_request', branch: 'feature', conclusion: 'success' }), false);
+});
+
+test('closes a flaky-test issue after a day with no flake and no comment, unless someone owns it', () => {
+  const now = Date.parse('2026-11-12T12:00:00Z');
+  const ago = ms => new Date(now - ms).toISOString();
+  const bot = { login: 'app/github-actions' };
+  const issue = (number, fields) => ({ number, title: `Flaky test: t${number}`, author: bot, assignees: [], createdAt: ago(2 * QUIET_MS), comments: [], ...fields });
+  const issues = [
+    issue(1),
+    issue(2, { comments: [{ createdAt: ago(QUIET_MS / 2) }] }),
+    issue(3, { createdAt: ago(QUIET_MS / 2) }),
+    issue(4, { assignees: [{ login: 'someone' }] }),
+    // Filed by hand under the reporter's title.
+    issue(5, { author: { login: 'someone' } }),
+    issue(6, { title: 'Spec harness flakes', comments: [{ createdAt: ago(2 * QUIET_MS) }] }),
+  ];
+  assert.deepEqual(quietIssues(issues, now).map(issue => issue.number), [1, 5]);
 });

@@ -28,7 +28,11 @@ export function AssistantSettingsDialog({
   useEffect(() => {
     const element = dialog.current;
     if (!element) return;
-    if (open && !element.open) element.showModal();
+    if (open && !element.open) {
+      element.showModal();
+      // Opened from a link to one section: start in that section's form, not on the close button.
+      element.querySelector<HTMLElement>('section:not([hidden]) :is(input, select, textarea)')?.focus();
+    }
     if (!open && element.open) element.close();
   }, [open]);
   const current = sections.find(item => item.id === section) ?? sections[0]!;

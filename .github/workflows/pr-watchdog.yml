@@ -1,0 +1,37 @@
+name: PR watchdog
+
+# Every 30 minutes, around the clock: cancels and reruns PR CI runs an Actions outage left queued for hours, and labels
+# `needs-attention` (with one comment) each open PR that is orphaned, stacked too deep, conflicting, left dequeued or
+# idle, whatever its other labels. Runs main's copy of the script and never checks out PR code. See
+# scripts/pr-watchdog.mjs.
+on:
+  schedule:
+    # Off the hour: crons on the hour start late.
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: pr-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Flag stalled PRs and rerun stuck runs
+        run: node scripts/pr-watchdog.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

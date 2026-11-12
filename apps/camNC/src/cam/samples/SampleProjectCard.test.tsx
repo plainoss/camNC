@@ -6,11 +6,20 @@ import { SampleProjectCard } from './SampleProjectCard';
 const action = vi.hoisted(() => ({ create: vi.fn(), navigate: vi.fn() }));
 vi.mock('./createSampleJob', () => ({ createSampleJob: action.create }));
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => action.navigate }));
+const demo = vi.hoisted(() => ({ on: false, localPreview: false, rehearsal: null as string | null, exit: vi.fn() }));
+vi.mock('@/lib/demo/demo-mode', () => ({
+  isDemoMode: () => demo.on,
+  isLocalPreviewDemo: () => demo.localPreview,
+  getRehearsalId: () => demo.rehearsal,
+  exitDemo: demo.exit,
+}));
 
 afterEach(() => {
   cleanup();
   action.create.mockReset();
   action.navigate.mockReset();
+  Object.assign(demo, { on: false, localPreview: false, rehearsal: null });
+  demo.exit.mockReset();
 });
 const show = (autoOpen = false) =>
   render(
@@ -56,5 +65,30 @@ describe('sample entry', () => {
     show(true);
     await waitFor(() => expect(action.navigate).toHaveBeenCalled());
     expect(action.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the sample in place on a local build without a sign-in key, where demo mode cannot be left', async () => {
+    // Leaving would reload into the same demo with the sample intent, and open the sample again, forever.
+    Object.assign(demo, { on: true, localPreview: true });
+    action.create.mockResolvedValue({ id: 'local-sample' });
+    show(true);
+    await waitFor(() => expect(action.navigate).toHaveBeenCalledWith({ to: '/cam/$jobId/model', params: { jobId: 'local-sample' } }));
+    expect(demo.exit).not.toHaveBeenCalled();
+    expect(action.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a demo that can be left before saving the sample', () => {
+    for (const state of [
+      { localPreview: false, rehearsal: null },
+      { localPreview: true, rehearsal: crypto.randomUUID() },
+    ]) {
+      Object.assign(demo, { on: true, ...state });
+      show();
+      fireEvent.click(screen.getByRole('button', { name: 'Open sample project' }));
+      expect(demo.exit).toHaveBeenLastCalledWith('/cam?sample=standing-shelf');
+      cleanup();
+    }
+    expect(demo.exit).toHaveBeenCalledTimes(2);
+    expect(action.create).not.toHaveBeenCalled();
   });
 });
