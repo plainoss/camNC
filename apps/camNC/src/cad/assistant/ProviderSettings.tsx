@@ -33,6 +33,22 @@ export function ProviderSettings({
   const [notes, setNotes] = useState<string[]>([]);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
+  // A connection saved elsewhere (the dock's first-run form, another assistant) replaces what this form shows: it stays
+  // mounted in the settings dialog, so its first render's value would otherwise be kept.
+  const shown = useRef(value);
+  useEffect(() => {
+    if (shown.current === value) return;
+    shown.current = value;
+    if (!value) return;
+    const next = connectionPreset(value.config);
+    setPresetId(next.id);
+    setConfig(value.config);
+    setKey(value.key);
+    setCustomModel(!!value.config.model && !next.models.some(model => model.id === value.config.model));
+    setAdvanced(next.id === 'other');
+    setError('');
+    picked.current = true;
+  }, [value]);
   const listed = !config.model || preset.models.some(model => model.id === config.model);
   const [customModel, setCustomModel] = useState(!listed);
   const choosePreset = (id: ConnectionPresetId) => {

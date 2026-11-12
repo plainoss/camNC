@@ -81,13 +81,17 @@
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/scripts/test-timings.mjs", "$TURBO_ROOT$/scripts/balanced-shards.mjs"
+        "$TURBO_ROOT$/scripts/test-timings.mjs", "$TURBO_ROOT$/scripts/balanced-shards.mjs", "$TURBO_ROOT$/scripts/quarantine.mjs"
       ],
       "outputs": [
         "test-results/browser*.json"
       ],
+      // Hashed, so a batch shard that passed only on a retry (VITEST_RETRY=1) or by skipping quarantined tests
+      // (VITEST_QUARANTINE) never replays as a pass for a run that retries and skips nothing, such as a `full-ci` PR.
       "env": [
-        "CI"
+        "CI",
+        "VITEST_RETRY",
+        "VITEST_QUARANTINE"
       ],
       "passThroughEnv": [
         "PLAYWRIGHT_BROWSERS_PATH"

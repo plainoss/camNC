@@ -144,11 +144,7 @@ export function sketchContextTarget(editor: SketchEditorInput, target: Element, 
   const { dimensionSelection, projectPoint, sketch } = editor;
   return sketch
     ? target.closest('[data-constraint-id]')
-      ? sketch.constraints.some(
-          c =>
-            (c.type === 'linearPattern' || c.type === 'circularPattern' || c.type === 'slot') &&
-            c.id === target.closest('[data-constraint-id]')?.getAttribute('data-constraint-id')
-        )
+      ? sketch.constraints.some(c => c.id === target.closest('[data-constraint-id]')?.getAttribute('data-constraint-id'))
         ? { kind: 'constraint' as const, id: target.closest('[data-constraint-id]')!.getAttribute('data-constraint-id')! }
         : ({ kind: 'blank' } as const)
       : pickSketchContextTarget(sketch, position, {

@@ -307,7 +307,7 @@ export function useCarvingAssistant({
         asset: { ...asset, prompt: prompt.trim() || asset.prompt },
         tracedFor: traceKey(target, detail),
       };
-      if (!prompt.trim()) setPrompt(asset.prompt);
+      // The description stays the person's own: an imported file's name isn't a motif to generate or copy from.
       setVariants(list => [variant, ...list].slice(0, kMaxVariants));
       setPicked(variant.id);
       setStatus('');

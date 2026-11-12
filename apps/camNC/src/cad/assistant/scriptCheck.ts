@@ -2,6 +2,7 @@ import { parseCadDocument, type CadDocument } from '@wbcnc/cad';
 import { inspectCadDocument, type CadEditResult } from '@wbcnc/cad-script';
 import runtime from 'virtual:cad-script-sandbox';
 import { sandboxFrameHtml } from './sandboxFrame';
+import { structuralWarnings } from './structuralWarnings';
 
 const failed = (document: CadDocument, message: string): CadEditResult => ({
   ok: false,
@@ -72,6 +73,7 @@ export function checkScriptInBrowser(
           // A script can modify globals in its disposable worker. Recheck source with the app's trusted runtime.
           const trusted = await inspectCadDocument(candidate, new Map(), { toolpaths: options.toolpaths });
           trusted.report.warnings.push(...(result.report.warnings ?? []).filter(warning => warning.code === 'close-straight'));
+          trusted.report.warnings.push(...structuralWarnings(trusted.report));
           finish({ ...trusted, ok: trusted.report.ok });
         } catch (error) {
           finish(failed(start, error instanceof Error ? error.message : 'Invalid design result.'));

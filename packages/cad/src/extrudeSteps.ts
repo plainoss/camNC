@@ -55,18 +55,23 @@ export function removeSupport(document: CadDocument, part: CadPart): { board: Ca
 
 const removedSketchId = (part: CadPart) => `${part.id}:removed`;
 
-/**
- * A Hole step's sketch as the board sees it: a circle round each point that isn't the end or centre of a line or curve,
- * as wide as the hole. The circles take their IDs from their points, so the holes keep theirs as the design changes.
- */
-export function holeSketch(part: CadPart): CadSketch {
+/** A sketch's points drawn on their own: not construction, not a used edge's, not the end or centre of a line or curve. */
+export function standaloneSketchPoints(sketch: CadSketch): Extract<CadEntity, { type: 'point' }>[] {
   const used = new Set(
-    part.sketch.entities.flatMap(entity => (entity.type === 'point' ? [] : entityPointIds(entity).filter(id => id !== entity.id)))
+    sketch.entities.flatMap(entity => (entity.type === 'point' ? [] : entityPointIds(entity).filter(id => id !== entity.id)))
   );
-  const centres = part.sketch.entities.filter(
+  return sketch.entities.filter(
     (entity): entity is Extract<CadEntity, { type: 'point' }> =>
       entity.type === 'point' && !entity.construction && !entity.faceEdge && !used.has(entity.id)
   );
+}
+
+/**
+ * A Hole step's sketch as the board sees it: a circle round each of its standalone points, as wide as the hole. The
+ * circles take their IDs from their points, so the holes keep theirs as the design changes.
+ */
+export function holeSketch(part: CadPart): CadSketch {
+  const centres = standaloneSketchPoints(part.sketch);
   const radius = part.hole!.diameter / 2;
   return {
     ...part.sketch,
