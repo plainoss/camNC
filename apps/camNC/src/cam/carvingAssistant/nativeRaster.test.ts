@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import imagegenReadingOwlUrl from './fixtures/owl-imagegen-reading.png?url';
 import { generateNativeRasterAsset } from './nativeRaster';
 import { boundedCarvingRasterPreview, traceCarvingPng, traceCarvingPngFile } from './rasterSource';
 import { sanitizeCarvingSvg } from './sanitize';
@@ -7,6 +6,7 @@ import { outlineArt } from '../carvingOutline';
 import type { CarvingGenerationOptions } from './generation';
 import { buildRasterArtPrompt } from './nativeImage';
 import actualOwlUrl from './fixtures/owl-imagegen-line-art.png?url';
+import detailedOwlUrl from './fixtures/owl-imagegen-detailed.png?url';
 
 const constraints = { widthMm: 80, heightMm: 80, detail: 'balanced' as const, minFeatureMm: 0.6 };
 const native = { endpoint: 'https://native.example/v1', model: 'image-model', key: 'native-secret', quality: 'low' as const };
@@ -67,7 +67,8 @@ describe('native monochrome generation and tracing', () => {
   });
 
   it('accepts its own trace of a generated image above the size cap for model-written SVG', async () => {
-    const bytes = new Uint8Array(await (await fetch(imagegenReadingOwlUrl)).arrayBuffer());
+    // Merged curves keep most generated drawings below that cap now; the detailed owl still traces above it.
+    const bytes = new Uint8Array(await (await fetch(detailedOwlUrl)).arrayBuffer());
     let binary = '';
     for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ data: [{ b64_json: btoa(binary) }] })));

@@ -10,8 +10,10 @@ import {
   cadSession,
   commitCadSession,
   endCadSession,
+  markCadSession,
   redoCadSession,
   replaceCadSession,
+  restoreCadSession,
   undoCadSession,
 } from './session';
 
@@ -32,6 +34,35 @@ describe('CAD editing sessions', () => {
     expect(session.entry).toEqual(document);
     endCadSession(document.id);
     expect(cadSession(document)).not.toBe(session);
+  });
+
+  it('restores the document and both history stacks on cancel, so the cancelled edit is neither undone nor redone', () => {
+    const document = createPlateDocument();
+    const width = document.parts[0]!.sketch.constraints.find(c => c.label === 'Width')!;
+    const widthOf = (d: CadDocument) => d.parts[0]!.sketch.constraints.find(c => c.id === width.id);
+    const session = cadSession(document);
+    commitCadSession(session, updateDimension(document, width.id, 130));
+    commitCadSession(session, updateDimension(session.document, width.id, 150));
+    undoCadSession(session);
+    // A dialog opens on 130 with 150 waiting to be redone, and previews two values before Cancel.
+    const mark = markCadSession(session);
+    commitCadSession(session, updateDimension(session.document, width.id, 170));
+    commitCadSession(session, updateDimension(session.document, width.id, 190));
+    const revision = session.document.revision;
+    const restored = restoreCadSession(session, mark);
+    expect(widthOf(restored)).toMatchObject({ value: 130 });
+    expect(restored.revision).toBe(revision + 1);
+    expect(session.past).toHaveLength(1);
+    expect(session.future).toHaveLength(1);
+    expect(widthOf(redoCadSession(session))).toMatchObject({ value: 150 });
+    expect(widthOf(undoCadSession(session))).toMatchObject({ value: 130 });
+    expect(widthOf(undoCadSession(session))).toMatchObject({ value: 120 });
+    expect(session.past).toHaveLength(0);
+    expect(session.future.map(d => widthOf(d))).toEqual([expect.objectContaining({ value: 150 }), expect.objectContaining({ value: 130 })]);
+    // The mark keeps its own stacks: later undo and redo didn't change what it restores.
+    expect(mark.past).toHaveLength(1);
+    expect(() => restoreCadSession(session, { ...mark, document: { ...mark.document, id: 'other' } })).toThrow();
+    endCadSession(document.id);
   });
 
   it('releases keyboard ownership once per mounted owner, including overlapping mounts', () => {

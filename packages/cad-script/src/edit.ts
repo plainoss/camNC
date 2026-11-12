@@ -819,7 +819,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       variablesDirty = true;
       return name;
     },
-    cutParts(targets, { with: tools, clearance = 0, split }) {
+    cutParts(targets, { with: tools, clearance = 0, split, cornerRelief }) {
       const ids = (parts: PartEdit | PartCopy | readonly (PartEdit | PartCopy)[]) =>
         'id' in parts ? [parts.id] : parts.map(part => part.id);
       const value = measure(clearance, 'Clearance');
@@ -827,6 +827,8 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
       const fingers = typeof split === 'object' ? measure(split.fingers, 'Fingers', 'scalar') : undefined;
       if (fingers !== undefined && !(Number.isInteger(fingers) && fingers >= 2))
         fail(`A finger joint needs a whole number of fingers, at least 2, not ${fingers}.`);
+      const dogbone = typeof cornerRelief === 'object' ? measure(cornerRelief.dogbone, 'Cutter diameter') : undefined;
+      if (dogbone !== undefined && !(dogbone > 0)) fail(`A dogbone needs a cutter diameter greater than zero, not ${dogbone} mm.`);
       document = addPartCut(
         document,
         ids(tools),
@@ -834,7 +836,15 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
         { value, ...(typeof clearance === 'string' && { expression: clearance }) },
         typeof split === 'object'
           ? { fingers: fingers!, ...(typeof split.fingers === 'string' && { fingersExpression: split.fingers }) }
-          : split
+          : split,
+        cornerRelief === 'off'
+          ? null
+          : typeof cornerRelief === 'object'
+            ? {
+                diameter: dogbone!,
+                ...(typeof cornerRelief.dogbone === 'string' && { diameterExpression: cornerRelief.dogbone }),
+              }
+            : undefined
       ).document;
     },
     value(expression) {

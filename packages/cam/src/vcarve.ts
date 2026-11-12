@@ -196,7 +196,18 @@ function ringEstimate(carving: BoardCarving): { walls: number; floor: number } {
   // Past the flat bit's reach, the V-bit cuts no more floor rings.
   const reach = carving.clearTool ? carving.clearTool.diameter / 2 + flatStep : Infinity;
   let [inside, outside] = [rCap, Math.min(rCap + reach, rCap + Math.min(maxOf(xs) - minOf(xs), maxOf(ys) - minOf(ys)) / 2)];
-  if (offset(region, -outside).length) inside = outside;
+  // Search outward from the walls, doubling the step, before halving. An inward offset by a large distance is by far
+  // the costliest: every hole outline grows wide round joins. Line art closes up within a few mm, so starting from half
+  // the artwork's size took seconds per probe on a detailed 1024 px illustration.
+  let closed = false;
+  for (let step = 4 * flatStep; !closed && inside + step < outside; step *= 2) {
+    if (offset(region, -(inside + step)).length) inside += step;
+    else {
+      outside = inside + step;
+      closed = true;
+    }
+  }
+  if (!closed && offset(region, -outside).length) inside = outside;
   while (outside - inside > 4 * flatStep) {
     const mid = (inside + outside) / 2;
     if (offset(region, -mid).length) inside = mid;

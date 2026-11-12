@@ -1,7 +1,12 @@
 import tracer from 'imagetracerjs';
-import { flattenCurveContours } from './curveFlatten';
+import { flattenCurveContours, kMaxOutlinePoints } from './curveFlatten';
+import { mergeCurveRuns } from './curveMerge';
 import { smoothCurveJoins } from './curveSmoothing';
 import { regularizeRoundTrace } from './roundTraceQuality';
+
+// A detailed 1024 px line-art illustration takes about 2800 merged segments and 150 contours. At about 40 characters
+// per cubic, the 170,000-character path cap below binds at a similar count.
+const kMaxSegments = 4000;
 
 self.onmessage = (
   event: MessageEvent<{
@@ -48,17 +53,21 @@ self.onmessage = (
         blurradius: 0,
       }
     );
-    const roundFit = regularizeRoundTrace(smoothCurveJoins(traced.layers[0], tolerancePx / 3, event.data.microCornerSpanPx));
+    // Merge the tracer's short segments within half the fit tolerance; the raster checks measure the result again.
+    const roundFit = regularizeRoundTrace(
+      mergeCurveRuns(smoothCurveJoins(traced.layers[0], tolerancePx / 3, event.data.microCornerSpanPx), tolerancePx / 2)
+    );
     const paths = roundFit.paths;
     const segmentCount = paths.reduce((sum, path) => sum + path.segments.length, 0);
-    if (!paths.length || paths.length > 300 || segmentCount > 2000)
+    if (!paths.length || paths.length > 300 || segmentCount > kMaxSegments)
       throw new Error('Smooth tracing exceeds its contour budget. Use simpler artwork.');
     let curves = 0,
       lines = 0;
     const number = (value: number | undefined) => {
       if (value === undefined || !Number.isFinite(value) || Math.abs(value) > 1e6)
         throw new Error('Smooth tracer returned an invalid coordinate.');
-      return Number(value.toFixed(4));
+      // A hundredth of a tracing pixel is far below what the source resolves, and keeps a detailed trace compact.
+      return Number(value.toFixed(2));
     };
     const d = paths
       .map(path => {
@@ -87,7 +96,7 @@ self.onmessage = (
         );
       })
       .join('');
-    if (d.length > 110_000) throw new Error('Smooth vector source exceeds its encoded geometry budget.');
+    if (d.length > 170_000) throw new Error('Smooth vector source exceeds its encoded geometry budget.');
     const holes = paths.filter(path => path.isholepath).length;
     // Emit only checked numeric path data. Never import or insert the library's generated SVG markup.
     self.postMessage({
@@ -96,7 +105,7 @@ self.onmessage = (
       lines,
       components: paths.length - holes,
       holes,
-      outline: flattenCurveContours(paths, event.data.chordTolerancePx),
+      outline: flattenCurveContours(paths, event.data.chordTolerancePx, kMaxOutlinePoints),
       roundRegularized: roundFit.regularized,
     });
   } catch (error) {

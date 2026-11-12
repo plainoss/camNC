@@ -119,7 +119,7 @@ it('ignores callbacks after unmount and starts a fresh candidate when the same f
     onOk = vi.fn(),
     onCancel = vi.fn(),
     onPreview = vi.fn();
-  let state: StudioFeatureDialogState = { kind: 'pattern', partId: document.parts[0]!.id, before: document };
+  let state: StudioFeatureDialogState = { kind: 'pattern', partId: document.parts[0]!.id, before: { document, past: [], future: [] } };
   const view = () => (
     <StudioFeatureDialog
       state={state}

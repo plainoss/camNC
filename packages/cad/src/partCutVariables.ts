@@ -1,6 +1,13 @@
 import { cadPartReferenceName, cadPartReferenceOwner } from './partReferences';
 import type { CadDocument, CadPartCut } from './types';
-import { kPartCutClearance, kPartCutFingers, usesVariables, workOutTypedValue, type TypedValueKind } from './typedValues';
+import {
+  kPartCutClearance,
+  kPartCutCornerRelief,
+  kPartCutFingers,
+  usesVariables,
+  workOutTypedValue,
+  type TypedValueKind,
+} from './typedValues';
 import type { CadValueScope } from './valueExpressions';
 
 const names = (document: CadDocument, ids: string[]) => ids.map(id => cadPartReferenceName(document, id) ?? 'a removed part').join(', ');
@@ -33,6 +40,7 @@ export function partCutVariableErrors(
     const messages = [
       ...typed(step.clearanceExpression, kPartCutClearance, ' mm'),
       ...(typeof step.split === 'object' ? typed(step.split.fingersExpression, kPartCutFingers) : []),
+      ...typed(step.cornerRelief?.diameterExpression, kPartCutCornerRelief, ' mm'),
     ];
     // Said on each part the step joins, tools first; copy IDs can hold colons, so each reference is matched to its part.
     const partIds = [
