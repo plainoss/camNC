@@ -13,6 +13,12 @@ const kNotchFit = 0.25;
  * corner leaves about 0.215 r², a 74° one about 0.40 r²: they stay quiet.
  */
 const kNotchArea = 0.5;
+/**
+ * However small, a piece reaching this far (× r) past where the bit's edge gets is a notch: a slit, which a bigger bit
+ * leaves as a thin sliver of little area. The corner of a square inside corner is 0.41 r from it, of a 70° one 0.74 r
+ * (r/sin(θ/2) − r): they stay quiet. Sharper corners (60° and less) are reported as corners the bit can't reach.
+ */
+const kNotchDepth = 1;
 /** The notch's own extent: its region against a bit this many times as wide. */
 const kMouthScale = 3;
 /** A piece filling this share of that region bridges the notch's mouth: the path runs straight across it. */
@@ -32,6 +38,20 @@ function notchWidth(notch: PathsD, r: number, tolerance: number): number {
 /** The path's loop, as `profileOperation` keeps it: the largest. Anything it closes off is never cut. */
 const largest = (paths: PathsD) => paths.sort((a, b) => Math.abs(areaD(b)) - Math.abs(areaD(a))).slice(0, 1);
 
+/** How far a point is from a closed path. */
+function distanceToLoop(p: { x: number; y: number }, loop: PathD): number {
+  let best = Infinity;
+  for (let i = 0; i < loop.length; i++) {
+    const a = loop[i]!,
+      b = loop[(i + 1) % loop.length]!;
+    const [dx, dy] = [b.x - a.x, b.y - a.y];
+    const l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+    best = Math.min(best, Math.hypot(a.x + t * dx - p.x, a.y + t * dy - p.y));
+  }
+  return best;
+}
+
 /**
  * What the profile path with a bit of radius `r` leaves of the waste: outside an outline (`inside` false), or inside
  * a hole loop (CCW, as in the features). It runs one loop, so what that loop closes off counts as left too.
@@ -48,8 +68,11 @@ function leftBy(loop: PathD, r: number, inside: boolean, tolerance: number): Pat
  */
 export function loopNotches(loop: PathD, index: number, diameter: number, tolerance: number, inside = false): OutlineNotches[] {
   const r = diameter / 2;
+  // Where the bit's middle runs: a piece's points this far past it, less r, are as far past the bit's edge.
+  const path = largest(offset([loop], inside ? -r : r, tolerance))[0];
+  const deep = (piece: PathsD) => !!path && piece.some(ring => ring.some(p => distanceToLoop(p, path) - r >= kNotchDepth * r));
   const pieces = components(leftBy(loop, r, inside, tolerance)).filter(
-    piece => Math.abs(polyArea(piece)) >= kNotchArea * r * r || offset(piece, -kNotchFit * r, tolerance).length > 0
+    piece => Math.abs(polyArea(piece)) >= kNotchArea * r * r || offset(piece, -kNotchFit * r, tolerance).length > 0 || deep(piece)
   );
   if (!pieces.length) return [];
   const regions = components(leftBy(loop, kMouthScale * r, inside, tolerance)).map(region => ({
