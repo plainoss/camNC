@@ -10,6 +10,8 @@ import {
 } from '@wbcnc/cad';
 import { useEffect, useMemo, useState } from 'react';
 import { drawnOnName } from './drawnOnName';
+import { DialogPartField } from './DialogPartField';
+import { useDialogPartPick, type DialogPartPicks } from './useDialogPartPick';
 import { FeatureDialog } from './FeatureDialog';
 import { useDialogPreview } from './useDialogPreview';
 
@@ -21,8 +23,9 @@ type Across = NonNullable<CadPartCopy['mirror']>;
  */
 export function MirrorDialog({
   document,
-  partId,
+  partId: openedFor,
   copyId,
+  partPicks,
   pickPlane,
   onSave,
   onPreview,
@@ -32,12 +35,17 @@ export function MirrorDialog({
   partId: string;
   /** The mirror image being changed, or none for a new one. */
   copyId?: string;
-  /** Starts picking a plane or a face; the pick comes back once. */
-  pickPlane?: (picked: (on: CadDrawnOn['on'], datum?: string) => void) => void;
+  /** Parts clicked while it's open: a new mirror's part field takes them. */
+  partPicks?: DialogPartPicks;
+  /** Starts picking a plane or a face; the pick comes back once. Null stops it. */
+  pickPlane?: (picked: ((on: CadDrawnOn['on'], datum?: string) => void) | null) => void;
   onSave: (document: CadDocument) => void;
   onPreview?: (document: CadDocument | null) => void;
   onCancel: () => void;
 }) {
+  // The mirror plane is picked first; clicking the part field then takes the next part clicked.
+  const partPick = useDialogPartPick({ document, partId: openedFor, picks: partPicks, pickable: !copyId, startActive: false });
+  const partId = partPick.partId;
   const part = document.parts.find(candidate => candidate.id === partId);
   const copy = part?.copies?.find(candidate => candidate.id === copyId);
   const [across, setAcross] = useState<Across | null>(copy?.mirror ?? null);
@@ -49,6 +57,7 @@ export function MirrorDialog({
   const issue = error ?? planeError;
   const pick = () => {
     if (!pickPlane) return;
+    partPick.deactivate();
     setPicking(true);
     pickPlane((on, datum) => {
       // A copy cannot define its own mirror plane: regeneration would keep reflecting it about its previous position.
@@ -93,15 +102,21 @@ export function MirrorDialog({
   };
   return (
     <FeatureDialog title="Mirror" okDisabled={!across || !part || !!issue} onOk={save} onCancel={onCancel}>
-      <div className="cad-feature-selection">
-        <small>Entities to mirror</small>
-        <span>{part?.name ?? 'Select a part'}</span>
-      </div>
+      <DialogPartField
+        label="Entities to mirror"
+        name={part?.name ?? 'Select a part'}
+        pick={copyId ? null : partPick}
+        onActivate={() => {
+          setPicking(false);
+          pickPlane?.(null);
+          partPick.activate();
+        }}
+      />
       <button
         type="button"
         className="cad-feature-selection"
         aria-label="Mirror plane"
-        data-active={picking || !across ? '' : undefined}
+        data-active={(picking || !across) && !partPick.active ? '' : undefined}
         onClick={pick}>
         <small>Mirror plane</small>
         <span>{name ?? 'Pick a plane or a face'}</span>

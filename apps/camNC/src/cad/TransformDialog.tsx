@@ -16,6 +16,8 @@ import {
 import { FeatureDialog } from './FeatureDialog';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
+import { DialogPartField } from './DialogPartField';
+import { useDialogPartPick, type DialogPartPicks } from './useDialogPartPick';
 
 const kAxisLabels = ['X', 'Y', 'Z'] as const;
 type TransformKind = 'xyz' | 'distance' | 'mate' | 'rotate' | 'line';
@@ -57,7 +59,7 @@ const pickedLine = (pick: CadConnectorPick): CadConnectorPick => {
  */
 export function TransformDialog({
   document,
-  part,
+  part: openedFor,
   copyId,
   variables,
   onSave,
@@ -67,6 +69,7 @@ export function TransformDialog({
   pickDirection,
   move,
   pickPoint,
+  partPicks,
 }: {
   document: CadDocument;
   part: CadPart;
@@ -82,11 +85,27 @@ export function TransformDialog({
   onConnectorsChange?: (picks: { from?: CadConnectorPick; to?: CadConnectorPick }) => void;
   onCancel: () => void;
   /** Starts picking a plane or a face in the view or the feature list, for a direction; the pick comes back once. */
-  pickDirection?: (picked: (on: CadDrawnOn['on']) => void) => void;
+  pickDirection?: (picked: ((on: CadDrawnOn['on']) => void) | null) => void;
   /** Starts picking a mate connector in the view: a part's face corner or middle, as a click snaps to. Null stops it. */
   pickPoint?: (picked: ((pick: CadConnectorPick) => void) | null) => void;
+  /** Parts clicked while it's open: a new transform's part field takes them. */
+  partPicks?: DialogPartPicks;
 }) {
   const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
+  const editing = !!copyId || !!move;
+  // What was picked on the part before belongs to that part, not to the one picked instead.
+  const partPick = useDialogPartPick({
+    document,
+    partId: openedFor.id,
+    picks: partPicks,
+    pickable: !editing,
+    startActive: true,
+    take: () => {
+      setPickingMate(null);
+      setPicks({});
+    },
+  });
+  const part = document.parts.find(candidate => candidate.id === partPick.partId) ?? openedFor;
   const copy = part.copies?.find(candidate => candidate.id === copyId);
   const moved = move ? part.moved : undefined;
   const alongNow = copy?.along ?? (moved && 'along' in moved ? moved : undefined);
@@ -102,6 +121,7 @@ export function TransformDialog({
   const [picking, setPicking] = useState(false);
   const pick = () => {
     if (!pickDirection) return;
+    partPick.deactivate();
     setPicking(true);
     pickDirection(on => {
       setDirection(on);
@@ -127,6 +147,7 @@ export function TransformDialog({
   useEffect(() => () => pickPoint?.(null), [pickPoint]);
   const pickMate = (end: PickEnd) => {
     if (!pickPoint) return;
+    partPick.deactivate();
     setPickingMate(end);
     setError(null);
     pickPoint(picked => {
@@ -337,10 +358,18 @@ export function TransformDialog({
   };
   return (
     <FeatureDialog title={`Transform · ${part.name}`} onOk={save} onCancel={onCancel}>
-      <div className="cad-feature-selection">
-        <small>{copyPart ? 'Part to copy' : 'Part to move'}</small>
-        <span>{part.name}</span>
-      </div>
+      <DialogPartField
+        label={copyPart ? 'Part to copy' : 'Part to move'}
+        name={part.name}
+        pick={editing ? null : partPick}
+        onActivate={() => {
+          setPicking(false);
+          setPickingMate(null);
+          pickDirection?.(null);
+          pickPoint?.(null);
+          partPick.activate();
+        }}
+      />
       <label className="cad-number-field">
         Type
         <select
