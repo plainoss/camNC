@@ -84,6 +84,16 @@ describe('A Cut parts step whose tool or target isn’t built', () => {
       expect(row(off)).toMatch(/can’t use its tool Front[^,]*, which is suppressed\.$/);
     });
 
+    it('leaves a copy that isn’t built out of the errors on the parts: the cut warns about it, and it can come back', () => {
+      const document = patterned();
+      const gone = { ...document, partCuts: [{ ...document.partCuts![0]!, targets: [`${document.parts[0]!.id}:missing-copy`] }] };
+      expect(row(gone)).toMatch(/can’t use its target, a deleted copy of Side\.$/);
+      expect(partCutInputProblems(gone)).toEqual([]);
+      const front = document.parts[1]!;
+      const off = { ...document, parts: [document.parts[0]!, { ...front, pattern: { ...front.pattern!, suppressed: true as const } }] };
+      expect(partCutInputProblems(off)).toEqual([]);
+    });
+
     it('says a suppressed copy is suppressed', () => {
       const plain = joined();
       const document = retargeted(addPartCopy(plain, plain.parts[1]!.id).document, 1);
