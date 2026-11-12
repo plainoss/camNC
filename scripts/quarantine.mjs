@@ -15,7 +15,9 @@ export const QUARANTINE_MS = 3 * 24 * 3600_000;
  */
 export function quarantinedTests(issues, now) {
   return issues
-    .filter(issue => issue.title.startsWith(PREFIX) && !issue.pull_request && now - Date.parse(issue.updated_at) < QUARANTINE_MS)
+    .filter(issue => issue.title.startsWith(PREFIX) && !issue.pull_request && now - Date.parse(issue.updated_at) < QUARANTINE_MS &&
+      // scripts/flaky-tests.mjs lifts the quarantine of a test that failed its non-gating run.
+      !(issue.labels ?? []).some(label => label.name === 'quarantine-lifted'))
     .map(issue => {
       const name = issue.title.slice(PREFIX.length);
       const cut = issue.title.length === 200 && name.endsWith(CUT);

@@ -126,3 +126,36 @@ describe('outline notches the bit can’t reach', () => {
     expect(describeOutlineNotches(inside!)).toMatch(/the hole’s path runs straight across/);
   });
 });
+
+describe('thin slits against a big bit', () => {
+  /** A V `angle`° wide at its tip, 20 mm deep, into the top edge of a 200 x 60 board. */
+  const vNotch = (angle: number) => {
+    const half = 21 * Math.tan((angle / 2) * (Math.PI / 180));
+    return cutAway(rect(0, 0, 200, 60), [
+      { x: 100 - half, y: 61 },
+      { x: 100, y: 40 },
+      { x: 100 + half, y: 61 },
+    ]);
+  };
+
+  it('a 1 x 15 mm slit with a ⌀12 bit: little area, but far past the bit', () => {
+    const [found, ...more] = notches(part(cutAway(rect(0, 0, 200, 60), rect(185, 30, 201, 31))), 12);
+    expect(more).toEqual([]);
+    expect(found).toMatchObject({ count: 1, spans: true, diameter: 12 });
+    expect(found!.width).toBeCloseTo(1, 1);
+  });
+
+  it('a 0.5 x 8 mm slit with a ⌀6 bit', () => {
+    const [found, ...more] = notches(part(cutAway(rect(0, 0, 200, 60), rect(192, 30, 201, 30.5))));
+    expect(more).toEqual([]);
+    expect(found).toMatchObject({ count: 1, spans: true });
+    expect(found!.width).toBeCloseTo(0.5, 1);
+  });
+
+  it('square and 74° inside corners stay quiet, with a small bit and a big one', () => {
+    for (const diameter of [6, 12]) {
+      expect(notches(part(cutAway(rect(0, 0, 100, 100), rect(40, 40, 101, 101))), diameter)).toEqual([]);
+      expect(notches(part(vNotch(74)), diameter)).toEqual([]);
+    }
+  });
+});

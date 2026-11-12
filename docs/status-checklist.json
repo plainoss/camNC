@@ -69,8 +69,8 @@
         {
           "item": "Transform a part: translate, translate by line, rotate, mate connectors",
           "status": "partial",
-          "evidence": ["packages/cad/src/mateMove.test.ts", "apps/camNC/src/cad/CadEditor.studio.test.tsx", "apps/camNC/src/cad/CadEditor.transformScope.test.tsx"],
-          "note": "Source-part transforms move the whole family and remain editable after downstream consumption. Transform refuses a selected physical copy, including an absent pattern slot. Independent copy transforms need persistent operation history distinct from creation offsets."
+          "evidence": ["packages/cad/src/mateMove.test.ts", "apps/camNC/src/cad/CadEditor.studio.test.tsx", "apps/camNC/src/cad/CadEditor.transformScope.test.tsx", "apps/camNC/src/cad/CadEditor.copyTransforms.test.tsx"],
+          "note": "Source-part transforms move the whole family and remain editable after downstream consumption. Ordered copy transforms already in a document are evaluated, saved and reloaded, but the Transform command refuses a selected physical copy, including an absent pattern slot."
         },
         {
           "item": "Copies of a part",
