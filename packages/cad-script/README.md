@@ -197,6 +197,9 @@ change a variable or a dimension, or a step's settings. So:
   its variables (`variable-value`, such as a thickness below 0.1 mm or a finger count that
   isn't a whole number of at least 2) are errors, and fail the check. The design keeps its
   last good value meanwhile, so its parts and report disagree with the variable until it's fixed.
+- A Cut parts step whose tool or target is deleted, suppressed or only a sketch (its Extrude
+  deleted) cuts without it, and fails the check (`part-cut-input`) on the parts it joins,
+  naming that tool or target.
 
 ### Native curves, offsets and measured fitting
 

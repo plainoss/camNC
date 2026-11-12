@@ -47,6 +47,7 @@ import {
   moveRefusedNote,
 } from '@/cam/boards/placeOffBoard';
 import { applySetupToAll, prepareGlobalRelayout, restorePhysicalBoardSetup } from '@/cam/boards/globalSetup';
+import { tabRoomFix } from '@/cam/boards/spacing';
 import { useHoldEditing } from '@/cam/boards/useHoldEditing';
 import type { PartMenuProps } from '@/cam/boards/PartMenu';
 import type { JobBoard } from '@/cam/useJobBoards';
@@ -658,7 +659,7 @@ function BoardsEditor({
       )}
       {cantHold.length > 0 && (
         <p role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive">
-          {`${cantHold.join(', ')}: no edge where tabs would hold, so the job waits. Move ${cantHold.length === 1 ? 'it' : 'them'}, or`}
+          {`${cantHold.join(', ')}: no edge where tabs would hold, so the job waits. ${tabRoomFix(selNest, plan.bit.diameter, cantHold.length)}, or`}
           <Button
             size="sm"
             variant="outline"

@@ -24,6 +24,22 @@ export function freezeSpacing(boards: BoardV1[], bit: number): BoardV1[] {
 }
 
 /**
+ * What gives tabs room on a board where some can't hold their part. A gap or margin narrower than tabs need with this
+ * bit (both outline cuts and a strip between them that holds the tabs) is the cause however the parts are moved, so
+ * that's said with the spacing that fits; otherwise more room around the part. A smaller bit needs less either way.
+ */
+export function tabRoomFix(nest: { gap: number; margin: number }, bit: number, parts: number): string {
+  const gap = boardGap(bit, 'tabs'),
+    margin = defaultMargin(bit, 'tabs');
+  const wider = [
+    ...(nest.gap < gap ? [`the gap between parts to ${gap} mm`] : []),
+    ...(nest.margin < margin ? [`the margin to ${margin} mm`] : []),
+  ];
+  if (wider.length) return `The spacing is too tight for tabs with the ⌀${bit} bit: widen ${wider.join(' and ')}, use a smaller bit`;
+  return `Give ${parts === 1 ? 'it' : 'them'} more room (a wider gap or margin, or move ${parts === 1 ? 'it' : 'them'}), use a smaller bit`;
+}
+
+/**
  * Why a board's gap is too tight for this bit: the cut around each part needs the bit's width (+1 mm), or one part's
  * outline cut eats into its neighbour. Blocks the job.
  */
