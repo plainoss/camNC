@@ -2,6 +2,8 @@ import { difference, intersect, polyArea, union, unionMany, type PathD, type Pat
 
 const kGridGuard = 0.0002;
 const kEpsilon = 1e-9;
+/** Plan cell of the sweep index, mm. */
+const kIndexCell = 10;
 type Interval = readonly [number, number];
 interface Sweep {
   from: Vec3;
@@ -269,6 +271,9 @@ export class StockModel {
   private readonly footprint?: PathsD;
   private readonly sweeps: Sweep[] = [];
   private readonly planes = new Map<number, PathsD>();
+  /** Sweep indices by plan cell, so a link query looks at the sweeps near it rather than at every one. */
+  private readonly cells = new Map<string, number[]>();
+  private indexed = 0;
 
   constructor(options: StockOptions) {
     this.stockTop = options.stockTop;
@@ -325,13 +330,51 @@ export class StockModel {
     if (!Number.isInteger(checkpoint) || checkpoint < 0 || checkpoint > this.sweeps.length) throw new Error('Invalid stock checkpoint');
     this.sweeps.length = checkpoint;
     this.planes.clear();
+    this.cells.clear();
+    this.indexed = 0;
+  }
+
+  /**
+   * The sweeps below z, clipped to it; with a query segment, only those within `radius` of it. A pass cut again one
+   * stepdown lower leaves the same sweep in plan, so a repeat is left out: it adds nothing to the union.
+   */
+  /** Indices of the sweeps whose plan reach overlaps the box around a-b grown by `radius`, in recorded order. */
+  private near(a: Pt, b: Pt, radius: number): number[] {
+    const cell = (v: number) => Math.floor(v / kIndexCell);
+    for (; this.indexed < this.sweeps.length; this.indexed++) {
+      const { from, to, radius: r } = this.sweeps[this.indexed];
+      for (let i = cell(Math.min(from[0], to[0]) - r); i <= cell(Math.max(from[0], to[0]) + r); i++)
+        for (let j = cell(Math.min(from[1], to[1]) - r); j <= cell(Math.max(from[1], to[1]) + r); j++) {
+          const key = `${i},${j}`;
+          const list = this.cells.get(key);
+          if (list) list.push(this.indexed);
+          else this.cells.set(key, [this.indexed]);
+        }
+    }
+    const found = new Set<number>();
+    for (let i = cell(Math.min(a.x, b.x) - radius); i <= cell(Math.max(a.x, b.x) + radius); i++)
+      for (let j = cell(Math.min(a.y, b.y) - radius); j <= cell(Math.max(a.y, b.y) + radius); j++)
+        for (const n of this.cells.get(`${i},${j}`) ?? []) found.add(n);
+    return [...found].sort((p, q) => p - q);
   }
 
   private at(z: number, a?: Pt, b?: Pt, radius = 0): Sweep[] {
-    return this.sweeps.flatMap(sweep => {
+    const seen = new Set<string>();
+    const sweeps = a && b ? this.near(a, b, radius).map(n => this.sweeps[n]) : this.sweeps;
+    return sweeps.flatMap(sweep => {
       if (a && b && !boxOverlaps(a, b, radius, sweep)) return [];
       const clipped = below(sweep, z);
-      return clipped ? [clipped] : [];
+      if (!clipped) return [];
+      if (
+        a &&
+        b &&
+        segmentDistance(a, b, { x: clipped.from[0], y: clipped.from[1] }, { x: clipped.to[0], y: clipped.to[1] }) > radius + clipped.radius
+      )
+        return [];
+      const key = `${clipped.from[0]},${clipped.from[1]},${clipped.to[0]},${clipped.to[1]},${clipped.radius}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [clipped];
     });
   }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { nestBoard, newBoard, reconcileBoards, setAsidePart, type BoardV1, type PartInstance } from '../boards';
+import { nestBoard, newBoard, reconcileBoards, setAsidePart, withLayout, type BoardV1, type PartInstance } from '../boards';
+import { onBoardOnly } from './placement';
 import { moveOnto, moveRefusedNote, placeOffBoard, placeOffBoardNote, tooBigForMachine } from './placeOffBoard';
 
 const inst = (id: string, w: number, h: number, t: number): PartInstance => ({ id, partId: id, name: id, size: [w, h, t], thickness: t });
@@ -103,5 +104,40 @@ describe('moveOnto', () => {
     const fixed = board(['Top'], { fit: false, w: 520, h: 330 });
     expect(nestBoard(fixed, parts, bit, opts).unplaced).toEqual([]);
     expect(moveOnto(fixed, 'Shelf', parts, bit, opts)).toEqual({ full: 'full' });
+  });
+});
+
+describe('a part a design edit left no room for', () => {
+  // Bottom grew over Shelf's stored spot: Shelf no longer fits where it was laid out.
+  const before = [inst('Bottom', 200, 100, 18), inst('Shelf', 200, 100, 18)];
+  const after = [inst('Bottom', 200, 180, 18), inst('Shelf', 200, 100, 18)];
+  const stored = (): BoardV1 => ({
+    ...newBoard([], 18, 'plywood', ['Bottom', 'Shelf']),
+    margin: 10,
+    gap: 10,
+    layout: { w: 220, h: 230, at: { Bottom: { x: 10, y: 10, rotated: false }, Shelf: { x: 10, y: 120, rotated: false } } },
+  });
+  const edited = { ...opts, preserveLayout: true };
+
+  it('is drawn once, off the board, and keeps its spot for when the edit is undone', () => {
+    expect(nestBoard(stored(), before, bit, edited).unplaced).toEqual([]);
+    const nest = nestBoard(stored(), after, bit, edited);
+    expect(nest.unplaced).toEqual(['Shelf']);
+    // On the board: only what is cut there. Shelf isn't drawn over Bottom too.
+    expect(onBoardOnly(nest).placements.map(p => p.id)).toEqual(['Bottom']);
+    expect(onBoardOnly(nest).unplaced).toEqual(['Shelf']);
+    expect(withLayout(stored(), nest).layout!.at.Shelf).toEqual({ x: 10, y: 120, rotated: false });
+    // Nothing off the board: the nest as it is.
+    const whole = nestBoard(stored(), before, bit, edited);
+    expect(onBoardOnly(whole)).toBe(whole);
+  });
+
+  it('goes back onto a board with "Place on boards", with no part over another', () => {
+    const board = stored();
+    const res = placeOffBoard([{ board, nest: nestBoard(board, after, bit, edited) }], after, bit, edited);
+    expect(res.placed).toEqual(['Shelf']);
+    const nests = res.boards.map(b => onBoardOnly(nestBoard(b, after, bit, edited)));
+    expect(nests.flatMap(n => n.unplaced)).toEqual([]);
+    expect(nests.flatMap(n => n.placements.map(p => p.id)).sort()).toEqual(['Bottom', 'Shelf']);
   });
 });

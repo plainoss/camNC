@@ -90,12 +90,20 @@ export function AssistantDock({
   const stopReason = useRef('Stopped. The design is unchanged.');
   const previousDocument = useRef(JSON.stringify(document));
   const mounted = useRef(true);
+  // The last proposal and, once applied, its before and after: applying, undoing and redoing it are the proposal's own
+  // changes, reported as such rather than as a generic design change.
+  const latestProposal = useRef(proposal);
+  latestProposal.current = proposal ?? latestProposal.current;
+  const applied = useRef<{ before: string; after: string } | null>(null);
   useEffect(
     () =>
       subscribeConversation(document.id, () => {
         const next = readConversation(document.id);
         setMessages(next);
-        if (next.at(-1)?.proposalOutcome) {
+        const outcome = next.at(-1)?.proposalOutcome;
+        if (outcome === 'applied' && latestProposal.current)
+          applied.current = { before: contentOf(latestProposal.current.base), after: contentOf(latestProposal.current.document) };
+        if (outcome) {
           onCheckedProposal(null);
           setActivity(next.at(-1)?.proposalOutcome === 'applied' ? 'Proposal applied.' : 'Proposal discarded. The design is unchanged.');
         }
@@ -110,6 +118,11 @@ export function AssistantDock({
       stopReason.current = 'The design changed. Send again to work from the current design.';
       controller.current?.abort();
       setActivity(stopReason.current);
+    }
+    const content = contentOf(document);
+    if (applied.current && (content === applied.current.before || content === applied.current.after)) {
+      setActivity(content === applied.current.before ? 'Proposal undone. The design is back as it was.' : 'Proposal applied.');
+      return;
     }
     if (readConversation(document.id).length)
       recordAssistantEvent(
@@ -408,4 +421,10 @@ export function AssistantDock({
       )}
     </aside>
   );
+}
+
+/** A design's content without its edit counter, which Undo and Redo change without changing the design. */
+function contentOf(document: CadDocument): string {
+  const { revision: _revision, ...content } = document;
+  return JSON.stringify(content);
 }

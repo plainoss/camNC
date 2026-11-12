@@ -114,8 +114,9 @@ export function NestView({
   onTabsChange?: (item: string, tabs: { x: number; y: number }[]) => void;
   /** A click on an outline places a tab. */
   tabTool?: boolean;
+  /** The selected tab: its body (instance id), and which of its tabs. */
   selectedTab?: { part: string; i: number } | null;
-  onTabSelect?: (part: string, i: number) => void;
+  onTabSelect?: (item: string, i: number) => void;
   /** A click on the piece in a through hole's middle: that hole, and where it is (board frame, mm). */
   onHole?: (middle: HoleMiddle, at: { x: number; y: number }) => void;
 }) {
@@ -136,19 +137,22 @@ export function NestView({
   const [holdDrag, setHoldDrag] = useState<{ i: number; moved: boolean; start: P2 } | null>(null);
   const hatch = useId();
   const cleared = useId();
-  // A tab being dragged: its part, which of its tabs, and where it is now (on the part's outline).
-  const [tabDrag, setTabDrag] = useState<{ part: string; i: number; x: number; y: number } | null>(null);
+  // A tab being dragged: its body (instance id), which of its tabs, and where it is now (on the part's outline).
+  const [tabDrag, setTabDrag] = useState<{ item: string; i: number; x: number; y: number } | null>(null);
   // With the tab tool: where a click would put one.
-  const [tabGhost, setTabGhost] = useState<{ part: string; x: number; y: number } | null>(null);
-  const placedOf = (name: string) => {
-    const p = nest.placements.find(q => byInst.get(q.id)?.name === name);
+  const [tabGhost, setTabGhost] = useState<{ item: string; x: number; y: number } | null>(null);
+  // Bodies by instance id, never by name: two parts can have the same name.
+  type Hold = NonNullable<PlanResult['hold']>[number];
+  const holdOf = (item: string) => plan?.hold?.find(x => x.id === item);
+  const placedOf = (item: string | undefined) => {
+    const p = nest.placements.find(q => q.id === item);
     const inst = p && byInst.get(p.id);
     const part = inst && byPart.get(inst.partId);
     return p && inst && part ? { p, inst, part } : undefined;
   };
   // The point of the body's outlines nearest to `q`, board frame: where a dragged tab goes.
-  const onOutline = (name: string, q: { x: number; y: number }) => {
-    const at = placedOf(name);
+  const onOutline = (item: string | undefined, q: { x: number; y: number }) => {
+    const at = placedOf(item);
     if (!at) return q;
     const f = place(at.p, at.inst.size);
     let best = q,
@@ -167,9 +171,9 @@ export function NestView({
       }
     return best;
   };
-  const tabsOf = (h: NonNullable<PlanResult['hold']>[number]) => tabSpots(h.tabs);
-  const saveTabs = (name: string, tabs: { x: number; y: number }[]) => {
-    const at = placedOf(name);
+  const tabsOf = (h: Hold) => tabSpots(h.tabs);
+  const saveTabs = (item: string | undefined, tabs: { x: number; y: number }[]) => {
+    const at = placedOf(item);
     if (at && onTabsChange)
       onTabsChange(
         at.p.id,
@@ -177,17 +181,17 @@ export function NestView({
       );
   };
   // Never the last one: a part with none is cut free; "I hold it down" says that.
-  const remove = (h: NonNullable<PlanResult['hold']>[number], i: number) => {
+  const remove = (h: Hold, i: number) => {
     const gone = h.tabs[i].at;
     const rest = tabsOf(h).filter(q => Math.hypot(q.x - gone.x, q.y - gone.y) >= 1);
-    if (rest.length) saveTabs(h.part, rest);
+    if (rest.length) saveTabs(h.id, rest);
   };
   /** A double-click on a body: a tab on its outline nearest the pointer. */
-  const addTab = (name: string, e: React.MouseEvent) => {
-    const h = plan?.hold?.find(x => x.part === name);
+  const addTab = (item: string, e: React.MouseEvent) => {
+    const h = holdOf(item);
     const p = toFrame(e);
     if (!h || !p) return;
-    saveTabs(name, [...tabsOf(h), onOutline(name, p)]);
+    saveTabs(item, [...tabsOf(h), onOutline(item, p)]);
   };
   const clash = new Set((plan?.holdClash ?? []).map(p => `${p.x},${p.y}`));
   const toFrame = (e: React.MouseEvent) => {
@@ -206,12 +210,13 @@ export function NestView({
   };
   /** With the tab tool: the point of the nearest outline, when the pointer is near one. */
   const tabSpotAt = (p: { x: number; y: number }) => {
-    let best: { part: string; x: number; y: number } | null = null,
+    let best: { item: string; x: number; y: number } | null = null,
       d = u / 12;
-    for (const { part } of plan?.hold ?? []) {
-      const q = onOutline(part, p);
+    for (const { id: item } of plan?.hold ?? []) {
+      if (!placedOf(item)) continue;
+      const q = onOutline(item, p);
       const e = Math.hypot(q.x - p.x, q.y - p.y);
-      if (e < d) [best, d] = [{ part, x: q.x, y: q.y }, e];
+      if (e < d) [best, d] = [{ item: item!, x: q.x, y: q.y }, e];
     }
     return best;
   };
@@ -244,8 +249,8 @@ export function NestView({
             ? e => {
                 const p = toBoard(e);
                 const spot = p && tabSpotAt(p);
-                const h = spot && plan?.hold?.find(x => x.part === spot.part);
-                if (spot && h) saveTabs(spot.part, [...tabsOf(h), { x: spot.x, y: spot.y }]);
+                const h = spot && holdOf(spot.item);
+                if (spot && h) saveTabs(spot.item, [...tabsOf(h), { x: spot.x, y: spot.y }]);
               }
             : undefined
       }
@@ -329,7 +334,7 @@ export function NestView({
               tabIndex={interactive ? 0 : undefined}
               aria-label={interactive ? `${inst.name}: drag, or move with the arrow keys; Enter opens its menu` : undefined}
               onPointerDown={onPartPointerDown && (e => onPartPointerDown(p.id, e))}
-              onDoubleClick={onTabsChange && plan?.hold?.some(x => x.part === inst.name) ? e => addTab(inst.name, e) : undefined}
+              onDoubleClick={onTabsChange && holdOf(p.id) ? e => addTab(p.id, e) : undefined}
               onKeyDown={onPartKeyDown && (e => onPartKeyDown(p.id, e))}
               onFocus={onPartFocus && (() => onPartFocus(p.id))}
               onContextMenu={onPartContextMenu && (e => onPartContextMenu(p.id, e))}
@@ -427,7 +432,7 @@ export function NestView({
             .filter(t => !t.anchored)
             .map((t, i) => (
               <circle
-                key={`${h.part}-${i}`}
+                key={`${h.id ?? h.part}-${i}`}
                 cx={t.at.x}
                 cy={t.at.y}
                 r={stroke * 9}
@@ -450,14 +455,15 @@ export function NestView({
         {/* Tabs to drag along the outline (the planner puts each on the bit's path nearest to where it's dropped). */}
         {onTabsChange &&
           plan?.hold?.flatMap(h => {
-            const at = placedOf(h.part);
+            const at = placedOf(h.id);
             if (!at) return [];
+            const item = at.p.id;
             return h.tabs.map((t, i) => {
-              const dragged = tabDrag?.part === h.part && tabDrag.i === i;
+              const dragged = tabDrag?.item === item && tabDrag.i === i;
               const pos = dragged ? tabDrag : t.at;
               return (
                 <g
-                  key={`tab-${h.part}-${i}`}
+                  key={`tab-${item}-${i}`}
                   role="button"
                   aria-label={`${h.part}: tab ${i + 1}, drag along the outline to move; double-click or Delete removes it`}
                   tabIndex={0}
@@ -466,29 +472,29 @@ export function NestView({
                     e.stopPropagation();
                     e.preventDefault();
                     (e.currentTarget as SVGGElement).setPointerCapture(e.pointerId);
-                    setTabDrag({ part: h.part, i, x: t.at.x, y: t.at.y });
+                    setTabDrag({ item, i, x: t.at.x, y: t.at.y });
                   }}
                   onPointerMove={e => {
                     if (!dragged) return;
                     const p = toFrame(e);
-                    if (p) setTabDrag({ part: h.part, i, ...onOutline(h.part, p) });
+                    if (p) setTabDrag({ item, i, ...onOutline(item, p) });
                   }}
                   onPointerUp={e => {
                     if (!dragged) return;
                     e.stopPropagation();
                     setTabDrag(null);
                     if (Math.hypot(tabDrag.x - t.at.x, tabDrag.y - t.at.y) < 0.5) {
-                      onTabSelect?.(h.part, i);
+                      onTabSelect?.(item, i);
                       return;
                     }
                     const from = t.at;
                     saveTabs(
-                      h.part,
+                      item,
                       tabsOf(h).map(q => (Math.hypot(q.x - from.x, q.y - from.y) < 1 ? { x: tabDrag.x, y: tabDrag.y } : q))
                     );
                   }}
                   onClick={e => e.stopPropagation()}
-                  onFocus={() => onTabSelect?.(h.part, i)}
+                  onFocus={() => onTabSelect?.(item, i)}
                   onDoubleClick={e => {
                     e.stopPropagation();
                     remove(h, i);
@@ -521,12 +527,13 @@ export function NestView({
                   ))}
                   <circle
                     data-tab={h.part}
+                    data-tab-item={item}
                     cx={pos.x}
                     cy={pos.y}
                     r={stroke * 6}
                     className={cn(
                       'stroke-amber-600 group-focus-visible:stroke-primary dark:stroke-amber-500',
-                      dragged || (selectedTab?.part === h.part && selectedTab.i === i)
+                      dragged || (selectedTab?.part === item && selectedTab.i === i)
                         ? 'fill-amber-500/70'
                         : 'fill-amber-500/0 group-hover:fill-amber-500/40'
                     )}

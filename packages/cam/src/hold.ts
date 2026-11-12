@@ -16,11 +16,22 @@ export interface TabHold {
 }
 
 export interface PartHold {
+  /** The part's name, for people. */
   part: string;
+  /** The board part's id: what tells two parts of the same name apart. */
+  id?: string;
   tabs: TabHold[];
   anchored: number;
   /** Enough anchored tabs to hold the part once its outline is cut through. */
   ok: boolean;
+}
+
+/** The board, and the board part each operation of its program cuts (see `camBoardParts`). */
+export interface HoldBoard {
+  w: number;
+  h: number;
+  /** By operation index: what tells two parts of the same name apart. Without it, parts have only their names. */
+  partIds?: readonly (string | undefined)[];
 }
 
 export interface HoldOptions {
@@ -88,16 +99,22 @@ function pieces(region: PathsD): PathsD[] {
  * is at least `minWeb` wide all the way to the board's edge (or an anchor): a tab into the 1 mm sliver left between
  * two neighbouring cuts holds nothing.
  */
-export function holdCheck(cam: PartCam, board: { w: number; h: number }, opts: HoldOptions = {}): PartHold[] {
+export function holdCheck(cam: PartCam, board: HoldBoard, opts: HoldOptions = {}): PartHold[] {
   const minTabs = opts.minTabs ?? 2;
   const { parts, held } = holdState(cam, board, opts);
-  return parts.map(({ part, interior, tabs, r }) => {
+  return parts.map(({ part, id, interior, tabs, r }) => {
     const checked = tabs.map(tab => ({
       at: tab.at,
       anchored: held(beyond(tab.at, tab.dir, r, interior)) && tabWhole(tabLeft(opts.layer, tab, r), tab.height),
     }));
     const count = checked.filter(t => t.anchored).length;
-    return { part, tabs: checked, anchored: count, ok: count >= Math.min(minTabs, Math.max(1, tabs.length)) && tabs.length > 0 };
+    return {
+      part,
+      ...(id && { id }),
+      tabs: checked,
+      anchored: count,
+      ok: count >= Math.min(minTabs, Math.max(1, tabs.length)) && tabs.length > 0,
+    };
   });
 }
 
@@ -120,13 +137,13 @@ export function beyond(at: P2, dir: P2, r: number, interior: PathsD): P2 {
  * The board after every through cut: each part's interior and tabs, the stock's pieces, and `held(p)`: whether p lies in
  * stock that takes tabs: at least `minWeb` wide all the way to the board's edge, or held by enough hold points.
  */
-export function holdState(cam: PartCam, board: { w: number; h: number }, opts: HoldOptions = {}) {
+export function holdState(cam: PartCam, board: HoldBoard, opts: HoldOptions = {}) {
   const minWeb = opts.minWeb ?? 3;
   const cuts: PathsD = [];
   // The tabs' own material: left out when judging the stock beyond them (it would widen a thin strip).
   const bridges: PathsD = [];
-  const parts: { part: string; interior: PathsD; tabs: Tab[]; r: number }[] = [];
-  for (const op of cam.operations) {
+  const parts: { part: string; id?: string; interior: PathsD; tabs: Tab[]; r: number }[] = [];
+  for (const [index, op] of cam.operations.entries()) {
     if (op.kind !== 'profile') continue;
     const r = op.tool.diameter / 2;
     for (const pass of op.passes) {
@@ -179,7 +196,7 @@ export function holdState(cam: PartCam, board: { w: number; h: number }, opts: H
       bridges.push(...inflatePathsD(tabLines, r, JoinType.Round, EndType.Butt, 2, PRECISION));
       if (op.feature === 'outline') {
         const loop = pass.pts.map(q => ({ x: q[0], y: q[1] }));
-        parts.push({ part: op.name.replace(/: [^:]*$/, ''), interior: offset(union([loop]), -r), tabs, r });
+        parts.push({ part: op.name.replace(/: [^:]*$/, ''), id: board.partIds?.[index], interior: offset(union([loop]), -r), tabs, r });
       }
     }
   }
@@ -260,6 +277,8 @@ export interface HoldEvent {
   cut?: 'tabs' | 'skin';
   /** The part's name, or "stock". */
   what: string;
+  /** The board part's id, for a part. */
+  id?: string;
   /** Where to point at, board coordinates. */
   at: P2;
   /** Hold points on that piece of stock. */
@@ -272,7 +291,7 @@ export interface HoldEvent {
  * held stock. Each problem is reported once, at the step it first happens. Pieces smaller than `minArea` mm² (offcuts
  * that may fall free) are left out.
  */
-export function holdTimeline(cam: PartCam, board: { w: number; h: number }, opts: HoldOptions & { minArea?: number } = {}): HoldEvent[] {
+export function holdTimeline(cam: PartCam, board: HoldBoard, opts: HoldOptions & { minArea?: number } = {}): HoldEvent[] {
   const minTabs = opts.minTabs ?? 2;
   const minArea = opts.minArea ?? 2500;
   const events: HoldEvent[] = [];
@@ -304,10 +323,11 @@ export function holdTimeline(cam: PartCam, board: { w: number; h: number }, opts
       events.push({ step: i, after: op.name, kind: 'pivot', what: 'stock', at: s.centre, holds: s.holds });
     }
     for (const p of parts) {
-      if (seenParts.has(p.part)) continue;
+      // By id: two parts of the same name are two parts.
+      if (seenParts.has(p.id ?? p.part)) continue;
       const anchored = p.tabs.filter(({ at, dir }) => held(beyond(at, dir, p.r, p.interior))).length;
       if (p.tabs.length && anchored >= Math.min(minTabs, p.tabs.length)) continue;
-      seenParts.add(p.part);
+      seenParts.add(p.id ?? p.part);
       const pts = p.interior.flat();
       const at = pts.length
         ? {
@@ -315,7 +335,7 @@ export function holdTimeline(cam: PartCam, board: { w: number; h: number }, opts
             y: (minOf(pts.map(q => q.y)) + maxOf(pts.map(q => q.y))) / 2,
           }
         : { x: 0, y: 0 };
-      events.push({ step: i, after: op.name, kind: 'loose', what: p.part, at });
+      events.push({ step: i, after: op.name, kind: 'loose', what: p.part, ...(p.id && { id: p.id }), at });
     }
   });
   if (opts.layer) events.push(...pocketEvents(cam, board, { ...opts, layer: opts.layer }, minTabs));
@@ -331,12 +351,7 @@ const gone = (left: number, whole: number) => left < Math.min(kThinnest, whole /
  * reported at its end. Tabs: too few left to hold the part. Skin: what's left along the outline no longer surrounds the
  * part's centre (like holds around a piece of stock: left on two opposite edges, it can't pivot).
  */
-function pocketEvents(
-  cam: PartCam,
-  board: { w: number; h: number },
-  opts: HoldOptions & { layer: BottomLayer },
-  minTabs: number
-): HoldEvent[] {
+function pocketEvents(cam: PartCam, board: HoldBoard, opts: HoldOptions & { layer: BottomLayer }, minTabs: number): HoldEvent[] {
   const step = cam.operations.length - 1;
   const after = cam.operations.at(-1)?.name ?? '';
   const middle = (pts: P2[]) => ({
@@ -344,13 +359,13 @@ function pocketEvents(
     y: (minOf(pts.map(q => q.y)) + maxOf(pts.map(q => q.y))) / 2,
   });
   const events: HoldEvent[] = [];
-  for (const { part, tabs, r, interior } of holdState(cam, board, opts).parts) {
+  for (const { part, id, tabs, r, interior } of holdState(cam, board, opts).parts) {
     const left = tabs.filter(tab => {
       const l = tabLeft(opts.layer, tab, r);
       return !gone(Math.min(l.to, tab.height) - l.from, tab.height);
     }).length;
     if (tabs.length && left < Math.min(minTabs, tabs.length))
-      events.push({ step, after, kind: 'pocket', cut: 'tabs', what: part, at: middle(interior.flat()) });
+      events.push({ step, after, kind: 'pocket', cut: 'tabs', what: part, ...(id && { id }), at: middle(interior.flat()) });
   }
   for (const op of cam.operations) {
     if (op.feature !== 'outline') continue;

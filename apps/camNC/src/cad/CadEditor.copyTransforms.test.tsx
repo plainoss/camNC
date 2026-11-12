@@ -35,8 +35,15 @@ async function open(source: CadDocument) {
       .mocked(ModelViewport)
       .mock.calls.findLast(([props]) => props.cameraState && props.meshes.some(mesh => mesh.partId === source.parts[0]!.id))![0];
   await waitFor(() => expect(props().cameraState!.current?.height).toBeGreaterThan(0), { timeout: 20_000 });
+  // Idle means not busy and not solving: aria-busy shows only the first, and the status line says "Checking sketch…" for the second.
   const settled = () =>
-    waitFor(() => expect(document.querySelector('.cad-editor')).toHaveAttribute('aria-busy', 'false'), { timeout: 20_000 });
+    waitFor(
+      () => {
+        expect(document.querySelector('.cad-editor')).toHaveAttribute('aria-busy', 'false');
+        expect(document.querySelector('.cad-status')?.textContent).not.toContain('Checking sketch');
+      },
+      { timeout: 20_000 }
+    );
   const top = async () => {
     frame.focus();
     await userEvent.keyboard('{Shift>}5{/Shift}');
@@ -53,7 +60,10 @@ async function open(source: CadDocument) {
       position: { x: box.width / 2 + (dot(right) * box.height) / height, y: box.height / 2 - (dot(up) * box.height) / height },
     });
   };
-  const prepare = () => {
+  // prepareDocument returns null while the editor is busy or solving, as it is for a moment after a click or an Undo,
+  // so the document is only prepared once the editor is idle.
+  const prepare = async () => {
+    await settled();
     let value: CadDocument | null = null;
     act(() => {
       value = controller.current!.prepareDocument();
@@ -80,7 +90,7 @@ it.each([false, true])(
     expect(first.props().selectedFace?.index).toBe(index);
     expect(boundaryVolume(first.props().meshes[index]!.positions, first.props().meshes[index]!.indices)).toBe(99000);
     expect(screen.getByRole('button', { name: 'Undo (Ctrl or Command Z)' })).toBeDisabled();
-    const before = first.prepare();
+    const before = await first.prepare();
     expect(before.parts[0]!.copies![0]!.placement!.position).toEqual([200, 0, 0]);
     expect(before.operationOrder).toEqual([f.cutA, f.move, f.cutB]);
     act(() => {
@@ -90,10 +100,10 @@ it.each([false, true])(
     expect(first.latest().name).toBe('Imported copy edit');
     await userEvent.click(screen.getByRole('button', { name: 'Undo (Ctrl or Command Z)' }));
     await first.settled();
-    expect(first.prepare().name).toBe(before.name);
+    expect((await first.prepare()).name).toBe(before.name);
     expect(screen.getByRole('button', { name: 'Undo (Ctrl or Command Z)' })).toBeDisabled();
     // Save to file uses this same controller preparation plus portable JSON serialization.
-    const portable = parseCadDocument(JSON.parse(JSON.stringify(first.prepare())));
+    const portable = parseCadDocument(JSON.parse(JSON.stringify(await first.prepare())));
     expect(portable.parts[0]!.copies![0]!.placement!.position).toEqual([200, 0, 0]);
     expect(portable.copyTransforms).toEqual(f.document.copyTransforms);
     first.unmount();
@@ -103,7 +113,7 @@ it.each([false, true])(
     await reloaded.click([mirrored ? 250 : 350, 40, 18]);
     expect(await screen.findByRole('button', { name: 'Area: 5500 mm²' })).toBeVisible();
     expect(reloaded.props().selectedFace?.point).toEqual([300, 0, 18]);
-    expect(reloaded.prepare().parts[0]!.copies![0]!.placement!.position).toEqual([200, 0, 0]);
+    expect((await reloaded.prepare()).parts[0]!.copies![0]!.placement!.position).toEqual([200, 0, 0]);
     const cam = await nativeCadModel(portable),
       part = cam.model.parts.findIndex(part => part.names?.includes('Panel 2'));
     expect(boundaryVolume(cam.model.meshes[part]!.positions, cam.model.meshes[part]!.indices)).toBe(99000);
@@ -129,8 +139,8 @@ it('picks a destination mate connector from the moved physical copy and cancels 
   );
   await userEvent.click(within(screen.getByRole('dialog', { name: /^Transform/ })).getByRole('button', { name: 'Cancel' }));
   await view.settled();
-  expect(view.prepare().copyTransforms).toEqual(f.document.copyTransforms);
-  expect(view.prepare().parts[0]!.copies![0]!.placement!.position).toEqual([200, 0, 0]);
+  expect((await view.prepare()).copyTransforms).toEqual(f.document.copyTransforms);
+  expect((await view.prepare()).parts[0]!.copies![0]!.placement!.position).toEqual([200, 0, 0]);
   expect(screen.getByRole('button', { name: 'Undo (Ctrl or Command Z)' })).toBeDisabled();
   expect(JSON.stringify(f.document)).toBe(before);
 }, 40_000);
@@ -182,7 +192,7 @@ it('uses generation-stage backdrop geometry before later copy operations and sav
       expect.objectContaining({ x: 300, y: 60, used: expect.objectContaining({ partId: f.partId, copyId: f.copyId }) }),
     ])
   );
-  const saved = parseCadDocument(JSON.parse(JSON.stringify(view.prepare())));
+  const saved = parseCadDocument(JSON.parse(JSON.stringify(await view.prepare())));
   expect(saved.operationOrder).toEqual([f.cutA, f.move, f.cutB]);
   expect(saved.parts[0]!.copies![0]!.placement!.position).toEqual([200, 0, 0]);
   expect(JSON.stringify(source)).toBe(before);
