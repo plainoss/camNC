@@ -11,6 +11,8 @@ import { cadFolderIssue, cadFolderStepIssue } from './folderModel';
 import { designSteps } from './designSteps';
 import { cadDocumentVersion } from './documentVersion';
 import { validCircularPartPattern } from './circularPartPattern';
+import { partCutReliefIssue } from './partCutRelief';
+import { unsupportedCadSourceIssue } from './unsupportedCadSource';
 import { copyOperationSourceIssue } from './copyOperationSource';
 
 /** Reject invalid source shapes early when loading portable documents. Geometric errors stay editable. */
@@ -18,8 +20,10 @@ export function parseCadDocument(input: unknown): CadDocument {
   // Saved designs nest about ten levels; far deeper input is not one, and would overflow the stack while loading.
   if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
+  const unsupported = unsupportedCadSourceIssue(d);
+  if (unsupported) throw new Error(unsupported);
   if (
-    (d.version !== 1 && d.version !== 2 && d.version !== 3 && d.version !== 4) ||
+    (d.version !== 1 && d.version !== 2 && d.version !== 3 && d.version !== 4 && d.version !== 5) ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
@@ -109,6 +113,8 @@ export function parseCadDocument(input: unknown): CadDocument {
       if (!validPartCutSplit(step.split)) throw new Error('Invalid CAD part cut');
       if (step.clearanceExpression !== undefined && typeof step.clearanceExpression !== 'string') throw new Error('Invalid CAD part cut');
       if (step.consumeTools !== undefined && step.consumeTools !== true) throw new Error('Invalid CAD part cut');
+      const reliefIssue = partCutReliefIssue(step.cornerRelief);
+      if (reliefIssue) throw new Error(reliefIssue);
     }
   }
   const operationIssue = copyOperationSourceIssue(d);
@@ -519,8 +525,8 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (folderIssue) throw new Error(folderIssue);
   // The derived version walks feature arrays, so their shapes must be validated before it runs.
   const requiredVersion = cadDocumentVersion(d);
-  if (d.version === 3 && requiredVersion !== 3) throw new Error('Invalid CAD document');
-  if (d.version < requiredVersion) throw new Error('These CAD source settings require a newer document version');
+  if ((d.version === 3 || d.version === 5) && requiredVersion !== d.version) throw new Error('Invalid CAD document');
+  if (d.version < requiredVersion) throw new Error(`These CAD source settings require document version ${requiredVersion}`);
   for (const folder of d.folders ?? []) addId(folder.id);
   const parsed = structuredClone(d);
   for (const part of parsed.parts) {

@@ -1,4 +1,4 @@
-import { solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
+import { smallestCornerRelief, solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
 import { studioCutParts } from '@/cad/studioGeometry';
 import { profileFeatures, summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three';
@@ -94,8 +94,9 @@ export async function nativeCadModel(document: CadDocument): Promise<{ model: Mo
     const native = nativePart(asMilled(part));
     native.info.names = names;
     // A mirrored copy is cut as a part of its own, relieved like the part it mirrors.
-    const relief = solved.document.parts.find(source => part.partId.split(':')[0] === source.id)?.cornerRelief;
-    if (relief) native.entry.cornerRelief = relief.diameter;
+    // Its Cut parts steps may relieve their openings for a smaller bit than the part's own setting.
+    const relief = smallestCornerRelief(solved.document, part.partId.split(':')[0]!);
+    if (relief) native.entry.cornerRelief = relief;
     return native;
   });
   return {

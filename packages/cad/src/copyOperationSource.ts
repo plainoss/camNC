@@ -4,7 +4,8 @@ import type { CadDocument } from './types';
 export function copyOperationSourceIssue(document: CadDocument): string | null {
   const present = document.operationOrder !== undefined || document.copyTransforms !== undefined || document.legacyPartCutIds !== undefined;
   if (!present) return document.version === 4 ? 'Reader version 4 requires an explicit operation order.' : null;
-  if (document.version !== 4) return 'Physical-copy operations require reader version 4.';
+  // Later readers (5 adds Cut parts corner relief) keep ordered operations, so 4 is a floor, not an exact match.
+  if (document.version < 4) return 'Physical-copy operations require reader version 4.';
   const ids = new Set<string>();
   const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
   const vector = (value: unknown, length: number) =>

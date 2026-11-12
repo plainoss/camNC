@@ -26,6 +26,8 @@ import { regionProfile } from './regionProfile';
 import { withEdgeFillets } from './edgeFillets';
 import { cadFolderIssue } from './folderModel';
 import { cadDocumentVersion } from './documentVersion';
+import { partCutReliefIssue } from './partCutRelief';
+import { unsupportedCadSourceIssue } from './unsupportedCadSource';
 import { copyOperationSourceIssue } from './copyOperationSource';
 export { CAD_GEOMETRY_TOLERANCE } from './tolerances';
 /** Absolute chord error, mm; analytic sketch geometry is retained in the source. */
@@ -33,6 +35,8 @@ export const CAD_CHORD_TOLERANCE = 0.01;
 
 export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   const diagnostics: CadDiagnostic[] = [];
+  const unsupported = unsupportedCadSourceIssue(document);
+  if (unsupported) return [{ code: 'invalid-document', message: unsupported, severity: 'error' }];
   const ids = new Set<string>();
   const addId = (id: string, partId?: string) => {
     if (!id || ids.has(id))
@@ -43,7 +47,7 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   const operationIssue = copyOperationSourceIssue(document);
   if (operationIssue) diagnostics.push({ code: 'invalid-copy-operations', message: operationIssue, severity: 'error' });
   for (const move of document.copyTransforms ?? []) addId(move.id, move.partId);
-  if (![1, 2, 3, 4].includes(document.version) || !Number.isSafeInteger(document.revision) || document.revision < 0)
+  if (![1, 2, 3, 4, 5].includes(document.version) || !Number.isSafeInteger(document.revision) || document.revision < 0)
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   if (!document.parts.length) diagnostics.push({ code: 'no-parts', message: 'Add a part before preparing a cut.', severity: 'error' });
   if (document.version < cadDocumentVersion(document))
@@ -51,6 +55,10 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   const folderIssue = cadFolderIssue(document);
   if (folderIssue || (document.version < 3 && document.folders?.length))
     diagnostics.push({ code: 'invalid-folder', message: folderIssue ?? 'Folders require document version 3.', severity: 'error' });
+  for (const step of document.partCuts ?? []) {
+    const issue = partCutReliefIssue(step.cornerRelief);
+    if (issue) diagnostics.push({ code: 'invalid-part-cut-relief', message: issue, severity: 'error' });
+  }
   for (const folder of document.folders ?? []) addId(folder.id);
   for (const owner of document.parts) {
     addId(owner.id, owner.id);

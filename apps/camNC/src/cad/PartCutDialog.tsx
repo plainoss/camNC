@@ -1,6 +1,7 @@
 import { useDesignUnits } from './designUnits';
 import {
   activeDesign,
+  cadDocumentVersion,
   cadPartReferenceName,
   cadPartReferenceOwner,
   isCadPart,
@@ -21,6 +22,7 @@ const kDefaultClearance = '0.2';
 
 type Box = 'tools' | 'targets';
 type Joint = 'none' | 'half' | 'fingers';
+type Relief = 'inherit' | 'off' | 'dogbone';
 
 interface PartCutChange {
   tools: string[];
@@ -29,6 +31,8 @@ interface PartCutChange {
   clearanceExpression?: string;
   split?: CadPartCut['split'];
   consumeTools?: true;
+  /** Always present, so choosing Inherit again clears a saved override. */
+  cornerRelief: CadPartCut['cornerRelief'];
 }
 
 /**
@@ -78,6 +82,13 @@ export function PartCutDialog({
   const [fingersText, setFingersText] = useState(
     step?.split && typeof step.split === 'object' ? (step.split.fingersExpression ?? String(step.split.fingers)) : '5'
   );
+  // Left out, a step relieves corners as its target part does; Off and Dogbone apply to this step's openings only.
+  const [relief, setRelief] = useState<Relief>(
+    step?.cornerRelief === undefined ? 'inherit' : step.cornerRelief === null ? 'off' : 'dogbone'
+  );
+  const [diameterText, setDiameterText] = useState(
+    step?.cornerRelief ? (step.cornerRelief.diameterExpression ?? lengthText(step.cornerRelief.diameter)) : lengthText(6)
+  );
   const fingers = useMemo(() => parseCadValue(fingersText, { unit: 'scalar', variables }), [fingersText, variables, parseCadValue]);
   const fingersError =
     joint !== 'fingers'
@@ -114,6 +125,13 @@ export function PartCutDialog({
     if ('error' in parsed) return { error: parsed.error };
     if (parsed.value < 0) return { error: 'A clearance can’t be less than nothing.' };
     if (fingersError) return { error: fingersError };
+    let cornerRelief: CadPartCut['cornerRelief'] = relief === 'off' ? null : undefined;
+    if (relief === 'dogbone') {
+      const diameter = parseCadValue(diameterText, { unit: 'mm', variables });
+      if ('error' in diameter) return { error: diameter.error };
+      if (!(diameter.value > 0)) return { error: 'A dogbone needs a cutter diameter greater than zero.' };
+      cornerRelief = { diameter: diameter.value, ...(diameter.expression && { diameterExpression: diameter.expression }) };
+    }
     const split: CadPartCut['split'] =
       joint === 'half'
         ? 'half'
@@ -128,20 +146,24 @@ export function PartCutDialog({
         clearanceExpression: parsed.expression,
         split,
         consumeTools: !split && !keepTools ? true : undefined,
+        cornerRelief,
       },
     };
-  }, [document, tools, targets, text, variables, joint, keepTools, fingersError, fingers, parseCadValue]);
+  }, [document, tools, targets, text, variables, joint, keepTools, fingersError, fingers, relief, diameterText, parseCadValue]);
 
   const candidate = useMemo(() => {
     if ('error' in result) return null;
     if (step) return updatePartCut(document, step.id, result.change);
-    return {
+    const { cornerRelief, ...change } = result.change;
+    const next = {
       ...document,
       revision: document.revision + 1,
-      partCuts: [...(document.partCuts ?? []), { id: featureId, ...result.change }],
+      partCuts: [...(document.partCuts ?? []), { id: featureId, ...change, ...(cornerRelief !== undefined && { cornerRelief }) }],
       // An ordered document lists every operation; a preview step missing from it would make the whole design invalid.
       ...(document.operationOrder && { operationOrder: [...document.operationOrder, featureId] }),
     };
+    // Relief overrides raise the reader floor; the preview must evaluate as the saved step will.
+    return { ...next, version: cadDocumentVersion(next) };
   }, [document, result, step, featureId]);
   useDialogPreview(candidate, onPreview);
   const save = () => {
@@ -216,6 +238,27 @@ export function PartCutDialog({
         </select>
       </label>
       {joint !== 'none' && <p className="cad-feature-hint">Both parts are kept.</p>}
+      <label>
+        Corner relief
+        <select value={relief} onChange={event => setRelief(event.target.value as Relief)}>
+          <option value="inherit">Inherit</option>
+          <option value="off">Off</option>
+          <option value="dogbone">Dogbone</option>
+        </select>
+      </label>
+      {relief === 'dogbone' && (
+        <label className="cad-part-cut-clearance">
+          Cutter diameter
+          <CadValueInput
+            bare
+            value={diameterText}
+            aria-label="Cutter diameter"
+            spellCheck={false}
+            onChange={event => setDiameterText(event.target.value)}
+          />
+          {lengthUnit}
+        </label>
+      )}
       {joint === 'fingers' && (
         <label className="cad-part-cut-clearance">
           Fingers
