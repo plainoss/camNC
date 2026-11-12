@@ -49,16 +49,32 @@ describe('feedback while sketching', () => {
     expect(sketchFeedback(result('conflicting-constraints')).sketchProblems).toEqual(['conflicting-constraints']);
   });
 
-  it('treats an empty sketch and an open chain as normal work in progress with meaningful DOF', async () => {
+  it('reports nothing for a design with nothing drawn, and an open chain as normal work in progress with meaningful DOF', async () => {
     const document = createCadDocument();
     const part = createCadPart();
     document.parts.push(part);
-    expect(sketchFeedback(await solveCadDocument(document))).toMatchObject({ inProgress: true, status: 'Empty sketch' });
+    // The editor's own hint asks for a first part; a "Sketch in progress" card would only repeat it (#934).
+    expect(sketchFeedback(await solveCadDocument(document))).toMatchObject({
+      inProgress: false,
+      status: 'Empty sketch',
+      problems: [],
+      sketchProblems: [],
+    });
     part.sketch = addLine(part.sketch, { x1: 10, y1: 10, x2: 40, y2: 20 });
     const feedback = sketchFeedback(await solveCadDocument(document));
     expect(feedback.inProgress).toBe(true);
     expect(feedback.status).toBe('4 degrees of freedom');
     expect(feedback.problems).toHaveLength(1);
+  });
+
+  it('still reports an empty part beside one that is drawn', async () => {
+    const document = createCadDocument();
+    const drawn = createCadPart();
+    drawn.sketch = addLine(drawn.sketch, { x1: 10, y1: 10, x2: 40, y2: 20 });
+    document.parts.push(drawn, createCadPart());
+    const feedback = sketchFeedback(await solveCadDocument(document));
+    expect(feedback.inProgress).toBe(true);
+    expect(feedback.problems.length).toBeGreaterThan(0);
   });
 
   it('does not call a sketch of only points empty', async () => {

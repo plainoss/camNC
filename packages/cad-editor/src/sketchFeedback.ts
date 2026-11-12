@@ -33,24 +33,27 @@ const PROFILE_CODES = new Set([
 export function sketchFeedback(result: CadSolveResult) {
   const issues = result.diagnostics.filter(d => d.severity === 'error');
   const nativeSolved = result.sketches.length > 0 && result.sketches.every(s => s.status === 'solved');
-  const inProgress = nativeSolved && issues.length > 0 && issues.every(d => d.code === 'open-profile' || d.code === 'empty-sketch');
+  const unfinished = nativeSolved && issues.length > 0 && issues.every(d => d.code === 'open-profile' || d.code === 'empty-sketch');
   // Each part's profile comes first. Its face sketches are hidden here, so their freedom isn't reported as the profile's.
   const profiles = result.sketches.filter((s, i, all) => all.findIndex(other => other.partId === s.partId) === i);
   const free = profiles.reduce((sum, s) => sum + s.dof, 0);
   const empty = result.document.parts.every(p => isEmptySketch(p.sketch));
+  // Nothing drawn yet isn't a sketch in progress: the editor's own hint says to draw a part, so there's nothing to report.
+  const inProgress = unfinished && !empty;
+  const reported = unfinished && empty ? [] : issues;
   const status = issues.some(issue => issue.code === 'solver-restarted')
     ? 'Sketch solver reset'
     : result.status === 'conflict'
       ? 'Conflicting constraints'
-      : result.status === 'invalid' && !inProgress
+      : result.status === 'invalid' && !unfinished
         ? 'Sketch needs attention'
         : sketchDofStatus(free, empty);
   return {
     status,
     inProgress,
-    problems: [...new Set(issues.map(d => d.message))],
+    problems: [...new Set(reported.map(d => d.message))],
     /** What only the sketches got wrong: a feature built from them, broken by an edit, doesn't stop one closing. */
-    sketchProblems: [...new Set(issues.filter(d => !result.featuresEvaluated || PROFILE_CODES.has(d.code)).map(d => d.message))],
+    sketchProblems: [...new Set(reported.filter(d => !result.featuresEvaluated || PROFILE_CODES.has(d.code)).map(d => d.message))],
     conflictedConstraintIds: [...new Set(issues.flatMap(d => d.constraintIds ?? []))],
     /** Why each part, by id, wasn't built from its solved sketch: the first error building it reported. */
     featureProblems: Object.fromEntries(
