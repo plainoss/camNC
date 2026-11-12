@@ -129,7 +129,7 @@ it('rejects component overflow atomically instead of partially moving its host',
 
 it('resolves and renames seed operation expressions without changing source target kind or creation poses', () => {
   const f = notchedSeedSource();
-  let source = copyOperationPrefix(f.source, f.moveId);
+  const source = copyOperationPrefix(f.source, f.moveId);
   source.variables = [{ id: 'travel', name: 'travel', expression: '25mm' }];
   source.copyTransforms = [{ ...source.copyTransforms![0]!, by: [0, 0, 0], byExpressions: [null, '#travel', null] }];
   const renamed = setCadVariable(source, { id: 'travel', name: 'offset', expression: '35mm' });
