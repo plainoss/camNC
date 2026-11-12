@@ -1,5 +1,7 @@
 import { createCarvingJob, getJob, saveJob } from '@/cam/jobDb';
+import { closestOnLoop, cutoutOutline, withCarving } from '@/cam/carving';
 import { carvingBounds } from '@/cam/carvingView';
+import type { BoardRequest } from '@wbcnc/cam';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
@@ -97,6 +99,47 @@ it('holds an untaped board’s cutout with tabs, placed and dragged along the li
   // A double-click on a tab takes it away; with none placed, Plan picks them again.
   fireEvent.doubleClick(screen.getByRole('button', { name: 'Tab 1' }));
   await waitFor(async () => expect((await saved(job.id))?.tabsAt).toBeUndefined());
+});
+
+it('moves placed tabs with the artwork, spread round the moved cut line, and back on undo', async () => {
+  const job = await open(false);
+  fireEvent.click(screen.getByRole('checkbox', { name: /Cut it out/ }));
+  await waitFor(async () => expect((await saved(job.id))?.hold).toBe('tabs'));
+  fireEvent.change(screen.getByLabelText('Cutout shape'), { target: { value: 'plaque' } });
+  await waitFor(async () => expect((await saved(job.id))?.shape).toBe('plaque'));
+  const art = carvingBounds(job.carving!.region)!;
+  const middle = { x: (art.x0 + art.x1) / 2, y: (art.y0 + art.y1) / 2 };
+  // One tab on each side of the plaque.
+  const spots = [at(art.x0 - 7, middle.y), at(middle.x, art.y1 + 7), at(art.x1 + 7, middle.y), at(middle.x, art.y0 - 7)];
+  for (const [i, spot] of spots.entries()) {
+    fireEvent.doubleClick(screen.getByRole('button', { name: 'Cut line' }), spot);
+    await waitFor(async () => expect((await saved(job.id))?.tabsAt).toHaveLength(i + 1));
+  }
+  const placed = (await saved(job.id))!.tabsAt!;
+
+  // The artwork is dragged 40 mm right and 20 mm down.
+  const path = screen.getByTestId('carving-item');
+  const svg = path.closest('svg')!;
+  fireEvent.pointerDown(path, at(middle.x, middle.y));
+  fireEvent.pointerMove(svg, at(middle.x + 40, middle.y - 20));
+  fireEvent.pointerUp(svg, at(middle.x + 40, middle.y - 20));
+  await waitFor(async () => expect(carvingBounds((await getJob(job.id))!.carving!.region)!.x0).toBeCloseTo(art.x0 + 40, 0));
+  const moved = await getJob(job.id);
+  const tabs = moved!.carving!.cutout!.tabsAt!;
+  // Each tab keeps its place on the line, moved as the artwork was: not snapped to the line's nearest end.
+  tabs.forEach((t, i) => {
+    expect(t.x).toBeCloseTo(placed[i].x + 40, 1);
+    expect(t.y).toBeCloseTo(placed[i].y - 20, 1);
+  });
+  const [line] = cutoutOutline(moved!.carving!);
+  for (const t of tabs) expect(closestOnLoop(t, line).d).toBeLessThan(0.5);
+  // Plan holds the piece with all four.
+  const request = withCarving({ parts: [], taped: false } as unknown as BoardRequest, moved!);
+  expect(request.cutouts?.[0].tabsAt).toHaveLength(4);
+
+  // Undo takes the tabs back with the artwork.
+  fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+  await waitFor(async () => expect((await saved(job.id))?.tabsAt).toEqual(placed));
 });
 
 it('warns while the cut line runs past the board, though the artwork is on it', async () => {

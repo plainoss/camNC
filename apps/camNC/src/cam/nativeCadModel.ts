@@ -1,4 +1,5 @@
-import { cadPartsToCut, solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
+import { solveCadDocument, type CadDocument, type EvaluatedCadPart } from '@wbcnc/cad';
+import { studioCutParts } from '@/cad/studioGeometry';
 import { profileFeatures, summarizePart, type FlatPart, type PartFeatures } from '@wbcnc/cam';
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three';
 import type { BodyMesh, CamPartInfo, ModelImport, Outline2D } from './camTypes';
@@ -89,7 +90,7 @@ export async function nativeCadModel(document: CadDocument): Promise<{ model: Mo
   const started = performance.now();
   const solved = await solveCadDocument(document);
   if (solved.status !== 'solved') throw new Error(solved.diagnostics.map(d => d.message).join(' ') || 'The design could not be solved.');
-  const parts = cadPartsToCut(solved.document, solved.parts).map(({ part, names }) => {
+  const parts = studioCutParts(solved).map(({ part, names }) => {
     const native = nativePart(asMilled(part));
     native.info.names = names;
     // A mirrored copy is cut as a part of its own, relieved like the part it mirrors.

@@ -2,7 +2,6 @@ import {
   activeDesign,
   assemblyReport,
   cadPartReferenceMatches,
-  cadFaceFrame,
   evaluateCadDocument,
   isCadBody,
   partFaceAt,
@@ -21,6 +20,8 @@ import {
 import { ExplosionSlider } from '@/cam/model/ExplosionSlider';
 import { useExplodedView } from '@/cam/model/useExplodedView';
 import { assemblyModel, instanceKey } from './assemblyModel';
+import { studioGeometry } from './studioGeometry';
+import { physicalFaceFrame as cadFaceFrame } from './studioGeometryReaders';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { sketchLinesInModel } from './sketchLines';
 import { featureShownByDefault } from './sketchShown';
@@ -157,18 +158,19 @@ export default function WorkspaceView({
   }, [onReady]);
   const lastClick = useRef<{ partId: string; face: string; at: number; topology: object } | null>(null);
   const assembly = useMemo(() => assemblyModel(document, hiddenIds), [document, hiddenIds]);
+  const physical = useMemo(() => studioGeometry(document), [document]);
   const clashes = useMemo(() => {
     // Sketches not yet extruded take up no space.
     const sketches = new Set(document.parts.filter(part => !isCadBody(document, part)).map(part => part.id));
     // Nor does anything suppressed in the feature list.
-    const built = activeDesign(document);
+    const built = physical.parts ? physical.document : activeDesign(document);
     return (
       assemblyReport(
         built,
-        evaluateCadDocument(built).parts.filter(part => !sketches.has(part.partId))
+        (physical.parts ?? evaluateCadDocument(built).parts).filter(part => !sketches.has(part.partId))
       )?.collisions ?? []
     );
-  }, [document]);
+  }, [document, physical]);
   const [view, setView] = useState<ModelView>('assembled');
   const explosion = useExplodedView(view, setView);
   // The studio shows parts with their edges, as a model usually is.
@@ -230,7 +232,7 @@ export default function WorkspaceView({
     if (pick.sectionCap) return null;
     const instance = model.instances[pick.index]!;
 
-    const part = document.parts.find(candidate => candidate.id === instance.partId)!;
+    const part = physical.document.parts.find(candidate => candidate.id === instance.partId)!;
     const copy = instance.copyId ? part.copies?.find(copy => copy.id === instance.copyId) : undefined;
     // Mirrored instances share edge IDs while their sketch x coordinates are reflected.
     const facePart = copy?.mirrored
@@ -276,7 +278,7 @@ export default function WorkspaceView({
     ? model.instances.flatMap((instance, index) => (cadPartReferenceMatches(hoverIds, instance.partId, instance.copyId) ? [index] : []))
     : [];
   const pickedIndexes = [...new Set([...(selectedFace ? [] : selectedIndexes), ...hoverIndexes])];
-  const selectedFrame = selectedFace && cadFaceFrame(document, selectedFace);
+  const selectedFrame = selectedFace && cadFaceFrame(document, selectedFace, assembly);
   const selectedFaceIndex = selectedFace
     ? model.instances.findIndex(instance => instance.partId === selectedFace.partId && instance.copyId === selectedFace.copyId)
     : -1;

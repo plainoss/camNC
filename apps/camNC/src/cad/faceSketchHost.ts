@@ -1,16 +1,10 @@
-import {
-  addCopyFaceSketch,
-  addFaceSketch,
-  cadFaceSketches,
-  rotateVector,
-  type CadDocument,
-  type CadPart,
-  type CadFaceRef,
-} from '@wbcnc/cad';
+import { addCopyFaceSketch, addFaceSketch, cadFaceSketches, type CadDocument, type CadPart, type CadFaceRef } from '@wbcnc/cad';
 import { hasOutline } from './editorHelpers';
 import { faceSketchScene, partViewSnapshot, type FaceSketchScene, type PartViewSnapshot } from './faceSketchScene';
 import type { StudioCameraRef } from './studioCamera';
 import { assemblyModel } from './assemblyModel';
+import { physicalCopyMirrored } from './studioGeometryReaders';
+import { partCameraFromAssembly } from './partAssemblyCamera';
 
 /** All routed face-editor entry points must transfer the visible camera, including editing an existing sketch. */
 export function faceSketchHost(context: {
@@ -19,7 +13,7 @@ export function faceSketchHost(context: {
   prepare: () => CadDocument | null | undefined;
   commit: (document: CadDocument) => void;
   read: () => CadDocument;
-  onEdit?: (document: CadDocument, partId: string, sketchId: string, scene?: FaceSketchScene) => void;
+  onEdit?: (document: CadDocument, partId: string, sketchId: string, scene?: FaceSketchScene, fromStudio?: boolean) => void;
   root: { current: HTMLElement | null };
   partCamera: StudioCameraRef;
   studioCamera: StudioCameraRef;
@@ -33,21 +27,7 @@ export function faceSketchHost(context: {
     if (!camera || !bounds?.height) return;
     // Include the visible row placement of parts not yet attached to an assembly plane.
     const placement = assemblyModel(document).placements.get(copyId ? `${partId}/${copyId}` : partId);
-    const inverse =
-      placement &&
-      ([-placement.rotation[0], -placement.rotation[1], -placement.rotation[2], placement.rotation[3]] as [number, number, number, number]);
-    const local =
-      placement && inverse
-        ? {
-            ...camera,
-            center: rotateVector(
-              inverse,
-              camera.center.map((value, axis) => value - placement.position[axis]!) as [number, number, number]
-            ),
-            back: rotateVector(inverse, camera.back),
-            up: rotateVector(inverse, camera.up),
-          }
-        : camera;
+    const local = placement ? partCameraFromAssembly(camera, placement, physicalCopyMirrored(document, partId, copyId)) : camera;
     context.partCamera.current = { ...local, key: partId, seq: undefined };
     return { cameraState: context.partCamera, aspect: bounds.width / bounds.height };
   };
@@ -62,9 +42,16 @@ export function faceSketchHost(context: {
       const carried = given ?? snapshot(prepared, id, copyId);
       const added = copyId ? addCopyFaceSketch(prepared, id, copyId, face) : addFaceSketch(prepared, id, face);
       context.commit(added.document);
-      context.onEdit(context.read(), id, added.sketchId, carried && faceSketchScene(prepared, id, face, carried, copyId));
+      context.onEdit(
+        context.read(),
+        id,
+        added.sketchId,
+        carried && faceSketchScene(prepared, id, face, carried, copyId),
+        context.workspace
+      );
     },
-    edit(partId: string, sketchId: string) {
+    /** Opens a face sketch to edit, from the studio's feature list or view (`fromStudio`), or from the part's own view. */
+    edit(partId: string, sketchId: string, fromStudio = context.workspace) {
       if (!context.onEdit) return;
       const prepared = context.prepare();
       if (!prepared || !hasOutline(prepared, partId)) return;
@@ -75,7 +62,8 @@ export function faceSketchHost(context: {
         prepared,
         partId,
         sketchId,
-        face && carried ? faceSketchScene(prepared, partId, face.on, carried, face.copyId) : undefined
+        face && carried ? faceSketchScene(prepared, partId, face.on, carried, face.copyId) : undefined,
+        fromStudio
       );
     },
   };

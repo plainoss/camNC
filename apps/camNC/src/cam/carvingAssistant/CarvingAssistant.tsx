@@ -16,6 +16,7 @@ import { kVariantCounts, type CarvingStyle } from './session';
 import type { CarvingAssistantSession } from './useCarvingAssistant';
 import { VariantGrid } from './VariantGrid';
 import { ExternalChatImage } from './ExternalChatImage';
+import { useImageDrop } from './useImageDrop';
 import { AssistantSettingsDialog } from '../../cad/assistant/SettingsDialog';
 import { useAssistantSettings } from '../../cad/assistant/useAssistantSettings';
 import './panel.css';
@@ -35,6 +36,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
   const id = useId();
   const { connection, current, shown, request } = session;
   const settings = useAssistantSettings();
+  const drop = useImageDrop(file => void session.request.importPng(file), session.generating);
   const prepared = current?.prepared;
   const report = prepared?.report;
   const problems = prepared?.problemAreas?.length ?? 0;
@@ -49,7 +51,12 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
   }, [shown]);
   const applyLabel = session.applied ? 'Applied' : session.replace.on ? 'Replace on board' : 'Add to board';
   return (
-    <div className="carving-assistant flex flex-1 flex-col gap-4">
+    <div
+      className={cn(
+        'carving-assistant flex flex-1 flex-col gap-4 rounded-md',
+        drop.dropping && 'outline-2 outline-offset-4 outline-violet-500 outline-dashed'
+      )}
+      {...drop.handlers}>
       <CarvePanelHeader
         title="AI artwork"
         icon={<Sparkles className="size-4 text-violet-500" />}
@@ -209,7 +216,7 @@ export function CarvingAssistant({ job, session, onClose }: { job: CamJobV1; ses
             ))}
           </select>
         </div>
-        <ExternalChatImage session={session} />
+        <ExternalChatImage session={session} dropping={drop.dropping} />
       </form>
       {session.replace.available && (
         <label className="flex items-start gap-2 text-sm">

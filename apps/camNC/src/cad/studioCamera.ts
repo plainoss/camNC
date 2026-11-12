@@ -1,4 +1,5 @@
 import { cadSketchFrame, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { useState } from 'react';
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { CadViewport } from '@wbcnc/cad-editor/viewState';
 import type { SketchTurn } from './sketchOrbit';
@@ -117,4 +118,17 @@ export function captureSketchCamera(
     camera.current,
     shift
   );
+}
+
+/**
+ * The studio's and the part view's cameras: the host's, so a view stays as it was left when the editor is opened again
+ * (back from a face sketch, say), or the editor's own. An editor opened again starts without view requests, so a kept
+ * studio view is restored as it was left rather than fitted again.
+ */
+export function useEditorCameras(studio?: StudioCameraRef, part?: StudioCameraRef) {
+  const [own] = useState(() => {
+    if (studio?.current) studio.current = { ...studio.current, seq: undefined };
+    return { studio: { current: null } as StudioCameraRef, part: { current: null } as StudioCameraRef };
+  });
+  return { studioCamera: studio ?? own.studio, partCameraState: part ?? own.part };
 }

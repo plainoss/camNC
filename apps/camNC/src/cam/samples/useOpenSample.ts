@@ -1,4 +1,4 @@
-import { exitDemo, isDemoMode } from '@/lib/demo/demo-mode';
+import { exitDemo, getRehearsalId, isDemoMode, isLocalPreviewDemo } from '@/lib/demo/demo-mode';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useCallback, useRef, useState } from 'react';
@@ -13,7 +13,10 @@ export function useOpenSample() {
   const [error, setError] = useState<string | null>(null);
   const opening = useRef(false);
   const open = useCallback(async () => {
-    if (isDemoMode()) return exitDemo('/cam?sample=standing-shelf');
+    // The sample belongs in the visitor's own projects, so leave the demo first. A keyless local build is demo mode for
+    // good (only a rehearsal ends), and leaving it would reload into the same demo and open the sample again, forever:
+    // there the sample goes into the demo's projects, the only ones that build has.
+    if (isDemoMode() && (!isLocalPreviewDemo() || getRehearsalId())) return exitDemo('/cam?sample=standing-shelf');
     if (opening.current) return;
     opening.current = true;
     setPending(true);

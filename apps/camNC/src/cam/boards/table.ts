@@ -120,9 +120,17 @@ export function bestColumns(boards: TableBoard[], area: { w: number; h: number }
 /** The most and least px per mm the table is drawn at. */
 export const kMinScale = 0.03;
 export const kMaxScale = 12;
+/** Beyond a board's selection frame, px, when it is fitted to the view. */
+const kFrameRoom = 8;
 
-/** Px per mm that shows this much of the table in an area of this size, with room around it for labels and handles. */
+/**
+ * Px per mm that shows this much of the table in an area of this size, with room around it for labels and handles.
+ * Each board is drawn with `kBoardPad` around it, and its selection frame is the edge of that: zoomed in on a small
+ * board, that pad is wider than the room, so the frame, with `kFrameRoom` px beyond it, is what has to fit then.
+ */
 export function fitScale(area: { w: number; h: number }, size: { w: number; h: number }) {
-  const s = Math.min((area.w - 72) / Math.max(1, size.w), (area.h - 88) / Math.max(1, size.h));
-  return Math.min(kMaxScale, Math.max(kMinScale, s));
+  const room = Math.min((area.w - 72) / Math.max(1, size.w), (area.h - 88) / Math.max(1, size.h));
+  const [w, h] = [size.w + 2 * kBoardPad, size.h + 2 * kBoardPad];
+  const framed = Math.min((area.w - 2 * kFrameRoom) / w, (area.h - 2 * kFrameRoom) / h);
+  return Math.min(kMaxScale, Math.max(kMinScale, Math.min(room, framed)));
 }

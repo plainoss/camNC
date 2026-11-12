@@ -7,6 +7,7 @@ import { resolveUpTo } from './upTo';
 import { resolveDatumPlanes } from './datumPlanes';
 import { sketchTargets } from './featureModel';
 import { evaluateCadDocument } from './features';
+import { requiresInstanceEvaluation } from './requiresInstanceEvaluation';
 import { validateCadDocument, CAD_GEOMETRY_TOLERANCE } from './geometry';
 import type {
   CadArcEntity,
@@ -1035,17 +1036,13 @@ function* solveCadSteps(document: CadDocument, options: CadSolveOptions): Genera
   const placed = resolvePartPatterns(resolved.document);
   // Cut-parts and Remove volumes intersect copies where patterns and transforms place them now.
   // Copy-specific features follow the final pattern count too, including dormant features when a copy disappears.
-  if (
-    placed !== next &&
-    (placed.partCuts?.length || placed.parts.some(part => part.remove || part.features?.some(feature => feature.copyId)))
-  )
-    evaluated = evaluateCadDocument(placed);
+  if (placed !== next && requiresInstanceEvaluation(placed)) evaluated = evaluateCadDocument(placed);
   diagnostics.push(...evaluated.diagnostics);
   return {
+    ...evaluated,
     document: placed,
     status: diagnostics.some(d => d.severity === 'error') ? 'invalid' : 'solved',
     diagnostics,
-    parts: evaluated.parts,
     sketches,
   };
 }

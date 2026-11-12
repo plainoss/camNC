@@ -17,11 +17,11 @@ import {
   type CadDocument,
   type CadPart,
   type CadPlacement,
-  type EvaluatedCadPart,
 } from '@wbcnc/cad';
 import { Matrix4, Vector3 } from 'three';
 import type { BodyMesh, CamPartInfo } from '@/cam/camTypes';
 import { nativePart } from '@/cam/nativeCadModel';
+import { studioGeometry } from './studioGeometry';
 import { assemblyDisplayPlacements } from './assemblyDisplayPlacements';
 
 /** Room left between parts that haven't been placed yet. */
@@ -57,8 +57,11 @@ export interface AssemblyModel {
 export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = new Set()): AssemblyModel {
   // Where each part drawn on a plane or face is, from that face as it is now: a step changed without solving, such as a
   // thickness in the Extrude dialog, would otherwise leave the parts on it where it used to be.
+  const geometry = studioGeometry(given);
   // Inherited material uses the ordinary copy path so its reflected contours and instance-specific cuts stay visible.
-  const document = physicalJoinedCopies(resolveDrawnPlacements(resolveDatumPlanes(activeDesign(given))).document);
+  const document = geometry.parts
+    ? geometry.document
+    : physicalJoinedCopies(resolveDrawnPlacements(resolveDatumPlanes(activeDesign(given))).document);
   type Shape = ReturnType<typeof nativePart>;
   type Built = { part: CadPart; problem: string } | { part: CadPart; shape: Shape; copies: Shape[] };
   // A sketch not yet extruded has nothing to show in 3D.
@@ -67,10 +70,12 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
   const built = document.parts
     .filter(part => isCadBody(document, part) && !consumed.has(part.id))
     .map((part): Built => {
-      const { part: profile } = evaluateCadPart(part);
-      if (!profile) return { part, problem: 'Its sketch needs fixing first.' };
       try {
-        const evaluated: EvaluatedCadPart = withPartCuts(document, evaluateCadPartFamily(part, profile).part);
+        const profile = geometry.parts ? undefined : evaluateCadPart(part).part;
+        const evaluated =
+          geometry.parts?.find(shape => shape.partId === part.id) ??
+          (profile && withPartCuts(document, evaluateCadPartFamily(part, profile).part));
+        if (!evaluated) return { part, problem: 'Its sketch needs fixing first.' };
         const shape = nativePart(evaluated);
         // A copy is meshed on its own only when it's mirrored or cut differently; the rest share the part's mesh.
         let mirrored: Shape | undefined;
@@ -117,14 +122,26 @@ export function assemblyModel(given: CadDocument, hidden: ReadonlySet<string> = 
       right = Math.max(right, v.fromArray(shape.mesh.positions, i).applyMatrix4(matrix).x);
     return right;
   }, -Infinity);
+  const rowStart = Number.isFinite(placedRight) ? placedRight + kGap : 0;
   const displayPlacements = assemblyDisplayPlacements(
     document,
-    given,
-    pieces.map(piece => ({ ...piece, origin: piece.shape.info.sourceOrigin, width: piece.shape.info.size[0] })),
-    Number.isFinite(placedRight) ? placedRight + kGap : 0,
+    geometry.source,
+    pieces.map(piece => ({
+      ...piece,
+      origin: piece.shape.info.sourceOrigin,
+      width: piece.shape.info.size[0],
+    })),
+    rowStart,
     kGap
   );
   const model: AssemblyModel = { meshes: [], instances: [], solids: [], parts: [], placements: new Map(), problems: [] };
+  model.problems.push(
+    ...geometry.diagnostics.map(diagnostic => ({
+      partId: diagnostic.partId ?? given.id,
+      name: given.parts.find(part => part.id === diagnostic.partId)?.name ?? given.name,
+      message: diagnostic.message,
+    }))
+  );
   for (const entry of built)
     if ('problem' in entry) model.problems.push({ partId: entry.part.id, name: entry.part.name, message: entry.problem });
   for (const { instance, shape } of pieces) {

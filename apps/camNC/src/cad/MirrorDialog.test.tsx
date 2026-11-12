@@ -21,7 +21,7 @@ it.each(['self', 'dependent'])('rejects a %s mirror plane dependency and allows 
       partId={part.id}
       copyId="first"
       pickPlane={callback => {
-        picked = callback;
+        if (callback) picked = callback;
       }}
       onSave={save}
       onPreview={preview}
@@ -61,7 +61,7 @@ it.each([false, true])('blocks a copy face without persisted placement and permi
       partId={part.id}
       copyId={editing ? 'mirror' : undefined}
       pickPlane={callback => {
-        picked = callback;
+        if (callback) picked = callback;
       }}
       onSave={save}
       onPreview={preview}
@@ -108,7 +108,7 @@ it('numbers a new mirror after the pattern copies, in the preview and as saved',
       document={document}
       partId={part.id}
       pickPlane={callback => {
-        picked = callback;
+        if (callback) picked = callback;
       }}
       onSave={save}
       onPreview={preview}

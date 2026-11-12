@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AssistantDock } from './Dock';
 import { defaultProvider, rememberAssistantCredentials } from './keyStore';
 import { runDesignAssistant } from './loop';
+import { readConversation, recordAssistantEvent, writeConversation } from './conversationStore';
 import { createAssistantUsage } from './runBudget';
 
 vi.mock('@wbcnc/cad-script', async importOriginal => ({
@@ -280,4 +281,26 @@ it('keeps a key typed in settings but not yet saved across a section switch and 
   await userEvent.click(screen.getByRole('button', { name: 'Close settings' }));
   await userEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
   expect(screen.getByLabelText('API key')).toHaveProperty('value', 'sk-ant-unsaved');
+});
+
+it('says a proposal was undone, and adds no generic design-changed notice for applying, undoing or redoing it', async () => {
+  const base = createPlateDocument();
+  const candidate = { ...base, name: 'With cupboard', revision: base.revision + 1 };
+  const proposal = { base, document: candidate };
+  const props = { onCheckedProposal: () => {}, onDiscardProposal: () => {}, onProposal: () => {}, onClose: () => {} };
+  writeConversation(base.id, [{ role: 'user', text: 'Make a cupboard.' }]);
+  const view = render(<AssistantDock {...props} proposal={proposal} document={base} />);
+  // What StudioProposals does on Apply: the editor takes the candidate and the outcome is recorded.
+  recordAssistantEvent(base.id, 'The user applied the checked proposal as one undo step.', 'applied');
+  view.rerender(<AssistantDock {...props} proposal={null} document={candidate} />);
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Proposal applied.'));
+  view.rerender(<AssistantDock {...props} proposal={null} document={{ ...base, revision: base.revision + 2 }} />);
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Proposal undone. The design is back as it was.'));
+  view.rerender(<AssistantDock {...props} proposal={null} document={{ ...candidate, revision: base.revision + 3 }} />);
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Proposal applied.'));
+  expect(readConversation(base.id).filter(message => message.text.includes('The open design changed'))).toHaveLength(0);
+  // A hand edit afterwards is a real design change.
+  view.rerender(<AssistantDock {...props} proposal={null} document={{ ...candidate, name: 'Hand edit', revision: base.revision + 4 }} />);
+  await waitFor(() => expect(readConversation(base.id).some(message => message.text.includes('The open design changed'))).toBe(true));
+  writeConversation(base.id, []);
 });
