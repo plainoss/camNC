@@ -1,3 +1,4 @@
+import '@/style.css';
 import { createCarvingJob, getJob, saveJob, type CamJobV1 } from '@/cam/jobDb';
 import { camKeys } from '@/cam/camQueries';
 import { carvingRegion, kVBits } from '@/cam/carving';
@@ -203,6 +204,24 @@ it('prepares real owl geometry and CAM without saving, then applies as one rever
   await ready();
   expect(generateCarvingAsset).toHaveBeenCalledTimes(1);
   expect((await getJob(job.id))!.carving).toEqual(applied);
+  // The artwork box stands for the selected artwork: one frame, one size label and one resize handle.
+  const board = screen.getByRole('img', { name: /^Board / });
+  expect(board.querySelector('[aria-label="Drag to resize"]')).toBeNull();
+  expect(board.querySelector('[aria-label="Drag to size the artwork box"]')).toBeTruthy();
+  expect([...board.querySelectorAll('text')].filter(label => /^\d+ × \d+ mm$/.test(label.textContent!.trim()))).toHaveLength(1);
+  expect(screen.queryByRole('toolbar', { name: 'Assistant artwork.svg' })).toBeNull();
+}, 30_000);
+
+it('keeps the Lettering bar off the AI artwork box', async () => {
+  await open();
+  fireEvent.click(screen.getByRole('button', { name: 'Lettering' }));
+  const bar = await screen.findByRole('toolbar', { name: 'Lettering' });
+  const box = screen.getByLabelText('Artwork box: drag to move');
+  await waitFor(() => expect(bar.style.visibility).toBe('visible'));
+  const [a, b] = [bar.getBoundingClientRect(), box.getBoundingClientRect()];
+  const overlap =
+    Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+  expect(overlap).toBe(0);
 }, 30_000);
 
 it('invalidates accepted suitability and a pending proposal after tool and board edits, then locally rechecks before Plan', async () => {
