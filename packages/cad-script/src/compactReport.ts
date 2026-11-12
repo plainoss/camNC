@@ -9,7 +9,9 @@ export function compactCadReport(document: CadDocument, report: CadReport) {
   const { spatial, ...summary } = report;
   const partHandles = shortHandles(document.parts.map(part => part.id));
   const steps = designSteps(reportPrefix(document));
-  const stepHandles = shortHandles(steps.map(step => step.id));
+  // Ordered Cut parts steps are reported under `spatial`, but the editor resolves handles against every step, so
+  // handles are only as short as they stay unique among all of them.
+  const stepHandles = shortHandles(designSteps(document).map(step => step.id));
   return {
     ...summary,
     ...(spatial && { spatial: compactSpatialReport(spatial) }),

@@ -3,6 +3,7 @@ import {
   cadPartsToCut,
   cadStepReport,
   copyOperationSteps,
+  designSteps,
   evaluateCadDocument,
   placePoint,
   type CadCopyTransform,
@@ -37,7 +38,7 @@ interface SpatialStage {
 }
 export type CadSpatialReportOperation = (
   | { id: string; kind: 'copyTransform'; legacy: false; settings: Omit<CadCopyTransform, 'id'> }
-  | { id: string; kind: 'partCut'; legacy: boolean; settings: Omit<CadPartCut, 'id'> }
+  | { id: string; kind: 'partCut'; legacy: boolean; label: string; broken?: string; settings: Omit<CadPartCut, 'id'> }
 ) & { after: SpatialStage };
 export interface CadSpatialReport {
   /** Draft source contract: part/face generation precedes this ordered cut/pose stream. */
@@ -88,6 +89,8 @@ export function spatialReport(source: CadDocument, evaluation: CadEvaluation): C
   if (source.operationOrder === undefined) return;
   const moves = new Map(source.copyTransforms?.map(move => [move.id, move])),
     cuts = new Map(source.partCuts?.map(cut => [cut.id, cut]));
+  // The feature list's row for each Cut parts step: its name, and why it can't follow its values, if it can't.
+  const listed = new Map(designSteps(source).map(step => [step.id, step]));
   const operations = copyOperationSteps(source).map((step): CadSpatialReportOperation => {
     const prefix = reportPrefix(source, step.id),
       state = evaluateCadDocument(prefix);
@@ -102,7 +105,16 @@ export function spatialReport(source: CadDocument, evaluation: CadEvaluation): C
     const { id, ...settings } = structuredClone(cuts.get(step.id)!);
     const opening = cadStepReport(prefix, state.parts).find((entry): entry is CutReport => entry.kind === 'partCut' && entry.stepId === id);
     if (opening) after.openings = opening.cuts;
-    return { id, kind: 'partCut', legacy: step.legacy, settings, after };
+    const row = listed.get(id);
+    return {
+      id,
+      kind: 'partCut',
+      legacy: step.legacy,
+      label: row?.label ?? id,
+      ...(row?.broken && { broken: row.broken }),
+      settings,
+      after,
+    };
   });
   const geometry = reportGeometry(source, evaluation.parts, evaluation);
   const camGroups = cadPartsToCut(geometry.document, geometry.parts).map(group => {
