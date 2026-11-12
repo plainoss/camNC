@@ -114,7 +114,9 @@ import {
   cadSession,
   commitCadSession,
   endCadSession,
+  markCadSession,
   redoCadSession,
+  restoreCadSession,
   undoCadSession,
   type CadCommandCheckpoint,
 } from '@wbcnc/cad-editor/session';
@@ -1731,11 +1733,7 @@ export function CadEditor({
   const cancel = async () => {
     setBusy(true);
     try {
-      const restored = { ...structuredClone(session.entry), revision: session.document.revision + 1 };
-      session.document = restored;
-      session.past = [];
-      session.future = [];
-      publish(restored);
+      publish(restoreCadSession(session, { document: session.entry, past: [], future: [] }));
       await callbacks.current.onCancel();
       endCadSession(doc.id);
     } catch (error) {
@@ -1747,7 +1745,7 @@ export function CadEditor({
   const openFeature = (
     kind: 'extrude' | 'pattern' | 'hole',
     partId: string,
-    before = documentRef.current,
+    before = markCadSession(session),
     initialPatternKind?: PartPatternKind
   ) => {
     setSelectedFace(null);
@@ -1766,7 +1764,8 @@ export function CadEditor({
   const closeFeature = (keep: boolean) => {
     setDirectionPicker(null);
     // Pattern candidates use the viewport preview transaction, so cancel has no source or history edit to undo.
-    if (!keep && featureDialog && featureDialog.kind !== 'pattern') commit(featureDialog.before);
+    // Cancel puts history back too: a new entry would leave the cancelled edit for Undo to bring back.
+    if (!keep && featureDialog && featureDialog.kind !== 'pattern') publish(restoreCadSession(session, featureDialog.before));
     // Regions picked apart are a part each.
     if (keep && featureDialog?.kind === 'extrude') {
       const split = splitApartRegions(documentRef.current, featureDialog.partId, apartIds);
@@ -2051,8 +2050,8 @@ export function CadEditor({
       setChoosingFace(false);
       setVariableDialog({});
     } else if (command === 'hole' && part?.extrude === false) {
-      const before = documentRef.current;
-      commit(replacePart(before, part.id, asHole));
+      const before = markCadSession(session);
+      commit(replacePart(documentRef.current, part.id, asHole));
       openFeature('hole', part.id, before);
     } else if (command === 'fillet') setFilletDialog({});
     else if (command === 'mirror') {
@@ -2068,12 +2067,13 @@ export function CadEditor({
       setChoosingFace(false);
       setPartCutting({});
     } else if (command === 'extrude' && (selectedFace || part)) {
-      const before = documentRef.current;
+      const mark = markCadSession(session),
+        before = mark.document;
       const from = selectedFace ? { face: selectedFace } : { part: part! };
       const started = startExtrude(before, from, part?.extrude === false && sketchRowPicked === part.id, profiles.pickedProfile);
       if ('refusal' in started) return setStudioRefusal(started.refusal);
       commit(started.document);
-      openFeature('extrude', started.partId, before);
+      openFeature('extrude', started.partId, mark);
     } else if (part)
       cutSelection.featurePart(command, (kind, partId) => openFeature(kind, partId, undefined, initialPatternKind), setStudioRefusal);
   };
@@ -2622,9 +2622,9 @@ export function CadEditor({
               onExtrude={() => {
                 if (!closeSketch(true)) return;
                 // Read after closing: a value still being typed is applied as the sketch closes.
-                const before = documentRef.current;
-                const sketched = before.parts.find(candidate => candidate.id === part.id);
-                const started = sketched && startExtrude(before, { part: sketched }, true, picked => picked);
+                const before = markCadSession(session);
+                const sketched = before.document.parts.find(candidate => candidate.id === part.id);
+                const started = sketched && startExtrude(before.document, { part: sketched }, true, picked => picked);
                 if (!started) return;
                 if ('refusal' in started) return setStudioRefusal(started.refusal);
                 commit(started.document);
