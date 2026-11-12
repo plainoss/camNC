@@ -4,6 +4,10 @@ export interface AssistantContextOptions {
   images: boolean;
   /** Textual payload ceiling, not a token estimate; image bytes are limited separately. */
   maxCharacters?: number;
+  /** Keep superseded tool batches verbatim while the whole history fits, so the provider's cached prefix stays valid. */
+  compactOnlyOverLimit?: boolean;
+  /** Characters the caller appends after this context, such as a final-turn note; they count against the limit. */
+  reserveCharacters?: number;
 }
 
 type Batch = { start: number; end: number; message: AssistantMessage };
@@ -58,31 +62,42 @@ export function buildAssistantContext(messages: readonly AssistantMessage[], opt
   let latestImages = -1;
   for (let index = 0; index < messages.length; index++)
     if (messages[index]!.role === 'tool' && messages[index]!.images?.length) latestImages = index;
-  const result: AssistantMessage[] = [];
-  const byStart = new Map(batches.map(batch => [batch.start, batch]));
-  for (let index = 0; index < messages.length; index++) {
-    const batch = byStart.get(index);
-    if (batch && !retained.has(index)) {
-      // Tool-call narration can repeat the entire generated script. Final assistant decisions are separate messages below.
-      result.push({
-        role: 'user',
-        text: `[Application context data: superseded tool batch omitted: ${batch.message.calls!.map(call => call.name).join(', ')}. Its script/report is historical; no apply outcome is implied.]`,
-      });
-      index = batch.end;
-      continue;
+  const render = (kept: ReadonlySet<number>) => {
+    const result: AssistantMessage[] = [];
+    const byStart = new Map(batches.map(batch => [batch.start, batch]));
+    for (let index = 0; index < messages.length; index++) {
+      const batch = byStart.get(index);
+      if (batch && !kept.has(index)) {
+        // Tool-call narration can repeat the entire generated script. Final assistant decisions are separate messages below.
+        result.push({
+          role: 'user',
+          text: `[Application context data: superseded tool batch omitted: ${batch.message.calls!.map(call => call.name).join(', ')}. Its script/report is historical; no apply outcome is implied.]`,
+        });
+        index = batch.end;
+        continue;
+      }
+      const message = structuredClone(messages[index]!);
+      // Standalone assistant text is enough; raw Responses items would duplicate historical text/reasoning.
+      if (message.role === 'assistant' && !message.calls?.length) delete message.responseItems;
+      if (message.role === 'assistant' && !message.calls?.length) delete message.anthropicContent;
+      if (message.images?.length && (!options.images || (message.role === 'tool' && index !== latestImages))) {
+        const names = message.images.map(image => image.name).join(', ');
+        message.text += `\n[Application context data: images unavailable in this request: ${names}. ${options.images ? 'Superseded candidate views were omitted.' : 'The selected provider is text-only; ask for an image-capable provider when visual evidence is required.'}]`;
+        delete message.images;
+      }
+      result.push(message);
     }
-    const message = structuredClone(messages[index]!);
-    // Standalone assistant text is enough; raw Responses items would duplicate historical text/reasoning.
-    if (message.role === 'assistant' && !message.calls?.length) delete message.responseItems;
-    if (message.role === 'assistant' && !message.calls?.length) delete message.anthropicContent;
-    if (message.images?.length && (!options.images || (message.role === 'tool' && index !== latestImages))) {
-      const names = message.images.map(image => image.name).join(', ');
-      message.text += `\n[Application context data: images unavailable in this request: ${names}. ${options.images ? 'Superseded candidate views were omitted.' : 'The selected provider is text-only; ask for an image-capable provider when visual evidence is required.'}]`;
-      delete message.images;
-    }
-    result.push(message);
+    return result;
+  };
+  const reserve = options.reserveCharacters ?? 0;
+  // Measured as sent: image notes and the caller's trailing note count too, so "fits verbatim" never overruns the limit.
+  const fits = (result: AssistantMessage[]) => assistantContextCharacters(result) + reserve <= limit;
+  if (options.compactOnlyOverLimit) {
+    const verbatim = render(new Set(batches.map(batch => batch.start)));
+    if (fits(verbatim)) return verbatim;
   }
-  if (assistantContextCharacters(result) > limit)
+  const result = render(retained);
+  if (!fits(result))
     throw new Error(
       'Assistant context exceeds the input limit. Start a new conversation and restate the constraints you want to keep; nothing was sent.'
     );
