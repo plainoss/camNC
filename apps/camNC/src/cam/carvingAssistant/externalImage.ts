@@ -4,7 +4,9 @@ import type { CarvingStyle } from './session';
 
 /** What to paste into ChatGPT, Gemini or any image chat: the same art direction the image route sends. */
 export function externalImagePrompt(subject: string, style: CarvingStyle, detail: CarvingDetail): string {
-  const base = buildRasterArtPrompt(subject.trim() || 'a simple motif', detail);
+  // Imported artwork is described as "Line art from <file>"; that names a file, not a motif.
+  const motif = /^line art from /i.test(subject.trim()) ? '' : subject.trim();
+  const base = buildRasterArtPrompt(motif || 'a simple motif', detail);
   return `${base} ${style === 'bold' ? 'Bold, broad filled shapes with few interior lines.' : 'Clean line art with filled strokes.'} Square image.`;
 }
 
