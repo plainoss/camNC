@@ -196,13 +196,10 @@ it('keeps step corners square where their bones would break into a neighbouring 
   expect(second!.outline.length).toBeGreaterThan(4);
   expect(Math.max(...first!.outline.map(p => p.x))).toBeCloseTo(60, 6);
   expect(Math.min(...second!.outline.map(p => p.x))).toBeCloseTo(60.5, 6);
-  const warnings = skippedWarnings(evaluated);
-  expect(warnings.map(w => w.message.slice(0, 40))).toEqual([
-    '2 of the corners Tenon 2 cuts in Seat st',
-    '2 of the corners Tenon 1 cuts in Seat st',
-  ]);
-  expect(warnings[0]!.points!.every(p => p.x === 60.5)).toBe(true);
-  expect(warnings[1]!.points!.every(p => p.x === 60)).toBe(true);
+  const warnings = Object.fromEntries(skippedWarnings(evaluated).map(w => [w.message.slice(0, 24), w.points]));
+  expect(Object.keys(warnings).sort()).toEqual(['2 of the corners Tenon 1', '2 of the corners Tenon 2']);
+  expect(warnings['2 of the corners Tenon 1']!.every(p => p.x === 60)).toBe(true);
+  expect(warnings['2 of the corners Tenon 2']!.every(p => p.x === 60.5)).toBe(true);
   expect(
     skippedWarnings(
       seatWith([
@@ -211,4 +208,76 @@ it('keeps step corners square where their bones would break into a neighbouring 
       ])
     )
   ).toEqual([]);
+});
+
+/** A seat with a 0.5 mm-walled mortise beside each of `tools`, given as [x, y, width, height, z offset, thickness]. */
+function seatCutBy(tools: [number, number, number, number, number, number][], order = tools.map((_, i) => i)) {
+  const seat = createCadPart('Seat', 18);
+  seat.sketch = addRectangle(seat.sketch, { x: 0, y: 0, width: 240, height: 200, dimensioned: true, positioned: true });
+  seat.placement = { position: [0, 0, 0], rotation: [0, 0, 0, 1] };
+  const parts = tools.map(([x, y, width, height, z, thickness], index) => {
+    const tool = createCadPart(`T${index + 1}`, thickness);
+    tool.sketch = addRectangle(tool.sketch, { x, y, width, height, dimensioned: true, positioned: true });
+    tool.placement = { position: [0, 0, z], rotation: [0, 0, 0, 1] };
+    return tool;
+  });
+  let document = { ...createCadDocument('Bones and depths'), parts: [seat, ...parts] };
+  for (const index of order) {
+    const made = addPartCut(document, [parts[index]!.id], [seat.id], { value: 0 });
+    document = updatePartCut(made.document, made.id, { cornerRelief: { diameter: 6 } });
+  }
+  return { document, evaluated: evaluateCadDocument(document) };
+}
+const cutBy = (evaluated: ReturnType<typeof evaluateCadDocument>, name: string, part = 0) => {
+  const tool = evaluated.parts.find(p => p.name === name)!;
+  return evaluated.parts[part]!.cuts!.find(cut => cut.id.includes(`:${tool.partId}`))!;
+};
+
+it.each([[[0, 1]], [[1, 0]]])('keeps the bones of a through mortise inside a shallower dado (order %j)', order => {
+  // A 6 mm deep dado across the seat from the top, with a through mortise inside it.
+  const { evaluated } = seatCutBy(
+    [
+      [0, 50, 240, 40, 12, 6],
+      [100, 61, 40, 18, -1, 20],
+    ],
+    order
+  );
+  expect(cutBy(evaluated, 'T2').outline.length).toBeGreaterThan(4);
+  expect(skippedWarnings(evaluated)).toEqual([]);
+});
+
+it('keeps an earlier opening clear of a neighbour at another depth when a third opening revises it', () => {
+  const { evaluated } = seatCutBy([
+    // A through mortise; an underside pocket 0.5 mm beside it; a top pocket over the first.
+    [20, 60, 40, 18, -1, 20],
+    [60.5, 60, 40, 18, -12, 18],
+    [10, 55, 30, 30, 12, 6],
+  ]);
+  expect(Math.max(...cutBy(evaluated, 'T1').outline.map(p => p.x))).toBeCloseTo(60, 6);
+});
+
+it('keeps facing bones apart on a mirrored copy of an ordered design', () => {
+  const { document } = seatCutBy([
+    [20, 60, 40, 18, 0, 18],
+    [60.5, 60, 40, 18, 0, 18],
+  ]);
+  const seat = document.parts[0]!;
+  const mirrored = orderedCadDocument({
+    ...document,
+    parts: [
+      { ...seat, copies: [{ id: 'mirror', mirrored: true, placement: { position: [240, 0, 0], rotation: [0, 0, 0, 1] } }] },
+      ...document.parts.slice(1),
+    ],
+  });
+  const evaluated = evaluateCadDocument(mirrored);
+  expect(evaluated.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+  // The mirrored copy overlaps the original exactly, so both take both mortises.
+  const original = evaluated.parts.find(part => part.partId === seat.id)!;
+  const copyCuts = original.copyCuts?.mirror;
+  expect(copyCuts).toHaveLength(2);
+  for (const cuts of [original.cuts!, copyCuts!]) {
+    const [a, b] = [...cuts].sort((p, q) => Math.min(...p.outline.map(v => v.x)) - Math.min(...q.outline.map(v => v.x)));
+    const gap = Math.min(...b!.outline.map(p => p.x)) - Math.max(...a!.outline.map(p => p.x));
+    expect(gap).toBeCloseTo(0.5, 6);
+  }
 });

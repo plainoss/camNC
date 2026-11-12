@@ -1,5 +1,5 @@
 import { applyExtrudeRemovals } from './extrudeRemoval';
-import { relieveStepOpening } from './stepReliefFit';
+import { relieveStepOpenings } from './stepReliefFit';
 import { effectivePartCutRelief, partCutReliefIssue } from './partCutRelief';
 import { cadDocumentVersion } from './documentVersion';
 import { newCadId } from './document';
@@ -287,6 +287,21 @@ export function applyPartCuts(
       ],
     ])
   );
+  // Said once, however many later steps or copies work the bones out again.
+  const reliefSaid = new Set<string>();
+  /** Puts `shape` on the target with every Cut parts opening's bones worked out again, and says which corners stay square. */
+  const settleRelief = (target: { shape: EvaluatedCadPart }, partName: string, shape: EvaluatedCadPart) => {
+    const { part, skipped } = relieveStepOpenings(shape);
+    target.shape = part;
+    for (const [id, points] of skipped) {
+      const toolId = /^cut-parts:[^:]+:([^:#]+)/.exec(id)?.[1];
+      const tool = document.parts.find(candidate => candidate.id === toolId)?.name ?? 'another part';
+      const message = `${points.length} of the corners ${tool} cuts in ${partName} stay square: a bone there would cut into another edge or opening.`;
+      // Copies of one target are cut alike, so their corners are said once, at the first one's.
+      if (!reliefSaid.has(message)) diagnostics.push({ code: 'corner-relief-skipped', severity: 'warning', message, points });
+      reliefSaid.add(message);
+    }
+  };
   for (const step of document.partCuts ?? []) {
     let made = 0,
       refused = false;
@@ -355,27 +370,6 @@ export function applyPartCuts(
           through = reach >= t - kSquare;
         const setting = effectivePartCutRelief(step, intoSource);
         const current = target.shape;
-        const z0 = through || fromBelow ? 0 : t - reach,
-          z1 = through || fromTop ? t : reach;
-        // This tool's own pieces join this opening, so their bones may meet it.
-        const relief = relieveStepOpening(
-          current,
-          outline,
-          setting?.diameter,
-          [z0, z1],
-          other => other.id === prefix || other.id.startsWith(`${prefix}#`)
-        );
-        const square = (count: number, cutBy: string, points: CadPoint[]) => {
-          const message = `${count} of the corners ${cutBy} cuts in ${intoSource.name} stay square: a bone there would cut into another edge or opening.`;
-          if (!said.has(message)) diagnostics.push({ code: 'corner-relief-skipped', severity: 'warning', message, points });
-          said.add(message);
-        };
-        if (relief.skipped.length) square(relief.skipped.length, name, relief.skipped);
-        for (const { cut, skipped } of relief.revised)
-          if (skipped.length) {
-            const toolId = /^cut-parts:[^:]+:([^:#]+)/.exec(cut.id)?.[1];
-            square(skipped.length, document.parts.find(part => part.id === toolId)?.name ?? 'another part', skipped);
-          }
         // The first piece keeps the ID a tool's one cut always had.
         const id = `${prefix}${index ? `#${index}` : ''}`;
         const cut: EvaluatedCadCut = {
@@ -385,12 +379,13 @@ export function applyPartCuts(
           from: 0,
           to: through ? t : reach,
           through,
-          outline: relief.points,
+          // Square here; its bones are added with every other opening's, below.
+          outline,
           islands: [],
           opening: { x0, y0, x1, y1 },
+          ...(setting && { relief: setting.diameter }),
         };
-        relief.remember(cut);
-        target.shape = { ...current, cuts: [...relief.cuts, cut] };
+        settleRelief(target, intoSource.name, { ...current, cuts: [...(current.cuts ?? []), cut] });
         made++;
       });
     };
@@ -506,7 +501,8 @@ export function applyPartCuts(
                 outline: grown(outlined.outline, step.clearance),
                 islands: outlined.islands.map(island => grown([...island].reverse(), -step.clearance).reverse()),
               };
-              target.shape = { ...target.shape, cuts: [...(target.shape.cuts ?? []), cut] };
+              // Bones cut earlier beside it may have to give way to it.
+              settleRelief(target, intoSource.name, { ...target.shape, cuts: [...(target.shape.cuts ?? []), cut] });
               made++;
               continue;
             }

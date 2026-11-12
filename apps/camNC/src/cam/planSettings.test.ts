@@ -16,10 +16,10 @@ describe('withHoleChoice', () => {
 });
 
 describe('plannedReliefBit', () => {
-  it('is the job bit, the smaller of two bits, or the default bit without a plan', () => {
+  it("is the job's main bit, even with a smaller second bit, or the default bit without a plan", () => {
     const six = { number: 3, diameter: 6, name: '6 mm flat' };
     expect(plannedReliefBit({ bit: six })).toBe(6);
-    expect(plannedReliefBit({ bit: six, smallBit: kDefaultPlan.bit })).toBe(3.175);
+    expect(plannedReliefBit({ bit: six, smallBit: kDefaultPlan.bit })).toBe(6);
     expect(plannedReliefBit(undefined)).toBe(3.175);
   });
 });
