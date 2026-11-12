@@ -84,3 +84,29 @@ it('picks the provider from the key and offers an image model override for OpenA
   expect(test.mock.calls[0]![0].imageModel).toBeUndefined();
   expect(onSave.mock.calls[0]![0].config).toMatchObject({ model: 'gpt-x', imageModel: 'gpt-image-x' });
 });
+
+it("shows a connection saved elsewhere, such as the dock's first-run form", () => {
+  const view = render(<ProviderSettings value={null} onSave={() => {}} test={vi.fn()} />);
+  expect(screen.getByLabelText('API key')).toHaveProperty('value', '');
+  view.rerender(
+    <ProviderSettings
+      value={{
+        key: 'local-key',
+        config: {
+          kind: 'compatible',
+          protocol: 'chat',
+          endpoint: 'http://localhost:59999/v1',
+          model: 'mock-text',
+          tools: true,
+          images: false,
+        },
+      }}
+      onSave={() => {}}
+      test={vi.fn()}
+    />
+  );
+  expect(screen.getByLabelText('API key')).toHaveProperty('value', 'local-key');
+  expect(screen.getByRole('radio', { name: 'Other…' })).toHaveProperty('ariaChecked', 'true');
+  expect(screen.getByLabelText('API address')).toHaveProperty('value', 'http://localhost:59999/v1');
+  expect(screen.getByLabelText('Model ID')).toHaveProperty('value', 'mock-text');
+});

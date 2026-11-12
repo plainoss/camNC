@@ -10,7 +10,8 @@ export function GcodeDropZone() {
       if (hasFiles(e)) e.preventDefault();
     };
     const onDrop = async (e: DragEvent) => {
-      if (!hasFiles(e)) return;
+      // A panel that takes the file itself (the carving assistant's image drop) has handled it already.
+      if (!hasFiles(e) || e.defaultPrevented) return;
       e.preventDefault();
       const file = e.dataTransfer?.files[0];
       if (file) await openFile(file);

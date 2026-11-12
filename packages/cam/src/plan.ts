@@ -34,6 +34,7 @@ import {
   type CamSettings,
   type HoleChoice,
   type HoleMiddle,
+  type OutlineNotches,
   type Operation,
   type PartCam,
 } from './toolpaths';
@@ -165,6 +166,8 @@ export interface PlanResult {
   release?: ReleaseProgram[];
   /** The piece in the middle of each through hole that leaves one: cleared, sucked up, or to be fixed by hand. */
   holeMiddles?: HoleMiddle[];
+  /** What the outline and hole paths can't reach, per part (instance id): it stays uncut. */
+  outlineNotches?: OutlineNotches[];
 }
 
 /** A board to generate: which bodies sit where. */
@@ -687,6 +690,7 @@ export function summarize(
     size,
     path: moves.filter(m => !m.rapid && Math.min(m.from[2], m.to[2]) < cam.stockTop - 1e-3).map(m => [m.from, m.to]),
     ...(cam.holeMiddles && { holeMiddles: cam.holeMiddles }),
+    ...(cam.outlineNotches && { outlineNotches: cam.outlineNotches }),
   };
 }
 

@@ -220,7 +220,8 @@ import { ShortcutList } from './ShortcutList';
 import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
-import { asHole, editable, hasOutline, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { editable, hasOutline, isSingleLine, replacePart, withoutExtrude } from './editorHelpers';
+import { startHole } from './holeSource';
 import { useFeaturePreview } from './useFeaturePreview';
 import { SketchProblems } from './SketchProblems';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
@@ -231,7 +232,8 @@ import { useAssistantProposal } from './assistant/useAssistantProposal';
 import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
 import { useProfileSelection } from './useProfileSelection';
-import { basePlaneViews, pickedPlane, pickedPlaneFrame, planeOffsetFrom } from './basePlanes';
+import { basePlaneViews, pickedPlane, planeOffsetFrom } from './basePlanes';
+import { studioNormalView } from './studioNormalView';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
@@ -477,6 +479,7 @@ export function CadEditor({
   const [transformDialog, setTransformDialog] = useState<{ partId: string; copyId?: string; move?: boolean } | null>(null);
   // When a step's dialog closes, the view has the keyboard again, so its shortcuts work straight away.
   const stepDialogOpen = !!(featureDialog || variableDialog || planeDialog || mirrorDialog || transformDialog || partCutting);
+  const partPicking = !!(partCutting || mirrorDialog || transformDialog || featureDialog?.kind === 'pattern');
   const dialogWasOpen = useRef(false);
   // A view still solving is inert: it takes the keyboard once it's done, unless something else has it by then.
   const viewWantsKeyboard = useRef(false);
@@ -1185,21 +1188,11 @@ export function CadEditor({
       }
       // N looks straight at the picked plane or face, or the selected part's sketch plane; again, from its other side.
       if (!event.shiftKey && event.key.toLowerCase() === 'n') {
-        const on = selectedFace ?? (part ? (part.drawnOn?.on ?? { plane: 'top' as const }) : null);
-        const frame = selectedPlane ? pickedPlaneFrame(documentRef.current, selectedPlane) : on && cadFaceFrame(documentRef.current, on);
-        if (!frame || 'error' in frame) return;
+        const request = studioNormalView(documentRef.current, selectedPlane, selectedFace, part);
+        if (!request) return;
         event.preventDefault();
         if (event.repeat) return;
-        setViewRequest(previous => {
-          const same =
-            previous?.name === 'normal' && previous.direction?.every((value, axis) => Math.abs(value - frame.normal[axis]!) < 1e-9);
-          return {
-            name: 'normal',
-            seq: (previous?.seq ?? 0) + 1,
-            direction: same ? (frame.normal.map(value => -value) as [number, number, number]) : frame.normal,
-            up: frame.y,
-          };
-        });
+        setViewRequest(request);
         return;
       }
     }
@@ -2050,10 +2043,9 @@ export function CadEditor({
       setPartCutting(null);
       setChoosingFace(false);
       setVariableDialog({});
-    } else if (command === 'hole' && part?.extrude === false) {
-      const before = documentRef.current;
-      commit(replacePart(before, part.id, asHole));
-      openFeature('hole', part.id, before);
+    } else if (command === 'hole') {
+      const at = { partId: part?.id, copyId: cutSelection.pickedCopyId, cancel: () => featureDialog && closeFeature(false) };
+      startHole({ ...at, rolledTo: userRollback, read: () => documentRef.current, commit, open: openFeature, refuse: setStudioRefusal });
     } else if (command === 'fillet') setFilletDialog({});
     else if (command === 'mirror') {
       if (part) setMirrorDialog({ partId: part.id });
@@ -2244,7 +2236,7 @@ export function CadEditor({
         trouble={partTrouble}
         onPick={(partId, copyId) => {
           setSelectedFace(null);
-          if (partCutting && showWorkspace) return cutSelection.pickForCut(partId, copyId);
+          if (partPicking && showWorkspace) return cutSelection.pickForCut(partId, copyId);
           cutSelection.selectPart(partId, copyId);
           setSelected([]);
           chooseTool('select');
@@ -2575,8 +2567,7 @@ export function CadEditor({
               mirror={mirrorDialog}
               fillet={filletDialog}
               commit={next => commit(prepareStudioPreview(next))}
-              onPreview={studioPreview.update}
-              onConnectorsChange={setMateConnectors}
+              {...{ onPreview: studioPreview.update, onConnectorsChange: setMateConnectors, partPicks: cutSelection.dialogPicks }}
               setTransform={setTransformDialog}
               setVariable={setVariableDialog}
               setPlane={setPlaneDialog}
@@ -2594,7 +2585,7 @@ export function CadEditor({
               onChange={change => commit(change(documentRef.current))}
               onOk={() => closeFeature(true)}
               onCancel={() => closeFeature(false)}
-              onPreview={studioPreview.update}
+              {...{ onPreview: studioPreview.update, partPicks: cutSelection.dialogPicks }}
               depthDragging={extrusionDepth.control(shownDocument)?.dragging}
               profilePicking={profiles.enabled}
               onPickProfile={() => profiles.setEnabled(!profiles.enabled)}
@@ -2745,7 +2736,7 @@ export function CadEditor({
                 selectedCopyId={cutSelection.selectedCopyId}
                 onSelect={(id, copyId) => {
                   setSketchRowPicked(null);
-                  if (partCutting) return cutSelection.pickForCut(id, copyId);
+                  if (partPicking) return cutSelection.pickForCut(id, copyId);
                   cutSelection.selectPart(id, copyId);
                   setSelected([]);
                 }}
@@ -2754,7 +2745,7 @@ export function CadEditor({
                 featureShown={featureShown}
                 onHover={onHoverPart}
                 onOpen={(id, copyId) => {
-                  if (partCutting) return cutSelection.pickForCut(id, copyId);
+                  if (partPicking) return cutSelection.pickForCut(id, copyId);
                   if (studioSession) return openSketch(id);
                   setPartId(id);
                   setSelected([]);

@@ -53,7 +53,7 @@ export const kStudioCommands: { id: StudioCommand; label: string; hint: string; 
   {
     id: 'hole',
     label: 'Hole',
-    hint: 'Round holes at the points of the selected sketch on a part’s face',
+    hint: 'Round holes at the points of the selected sketch on a part’s face, or of the newest such sketch on the selected part',
     glyph: <path d="M5 8h14v8H5zM12 8v8M9.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0" />,
   },
   {
