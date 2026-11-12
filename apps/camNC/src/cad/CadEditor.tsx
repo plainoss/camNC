@@ -83,6 +83,7 @@ import {
   withFeatureVersion,
   type CadPoint,
   cadVariableProblems,
+  partCutInputProblems,
   drawnOnOutline,
   cadFaceFrame,
   cadSketchFrame,
@@ -1925,14 +1926,7 @@ export function CadEditor({
     if (action !== 'delete') return;
     setFeatureDialog(null);
     if (step.kind === 'fillet') return commit(removeEdgeFillet(current, step.partId, step.id));
-    if (step.kind === 'move')
-      return commit(
-        replacePart(current, step.partId, p => {
-          const next = { ...p };
-          delete next.moved;
-          return next;
-        })
-      );
+    if (step.kind === 'move') return commit(replacePart(current, step.partId, ({ moved: _moved, ...p }) => p));
     // In the studio a sketch stands on its own, as in the reference: deleting its Extrude leaves the sketch.
     if (
       step.kind === 'extrude' &&
@@ -2108,7 +2102,8 @@ export function CadEditor({
   const shownConflicts = [...conflictedConstraints, ...variableProblems.flatMap(problem => problem.constraintIds ?? [])];
   /** Why a part can't take its current values, for the mark beside it in the list. */
   const partTrouble = (id: string) =>
-    variableProblems.find(problem => problem.partId === id)?.message ??
+    // A Cut parts step that can't use a tool or target says so on the parts it joins, as a value in error does.
+    [...variableProblems, ...partCutInputProblems(doc)].find(problem => problem.partId === id)?.message ??
     (sketchStatuses[id]?.status === 'conflict' ? 'This part’s sketch can’t be solved with its current values.' : null);
   // A studio sketch closes whatever its edit did to the features built from it, which show as broken in the feature list.
   const openSketchProblems = studioSession && !showWorkspace ? sketchProblems : problems;
