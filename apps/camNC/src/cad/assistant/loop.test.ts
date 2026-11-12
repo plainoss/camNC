@@ -309,6 +309,17 @@ it('checks with the cutter the assistant names, as its own check, and refuses an
   expect(emitted.filter(message => message.role === 'tool').at(-1)?.text).toContain('flat bit diameter');
 });
 
+it('plans the full check with the bit its geometry check named', async () => {
+  const options = setup();
+  options.finalize = vi.fn(async checked => checked);
+  const checkWith6 = answer('check_design', 'mortise');
+  checkWith6.calls![0].arguments.bit = 6;
+  const replies = [checkWith6, answer('finalize_design'), { role: 'assistant' as const, text: 'Proposal: checked.' }];
+  options.request = vi.fn(async () => replies.shift()!);
+  await runDesignAssistant(options);
+  expect(vi.mocked(options.finalize).mock.calls[0]![0].bit).toBe(6);
+});
+
 it('stops before requesting overlarge input and stops when capped provider usage is unknown', async () => {
   const options = setup();
   options.limits = { maxInputCharacters: 1 };
