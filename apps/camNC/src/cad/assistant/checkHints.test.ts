@@ -40,5 +40,7 @@ describe('checkNextStep', () => {
     expect(checkNextStep({ ok: true, report: { warnings: [{ code: 'thin-profile' }] }, stage: 'complete' })).toMatch(
       /warnings \(thin-profile\).*Proposal: and mention the remaining warnings/
     );
+    // An unused sketch is not a problem with the design.
+    expect(checkNextStep({ ok: true, report: { warnings: [{ code: 'empty-sketch' }] }, stage: 'complete' })).not.toContain('warnings');
   });
 });

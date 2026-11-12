@@ -285,6 +285,14 @@ it('does not lose a checked proposal when a later unrelated tool fails', async (
   expect((await runDesignAssistant(options)).status).toBe('proposal');
 });
 
+it('explains a Proposal: reply that no passing check backs', async () => {
+  const options = setup();
+  options.request = vi.fn(async () => ({ role: 'assistant' as const, text: 'Proposal: a tray.' }));
+  const result = await runDesignAssistant(options);
+  expect(result.status).toBe('exhausted');
+  expect(result.stopReason).toContain('no check of it passed');
+});
+
 it('requests views only on demand and automatically for the latest reference image', async () => {
   const options = setup();
   options.config.images = true;
