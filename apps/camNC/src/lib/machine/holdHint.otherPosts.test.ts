@@ -120,6 +120,20 @@ describe('an M0 of another post with no lift before it', () => {
     expect(holdHint(gcode, at(heldAtTheM5(gcode), cutting))).toBeNull();
   });
 
+  describe('a frame change or probe before the first cut', () => {
+    for (const header of [['G54'], ['G49'], ['G43.1 Z0'], ['G92 Z0'], ['G38.2 Z-20 F100', 'G92 Z0']])
+      it(`${header.join(' / ')} leaves a later feed lift recognisable`, () => {
+        const gcode = program(['G21', 'G90', ...header, 'G0 Z11'], ['G1 Z5 F300', 'M5', m0]);
+        expect(holdHint(gcode, at(after(gcode, m0), { wpos: { z: 5 } }))?.reason).toContain('Change to T2');
+        expect(holdHint(gcode, at(heldAtTheM5(gcode), cutting))).toBeNull();
+      });
+
+    it('after a cut, a frame change still makes earlier cut heights unknown', () => {
+      const gcode = program(['G21', 'G90', 'G0 Z11', 'G1 Z-6 F300', 'G1 X10', 'G0 Z11', 'G55', 'G0 Z11'], ['G1 Z5 F300', 'M5', m0]);
+      expect(holdHint(gcode, at(after(gcode, m0), { wpos: { z: 5 } }))).toBeNull();
+    });
+  });
+
   describe('with cutting lines that carry no Z', () => {
     /** A cut in X and Y only, at the Z the plunge went to. */
     const flat = Array.from({ length: 30_000 }, (_, i) => `G1 X${i % 90} Y${i % 40}`);

@@ -188,6 +188,12 @@ const kProbes = [38.2, 38.3, 38.4, 38.5];
 /** Motion modes (G0, G1, G2, G3, probes, G80), as their G number. */
 const kMotionModes = [0, 1, 2, 3, ...kProbes, 80];
 
+/**
+ * The highest cut after a probe or frame change: the Z of earlier cuts no longer compares with work Z moves after it.
+ * Before any cut there is nothing to compare, so a header's G54/G49/G92 or a Z probe keeps later lifts recognisable.
+ */
+const cutsUnknown = (highestCut: number) => (highestCut === -Infinity ? -Infinity : Infinity);
+
 function readZBefore(lines: Line[], index: number): ZBefore | null {
   let relative = false;
   let units: 'mm' | 'inch' | undefined;
@@ -233,14 +239,14 @@ function readZBefore(lines: Line[], index: number): ZBefore | null {
     if (hasWord(words, 'G', ...kProbes)) {
       last = null;
       workZ = undefined;
-      highestCut = Infinity;
+      highestCut = cutsUnknown(highestCut);
       continue;
     }
     // Their Z (G43.1 Z…, G10 L20 Z…, G92 Z…) is not a move either. The bit stays put, so a machine Z still holds.
     if (hasWord(words, 'G', ...kZFrameChanges)) {
       if (!last?.machine) last = null;
       workZ = undefined;
-      highestCut = Infinity;
+      highestCut = cutsUnknown(highestCut);
       continue;
     }
     const feed = axes && motion !== 0;
