@@ -423,7 +423,7 @@ function stability(
               : `is held by ${ev.holds === 0 ? 'no' : `only ${ev.holds}`} screw${ev.holds === 1 ? '' : 's'} or clamp${ev.holds === 1 ? '' : 's'}`
           }, so it can turn or lift. Keep an eye on it, or add one (ringed on the board).`
         : how(ev) === 'unheld'
-          ? `${ev.what} has no two opposite edges where tabs would hold it, so it would come loose when its outline is cut through. On the Boards step, move it, or switch the board to a bottom skin.`
+          ? `${ev.what} has no two opposite edges where tabs would hold it, so it would come loose when its outline is cut through. On the Boards step, give it room for tabs between the cuts: widen the gap or margin between parts, or move it. Or use a smaller bit, or switch the board to a bottom skin.`
           : `${ev.what} comes loose when its outline is cut through${watched ? ', as you chose: nothing holds the parts. Keep an eye on it.' : ': no tabs into stock that is held.'}`;
     return { ...ev, block, message };
   });
@@ -736,7 +736,9 @@ function opSummaries(cam: PartCam, partTop: number): OpSummary[] {
       zBottom: minOf(zs),
       depthSteps: levels.size,
       stepdown: Math.max(...depths.slice(1).map((z, i) => depths[i] - z)),
-      feeds: [...new Set(op.passes.flatMap(p => p.feeds.slice(1)))].sort((a, b) => b - a),
+      // Whole mm/min, as the feeds are set: a stay-down link between pocket passes is slowed to a fraction, which the
+      // G-code keeps but the plan doesn't need to show.
+      feeds: [...new Set(op.passes.flatMap(p => p.feeds.slice(1).map(Math.round)))].sort((a, b) => b - a),
       timeMin: one([op]),
     };
   });
