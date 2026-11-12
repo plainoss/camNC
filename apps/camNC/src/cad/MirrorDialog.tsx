@@ -43,8 +43,18 @@ export function MirrorDialog({
   onPreview?: (document: CadDocument | null) => void;
   onCancel: () => void;
 }) {
-  // The mirror plane is picked first; clicking the part field then takes the next part clicked.
-  const partPick = useDialogPartPick({ document, partId: openedFor, picks: partPicks, pickable: !copyId, startActive: false });
+  // The mirror plane is picked first; clicking the part field then takes the next part clicked. Once a part is taken,
+  // a mirror still without a plane goes on to pick it, so a plane clicked next is the mirror's, not a new selection.
+  const partPick = useDialogPartPick({
+    document,
+    partId: openedFor,
+    picks: partPicks,
+    pickable: !copyId,
+    startActive: false,
+    take: (): void => {
+      if (!across) pick();
+    },
+  });
   const partId = partPick.partId;
   const part = document.parts.find(candidate => candidate.id === partId);
   const copy = part?.copies?.find(candidate => candidate.id === copyId);
