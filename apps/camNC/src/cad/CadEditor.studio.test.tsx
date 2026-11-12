@@ -857,6 +857,32 @@ it('extrudes a sketch already used again, as a new part of the regions left, sha
   expect(await screen.findByRole('dialog', { name: 'Sketch · Shelf' })).toBeDefined();
 });
 
+it('picks a further region of the shared sketch in the view into the same extrude, and takes it out when picked again', async () => {
+  const { latest, features, wide, narrow } = await splitShelf();
+  await userEvent.click(within(features).getByRole('button', { name: /Sketch · Shelf/ }));
+  await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Extrude/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
+  await waitFor(() => expect(latest().parts[1]?.regions).toEqual([narrow]));
+  const shelf = latest().parts[0]!.id;
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  // With the shelf's sketch shown in the view, its regions can be clicked there.
+  await userEvent.click(within(features).getByTitle('Show Sketch · Shelf in the view'));
+  await settled();
+  // The shelf's sketch region picked in the view joins the regions the extrude takes, rather than replacing them.
+  const pickSketchRegion = (region: string) => {
+    const id = JSON.stringify([shelf, region]);
+    expect(props().regions?.some(view => view.id === id)).toBe(true);
+    act(() => props().onPickRegion!(id));
+  };
+  pickSketchRegion(wide);
+  await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow, wide]));
+  expect(within(dialog).getByText('2 regions of Sketch · Shelf')).toBeDefined();
+  expect(latest().parts).toHaveLength(2);
+  pickSketchRegion(wide);
+  await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow]));
+  expect(within(dialog).getByText('A region of Sketch · Shelf')).toBeDefined();
+});
+
 const operation = (dialog: HTMLElement) => within(dialog).getByRole('tablist', { name: 'Extrude operation' });
 
 it('adds regions to a part made from the same sketch with Extrude → Add', async () => {
