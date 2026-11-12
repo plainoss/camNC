@@ -1,17 +1,9 @@
-import {
-  cadCornerSources,
-  cadSketchFrame,
-  cornerKey,
-  type CadDocument,
-  type CadPart,
-  type CadPoint,
-  type CadPointEntity,
-  type CadSketch,
-} from '@wbcnc/cad';
+import { cadSketchFrame, cornerKey, type CadDocument, type CadPart, type CadPoint, type CadPointEntity, type CadSketch } from '@wbcnc/cad';
 import type { CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 import type { PartEdge } from './partEdges';
 import { partVertices } from './partVertices';
 import { partEdgeSourceKey } from './partWorldEdges';
+import { physicalCornerSources as cadCornerSources } from './studioGeometryReaders';
 
 interface CornerInference extends CadDrawingInference {
   sourceCorner?: NonNullable<CadPointEntity['used']>;
