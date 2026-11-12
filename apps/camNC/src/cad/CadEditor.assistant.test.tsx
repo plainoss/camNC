@@ -8,6 +8,7 @@ import { defaultProvider, rememberAssistantCredentials } from './assistant/keySt
 import { requestAssistant, type AssistantMessage } from './assistant/provider';
 import { readConversation } from './assistant/conversationStore';
 import { checkScriptInBrowser } from './assistant/scriptCheck';
+import { studioCommand } from './studioToolbarTesting';
 
 vi.mock('./assistant/provider', { spy: true });
 vi.mock('./assistant/scriptCheck', { spy: true });
@@ -185,7 +186,7 @@ it('keeps an assistant proposal pending until a feature preview is cancelled', a
   await userEvent.click(within(dock).getByRole('button', { name: 'Send' }));
   const preview = await within(dock).findByRole('button', { name: 'Review proposal' }, { timeout: 45_000 });
   const toolbar = screen.getByRole('toolbar', { name: 'Part Studio toolbar' });
-  await userEvent.click(within(toolbar).getByRole('button', { name: /^Variable$/ }));
+  await userEvent.click(await studioCommand(/^Variable$/));
   const feature = await screen.findByRole('dialog', { name: 'Variable' });
   expect(preview).toHaveProperty('disabled', true);
   expect(screen.getByRole('button', { name: 'Assistant' })).toHaveProperty('disabled', true);

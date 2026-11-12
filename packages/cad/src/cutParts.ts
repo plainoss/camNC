@@ -2,6 +2,9 @@ import { applyExtrudeRemovals } from './extrudeRemoval';
 import { relieveLoopCorners } from './cornerRelief';
 import { newCadId } from './document';
 import { validPartCutSplit } from './partCutSplit';
+import { joinedCutReferences } from './joinedCutReferences';
+import { physicalJoinedCopies } from './physicalJoinedCopies';
+import { activeDesign } from './suppression';
 import { resolvePartCutTargets } from './partCutTargetSelection';
 import { cadPartReferenceOwner } from './partReferences';
 import { evaluatedPartCopy, mirrorEvaluatedPart, sameCadCuts } from './copies';
@@ -10,7 +13,9 @@ import { cadCopyName } from './partPatterns';
 import { evaluateCadPartFamily } from './features';
 import { evaluateCadPart, polygonArea } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
-import type { CadDiagnostic, CadDocument, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
+import { occupiedToolBoxes } from './occupiedToolBoxes';
+import { certifiedToolProfile } from './certifiedToolProfile';
+import type { CadDiagnostic, CadDocument, CadPart, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
 const conjugate = ([x, y, z, w]: readonly number[]) => [-x!, -y!, -z!, w!];
 const toWorld = (placement: CadPlacement, point: Vec3): Vec3 => {
@@ -131,13 +136,20 @@ function toolBoxes(
   tool: EvaluatedCadPart,
   toolAt: CadPlacement,
   into: EvaluatedCadPart,
-  intoAt: CadPlacement
+  intoAt: CadPlacement,
+  occupied = false,
+  source?: CadPart
 ): { boxes: [Vec3, Vec3][] } | { refused: string } {
+  if (occupied && source) tool = certifiedToolProfile(tool, source);
   const [tlo, thi] = box(tool);
   const [rlo, rhi] = carry(intoAt, toolAt, box(into));
   const lo = [0, 1, 2].map(a => Math.max(tlo[a]!, rlo[a]!)) as Vec3,
     hi = [0, 1, 2].map(a => Math.min(thi[a]!, rhi[a]!)) as Vec3;
   if (lo.some((value, a) => hi[a]! - value < kSquare)) return { boxes: [] };
+  if (occupied) {
+    const found = occupiedToolBoxes(tool, lo, hi);
+    return 'refused' in found ? found : { boxes: found.boxes.map(bounds => carry(toolAt, intoAt, bounds)) };
+  }
   // Split the reach into cells along every corner of the tool's outline and holes inside it, and keep the filled ones.
   const stops = (values: number[], from: number, to: number) =>
     [...new Set([from, to, ...values.filter(v => v > from + kSquare && v < to - kSquare)].map(v => Math.round(v * 1e6) / 1e6))].sort(
@@ -241,9 +253,11 @@ function toolOutlineCut(
  * cut where it reaches in is left out with a warning rather than cut as a block.
  */
 export function applyPartCuts(
-  document: CadDocument,
-  parts: readonly EvaluatedCadPart[]
+  given: CadDocument,
+  parts: readonly EvaluatedCadPart[],
+  options: { occupiedTools?: boolean } = {}
 ): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
+  const document = physicalJoinedCopies(activeDesign(given));
   const diagnostics: CadDiagnostic[] = [];
   const byId = new Map(parts.map(part => [part.partId, part]));
   const sources = new Map(document.parts.map(part => [part.id, part]));
@@ -251,7 +265,7 @@ export function applyPartCuts(
   const before = new Map(
     parts.map(part => {
       const source = sources.get(part.partId);
-      const outline = source?.cornerRelief && document.partCuts?.length && evaluateCadPart(source).part?.outline;
+      const outline = !options.occupiedTools && source?.cornerRelief && document.partCuts?.length && evaluateCadPart(source).part?.outline;
       return [part.partId, outline ? { ...part, outline } : part];
     })
   );
@@ -302,7 +316,14 @@ export function applyPartCuts(
             j !== index &&
             (Math.abs(other.lo[axis] - at) < kSquare || Math.abs(other.hi[axis] - at) < kSquare) &&
             other.lo[1 - axis]! < reaches[index]!.hi[1 - axis]! - kSquare &&
-            other.hi[1 - axis]! > reaches[index]!.lo[1 - axis]! + kSquare
+            other.hi[1 - axis]! > reaches[index]!.lo[1 - axis]! + kSquare &&
+            // Occupied tools have several height layers. Only a neighbour covering this complete face can make
+            // it internal; a lower neighbour must not suppress clearance on an exposed upper pocket wall.
+            (!options.occupiedTools ||
+              (other.lo[2] <= reaches[index]!.lo[2] &&
+                other.hi[2] >= reaches[index]!.hi[2] &&
+                other.lo[1 - axis]! <= reaches[index]!.lo[1 - axis]! &&
+                other.hi[1 - axis]! >= reaches[index]!.hi[1 - axis]!))
         );
       reaches.forEach(({ lo, hi }, index) => {
         const fromTop = hi[2] >= t - kSquare,
@@ -360,7 +381,11 @@ export function applyPartCuts(
       warn('Invalid split in a "cut parts" step: fingers must be an integer of at least 2.');
       continue;
     }
-    const selection = resolvePartCutTargets(document, step.targets);
+    const targetReferences = joinedCutReferences(document, step.targets);
+    const selection = resolvePartCutTargets(
+      document,
+      targetReferences.map(item => item.reference)
+    );
     for (const reference of selection.missing) {
       refused = true;
       const owner = cadPartReferenceOwner(document, reference);
@@ -372,7 +397,8 @@ export function applyPartCuts(
       );
     }
     // Exact-copy split joints need their own reciprocal-cut semantics; accepting them would promise an unsupported mode.
-    if (step.split && selection.targets.some(target => target.copyId !== undefined)) {
+    // The authored scope decides support: a derived child family must not hide an explicit copy restriction.
+    if (step.split && resolvePartCutTargets(document, step.targets).targets.some(target => target.copyId !== undefined)) {
       warn(
         'Split joints on a single target copy are not supported. Choose Cut out or target the source family.',
         'part-cut-copy-target-split'
@@ -382,7 +408,7 @@ export function applyPartCuts(
     // A tool `<partId>:<copyId>` cuts with that one copy; a copy that's gone is said once, not once per target.
     const goneCopies = new Set<string>();
     for (const { part: intoSource, copyId: targetCopyId } of selection.targets)
-      for (const toolId of step.tools) {
+      for (const { reference: toolId, origin: toolOrigin } of joinedCutReferences(document, step.tools)) {
         const targetId = intoSource.id;
         const [partId, copyId] = toolId.split(/:(.*)/s) as [string, string?];
         // Source-family self cuts were already refused. An exact target must not bypass that owner guard.
@@ -398,6 +424,14 @@ export function applyPartCuts(
         }
         for (const target of targets.get(targetId) ?? []) {
           if (targetCopyId !== undefined && target.key !== targetCopyId) continue;
+          // Derived host components retain the raw selection's owner. Otherwise a host selected on both
+          // sides would start cutting itself, or an explicit child-copy selection could enable every sibling.
+          if (
+            !targetReferences.some(
+              ({ reference, origin }) => origin !== toolOrigin && (reference === targetId || reference === `${targetId}:${target.key}`)
+            )
+          )
+            continue;
           const original = before.get(targetId)!;
           const into = target.mirrored ? mirrorEvaluatedPart(original) : original,
             intoAt = target.at;
@@ -426,7 +460,7 @@ export function applyPartCuts(
               warn(`${name} isn't square to ${intoSource.name}, so it can't be cut from it yet.`);
               continue;
             }
-            const found = toolBoxes(shape, at, into, intoAt);
+            const found = toolBoxes(shape, at, into, intoAt, options.occupiedTools, toolSource);
             // A round or slanted tool entering a face cuts its own outline in.
             // Only a shape boxes can't follow: a tool with a cut of its own there stays refused.
             const outlined =
@@ -470,7 +504,7 @@ export function applyPartCuts(
             }
             const normal = rotateVector(conjugate(intoAt.rotation), rotateVector(at.rotation, [0, 0, 1]));
             const parallel = Math.abs(normal[2]) > 1 - kSquare;
-            const reverse = toolBoxes(into, intoAt, shape, at);
+            const reverse = toolBoxes(into, intoAt, shape, at, options.occupiedTools, intoSource);
             if ('refused' in reverse) {
               refused = true;
               warn(`${intoSource.name} ${reverse.refused} where it reaches into ${name}, so it can't be cut from it yet.`);
@@ -584,15 +618,23 @@ export function applyPartCuts(
  * One evaluated part with the cuts other parts make in it, for views that evaluate a part on its own. The tools are
  * evaluated as they are in `document`.
  */
-export function withPartCuts(document: CadDocument, part: EvaluatedCadPart): EvaluatedCadPart {
+export function withPartCuts(given: CadDocument, part: EvaluatedCadPart): EvaluatedCadPart {
+  const document = physicalJoinedCopies(activeDesign(given));
   const steps = (document.partCuts ?? []).filter(
     step =>
-      step.targets.some(id => cadPartReferenceOwner(document, id)?.id === part.partId) ||
-      (step.split && step.tools.some(id => id.split(':')[0] === part.partId))
+      joinedCutReferences(document, step.targets).some(({ reference }) => cadPartReferenceOwner(document, reference)?.id === part.partId) ||
+      (step.split &&
+        joinedCutReferences(document, step.tools).some(({ reference }) => cadPartReferenceOwner(document, reference)?.id === part.partId))
   );
   if (!steps.length && !document.parts.some(candidate => candidate.remove)) return part;
   const toolIds = [
-    ...new Set(steps.flatMap(step => [...step.targets, ...step.tools].map(id => cadPartReferenceOwner(document, id)?.id))),
+    ...new Set(
+      steps.flatMap(step =>
+        joinedCutReferences(document, [...step.targets, ...step.tools]).map(
+          ({ reference }) => cadPartReferenceOwner(document, reference)?.id
+        )
+      )
+    ),
   ].filter(id => id !== part.partId);
   const tools = toolIds.flatMap(id => {
     const source = document.parts.find(candidate => candidate.id === id);
@@ -619,7 +661,15 @@ export function addPartCut(
     ...(split !== undefined && { split }),
     ...(clearance.expression && { clearanceExpression: clearance.expression }),
   };
-  return { id: step.id, document: { ...document, revision: document.revision + 1, partCuts: [...(document.partCuts ?? []), step] } };
+  return {
+    id: step.id,
+    document: {
+      ...document,
+      revision: document.revision + 1,
+      partCuts: [...(document.partCuts ?? []), step],
+      ...(document.operationOrder && { operationOrder: [...document.operationOrder, step.id] }),
+    },
+  };
 }
 
 /** Changes a step's parts or clearance. A clearance given without an expression drops the step's old one. */
@@ -645,6 +695,8 @@ export function removePartCut(document: CadDocument, id: string): CadDocument {
     ...document,
     revision: document.revision + 1,
     partCuts: (document.partCuts ?? []).filter(step => step.id !== id),
+    ...(document.operationOrder && { operationOrder: document.operationOrder.filter(operation => operation !== id) }),
+    ...(document.legacyPartCutIds && { legacyPartCutIds: document.legacyPartCutIds.filter(operation => operation !== id) }),
   };
   if (!next.partCuts!.length) delete next.partCuts;
   return next;

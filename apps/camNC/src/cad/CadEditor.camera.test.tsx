@@ -5,11 +5,19 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CadEditor } from './CadEditor';
 import { ModelViewport } from '@/cam/model/ModelViewport';
 import { endCadSession } from '@wbcnc/cad-editor/session';
-import type { StudioCameraRef } from './studioCamera';
+import { settled } from '@/test/settled';
 
 vi.mock('@/cam/model/ModelViewport', { spy: true });
-const settled = () =>
-  waitFor(() => expect(document.querySelector('.cad-editor')!.getAttribute('aria-busy')).toBe('false'), { timeout: 20_000 });
+const viewportCamera = () => vi.mocked(ModelViewport).mock.calls.findLast(([props]) => props.cameraState)?.[0].cameraState;
+/**
+ * The workspace view is loaded lazily, and the settled signal can't see its module loading before its canvas is
+ * there: wait for the camera it publishes, then settle on its frames and Html's separate DOM root (the origin marker).
+ */
+async function viewportReady() {
+  await waitFor(() => expect(viewportCamera()?.current?.height).toBeGreaterThan(0), { timeout: 20_000 });
+  await settled();
+  return viewportCamera()!;
+}
 const sessions: string[] = [];
 afterEach(() => {
   cleanup();
@@ -27,37 +35,27 @@ it.each([1200, 375, 320])(
         <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={() => {}} onCancel={() => {}} />
       </div>
     );
-    let state: StudioCameraRef | undefined;
-    await waitFor(
-      () => {
-        state = vi.mocked(ModelViewport).mock.calls.findLast(([props]) => props.cameraState)?.[0].cameraState;
-        expect(state?.current?.height).toBeGreaterThan(0);
-        // The camera ref can precede Html's separate DOM-root commit; sample screen positions only once its marker is visible.
-        expect(screen.getByTestId('model-origin')).toBeVisible();
-      },
-      { timeout: 20000 }
-    );
+    const state = await viewportReady();
+    expect(screen.getByTestId('model-origin')).toBeVisible();
     const marker = () => {
       const box = screen.getByTestId('model-origin').getBoundingClientRect();
       return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
     };
     const before = marker();
-    const saved = structuredClone(state!.current!);
+    const saved = structuredClone(state.current!);
     await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Sketch ·/ }));
-    const drawing = await screen.findByTestId('cad-drawing');
-    await waitFor(() => {
-      const point = new DOMPoint(0, 0).matrixTransform((drawing as unknown as SVGGraphicsElement).getScreenCTM()!);
-      expect(point.x).toBeCloseTo(before.x, 0);
-      expect(point.y).toBeCloseTo(before.y, 0);
-    });
+    await settled();
+    const drawing = screen.getByTestId('cad-drawing');
+    const point = new DOMPoint(0, 0).matrixTransform((drawing as unknown as SVGGraphicsElement).getScreenCTM()!);
+    expect(point.x).toBeCloseTo(before.x, 0);
+    expect(point.y).toBeCloseTo(before.y, 0);
     expect(screen.getByTestId('cad-canvas').hasAttribute('data-sketch-turned')).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: '✓ Finish sketch' }));
-    await waitFor(() => {
-      expect(marker().x).toBeCloseTo(before.x, 0);
-      expect(marker().y).toBeCloseTo(before.y, 0);
-      expect(state!.current!.height).toBeCloseTo(saved.height, 6);
-      state!.current!.back.forEach((value, axis) => expect(value).toBeCloseTo(saved.back[axis]!, 10));
-    });
+    await settled();
+    expect(marker().x).toBeCloseTo(before.x, 0);
+    expect(marker().y).toBeCloseTo(before.y, 0);
+    expect(state.current!.height).toBeCloseTo(saved.height, 6);
+    state.current!.back.forEach((value, axis) => expect(value).toBeCloseTo(saved.back[axis]!, 10));
   }
 );
 
@@ -73,20 +71,15 @@ it('shows the parts built before a sketch behind it, without changing view, look
       <CadEditor document={source} startIn3D onDraftChange={() => {}} onFinish={async () => {}} onCancel={() => {}} />
     </div>
   );
-  await settled();
-  // The sketch must inherit a rendered camera; worker readiness alone can precede its first frame.
-  await waitFor(
-    () => {
-      const state = vi.mocked(ModelViewport).mock.calls.findLast(([props]) => props.cameraState)?.[0].cameraState;
-      expect(state?.current?.height).toBeGreaterThan(0);
-    },
-    { timeout: 20_000 }
-  );
-  const features = await screen.findByRole('region', { name: 'Features' });
+  // The sketch must inherit a rendered camera.
+  await viewportReady();
+  const features = screen.getByRole('region', { name: 'Features' });
   expect(document.querySelector('.cad-sketch-backdrop')).toBeNull();
   await userEvent.dblClick(within(features).getByRole('button', { name: /Sketch · Back/ }));
   await screen.findByRole('dialog', { name: 'Sketch · Back' });
+  // The backdrop is loaded lazily too, so its canvas is waited for before it can count as a view still to draw.
   await waitFor(() => expect(document.querySelector('.cad-sketch-backdrop canvas')).not.toBeNull(), { timeout: 10_000 });
+  await settled();
   // The drawing stays on top, and the face it's drawn on shows by its outline over the part.
   const canvas = screen.getByTestId('cad-canvas');
   expect(canvas.classList.contains('cad-canvas-over-parts')).toBe(true);
@@ -94,7 +87,8 @@ it('shows the parts built before a sketch behind it, without changing view, look
   expect(canvas.hasAttribute('data-sketch-turned')).toBe(true);
   canvas.focus();
   await userEvent.keyboard('n');
-  await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(false));
+  await settled();
+  expect(canvas.hasAttribute('data-sketch-turned')).toBe(false);
   const box = canvas.getBoundingClientRect(),
     at = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
   const pointer = (type: string, dx: number, buttons: number) =>
@@ -104,7 +98,8 @@ it('shows the parts built before a sketch behind it, without changing view, look
   pointer('pointerdown', 0, 2);
   for (const dx of [20, 40, 60]) pointer('pointermove', dx, 2);
   pointer('pointerup', 60, 0);
-  await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(true));
+  await settled();
+  expect(canvas.hasAttribute('data-sketch-turned')).toBe(true);
   // The drawing turns inside the canvas, so its lines keep their width.
   expect(screen.getByTestId('cad-drawing').getAttribute('transform')).toMatch(/matrix\(/);
   expect(canvas.style.transform).toBe('');
@@ -112,9 +107,11 @@ it('shows the parts built before a sketch behind it, without changing view, look
   // n looks straight at the plane again, and once more, at its other side.
   canvas.focus();
   await userEvent.keyboard('n');
-  await waitFor(() => expect(canvas.hasAttribute('data-sketch-turned')).toBe(false));
+  await settled();
+  expect(canvas.hasAttribute('data-sketch-turned')).toBe(false);
   await userEvent.keyboard('n');
-  await waitFor(() => expect(screen.getByTestId('cad-drawing').getAttribute('transform')).toMatch(/matrix\(-1 0 0 1 0 0\)/));
+  await settled();
+  expect(screen.getByTestId('cad-drawing').getAttribute('transform')).toMatch(/matrix\(-1 0 0 1 0 0\)/);
   // Seen from behind, a middle drag to the right still carries the drawing to the right.
   const viewX = () => Number(canvas.getAttribute('viewBox')!.split(' ')[0]);
   const x0 = viewX();
@@ -125,7 +122,9 @@ it('shows the parts built before a sketch behind it, without changing view, look
   middle('pointerdown', 0, 4);
   middle('pointermove', 50, 4);
   middle('pointerup', 50, 0);
-  await waitFor(() => expect(viewX()).toBeGreaterThan(x0));
+  await settled();
+  expect(viewX()).toBeGreaterThan(x0);
   await userEvent.click(within(screen.getByRole('dialog', { name: 'Sketch · Back' })).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(document.querySelector('.cad-sketch-backdrop')).toBeNull());
+  await settled();
+  expect(document.querySelector('.cad-sketch-backdrop')).toBeNull();
 });

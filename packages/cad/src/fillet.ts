@@ -161,14 +161,15 @@ export function filletLineCorners(sketch: CadSketch, options: CadFilletOptions):
         corners: [...(previous?.corners ?? []), corner.point.id],
       });
     });
-  for (const edge of consumption.values())
-    if (radius * edge.factor >= edge.length - CAD_GEOMETRY_TOLERANCE)
-      return {
-        ok: false,
-        cornerPointIds: edge.corners,
-        maximumRadius: (edge.length - CAD_GEOMETRY_TOLERANCE) / edge.factor,
-        message: 'This radius would consume an entire adjacent line. Choose a smaller radius.',
-      };
+  // Every line the radius would use up, with the corners on it: those corners can't take it, whichever order they're in.
+  const consumed = [...consumption.values()].filter(edge => radius * edge.factor >= edge.length - CAD_GEOMETRY_TOLERANCE);
+  if (consumed.length)
+    return {
+      ok: false,
+      cornerPointIds: [...new Set(consumed.flatMap(edge => edge.corners))],
+      maximumRadius: Math.min(...consumed.map(edge => (edge.length - CAD_GEOMETRY_TOLERANCE) / edge.factor)),
+      message: 'This radius would consume an entire adjacent line. Choose a smaller radius.',
+    };
 
   const next = structuredClone(sketch);
   const arcIds: string[] = [];

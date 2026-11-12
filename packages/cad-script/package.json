@@ -16,7 +16,8 @@
     "iterate": "vite-node --config vite.config.ts src/iteration/cli.ts",
     "tasks": "vite-node --config vite.config.ts src/tasks/cli.ts",
     "test": "vitest",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "oxlint --max-warnings 0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

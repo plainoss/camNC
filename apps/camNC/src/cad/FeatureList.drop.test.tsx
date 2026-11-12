@@ -1,0 +1,165 @@
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { createCadDocument, createCadFolder, createPlateDocument, setCadVariable, type CadDocument } from '@wbcnc/cad';
+import { useRef, useState } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { StudioFeatureList } from './StudioFeatureList';
+
+afterEach(cleanup);
+const plate = (name: string) => ({ ...createPlateDocument({ width: 100, height: 50 }).parts[0]!, name });
+
+function setup(initial: CadDocument) {
+  const commits = vi.fn<(document: CadDocument) => void>();
+  const refusals = vi.fn();
+  function Host() {
+    const [document, setDocument] = useState(initial);
+    const current = useRef(document);
+    current.current = document;
+    return (
+      <div className="cad-editor">
+        <StudioFeatureList
+          document={document}
+          currentDocument={current}
+          selectedPartId={null}
+          onSelect={() => undefined}
+          onAction={() => undefined}
+          workspace
+          onRefusal={refusals}
+          commit={next => {
+            commits(next);
+            setDocument(next);
+          }}
+        />
+      </div>
+    );
+  }
+  render(<Host />);
+  const dataTransfer = new DataTransfer();
+  const row = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) }).closest('li')!;
+  const drag = (target: Element, type: string) => {
+    const event = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer });
+    act(() => void target.dispatchEvent(event));
+    return event;
+  };
+  return { commits, refusals, row, drag, button: (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) }) };
+}
+
+describe('dragging a step in the feature list', () => {
+  it('draws a line where the step will land, before the part it’s dropped on, and moves it there', () => {
+    const { commits, row, drag, button } = setup({ ...createCadDocument(), parts: [plate('A'), plate('B'), plate('C')] });
+    drag(button('Extrude · C'), 'dragstart');
+    // Over B's extrude, C's steps go ahead of all of B's, so the line is above B's sketch.
+    const over = drag(row('Extrude · B'), 'dragover');
+    expect(over.defaultPrevented).toBe(true);
+    expect(row('Sketch · B').classList).toContain('cad-feature-drop-before');
+    expect(row('Extrude · B').classList).not.toContain('cad-feature-drop-before');
+    expect(document.querySelectorAll('.cad-feature-drop-before')).toHaveLength(1);
+    expect(screen.queryByRole('status')).toBeNull();
+    // Over its own part nothing moves, so nothing is marked and the drop isn't taken.
+    expect(drag(row('Sketch · C'), 'dragover').defaultPrevented).toBe(false);
+    expect(document.querySelector('.cad-feature-drop-before')).toBeNull();
+    drag(row('Extrude · B'), 'dragover');
+    drag(row('Extrude · B'), 'drop');
+    expect(commits.mock.calls.at(-1)?.[0].parts.map(part => part.name)).toEqual(['A', 'C', 'B']);
+    expect(document.querySelector('.cad-feature-drop-before')).toBeNull();
+  });
+
+  it('draws the line where a part used by a Cut parts step lands, and drops it there', () => {
+    const [side, back, shelf] = [plate('Side'), plate('Back'), plate('Shelf')];
+    const { commits, row, drag, button } = setup({
+      ...createCadDocument(),
+      parts: [side, back, shelf],
+      partCuts: [{ id: 'joint', tools: [shelf.id], targets: [side.id], clearance: 0 }],
+    });
+    const rows = () => [...document.querySelectorAll('.cad-studio-features li button')].map(item => item.textContent ?? '');
+    const at = (name: string) => rows().findIndex(text => text.includes(name));
+    expect(at('Cut Side with Shelf')).toBeGreaterThan(at('Extrude · Shelf'));
+    drag(button('Extrude · Shelf'), 'dragstart');
+    // The cut is listed after the last part it uses, so it follows Shelf up, but the line stays above Back's sketch.
+    for (const onto of ['Extrude · Back', 'Sketch · Back']) {
+      expect(drag(row(onto), 'dragover').defaultPrevented).toBe(true);
+      expect([...document.querySelectorAll('.cad-feature-drop-before')]).toEqual([row('Sketch · Back')]);
+    }
+    drag(row('Sketch · Back'), 'drop');
+    expect(commits.mock.calls.at(-1)![0].parts.map(part => part.name)).toEqual(['Side', 'Shelf', 'Back']);
+    // Shelf's steps sit where the line was, just above Back's sketch, with the cut that follows them.
+    expect(at('Extrude · Shelf')).toBeLessThan(at('Sketch · Back'));
+    expect(at('Cut Side with Shelf')).toBe(at('Sketch · Back') - 1);
+  });
+
+  it('marks a row the step can’t go to with the reason, and refuses the drop', () => {
+    const a = plate('A');
+    const b = { ...plate('B'), drawnOn: { on: { partId: a.id, face: 'top' as const }, offset: 0 } };
+    const { commits, row, drag, button } = setup({ ...createCadDocument(), parts: [a, b] });
+    drag(button('Extrude · B'), 'dragstart');
+    const over = drag(row('Sketch · A'), 'dragover');
+    expect(over.defaultPrevented).toBe(false);
+    expect(over.dataTransfer!.dropEffect).toBe('none');
+    expect(row('Sketch · A').classList).toContain('cad-feature-drop-refused');
+    expect(screen.getByRole('status').textContent).toBe('B is built on A, so it comes after it.');
+    // At the top of the list the reason is shown under the row.
+    expect(screen.getByRole('status').classList).not.toContain('cad-feature-drop-reason-above');
+    expect(document.querySelector('.cad-feature-drop-before')).toBeNull();
+    // Ending the drag clears it.
+    drag(button('Extrude · B'), 'dragend');
+    expect(document.querySelector('.cad-feature-drop-refused')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(commits).not.toHaveBeenCalled();
+  });
+
+  it('moves a fillet with its part, and says why it can’t go ahead of its extrude without moving the rows', () => {
+    const back = { ...plate('Back'), fillets: [{ id: 'round', corners: [], radius: 5 }] };
+    const { commits, row, drag, button } = setup({ ...createCadDocument(), parts: [plate('Top'), back, plate('Shelf')] });
+    const tops = () =>
+      ['Extrude · Back', 'Fillet · Back', 'Sketch · Shelf', 'Extrude · Shelf'].map(name => row(name).getBoundingClientRect().top);
+    const before = tops();
+    drag(button('Fillet · Back'), 'dragstart');
+    const refused = drag(row('Extrude · Back'), 'dragover');
+    expect(refused.defaultPrevented).toBe(false);
+    expect(row('Extrude · Back').classList).toContain('cad-feature-drop-refused');
+    expect(screen.getByRole('status').textContent).toBe('Fillet · Back rounds the edges Extrude · Back makes, so it comes after it.');
+    // The reason floats over the rows below, so none of them moves under the pointer.
+    expect(tops()).toEqual(before);
+    // Dropped on Top, the fillet takes Back's steps ahead of Top's.
+    expect(drag(row('Extrude · Top'), 'dragover').defaultPrevented).toBe(true);
+    expect([...document.querySelectorAll('.cad-feature-drop-before')]).toEqual([row('Sketch · Top')]);
+    drag(row('Extrude · Top'), 'drop');
+    expect(commits.mock.calls.at(-1)![0].parts.map(part => part.name)).toEqual(['Back', 'Top', 'Shelf']);
+    // And a part dropped on the fillet goes ahead of Back.
+    drag(button('Extrude · Shelf'), 'dragstart');
+    expect(drag(row('Fillet · Back'), 'dragover').defaultPrevented).toBe(true);
+    drag(row('Fillet · Back'), 'drop');
+    expect(commits.mock.calls.at(-1)![0].parts.map(part => part.name)).toEqual(['Shelf', 'Back', 'Top']);
+  });
+
+  it('shows the reason above a refused row in the lower half of the list, where it isn’t clipped', () => {
+    const back = { ...plate('Back'), fillets: [{ id: 'round', corners: [], radius: 5 }] };
+    const { row, drag, button } = setup({ ...createCadDocument(), parts: [plate('Top'), plate('Shelf'), back] });
+    const tops = () => ['Sketch · Back', 'Extrude · Back', 'Fillet · Back'].map(name => row(name).getBoundingClientRect().top);
+    const before = tops();
+    drag(button('Fillet · Back'), 'dragstart');
+    expect(drag(row('Extrude · Back'), 'dragover').defaultPrevented).toBe(false);
+    const reason = screen.getByRole('status');
+    expect(reason.classList).toContain('cad-feature-drop-reason-above');
+    expect(reason.getBoundingClientRect().bottom).toBeLessThanOrEqual(row('Extrude · Back').getBoundingClientRect().top + 1);
+    expect(tops()).toEqual(before);
+  });
+
+  it('marks the folder row when a step would land just ahead of the folder', () => {
+    const parts = [plate('A'), plate('B'), plate('C')];
+    const made = createCadFolder({ ...createCadDocument(), parts }, { id: 'box', name: 'Box', partIds: [parts[0]!.id, parts[1]!.id] });
+    if ('error' in made) throw new Error(made.error);
+    // The folder's variable is listed between its row and its first step.
+    const variable = setCadVariable(made.document, { name: 'width', expression: '600 mm', folderId: 'box' });
+    if ('error' in variable) throw new Error(variable.error);
+    const { row, drag, button } = setup(variable.document);
+    expect(button('#width')).toBeTruthy();
+    drag(button('Extrude · C'), 'dragstart');
+    drag(row('Extrude · A'), 'dragover');
+    expect(screen.getByRole('button', { name: 'Box' }).closest('li')!.classList).toContain('cad-feature-drop-before');
+    expect(row('Sketch · A').classList).not.toContain('cad-feature-drop-before');
+    // Dragged out of the list, the line goes.
+    const list = row('Sketch · A').closest('ol')!;
+    act(() => void list.dispatchEvent(new DragEvent('dragleave', { bubbles: true, relatedTarget: document.body })));
+    expect(document.querySelector('.cad-feature-drop-before')).toBeNull();
+  });
+});

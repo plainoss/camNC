@@ -28,8 +28,9 @@ export function HoleDialog({
   const [diameterText, setDiameterText] = useState(part.hole?.diameterExpression ?? lengthText(part.hole?.diameter ?? 5));
   const [depthText, setDepthText] = useState(depth === 'through' ? lengthText(10) : (part.remove?.depthExpression ?? lengthText(depth)));
   const [error, setError] = useState<string | null>(null);
+  // Only a Hole step is written to: opened on anything else, such as a board, the dialog must never turn it into a hole.
   const change = (next: (p: CadPart) => CadPart) =>
-    onChange(current => ({ ...current, parts: current.parts.map(p => (p.id === part.id ? next(p) : p)) }));
+    onChange(current => ({ ...current, parts: current.parts.map(p => (p.id === part.id && p.hole ? next(p) : p)) }));
   const apply = (diameter = diameterText, through = depth === 'through', blind = depthText, preview = false) => {
     const across = parseCadValue(diameter, { unit: 'mm', variables });
     const deep = parseCadValue(blind, { unit: 'mm', variables });
@@ -55,7 +56,7 @@ export function HoleDialog({
           : { depth: deep.value, ...(deep.expression && { depthExpression: deep.expression }) },
     }));
   };
-  const problem = extrudeStepProblem(document, part);
+  const problem = part.hole ? extrudeStepProblem(document, part) : `Hole drills at the points of a sketch, not into ${part.name} itself.`;
   return (
     <FeatureDialog title={`Hole · ${part.name}`} okDisabled={!!error || !!problem} onOk={onOk} onCancel={onCancel}>
       <label className="cad-number-field">

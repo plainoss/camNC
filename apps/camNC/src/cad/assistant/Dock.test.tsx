@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AssistantDock } from './Dock';
 import { defaultProvider, rememberAssistantCredentials } from './keyStore';
 import { runDesignAssistant } from './loop';
+import { readConversation, recordAssistantEvent, writeConversation } from './conversationStore';
 import { createAssistantUsage } from './runBudget';
 
 vi.mock('@wbcnc/cad-script', async importOriginal => ({
@@ -168,7 +169,8 @@ it('keeps the fresh greeting at the top and the composer visible beside expanded
     await userEvent.click(screen.getByRole('button', { name: /Build a cupboard/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Plywood with dados' })).toHaveProperty('disabled', false));
-    await userEvent.click(screen.getByText('Agent activity'));
+    // Expand the turn's inline steps, the tallest state of the conversation.
+    await userEvent.click(screen.getByText('1 step'));
     await page.viewport(390, 844);
     const send = screen.getByRole('button', { name: 'Send' }).getBoundingClientRect();
     const bounds = panel.getBoundingClientRect();
@@ -213,4 +215,92 @@ it('keeps clarification replies usable while a checked proposal remains availabl
   expect(vi.mocked(runDesignAssistant).mock.calls[1]![0].messages.at(-1)).toEqual({ role: 'user', text: '24 mm' });
   expect(onProposal).not.toHaveBeenCalled();
   expect(source).toEqual(before);
+});
+
+it('confirms typed answers as the brief, sends them in words and lets a chip be removed', async () => {
+  vi.mocked(runDesignAssistant).mockImplementationOnce(async options => {
+    options.onMessage?.({
+      role: 'assistant',
+      text: '',
+      calls: [
+        {
+          id: 'size',
+          name: 'ask_user',
+          arguments: {
+            question: 'What size should the tray be?',
+            choices: ['Use your proposal', 'Help me choose'],
+            fields: [
+              { name: 'width', label: 'Width', unit: 'mm', value: 280 },
+              { name: 'minimumWall', label: 'Wall', unit: 'mm', value: 18 },
+            ],
+          },
+        },
+      ],
+    });
+    options.onMessage?.({ role: 'tool', callId: 'size', text: 'Question shown to the user.' });
+    return { status: 'question', messages: [], checks: 0, usage: createAssistantUsage() };
+  });
+  const document = createPlateDocument();
+  render(
+    <AssistantDock
+      proposal={null}
+      onCheckedProposal={() => {}}
+      onDiscardProposal={() => {}}
+      document={document}
+      onProposal={() => {}}
+      onClose={() => {}}
+    />
+  );
+  await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'A tray please.');
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+  const wall = await screen.findByRole('spinbutton', { name: /^Wall/ });
+  await userEvent.clear(wall);
+  await userEvent.type(wall, '20');
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Use these values' })).toHaveProperty('disabled', false));
+  await userEvent.click(screen.getByRole('button', { name: 'Use these values' }));
+  await waitFor(() => expect(runDesignAssistant).toHaveBeenCalledTimes(2));
+  const second = vi.mocked(runDesignAssistant).mock.calls[1][0];
+  expect(second.messages.at(-1)).toEqual({ role: 'user', text: 'Width: 280 mm, Wall: 20 mm' });
+  expect(second.requirements).toEqual({ width: 280, minimumWall: 20 });
+  const brief = screen.getByRole('region', { name: 'Brief' });
+  expect(within(brief).getByText('Wall ≥ 20 mm')).toBeDefined();
+  await userEvent.click(within(brief).getByRole('button', { name: 'Remove Wall ≥ 20 mm' }));
+  await waitFor(() => expect(within(screen.getByRole('region', { name: 'Brief' })).queryByText('Wall ≥ 20 mm')).toBeNull());
+  expect(screen.getByText('Width 280 mm')).toBeDefined();
+});
+
+it('keeps a key typed in settings but not yet saved across a section switch and closing the dialog', async () => {
+  dock();
+  await userEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
+  const key = screen.getByLabelText('API key');
+  await userEvent.clear(key);
+  await userEvent.type(key, 'sk-ant-unsaved');
+  await userEvent.click(screen.getByRole('button', { name: 'Brief' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Connection' }));
+  expect(screen.getByLabelText('API key')).toHaveProperty('value', 'sk-ant-unsaved');
+  await userEvent.click(screen.getByRole('button', { name: 'Close settings' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Assistant settings' }));
+  expect(screen.getByLabelText('API key')).toHaveProperty('value', 'sk-ant-unsaved');
+});
+
+it('says a proposal was undone, and adds no generic design-changed notice for applying, undoing or redoing it', async () => {
+  const base = createPlateDocument();
+  const candidate = { ...base, name: 'With cupboard', revision: base.revision + 1 };
+  const proposal = { base, document: candidate };
+  const props = { onCheckedProposal: () => {}, onDiscardProposal: () => {}, onProposal: () => {}, onClose: () => {} };
+  writeConversation(base.id, [{ role: 'user', text: 'Make a cupboard.' }]);
+  const view = render(<AssistantDock {...props} proposal={proposal} document={base} />);
+  // What StudioProposals does on Apply: the editor takes the candidate and the outcome is recorded.
+  recordAssistantEvent(base.id, 'The user applied the checked proposal as one undo step.', 'applied');
+  view.rerender(<AssistantDock {...props} proposal={null} document={candidate} />);
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Proposal applied.'));
+  view.rerender(<AssistantDock {...props} proposal={null} document={{ ...base, revision: base.revision + 2 }} />);
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Proposal undone. The design is back as it was.'));
+  view.rerender(<AssistantDock {...props} proposal={null} document={{ ...candidate, revision: base.revision + 3 }} />);
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Proposal applied.'));
+  expect(readConversation(base.id).filter(message => message.text.includes('The open design changed'))).toHaveLength(0);
+  // A hand edit afterwards is a real design change.
+  view.rerender(<AssistantDock {...props} proposal={null} document={{ ...candidate, name: 'Hand edit', revision: base.revision + 4 }} />);
+  await waitFor(() => expect(readConversation(base.id).some(message => message.text.includes('The open design changed'))).toBe(true));
+  writeConversation(base.id, []);
 });
