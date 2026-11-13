@@ -5,6 +5,7 @@ export type StudioCommand =
   | 'sketch'
   | 'extrude'
   | 'cutParts'
+  | 'boolean'
   | 'transform'
   | 'pattern'
   | 'mirror'
@@ -31,6 +32,12 @@ export const kStudioCommands: { id: StudioCommand; label: string; hint: string; 
     label: 'Cut parts',
     hint: 'Cut parts out of the parts they reach into, with a clearance',
     glyph: <path d="M3 9h18v9H3zM9 9V4h6v5M8 9v4h8V9" />,
+  },
+  {
+    id: 'boolean',
+    label: 'Boolean',
+    hint: 'Join parts into one, subtract parts from others, or keep only what they share',
+    glyph: <path d="M3 4h11v11H3zM10 9h11v11H10z" />,
   },
   {
     id: 'transform',

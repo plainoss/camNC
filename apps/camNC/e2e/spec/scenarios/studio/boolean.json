@@ -1,0 +1,161 @@
+[
+  {
+    "id": "studio/boolean/union-two-boards",
+    "title": "An overlapping second board switches its Extrude to Add, and Boolean \u203a Union joins the two boards into one stepped part",
+    "evidence": "design Boolean Union of plain boards drawn on one plane; automatic Add for a region that runs into a part",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key g",
+      {
+        "spec": "5 draw"
+      },
+      "rect 0,0 100,40",
+      {
+        "spec": "6 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "7 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "8 pick"
+      },
+      "viewpick 50,30,0",
+      {
+        "spec": "9 field"
+      },
+      "dialogfill Thickness = 10",
+      "key Enter",
+      {
+        "spec": "10 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1
+          }
+        }
+      },
+      {
+        "spec": "11 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "12 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "13 command"
+      },
+      "key g",
+      {
+        "spec": "14 draw"
+      },
+      "rect 0,0 40,80",
+      {
+        "spec": "15 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "16 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "17 pick"
+      },
+      "viewpick 20,60,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "box": "Regions to add",
+              "regions": 1
+            }
+          }
+        }
+      },
+      {
+        "spec": "18 field"
+      },
+      "dialogtab New",
+      {
+        "spec": "19 field"
+      },
+      "dialogfill Thickness = 30",
+      "key Enter",
+      {
+        "spec": "20 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 2
+          }
+        }
+      },
+      {
+        "spec": "21 command"
+      },
+      "studiotool Boolean",
+      {
+        "spec": "22 select"
+      },
+      "selectpart Part 1",
+      {
+        "spec": "23 select"
+      },
+      "selectpart Part 2",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": ["Part 1", "Part 2"]
+            }
+          }
+        }
+      },
+      {
+        "spec": "24 field"
+      },
+      "dialogcheck Keep tools = false",
+      {
+        "spec": "25 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1,
+            "listedParts": [
+              {
+                "name": "Part 1",
+                "thickness": 30
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+]

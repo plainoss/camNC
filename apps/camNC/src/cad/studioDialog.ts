@@ -25,8 +25,8 @@ export type StudioDialog =
   | { kind: 'plane'; id?: string; preselected?: CadDrawnOn['on'] }
   /** A variable being added, or the one being changed. */
   | { kind: 'variable'; id?: string }
-  /** A "cut parts" step being added, or the one being changed. */
-  | { kind: 'partCut'; id?: string };
+  /** A "cut parts" or Boolean step being added, or the one being changed. */
+  | { kind: 'partCut'; id?: string; boolean?: true };
 
 /** The toolbar command each dialog belongs to, which shows as active while it is open. */
 export const dialogCommand: Record<StudioDialog['kind'], StudioCommand> = {

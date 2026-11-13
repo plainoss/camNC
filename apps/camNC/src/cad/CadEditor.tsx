@@ -1663,7 +1663,8 @@ export function CadEditor({
     } else if (command === 'plane') {
       const preselected = planeOffsetFrom(documentRef.current, selectedPlane, selectedFace);
       openDialog({ kind: 'plane', ...(preselected && { preselected }) });
-    } else if (command === 'cutParts') openDialog({ kind: 'partCut' });
+    } else if (command === 'cutParts' || command === 'boolean')
+      openDialog({ kind: 'partCut', ...(command === 'boolean' && { boolean: true }) });
     else if (command === 'extrude' && (selectedFace || part)) {
       const mark = markCadSession(session),
         before = mark.document;
