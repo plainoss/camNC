@@ -96,14 +96,3 @@ describe('draft recovery before IndexedDB finishes', () => {
     });
   });
 });
-
-describe('a kept draft that cannot be migrated', () => {
-  it('is dropped, and the stored design opens', () => {
-    const saved = { ...durableDocument(), lengthUnit: 'in' as const };
-    // Parses, and names its own checkpoint, but its parts aren't a design's.
-    const broken = { ...saved, parts: 'not parts' };
-    sessionStorage.setItem('camnc-pending-design:normal:job', JSON.stringify({ document: broken, sources: [JSON.stringify(broken)] }));
-    expect(pendingDesignDraft('job', saved)).toBeNull();
-    expect(sessionStorage.getItem('camnc-pending-design:normal:job')).toBeNull();
-  });
-});

@@ -3,7 +3,8 @@ import { createPlateDocument, setPartPattern, type CadDocument } from '@wbcnc/ca
 import { afterEach, expect, it, vi } from 'vitest';
 import { PartPatternDialog } from './PartFeatureDialogs';
 import { StudioPatternDialog } from './StudioPatternDialog';
-import { StudioFeatureDialog, type StudioFeatureDialogState } from './StudioFeatureDialog';
+import { StudioDialogHost } from './StudioDialogHost';
+import type { StudioDialog } from './studioDialog';
 
 vi.mock('./PartFeatureDialogs', { spy: true });
 afterEach(() => {
@@ -119,20 +120,18 @@ it('ignores callbacks after unmount and starts a fresh candidate when the same f
     onOk = vi.fn(),
     onCancel = vi.fn(),
     onPreview = vi.fn();
-  let state: StudioFeatureDialogState = { kind: 'pattern', partId: document.parts[0]!.id, before: { document, past: [], future: [] } };
+  let dialog: StudioDialog = { kind: 'pattern', partId: document.parts[0]!.id, before: { document, past: [], future: [] } };
   const view = () => (
-    <StudioFeatureDialog
-      state={state}
+    <StudioDialogHost
+      dialog={dialog}
       document={document}
       variables={{}}
-      onChange={onChange}
+      change={onChange}
+      close={vi.fn()}
       onOk={onOk}
       onCancel={onCancel}
       onPreview={onPreview}
-      profilePicking={false}
-      onPickProfile={vi.fn()}
-      onEditSketch={vi.fn()}
-      pickDirection={vi.fn()}
+      setDirectionPicker={vi.fn()}
       pickPoint={vi.fn()}
     />
   );
@@ -141,7 +140,7 @@ it('ignores callbacks after unmount and starts a fresh candidate when the same f
   const stale = current(),
     firstId = stale.part.pattern!.id;
   act(() => stale.onChange(document => setPartPattern(document, document.parts[0]!.id, { axis: 'x', count: 5, spacing: 100 })));
-  state = { ...state };
+  dialog = { ...dialog };
   rendered.rerender(view());
   await waitFor(() => expect(current().part.pattern!.id).not.toBe(firstId));
   expect(current().part.pattern!.count).toBe(2);
