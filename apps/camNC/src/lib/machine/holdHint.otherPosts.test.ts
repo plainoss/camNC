@@ -59,9 +59,12 @@ describe('a tool change of another post after a lift in machine coordinates', ()
       expect(holdHint(offset, at(after(offset, m0), cutting))).toBeNull();
     });
 
-    it('a G53 lift at feed is not taken as one', () => {
+    it('a G53 lift at feed counts as one too', () => {
       const feed = program(['G21', 'G90', 'G0 Z11'], ['G53 G1 Z0 F1000', 'M5', m0]);
-      expect(holdHint(feed, at(after(feed, m0), { mpos: { z: 0 } }))).toBeNull();
+      expect(holdHint(feed, at(after(feed, m0), { mpos: { z: 0 }, wpos: { z: 30 } }))?.reason).toContain('Change to T2');
+      const percent = heldAtTheM5(feed);
+      expect(holdHint(feed, at(percent, cutting))).toBeNull();
+      expect(holdHint(feed, at(percent, { mpos: { z: -10 }, wpos: { z: 20 } }))).toBeNull();
     });
   });
 
