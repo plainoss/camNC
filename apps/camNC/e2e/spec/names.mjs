@@ -8,20 +8,25 @@ import { openPage, startDevServer } from './harness.mjs';
 /**
  * Checks that the accessible names a glossary maps its terms to exist in the running app, the way a scenario or a
  * screen reader finds them. The glossary is a Markdown table with `camNC accessible name`, `role` and `where` columns;
- * a name in backticks is exact, `/…/` is a regular expression, and `—` means there is no control to find.
+ * a name in backticks is exact, `/…/` is a regular expression, and `—` means there is no control to find. A control
+ * behind a menu is written as a path, `` `Rectangle tools` › `Center rectangle` ``: each button before the last is
+ * clicked to open it.
  */
 
 /** Where a row is looked up: steps from the page a scenario starts on (a new design, a sketch open on the Top plane). */
 export const CONTEXTS = {
   sketch: [],
-  studio: ['closesketch'],
+  // A new design's first sketch is empty, so it is left with its Cancel rather than finished.
+  studio: ['cancelsketch'],
   extrude: ['rect 0,0 60,40', 'key Shift+E'],
-  'extrude-add': ['rect 0,0 60,40', 'key Shift+E', 'tab Add'],
-  'extrude-remove': ['rect 0,0 60,40', 'key Shift+E', 'tab Remove'],
+  // Add and Remove need a part to join or cut, so a second sketch is drawn over the first part.
+  'extrude-add': ['rect 0,0 60,40', 'key Shift+E', 'dialogconfirm', 'addpart', 'rect 10,10 30,30', 'key Shift+E', 'tab Add'],
+  'extrude-remove': ['rect 0,0 60,40', 'key Shift+E', 'dialogconfirm', 'addpart', 'rect 10,10 30,30', 'key Shift+E', 'tab Remove'],
   'part-menu': ['rect 0,0 60,40', 'key Shift+E', 'dialogconfirm', 'partmenu'],
 };
 
-const cells = line => line.trim().replace(/^\||\|$/g, '').split('|').map(cell => cell.trim());
+/** A table row's cells; `\|` is a pipe inside a cell, as in a regular expression. */
+const cells = line => line.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map(cell => cell.trim().replaceAll('\\|', '|'));
 
 /** The rows of the first table with the three columns, as `{ term, name, role, where }`; `name` is null for `—`. */
 export function parseGlossary(text) {
@@ -43,8 +48,16 @@ export function parseGlossary(text) {
   throw new Error('No table with "camNC accessible name", "role" and "where" columns');
 }
 
-/** `exact` or a regular expression from a cell: the first backtick span or `/…/`, else null for no control. */
+/**
+ * `exact` or a regular expression from a cell: a backtick span or `/…/`, else null for no control. Spans joined by `›`
+ * are a menu path, kept as `menus` before the name.
+ */
 export function parseName(cell) {
+  const path = /^\s*`[^`]+`(?:\s*›\s*`[^`]+`)+/.exec(cell ?? '');
+  if (path) {
+    const names = [...path[0].matchAll(/`([^`]+)`/g)].map(match => match[1]);
+    return { exact: names.at(-1), menus: names.slice(0, -1) };
+  }
   const exact = /`([^`]+)`/.exec(cell ?? '');
   if (exact) return { exact: exact[1] };
   const pattern = /^\/(.+)\/([a-z]*)$/.exec((cell ?? '').trim());
@@ -55,6 +68,12 @@ export function parseName(cell) {
 async function find(page, { name, role }) {
   const accessible = name.exact ?? new RegExp(name.pattern, name.flags);
   const options = { name: accessible, exact: name.exact !== undefined };
+  if (name.menus) {
+    for (const menu of name.menus) await page.getByRole('button', { name: menu, exact: true }).first().click();
+    const found = await page.getByRole(role, options).count();
+    await page.keyboard.press('Escape');
+    return found ? 'found' : null;
+  }
   if (await page.getByRole(role, options).count()) return 'found';
   // A Part Studio command that doesn't fit the toolbar's width is in its More menu.
   const more = page.getByRole('group', { name: 'Part Studio features', exact: true }).getByRole('button', { name: 'More', exact: true });
@@ -69,6 +88,7 @@ async function find(page, { name, role }) {
 
 async function setUp(adapter, page, step) {
   if (step.startsWith('tab ')) await page.getByRole('dialog').getByRole('tab', { name: step.slice(4), exact: true }).click();
+  else if (step === 'cancelsketch') await page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: 'Cancel', exact: true }).click();
   else if (step === 'partmenu') await page.getByRole('list', { name: 'Parts', exact: true }).getByRole('listitem').first().getByRole('button').first().click({ button: 'right' });
   else await adapter.step(step);
   await adapter.settle();

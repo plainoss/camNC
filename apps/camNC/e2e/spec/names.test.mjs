@@ -11,6 +11,7 @@ Intro text | with a pipe.
 | Depth | x | /^Thickness/ | textbox | extrude | |
 | Region selection | x | \`Select profile\` (then a box) | button | extrude-add | |
 | Named views | x | — | — | studio | |
+| Eye | x | /^(Show\\|Hide) / | button | studio | |
 
 After the table.
 `;
@@ -22,11 +23,13 @@ describe('glossary names', () => {
       { term: 'Depth', name: { pattern: '^Thickness', flags: '' }, role: 'textbox', where: 'extrude' },
       { term: 'Region selection', name: { exact: 'Select profile' }, role: 'button', where: 'extrude-add' },
       { term: 'Named views', name: null, role: '—', where: 'studio' },
+      { term: 'Eye', name: { pattern: '^(Show|Hide) ', flags: '' }, role: 'button', where: 'studio' },
     ]);
   });
   it('refuses a file without such a table, and knows every context it names', () => {
     expect(() => parseGlossary('| a | b |\n| - | - |\n')).toThrow(/No table/);
     expect(parseName('plain text')).toBeNull();
+    expect(parseName('`Rectangle tools` › `Center rectangle` (a menu)')).toEqual({ exact: 'Center rectangle', menus: ['Rectangle tools'] });
     for (const where of parseGlossary(glossary).map(row => row.where)) expect(CONTEXTS[where]).toBeDefined();
   });
 });
