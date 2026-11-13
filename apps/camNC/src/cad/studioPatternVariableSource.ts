@@ -1,12 +1,12 @@
 import { useCallback, useRef, type RefObject } from 'react';
 import { setPartPattern, type CadDocument } from '@wbcnc/cad';
-import type { StudioFeatureDialogState } from './StudioFeatureDialog';
+import type { StudioDialog } from './studioDialog';
 
 const changes = new WeakMap<object, WeakMap<CadDocument, CadDocument>>();
 
 /** An inline variable is its own accepted operation; identify exactly that source update for the open pattern. */
 export function usePatternVariableCommit(
-  owner: StudioFeatureDialogState | null,
+  owner: StudioDialog | null,
   document: RefObject<CadDocument>,
   commit: (document: CadDocument) => void
 ) {
