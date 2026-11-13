@@ -137,6 +137,28 @@ describe('Extrude → Add', () => {
     expect(isJoinedBody(higher, higher.parts[1]!)).toBe(true);
   });
 
+  it('leaves the part’s own regions, steps a region several Adds take to the highest, and folds a level or flipped Add', () => {
+    const { owner, wide, narrow } = splitDesign();
+    const add = (id: string, regions: string[], extra: Partial<CadPart>) => ({
+      ...second(owner, regions, { addTo: owner.id, ...extra }),
+      id,
+    });
+    const own = resolveExtrudeSteps(design(owner, add('a', [wide, narrow], { thickness: 10 })));
+    expect(cadCuts(own.parts[0]!)).toMatchObject([{ regionId: narrow, depth: 8 }]);
+    const two = resolveExtrudeSteps(design(owner, add('a', [narrow], { thickness: 10 }), add('b', [narrow], { thickness: 14 })));
+    expect(cadCuts(two.parts[0]!)).toMatchObject([{ regionId: narrow, depth: 4, removedBy: 'b' }]);
+    const level = resolveExtrudeSteps(design(owner, add('a', [narrow], { thickness: 10 }), add('b', [narrow], { thickness: 18 })));
+    expect(cadCuts(level.parts[0]!)).toEqual([]);
+    // Typed rather than following the variable, or a hair apart, the same depth folds.
+    const typed = { ...owner, thicknessExpression: 'board' };
+    const near = resolveExtrudeSteps(design(typed, add('a', [narrow], { thickness: 17.99 })));
+    expect([near.parts[0]!.addedRegions, cadCuts(near.parts[0]!)]).toEqual([[narrow], []]);
+    // Into the plane, a lower Add can't be cut from the part's top, so it's a body of its own.
+    const inward = { ...owner, drawnOn: { ...owner.drawnOn!, inward: true } };
+    const flipped = resolveExtrudeSteps(design(inward, add('a', [narrow], { thickness: 10, drawnOn: inward.drawnOn })));
+    expect(isJoinedBody(flipped, flipped.parts[1]!)).toBe(true);
+  });
+
   it('says why when it can’t add', () => {
     const { owner, narrow } = splitDesign();
     const other = { ...createCadPart('Other', 18), id: 'other' };

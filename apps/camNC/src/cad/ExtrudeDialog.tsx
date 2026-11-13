@@ -17,6 +17,7 @@ import {
   isSpatialRemoval,
   removalTargets,
   removalInward,
+  addsRegionsTo,
   sharesSketch,
   sketchOwnerId,
   sketchRegions,
@@ -237,8 +238,11 @@ export function ExtrudeDialog({
   // A sketch that isn't one outline extrudes the region picked from it in the view; until then there's nothing to make.
   // Regions picked apart are fine for New: each group becomes a part of its own on OK.
   const apart = operation === 'new' && splitApartRegions(document, part.id) !== document;
+  // An Add folded into its part's profile is checked as that part, by its step problem.
+  const mergeTarget = operation === 'add' ? document.parts.find(candidate => candidate.id === part.addTo) : undefined;
+  const folded = !!mergeTarget && addsRegionsTo(mergeTarget, part);
   const profileError =
-    operation === 'remove' || part.thin || apart || (part.regions?.length === 0 && alsoMade.length)
+    operation === 'remove' || folded || part.thin || apart || (part.regions?.length === 0 && alsoMade.length)
       ? undefined
       : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
   const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? lengthText(part.thin.depth)) : lengthText(100));

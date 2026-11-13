@@ -341,7 +341,11 @@
         "expect": {
           "studio": {
             "dialog": null,
-            "workspacePartCount": 1
+            "workspacePartCount": 1,
+            "thicknesses": {
+              "Part 1": 40,
+              "Part 2": 25
+            }
           }
         }
       }

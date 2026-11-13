@@ -41,7 +41,7 @@ describe('closed sketch regions', () => {
       </svg>
     );
     const region = shading(container);
-    expect(region.first.getAttribute('fill-rule')).toBe('nonzero');
+    expect(region.first.getAttribute('fill-rule')).toBe('evenodd');
     expect(region.first.getAttribute('pointer-events')).toBe('none');
     expect(getComputedStyle(region.first).pointerEvents).toBe('none');
     expect(region.isPointInFill(new DOMPoint(20, -20))).toBe(true);

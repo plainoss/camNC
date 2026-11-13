@@ -15,19 +15,20 @@ export const sketchOwnerId = (part: CadPart): string => part.sketchOf ?? part.id
 /** Whether two parts extrude the same sketch. */
 export const sharesSketch = (a: CadPart, b: CadPart): boolean => sketchOwnerId(a) === sketchOwnerId(b);
 
-/** What sets how far and which way a part is extruded from its sketch. */
-const depthKeys = ['thickness', 'thicknessExpression', 'upTo', 'upToDatum', 'symmetric', 'thin'] as const;
-
 /**
- * How far below a part's top an Extrude → Add of the part's own sketch ends: 0 when it extrudes its regions just as far
- * and the same way, the step down when it is a plain extrude that ends lower, or null when it's neither.
+ * How far below a part's top an Extrude → Add of the part's own sketch ends: 0 when it extrudes its regions as far the
+ * same way, the step down when it is a plain extrude away from the sketch plane that ends lower, or null otherwise.
  */
 export function addedRegionStep(target: CadPart, step: CadPart): number | null {
   if (!sharesSketch(target, step) || !target.drawnOn?.inward !== !step.drawnOn?.inward) return null;
-  if (depthKeys.every(key => JSON.stringify(target[key]) === JSON.stringify(step[key]))) return 0;
-  const plain = (part: CadPart) => !part.upTo && !part.upToDatum && !part.symmetric && !part.thin;
+  const same = (key: 'upTo' | 'upToDatum' | 'symmetric' | 'thin') => JSON.stringify(target[key]) === JSON.stringify(step[key]);
+  if (!(['upTo', 'upToDatum', 'symmetric', 'thin'] as const).every(same)) return null;
+  // Typed or following a variable, the same depth is the same: only a real step down is cut.
   const below = target.thickness - step.thickness;
-  return plain(target) && plain(step) && below >= MIN_ADDED_STEP ? below : null;
+  if (below < MIN_ADDED_STEP) return below > -MIN_ADDED_STEP ? 0 : null;
+  // A step down is cut from the part's top: one extruded into the plane, or up to something, isn't stepped.
+  const plain = !target.upTo && !target.upToDatum && !target.symmetric && !target.thin && !target.drawnOn?.inward;
+  return plain ? below : null;
 }
 
 /** The smallest step down an Add's regions can end at, as the shallowest cut. */
@@ -250,26 +251,29 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
 
   const added = new Map<string, string[]>();
   // An Add that ends lower than its part steps the part down over its regions, as a cut from the top kept with the Add.
-  const removed = new Map<string, CadFeature[]>();
+  // A region the part makes itself isn't stepped, and one several Adds take ends at the highest of them.
+  const highest = new Map<string, Map<string, { below: number; by: string }>>();
   for (const step of parts) {
     const target = step.addTo && parts.find(part => part.id === step.addTo);
     // A suppressed Add adds nothing, as in the reference.
     // Nor does one not extruded, such as a sketch whose extrude was deleted.
-    const below = target && addedRegionStep(target, step);
+    const below = target ? addedRegionStep(target, step) : null;
     if (step.suppressed || step.extrude === false || !target || !target.regions || below === null || step.addTo === step.id) continue;
     added.set(target.id, [...(added.get(target.id) ?? []), ...(step.regions ?? [])]);
-    if (!below) continue;
-    const steps = (step.regions ?? []).map(
-      (regionId): CadCut => ({
-        type: 'cut',
-        id: `${step.id}:cut:${regionId}`,
-        sketchId: target.sketch.id,
-        regionId,
-        depth: below,
-        removedBy: step.id,
-      })
+    const ends = highest.get(target.id) ?? highest.set(target.id, new Map()).get(target.id)!;
+    for (const regionId of step.regions ?? []) {
+      if (target.regions.includes(regionId)) continue;
+      const known = ends.get(regionId);
+      if (!known || below < known.below) ends.set(regionId, { below, by: step.id });
+    }
+  }
+  const removed = new Map<string, CadFeature[]>();
+  for (const [targetId, ends] of highest) {
+    const sketchId = parts.find(part => part.id === targetId)!.sketch.id;
+    const steps = [...ends].flatMap(([regionId, { below, by }]): CadCut[] =>
+      below ? [{ type: 'cut', id: `${by}:cut:${regionId}`, sketchId, regionId, depth: below, removedBy: by }] : []
     );
-    removed.set(target.id, [...(removed.get(target.id) ?? []), ...steps]);
+    if (steps.length) removed.set(targetId, steps);
   }
   parts = parts.map(part => {
     const regions = added.get(part.id);
