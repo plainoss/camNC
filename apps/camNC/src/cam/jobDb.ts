@@ -2,7 +2,6 @@ import { getRehearsalId, isDemoMode } from '@/lib/demo/demo-mode';
 import { carvingBoard, carvingRegion, kCarvingBoard, kDefaultVBit, type CarvingV1 } from './carving';
 import { outlineArt } from './carvingOutline';
 import { rebaseJob } from './rebaseJob';
-import { withDesignUnitNumbers } from './jobDesignUnits';
 import { trackPending } from '@/lib/settled';
 import type { BoardV1, StockBoardV1 } from './boards';
 import type { NestObjective } from './autoNest';
@@ -71,18 +70,9 @@ const kDemoDbName = 'camnc-cam-demo';
 const kJobs = 'jobs';
 const kModels = 'models';
 
-// Rehearsals deliberately restart from their handoff snapshot on reload. Ordinary demo
-// designs use their own persistent database, never the visitor's saved CAM projects.
-const rehearsalJobs = new Map<string, CamJobV1>();
-const rehearsalModels = new Map<string, Uint8Array>();
-type StorageContext = 'normal' | 'demo' | 'rehearsal';
-// Capture once at public entry: file reads and IndexedDB requests may outlive leaving demo mode.
-const captureStorageContext = (): StorageContext => (!isDemoMode() ? 'normal' : getRehearsalId() ? 'rehearsal' : 'demo');
-
 const databases = new Map<string, Promise<IDBDatabase>>();
 
-function openDb(context: Exclude<StorageContext, 'rehearsal'>): Promise<IDBDatabase> {
-  const name = context === 'demo' ? kDemoDbName : kDbName;
+function openDb(name: string): Promise<IDBDatabase> {
   const existing = databases.get(name);
   if (existing) return existing;
   const opening = new Promise<IDBDatabase>((resolve, reject) => {
@@ -121,16 +111,11 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
-function tx(
-  context: Exclude<StorageContext, 'rehearsal'>,
-  stores: string[],
-  mode: IDBTransactionMode,
-  fn: (t: IDBTransaction) => void
-): Promise<void> {
-  const done = openDb(context).then(
+function write(name: string, stores: string[], fn: (t: IDBTransaction) => void): Promise<void> {
+  const done = openDb(name).then(
     db =>
       new Promise<void>((resolve, reject) => {
-        const t = db.transaction(stores, mode);
+        const t = db.transaction(stores, 'readwrite');
         fn(t);
         t.oncomplete = () => resolve();
         t.onerror = () => reject(t.error);
@@ -138,8 +123,95 @@ function tx(
       })
   );
   // A write is pending for the specs' settled signal from the moment it is asked for, including opening the database.
-  return mode === 'readwrite' ? trackPending('save', done) : done;
+  return trackPending('save', done);
 }
+
+/** Where jobs and their model bytes are kept. A model is only ever written together with its job. */
+interface JobStore {
+  list(): Promise<CamJobV1[]>;
+  get(id: string): Promise<CamJobV1 | null>;
+  getModel(id: string): Promise<Uint8Array | null>;
+  /** Store `job`, whatever is stored under its id now. */
+  put(job: CamJobV1, model?: ArrayBuffer): Promise<void>;
+  /**
+   * Read a job and store what `fn` makes of it, atomically; null from `fn` stores nothing. `fn` runs synchronously
+   * against the stored job, or undefined when there is none. Resolves to what was stored, or null.
+   */
+  update(id: string, fn: (current: CamJobV1 | undefined) => CamJobV1 | null, model?: ArrayBuffer): Promise<CamJobV1 | null>;
+  remove(id: string): Promise<void>;
+}
+
+// A save without a model leaves the models store unlocked.
+const storesFor = (model: ArrayBuffer | undefined) => (model ? [kJobs, kModels] : [kJobs]);
+
+const idbStore = (name: string): JobStore => ({
+  async list() {
+    const db = await openDb(name);
+    return request(db.transaction(kJobs).objectStore(kJobs).getAll() as IDBRequest<CamJobV1[]>);
+  },
+  async get(id) {
+    const db = await openDb(name);
+    return (await request(db.transaction(kJobs).objectStore(kJobs).get(id) as IDBRequest<CamJobV1 | undefined>)) ?? null;
+  },
+  async getModel(id) {
+    const db = await openDb(name);
+    const buf = await request(db.transaction(kModels).objectStore(kModels).get(id) as IDBRequest<ArrayBuffer | undefined>);
+    return buf ? new Uint8Array(buf) : null;
+  },
+  put: (job, model) =>
+    write(name, storesFor(model), t => {
+      t.objectStore(kJobs).put(job);
+      if (model) t.objectStore(kModels).put(model, job.id);
+    }),
+  async update(id, fn, model) {
+    let saved = null as CamJobV1 | null;
+    await write(name, storesFor(model), t => {
+      const jobs = t.objectStore(kJobs);
+      const read = jobs.get(id) as IDBRequest<CamJobV1 | undefined>;
+      read.onsuccess = () => {
+        saved = fn(read.result);
+        if (!saved) return;
+        jobs.put(saved);
+        if (model) t.objectStore(kModels).put(model, id);
+      };
+    });
+    return saved;
+  },
+  remove: id =>
+    write(name, [kJobs, kModels], t => {
+      t.objectStore(kJobs).delete(id);
+      t.objectStore(kModels).delete(id);
+    }),
+});
+
+// Rehearsals deliberately restart from their handoff snapshot on reload, so their jobs are kept in memory only. Jobs
+// are copied on the way in and out, as IndexedDB copies them: a caller never holds the stored object.
+const rehearsalJobs = new Map<string, CamJobV1>();
+const rehearsalModels = new Map<string, Uint8Array>();
+const rehearsalStore: JobStore = {
+  list: async () => structuredClone([...rehearsalJobs.values()]),
+  get: async id => structuredClone(rehearsalJobs.get(id) ?? null),
+  getModel: async id => rehearsalModels.get(id)?.slice() ?? null,
+  async put(job, model) {
+    rehearsalJobs.set(job.id, structuredClone(job));
+    if (model) rehearsalModels.set(job.id, new Uint8Array(model));
+  },
+  async update(id, fn, model) {
+    const saved = fn(structuredClone(rehearsalJobs.get(id)));
+    if (saved) await rehearsalStore.put(saved, model);
+    return saved;
+  },
+  async remove(id) {
+    rehearsalJobs.delete(id);
+    rehearsalModels.delete(id);
+  },
+};
+
+const savedStore = idbStore(kDbName);
+// Ordinary demo designs use their own persistent database, never the visitor's saved CAM projects.
+const demoStore = idbStore(kDemoDbName);
+// Capture once at public entry: file reads and IndexedDB requests may outlive leaving demo mode.
+const currentStore = (): JobStore => (!isDemoMode() ? savedStore : getRehearsalId() ? rehearsalStore : demoStore);
 
 export const kModelFile = /\.(step|stp|stl)$/i;
 /** A CAD document saved as JSON, as `@wbcnc/cad-script` writes it. */
@@ -159,52 +231,51 @@ export type NewJobDefaults = Pick<
   'name' | 'origin' | 'plan' | 'boards' | 'stock' | 'parts' | 'partsFrom' | 'modelRevision' | 'nestObjective'
 >;
 
-export async function createJob(file: File, defaults: NewJobDefaults = {}): Promise<CamJobV1> {
-  const context = captureStorageContext();
+type NewJobFields = Partial<CamJobV1> & Pick<CamJobV1, 'fileName'>;
+
+/** A job of a name no other job has, stored together with its `model` file if it has one. */
+async function newJob(
+  store: JobStore,
+  name: string,
+  fields: (title: string) => NewJobFields | Promise<NewJobFields>,
+  model?: File
+): Promise<CamJobV1> {
   const now = Date.now();
-  const taken = (await listJobsIn(context)).map(j => j.name);
+  const title = uniqueJobName(
+    name,
+    (await store.list()).map(j => j.name)
+  );
   const job: CamJobV1 = {
-    ...structuredClone(defaults),
+    parts: [],
+    ...(await fields(title)),
     v: 1,
     id: crypto.randomUUID(),
-    name: uniqueJobName(defaults.name ?? file.name.replace(kModelFile, ''), taken),
-    fileName: file.name,
+    name: title,
     createdAt: now,
     updatedAt: now,
-    parts: structuredClone(defaults.parts ?? []),
   };
-  const bytes = await file.arrayBuffer();
-  if (context === 'rehearsal') {
-    rehearsalJobs.set(job.id, structuredClone(job));
-    rehearsalModels.set(job.id, new Uint8Array(bytes));
-    return job;
-  }
-  await tx(context, [kJobs, kModels], 'readwrite', t => {
-    t.objectStore(kJobs).put(job);
-    t.objectStore(kModels).put(bytes, job.id);
-  });
+  await store.put(job, await model?.arrayBuffer());
   return job;
+}
+
+export async function createJob(file: File, defaults: NewJobDefaults = {}): Promise<CamJobV1> {
+  return newJob(
+    currentStore(),
+    defaults.name ?? file.name.replace(kModelFile, ''),
+    () => {
+      const { parts = [], ...fields } = structuredClone(defaults);
+      return { ...fields, parts, fileName: file.name };
+    },
+    file
+  );
 }
 
 /** Start a native flat-part design without an intermediate model file. */
 export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV1> {
-  const context = captureStorageContext();
-  const now = Date.now();
-  const title = uniqueJobName(
-    name,
-    (await listJobsIn(context)).map(j => j.name)
-  );
-  const draft = { ...createCadDocument(title), lengthUnit: 'cm' as const };
-  draft.parts.push(createCadPart('Part 1'));
-  return saveJobIn(context, {
-    v: 1,
-    id: crypto.randomUUID(),
-    name: title,
-    fileName: title,
-    createdAt: now,
-    updatedAt: now,
-    parts: [],
-    design: { draft, acceptedRevision: 0, partRevisions: {} },
+  return newJob(currentStore(), name, title => {
+    const draft = { ...createCadDocument(title), lengthUnit: 'cm' as const };
+    draft.parts.push(createCadPart('Part 1'));
+    return { fileName: title, design: { draft, acceptedRevision: 0, partRevisions: {} } };
   });
 }
 
@@ -213,29 +284,19 @@ export async function createDesignJob(name = 'Untitled design'): Promise<CamJobV
  * with that text centred on the board instead.
  */
 export async function createCarvingJob(name = 'Untitled carving', { lettering }: { lettering?: string } = {}): Promise<CamJobV1> {
-  const context = captureStorageContext();
-  const now = Date.now();
-  const title = uniqueJobName(
-    name,
-    (await listJobsIn(context)).map(j => j.name)
-  );
-  const items: CarvingV1['items'] = [];
-  if (lettering) {
-    const art = { kind: 'text' as const, text: lettering, font: 'serif' as const };
-    const height = 30;
-    const { region } = await outlineArt(art, height);
-    items.push({ id: crypto.randomUUID(), art, height, x: kCarvingBoard.w / 2, y: kCarvingBoard.h / 2, rotation: 0, outline: region });
-  }
-  return saveJobIn(context, {
-    v: 1,
-    id: crypto.randomUUID(),
-    name: title,
-    fileName: title,
-    createdAt: now,
-    updatedAt: now,
-    parts: [],
-    carving: { items, maxDepth: 3, vBit: kDefaultVBit, clearWithFlat: true, region: carvingRegion(items) },
-    boards: [carvingBoard(kCarvingBoard)],
+  return newJob(currentStore(), name, async title => {
+    const items: CarvingV1['items'] = [];
+    if (lettering) {
+      const art = { kind: 'text' as const, text: lettering, font: 'serif' as const };
+      const height = 30;
+      const { region } = await outlineArt(art, height);
+      items.push({ id: crypto.randomUUID(), art, height, x: kCarvingBoard.w / 2, y: kCarvingBoard.h / 2, rotation: 0, outline: region });
+    }
+    return {
+      fileName: title,
+      carving: { items, maxDepth: 3, vBit: kDefaultVBit, clearWithFlat: true, region: carvingRegion(items) },
+      boards: [carvingBoard(kCarvingBoard)],
+    };
   });
 }
 
@@ -244,107 +305,23 @@ export async function createCarvingJob(name = 'Untitled carving', { lettering }:
  * IDs in an existing job would mark its physical sheets out of date, and someone has to finish the sketch to use it.
  */
 export async function importDesignJob(document: CadDocument, fileName: string): Promise<CamJobV1> {
-  const context = captureStorageContext();
-  const now = Date.now();
-  const title = uniqueJobName(
-    document.name.trim() || fileName.replace(kDesignFile, ''),
-    (await listJobsIn(context)).map(j => j.name)
-  );
-  return saveJobIn(context, {
-    v: 1,
+  return newJob(currentStore(), document.name.trim() || fileName.replace(kDesignFile, ''), title => ({
     origin: { kind: 'designFile', fileName },
-    id: crypto.randomUUID(),
-    name: title,
     fileName,
-    createdAt: now,
-    updatedAt: now,
-    parts: [],
     design: { draft: { ...structuredClone(document), name: title }, acceptedRevision: 0, partRevisions: {} },
-  });
+  }));
 }
 
-export function listJobs(): Promise<CamJobV1[]> {
-  return listJobsIn(captureStorageContext());
+export async function listJobs(): Promise<CamJobV1[]> {
+  return (await currentStore().list()).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-async function listJobsIn(context: StorageContext): Promise<CamJobV1[]> {
-  if (context === 'rehearsal')
-    return migrateStored(context, structuredClone([...rehearsalJobs.values()])).then(jobs =>
-      jobs.sort((a, b) => b.updatedAt - a.updatedAt)
-    );
-  const db = await openDb(context);
-  const jobs = await request(db.transaction(kJobs).objectStore(kJobs).getAll() as IDBRequest<CamJobV1[]>);
-  return (await migrateStored(context, jobs)).sort((a, b) => b.updatedAt - a.updatedAt);
+export function getJob(id: string): Promise<CamJobV1 | null> {
+  return currentStore().get(id);
 }
 
-export async function getJob(id: string): Promise<CamJobV1 | null> {
-  const context = captureStorageContext();
-  if (context === 'rehearsal') {
-    const job = rehearsalJobs.get(id);
-    return job ? (await migrateStored(context, [structuredClone(job)]))[0]! : null;
-  }
-  const db = await openDb(context);
-  const job = await request(db.transaction(kJobs).objectStore(kJobs).get(id) as IDBRequest<CamJobV1 | undefined>);
-  return job ? (await migrateStored(context, [job]))[0]! : null;
-}
-
-/**
- * Jobs as read, with designs saved before plain numbers took the design's unit migrated (`withDesignUnitNumbers`). A
- * migrated job is stored at once, so the draft an editor starts from is the stored one and its first save isn't taken
- * for a change made elsewhere. It's stored only while the job is still as read, so it never replaces a newer save.
- */
-async function migrateStored(context: StorageContext, jobs: CamJobV1[]): Promise<CamJobV1[]> {
-  const next = jobs.map(withDesignUnitNumbers);
-  const changed = next.flatMap((job, index) => (job === jobs[index] ? [] : [{ before: JSON.stringify(jobs[index]), job }]));
-  if (!changed.length) return next;
-  if (context === 'rehearsal') {
-    for (const { before, job } of changed)
-      if (JSON.stringify(rehearsalJobs.get(job.id)) === before) rehearsalJobs.set(job.id, structuredClone(job));
-    return next;
-  }
-  try {
-    await tx(context, [kJobs], 'readwrite', t => {
-      const store = t.objectStore(kJobs);
-      for (const { before, job } of changed) {
-        const read = store.get(job.id) as IDBRequest<CamJobV1 | undefined>;
-        read.onsuccess = () => {
-          if (JSON.stringify(read.result) === before) store.put(job);
-        };
-      }
-    });
-  } catch {
-    // Storing it is only so the first save matches; a full, blocked or aborted write mustn't stop the job opening. The
-    // migrated copy reads the same, and the next read tries storing it again.
-  }
-  return next;
-}
-
-export async function getModelBytes(id: string): Promise<Uint8Array | null> {
-  const context = captureStorageContext();
-  if (context === 'rehearsal') return rehearsalModels.get(id)?.slice() ?? null;
-  const db = await openDb(context);
-  const buf = await request(db.transaction(kModels).objectStore(kModels).get(id) as IDBRequest<ArrayBuffer | undefined>);
-  return buf ? new Uint8Array(buf) : null;
-}
-
-/** Save a document, or rebase an edit from `base` within the guarded transaction. */
-export function saveJob(job: CamJobV1, base?: CamJobV1): Promise<CamJobV1> {
-  return saveJobIn(captureStorageContext(), job, base);
-}
-
-async function saveJobIn(context: StorageContext, job: CamJobV1, base?: CamJobV1): Promise<CamJobV1> {
-  if (base) {
-    const saved = await updateJobForModelIn(context, base, current => rebaseJob(base, job, current));
-    if (!saved) throw new Error('This job or its model changed. Open it again before editing.');
-    return saved;
-  }
-  const saved = { ...job, updatedAt: Date.now() };
-  if (context === 'rehearsal') {
-    rehearsalJobs.set(job.id, structuredClone(saved));
-    return saved;
-  }
-  await tx(context, [kJobs], 'readwrite', t => t.objectStore(kJobs).put(saved));
-  return saved;
+export function getModelBytes(id: string): Promise<Uint8Array | null> {
+  return currentStore().getModel(id);
 }
 
 /** One version of a job's model: what its parts and programs are computed from. */
@@ -355,88 +332,56 @@ export const modelKey = (job: CamJobV1) =>
       ? `${job.id}:cad:${job.design.acceptedRevision}`
       : `${job.id}:${job.fileName}:${job.modelRevision ?? 0}`;
 
+const updateForModel = (store: JobStore, source: CamJobV1, update: (current: CamJobV1) => CamJobV1 | null) =>
+  store.update(source.id, current => {
+    if (!current || modelKey(current) !== modelKey(source)) return null;
+    const next = update(current);
+    return next && { ...next, updatedAt: Date.now() };
+  });
+
+/** Save a document, or rebase an edit from `base` within the guarded transaction. */
+export async function saveJob(job: CamJobV1, base?: CamJobV1): Promise<CamJobV1> {
+  const store = currentStore();
+  if (base) {
+    const saved = await updateForModel(store, base, current => rebaseJob(base, job, current));
+    if (!saved) throw new Error('This job or its model changed. Open it again before editing.');
+    return saved;
+  }
+  const saved = { ...job, updatedAt: Date.now() };
+  await store.put(saved);
+  return saved;
+}
+
 /**
  * Commit an update only while its model still belongs to an existing job. Reading and writing in one transaction
  * keeps a late worker response from restoring a deleted job or putting old parts onto a replaced model.
  * `update` runs synchronously against the current job; null means there is nothing to save.
  */
 export function updateJobForModel(source: CamJobV1, update: (current: CamJobV1) => CamJobV1 | null): Promise<CamJobV1 | null> {
-  return updateJobForModelIn(captureStorageContext(), source, update);
-}
-
-async function updateJobForModelIn(
-  context: StorageContext,
-  source: CamJobV1,
-  update: (current: CamJobV1) => CamJobV1 | null
-): Promise<CamJobV1 | null> {
-  const apply = (current: CamJobV1 | undefined) => {
-    if (!current || modelKey(current) !== modelKey(source)) return null;
-    const next = update(current);
-    return next && { ...next, updatedAt: Date.now() };
-  };
-  if (context === 'rehearsal') {
-    const current = rehearsalJobs.get(source.id);
-    const saved = apply(current && structuredClone(current));
-    if (saved) rehearsalJobs.set(source.id, structuredClone(saved));
-    return saved;
-  }
-  let saved: CamJobV1 | null = null;
-  await tx(context, [kJobs], 'readwrite', t => {
-    const store = t.objectStore(kJobs);
-    const req = store.get(source.id) as IDBRequest<CamJobV1 | undefined>;
-    req.onsuccess = () => {
-      saved = apply(req.result);
-      if (saved) store.put(saved);
-    };
-  });
-  return saved;
+  return updateForModel(currentStore(), source, update);
 }
 
 /** Swap the model file of a job; parts are re-derived on the next import, found again by what they are (`partMatch`). */
 export async function replaceModel(job: CamJobV1, file: File): Promise<CamJobV1> {
-  const context = captureStorageContext();
+  const store = currentStore();
   if (job.design) throw new Error('Open a model as a new job. Native designs are edited in Design.');
   const bytes = await file.arrayBuffer();
   // Reading a file or picking it in another tab can outlive edits, another replacement, or deletion. Derive the
   // revision from the stored job in the same transaction as the bytes, so every committed model has its own key.
-  const replace = (current: CamJobV1 | undefined) => {
-    if (!current) return null;
-    const saved = { ...current, fileName: file.name, modelRevision: (current.modelRevision ?? 0) + 1, updatedAt: Date.now() };
-    delete saved.readError;
-    return saved;
-  };
-  const missing = () => new Error('This job no longer exists. Open another job before replacing its model.');
-  if (context === 'rehearsal') {
-    const saved = replace(rehearsalJobs.get(job.id));
-    if (!saved) throw missing();
-    rehearsalJobs.set(job.id, structuredClone(saved));
-    rehearsalModels.set(job.id, new Uint8Array(bytes));
-    return saved;
-  }
-  let saved: CamJobV1 | null = null;
-  await tx(context, [kJobs, kModels], 'readwrite', t => {
-    const store = t.objectStore(kJobs);
-    const req = store.get(job.id) as IDBRequest<CamJobV1 | undefined>;
-    req.onsuccess = () => {
-      saved = replace(req.result);
-      if (!saved) return;
-      store.put(saved);
-      t.objectStore(kModels).put(bytes, job.id);
-    };
-  });
-  if (!saved) throw missing();
+  const saved = await store.update(
+    job.id,
+    current => {
+      if (!current) return null;
+      const next = { ...current, fileName: file.name, modelRevision: (current.modelRevision ?? 0) + 1, updatedAt: Date.now() };
+      delete next.readError;
+      return next;
+    },
+    bytes
+  );
+  if (!saved) throw new Error('This job no longer exists. Open another job before replacing its model.');
   return saved;
 }
 
-export async function deleteJob(id: string): Promise<void> {
-  const context = captureStorageContext();
-  if (context === 'rehearsal') {
-    rehearsalJobs.delete(id);
-    rehearsalModels.delete(id);
-    return;
-  }
-  await tx(context, [kJobs, kModels], 'readwrite', t => {
-    t.objectStore(kJobs).delete(id);
-    t.objectStore(kModels).delete(id);
-  });
+export function deleteJob(id: string): Promise<void> {
+  return currentStore().remove(id);
 }

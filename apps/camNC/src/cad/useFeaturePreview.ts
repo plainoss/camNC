@@ -3,41 +3,22 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { designSteps, rolledBackTo } from '@wbcnc/cad';
 import { apartExtrudePreview, apartPartIds, withoutApartRegionProblem } from './apartExtrudePreview';
 import { offerFinalPreview } from './finalPreview';
+import { editedStepId, type StudioDialog } from './studioDialog';
 
 interface PreviewOptions {
   document: CadDocument;
   enabled: boolean;
   blank: boolean;
   rolledTo: string | null;
-  featureDialog: { kind: 'extrude' | 'pattern' | 'hole'; partId: string } | null;
-  partCutting: { id?: string } | null;
-  transformDialog: { partId: string; copyId?: string; move?: boolean } | null;
-  mirrorDialog: { copyId?: string } | null;
+  dialog: StudioDialog | null;
   /** The editor's sketch check, run again when an extrude dialog opens or closes: its problems depend on it. */
   checks: { lastCheckedRevision: RefObject<string>; setCheckEpoch: (next: (epoch: number) => number) => void };
 }
 
 /** Every feature dialog shares the same rollback and explicit Final preview behavior. */
-export function useFeaturePreview({
-  document,
-  enabled,
-  blank,
-  rolledTo,
-  featureDialog,
-  partCutting,
-  transformDialog,
-  mirrorDialog,
-  checks,
-}: PreviewOptions) {
+export function useFeaturePreview({ document, enabled, blank, rolledTo, dialog, checks }: PreviewOptions) {
   const ids = designSteps(document).map(step => step.id);
-  const candidate = featureDialog
-    ? featureDialog.kind === 'pattern'
-      ? document.parts.find(part => part.id === featureDialog.partId)?.pattern?.id
-      : `${featureDialog.partId}:extrude`
-    : (partCutting?.id ??
-      transformDialog?.copyId ??
-      (transformDialog?.move ? `${transformDialog.partId}:move` : null) ??
-      mirrorDialog?.copyId);
+  const candidate = editedStepId(document, dialog);
   const editingStep = enabled && candidate && ids.includes(candidate) ? candidate : null;
   // Where the user put the bar, whatever dialog is open: what an export of the shown design stops at.
   const userRollback = enabled && rolledTo && ids.includes(rolledTo) ? rolledTo : null;
@@ -52,10 +33,10 @@ export function useFeaturePreview({
     return () => offerFinalPreview(null);
   }, [offersFinal, showFinal, editingStep]);
   const rolledBack = rollbackStep && !(offersFinal && showFinal) ? rollbackStep : null;
-  const extrudingId = enabled && featureDialog?.kind === 'extrude' ? featureDialog.partId : null;
+  const extrudingId = enabled && dialog?.kind === 'extrude' ? dialog.partId : null;
   // One dialog's split parts keep their ids, so what's hidden, made transparent or picked in the preview is what OK makes.
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- a new dialog starts new ids.
-  const apartIds = useMemo(() => apartPartIds(), [featureDialog]);
+  const apartIds = useMemo(() => apartPartIds(), [dialog]);
   const shownDocument = useMemo(
     () =>
       blank

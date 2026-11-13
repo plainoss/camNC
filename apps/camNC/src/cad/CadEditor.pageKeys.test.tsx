@@ -127,7 +127,8 @@ it("takes undo and redo after a dialog's OK", async () => {
   await waitFor(() => expect(latest().parts[0]!.fillets).toHaveLength(1));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Fillet' })).toBeNull());
   await settled();
-  await focusLeftEditor();
+  // A closed step dialog hands the keyboard to the view, which takes these keys where OK left them.
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('workspace-3d')));
   await userEvent.keyboard('{Control>}z{/Control}');
   await waitFor(() => expect(latest().parts[0]!.fillets ?? []).toHaveLength(0));
   await userEvent.keyboard('{Control>}y{/Control}');

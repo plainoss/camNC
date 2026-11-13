@@ -85,3 +85,20 @@ it('moves what’s drawn on a plane with it, and leaves it there when the plane 
   await waitFor(() => expect(latest().planes).toBeUndefined());
   expect(latest().parts.find(part => part.id === 'shelf')!.drawnOn).toEqual({ on: { plane: 'top' }, offset: 200 });
 });
+
+it('keeps waiting for the plane to offset from when Plane is clicked again before one is picked', async () => {
+  const { latest } = await studio();
+  await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
+  const features = screen.getByRole('region', { name: 'Features' });
+  const geometry = within(features).getByRole('list', { name: 'Default geometry' });
+
+  await userEvent.click(await studioCommand(/^Plane/));
+  await userEvent.click(await studioCommand(/^Plane/));
+  const dialog = screen.getByRole('dialog', { name: 'Plane' });
+  expect(within(dialog).getByRole('button', { name: 'Plane on' }).hasAttribute('data-active')).toBe(true);
+  // The plane clicked next still goes to the dialog.
+  await userEvent.click(within(geometry).getByRole('button', { name: /Front/ }));
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Plane on' }).textContent).toContain('front plane'));
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  await waitFor(() => expect(latest().planes).toMatchObject([{ on: { plane: 'front' } }]));
+});
