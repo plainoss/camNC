@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { sketchOwnerId, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { autoAddTarget } from './extrudeAutoAdd';
 import { extrudeRegionViews, withRegionToggled } from './extrudeRegionViews';
 import { replaceExtrudeProfile } from './profileSelection';
 
@@ -36,7 +37,11 @@ export function useProfileSelection(
         : part,
     pickFace: (face: Extract<CadDrawnOn['on'], { partId: string }>) => replace({ face }),
     pickRegion: (id: string) => {
-      if (target) commit(withRegionToggled(document, target.id, id));
+      if (!target) return;
+      const next = withRegionToggled(document, target.id, id);
+      // A New extrude's first region that runs into a part switches it to Add with that part, as an Extrude does.
+      const into = !target.regions?.length && autoAddTarget(next, target.id);
+      commit(into ? { ...next, parts: next.parts.map(p => (p.id === target.id ? { ...p, addTo: into } : p)) } : next);
     },
   };
 }
