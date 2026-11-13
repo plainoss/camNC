@@ -30,6 +30,11 @@ describe('no extra inputs per spec step', () => {
     ]));
     expect(result).toMatchObject({ ok: true, steps: 5 });
   });
+  it('takes one view shortcut as a view step, and no other key', () => {
+    expect(lintScenario(scenario([{ spec: '1 view' }, 'key f', { spec: '2 view' }, 'key Shift+7', { spec: '3 view' }, 'view top', { spec: '4 view' }, 'key n'])).ok).toBe(true);
+    expect(lintScenario(scenario([{ spec: '1 view' }, 'key d'])).findings[0].problem).toBe('input not allowed for this kind');
+    expect(lintScenario(scenario([{ spec: '1 view' }, 'key f', 'key f'])).findings[0].problem).toBe('1 extra input');
+  });
   it('reports a needed toggle before a pick as an extra input', () => {
     const result = lintScenario(scenario([{ spec: '1 pick' }, 'button Select profile', 'viewpick 30,20,0']));
     expect(result.ok).toBe(false);

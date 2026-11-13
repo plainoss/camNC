@@ -267,7 +267,7 @@ pnpm --silent --filter @wbcnc/camNC spec:lint path/to/scenarios.json
 | `field`   | `dialogfill`, `dialogselect`, `dialogcheck` or `field`, then optionally `key Enter` |
 | `confirm` | `dialogconfirm`, `closesketch` or `key Enter`                                       |
 | `cancel`  | `dialogcancel` or `key Escape`                                                      |
-| `view`    | `view`                                                                              |
+| `view`    | `view`, or one view shortcut key: `F`, `N`, `Shift+1`…`Shift+7`                     |
 
 Expectations, `frame`, `shot`, `checkpoint`, `exportstep` and `savedesign` are free; steps before the first marker are
 setup. `spec:names <table.md>` checks that the accessible names in a Markdown table (columns `camNC accessible name`,

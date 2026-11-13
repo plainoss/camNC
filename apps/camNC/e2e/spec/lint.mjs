@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
  * "No extra inputs": a scenario written from a step-by-step spec marks each spec step with `{ "spec": "<n> <kind>" }`
  * before the camNC input that does it. Each kind allows exactly one input of the listed steps. Checks are free.
  */
+/** The 3D view's own shortcuts: fit (F), normal to the picked plane or face (N), and the named views Shift+1…7. */
+export const VIEW_KEYS = ['f', 'F', 'n', 'N', ...[1, 2, 3, 4, 5, 6, 7].flatMap(digit => [`Shift+${digit}`, `Shift+Digit${digit}`])];
+
 export const ALLOWED = {
   // `click x,y` is a pick on an open sketch's drawing, as `viewpick` is there.
   pick: { steps: ['viewpick', 'click'] },
@@ -16,7 +19,7 @@ export const ALLOWED = {
   field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'field'], then: ['key Enter'] },
   confirm: { steps: ['dialogconfirm', 'closesketch', 'key Enter'] },
   cancel: { steps: ['dialogcancel', 'key Escape'] },
-  view: { steps: ['view'] },
+  view: { steps: ['view', ...VIEW_KEYS.map(key => `key ${key}`)] },
 };
 
 /** Steps that look or record without being an input a person makes. */
