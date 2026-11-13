@@ -22,7 +22,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (!input || typeof input !== 'object' || nestedDeeperThan(input, 64)) throw new Error('Invalid CAD document');
   const d = input as CadDocument;
   if (
-    ![1, 2, 3, 4, 5, 6].includes(d.version) ||
+    ![1, 2, 3, 4, 5, 6, 7].includes(d.version) ||
     typeof d.id !== 'string' ||
     typeof d.name !== 'string' ||
     (d.lengthUnit !== undefined && !['mm', 'cm', 'm', 'in', 'ft'].includes(d.lengthUnit)) ||
@@ -114,6 +114,8 @@ export function parseCadDocument(input: unknown): CadDocument {
       if (!validPartCutSplit(step.split)) throw new Error('Invalid CAD part cut');
       if (step.clearanceExpression !== undefined && typeof step.clearanceExpression !== 'string') throw new Error('Invalid CAD part cut');
       if (step.consumeTools !== undefined && step.consumeTools !== true) throw new Error('Invalid CAD part cut');
+      if (step.operation !== undefined && !['union', 'subtract', 'intersect'].includes(step.operation))
+        throw new Error('Invalid CAD part cut');
       const reliefIssue = partCutReliefIssue(step.cornerRelief);
       if (reliefIssue) throw new Error(reliefIssue);
     }
@@ -526,7 +528,7 @@ export function parseCadDocument(input: unknown): CadDocument {
   if (folderIssue) throw new Error(folderIssue);
   // The derived version walks feature arrays, so their shapes must be validated before it runs.
   const requiredVersion = cadDocumentVersion(d);
-  if ((d.version === 3 || d.version === 5 || d.version === 6) && requiredVersion !== d.version) throw new Error('Invalid CAD document');
+  if ((d.version === 3 || d.version >= 5) && requiredVersion !== d.version) throw new Error('Invalid CAD document');
   if (d.version < requiredVersion) throw new Error(`These CAD source settings require document version ${requiredVersion}`);
   for (const folder of d.folders ?? []) addId(folder.id);
   for (const plan of d.constructions ?? []) {

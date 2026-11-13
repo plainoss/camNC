@@ -510,7 +510,7 @@ export interface CadDocument {
   /** Display/input unit only. Geometry and persisted expressions remain in millimeters. */
   lengthUnit?: CadLengthUnit;
   /** Minimum supported reader: 2 features, 3 folders, 4 ordered operations, 5 step relief, 6 construction intent. */
-  version: 1 | 2 | 3 | 4 | 5 | 6;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   id: string;
   name: string;
   /** Increases on source edits; solving preserves the source revision. */
@@ -610,7 +610,13 @@ export interface CadPartCut {
   split?: 'half' | { fingers: number; fingersExpression?: string };
   /** The tools are used up by a cut-out. Split joints always keep both parts, even when this is saved as true. */
   consumeTools?: true;
+  /**
+   * Set when it's a Boolean step: `union` joins the tools into the first target, `subtract` cuts as "cut parts" does,
+   * and `intersect` keeps only what they share. Absent, it's a "cut parts" step.
+   */
+  operation?: CadBooleanOperation;
 }
+export type CadBooleanOperation = 'union' | 'subtract' | 'intersect';
 /** A named value. Its kind follows from the expression: a length or angle unit, or a plain number. */
 export interface CadVariable {
   id: string;

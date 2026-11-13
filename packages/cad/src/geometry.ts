@@ -45,7 +45,7 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
   const operationIssue = copyOperationSourceIssue(document);
   if (operationIssue) diagnostics.push({ code: 'invalid-copy-operations', message: operationIssue, severity: 'error' });
   for (const move of document.copyTransforms ?? []) addId(move.id, move.partId);
-  if (![1, 2, 3, 4, 5, 6].includes(document.version) || !Number.isSafeInteger(document.revision) || document.revision < 0)
+  if (![1, 2, 3, 4, 5, 6, 7].includes(document.version) || !Number.isSafeInteger(document.revision) || document.revision < 0)
     diagnostics.push({ code: 'invalid-document', message: 'Unsupported or invalid CAD document.', severity: 'error' });
   if (!document.parts.length) diagnostics.push({ code: 'no-parts', message: 'Add a part before preparing a cut.', severity: 'error' });
   const constructionIssue = constructionShapeIssue(document.constructions);

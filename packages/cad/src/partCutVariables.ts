@@ -12,9 +12,11 @@ import type { CadValueScope } from './valueExpressions';
 
 const names = (document: CadDocument, ids: string[]) => ids.map(id => cadPartReferenceName(document, id) ?? 'a removed part').join(', ');
 
-/** The feature list's name for a Cut parts step. */
+/** The feature list's name for a Cut parts step, or a Boolean step by its number among them. */
 export const partCutLabel = (document: CadDocument, step: CadPartCut) =>
-  `Cut ${names(document, step.targets)} with ${names(document, step.tools)}`;
+  step.operation
+    ? `Boolean ${(document.partCuts ?? []).filter(other => other.operation).indexOf(step) + 1}`
+    : `Cut ${names(document, step.targets)} with ${names(document, step.tools)}`;
 
 /**
  * Why each Cut parts step that's switched on can't follow its variables, and the parts it joins that say so. A step
