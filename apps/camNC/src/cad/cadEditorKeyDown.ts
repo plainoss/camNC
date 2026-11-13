@@ -36,13 +36,14 @@ export type CadEditorKeyDownInput = SketchEditorInput & {
   setHiddenParts: Dispatch<SetStateAction<ReadonlySet<string>>>;
   setSearchMode: Dispatch<SetStateAction<boolean>>;
   setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
-  setShowPlanes: Dispatch<SetStateAction<boolean>>;
   setSketchCameraShift: Dispatch<SetStateAction<[number, number]>>;
   setTransparentParts: Dispatch<SetStateAction<ReadonlySet<string>>>;
   setViewRequest: Dispatch<SetStateAction<ViewRequest | undefined>>;
   shortcutsOpen: boolean;
   showWorkspace: boolean;
   studioCommand: (command: StudioCommand) => void;
+  /** P: hides every plane, or shows them all again. */
+  togglePlanes: () => void;
   studioSession: boolean;
   toggleCommandSearch: () => void;
   toggleConstruction: () => void;
@@ -112,7 +113,6 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     setSelectedConstraints,
     setSelectionBox,
     setShortcutsOpen,
-    setShowPlanes,
     setSketchCameraShift,
     setSketchTurn,
     setSnapCue,
@@ -130,6 +130,7 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     toggleCommandSearch,
     toggleConstruction,
     toggleFix,
+    togglePlanes,
     tool,
     transformSelectionCenter,
     usingEdges,
@@ -192,7 +193,7 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     }
     if (!event.shiftKey && event.key.toLowerCase() === 'p') {
       event.preventDefault();
-      if (!event.repeat) setShowPlanes(previous => !previous);
+      if (!event.repeat) togglePlanes();
       return;
     }
     // N looks straight at the picked plane or face, or the selected part's sketch plane; again, from its other side.

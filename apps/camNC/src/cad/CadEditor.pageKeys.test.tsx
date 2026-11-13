@@ -89,7 +89,7 @@ it('takes studio shortcuts, undo and redo after the page loads with focus on the
   const { latest } = await studio();
   focusPage();
   await userEvent.keyboard('p');
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
   await userEvent.keyboard('p');
   await waitFor(() => expect(props().planes).toHaveLength(3));
   await deleteBoth(latest);
@@ -178,7 +178,7 @@ it('leaves keys typed in a text field outside the editor to that field', async (
   expect((field as HTMLInputElement).value).toBe('p');
   focusPage();
   await userEvent.keyboard('p');
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
 });
 
 it('leaves keys to an open menu, even once focus has fallen to the page', async () => {
@@ -194,7 +194,7 @@ it('leaves keys to an open menu, even once focus has fallen to the page', async 
   await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
   focusPage();
   await userEvent.keyboard('p');
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
 });
 
 it('leaves keys to a modal dialog outside the editor', async () => {
@@ -203,7 +203,7 @@ it('leaves keys to a modal dialog outside the editor', async () => {
   await userEvent.keyboard('p');
   screen.getByRole('dialog', { name: 'Outside modal' }).hidden = true;
   await userEvent.keyboard('p');
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
 });
 
 it('takes sketch shortcuts in a sketch editor while focus is on the page', async () => {

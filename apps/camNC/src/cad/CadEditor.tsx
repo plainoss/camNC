@@ -238,6 +238,7 @@ import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
 import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane, planeOffsetFrom } from './basePlanes';
+import { planesToggled } from './planesShortcut';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designSteps, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import { toggleSuppressed } from './toggleSuppressed';
@@ -413,7 +414,6 @@ export function CadEditor({
   // in dialogs over the view.
   const studioSession = startIn3D !== undefined && !faceSketch;
   const [viewRequest, setViewRequest] = useState<ViewRequest>();
-  const [showPlanes, setShowPlanes] = useState(true);
   // The one step dialog open over the view.
   const [dialog, setDialog] = useState<StudioDialog | null>(null);
   // A part's step open in its dialog, with the design as it was when it opened, to go back to on cancel.
@@ -1142,7 +1142,6 @@ export function CadEditor({
         setHiddenParts,
         setSearchMode,
         setShortcutsOpen,
-        setShowPlanes,
         setSketchCameraShift,
         setTransparentParts,
         setViewRequest,
@@ -1153,6 +1152,7 @@ export function CadEditor({
         toggleCommandSearch,
         toggleConstruction,
         toggleFix,
+        togglePlanes: () => setFeatureVisibility(shown => planesToggled(shown, documentRef.current, featureShown)),
       },
       event
     );
@@ -2296,7 +2296,6 @@ export function CadEditor({
                   studioSession ? request => setViewRequest(previous => ({ ...request, seq: (previous?.seq ?? 0) + 1 })) : undefined
                 }
                 transparentIds={transparentParts}
-                showPlanes={showPlanes}
                 selectedId={cutSelection.selectedTool ? part!.id : null}
                 selectedCopyId={cutSelection.selectedCopyId}
                 onSelect={(id, copyId) => {
@@ -2403,7 +2402,7 @@ export function CadEditor({
                   <SketchBackdrop
                     document={sketchBackdrop.document}
                     view={sketchBackdrop.view}
-                    planes={showPlanes ? basePlaneViews(doc).filter(plane => featureShown(plane.id)) : []}
+                    planes={basePlaneViews(doc).filter(plane => featureShown(plane.id))}
                     hiddenIds={hiddenParts}
                     onEdges={setPartEdges}
                   />

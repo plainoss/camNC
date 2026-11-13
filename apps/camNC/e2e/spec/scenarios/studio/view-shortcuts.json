@@ -1,0 +1,125 @@
+[
+  {
+    "id": "studio/view/planes-and-views-after-enter",
+    "title": "After Enter confirms an Extrude, P hides and shows the planes, greying their Feature list rows, and Shift+5 and Shift+7 show the top and isometric views",
+    "evidence": "design view shortcuts work with no click after a dialog is confirmed with the keyboard",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key g",
+      {
+        "spec": "5 draw"
+      },
+      "rect 0,0 100,60",
+      {
+        "spec": "6 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "7 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "8 pick"
+      },
+      "viewpick 50,30,0",
+      {
+        "spec": "9 field"
+      },
+      "dialogfill Thickness = 40",
+      "key Enter",
+      {
+        "spec": "10 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "listedParts": [
+              {
+                "name": "Part 1",
+                "thickness": 40
+              }
+            ]
+          }
+        }
+      },
+      {
+        "spec": "11 command"
+      },
+      "key p",
+      {
+        "expect": {
+          "studio": {
+            "planes": {
+              "Top": {
+                "view": false,
+                "list": "hidden"
+              },
+              "Front": {
+                "view": false,
+                "list": "hidden"
+              },
+              "Right": {
+                "view": false,
+                "list": "hidden"
+              }
+            }
+          }
+        }
+      },
+      {
+        "spec": "12 command"
+      },
+      "key p",
+      {
+        "expect": {
+          "studio": {
+            "planes": {
+              "Top": {
+                "view": true,
+                "list": "shown"
+              },
+              "Front": {
+                "view": true,
+                "list": "shown"
+              },
+              "Right": {
+                "view": true,
+                "list": "shown"
+              }
+            }
+          }
+        }
+      },
+      {
+        "spec": "13 view"
+      },
+      "key Shift+7",
+      {
+        "expect": {
+          "studio": {
+            "camera": {
+              "view": "iso"
+            }
+          }
+        }
+      }
+    ]
+  }
+]

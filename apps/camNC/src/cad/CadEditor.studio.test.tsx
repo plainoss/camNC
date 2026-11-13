@@ -198,10 +198,15 @@ it('toggles base planes and requests named views and fit from workspace shortcut
   const workspace = await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() => expect(props().planes).toHaveLength(3));
+  // P hides the planes as their eyes do: their Feature list rows show them hidden, and the origin stays.
+  const shownEyes = () => within(screen.getByRole('list', { name: 'Default geometry' })).queryAllByRole('button', { name: 'Show' });
   fireEvent.keyDown(workspace, { key: 'p', code: 'KeyP' });
-  await waitFor(() => expect(props().planes).toBeUndefined());
+  await waitFor(() => expect(props().planes ?? []).toHaveLength(0));
+  expect(shownEyes()).toHaveLength(3);
+  expect(props().showOrigin).toBe(true);
   fireEvent.keyDown(workspace, { key: 'p', code: 'KeyP' });
   await waitFor(() => expect(props().planes).toHaveLength(3));
+  expect(shownEyes()).toHaveLength(0);
   // The physical digit works even on a layout whose shifted key isn't "5".
   fireEvent.keyDown(workspace, { key: '%', code: 'Digit5', shiftKey: true });
   await waitFor(() => expect(props().viewRequest).toEqual({ name: 'top', seq: 1 }));
