@@ -41,6 +41,36 @@ export const dialogCommand: Record<StudioDialog['kind'], StudioCommand> = {
   partCut: 'cutParts',
 };
 
+/**
+ * The dialog component a dialog shows in, as its React key: a dialog with the same kind and key stays mounted when it
+ * is opened again, keeping what it is waiting to have picked. A pattern dialog is mounted afresh each time (null).
+ */
+export function dialogKey(dialog: StudioDialog): string | null {
+  switch (dialog.kind) {
+    case 'extrude':
+    case 'hole':
+      return dialog.partId;
+    case 'pattern':
+      return null;
+    case 'transform':
+      return `${dialog.partId}:${dialog.copyId ?? 'new'}`;
+    case 'mirror':
+      return dialog.copyId ?? dialog.partId;
+    case 'fillet':
+      return dialog.filletId ?? 'new';
+    case 'plane':
+    case 'variable':
+    case 'partCut':
+      return dialog.id ?? 'new';
+  }
+}
+
+/** Whether opening `next` over `open` leaves the same dialog component mounted. */
+export function sameDialogShown(open: StudioDialog | null, next: StudioDialog): boolean {
+  const key = open && open.kind === next.kind ? dialogKey(open) : null;
+  return key !== null && key === dialogKey(next);
+}
+
 export function featureDialog(dialog: StudioDialog | null): StudioFeatureDialog | null {
   return dialog && (dialog.kind === 'extrude' || dialog.kind === 'hole' || dialog.kind === 'pattern') ? dialog : null;
 }

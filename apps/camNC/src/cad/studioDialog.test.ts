@@ -1,6 +1,6 @@
 import { createPlateDocument, setPartPattern } from '@wbcnc/cad';
 import { expect, it } from 'vitest';
-import { dialogCommand, editedStepId, featureDialog, picksParts, previewOwner, type StudioDialog } from './studioDialog';
+import { dialogCommand, editedStepId, featureDialog, picksParts, previewOwner, sameDialogShown, type StudioDialog } from './studioDialog';
 
 const document = createPlateDocument();
 const partId = document.parts[0]!.id;
@@ -80,4 +80,14 @@ it('has no edited step for a dialog adding one, nor for Fillet, Plane and Variab
   expect(editedStepId(document, { kind: 'fillet', partId, filletId: 'round' })).toBeNull();
   expect(editedStepId(document, { kind: 'plane', id: 'plane-1' })).toBeNull();
   expect(editedStepId(document, { kind: 'variable', id: 'width' })).toBeNull();
+});
+
+it('keeps a dialog opened again in place only when it shows the same step, and a pattern never', () => {
+  // Each opening is a new object, as the toolbar and feature list make them.
+  expect(dialogs.map(dialog => sameDialogShown(dialog, { ...dialog }))).toEqual([true, true, false, true, true, true, true, true, true]);
+  expect(sameDialogShown(null, { kind: 'plane' })).toBe(false);
+  expect(sameDialogShown({ kind: 'plane' }, { kind: 'plane', id: 'p1' })).toBe(false);
+  expect(sameDialogShown({ kind: 'plane', id: 'p1' }, { kind: 'variable', id: 'p1' })).toBe(false);
+  expect(sameDialogShown({ kind: 'mirror', partId }, { kind: 'mirror', partId, copyId: 'c1' })).toBe(false);
+  expect(sameDialogShown({ kind: 'transform', partId }, { kind: 'transform', partId, copyId: 'c1' })).toBe(false);
 });

@@ -9,7 +9,7 @@ import { PlaneDialog } from './PlaneDialog';
 import { StudioPatternDialog } from './StudioPatternDialog';
 import { TransformDialog } from './TransformDialog';
 import { VariableDialog } from './VariableDialog';
-import type { StudioDialog } from './studioDialog';
+import { dialogKey, type StudioDialog } from './studioDialog';
 import type { DialogPartPicks } from './useDialogPartPick';
 import { prepareStudioPreview } from './useStudioPreview';
 
@@ -88,11 +88,11 @@ export function StudioDialogHost({
       const target = part(dialog.partId);
       if (!target) return null;
       const props = { document, part: target, variables, onChange: change, onOk, onCancel };
-      if (dialog.kind === 'hole') return <HoleDialog key={target.id} {...props} />;
+      if (dialog.kind === 'hole') return <HoleDialog key={dialogKey(dialog)} {...props} />;
       if (dialog.kind === 'extrude')
         return (
           <ExtrudeDialog
-            key={target.id}
+            key={dialogKey(dialog)}
             {...props}
             depthDragging={depthDragging}
             profilePicking={!!profilePicking}
@@ -118,7 +118,7 @@ export function StudioDialogHost({
       const target = part(dialog.partId);
       return target ? (
         <TransformDialog
-          key={`${target.id}:${dialog.copyId ?? 'new'}`}
+          key={dialogKey(dialog)}
           document={document}
           part={target}
           copyId={dialog.copyId}
@@ -137,7 +137,7 @@ export function StudioDialogHost({
     case 'mirror':
       return (
         <MirrorDialog
-          key={dialog.copyId ?? dialog.partId}
+          key={dialogKey(dialog)}
           document={document}
           partId={dialog.partId}
           copyId={dialog.copyId}
@@ -151,7 +151,7 @@ export function StudioDialogHost({
     case 'fillet':
       return (
         <FilletDialog
-          key={dialog.filletId ?? 'new'}
+          key={dialogKey(dialog)}
           document={document}
           variables={variables}
           partId={dialog.partId}
@@ -165,7 +165,7 @@ export function StudioDialogHost({
     case 'plane':
       return (
         <PlaneDialog
-          key={dialog.id ?? 'new'}
+          key={dialogKey(dialog)}
           document={document}
           planeId={dialog.id}
           preselected={dialog.preselected}
@@ -179,7 +179,7 @@ export function StudioDialogHost({
     case 'variable':
       return (
         <VariableDialog
-          key={dialog.id ?? 'new'}
+          key={dialogKey(dialog)}
           document={document}
           variableId={dialog.id}
           onPreview={onPreview}
@@ -191,7 +191,7 @@ export function StudioDialogHost({
       const { id } = dialog;
       return (
         <PartCutDialog
-          key={id ?? 'new'}
+          key={dialogKey(dialog)}
           document={document}
           onPreview={onPreview}
           step={document.partCuts?.find(step => step.id === id)}

@@ -257,7 +257,7 @@ import { bindPartCorners } from './partCornerInference';
 import { newSketchPart } from './newSketchPart';
 import type { CadConnectorPick } from './PartFeatureDialogs';
 import { StudioDialogHost } from './StudioDialogHost';
-import { dialogCommand, featureDialog, picksParts, previewOwner, type StudioDialog } from './studioDialog';
+import { dialogCommand, featureDialog, picksParts, previewOwner, sameDialogShown, type StudioDialog } from './studioDialog';
 import { usePatternVariableCommit } from './studioPatternVariableSource';
 import { useStudioPreview } from './useStudioPreview';
 import { useEditorDocumentKeys } from './useEditorDocumentKeys';
@@ -429,10 +429,10 @@ export function CadEditor({
   const [directionPicker, setDirectionPicker] = useState<((on: CadDrawnOn['on'], datum?: string) => void) | null>(null);
   /**
    * Opens a step's dialog in place of any other. The one it replaces is dropped, not cancelled: what an Extrude or Hole
-   * dialog committed stays, as the step opened next may be made from it.
+   * dialog committed stays, as the step opened next may be made from it. The same one opened again keeps its pick.
    */
   const openDialog = (next: StudioDialog) => {
-    setDirectionPicker(null);
+    if (!sameDialogShown(dialog, next)) setDirectionPicker(null);
     setChoosingFace(false);
     setDialog(next);
   };
