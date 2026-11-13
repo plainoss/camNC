@@ -1,11 +1,17 @@
 import { createAdapter as sketchAdapter } from './sketch.mjs';
+import path from 'node:path';
+import process from 'node:process';
 import { settledSnapshot } from '../settle.mjs';
+import { exportStep, extrudeRegions, saveDesign, viewPick } from './studioPick.mjs';
 import { checkStudio, studioContent, studioState } from './studioModel.mjs';
 
 const escapePattern = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Part Studio steps use visible feature names and labelled controls; source reads never perform edits. */
-export async function createAdapter(page, url) {
+/**
+ * Part Studio steps use visible feature names and labelled controls; source reads never perform edits. Files a step
+ * writes (`exportstep`, `savedesign`) are relative to `baseDir`: the scenario file's folder, or where a session started.
+ */
+export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD ?? process.cwd() } = {}) {
   const base = await sketchAdapter(page, url), checkpoints = new Map();
   const readDocument = () => page.evaluate(async () => {
     const jobId = location.pathname.split('/')[2];
@@ -48,14 +54,27 @@ export async function createAdapter(page, url) {
         flipped: await sectionDialog.getByRole('button', { name: 'Flip plane', exact: true }).getAttribute('aria-pressed') === 'true',
       } : {}),
     };
-    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, section, dialog: dialogName };
+    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, section, dialog: dialogName, extrudeRegions: await extrudeRegions(page) };
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
-    if (verb === 'pickviewcenter') {
+    if (verb === 'viewpick') await viewPick(page, rest);
+    else if (verb === 'selectfeature') {
+      // One click on a named row of the feature list, a default plane included, as a person selects it there.
+      const features = page.getByRole('region', { name: 'Features', exact: true });
+      const plane = features.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('button', { name: rest, exact: true });
+      const row = await plane.count() ? plane : features.getByRole('button', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) });
+      if (await row.count() !== 1) throw new Error(`Feature name must identify one row: ${rest}`);
+      await row.click();
+    }
+    else if (verb === 'exportstep' || verb === 'savedesign') {
+      if (!rest) throw new Error(`${verb} takes a file path`);
+      const file = path.resolve(baseDir, rest);
+      await (verb === 'exportstep' ? exportStep(page, file) : saveDesign(page, file));
+    } else if (verb === 'pickviewcenter') {
       // A single stock board is centered by the named camera view. This is a real canvas click, never a model edit.
       const canvas = page.getByTestId('workspace-3d').locator('canvas').first();
       await canvas.waitFor();

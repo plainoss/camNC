@@ -17,6 +17,8 @@ export function stepLine(text, where = 'Step') {
     } catch (error) {
       throw new Error(`${where} is not valid JSON: ${error.message}`);
     }
+    // A spec marker only labels the steps after it.
+    if (step && 'spec' in step) return null;
     if (!step || typeof step.expect !== 'object') throw new Error(`${where} is an object without "expect": ${line}`);
     return `expect ${JSON.stringify(step.expect)}`;
   }
@@ -33,6 +35,7 @@ export function parseStepsFile(text, name = 'steps file') {
   return text.split(/\r?\n/).flatMap((raw, index) => {
     const line = raw.trim();
     if (!line || line.startsWith('#') || line.startsWith('//')) return [];
-    return [stepLine(line, `Line ${index + 1} of ${name}`)];
+    const step = stepLine(line, `Line ${index + 1} of ${name}`);
+    return step === null ? [] : [step];
   });
 }

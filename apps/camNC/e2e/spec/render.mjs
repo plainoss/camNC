@@ -42,7 +42,8 @@ export function parseRenderArgs(args) {
       const start = i;
       while (i + 1 < args.length && !args[i + 1].startsWith('--')) {
         i++;
-        options.steps.push(stepLine(args[i], `Step ${options.steps.length + 1}`));
+        const step = stepLine(args[i], `Step ${options.steps.length + 1}`);
+        if (step !== null) options.steps.push(step);
       }
       if (i === start) throw new Error('--steps takes one or more steps, such as --steps "rect 10,10 100,60" "key d"');
     } else if (flag === '--steps-file') {
@@ -54,6 +55,7 @@ export function parseRenderArgs(args) {
     else if (flag === '--out') options.outDir = fromCaller(args[++i]);
     else if (flag === '--url') options.url = args[++i];
     else if (flag === '--headed') options.headed = true;
+    else if (flag === '--domain') options.domain = args[++i];
     else if (flag === '--planes') options.planes = true;
     else if (flag === '--size') {
       const match = /^(\d+)x(\d+)$/.exec(args[++i] ?? '');

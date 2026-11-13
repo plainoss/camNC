@@ -59,7 +59,11 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
     if (JSON.stringify(want) !== JSON.stringify(got)) failures.push(`studio/${label}: wanted ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
   };
   for (const [key, wanted] of Object.entries(expected)) {
-    if (['variables', 'copies', 'measurements', 'section'].includes(key)) {
+    if (key === 'extrudeRegions') {
+      // Only the fields a scenario names, so a check of the region count doesn't depend on the sketch's label.
+      if (wanted === null || !actual.extrudeRegions) equal(key, wanted, actual.extrudeRegions ?? null);
+      else for (const [field, value] of Object.entries(wanted)) equal(`${key}/${field}`, value, actual.extrudeRegions[field]);
+    } else if (['variables', 'copies', 'measurements', 'section'].includes(key)) {
       for (const [name, value] of Object.entries(wanted)) equal(`${key}/${name}`, value, actual[key]?.[name]);
     } else if (['patterns', 'offsets'].includes(key)) {
       for (const [name, fields] of Object.entries(wanted)) {

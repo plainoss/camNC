@@ -13,13 +13,14 @@ import { failsRun, scenarioResult } from './results.mjs';
 const root = path.dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(args) {
-  const options = { url: null, only: '', headed: false, list: false, update: false, workers: 4, shard: null };
+  const options = { url: null, only: '', headed: false, list: false, update: false, workers: 4, shard: null, files: [] };
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
     if (flag === '--') continue;
     if (flag.startsWith('--shard=')) { options.shard = parseShard(flag.slice(8)); continue; }
     if (flag === '--url') options.url = args[++i];
     else if (flag === '--only') options.only = args[++i];
+    else if (flag === '--file') options.files.push(path.resolve(process.env.INIT_CWD ?? process.cwd(), args[++i]));
     else if (flag === '--headed') options.headed = true;
     else if (flag === '--list') options.list = true;
     else if (flag === '--update-goldens') options.update = true;
@@ -28,6 +29,18 @@ function parseArgs(args) {
     else throw new Error(`Unknown option: ${flag}`);
   }
   return options;
+}
+
+/** Scenarios kept outside `scenarios/`, such as a checkout of specs. Files their steps write land next to them. */
+async function loadFiles(files) {
+  const scenarios = [];
+  for (const file of files) {
+    for (const scenario of JSON.parse(await readFile(file, 'utf8'))) {
+      assert(scenario.id && scenario.title && scenario.evidence, `${file}: every scenario needs an id, a title and evidence`);
+      scenarios.push({ ...scenario, baseDir: path.dirname(file) });
+    }
+  }
+  return scenarios;
 }
 
 async function loadScenarios(only) {
@@ -77,11 +90,13 @@ async function runScenario(browser, scenario, options, outDir) {
   let phase = 'bootstrap';
   let bootstrapMs = 0;
   try {
-    const adapter = await createAdapter(page, options.url);
+    const adapter = await createAdapter(page, options.url, scenario.baseDir ? { baseDir: scenario.baseDir } : undefined);
     bootstrapMs = performance.now() - started;
     page.setDefaultTimeout(8000);
     for (const [index, step] of scenario.steps.entries()) {
       phase = `step ${index + 1}`;
+      // A `spec` marker only says where a written spec's step starts; the lint reads it, the run skips it.
+      if (typeof step === 'object' && 'spec' in step) continue;
       if (typeof step === 'object') {
         await adapter.settle();
         failures.push(...(await adapter.check(step.expect)).map(failure => `step ${index + 1}: ${failure}`));
@@ -105,7 +120,7 @@ async function runScenario(browser, scenario, options, outDir) {
 
 const options = parseArgs(process.argv.slice(2));
 assert(!(options.update && options.shard), 'Golden updates must run without sharding');
-const scenarios = selectShard(await loadScenarios(options.only), options.shard);
+const scenarios = selectShard(options.files.length ? await loadFiles(options.files) : await loadScenarios(options.only), options.shard);
 assert(scenarios.length > 0, 'No scenarios selected');
 const runStarted = performance.now();
 if (options.list) {

@@ -100,13 +100,14 @@ export function createSession({ open, outDir }) {
 }
 
 function parseArgs(args) {
-  const options = { url: null, headed: false, listen: false };
+  const options = { url: null, headed: false, listen: false, domain: 'sketch' };
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
     if (flag === '--') continue;
     if (flag === '--url') options.url = args[++i];
     else if (flag === '--headed') options.headed = true;
     else if (flag === '--listen') options.listen = true;
+    else if (flag === '--domain') options.domain = args[++i];
     else throw new Error(`Unknown option: ${flag}`);
   }
   if (options.url) assertLocalUrl(options.url);
@@ -123,7 +124,9 @@ export async function browserSession(options) {
       options.url = server.url;
     }
     browser ??= await createRequire(import.meta.url)('playwright').chromium.launch({ headless: !options.headed });
-    const { createAdapter } = await import('./adapters/sketch.mjs');
+    // `studio` adds the Part Studio steps and state; `sketch` is lighter, reading no saved studio state per line.
+    if (!['sketch', 'studio'].includes(options.domain ?? 'sketch')) throw new Error(`Unknown domain: ${options.domain}`);
+    const { createAdapter } = await import(`./adapters/${options.domain ?? 'sketch'}.mjs`);
     const { context, page, runtime } = await openPage(browser, options.viewport);
     try {
       const adapter = await createAdapter(page, options.url);
