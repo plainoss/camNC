@@ -7,6 +7,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { openPage, startDevServer } from './harness.mjs';
+import { shotPath } from './shots.mjs';
 import { junitReport } from './junit.mjs';
 import { failsRun, scenarioResult } from './results.mjs';
 
@@ -100,6 +101,10 @@ async function runScenario(browser, scenario, options, outDir) {
       if (typeof step === 'object') {
         await adapter.settle();
         failures.push(...(await adapter.check(step.expect)).map(failure => `step ${index + 1}: ${failure}`));
+      } else if (step === 'shot' || step.startsWith('shot ')) {
+        // As in a session: a picture of the page now, settled. A file scenario's picture lands next to it.
+        await adapter.settle();
+        await page.screenshot({ path: shotPath(scenario, step.slice(5).trim(), outDir) });
       } else if (step.startsWith('frame ')) {
         await adapter.settle();
         const failure = await compareFrame(scenario, step.slice(6), await adapter.frame(), options, outDir);

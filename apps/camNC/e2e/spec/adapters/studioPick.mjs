@@ -54,8 +54,9 @@ export async function viewPick(page, text) {
   await page.mouse.up();
 }
 
-/** A selection box's listing as a count: one region, several, or null for the whole sketch or a face. */
+/** A selection box's listing as a count: none, one region, several, or null for the whole sketch or a face. */
 export function regionCount(selection) {
+  if (/^No region picked/.test(selection ?? '')) return 0;
   if (/^A region of /.test(selection ?? '')) return 1;
   const count = /^(\d+) regions of /.exec(selection ?? '')?.[1];
   return count ? Number(count) : null;

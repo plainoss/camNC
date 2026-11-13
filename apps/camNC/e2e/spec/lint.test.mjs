@@ -30,6 +30,10 @@ describe('no extra inputs per spec step', () => {
     ]));
     expect(result).toMatchObject({ ok: true, steps: 5 });
   });
+  it('takes an eye click as a select and a dialog tab as a field', () => {
+    expect(lintScenario(scenario([{ spec: '1 select' }, 'featureeye Sketch · Part 1', { spec: '2 field' }, 'dialogtab Add'])).ok).toBe(true);
+    expect(lintScenario(scenario([{ spec: '1 select' }, 'hover 0,0', 'featureeye Top'])).ok).toBe(false);
+  });
   it('takes one view shortcut as a view step, and no other key', () => {
     expect(lintScenario(scenario([{ spec: '1 view' }, 'key f', { spec: '2 view' }, 'key Shift+7', { spec: '3 view' }, 'view top', { spec: '4 view' }, 'key n'])).ok).toBe(true);
     expect(lintScenario(scenario([{ spec: '1 view' }, 'key d'])).findings[0].problem).toBe('input not allowed for this kind');

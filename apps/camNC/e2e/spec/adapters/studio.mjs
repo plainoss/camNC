@@ -58,7 +58,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
     if (verb === 'viewpick') {
@@ -66,7 +66,17 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       if (await page.getByRole('dialog', { name: /^Sketch ·/ }).isVisible()) await base.step(`click ${parseSketchPick(rest).join(',')}`);
       else await viewPick(page, rest);
     }
-    else if (verb === 'selectfeature') {
+    else if (verb === 'featureeye') {
+      // A row's eye only shows while the row is hovered, so hover it first, as a person does, then click the eye.
+      const features = page.getByRole('region', { name: 'Features', exact: true });
+      const plane = features.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('button', { name: rest, exact: true });
+      const row = await plane.count() ? plane : features.getByRole('button', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) });
+      if (await row.count() !== 1) throw new Error(`Feature name must identify one row: ${rest}`);
+      await row.hover();
+      await row.locator('xpath=ancestor::li[1]').getByRole('button', { name: /^(Show|Hide)$/ }).click();
+    } else if (verb === 'dialogtab') {
+      await page.getByRole('dialog').getByRole('tab', { name: rest, exact: true }).click();
+    } else if (verb === 'selectfeature') {
       // One click on a named row of the feature list, a default plane included, as a person selects it there.
       const features = page.getByRole('region', { name: 'Features', exact: true });
       const plane = features.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('button', { name: rest, exact: true });

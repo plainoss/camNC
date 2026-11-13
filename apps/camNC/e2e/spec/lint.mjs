@@ -13,10 +13,10 @@ export const VIEW_KEYS = ['f', 'F', 'n', 'N', ...[1, 2, 3, 4, 5, 6, 7].flatMap(d
 export const ALLOWED = {
   // `click x,y` is a pick on an open sketch's drawing, as `viewpick` is there.
   pick: { steps: ['viewpick', 'click'] },
-  select: { steps: ['selectpart', 'selectfeature', 'click'] },
+  select: { steps: ['selectpart', 'selectfeature', 'featureeye', 'click'] },
   command: { steps: ['studiotool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },
-  field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'field'], then: ['key Enter'] },
+  field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'field'], then: ['key Enter'] },
   confirm: { steps: ['dialogconfirm', 'closesketch', 'key Enter'] },
   cancel: { steps: ['dialogcancel', 'key Escape'] },
   view: { steps: ['view', ...VIEW_KEYS.map(key => `key ${key}`)] },
