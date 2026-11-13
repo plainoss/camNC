@@ -429,7 +429,8 @@ export default function WorkspaceView({
         measureWitness={measure.witness}
         onMissed={measure.clear}
         onHover={(id, index) => onHover?.(id !== null && index !== undefined ? instanceKey(model.instances[index]!) : id)}
-        planes={onNewPart && showPlanes ? planes : undefined}
+        // While a dialog picks a point or an edge on a part, the planes don't take the click.
+        planes={onNewPart && showPlanes && !onPickPoint ? planes : undefined}
         sketchLines={sketchLines}
         onPickSketch={
           !sectionEditing && !measure.expanded && onPickSketch

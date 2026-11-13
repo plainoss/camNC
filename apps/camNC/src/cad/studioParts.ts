@@ -43,6 +43,7 @@ export function disabledStudioCommands(part: CadPart | undefined, partHasOutline
         : !partHasOutline && { extrude: 'Select a part first', pattern: 'Select a part first', transform: 'Select a part first' }),
     ...(partCount < 2 && { cutParts: 'Cutting parts needs two parts' }),
     ...(partCount < 2 && { boolean: 'A Boolean needs two parts' }),
+    ...(partCount < 1 && { linearPattern: 'A pattern needs a part' }),
   };
   // A mirror image is of a part, as a pattern is.
   if (studioDisabled.pattern) studioDisabled.mirror = studioDisabled.pattern;

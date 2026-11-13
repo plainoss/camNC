@@ -1,0 +1,153 @@
+[
+  {
+    "id": "studio/pattern/remove-pocket-in-a-row",
+    "title": "A pocket cut by an Extrude that removes is repeated three times, 30 apart along the board's front edge, with Linear pattern \u203a Feature pattern",
+    "evidence": "design feature pattern of a Remove extrude, direction from an edge picked in the top view",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key g",
+      {
+        "spec": "5 draw"
+      },
+      "rect 0,0 100,40",
+      {
+        "spec": "6 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "7 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "8 pick"
+      },
+      "viewpick 50,30,0",
+      {
+        "spec": "9 field"
+      },
+      "dialogfill Thickness = 10",
+      "key Enter",
+      {
+        "spec": "10 confirm"
+      },
+      "key Enter",
+      {
+        "spec": "11 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "12 pick"
+      },
+      "viewpick 60,30,10",
+      {
+        "spec": "13 command"
+      },
+      "key c",
+      {
+        "spec": "14 draw"
+      },
+      "circle 20,20 5",
+      {
+        "spec": "15 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "16 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "17 pick"
+      },
+      "viewpick 20,20,10",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "box": "Regions to add",
+              "regions": 1
+            }
+          }
+        }
+      },
+      {
+        "spec": "18 field"
+      },
+      "dialogtab Remove",
+      {
+        "spec": "19 field"
+      },
+      "dialogfill Cut depth = 5",
+      "key Enter",
+      {
+        "spec": "20 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1
+          }
+        }
+      },
+      {
+        "spec": "21 command"
+      },
+      "studiotool Linear pattern",
+      {
+        "spec": "22 field"
+      },
+      "dialogselect Pattern type = Feature pattern",
+      {
+        "spec": "23 select"
+      },
+      "selectfeature Extrude \u00b7 Part 2",
+      {
+        "spec": "24 select"
+      },
+      "dialogfocus Direction",
+      {
+        "spec": "25 pick"
+      },
+      "viewpick 50,0,10",
+      {
+        "spec": "26 field"
+      },
+      "dialogfill Distance = 30",
+      "key Enter",
+      {
+        "spec": "27 field"
+      },
+      "dialogfill Instance count = 3",
+      "key Enter",
+      {
+        "spec": "28 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1,
+            "partIssues": []
+          }
+        }
+      }
+    ]
+  }
+]

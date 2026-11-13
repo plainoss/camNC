@@ -1,5 +1,6 @@
 import { addPartCut, removePartCut, updatePartCut, type CadDocument, type CadDrawnOn, type CadValueScope } from '@wbcnc/cad';
 import { BooleanDialog, type BooleanChange } from './BooleanDialog';
+import { LinearPatternDialog } from './LinearPatternDialog';
 import { useRef, type ComponentProps } from 'react';
 import { ExtrudeDialog, type CadConnectorPick } from './PartFeatureDialogs';
 import { FilletDialog } from './FilletDialog';
@@ -108,6 +109,9 @@ export function StudioDialogHost({
             pickFace={setDirectionPicker}
           />
         );
+      // The Linear pattern command, and a pattern of a Remove's cuts, use the Linear pattern dialog.
+      if (dialog.initialPatternKind === 'linearPattern' || target.remove)
+        return <LinearPatternDialog key={dialogKey(dialog)} {...props} onPreview={onPreview} pickPoint={pickPoint} partPicks={partPicks} />;
       return (
         <StudioPatternDialog
           key={`${target.id}:${opening.current.generation}`}

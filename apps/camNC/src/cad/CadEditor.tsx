@@ -207,7 +207,7 @@ import { InlineConstraints } from './inlineConstraints';
 import { associatedEntityIds } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { StudioCommandSearch } from './StudioCommandSearch';
-import type { PartPatternKind } from './partPatternKind';
+import type { PatternOpening } from './partPatternKind';
 import { featureRowParts, selectStudioFeature } from './studioFeatureSelection';
 import { startExtrude } from './studioExtrude';
 import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts } from './studioParts';
@@ -1410,7 +1410,7 @@ export function CadEditor({
     kind: 'extrude' | 'pattern' | 'hole',
     partId: string,
     before = markCadSession(session),
-    initialPatternKind?: PartPatternKind
+    initialPatternKind?: PatternOpening
   ) => {
     partId = featureLeadId(documentRef.current, kind, partId);
     setSelectedFace(null);
@@ -1634,7 +1634,8 @@ export function CadEditor({
     setSelectedFace(null);
     setSelectedPlane(picked => (picked === plane ? null : plane));
   };
-  const studioCommand = (command: StudioCommand, initialPatternKind?: PartPatternKind) => {
+  const studioCommand = (command: StudioCommand, initialPatternKind?: PatternOpening): void => {
+    if (command === 'linearPattern') return studioCommand('pattern', 'linearPattern');
     setStudioRefusal(null);
     if (command === 'sketch') {
       closeDialog();
@@ -1666,10 +1667,9 @@ export function CadEditor({
     } else if (command === 'cutParts' || command === 'boolean')
       openDialog({ kind: 'partCut', ...(command === 'boolean' && { boolean: true }) });
     else if (command === 'extrude' && (selectedFace || part)) {
-      const mark = markCadSession(session),
-        before = mark.document;
+      const mark = markCadSession(session);
       const from = selectedFace ? { face: selectedFace } : { part: part! };
-      const started = startExtrude(before, from, sketchRowPicked === part?.id, profiles.pickedProfile);
+      const started = startExtrude(mark.document, from, sketchRowPicked === part?.id, profiles.pickedProfile);
       if ('refusal' in started) return setStudioRefusal(started.refusal);
       commit(started.document);
       openFeature('extrude', started.partId, mark);
@@ -1966,7 +1966,7 @@ export function CadEditor({
               onSelect={selectStudioFeature(doc, profiles.pickSketch, {
                 sketch: setSketchRowPicked,
                 face: () => setSelectedFace(null),
-                part: cutSelection.selectPart,
+                part: partPicking ? cutSelection.pickForCut : cutSelection.selectPart,
                 entities: () => setSelected([]),
               })}
               onAction={featureAction}

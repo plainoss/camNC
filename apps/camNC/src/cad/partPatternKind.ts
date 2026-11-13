@@ -2,6 +2,8 @@ import { setPartPattern, type CadDocument, type CadPartPattern } from '@wbcnc/ca
 import { circularPartPatternStart } from './circularPartPatternStart';
 
 export type PartPatternKind = 'linear' | 'circular';
+/** How a pattern dialog opens: a kind for the Pattern dialog, or the Linear pattern command's own dialog. */
+export type PatternOpening = PartPatternKind | 'linearPattern';
 
 /** The same conversion whether a kind is chosen in the dialog or explicitly in tool search. */
 export function partPatternForKind(

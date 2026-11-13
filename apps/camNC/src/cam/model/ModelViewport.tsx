@@ -18,6 +18,8 @@ import { sameFacePlane } from './faceHighlight';
 import { ModelConnector, type ViewConnector } from './ModelConnector';
 import { snapToFace } from './faceSnap';
 import { nearestEdgeBy, screenDistance, type ModelEdge } from './edgePick';
+import { CameraTap } from './CameraTap';
+import { edgeNearMiss } from './edgeNearMiss';
 import { measurementEntityAt, type ModelMeasurePick } from './measurementPick';
 import { ModelMeasurement, type ModelMeasureWitness } from './ModelMeasurement';
 import { ModelLights } from './ModelLights';
@@ -186,6 +188,7 @@ export function ModelViewport({
   // The studio shows a design where it is, about its origin, so hiding a part doesn't shift the rest.
   const assembled = useMemo(() => (palette === 'studio' ? new THREE.Matrix4() : centerAssembled(meshes)), [meshes, palette]);
   const exploded = useMemo(() => explodeAssembled(meshes, assembled), [meshes, assembled]);
+  const camera = useRef<THREE.Camera | null>(null);
   const matrices = useMemo(
     () =>
       view === 'flat'
@@ -333,11 +336,33 @@ export function ModelViewport({
         setHoveredFace(null);
         setHoveredConnector(null);
       }}
-      onPointerMissed={() => {
+      onPointerMissed={event => {
         onHover?.(null);
         setHoveredConnector(null);
+        // Picking a point or an edge, a click just off a part's edge, such as one seen edge-on, picks that edge.
+        const canvas = event.target instanceof HTMLCanvasElement ? event.target : null;
+        if (pickingConnector && canvas && camera.current) {
+          const box = canvas.getBoundingClientRect();
+          const pointer = { x: ((event.clientX - box.left) / box.width) * 2 - 1, y: -((event.clientY - box.top) / box.height) * 2 + 1 };
+          const bodies = meshes.map((mesh, i) => ({ ...(sourceMeshes?.[i] ?? mesh), matrix: matrices[i]! }));
+          const near = edgeNearMiss(camera.current, bodies, { width: box.width, height: box.height }, pointer, kEdgePixels);
+          if (near) {
+            const mesh = meshes[near.index]!;
+            const point = near.edge.a.map((value, axis) => (value + near.edge.b[axis]!) / 2) as [number, number, number];
+            const face: ModelFacePick = {
+              partId: mesh.partId,
+              index: near.index,
+              point,
+              surfacePoint: point,
+              normal: [0, 0, 1],
+              edge: near.edge,
+            };
+            return onPickFace ? onPickFace(face) : onSelect(mesh.partId, near.index, face);
+          }
+        }
         onMissed?.();
       }}>
+      <CameraTap cameraRef={camera} />
       <ModelLights />
       {sketchView ? (
         <SketchCamera view={sketchView} model={assembled} />

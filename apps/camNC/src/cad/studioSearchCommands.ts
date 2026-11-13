@@ -17,7 +17,8 @@ export function resolveStudioSearchCommand(id: SearchCommand['id']): Selection |
 
 export function studioSearchCommands(disabled: Partial<Record<StudioCommand, string>>): SearchCommand[] {
   return kStudioCommands.flatMap<SearchCommand>(({ id, label, hint, glyph }) => {
-    if (disabled[id]) return [];
+    // Search lists Linear pattern under Pattern, where both open the same dialog.
+    if (disabled[id] || id === 'linearPattern') return [];
     if (id === 'pattern')
       return [
         { id: 'linearPartPattern', label: 'Linear pattern', description: 'Copies of the selected part in a row', glyph },
