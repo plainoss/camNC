@@ -1,5 +1,7 @@
 import { activeDesign, consumedTools, isCadPart, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { isBlank } from './editorHelpers';
+import type { StudioDialog } from './studioDialog';
+import { unpickedExtrudePreview } from './unpickedExtrude';
 
 /** Physical parts in the studio: suppressed copies and consumed tools retain source settings but have no visible row. */
 export function builtStudioParts(document: CadDocument): CadPart[] {
@@ -9,9 +11,13 @@ export function builtStudioParts(document: CadDocument): CadPart[] {
   return active.parts.filter(part => isCadPart(part) && !consumed.has(part.id));
 }
 
-/** The parts the studio's Parts list shows: a new design's untouched placeholder Part 1 is not one yet. */
-export function listedStudioParts(document: CadDocument): CadPart[] {
-  return isBlankDesign(document) ? [] : builtStudioParts(document);
+/**
+ * The parts the studio's Parts list shows: a new design's untouched placeholder Part 1 is not one yet, nor is the part
+ * of an open Extrude with no region picked.
+ */
+export function listedStudioParts(document: CadDocument, dialog?: StudioDialog | null): CadPart[] {
+  if (isBlankDesign(document)) return [];
+  return builtStudioParts(unpickedExtrudePreview(document, dialog?.kind === 'extrude' ? dialog.partId : null));
 }
 
 /** A new design, untouched: its only part is the placeholder sketch with nothing drawn yet. */

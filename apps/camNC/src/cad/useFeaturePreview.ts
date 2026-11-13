@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { designSteps, rolledBackTo } from '@wbcnc/cad';
 import { apartExtrudePreview, apartPartIds, withoutApartRegionProblem } from './apartExtrudePreview';
 import { offerFinalPreview } from './finalPreview';
+import { unpickedExtrudePreview, withoutUnpickedProblem } from './unpickedExtrude';
 import { editedStepId, type StudioDialog } from './studioDialog';
 
 interface PreviewOptions {
@@ -41,7 +42,10 @@ export function useFeaturePreview({ document, enabled, blank, rolledTo, dialog, 
     () =>
       blank
         ? { ...document, parts: [] }
-        : apartExtrudePreview(rolledBack ? rolledBackTo(document, rolledBack) : document, extrudingId, apartIds),
+        : unpickedExtrudePreview(
+            apartExtrudePreview(rolledBack ? rolledBackTo(document, rolledBack) : document, extrudingId, apartIds),
+            extrudingId
+          ),
     [document, blank, rolledBack, extrudingId, apartIds]
   );
   // The steps below the bar the user rolled to: left out of the view, whatever their eye was set to. A feature dialog's
@@ -60,6 +64,9 @@ export function useFeaturePreview({ document, enabled, blank, rolledTo, dialog, 
     lastCheckedRevision.current = '';
     setCheckEpoch(epoch => epoch + 1);
   }, [extrudingId, lastCheckedRevision, setCheckEpoch]);
-  const solveFeedback = useCallback((result: CadSolveResult) => withoutApartRegionProblem(result, extruding.current), []);
+  const solveFeedback = useCallback(
+    (result: CadSolveResult) => withoutUnpickedProblem(withoutApartRegionProblem(result, extruding.current), extruding.current),
+    []
+  );
   return { rollbackStep, userRollback, shownDocument, pastRollback, solveFeedback, apartIds };
 }

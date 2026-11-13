@@ -141,6 +141,8 @@ export function ExtrudeDialog({
   const [removeError, setRemoveError] = useState<string | null>(null);
   /** Regions kept that the extrude can still take, given which of them it picks from. */
   const keptRegions = (p: CadPart, available: string[]) => p.regions?.filter(id => available.includes(id));
+  // Nothing picked yet stays so on another tab, rather than becoming the whole sketch.
+  const nonePicked = (p: CadPart) => p.regions?.length === 0;
   const switchTo = (next: ExtrudeOperation) => {
     setOperationError(null);
     if (next === operation) return;
@@ -179,7 +181,7 @@ export function ExtrudeDialog({
                   p,
                   found.regions.map(region => region.id)
                 );
-          if (regions?.length) made.regions = regions;
+          if (regions?.length || nonePicked(p)) made.regions = regions ?? [];
         } else if (next === 'add') {
           const into = mergeable[0]!;
           // A solid face names the profile, not the body to join: that scope must be picked explicitly.
@@ -187,11 +189,11 @@ export function ExtrudeDialog({
           if (sharesSketch(into, p)) made.regions = (keptRegions(p, own) ?? []).filter(id => !into.regions!.includes(id));
           else {
             const regions = keptRegions(p, own);
-            if (regions?.length || p.sketchOf) made.regions = regions ?? [];
+            if (regions?.length || p.sketchOf || nonePicked(p)) made.regions = regions ?? [];
           }
         } else {
           const regions = keptRegions(p, own);
-          if (regions?.length || p.sketchOf) made.regions = regions ?? [];
+          if (regions?.length || p.sketchOf || nonePicked(p)) made.regions = regions ?? [];
         }
         return made;
       })
@@ -223,9 +225,11 @@ export function ExtrudeDialog({
       ? drawnOnName(document, part.drawnOn.on)
       : regionCount === null
         ? sketchStepLabel(owner)
-        : regionCount === 1
-          ? `A region of ${sketchStepLabel(owner)}`
-          : `${regionCount} regions of ${sketchStepLabel(owner)}`;
+        : regionCount === 0
+          ? 'No region picked yet'
+          : regionCount === 1
+            ? `A region of ${sketchStepLabel(owner)}`
+            : `${regionCount} regions of ${sketchStepLabel(owner)}`;
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';
@@ -442,14 +446,19 @@ export function ExtrudeDialog({
               )}
             </div>
           )}
-          {profileError && (
-            <p role="alert" className="cad-thickness-error">
-              {part.faceProfile
-                ? (stepProblem ?? profileError.message)
-                : part.regions
-                  ? profileError.message
-                  : 'Pick a region of the sketch in the view.'}
-            </p>
+          {/* Nothing picked yet isn't a problem, only what to do next. */}
+          {profileError && !part.faceProfile && part.regions?.length === 0 ? (
+            <p>Pick a region of the sketch in the view.</p>
+          ) : (
+            profileError && (
+              <p role="alert" className="cad-thickness-error">
+                {part.faceProfile
+                  ? (stepProblem ?? profileError.message)
+                  : part.regions
+                    ? profileError.message
+                    : 'Pick a region of the sketch in the view.'}
+              </p>
+            )
           )}
           {solidControls && !part.thin && part.drawnOn && (
             <label className="cad-number-field">
