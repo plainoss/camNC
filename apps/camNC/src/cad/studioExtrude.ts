@@ -11,6 +11,9 @@ import {
 } from '@wbcnc/cad';
 import { extrudedSketch, isSingleLine, replacePart, wholeSketch } from './editorHelpers';
 
+/** A new board's thickness when nothing else sets it, as a new sketch's part has. */
+export const kDefaultThickness = 18;
+
 type PickedFace = Extract<CadDrawnOn['on'], { partId: string }>;
 
 /** The design with a new Extrude in it, and the step its dialog edits, or why it can't start. */
@@ -51,9 +54,11 @@ export function startExtrude(
     };
     return { document: replacePart(before, part.id, p => pickedProfile(started(p))), partId: part.id };
   }
-  // Extrude always starts a new extrude, of the part's sketch here, as in the reference: it starts with the regions
-  // the sketch's extrudes leave, or none, or with them all when asked. An extrude already made is edited from its step.
+  // Extrude always starts a new extrude, of the part's sketch here: with all of it when asked, otherwise with none
+  // picked and the default thickness rather than the last one used, unless that follows a variable. An extrude already
+  // made is edited from its step.
   const next = newExtrudeOf(before, part, `Part ${before.parts.length + 1}`);
-  const made = pickedProfile(pickAll ? wholeSketch(next) : next);
+  const fresh = { ...next, regions: [], ...(!next.thicknessExpression && { thickness: kDefaultThickness }) };
+  const made = pickedProfile(pickAll ? wholeSketch(next) : fresh);
   return { document: { ...before, revision: before.revision + 1, parts: [...before.parts, made] }, partId: made.id };
 }

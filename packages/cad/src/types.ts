@@ -500,7 +500,7 @@ export interface CadCut {
   depthExpression?: string;
   /** Switched off: the part evaluates as if the cut weren't there, and it keeps its depth for when it's back on. */
   suppressed?: boolean;
-  /** The Extrude → Remove step that makes this cut, kept in step with it by the design. */
+  /** The Extrude → Remove step that makes this cut, or the Extrude → Add that steps its part down, kept in step with it. */
   removedBy?: string;
 }
 export type CadFeature = CadFaceSketch | CadCut;

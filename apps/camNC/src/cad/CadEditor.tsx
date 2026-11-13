@@ -1668,7 +1668,7 @@ export function CadEditor({
       const mark = markCadSession(session),
         before = mark.document;
       const from = selectedFace ? { face: selectedFace } : { part: part! };
-      const started = startExtrude(before, from, part?.extrude === false && sketchRowPicked === part.id, profiles.pickedProfile);
+      const started = startExtrude(before, from, sketchRowPicked === part?.id, profiles.pickedProfile);
       if ('refusal' in started) return setStudioRefusal(started.refusal);
       commit(started.document);
       openFeature('extrude', started.partId, mark);

@@ -117,8 +117,6 @@ export function ExtrudeDialog({
     });
   };
   const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo !== undefined ? 'add' : 'new';
-  const mergeTarget = document.parts.find(candidate => candidate.id === part.addTo);
-  const ownExtrusion = operation !== 'add' || !mergeTarget || !sharesSketch(mergeTarget, part);
   const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
   // The parts an Add can join: those made from the same sketch, of regions picked from it, which it adds regions to, and
   // any other part, which it's joined to as a body of its own. The part its sketch is drawn on comes first.
@@ -240,7 +238,7 @@ export function ExtrudeDialog({
   // Regions picked apart are fine for New: each group becomes a part of its own on OK.
   const apart = operation === 'new' && splitApartRegions(document, part.id) !== document;
   const profileError =
-    operation === 'remove' || !ownExtrusion || part.thin || apart || (part.regions?.length === 0 && alsoMade.length)
+    operation === 'remove' || part.thin || apart || (part.regions?.length === 0 && alsoMade.length)
       ? undefined
       : evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
   const [depthText, setDepthText] = useState(part.thin ? (part.thin.depthExpression ?? lengthText(part.thin.depth)) : lengthText(100));
@@ -412,219 +410,217 @@ export function ExtrudeDialog({
           )}
         </>
       ) : null}
-      {ownExtrusion && (
-        <>
-          {operation === 'new' && part.drawnOn && (
-            // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
-            <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
-              <button type="button" role="tab" aria-selected={!part.thin} onClick={() => setThin(null)}>
-                Solid
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={!!part.thin}
-                onClick={() => {
-                  const parsed = parseCadValue(depthText, { unit: 'mm', variables });
-                  setThin({ depth: 'error' in parsed || parsed.value <= 0 ? 100 : parsed.value, midPlane: true });
-                }}>
-                Thin
-              </button>
-            </div>
-          )}
-          {operation === 'new' && (
-            <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
-              <small>{part.faceProfile ? 'Face to extrude' : 'Sketch to extrude'}</small>
-              <span>{selection}</span>
-              <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
-                Select profile
-              </button>
-              {!part.faceProfile && (
-                <button type="button" onClick={onEditSketch}>
-                  Edit sketch
-                </button>
-              )}
-            </div>
-          )}
-          {/* Nothing picked yet isn't a problem, only what to do next. */}
-          {profileError && !part.faceProfile && part.regions?.length === 0 ? (
-            <p>Pick a region of the sketch in the view.</p>
-          ) : (
-            profileError && (
-              <p role="alert" className="cad-thickness-error">
-                {part.faceProfile
-                  ? (stepProblem ?? profileError.message)
-                  : part.regions
-                    ? profileError.message
-                    : 'Pick a region of the sketch in the view.'}
-              </p>
-            )
-          )}
-          {solidControls && !part.thin && part.drawnOn && (
-            <label className="cad-number-field">
-              End type
-              <select
-                aria-label="End type"
-                value={part.upTo || pickingFace ? 'upTo' : 'blind'}
-                onChange={event => {
-                  if (event.target.value === 'upTo') return startPickingFace();
-                  stopPickingFace();
-                  setUpTo(null);
-                }}>
-                <option value="blind">Blind</option>
-                <option value="upTo">Up to face</option>
-              </select>
-            </label>
-          )}
-          {(part.upTo || pickingFace) && (
+      <>
+        {operation === 'new' && part.drawnOn && (
+          // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
+          <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
+            <button type="button" role="tab" aria-selected={!part.thin} onClick={() => setThin(null)}>
+              Solid
+            </button>
             <button
               type="button"
-              className="cad-feature-selection"
-              aria-label="Up to"
-              data-active={pickingFace ? '' : undefined}
-              onClick={startPickingFace}>
-              <small>Up to</small>
-              <span>
-                {part.upTo
-                  ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${formatLength(part.thickness)} ${lengthUnit} away`
-                  : 'Pick a plane or a face'}
-              </span>
+              role="tab"
+              aria-selected={!!part.thin}
+              onClick={() => {
+                const parsed = parseCadValue(depthText, { unit: 'mm', variables });
+                setThin({ depth: 'error' in parsed || parsed.value <= 0 ? 100 : parsed.value, midPlane: true });
+              }}>
+              Thin
             </button>
-          )}
-          {!part.upTo && !pickingFace && !part.thin && part.drawnOn && part.remove?.depth !== 'through' && (
+          </div>
+        )}
+        {operation === 'new' && (
+          <div className="cad-feature-selection" data-active={profileError && !part.regions?.length ? '' : undefined}>
+            <small>{part.faceProfile ? 'Face to extrude' : 'Sketch to extrude'}</small>
+            <span>{selection}</span>
+            <button type="button" aria-pressed={profilePicking} onClick={onPickProfile}>
+              Select profile
+            </button>
+            {!part.faceProfile && (
+              <button type="button" onClick={onEditSketch}>
+                Edit sketch
+              </button>
+            )}
+          </div>
+        )}
+        {/* Nothing picked yet isn't a problem, only what to do next. */}
+        {profileError && !part.faceProfile && part.regions?.length === 0 ? (
+          <p>Pick a region of the sketch in the view.</p>
+        ) : (
+          profileError && (
+            <p role="alert" className="cad-thickness-error">
+              {part.faceProfile
+                ? (stepProblem ?? profileError.message)
+                : part.regions
+                  ? profileError.message
+                  : 'Pick a region of the sketch in the view.'}
+            </p>
+          )
+        )}
+        {solidControls && !part.thin && part.drawnOn && (
+          <label className="cad-number-field">
+            End type
+            <select
+              aria-label="End type"
+              value={part.upTo || pickingFace ? 'upTo' : 'blind'}
+              onChange={event => {
+                if (event.target.value === 'upTo') return startPickingFace();
+                stopPickingFace();
+                setUpTo(null);
+              }}>
+              <option value="blind">Blind</option>
+              <option value="upTo">Up to face</option>
+            </select>
+          </label>
+        )}
+        {(part.upTo || pickingFace) && (
+          <button
+            type="button"
+            className="cad-feature-selection"
+            aria-label="Up to"
+            data-active={pickingFace ? '' : undefined}
+            onClick={startPickingFace}>
+            <small>Up to</small>
+            <span>
+              {part.upTo
+                ? `${document.planes?.find(plane => plane.id === part.upToDatum)?.name ?? drawnOnName(document, part.upTo)}, ${formatLength(part.thickness)} ${lengthUnit} away`
+                : 'Pick a plane or a face'}
+            </span>
+          </button>
+        )}
+        {!part.upTo && !pickingFace && !part.thin && part.drawnOn && part.remove?.depth !== 'through' && (
+          <label>
+            <input
+              type="checkbox"
+              checked={!!part.symmetric}
+              onChange={event =>
+                onChange(document =>
+                  changePart(document, part.id, p => {
+                    const next = { ...p };
+                    if (event.target.checked) next.symmetric = true;
+                    else delete next.symmetric;
+                    return next;
+                  })
+                )
+              }
+            />
+            Symmetric
+          </label>
+        )}
+        {!part.upTo && !part.symmetric && part.drawnOn && !part.thin?.midPlane && (
+          // The other way out of the sketch's plane, or into the face it's drawn on, for a thin board as for a solid one.
+          <button
+            type="button"
+            className="cad-flip-direction"
+            aria-label="Flip direction"
+            title="Extrude the other way"
+            aria-pressed={part.remove ? removalInward(part) : !!part.drawnOn.inward}
+            onClick={() =>
+              onChange(document =>
+                changePart(document, part.id, p => {
+                  const drawnOn = { ...p.drawnOn! };
+                  if (p.remove) drawnOn.inward = !removalInward(p);
+                  else if (drawnOn.inward) delete drawnOn.inward;
+                  else drawnOn.inward = true;
+                  return { ...p, drawnOn };
+                })
+              )
+            }>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3" />
+            </svg>
+          </button>
+        )}
+        {solidControls && !part.upTo && (
+          <CadThicknessField
+            livePreview
+            key={`${part.id}:thickness:${depthDragging}`}
+            value={part.thickness}
+            expression={part.thicknessExpression}
+            variables={variables}
+            onValidityChange={setThicknessValid}
+            onCommit={(thickness, thicknessExpression) =>
+              onChange(document =>
+                changePart(document, part.id, p => {
+                  const next = { ...p, thickness, thicknessExpression };
+                  if (thicknessExpression === undefined) delete next.thicknessExpression;
+                  return next;
+                })
+              )
+            }
+          />
+        )}
+        {part.thin && (
+          <>
+            <label className="cad-number-field">
+              Depth
+              <span>
+                <CadValueInput
+                  bare
+                  aria-label="Depth"
+                  value={depthText}
+                  spellCheck={false}
+                  aria-invalid={depthError ? true : undefined}
+                  onChange={event => {
+                    setDepthText(event.target.value);
+                    applyDepth(event.target.value, true);
+                  }}
+                  onBlur={() => applyDepth()}
+                  onKeyDown={event => {
+                    // A depth that isn't taken keeps the dialog open to fix it, rather than Enter keeping the old one.
+                    if (event.key === 'Enter' && !applyDepth()) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }
+                  }}
+                />
+              </span>
+              {lengthUnit}
+            </label>
+            {depthError && (
+              <p role="alert" className="cad-thickness-error">
+                {depthError}
+              </p>
+            )}
             <label>
               <input
                 type="checkbox"
-                checked={!!part.symmetric}
-                onChange={event =>
-                  onChange(document =>
-                    changePart(document, part.id, p => {
-                      const next = { ...p };
-                      if (event.target.checked) next.symmetric = true;
-                      else delete next.symmetric;
-                      return next;
-                    })
-                  )
-                }
+                checked={!!part.thin.midPlane}
+                onChange={event => setThin({ ...part.thin!, midPlane: event.target.checked })}
               />
-              Symmetric
+              Mid plane
             </label>
-          )}
-          {!part.upTo && !part.symmetric && part.drawnOn && !part.thin?.midPlane && (
-            // The other way out of the sketch's plane, or into the face it's drawn on, for a thin board as for a solid one.
-            <button
-              type="button"
-              className="cad-flip-direction"
-              aria-label="Flip direction"
-              title="Extrude the other way"
-              aria-pressed={part.remove ? removalInward(part) : !!part.drawnOn.inward}
-              onClick={() =>
-                onChange(document =>
-                  changePart(document, part.id, p => {
-                    const drawnOn = { ...p.drawnOn! };
-                    if (p.remove) drawnOn.inward = !removalInward(p);
-                    else if (drawnOn.inward) delete drawnOn.inward;
-                    else drawnOn.inward = true;
-                    return { ...p, drawnOn };
-                  })
-                )
-              }>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3" />
-              </svg>
-            </button>
-          )}
-          {solidControls && !part.upTo && (
-            <CadThicknessField
-              livePreview
-              key={`${part.id}:thickness:${depthDragging}`}
-              value={part.thickness}
-              expression={part.thicknessExpression}
-              variables={variables}
-              onValidityChange={setThicknessValid}
-              onCommit={(thickness, thicknessExpression) =>
-                onChange(document =>
-                  changePart(document, part.id, p => {
-                    const next = { ...p, thickness, thicknessExpression };
-                    if (thicknessExpression === undefined) delete next.thicknessExpression;
-                    return next;
-                  })
-                )
-              }
-            />
-          )}
-          {part.thin && (
-            <>
-              <label className="cad-number-field">
-                Depth
-                <span>
-                  <CadValueInput
-                    bare
-                    aria-label="Depth"
-                    value={depthText}
-                    spellCheck={false}
-                    aria-invalid={depthError ? true : undefined}
-                    onChange={event => {
-                      setDepthText(event.target.value);
-                      applyDepth(event.target.value, true);
-                    }}
-                    onBlur={() => applyDepth()}
-                    onKeyDown={event => {
-                      // A depth that isn't taken keeps the dialog open to fix it, rather than Enter keeping the old one.
-                      if (event.key === 'Enter' && !applyDepth()) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }
-                    }}
-                  />
-                </span>
-                {lengthUnit}
-              </label>
-              {depthError && (
-                <p role="alert" className="cad-thickness-error">
-                  {depthError}
-                </p>
-              )}
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!!part.thin.midPlane}
-                  onChange={event => setThin({ ...part.thin!, midPlane: event.target.checked })}
-                />
-                Mid plane
-              </label>
-            </>
-          )}
-          {part.drawnOn && (
-            <CadDrawnOnField
-              livePreview
-              key={`${part.id}:drawn-on`}
-              inwardToggle={false}
-              document={document}
-              part={part as CadPart & { drawnOn: NonNullable<CadPart['drawnOn']> }}
-              variables={variables}
-              onChange={drawnOn => onChange(document => changePart(document, part.id, p => ({ ...p, drawnOn })))}
-            />
-          )}
-          {solidControls && (
-            <CadReliefField
-              livePreview
-              key={`${part.id}:relief`}
-              relief={part.cornerRelief}
-              variables={variables}
-              onChange={cornerRelief =>
-                onChange(document =>
-                  changePart(document, part.id, p => {
-                    const next = { ...p, cornerRelief };
-                    if (!cornerRelief) delete next.cornerRelief;
-                    return next;
-                  })
-                )
-              }
-            />
-          )}
-        </>
-      )}
+          </>
+        )}
+        {part.drawnOn && (
+          <CadDrawnOnField
+            livePreview
+            key={`${part.id}:drawn-on`}
+            inwardToggle={false}
+            document={document}
+            part={part as CadPart & { drawnOn: NonNullable<CadPart['drawnOn']> }}
+            variables={variables}
+            onChange={drawnOn => onChange(document => changePart(document, part.id, p => ({ ...p, drawnOn })))}
+          />
+        )}
+        {solidControls && (
+          <CadReliefField
+            livePreview
+            key={`${part.id}:relief`}
+            relief={part.cornerRelief}
+            variables={variables}
+            onChange={cornerRelief =>
+              onChange(document =>
+                changePart(document, part.id, p => {
+                  const next = { ...p, cornerRelief };
+                  if (!cornerRelief) delete next.cornerRelief;
+                  return next;
+                })
+              )
+            }
+          />
+        )}
+      </>
     </FeatureDialog>
   );
 }

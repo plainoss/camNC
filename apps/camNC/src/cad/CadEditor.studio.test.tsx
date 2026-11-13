@@ -831,18 +831,23 @@ async function splitShelf() {
   return { latest, features, wide, narrow };
 }
 
-it('extrudes a sketch already used again, as a new part of the regions left, sharing the sketch', async () => {
+it('extrudes a sketch already used again, as a new part of a region picked from it, sharing the sketch', async () => {
   const { latest, features, narrow } = await splitShelf();
-  await userEvent.click(within(features).getByRole('button', { name: /Sketch · Shelf/ }));
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Extrude/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
   expect(within(operation(dialog)).getByRole('tab', { name: 'New' }).getAttribute('aria-selected')).toBe('true');
   await waitFor(() => expect(latest().parts).toHaveLength(2));
-  const made = latest().parts[1]!;
-  expect(made).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [narrow] });
+  // Nothing selected first, it starts with no region picked, at the default thickness rather than the shelf's.
+  expect(latest().parts[1]).toMatchObject({ sketchOf: latest().parts[0]!.id, regions: [], thickness: 18 });
+  expect(within(dialog).getByText('No region picked yet')).toBeDefined();
+  const shelf = latest().parts[0]!.id;
+  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
+  await userEvent.click(within(features).getByTitle('Show Sketch · Shelf in the view'));
+  await settled();
+  act(() => props().onPickRegion!(JSON.stringify([shelf, narrow])));
+  await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow]));
   expect(within(dialog).getByText('A region of Sketch · Shelf')).toBeDefined();
   // The regions show in the view, the one picked marked.
-  const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await waitFor(() =>
     expect(
       props()
@@ -864,10 +869,9 @@ it('extrudes a sketch already used again, as a new part of the regions left, sha
 
 it('picks a further region of the shared sketch in the view into the same extrude, and takes it out when picked again', async () => {
   const { latest, features, wide, narrow } = await splitShelf();
-  await userEvent.click(within(features).getByRole('button', { name: /Sketch · Shelf/ }));
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Extrude/ }));
   const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 2' });
-  await waitFor(() => expect(latest().parts[1]?.regions).toEqual([narrow]));
+  await waitFor(() => expect(latest().parts[1]?.regions).toEqual([]));
   const shelf = latest().parts[0]!.id;
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   // With the shelf's sketch shown in the view, its regions can be clicked there.
@@ -879,6 +883,8 @@ it('picks a further region of the shared sketch in the view into the same extrud
     expect(props().regions?.some(view => view.id === id)).toBe(true);
     act(() => props().onPickRegion!(id));
   };
+  pickSketchRegion(narrow);
+  await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow]));
   pickSketchRegion(wide);
   await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow, wide]));
   expect(within(dialog).getByText('2 regions of Sketch · Shelf')).toBeDefined();

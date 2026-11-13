@@ -15,14 +15,40 @@ export const sketchOwnerId = (part: CadPart): string => part.sketchOf ?? part.id
 /** Whether two parts extrude the same sketch. */
 export const sharesSketch = (a: CadPart, b: CadPart): boolean => sketchOwnerId(a) === sketchOwnerId(b);
 
+/** What sets how far and which way a part is extruded from its sketch. */
+const depthKeys = ['thickness', 'thicknessExpression', 'upTo', 'upToDatum', 'symmetric', 'thin'] as const;
+
 /**
- * Whether a part is an Extrude → Add of another sketch: a body of its own, joined to the part it adds to. It's built and
+ * How far below a part's top an Extrude → Add of the part's own sketch ends: 0 when it extrudes its regions just as far
+ * and the same way, the step down when it is a plain extrude that ends lower, or null when it's neither.
+ */
+export function addedRegionStep(target: CadPart, step: CadPart): number | null {
+  if (!sharesSketch(target, step) || !target.drawnOn?.inward !== !step.drawnOn?.inward) return null;
+  if (depthKeys.every(key => JSON.stringify(target[key]) === JSON.stringify(step[key]))) return 0;
+  const plain = (part: CadPart) => !part.upTo && !part.upToDatum && !part.symmetric && !part.thin;
+  const below = target.thickness - step.thickness;
+  return plain(target) && plain(step) && below >= MIN_ADDED_STEP ? below : null;
+}
+
+/** The smallest step down an Add's regions can end at, as the shallowest cut. */
+const MIN_ADDED_STEP = 0.1;
+
+/**
+ * Whether an Extrude → Add of a part's own sketch makes its regions part of that part's profile: it extrudes them as far,
+ * or less far, the same way; less far, the part is stepped down over them. Otherwise, as when it ends beyond the part's
+ * top, it is a body joined to the part, as another sketch's Add is.
+ */
+export const addsRegionsTo = (target: CadPart, step: CadPart): boolean => addedRegionStep(target, step) !== null;
+
+/**
+ * Whether a part is an Extrude → Add of another sketch, or of the same one with a depth of its own: a body of its own,
+ * joined to the part it adds to. It's built and
  * made like a part, but listed as part of that one. How it's machined, as one piece or several, is decided later.
  */
 export function isJoinedBody(document: Pick<CadDocument, 'parts'>, part: CadPart): boolean {
   if (!part.addTo || part.extrude === false || part.suppressed || part.remove || copyFaceOperationProblem(part)) return false;
   const target = document.parts.find(candidate => candidate.id === part.addTo);
-  return !!target && isCadPart(target) && !sharesSketch(target, part);
+  return !!target && isCadPart(target) && !addsRegionsTo(target, part);
 }
 
 /** The parts and the bodies joined to them: everything built as a solid. */
@@ -223,13 +249,27 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
   });
 
   const added = new Map<string, string[]>();
+  // An Add that ends lower than its part steps the part down over its regions, as a cut from the top kept with the Add.
+  const removed = new Map<string, CadFeature[]>();
   for (const step of parts) {
     const target = step.addTo && parts.find(part => part.id === step.addTo);
     // A suppressed Add adds nothing, as in the reference.
     // Nor does one not extruded, such as a sketch whose extrude was deleted.
-    if (step.suppressed || step.extrude === false || !target || !target.regions || !sharesSketch(target, step) || step.addTo === step.id)
-      continue;
+    const below = target && addedRegionStep(target, step);
+    if (step.suppressed || step.extrude === false || !target || !target.regions || below === null || step.addTo === step.id) continue;
     added.set(target.id, [...(added.get(target.id) ?? []), ...(step.regions ?? [])]);
+    if (!below) continue;
+    const steps = (step.regions ?? []).map(
+      (regionId): CadCut => ({
+        type: 'cut',
+        id: `${step.id}:cut:${regionId}`,
+        sketchId: target.sketch.id,
+        regionId,
+        depth: below,
+        removedBy: step.id,
+      })
+    );
+    removed.set(target.id, [...(removed.get(target.id) ?? []), ...steps]);
   }
   parts = parts.map(part => {
     const regions = added.get(part.id);
@@ -240,7 +280,6 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
     return next;
   });
 
-  const removed = new Map<string, CadFeature[]>();
   const resolved = { ...document, parts };
   for (const step of parts) {
     // A suppressed Remove cuts nothing, and nor does a sketch not extruded.
@@ -304,12 +343,11 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
   if (part.addTo) {
     const target = document.parts.find(candidate => candidate.id === part.addTo);
     if (!target) return 'The part it adds to is gone. Pick another, or make a new part.';
-    // Another sketch's extrude is joined as a body of its own: it only needs a profile to extrude.
-    if (!sharesSketch(target, part)) {
+    // Another sketch's extrude, or one with a depth of its own, is joined as a body of its own: it only needs a profile.
+    if (!addsRegionsTo(target, part)) {
       const problem = evaluateCadPart(part).diagnostics.find(diagnostic => diagnostic.severity === 'error');
       return problem ? (part.regions ? problem.message : 'Pick a region of the sketch in the view.') : null;
     }
-    if (!sharesSketch(target, part)) return `Add joins regions of the sketch ${target.name} is made from.`;
     if (!target.regions) return `${target.name} is its whole sketch already.`;
     if (!part.regions?.length) return 'Pick the regions to add in the view.';
     const problem = evaluateCadPart({ ...target, addedRegions: [...(target.addedRegions ?? []), ...part.regions] }).diagnostics.find(
@@ -354,7 +392,7 @@ export function extrudeStepProblem(document: CadDocument, part: CadPart): string
  * so copies, face sketches and later cuts still work. A same-sketch Add or Remove has no body of its own.
  */
 export function partIsBuiltOn(document: CadDocument, part: CadPart, addTo?: CadPart): string | null {
-  const keepsBody = !!addTo && !sharesSketch(addTo, part);
+  const keepsBody = !!addTo && !addsRegionsTo(addTo, part);
   if (
     !keepsBody &&
     (part.copies?.length ||

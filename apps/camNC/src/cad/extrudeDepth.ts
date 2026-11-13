@@ -3,7 +3,7 @@ import {
   cadSketchFrame,
   evaluateCadPart,
   resolveDrawnPlacements,
-  sharesSketch,
+  addsRegionsTo,
   rotateVector,
   type CadDocument,
 } from '@wbcnc/cad';
@@ -51,8 +51,8 @@ export function extrudeDepthView(document: CadDocument, partId: string): Extrude
     y = (Math.min(...ys) + Math.max(...ys)) / 2;
   const inward = part.drawnOn?.inward ? -1 : 1;
   const target = part.addTo && placed.parts.find(candidate => candidate.id === part.addTo);
-  // A shared-sketch Add has no independent end; its target owns the extrusion depth.
-  if (target && sharesSketch(target, part)) return null;
+  // An Add folded into its target's regions has no independent end; its target owns the extrusion depth.
+  if (target && addsRegionsTo(target, part)) return null;
   return {
     partId,
     origin: frame.origin.map((value, axis) => value + frame.x[axis]! * x + frame.y[axis]! * y) as Vec,

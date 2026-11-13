@@ -52,3 +52,17 @@ it('keeps showing an open extrude with nothing picked that still builds, as a th
   const thin = { ...createCadDocument(), parts: [{ ...board, regions: [], thin: { depth: 10, midPlane: true } }] };
   expect(unpickedExtrudePreview(thin, board.id)).toBe(thin);
 });
+
+it('starts another extrude of an extruded sketch with none picked and the default thickness, or all of it when asked', () => {
+  const first = started(sketched());
+  const [region] = sketchRegions(first.document.parts[0]!.sketch, CAD_CHORD_TOLERANCE);
+  const made = withRegionToggled(first.document, first.partId, region!.id);
+  const extruded = { ...made, parts: made.parts.map(p => ({ ...p, thickness: 40 })) };
+  const again = (pickAll: boolean) => {
+    const result = startExtrude(extruded, { part: extruded.parts[0]! }, pickAll, part => part);
+    if ('refusal' in result) throw new Error(result.refusal);
+    return result.document.parts.find(p => p.id === result.partId)!;
+  };
+  expect(again(false)).toMatchObject({ regions: [], thickness: 18 });
+  expect(again(true).regions).toBeUndefined();
+});

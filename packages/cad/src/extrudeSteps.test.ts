@@ -121,6 +121,22 @@ describe('Extrude → Add', () => {
     expect(resolveExtrudeSteps(design(document.parts[0]!)).parts[0]!.addedRegions).toBeUndefined();
   });
 
+  it('steps the part down over regions it adds less far, and is a joined body when it ends beyond the part', () => {
+    const { owner, narrow } = splitDesign();
+    const lower = resolveExtrudeSteps(design(owner, second(owner, [narrow], { addTo: owner.id, thickness: 10 })));
+    expect(lower.parts[0]!.addedRegions).toEqual([narrow]);
+    expect(cadCuts(lower.parts[0]!)).toMatchObject([{ sketchId: owner.sketch.id, regionId: narrow, depth: 8, removedBy: 'second' }]);
+    const [shelf] = evaluateCadDocument(lower).parts;
+    expect([area(shelf!.outline), shelf!.thickness]).toEqual([5000, 18]);
+    expect(isJoinedBody(lower, lower.parts[1]!)).toBe(false);
+    // Just as far, its regions are the part's own; further, it can't be a step down.
+    const level = resolveExtrudeSteps(design(owner, second(owner, [narrow], { addTo: owner.id, thickness: 18 })));
+    expect(cadCuts(level.parts[0]!)).toEqual([]);
+    const higher = resolveExtrudeSteps(design(owner, second(owner, [narrow], { addTo: owner.id, thickness: 25 })));
+    expect(higher.parts[0]!.addedRegions).toBeUndefined();
+    expect(isJoinedBody(higher, higher.parts[1]!)).toBe(true);
+  });
+
   it('says why when it can’t add', () => {
     const { owner, narrow } = splitDesign();
     const other = { ...createCadPart('Other', 18), id: 'other' };
