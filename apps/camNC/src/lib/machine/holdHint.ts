@@ -263,7 +263,8 @@ function readZBefore(lines: Line[], index: number): ZBefore | null {
     if (machine) {
       // G53 is in machine coordinates either way, also in G91.
       lastMachine = units ? { z: z.value, units } : null;
-      last = units ? { z: z.value, machine, units, lift: motion === 0 } : null;
+      // A G53 Z move is a lift at rapid or feed (G53 G1 Z0): posts move to a machine Z to park the bit, never to cut.
+      last = units ? { z: z.value, machine, units, lift: true } : null;
       workZ = undefined;
       // A feed move in machine coordinates: how high it cut in work coordinates is not known.
       if (feed) highestCut = Infinity;
