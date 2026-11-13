@@ -189,5 +189,162 @@
         }
       }
     ]
+  },
+  {
+    "id": "studio/extrude/regions-new-then-add-lower",
+    "title": "Overlapping rectangle and circle regions extrude separately: two as a new part 40 deep, then the rest as an Add 25 deep that steps the part down, as one part",
+    "evidence": "design region picks, an empty later Extrude at the default thickness, and Add with its own depth",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key g",
+      {
+        "spec": "5 draw"
+      },
+      "rect 0,0 80,40",
+      {
+        "spec": "6 command"
+      },
+      "key c",
+      {
+        "spec": "7 draw"
+      },
+      "circle 80,20 20",
+      {
+        "expect": {
+          "regions": 3
+        }
+      },
+      {
+        "spec": "8 confirm"
+      },
+      "closesketch",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null
+          }
+        }
+      },
+      {
+        "spec": "9 command"
+      },
+      "key Shift+e",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 0,
+              "picking": true
+            }
+          }
+        }
+      },
+      {
+        "spec": "10 pick"
+      },
+      "viewpick 30,20,0",
+      {
+        "spec": "11 pick"
+      },
+      "viewpick 70,20,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 2
+            }
+          }
+        }
+      },
+      {
+        "spec": "12 field"
+      },
+      "dialogfill Thickness = 40",
+      "key Enter",
+      {
+        "spec": "13 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "listedParts": [
+              {
+                "name": "Part 1",
+                "thickness": 40
+              }
+            ]
+          }
+        }
+      },
+      {
+        "spec": "14 select"
+      },
+      "featureeye Sketch \u00b7 Part 1",
+      {
+        "spec": "15 command"
+      },
+      "key Shift+e",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 0,
+              "picking": true
+            }
+          }
+        }
+      },
+      {
+        "spec": "16 pick"
+      },
+      "viewpick 90,20,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 1
+            }
+          }
+        }
+      },
+      {
+        "spec": "17 field"
+      },
+      "dialogtab Add",
+      {
+        "spec": "18 field"
+      },
+      "dialogfill Thickness = 25",
+      "key Enter",
+      {
+        "spec": "19 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1
+          }
+        }
+      }
+    ]
   }
 ]
