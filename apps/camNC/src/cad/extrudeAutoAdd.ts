@@ -1,6 +1,8 @@
 import {
   evaluateCadPart,
+  copyFaceOperationProblem,
   isCadPart,
+  partIsBuiltOn,
   placePoint,
   pointInPolygon,
   resolveDrawnPlacements,
@@ -25,7 +27,13 @@ function footprint(part: CadPart, normal: Vec, x: Vec, y: Vec) {
     return { x: dot(at, x), y: dot(at, y) };
   });
   const ends = [0, shape.thickness].map(z => dot(placePoint(part.placement, [shape.outline[0]!.x, shape.outline[0]!.y, z]), normal));
-  return { outline, lo: Math.min(...ends), hi: Math.max(...ends) };
+  const holes = shape.holes.map(hole =>
+    hole.map(p => {
+      const at = placePoint(part.placement, [p.x, p.y, 0]);
+      return { x: dot(at, x), y: dot(at, y) };
+    })
+  );
+  return { outline, holes, lo: Math.min(...ends), hi: Math.max(...ends) };
 }
 
 const crosses = (a: CadPoint, b: CadPoint, c: CadPoint, d: CadPoint) => {
@@ -57,11 +65,16 @@ function innerPoints(poly: CadPoint[]) {
   });
 }
 
-/** Whether two outlines share some area: an edge of one crosses the other, or a point inside one is inside the other. */
-function overlaps(a: CadPoint[], b: CadPoint[]) {
+/**
+ * Whether a new outline shares some area with a part's material: an edge of one crosses the other's outline, or a point
+ * just inside one is inside the other, and not in one of the part's holes, as a dowel drawn in a ring's hole is.
+ */
+function overlaps(a: CadPoint[], b: { outline: CadPoint[]; holes: CadPoint[][] }) {
+  const material = (point: CadPoint) => strictlyInside(point, b.outline) && !b.holes.some(hole => pointInPolygon(point, hole));
+  if (b.holes.length) return innerPoints(a).some(material);
   const edges = (poly: CadPoint[]) => poly.map((p, i) => [p, poly[(i + 1) % poly.length]!] as const);
-  if (edges(a).some(([p, q]) => edges(b).some(([r, s]) => crosses(p, q, r, s)))) return true;
-  return innerPoints(a).some(point => strictlyInside(point, b)) || innerPoints(b).some(point => strictlyInside(point, a));
+  if (edges(a).some(([p, q]) => edges(b.outline).some(([r, s]) => crosses(p, q, r, s)))) return true;
+  return innerPoints(a).some(material) || innerPoints(b.outline).some(point => strictlyInside(point, a));
 }
 
 /**
@@ -79,11 +92,11 @@ export function autoAddTarget(document: CadDocument, partId: string): string | n
   const own = footprint(part, normal, x, y);
   if (!own) return null;
   const before = placed.parts.slice(0, placed.parts.indexOf(part));
-  return (
-    before.find(other => {
-      if (!isCadPart(other) || other.suppressed || other.id === part.id) return false;
-      const theirs = footprint(other, normal, x, y);
-      return !!theirs && Math.min(own.hi, theirs.hi) - Math.max(own.lo, theirs.lo) > EPS && overlaps(own.outline, theirs.outline);
-    })?.id ?? null
-  );
+  const into = before.find(other => {
+    if (!isCadPart(other) || other.suppressed || other.id === part.id) return false;
+    const theirs = footprint(other, normal, x, y);
+    return !!theirs && Math.min(own.hi, theirs.hi) - Math.max(own.lo, theirs.lo) > EPS && overlaps(own.outline, theirs);
+  });
+  // A part other steps build on, or one that can't join that part, stays a part of its own.
+  return into && !partIsBuiltOn(document, part, into) && !copyFaceOperationProblem(part) ? into.id : null;
 }

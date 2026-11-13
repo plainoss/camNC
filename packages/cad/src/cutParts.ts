@@ -17,7 +17,7 @@ import { evaluateCadPart, polygonArea } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import { occupiedToolBoxes } from './occupiedToolBoxes';
 import { certifiedToolProfile } from './certifiedToolProfile';
-import { unitedPart } from './unionParts';
+import { unionOf } from './unionParts';
 import type { CadDiagnostic, CadDocument, CadPart, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
 const conjugate = ([x, y, z, w]: readonly number[]) => [-x!, -y!, -z!, w!];
@@ -312,26 +312,13 @@ export function applyPartCuts(
     }
     if (step.operation === 'union') {
       // The tools join the first target, in its place; kept, they stay parts of their own too.
-      const hostId = step.targets.find(id => !id.includes(':'));
-      const host = hostId && targets.get(hostId)?.[0];
-      const source = hostId && sources.get(hostId);
-      const tools = step.tools.flatMap(id => {
-        const shape = before.get(id),
-          tool = sources.get(id);
-        return shape && tool && !id.includes(':') ? [{ shape, source: tool, at: effectivePlacement(tool, supports) }] : [];
-      });
-      if (!host || !source || !host.at || tools.length !== step.tools.length || tools.some(tool => !tool.at)) {
-        warn('A Boolean › Union joins whole parts only: pick parts, not copies.', 'boolean-unresolved');
-        continue;
-      }
-      const joined = unitedPart(
-        { shape: host.shape, source, at: host.at },
-        tools.map(tool => ({ ...tool, at: tool.at! }))
-      );
-      if ('refused' in joined) warn(joined.refused, 'boolean-unresolved');
+      const joined = unionOf(document, step);
+      const host = targets.get(step.targets[0]!)?.[0];
+      if ('refused' in joined || !host)
+        warn('refused' in joined ? joined.refused : 'A Boolean › Union’s part is gone.', 'boolean-unresolved');
       else {
         host.shape = joined.part;
-        before.set(hostId, joined.part);
+        before.set(step.targets[0]!, joined.part);
       }
       continue;
     }

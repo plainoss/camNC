@@ -42,6 +42,7 @@ export * from './placement';
 export * from './drawnOn';
 export * from './faceEdges';
 export * from './cutParts';
+export { unionOf } from './unionParts';
 export * from './partPatterns';
 export * from './mirrorPlane';
 export * from './stepReport';

@@ -152,7 +152,8 @@
                 "name": "Part 1",
                 "thickness": 30
               }
-            ]
+            ],
+            "partIssues": []
           }
         }
       }

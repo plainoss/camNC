@@ -1,4 +1,4 @@
-import { activeDesign, consumedTools, isCadPart, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { activeDesign, consumedTools, isCadPart, unionOf, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { isBlank } from './editorHelpers';
 import type { StudioDialog } from './studioDialog';
 import { unpickedExtrudePreview } from './unpickedExtrude';
@@ -18,13 +18,12 @@ export function builtStudioParts(document: CadDocument): CadPart[] {
 export function listedStudioParts(document: CadDocument, dialog?: StudioDialog | null): CadPart[] {
   if (isBlankDesign(document)) return [];
   const built = builtStudioParts(unpickedExtrudePreview(document, dialog?.kind === 'extrude' ? dialog.partId : null));
-  // A Boolean › Union's part is as thick as the thickest of the parts it joins.
+  // A Boolean › Union's part is as thick as the part it makes, once it can join them.
   const joined = new Map<string, number>();
-  for (const step of activeDesign(document).partCuts ?? []) {
-    const host = step.operation === 'union' && step.targets[0];
-    if (!host) continue;
-    const thickness = [host, ...step.tools].map(id => document.parts.find(part => part.id === id)?.thickness ?? 0);
-    joined.set(host, Math.max(joined.get(host) ?? 0, ...thickness));
+  const active = activeDesign(document);
+  for (const step of active.partCuts ?? []) {
+    const made = step.operation === 'union' ? unionOf(active, step) : null;
+    if (made && 'part' in made) joined.set(made.part.partId, made.part.thickness);
   }
   return joined.size ? built.map(part => (joined.has(part.id) ? { ...part, thickness: joined.get(part.id)! } : part)) : built;
 }

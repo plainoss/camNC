@@ -25,6 +25,11 @@ it('switches a New extrude to Add with the part its picked region runs into, and
   expect(autoAddTarget(design(beside), beside.id)).toBeNull();
   const above = { ...board('Part 2', 0, 0, 40, 40, 10), drawnOn: { on: { plane: 'top' as const }, offset: 10 } };
   expect(autoAddTarget(design(above), above.id)).toBeNull();
+  // A region in a board's hole isn't in its material.
+  const ring = { ...first, regions: undefined };
+  ring.sketch = addRectangle(ring.sketch, { x: 10, y: 10, width: 20, height: 20 });
+  const dowel = board('Part 2', 15, 15, 10, 10, 30);
+  expect(autoAddTarget({ ...createCadDocument(), parts: [ring, dowel] }, dowel.id)).toBeNull();
   // Nothing picked, or chosen already, it stays as it is.
   const unpicked = { ...board('Part 2', 0, 0, 40, 80, 30), regions: [] };
   expect(autoAddTarget(design(unpicked), unpicked.id)).toBeNull();

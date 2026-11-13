@@ -34,12 +34,6 @@ export const kStudioCommands: { id: StudioCommand; label: string; hint: string; 
     glyph: <path d="M3 9h18v9H3zM9 9V4h6v5M8 9v4h8V9" />,
   },
   {
-    id: 'boolean',
-    label: 'Boolean',
-    hint: 'Join parts into one, subtract parts from others, or keep only what they share',
-    glyph: <path d="M3 4h11v11H3zM10 9h11v11H10z" />,
-  },
-  {
     id: 'transform',
     label: 'Transform',
     hint: 'A copy of the selected part, moved along X, Y and Z',
@@ -80,5 +74,11 @@ export const kStudioCommands: { id: StudioCommand; label: string; hint: string; 
     label: 'Variable',
     hint: 'A named size, such as the board thickness, that any value can use',
     glyph: <path d="M8 5C5 8 5 16 8 19M16 5c3 3 3 11 0 14M10 9l4 6M14 9l-4 6" />,
+  },
+  {
+    id: 'boolean',
+    label: 'Boolean',
+    hint: 'Join parts into one, subtract parts from others, or keep only what they share',
+    glyph: <path d="M3 4h11v11H3zM10 9h11v11H10z" />,
   },
 ];

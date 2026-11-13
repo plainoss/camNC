@@ -11,7 +11,7 @@ function design(): CadDocument {
   return { ...document, parts: [...document.parts, { ...createCadPart('Part 2', 30), id: 'two' }] };
 }
 
-it('opens on Union with nothing picked, joins the picked parts into the first, and accepts with Enter on Keep tools', async () => {
+it('opens on Union with nothing picked, joins the picked parts into the first, and accepts with Enter on a Parts list row', async () => {
   const onSave = vi.fn();
   const view = (pick: { partId: string; seq: number } | null) => (
     <BooleanDialog document={design()} pick={pick} onSave={onSave} onClose={() => {}} />
@@ -29,7 +29,12 @@ it('opens on Union with nothing picked, joins the picked parts into the first, a
   await waitFor(() => expect(within(tools).getAllByRole('listitem')).toHaveLength(2));
   const keep = screen.getByRole('checkbox', { name: 'Keep tools' }) as HTMLInputElement;
   expect(keep.checked).toBe(false);
-  fireEvent.keyDown(keep, { key: 'Enter' });
+  const row = document.createElement('ul');
+  row.className = 'cad-part-list';
+  row.innerHTML = '<li><button type="button" aria-pressed="false">Part 2</button></li>';
+  document.body.append(row);
+  fireEvent.keyDown(row.querySelector('button')!, { key: 'Enter' });
+  row.remove();
   await waitFor(() => expect(onSave).toHaveBeenCalledWith({ operation: 'union', targets: ['one'], tools: ['two'], consumeTools: true }));
 });
 

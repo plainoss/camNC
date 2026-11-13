@@ -169,7 +169,7 @@ function listedSteps(document: CadDocument): DesignStep[] {
         id: step.id,
         kind: 'partCut',
         label: partCutLabel(document, step),
-        detail: `clearance ${typed(step.clearanceExpression, step.clearance, document.lengthUnit)}`,
+        detail: step.operation ?? `clearance ${typed(step.clearanceExpression, step.clearance, document.lengthUnit)}`,
         partId: owner?.id ?? reference,
         ...(owner && reference !== owner.id && { copyId: reference.slice(owner.id.length + 1) }),
         partCutId: step.id,

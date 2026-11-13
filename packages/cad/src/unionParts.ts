@@ -1,9 +1,11 @@
 import { addLine, createCadPart } from './document';
+import { cadDrawnOnSupports, effectivePlacement, resolveDrawnPlacements } from './drawnOn';
+import { isJoinedBody } from './extrudeSteps';
 import { evaluateCadFeatures } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, pointInPolygon } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import { regionInteriorPoint, sketchRegions } from './sketchRegions';
-import type { CadCut, CadPart, CadPlacement, CadPoint, EvaluatedCadPart } from './types';
+import type { CadCut, CadDocument, CadPart, CadPartCut, CadPlacement, CadPoint, EvaluatedCadPart } from './types';
 
 const kSame = 1e-6;
 /** The smallest step a union leaves between parts of different heights; less is the same height. */
@@ -72,4 +74,51 @@ export function unitedPart(host: UnionInput, tools: readonly UnionInput[]): { pa
   const problem = result?.diagnostics.find(d => d.severity === 'error');
   if (!result || problem) return { refused: problem?.message ?? `${host.shape.name} can't be joined with its tools.` };
   return { part: { ...result.part, partId: host.shape.partId, name: host.shape.name } };
+}
+
+const unions = new WeakMap<CadDocument, Map<string, { part: EvaluatedCadPart } | { refused: string }>>();
+
+/**
+ * What a Boolean › Union step makes of the design's parts as drawn: the joined part, or why it can't join them. It joins
+ * whole parts only, as their sketches make them, so parts with copies, joined Add bodies, or cuts from other steps are
+ * refused rather than losing that material. A refused union changes nothing and uses up no tools.
+ */
+export function unionOf(document: CadDocument, step: CadPartCut): { part: EvaluatedCadPart } | { refused: string } {
+  const known = unions.get(document) ?? unions.set(document, new Map()).get(document)!;
+  const seen = known.get(step.id);
+  if (seen) return seen;
+  const made = unite(document, step);
+  known.set(step.id, made);
+  return made;
+}
+
+function unite(document: CadDocument, step: CadPartCut): { part: EvaluatedCadPart } | { refused: string } {
+  const ids = [...step.targets.slice(0, 1), ...step.tools];
+  if (step.targets.length !== 1 || !step.tools.length || ids.some(id => id.includes(':')))
+    return { refused: 'A Boolean › Union joins whole parts: pick parts, not copies.' };
+  const parts = ids.map(id => document.parts.find(part => part.id === id));
+  if (parts.some(part => !part)) return { refused: 'A part this Boolean › Union joins is gone.' };
+  const joined = parts as CadPart[];
+  for (const part of joined) {
+    if (part.copies?.length || part.pattern) return { refused: `${part.name} has copies, which a union can't join yet.` };
+    if (document.parts.some(other => other.addTo === part.id && isJoinedBody(document, other)))
+      return { refused: `${part.name} has a body added to it, which a union can't join yet.` };
+  }
+  // Other steps' cuts in these parts would be lost: the union joins the parts as their own sketches make them.
+  const cutByOthers = (document.partCuts ?? []).some(
+    other => other.id !== step.id && !other.suppressed && joined.some(part => other.targets.some(id => id.split(':')[0] === part.id))
+  );
+  if (cutByOthers || joined.some(part => part.features?.some(feature => feature.type === 'cut')))
+    return { refused: 'A part this union joins has cuts or pockets, which a union can’t keep yet.' };
+  // Placed as drawn, whether or not the document given has been solved.
+  const placed = resolveDrawnPlacements(document).document;
+  const supports = cadDrawnOnSupports(placed);
+  const inputs: UnionInput[] = [];
+  for (const source of joined.map(part => placed.parts.find(candidate => candidate.id === part.id)!)) {
+    const shape = evaluateCadPart(source).part,
+      at = effectivePlacement(source, supports);
+    if (!shape || !at) return { refused: `${source.name} isn't built, so it can't be joined.` };
+    inputs.push({ shape, source, at });
+  }
+  return unitedPart(inputs[0]!, inputs.slice(1));
 }

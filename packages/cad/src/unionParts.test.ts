@@ -60,3 +60,31 @@ it('keeps the tools as parts when asked, and refuses boards on different planes'
   const apart = await solveCadDocument(union([board('Part 1', 100, 40, 10), board('Part 2', 40, 80, 30, 5)]));
   expect(apart.diagnostics.some(d => d.code === 'boolean-unresolved')).toBe(true);
 });
+
+it('changes nothing and uses up no tools when it can’t join them: copies, cuts from other steps, or apart', async () => {
+  const refused = async (document: CadDocument) => {
+    const solved = await solveCadDocument(document);
+    expect(solved.diagnostics.some(d => d.code === 'boolean-unresolved')).toBe(true);
+    expect(consumedTools(document)).toEqual(new Set());
+    return cadPartsToCut(solved.document, solved.parts).map(entry => [entry.part.name, entry.part.thickness]);
+  };
+  const copied = union([
+    board('Part 1', 100, 40, 10),
+    { ...board('Part 2', 40, 80, 30), copies: [{ id: 'c1', placement: { position: [200, 0, 0], rotation: [0, 0, 0, 1] } }] },
+  ]);
+  expect((await refused(copied)).map(([name]) => name)).toContain('Part 2');
+  const cut = union([board('Part 1', 100, 40, 10), board('Part 2', 40, 80, 30), board('Peg', 10, 10, 30)]);
+  cut.partCuts = [
+    { id: 'c0', tools: ['Peg'], targets: ['Part 2'], clearance: 0 },
+    { ...cut.partCuts![0]!, tools: ['Part 2'] },
+  ];
+  expect(await refused(cut)).toContainEqual(['Part 1', 10]);
+  const apart = union([
+    board('Part 1', 100, 40, 10),
+    { ...board('Part 2', 40, 80, 30), drawnOn: { on: { plane: 'top' as const }, offset: 5 } },
+  ]);
+  expect(await refused(apart)).toEqual([
+    ['Part 1', 10],
+    ['Part 2', 30],
+  ]);
+});

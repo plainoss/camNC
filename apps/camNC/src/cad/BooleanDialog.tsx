@@ -133,6 +133,7 @@ export function BooleanDialog({
       title="Boolean"
       onOk={() => ('error' in result ? setError(result.error) : onSave(result.change))}
       onCancel={onClose}
+      acceptFromPartsList
       className="cad-part-cut-dialog">
       <div className="cad-feature-tabs" role="tablist" aria-label="Boolean type">
         {kOperations.map(choice => (

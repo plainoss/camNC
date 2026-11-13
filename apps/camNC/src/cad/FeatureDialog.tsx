@@ -16,6 +16,7 @@ export function FeatureDialog({
   onOk,
   onCancel,
   autoFocus = true,
+  acceptFromPartsList,
   className,
   children,
 }: {
@@ -30,6 +31,8 @@ export function FeatureDialog({
   onCancel: () => void;
   /** Puts the keyboard in its first field on opening. A sketch's dialog leaves it on the drawing. */
   autoFocus?: boolean;
+  /** Enter on a Parts list row accepts it, for a dialog whose parts are picked there, rather than picking that part again. */
+  acceptFromPartsList?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -48,19 +51,20 @@ export function FeatureDialog({
   // A part just picked into it from the Parts list keeps the keyboard on its row: Enter there accepts the dialog rather
   // than picking the part again, as it does in the view.
   useEffect(() => {
+    if (!acceptFromPartsList) return;
     const accept = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (event.key !== 'Enter' || event.isComposing || !target?.closest('.cad-part-list') || frame.current?.contains(target)) return;
-      if (target instanceof HTMLInputElement) return;
+      const row =
+        event.target instanceof HTMLButtonElement && event.target.closest('.cad-part-list') && event.target.hasAttribute('aria-pressed');
+      if (event.key !== 'Enter' || event.isComposing || !row) return;
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       ok();
     };
     document.addEventListener('keydown', accept, true);
     return () => document.removeEventListener('keydown', accept, true);
     // `ok` reads the latest props itself.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [acceptFromPartsList]);
   // Opening it puts the keyboard in its first field, as a dialog should.
   useEffect(() => {
     if (autoFocus) frame.current?.querySelector<HTMLElement>('input, select, button:not(.cad-feature-dialog-head button)')?.focus();
@@ -91,8 +95,6 @@ export function FeatureDialog({
             requestAnimationFrame(ok);
           } else lastEnter.current = { input, value: input.value };
         }
-        // Away from a field, as on a ticked box, Enter accepts it straight away; a button keeps Enter as its own click.
-        else if (event.key === 'Enter' && !typing && !(target instanceof HTMLButtonElement)) requestAnimationFrame(ok);
       }}>
       <div className="cad-feature-dialog-head">
         <h3>{title}</h3>
