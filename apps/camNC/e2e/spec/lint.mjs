@@ -13,7 +13,8 @@ export const VIEW_KEYS = ['f', 'F', 'n', 'N', ...[1, 2, 3, 4, 5, 6, 7].flatMap(d
 export const ALLOWED = {
   // `click x,y` is a pick on an open sketch's drawing, as `viewpick` is there.
   pick: { steps: ['viewpick', 'click'] },
-  select: { steps: ['selectpart', 'selectfeature', 'featureeye', 'click'] },
+  // A context menu is two selects: `featuremenu` (the right-click) and `menuitem` (the choice).
+  select: { steps: ['selectpart', 'selectfeature', 'featureeye', 'featuremenu', 'menuitem', 'dialogfocus', 'click'] },
   command: { steps: ['studiotool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },
   field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'field'], then: ['key Enter'] },

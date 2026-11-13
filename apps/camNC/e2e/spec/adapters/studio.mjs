@@ -58,7 +58,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
-    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
+    if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'featureeye', 'dialogtab', 'featuremenu', 'menuitem', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
     if (verb === 'viewpick') {
@@ -77,6 +77,18 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
       await row.getByRole('button', { name: /^(Show|Hide)$/ }).click();
     } else if (verb === 'dialogtab') {
       await page.getByRole('dialog').getByRole('tab', { name: rest, exact: true }).click();
+    } else if (verb === 'featuremenu') {
+      // Only the right-click: a separate `menuitem` step chooses from the menu, as a person's second click does.
+      const features = page.getByRole('region', { name: 'Features', exact: true });
+      const plane = features.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('button', { name: rest, exact: true });
+      const row = await plane.count() ? plane : features.getByRole('button', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) });
+      if (await row.count() !== 1) throw new Error(`Feature name must identify one row: ${rest}`);
+      await row.click({ button: 'right' });
+      await page.getByRole('menu').first().waitFor();
+    } else if (verb === 'menuitem') {
+      const item = page.getByRole('menu').getByRole('menuitem', { name: rest, exact: true });
+      if (await item.count() !== 1) throw new Error(`The open menu must have one item named ${rest}`);
+      await item.click();
     } else if (verb === 'selectfeature') {
       // One click on a named row of the feature list, a default plane included, as a person selects it there.
       const features = page.getByRole('region', { name: 'Features', exact: true });

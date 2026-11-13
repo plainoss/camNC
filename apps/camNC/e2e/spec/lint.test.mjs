@@ -30,6 +30,10 @@ describe('no extra inputs per spec step', () => {
     ]));
     expect(result).toMatchObject({ ok: true, steps: 5 });
   });
+  it('takes a context menu as two selects, and a selection box as one', () => {
+    expect(lintScenario(scenario([{ spec: '1 select' }, 'featuremenu Extrude · Part 1', { spec: '2 select' }, 'menuitem Suppress', { spec: '3 select' }, 'dialogfocus Tools'])).ok).toBe(true);
+    expect(lintScenario(scenario([{ spec: '1 select' }, 'featuremenu Extrude · Part 1', 'menuitem Suppress'])).findings[0].problem).toBe('1 extra input');
+  });
   it('takes an eye click as a select and a dialog tab as a field', () => {
     expect(lintScenario(scenario([{ spec: '1 select' }, 'featureeye Sketch · Part 1', { spec: '2 field' }, 'dialogtab Add'])).ok).toBe(true);
     expect(lintScenario(scenario([{ spec: '1 select' }, 'hover 0,0', 'featureeye Top'])).ok).toBe(false);
