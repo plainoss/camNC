@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
  * before the camNC input that does it. Each kind allows exactly one input of the listed steps. Checks are free.
  */
 export const ALLOWED = {
-  pick: { steps: ['viewpick'] },
+  // `click x,y` is a pick on an open sketch's drawing, as `viewpick` is there.
+  pick: { steps: ['viewpick', 'click'] },
   select: { steps: ['selectpart', 'selectfeature', 'click'] },
   command: { steps: ['studiotool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },

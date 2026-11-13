@@ -2,7 +2,7 @@ import { createAdapter as sketchAdapter } from './sketch.mjs';
 import path from 'node:path';
 import process from 'node:process';
 import { settledSnapshot } from '../settle.mjs';
-import { exportStep, extrudeRegions, saveDesign, viewPick } from './studioPick.mjs';
+import { exportStep, extrudeRegions, parseSketchPick, saveDesign, viewPick } from './studioPick.mjs';
 import { checkStudio, studioContent, studioState } from './studioModel.mjs';
 
 const escapePattern = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -61,7 +61,11 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
     if (!['feature', 'dialogfill', 'dialogconfirm', 'dialogcancel', 'checkpoint', 'studiotool', 'selectpart', 'dialogselect', 'dialogcheck', 'featureaction', 'dialogfocus', 'dialogremove', 'pickviewcenter', 'viewpick', 'selectfeature', 'exportstep', 'savedesign'].includes(verb)) return base.step(text);
     if (!(await base.inDemo())) throw new Error('Studio workflow input requires demo mode');
     const since = await settledSnapshot(page);
-    if (verb === 'viewpick') await viewPick(page, rest);
+    if (verb === 'viewpick') {
+      // With a sketch open the pick is on its drawing, as a person picks an edge or places a dimension there.
+      if (await page.getByRole('dialog', { name: /^Sketch ·/ }).isVisible()) await base.step(`click ${parseSketchPick(rest).join(',')}`);
+      else await viewPick(page, rest);
+    }
     else if (verb === 'selectfeature') {
       // One click on a named row of the feature list, a default plane included, as a person selects it there.
       const features = page.getByRole('region', { name: 'Features', exact: true });

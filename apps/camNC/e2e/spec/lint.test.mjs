@@ -20,6 +20,16 @@ describe('no extra inputs per spec step', () => {
     ]));
     expect(result).toMatchObject({ ok: true, steps: 9, setup: ['closesketch'], findings: [] });
   });
+  it('takes a sketch click as a pick, and a command before a draw as two steps', () => {
+    const result = lintScenario(scenario([
+      { spec: '1 command' }, 'key g',
+      { spec: '2 draw' }, 'rect 0,0 60,40',
+      { spec: '3 command' }, 'key d',
+      { spec: '4 pick' }, 'click 30,0',
+      { spec: '5 pick' }, 'viewpick 30,40',
+    ]));
+    expect(result).toMatchObject({ ok: true, steps: 5 });
+  });
   it('reports a needed toggle before a pick as an extra input', () => {
     const result = lintScenario(scenario([{ spec: '1 pick' }, 'button Select profile', 'viewpick 30,20,0']));
     expect(result.ok).toBe(false);

@@ -23,7 +23,9 @@ running app. CI runs the same command.
 pnpm --filter @wbcnc/camNC spec:cad
 ```
 
-Options: `--url <running dev server>`, `--only <id prefix>`, `--headed`, `--list`, `--update-goldens`, `--workers <n>`.
+Options: `--url <running dev server>`, `--only <id prefix>`, `--headed`, `--list`, `--update-goldens`, `--workers <n>`,
+`--file <scenarios.json>` (repeatable: run scenarios kept outside `scenarios/`; files their steps write are relative to
+that file).
 
 Scenarios run 4 at a time, each in its own browser context, so they share no saved state. Use `--workers 1` to rule out
 load when debugging a failure. Goldens are always rewritten one at a time.
@@ -78,8 +80,9 @@ pnpm --silent --filter @wbcnc/camNC spec:session --listen
 pnpm --silent --filter @wbcnc/camNC spec:session send 'rect 10,10 100,60' 'key d' 'frame after-dim'
 ```
 
-Options: `--listen`, `--url <running dev server>`, `--headed`. Each checkout runs one
-listening session.
+Options: `--listen`, `--url <running dev server>`, `--headed`, `--domain studio` (Part Studio steps and state; the
+default `sketch` is lighter). Each checkout runs one listening session. File paths in steps are relative to where the
+command was typed.
 
 Besides the steps below, a line can be:
 
@@ -224,6 +227,9 @@ Part Studio scenarios also use these steps, all through visible controls:
 | `dialogconfirm` / `dialogcancel`                                                                          | Confirm with OK or Save, or cancel the dialog.                                                       |
 | `checkpoint <name>`                                                                                       | Remember the settled saved source and visible parts for later checks.                                |
 | `pickviewcenter`                                                                                          | Click the center of the model canvas after a named view; intended for a single centered stock board. |
+| `viewpick x,y,z`                                                                                          | Click where a model point (mm, Top plane = XY, Z up) is drawn in the 3D view, through its camera.    |
+| `selectfeature <name>`                                                                                    | Click one named Feature list row once, a default plane included.                                     |
+| `exportstep <file>` / `savedesign <file>`                                                                 | Download the shown parts as STEP (mm) through Export…, or the design through Save to file.           |
 
 ### Expectations
 
@@ -235,9 +241,38 @@ Dimensions and relations: `dimensions`, `dimensionsInclude`, `constraintsAtLeast
 
 The `studio` expectations check source variables, thicknesses, patterns, offsets and cut settings separately from the rendered `listedParts` and `workspacePartCount`. `cutExpressions` checks linked clearance expressions; split settings include the finger count and its expression. `dialogSelections` checks the names actually displayed in a dialog's Tools and Targets boxes. Copy tool names resolve the exact persisted source/copy reference. `sameIdsSince` checks unchanged identities; `addedCopyIdsSince` requires prior copy IDs to retain their instance slots and allows the stated number of new IDs. `samePatternIdsSince` checks the pattern feature's identity. `sameFeatureIdsSince` also retains named variables, source sketches, patterns and ordered cut features. These are interface/source checks; source coordinates and part lists do not establish geometry correctness.
 
+`extrudeRegions` checks the open Extrude dialog's selection box: `box` (its label), `selection` (what it lists),
+`regions` (the picked region count, or null for the whole sketch) and `picking`; only the named fields are compared.
+
 `measurements` checks the visible measurement rows by label and displayed value, including units. The stock measurement scenario uses real top/bottom viewport clicks; its unchanged-content assertion keeps inspection separate from feature edits.
 
 `section` checks the visible section controls: `active` and `editing`, plus the selected `plane`, `offset` text and `flipped` state while the inspector is open. Section scenarios retain the complete cabinet Parts list and source identities, exercise a linked offset through a stock edit, and measure a stock cut surface through real canvas clicks. Geometry probes, cap orientation and source-mesh immutability are checked separately in the section domain tests.
+
+## Step-by-step specs
+
+A scenario written from a numbered list of single inputs marks where each one starts with `{ "spec": "<n> <kind>" }`.
+The runner skips markers. `spec:lint` checks that each marked step uses exactly one input its kind allows, so a
+workflow that needs an extra click fails even when the result is right:
+
+```sh
+pnpm --silent --filter @wbcnc/camNC spec:lint path/to/scenarios.json
+```
+
+| Kind      | Allowed input (exactly one)                                                         |
+| --------- | ----------------------------------------------------------------------------------- |
+| `pick`    | `viewpick`                                                                          |
+| `select`  | `selectfeature`, `selectpart` or `click`                                            |
+| `command` | `studiotool`, `key` or `tool`                                                       |
+| `draw`    | `rect`, `circle`, `line` or `arc`                                                   |
+| `field`   | `dialogfill`, `dialogselect`, `dialogcheck` or `field`, then optionally `key Enter` |
+| `confirm` | `dialogconfirm`, `closesketch` or `key Enter`                                       |
+| `cancel`  | `dialogcancel` or `key Escape`                                                      |
+| `view`    | `view`                                                                              |
+
+Expectations, `frame`, `shot`, `checkpoint`, `exportstep` and `savedesign` are free; steps before the first marker are
+setup. `spec:names <table.md>` checks that the accessible names in a Markdown table (columns `camNC accessible name`,
+`role`, `where`) exist in the running app; see `names.mjs` for the `where` states. Compare an exported STEP with
+`pnpm --silent -C packages/cad-script fingerprint --compare a.step b.step` from the repository root.
 
 ## Goldens
 

@@ -271,6 +271,15 @@ export async function createAdapter(page, url) {
     await page.getByRole('button', { name: family, exact: true }).click();
     await page.locator('[role=menu][data-state=open]').getByRole('menuitem', { name, exact: true }).click();
   };
+  /**
+   * A draw step chooses its tool by key, unless that tool is already on: a step before it may have chosen it, as a
+   * person does, and pressing the key again would turn it off.
+   */
+  const chooseByKey = async (key, name) => {
+    const button = page.getByRole('toolbar', { name: 'Sketch toolbar' }).getByRole('button', { name });
+    if ((await button.count()) === 1 && (await button.getAttribute('aria-pressed')) === 'true') return;
+    await page.keyboard.press(key);
+  };
   const readDesign = (which = 'draft') =>
     page.evaluate(async ([id, key]) => {
       const url = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => name.includes('/src/cam/jobDb.ts')).at(-1);
@@ -487,24 +496,24 @@ export async function createAdapter(page, url) {
         return;
       }
       case 'line':
-        await page.keyboard.press('l');
+        await chooseByKey('l', /^Line \(L\)$/);
         await click(point(args[0]));
         await click(point(args[1]));
         return leaveTool();
       case 'rect':
-        await page.keyboard.press('g');
+        await chooseByKey('g', /^Corner rectangle \(G\)$/);
         await click(point(args[0]));
         await click(point(args[1]));
         return leaveTool();
       case 'circle': {
         const [x, y] = point(args[0]);
-        await page.keyboard.press('c');
+        await chooseByKey('c', /^Circle \(C\)$/);
         await click([x, y]);
         await click([x + Number(args[1]), y]);
         return leaveTool();
       }
       case 'arc':
-        await page.keyboard.press('a');
+        await chooseByKey('a', /^Arc \(A\)$/);
         for (const at of args) await click(point(at));
         return leaveTool();
       case 'field': {

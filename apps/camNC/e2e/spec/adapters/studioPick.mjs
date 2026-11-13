@@ -32,6 +32,18 @@ export function parseModelPoint(text) {
   return values;
 }
 
+/**
+ * A pick in an open sketch, in the sketch plane's millimetres: `x,y`, or `x,y,0`. A point off the plane can't be
+ * picked in the drawing, so a non-zero z is refused rather than dropped.
+ */
+export function parseSketchPick(text) {
+  const values = text.split(',').map(value => (value.trim() ? Number(value) : NaN));
+  if (![2, 3].includes(values.length) || values.some(value => !Number.isFinite(value)))
+    throw new Error(`In a sketch, viewpick takes a point x,y in the sketch's mm: ${text}`);
+  if (values[2]) throw new Error(`In a sketch, viewpick picks on the sketch plane, so z must be 0: ${text}`);
+  return values.slice(0, 2);
+}
+
 /** One real click on the model point in the 3D view, as a person picks a face, region or plane there. */
 export async function viewPick(page, text) {
   const point = parseModelPoint(text);
