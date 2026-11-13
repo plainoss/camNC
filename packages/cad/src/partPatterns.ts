@@ -57,7 +57,8 @@ export function resolvePartPatterns(document: CadDocument): CadDocument {
   let changed = false;
   const supports = cadDrawnOnSupports(document);
   const parts = document.parts.map(part => {
-    if (!part.pattern && !part.copies?.some(copy => copy.pattern || copy.offset || copy.along || copy.mirror)) return part;
+    // A Remove's pattern repeats its cuts in the board it cuts, rather than making copies.
+    if (part.remove || (!part.pattern && !part.copies?.some(copy => copy.pattern || copy.offset || copy.along || copy.mirror))) return part;
     const at = effectivePlacement(part, supports);
     // A transformed copy sits where its offset puts it from the part.
     const own = (part.copies ?? [])

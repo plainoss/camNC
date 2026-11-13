@@ -188,6 +188,23 @@ describe('Extrude → Remove', () => {
     return { board, pocket };
   }
 
+  it('cuts again at each instance of its linear feature pattern, along the board, and not when suppressed', () => {
+    const { board, pocket } = onBoard(sketch => addCircle(sketch, { x: 20, y: 20, radius: 5 }));
+    const pattern = { id: 'p1', axis: 'x' as const, vector: [1, 0, 0] as [number, number, number], count: 3, spacing: 30 };
+    const document = resolveExtrudeSteps(design(board, { ...pocket, remove: { depth: 5 }, pattern }));
+    const evaluated = evaluateCadDocument(document);
+    expect(evaluated.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    const [cut] = cadPartsToCut(document, evaluated.parts);
+    const centres = cut!.part.cuts!.map(c => Math.round(c.outline.reduce((sum, p) => sum + p.x, 0) / c.outline.length));
+    expect([cut!.part.cuts!.map(c => c.to), centres]).toEqual([
+      [5, 5, 5],
+      [20, 50, 80],
+    ]);
+    expect(document.parts.map(part => part.copies?.length ?? 0)).toEqual([0, 0]);
+    const off = resolveExtrudeSteps(design(document.parts[0]!, { ...document.parts[1]!, pattern: { ...pattern, suppressed: true } }));
+    expect(cadCuts(off.parts[0]!)).toHaveLength(1);
+  });
+
   it('cuts a shape drawn on a board’s top into it, keeping the sketch as its own step', () => {
     const { board, pocket } = onBoard(sketch => addRectangle(sketch, { x: 50, y: 30, width: 40, height: 20 }));
     const document = resolveExtrudeSteps(design(board, { ...pocket, remove: { depth: 6 } }));

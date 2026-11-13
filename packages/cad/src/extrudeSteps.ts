@@ -1,10 +1,12 @@
 import { faceRemovalDepth } from './faceRemovalDepth';
+import { resolveDrawnPlacements } from './drawnOn';
 import { cadDocumentVersion } from './documentVersion';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
 import { faceExtrudeProblem, resolveFaceProfiles } from './faceExtrude';
 import { cadSketchRegions, evaluateCadFeatures, isCadPart } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, polygonArea } from './geometry';
+import { patternedRemoval } from './featurePattern';
 import { regionGroups } from './regionProfile';
 import { sketchRegions, type CadSketchRegion } from './sketchRegions';
 import type { CadCut, CadDocument, CadEntity, CadFaceSketch, CadFeature, CadPart, CadSketch } from './types';
@@ -285,6 +287,9 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
   });
 
   const resolved = { ...document, parts };
+  let placements: CadDocument | null = null;
+  const boardPlacement = (id: string) =>
+    (placements ??= resolveDrawnPlacements(resolved).document).parts.find(part => part.id === id)?.placement;
   for (const step of parts) {
     // A suppressed Remove cuts nothing, and nor does a sketch not extruded.
     if (!step.remove || step.suppressed || step.extrude === false || isSpatialRemoval(step)) continue;
@@ -308,7 +313,10 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
         removedBy: step.id,
       })
     );
-    removed.set(support.board.id, [...(removed.get(support.board.id) ?? []), face, ...cuts]);
+    // A feature pattern of the Remove cuts it again at each of its instances.
+    const placed = step.pattern && boardPlacement(support.board.id);
+    const repeated = step.pattern ? patternedRemoval(step, { placement: placed || undefined }, face, cuts) : [];
+    removed.set(support.board.id, [...(removed.get(support.board.id) ?? []), face, ...cuts, ...repeated]);
   }
   parts = parts.map(part => {
     const wanted = removed.get(part.id) ?? [];
