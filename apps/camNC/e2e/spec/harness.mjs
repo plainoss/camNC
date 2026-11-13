@@ -39,9 +39,17 @@ export async function startDevServer() {
   return { url, stop: () => process.kill(-server.pid) };
 }
 
+/** Runs in each page before its own scripts. */
+export function keepResourceEntries() {
+  performance.setResourceTimingBufferSize(100_000);
+}
+
 /** A fresh browser context, so nothing saved carries over, with its runtime errors collected. */
 export async function openPage(browser, viewport = { width: 1440, height: 1000 }) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1, locale: 'en-US' });
+  // Adapters find the app's own modules (its saved designs, the 3D view's library) by their loaded URLs. The browser
+  // keeps only 250 resource entries by default, and a dev server loads more than that before the 3D view's library.
+  await context.addInitScript(keepResourceEntries);
   const page = await context.newPage();
   // A cold Vite server can still compile lazy editor modules after DOMContentLoaded.
   page.setDefaultTimeout(45000);
