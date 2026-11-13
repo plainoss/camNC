@@ -200,8 +200,8 @@ export async function createAdapter(page, url) {
     await closeSketch();
   };
   /**
-   * A finished sketch is a sketch until it's extruded: Shift+E extrudes it as it is, as the reference's Extrude. A part
-   * already extruded is left as it is, since Extrude would start another extrude of it.
+   * A finished sketch is a sketch until it's extruded: its row selected, Shift+E extrudes all of it. A part already
+   * extruded is left as it is, since Extrude would start another extrude of it.
    */
   const extrudeSketch = async () => {
     const extrude = page.getByRole('dialog', { name: /^Extrude ·/ });
@@ -209,8 +209,10 @@ export async function createAdapter(page, url) {
     const rows = await page.getByRole('region', { name: 'Features' }).locator('button > span:not([aria-hidden])').allTextContents();
     const named = kind => rows.flatMap(text => (text.startsWith(`${kind} · `) ? [text.slice(kind.length + 3)] : []));
     const extruded = new Set(named('Extrude'));
-    const unextruded = named('Sketch').some(name => !extruded.has(name));
-    if (!(await extrude.isVisible()) && unextruded) {
+    const unextruded = named('Sketch').find(name => !extruded.has(name));
+    if (!(await extrude.isVisible()) && unextruded !== undefined) {
+      // With nothing selected a confirmed sketch's Extrude starts with no region picked.
+      await page.getByRole('region', { name: 'Features' }).getByRole('button', { name: new RegExp(`^Sketch · ${unextruded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).first().click();
       await page.keyboard.press('Shift+E');
       await extrude.waitFor({ timeout: 3000 }).catch(() => {});
     }

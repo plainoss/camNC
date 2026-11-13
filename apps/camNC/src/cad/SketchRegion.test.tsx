@@ -6,6 +6,12 @@ import './cad.css';
 
 afterEach(cleanup);
 
+/** The shading drawn, one shape per region: a point is shaded when any of them fills it. */
+const shading = (container: Element) => {
+  const paths = [...container.querySelectorAll('path')];
+  return { first: paths[0]!, count: paths.length, isPointInFill: (point: DOMPoint) => paths.some(path => path.isPointInFill(point)) };
+};
+
 describe('closed sketch regions', () => {
   it('shades both a concentric annulus and inner disc while CAM still treats the inner circle as a hole', () => {
     const document = createCadDocument();
@@ -18,7 +24,7 @@ describe('closed sketch regions', () => {
         <SketchRegion document={document} partId={part.id} verified />
       </svg>
     );
-    const region = container.querySelector('path')!;
+    const region = shading(container);
     expect(region.isPointInFill(new DOMPoint(50, -50))).toBe(true);
     expect(region.isPointInFill(new DOMPoint(70, -50))).toBe(true);
     expect(region.isPointInFill(new DOMPoint(90, -50))).toBe(false);
@@ -34,14 +40,14 @@ describe('closed sketch regions', () => {
         <SketchRegion document={document} partId={part.id} verified />
       </svg>
     );
-    const region = container.querySelector('path')!;
-    expect(region.getAttribute('fill-rule')).toBe('nonzero');
-    expect(region.getAttribute('pointer-events')).toBe('none');
-    expect(getComputedStyle(region).pointerEvents).toBe('none');
+    const region = shading(container);
+    expect(region.first.getAttribute('fill-rule')).toBe('nonzero');
+    expect(region.first.getAttribute('pointer-events')).toBe('none');
+    expect(getComputedStyle(region.first).pointerEvents).toBe('none');
     expect(region.isPointInFill(new DOMPoint(20, -20))).toBe(true);
     expect(region.isPointInFill(new DOMPoint(60, -40))).toBe(true);
-    expect(getComputedStyle(region).fill).toBe('rgb(226, 230, 233)');
-    expect(getComputedStyle(region).fillOpacity).toBe('1');
+    expect(getComputedStyle(region.first).fill).toBe('rgb(226, 230, 233)');
+    expect(getComputedStyle(region.first).fillOpacity).toBe('1');
     expect(region.isPointInFill(new DOMPoint(130, -40))).toBe(false);
   });
 
@@ -94,7 +100,7 @@ describe('closed sketch regions', () => {
         <SketchRegion document={document} partId={part.id} verified />
       </svg>
     );
-    const region = container.querySelector('path')!;
+    const region = shading(container);
     expect(region.isPointInFill(new DOMPoint(50, -20))).toBe(true);
     expect(region.isPointInFill(new DOMPoint(50, -60))).toBe(true);
     expect(region.isPointInFill(new DOMPoint(10, -40))).toBe(false);
@@ -128,8 +134,9 @@ describe('closed sketch regions', () => {
         <SketchRegion document={document} partId={part.id} verified />
       </svg>
     );
-    const region = container.querySelector('path')!;
-    expect(region).not.toBeNull();
+    const region = shading(container);
+    // The rectangle alone, the lens where they overlap and the rest of the circle are regions of their own.
+    expect(region.count).toBe(3);
     expect(region.isPointInFill(new DOMPoint(90, -30))).toBe(true);
     expect(region.isPointInFill(new DOMPoint(110, -30))).toBe(true);
     expect(region.isPointInFill(new DOMPoint(10, -10))).toBe(true);
