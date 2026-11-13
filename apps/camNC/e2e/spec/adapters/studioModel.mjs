@@ -1,3 +1,5 @@
+import { angleBetween } from './studioPick.mjs';
+
 /** Source-document expectations shared by browser workflows and small adapter tests. */
 export function studioState(document) {
   if (!document) throw new Error('The studio has no saved design');
@@ -63,6 +65,17 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
       // Only the fields a scenario names, so a check of the region count doesn't depend on the sketch's label.
       if (wanted === null || !actual.extrudeRegions) equal(key, wanted, actual.extrudeRegions ?? null);
       else for (const [field, value] of Object.entries(wanted)) equal(`${key}/${field}`, value, actual.extrudeRegions[field]);
+    } else if (key === 'planes') {
+      // Per plane, only the named fields: `view` (drawn in the 3D view) and `list` (its row shown or hidden).
+      for (const [name, fields] of Object.entries(wanted)) for (const [field, value] of Object.entries(fields)) equal(`${key}/${name}/${field}`, value, actual.planes?.[name]?.[field]);
+    } else if (key === 'camera') {
+      if (wanted === null || !actual.camera) equal(key, wanted, actual.camera ?? null);
+      else {
+        if ('view' in wanted) equal(`${key}/view`, wanted.view, actual.camera.view);
+        // The view direction within `degrees` (1 by default), so rounding and fitting noise don't fail it.
+        if (wanted.direction && !(angleBetween(wanted.direction, actual.camera.direction) <= (wanted.degrees ?? 1)))
+          failures.push(`studio/camera/direction: wanted ${JSON.stringify(wanted.direction)}, got ${JSON.stringify(actual.camera.direction)}`);
+      }
     } else if (['variables', 'copies', 'measurements', 'section'].includes(key)) {
       for (const [name, value] of Object.entries(wanted)) equal(`${key}/${name}`, value, actual[key]?.[name]);
     } else if (['patterns', 'offsets'].includes(key)) {

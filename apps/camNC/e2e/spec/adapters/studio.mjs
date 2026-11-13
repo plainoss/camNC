@@ -2,7 +2,7 @@ import { createAdapter as sketchAdapter } from './sketch.mjs';
 import path from 'node:path';
 import process from 'node:process';
 import { settledSnapshot } from '../settle.mjs';
-import { exportStep, extrudeRegions, parseSketchPick, saveDesign, viewPick } from './studioPick.mjs';
+import { exportStep, extrudeRegions, parseSketchPick, saveDesign, studioCamera, studioPlanes, viewPick } from './studioPick.mjs';
 import { checkStudio, studioContent, studioState } from './studioModel.mjs';
 
 const escapePattern = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -54,7 +54,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
         flipped: await sectionDialog.getByRole('button', { name: 'Flip plane', exact: true }).getAttribute('aria-pressed') === 'true',
       } : {}),
     };
-    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, section, dialog: dialogName, extrudeRegions: await extrudeRegions(page) };
+    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, section, dialog: dialogName, extrudeRegions: await extrudeRegions(page), planes: await studioPlanes(page), camera: await studioCamera(page) };
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();
@@ -68,12 +68,13 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
     }
     else if (verb === 'featureeye') {
       // A row's eye only shows while the row is hovered, so hover it first, as a person does, then click the eye.
+      // The origin's row has no button of its own, so default geometry is found by its row's name.
       const features = page.getByRole('region', { name: 'Features', exact: true });
-      const plane = features.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('button', { name: rest, exact: true });
-      const row = await plane.count() ? plane : features.getByRole('button', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) });
+      const geometry = features.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('listitem').filter({ has: page.getByText(rest, { exact: true }) });
+      const row = await geometry.count() ? geometry : features.getByRole('button', { name: new RegExp(`^${escapePattern(rest)}(?:\\s|$)`) }).locator('xpath=ancestor::li[1]');
       if (await row.count() !== 1) throw new Error(`Feature name must identify one row: ${rest}`);
       await row.hover();
-      await row.locator('xpath=ancestor::li[1]').getByRole('button', { name: /^(Show|Hide)$/ }).click();
+      await row.getByRole('button', { name: /^(Show|Hide)$/ }).click();
     } else if (verb === 'dialogtab') {
       await page.getByRole('dialog').getByRole('tab', { name: rest, exact: true }).click();
     } else if (verb === 'selectfeature') {

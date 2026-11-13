@@ -1,0 +1,193 @@
+[
+  {
+    "id": "studio/extrude/first-dimension-then-region-pick",
+    "title": "A rectangle's first dimension scales it about the origin, and a first Extrude starts with no region picked until one is picked in the view",
+    "evidence": "design sketch-to-part workflow: first dimension scales the sketch; Extrude region selection starts empty and active",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key g",
+      {
+        "spec": "5 draw"
+      },
+      "rect 0,0 20,10",
+      {
+        "expect": {
+          "entityCount": 4,
+          "regions": 1
+        }
+      },
+      {
+        "spec": "6 cancel"
+      },
+      "key Escape",
+      {
+        "spec": "7 command"
+      },
+      "key d",
+      {
+        "spec": "8 pick"
+      },
+      "viewpick 10,10,0",
+      {
+        "spec": "9 pick"
+      },
+      "viewpick 10,15,0",
+      {
+        "expect": {
+          "focus": "input",
+          "dimensions": [
+            {
+              "kind": "horizontal",
+              "value": 20
+            }
+          ]
+        }
+      },
+      {
+        "spec": "10 field"
+      },
+      "field Length 100",
+      {
+        "expect": {
+          "dimensions": [
+            {
+              "kind": "horizontal",
+              "value": 100
+            }
+          ],
+          "entitiesInclude": [
+            {
+              "type": "line",
+              "a": [100, 0],
+              "b": [100, 50]
+            }
+          ]
+        }
+      },
+      {
+        "spec": "11 view"
+      },
+      "key f",
+      {
+        "spec": "12 pick"
+      },
+      "viewpick 100,25,0",
+      {
+        "spec": "13 pick"
+      },
+      "viewpick 110,35,0",
+      {
+        "spec": "14 field"
+      },
+      "field Length 50",
+      {
+        "expect": {
+          "dimensions": [
+            {
+              "kind": "horizontal",
+              "value": 100
+            },
+            {
+              "kind": "vertical",
+              "value": 50
+            }
+          ],
+          "entitiesInclude": [
+            {
+              "type": "line",
+              "a": [100, 0],
+              "b": [100, 50]
+            }
+          ]
+        }
+      },
+      {
+        "spec": "15 cancel"
+      },
+      "key Escape",
+      {
+        "spec": "16 confirm"
+      },
+      "closesketch",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null
+          }
+        }
+      },
+      {
+        "spec": "17 command"
+      },
+      "key Shift+e",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 0,
+              "picking": true
+            }
+          }
+        }
+      },
+      {
+        "spec": "18 pick"
+      },
+      "viewpick 50,25,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 1
+            }
+          }
+        }
+      },
+      {
+        "spec": "19 field"
+      },
+      "dialogfill Thickness = 10",
+      "key Enter",
+      {
+        "expect": {
+          "focus": "input",
+          "studio": {
+            "dialog": "Extrude \u00b7 Part 1"
+          }
+        }
+      },
+      {
+        "spec": "20 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "listedParts": [
+              {
+                "name": "Part 1",
+                "thickness": 10
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+]

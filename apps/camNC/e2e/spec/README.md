@@ -246,6 +246,11 @@ The `studio` expectations check source variables, thicknesses, patterns, offsets
 `extrudeRegions` checks the open Extrude dialog's selection box: `box` (its label), `selection` (what it lists),
 `regions` (the picked region count, or null for the whole sketch) and `picking`; only the named fields are compared.
 
+`planes` checks the origin and the Top, Front and Right planes by name: `view` (the 3D view draws its label, or the
+origin's dot) and `list` (`shown` or `hidden` by its Feature list eye), as in `{ "planes": { "Top": { "view": false } } }`.
+`camera` checks the 3D view's camera: `view` is the named view it matches within 1° (`front`, `back`, `left`, `right`,
+`top`, `bottom`, `iso`, or null), and `direction` a direction it looks along, within `degrees` (1 by default).
+
 `measurements` checks the visible measurement rows by label and displayed value, including units. The stock measurement scenario uses real top/bottom viewport clicks; its unchanged-content assertion keeps inspection separate from feature edits.
 
 `section` checks the visible section controls: `active` and `editing`, plus the selected `plane`, `offset` text and `flipped` state while the inspector is open. Section scenarios retain the complete cabinet Parts list and source identities, exercise a linked offset through a stock edit, and measure a stock cut surface through real canvas clicks. Geometry probes, cap orientation and source-mesh immutability are checked separately in the section domain tests.

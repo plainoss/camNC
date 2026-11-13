@@ -107,3 +107,71 @@ export async function exportStep(page, file) {
 export function saveDesign(page, file) {
   return saveDownload(page, file, () => page.getByRole('button', { name: 'Save to file', exact: true }).click());
 }
+
+/** Where each named view looks from, Z up, as the 3D view frames them; its view direction is the opposite. */
+export const NAMED_VIEW_FROM = {
+  front: [0, -1, 0],
+  back: [0, 1, 0],
+  left: [-1, 0, 0],
+  right: [1, 0, 0],
+  top: [0, 0, 1],
+  bottom: [0, 0, -1],
+  iso: [0.2, -0.75, 1],
+};
+
+/** The angle in degrees between two directions, of any length. */
+export function angleBetween(a, b) {
+  const cosine = a.reduce((sum, value, axis) => sum + value * b[axis], 0) / (Math.hypot(...a) * Math.hypot(...b));
+  return (Math.acos(Math.min(1, Math.max(-1, cosine))) * 180) / Math.PI;
+}
+
+/** The named view a view direction matches within `degrees`, or null. */
+export function namedView(direction, degrees = 1) {
+  const match = Object.entries(NAMED_VIEW_FROM).find(([, from]) => angleBetween(from.map(value => -value), direction) <= degrees);
+  return match?.[0] ?? null;
+}
+
+/** The 3D view's camera: the unit direction it looks along, in model axes, and the named view that is. Null without one. */
+export async function studioCamera(page) {
+  const canvas = page.getByTestId('workspace-3d').locator('canvas').first();
+  if (!(await canvas.isVisible())) return null;
+  const direction = await canvas.evaluate(async element => {
+    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => /@react-three_fiber\.js|@react-three\/fiber/.test(name)).at(-1);
+    const root = moduleUrl && (await import(moduleUrl))._roots.get(element);
+    if (!root) return null;
+    const { camera } = root.store.getState();
+    camera.updateMatrixWorld();
+    return camera.getWorldDirection(camera.position.clone()).toArray();
+  });
+  if (!direction) return null;
+  return { direction: direction.map(value => Math.round(value * 1e4) / 1e4 || 0), view: namedView(direction) };
+}
+
+/**
+ * The origin and base planes: whether the 3D view draws each (its label, or the origin's dot) and whether its Feature
+ * list row is shown or hidden by its eye. An eye is named for what it does, so "Show" means the row is hidden.
+ */
+export async function studioPlanes(page) {
+  const view = page.getByTestId('workspace-3d');
+  const drawn = (await view.isVisible())
+    ? await view.evaluate(element => {
+        const names = new Set();
+        if (element.querySelector('[data-testid="model-origin"]')) names.add('Origin');
+        for (const label of element.querySelectorAll('div')) {
+          const text = label.textContent?.trim();
+          if (label.children.length || !['Top', 'Front', 'Right'].includes(text)) continue;
+          if (!label.closest('button, [role=toolbar], [role=group], [role=dialog]')) names.add(text);
+        }
+        return [...names];
+      })
+    : [];
+  const rows = await page.getByRole('list', { name: 'Default geometry', exact: true }).getByRole('listitem').evaluateAll(items => items.map(item => ({
+    // The name is the row's own span without children, not the icon beside it.
+    name: [...item.querySelectorAll('span:not([aria-hidden])')].filter(span => !span.children.length).map(span => span.textContent?.trim()).find(Boolean) ?? null,
+    eye: item.querySelector('button[aria-label="Show"], button[aria-label="Hide"]')?.getAttribute('aria-label') ?? null,
+  })));
+  return Object.fromEntries(['Origin', 'Top', 'Front', 'Right'].map(name => {
+    const row = rows.find(candidate => candidate.name === name);
+    return [name, { view: drawn.includes(name), list: !row ? null : row.eye === 'Show' ? 'hidden' : 'shown' }];
+  }));
+}
