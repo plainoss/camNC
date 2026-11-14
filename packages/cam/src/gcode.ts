@@ -293,10 +293,10 @@ export function postProgram(cam: PartCam, opts: GcodeOptions = {}): PostedProgra
   const tabStops = cam.operations.filter(o => o.pauseBefore);
   const takeOutMarker = (op: Operation): PauseMarker | null => {
     const n = takeOuts.indexOf(op);
-    return op.part ? { kind: 'take-out', n: n + 1, of: takeOuts.length, part: op.part, next: takeOuts[n + 1]?.part } : null;
+    return op.owner ? { kind: 'take-out', n: n + 1, of: takeOuts.length, part: op.owner.name, next: takeOuts[n + 1]?.owner?.name } : null;
   };
   const tabMarker = (op: Operation): PauseMarker | null =>
-    op.part ? { kind: 'tab', n: tabStops.indexOf(op) + 1, of: tabStops.length, part: op.part } : null;
+    op.owner ? { kind: 'tab', n: tabStops.indexOf(op) + 1, of: tabStops.length, part: op.owner.name } : null;
 
   move('G0', { z: safeZ });
   // Confirm before the spindle starts; a spindle the machine doesn't control (a router) is switched on here. A program

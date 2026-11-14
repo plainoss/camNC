@@ -52,7 +52,7 @@ describe('the lift at the end of a program', () => {
 });
 
 describe('who switches the spindle', () => {
-  const take: Operation = { ...op('Outline', 2), pauseBefore: 'Hold the part', part: 'Side' };
+  const take: Operation = { ...op('Outline', 2), pauseBefore: 'Hold the part', owner: { name: 'Side' } };
   const manualLines = (gcode: string) => gcode.split('\n').filter(l => /manual/i.test(l));
 
   it('by hand, the default: every pause says what to do, and a last pause after the park', () => {
