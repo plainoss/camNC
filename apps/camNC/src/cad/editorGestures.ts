@@ -1,4 +1,7 @@
-import type { CadDocument, CadSketch } from '@wbcnc/cad';
+import type { CadDocument, CadPoint, CadSketch } from '@wbcnc/cad';
+import type { CircularPatternParameters } from './circularPatternParameters';
+import type { LinearPatternParameters } from './linearPatternParameters';
+import type { TransformDragKind, TransformParameters } from './transformParameters';
 import type { CadSelectionBox } from './boxSelection';
 import type { CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 
@@ -40,6 +43,22 @@ export interface AnnotationGesture {
   position: Point;
   moved: boolean;
 }
+
+/** Dragging a tool's on-canvas handle. Each keeps the value the tool had when the drag began, to restore on cancel. */
+export type HandleDrag =
+  | { tool: 'slot'; center: CadPoint; width: string }
+  // A sweep drag adds each move's turn from `last` to `sweep`, so the angle can pass half a turn.
+  | {
+      tool: 'circularPattern';
+      kind: 'center' | 'sweep';
+      start: CadPoint;
+      parameters: CircularPatternParameters;
+      last: number;
+      sweep: number;
+    }
+  | { tool: 'linearPattern'; index: number; anchor: CadPoint; parameters: LinearPatternParameters }
+  | { tool: 'transform'; kind: TransformDragKind; start: CadPoint; parameters: TransformParameters }
+  | { tool: 'chamfer'; side: number; origin: CadPoint; direction: CadPoint; previous: string[] };
 
 /** Where a chain goes on from: its point, the way the curve ending there leaves it, and that curve. */
 export function chainGeometry(sketch: CadSketch, chain: ChainAnchor | null) {

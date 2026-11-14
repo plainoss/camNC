@@ -2,6 +2,7 @@ import { EndType, inflatePathsD, JoinType, pointInPolygonD, PointInPolygonResult
 import { difference, maxOf, minOf, offset, polyArea, PRECISION, union } from './geom';
 import { heldByPoints } from './holdPoints';
 import type { PartCam } from './toolpaths';
+import { ownerOf } from './toolpathTypes';
 
 type P2 = { x: number; y: number };
 
@@ -26,12 +27,9 @@ export interface PartHold {
   ok: boolean;
 }
 
-/** The board, and the board part each operation of its program cuts (see `camBoardParts`). */
 export interface HoldBoard {
   w: number;
   h: number;
-  /** By operation index: what tells two parts of the same name apart. Without it, parts have only their names. */
-  partIds?: readonly (string | undefined)[];
 }
 
 export interface HoldOptions {
@@ -143,7 +141,7 @@ export function holdState(cam: PartCam, board: HoldBoard, opts: HoldOptions = {}
   // The tabs' own material: left out when judging the stock beyond them (it would widen a thin strip).
   const bridges: PathsD = [];
   const parts: { part: string; id?: string; interior: PathsD; tabs: Tab[]; r: number }[] = [];
-  for (const [index, op] of cam.operations.entries()) {
+  for (const op of cam.operations) {
     if (op.kind !== 'profile') continue;
     const r = op.tool.diameter / 2;
     for (const pass of op.passes) {
@@ -196,7 +194,8 @@ export function holdState(cam: PartCam, board: HoldBoard, opts: HoldOptions = {}
       bridges.push(...inflatePathsD(tabLines, r, JoinType.Round, EndType.Butt, 2, PRECISION));
       if (op.feature === 'outline') {
         const loop = pass.pts.map(q => ({ x: q[0], y: q[1] }));
-        parts.push({ part: op.name.replace(/: [^:]*$/, ''), id: board.partIds?.[index], interior: offset(union([loop]), -r), tabs, r });
+        const { name, id } = ownerOf(op);
+        parts.push({ part: name, id, interior: offset(union([loop]), -r), tabs, r });
       }
     }
   }
@@ -265,8 +264,6 @@ function centroid(region: PathsD): P2 {
 export interface HoldEvent {
   /** Index of the operation after which it happens. */
   step: number;
-  /** That operation's name ("right: Outline 1"). */
-  after: string;
   /**
    * `board`: the whole board, before the first cut, has too few holds. `pivot`: a piece of stock with too few holds (it
    * can turn or lift). `loose`: a part cut through with nothing holding it (no tabs into held stock). `pocket`: a pocket
@@ -308,7 +305,7 @@ export function holdTimeline(cam: PartCam, board: HoldBoard, opts: HoldOptions &
     ];
     const at = { x: board.w / 2, y: board.h / 2 };
     const on = opts.points.filter(p => inside(p, [outline]));
-    if (!heldByPoints(on, at, outline)) events.push({ step: -1, after: '', kind: 'board', what: 'stock', at, holds: on.length });
+    if (!heldByPoints(on, at, outline)) events.push({ step: -1, kind: 'board', what: 'stock', at, holds: on.length });
   }
   cam.operations.forEach((op, i) => {
     if (op.kind !== 'profile' || op.feature !== 'outline' || !op.passes.some(p => p.pts.some(q => through(q[2])))) return;
@@ -320,7 +317,7 @@ export function holdTimeline(cam: PartCam, board: HoldBoard, opts: HoldOptions &
       if (seenStock.some(c => Math.hypot(c.x - s.centre.x, c.y - s.centre.y) < 20) || seenPieces.some(r => inside(s.centre, r))) continue;
       seenStock.push(s.centre);
       seenPieces.push(s.piece);
-      events.push({ step: i, after: op.name, kind: 'pivot', what: 'stock', at: s.centre, holds: s.holds });
+      events.push({ step: i, kind: 'pivot', what: 'stock', at: s.centre, holds: s.holds });
     }
     for (const p of parts) {
       // By id: two parts of the same name are two parts.
@@ -335,7 +332,7 @@ export function holdTimeline(cam: PartCam, board: HoldBoard, opts: HoldOptions &
             y: (minOf(pts.map(q => q.y)) + maxOf(pts.map(q => q.y))) / 2,
           }
         : { x: 0, y: 0 };
-      events.push({ step: i, after: op.name, kind: 'loose', what: p.part, ...(p.id && { id: p.id }), at });
+      events.push({ step: i, kind: 'loose', what: p.part, ...(p.id && { id: p.id }), at });
     }
   });
   if (opts.layer) events.push(...pocketEvents(cam, board, { ...opts, layer: opts.layer }, minTabs));
@@ -353,7 +350,6 @@ const gone = (left: number, whole: number) => left < Math.min(kThinnest, whole /
  */
 function pocketEvents(cam: PartCam, board: HoldBoard, opts: HoldOptions & { layer: BottomLayer }, minTabs: number): HoldEvent[] {
   const step = cam.operations.length - 1;
-  const after = cam.operations.at(-1)?.name ?? '';
   const middle = (pts: P2[]) => ({
     x: (minOf(pts.map(q => q.x)) + maxOf(pts.map(q => q.x))) / 2,
     y: (minOf(pts.map(q => q.y)) + maxOf(pts.map(q => q.y))) / 2,
@@ -365,7 +361,7 @@ function pocketEvents(cam: PartCam, board: HoldBoard, opts: HoldOptions & { laye
       return !gone(Math.min(l.to, tab.height) - l.from, tab.height);
     }).length;
     if (tabs.length && left < Math.min(minTabs, tabs.length))
-      events.push({ step, after, kind: 'pocket', cut: 'tabs', what: part, ...(id && { id }), at: middle(interior.flat()) });
+      events.push({ step, kind: 'pocket', cut: 'tabs', what: part, ...(id && { id }), at: middle(interior.flat()) });
   }
   for (const op of cam.operations) {
     if (op.feature !== 'outline') continue;
@@ -378,7 +374,7 @@ function pocketEvents(cam: PartCam, board: HoldBoard, opts: HoldOptions & { laye
       return !gone(Math.min(l.to, skin) - l.from, skin);
     });
     if (!heldByPoints(kept, centroid([loop]), loop))
-      events.push({ step, after, kind: 'pocket', cut: 'skin', what: op.name.replace(/: [^:]*$/, ''), at: middle(loop) });
+      events.push({ step, kind: 'pocket', cut: 'skin', what: ownerOf(op).name, at: middle(loop) });
   }
   return events;
 }

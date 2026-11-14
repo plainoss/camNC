@@ -38,12 +38,7 @@ import { cadFieldText, DesignUnitContext, useDesignUnits } from './designUnits';
 import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
 import { previewSlot } from './slotPreview';
 import { SketchCircularPatternControls, SketchCircularPatternManipulator } from './SketchCircularPatternControls';
-import {
-  initialCircularPatternParameters,
-  circularPatternParameters,
-  parseCircularPatternParameters,
-  type CircularPatternParameters,
-} from './circularPatternParameters';
+import { initialCircularPatternParameters, circularPatternParameters, parseCircularPatternParameters } from './circularPatternParameters';
 import {
   withCadLengthUnit,
   addBezier,
@@ -143,13 +138,7 @@ import {
   type LinearPatternParameters,
 } from './linearPatternParameters';
 import { SketchTransformControls, SketchTransformManipulator } from './SketchTransformControls';
-import {
-  initialTransformParameters,
-  parseTransformParameters,
-  repositionTransformPivot,
-  type TransformParameters,
-  type TransformDragKind,
-} from './transformParameters';
+import { initialTransformParameters, parseTransformParameters, repositionTransformPivot } from './transformParameters';
 import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
@@ -178,7 +167,14 @@ import { type InferredLineAxis } from './lineInference';
 import { cadViewState, saveCadViewState } from '@wbcnc/cad-editor/viewState';
 import { loadShownState, saveShownState } from './shownState';
 import { type CadSelectionBox } from './boxSelection';
-import { chainGeometry, type AnnotationGesture, type BoxGesture, type ChainAnchor, type DragGesture } from './editorGestures';
+import {
+  chainGeometry,
+  type AnnotationGesture,
+  type BoxGesture,
+  type ChainAnchor,
+  type DragGesture,
+  type HandleDrag,
+} from './editorGestures';
 import { constraintColorNotice, isEmptyDesign, isEmptySketch, sketchDofStatus, sketchFeedback } from '@wbcnc/cad-editor/sketchFeedback';
 import { failedCheckProblems, noSketchProblems } from './sketchProblemLists';
 import { isDemoMode } from '@/lib/demo/demo-mode';
@@ -251,7 +247,7 @@ import { sketchBackdropView } from './sketchBackdropView';
 import { initialFaceSketchView, assemblyCameraFromPart } from './faceSketchScene';
 import { useFaceSketchCamera } from './useFaceSketchCamera';
 import { fitSketchView, pointsOf } from './fitSketchView';
-import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions } from './sketchViewport';
+import { sketchValuePosition, projectSketchPoint, focusSketchCanvas, creationEditorPositions, sketchPointAtClient } from './sketchViewport';
 import { addUsedPartEdges } from './partEdgeUse';
 import { PartReferenceGeometry } from './PartReferenceGeometry';
 import { faceSketchHost } from './faceSketchHost';
@@ -371,28 +367,22 @@ export function CadEditor({
   const [slotChain, setSlotChain] = useState(false);
   const [sharedSlotWidth, setSharedSlotWidth] = useState<string | undefined>();
   const slotWidthField = useRef<HTMLInputElement>(null);
-  const slotDrag = useRef<{ center: CadPoint; width: string } | null>(null);
+  const handleDrag = useRef<HandleDrag | null>(null);
+  const startHandleDrag = (event: { pointerId: number }, gesture: HandleDrag) => {
+    handleDrag.current = gesture;
+    svg.current?.setPointerCapture(event.pointerId);
+  };
   const [circularParameters, setCircularParameters] = useState(initialCircularPatternParameters);
   const circularFields = useRef<Partial<Record<'count' | 'angle', HTMLInputElement>>>({});
-  const circularDrag = useRef<{
-    kind: 'center' | 'sweep';
-    start: CadPoint;
-    parameters: CircularPatternParameters;
-    last: number;
-    sweep: number;
-  } | null>(null);
   const [linearParameters, setLinearParameters] = useState(() => initialLinearPatternParameters(lengthUnit));
   const [patternEditId, setPatternEditId] = useState<string | null>(null);
   const [patternNotice, setPatternNotice] = useState('');
   const patternCommandId = useRef('');
   const patternFields = useRef<Partial<Record<Exclude<keyof LinearPatternParameters, 'secondDirection'>, HTMLInputElement>>>({});
-  const patternDrag = useRef<{ index: number; anchor: CadPoint; parameters: LinearPatternParameters } | null>(null);
   const [transformParameters, setTransformParameters] = useState(() => initialTransformParameters(undefined, lengthUnit));
   const [transformNotice, setTransformNotice] = useState('');
-  const transformDrag = useRef<{ kind: TransformDragKind; start: CadPoint; parameters: TransformParameters } | null>(null);
   const [splitNotice, setSplitNotice] = useState('');
   const [splitFirst, setSplitFirst] = useState<{ entityId: string; parameter: number; point: CadPoint } | null>(null);
-  const chamferDrag = useRef<{ side: number; origin: CadPoint; direction: CadPoint; previous: string[] } | null>(null);
   const [chamferDistances, setChamferDistances] = useState([lengthText(10), lengthText(10)]);
   const [filletRadius, setFilletRadius] = useState(lengthText(10));
   const [filletEditing, setFilletEditing] = useState(false);
@@ -1177,12 +1167,10 @@ export function CadEditor({
     centerArcSweep,
     chain,
     chamferDistances,
-    chamferDrag,
     chamferPreview,
     chamferSelection,
     changeSketch,
     chooseTool,
-    circularDrag,
     commit,
     conicEditing,
     constraintMode,
@@ -1210,6 +1198,7 @@ export function CadEditor({
     fit,
     fixGeometry,
     fixMode,
+    handleDrag,
     height,
     hoveredReferences,
     inference,
@@ -1233,7 +1222,6 @@ export function CadEditor({
     part,
     partEdges,
     patternCommandId,
-    patternDrag,
     patternEditId,
     pending,
     pendingSnaps,
@@ -1309,7 +1297,6 @@ export function CadEditor({
     sketch,
     sketchBackdrop,
     sketchTurn,
-    slotDrag,
     snap,
     solveDrag,
     solving,
@@ -1318,7 +1305,6 @@ export function CadEditor({
     takeEdges,
     tangentAxis,
     tool,
-    transformDrag,
     transformSelectionCenter,
     usingEdges,
     variableScope,
@@ -2362,9 +2348,8 @@ export function CadEditor({
                   center={slotWidthCenter}
                   radius={slotWidthCircle.radius}
                   pixelScale={markerScale}
-                  onStart={e => {
-                    slotDrag.current = { center: slotWidthCenter, width: slotWidth };
-                    svg.current?.setPointerCapture(e.pointerId);
+                  onStart={event => {
+                    startHandleDrag(event, { tool: 'slot', center: slotWidthCenter, width: slotWidth });
                     svg.current?.focus();
                   }}
                 />
@@ -2382,19 +2367,18 @@ export function CadEditor({
                     circularFields.current[field]?.select();
                   }}
                   onStart={(kind, event) => {
-                    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-                    if (!matrix) return;
-                    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-                    circularDrag.current = {
+                    const start = sketchPointAtClient(event, drawingGroup.current ?? svg.current);
+                    if (!start) return;
+                    startHandleDrag(event, {
+                      tool: 'circularPattern',
                       kind,
-                      start: { x: raw.x, y: -raw.y },
+                      start,
                       parameters: circularParameters,
-                      last: Math.atan2(-raw.y - parsedCircular.center.y, raw.x - parsedCircular.center.x),
+                      last: Math.atan2(start.y - parsedCircular.center.y, start.x - parsedCircular.center.x),
                       sweep:
                         ((parsedCircular.angle * Math.PI) / 180) *
                         (parsedCircular.closed ? (parsedCircular.count - 1) / parsedCircular.count : 1),
-                    };
-                    svg.current?.setPointerCapture(event.pointerId);
+                    });
                     svg.current?.focus();
                   }}
                 />
@@ -2405,10 +2389,9 @@ export function CadEditor({
                   steps={linearParameters.secondDirection ? [parsedLinear.stepX, parsedLinear.stepY] : [parsedLinear.stepX]}
                   counts={[parsedLinear.countX, parsedLinear.countY]}
                   pixelScale={markerScale}
-                  onStart={(index, event) => {
-                    patternDrag.current = { index, anchor: patternAnchor, parameters: linearParameters };
-                    svg.current?.setPointerCapture(event.pointerId);
-                  }}
+                  onStart={(index, event) =>
+                    startHandleDrag(event, { tool: 'linearPattern', index, anchor: patternAnchor, parameters: linearParameters })
+                  }
                   onEdit={field => {
                     patternFields.current[field]?.focus();
                     patternFields.current[field]?.select();
@@ -2423,11 +2406,8 @@ export function CadEditor({
                   }}
                   pixelScale={markerScale}
                   onStart={(kind, event) => {
-                    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-                    if (!matrix) return;
-                    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-                    transformDrag.current = { kind, start: { x: raw.x, y: -raw.y }, parameters: transformParameters };
-                    svg.current?.setPointerCapture(event.pointerId);
+                    const start = sketchPointAtClient(event, drawingGroup.current ?? svg.current);
+                    if (start) startHandleDrag(event, { tool: 'transform', kind, start, parameters: transformParameters });
                   }}
                 />
               )}
@@ -2466,13 +2446,13 @@ export function CadEditor({
                       onPointerDown={event => {
                         event.stopPropagation();
                         event.preventDefault();
-                        chamferDrag.current = {
+                        startHandleDrag(event, {
+                          tool: 'chamfer',
                           side,
                           origin,
                           direction: { x: (point.x - origin.x) / length, y: (point.y - origin.y) / length },
                           previous: chamferDistances,
-                        };
-                        svg.current?.setPointerCapture(event.pointerId);
+                        });
                       }}
                     />
                   );

@@ -112,20 +112,27 @@ function assertEffectiveXYZero(
     throw new Error('The effective XY offset differs from the workspace zero. Review or clear G92 offsets before starting.');
 }
 
-/** Table replies may precede the effective-offset status report after G10. */
-async function confirmedXYZero(api: ReturnType<typeof getCncApi>, assertCurrent: () => void) {
-  const zero = await api.getCurrentZero();
+/** The effective work offset once its XY reports `target`, or null when the controller never reports it. */
+async function reportedXYZero(api: ReturnType<typeof getCncApi>, target: { x: number; y: number }, assertCurrent: () => void) {
   const deadline = Date.now() + 5000;
   for (;;) {
     assertCurrent();
     const wco = api.status.value?.wco;
-    if (wco && Math.abs(zero.x - wco.x) <= 0.01 && Math.abs(zero.y - wco.y) <= 0.01) return { zero, wco: structuredClone(wco) };
-    if (Date.now() >= deadline) {
-      assertEffectiveXYZero(zero, wco);
-      throw new Error('Wait for a machine position report before using its zero.');
-    }
+    if (wco && Math.abs(target.x - wco.x) <= 0.01 && Math.abs(target.y - wco.y) <= 0.01) return structuredClone(wco);
+    if (Date.now() >= deadline) return null;
     await new Promise(resolve => setTimeout(resolve, 25));
   }
+}
+
+/** Table replies may precede the effective-offset status report after G10. */
+async function confirmedXYZero(api: ReturnType<typeof getCncApi>, assertCurrent: () => void) {
+  const zero = await api.getCurrentZero();
+  const wco = await reportedXYZero(api, zero, assertCurrent);
+  if (!wco) {
+    assertEffectiveXYZero(zero, api.status.value?.wco);
+    throw new Error('Wait for a machine position report before using its zero.');
+  }
+  return { zero, wco };
 }
 
 /** Save the physical placement before preparation can lock the editor's deferred drag save. */
@@ -222,20 +229,23 @@ function ownsPreparation(context: RunContext) {
         sameExecutionReference(state.runRecord, context.resumeReference)
     : context.previousReference === null;
 }
+/** The status report of a controller that is idle with no job; test doubles may omit the activity signals. */
+function idleStatus(api: ReturnType<typeof getCncApi>) {
+  const status = api.status.value;
+  if (!status || status.job || api.jobProgress?.value != null || api.jobStartedAt?.value != null) return null;
+  return (api.state?.value ?? status.state) === 'Idle' ? status : null;
+}
+const sessionChanged = (context: RunContext) =>
+  getCncApi() !== context.api || context.api.host.value !== context.host || isDemoMode() !== context.demo || !ownsPreparation(context);
 function assertRunContext(context: RunContext, awaitingXYReport = false) {
-  const status = context.api.status.value;
+  const status = idleStatus(context.api);
   if (
     !status ||
     (!awaitingXYReport && (Math.abs(status.wco.x - context.setup.wco.x) > 0.01 || Math.abs(status.wco.y - context.setup.wco.y) > 0.01)) ||
-    Math.abs(status.wco.z - context.setup.wco.z) > 0.01 ||
-    context.api.jobProgress?.value != null ||
-    context.api.jobStartedAt?.value != null ||
-    status.job ||
-    (context.api.state?.value ?? (status as { state?: string }).state) !== 'Idle'
+    Math.abs(status.wco.z - context.setup.wco.z) > 0.01
   )
     throw new Error('The controller position or activity changed while preparing. Execution was not requested.');
-  if (getCncApi() !== context.api || context.api.host.value !== context.host || isDemoMode() !== context.demo || !ownsPreparation(context))
-    throw new Error('The machine or session changed while preparing this program. Execution was not requested.');
+  if (sessionChanged(context)) throw new Error('The machine or session changed while preparing this program. Execution was not requested.');
 }
 class ReceiptConflict extends Error {}
 interface Preparation {
@@ -315,19 +325,29 @@ export async function uploadAndRun() {
   return startProgram(false);
 }
 
-async function startProgram(setXYZero: boolean) {
-  const api = getCncApi();
-  const { toolpath, toolpathName } = useStore.getState();
-  if (!toolpath?.gcode) throw new Error('No toolpath loaded');
-  if (isManufacturingLocked()) throw new Error('Review or dismiss the original machine job before starting another program.');
-  assertInsideTravel();
-  const context = captureRunContext(api),
-    pendingZero = api.currentZero?.value,
-    awaitingXYReport =
-      !!pendingZero && (Math.abs(pendingZero.x - context.setup.wco.x) > 0.01 || Math.abs(pendingZero.y - context.setup.wco.y) > 0.01),
-    previousSnapshot = useCamMachine.getState().runSnapshot;
-  const camSnapshot = pinManufacturingRun(toolpath.gcode);
-  const sdFile = executionJobFileName(context.executionId);
+interface Dispatch {
+  gcode: string;
+  sdFile: string;
+  toolpathName: string | null;
+  camSnapshot?: ManufacturingSnapshot;
+  /** A resumed native run must still have its started sheet before the physical preparation. */
+  requireStartedSheet?: boolean;
+  startedMessage: string;
+  /** Everything that must hold before the upload. Resolves to the recovery receipt head the dispatch replaces. */
+  confirmSetup(): Promise<JobRecordHead | null>;
+  /** After the controller accepted the start: retire what this execution replaced. */
+  onStarted(replaced: JobRecord | null | undefined): void;
+  /** Undo what the caller showed for this dispatch, after a clean rollback. */
+  restoreSetup(): void;
+}
+
+/**
+ * The one transaction that starts a program: upload, prepared receipt, native preparation, receipt promotion and
+ * runFile, with the run context checked after every await. Until runFile is requested, any failure rolls all of it back.
+ */
+async function dispatchExecution(context: RunContext, dispatch: Dispatch) {
+  const { api } = context,
+    { gcode, sdFile, toolpathName, camSnapshot } = dispatch;
   useCamMachine.setState({ preparingRun: true, preparingExecutionId: context.executionId, runPreparationError: null });
   let startRequested = false,
     uploadStarted = false,
@@ -336,61 +356,16 @@ async function startProgram(setXYZero: boolean) {
     activated = false,
     nativePreparation: NativePreparationReceipt | null = null;
   try {
-    let head: JobRecordHead | null;
-    try {
-      head = await readJobRecordHead(context.host, context.demo);
-    } catch (error) {
-      if (camSnapshot) throw error;
-      head = null;
-    }
-    assertRunContext(context, awaitingXYReport);
-    const unreviewed = head?.stored?.camSnapshot ? head.stored : head?.record?.camSnapshot ? head.record : null;
-    if (unreviewed) {
-      useCamMachine.setState({ preparingRun: false, preparingExecutionId: null });
-      await showRecordedNativeRun(api, unreviewed, context.demo);
-      throw new Error('Review the original machine setup before starting another program.');
-    }
-    const confirmed = await confirmedXYZero(api, () => assertRunContext(context, awaitingXYReport));
-    // Only a zero already awaiting its status report may replace the captured XY.
-    if (awaitingXYReport) assertEffectiveXYZero(pendingZero, confirmed.wco);
-    context.setup.wco = confirmed.wco;
+    const head = await dispatch.confirmSetup();
     assertRunContext(context);
-    if (setXYZero) {
-      const { x, y } = context.setup.toolpathOffset;
-      await step(api.setWorkspaceXYZero(x, y), 'Setting XY zero…', `XY zero set to ${x.toFixed(2)}, ${y.toFixed(2)}`);
-      // G10's acknowledgement is not a position report. Wait for the actual effective WCO;
-      // an optimistic UI zero must never become the recovery receipt's machine zero.
-      const deadline = Date.now() + 5000;
-      for (;;) {
-        if (getCncApi() !== api || api.host.value !== context.host || isDemoMode() !== context.demo || !ownsPreparation(context))
-          throw new Error('The machine or session changed while setting XY zero. Execution was not requested.');
-        const status = api.status.value;
-        if (
-          !status ||
-          (api.state?.value ?? status.state) !== 'Idle' ||
-          api.jobProgress?.value != null ||
-          api.jobStartedAt?.value != null ||
-          status.job
-        )
-          throw new Error('The controller activity changed while setting XY zero. Execution was not requested.');
-        if (Math.abs(status.wco.z - context.setup.wco.z) > 0.01)
-          throw new Error('Z zero changed while setting XY zero. Execution was not requested.');
-        if (Math.abs(status.wco.x - x) <= 0.01 && Math.abs(status.wco.y - y) <= 0.01) {
-          context.setup.wco = structuredClone(status.wco);
-          break;
-        }
-        if (Date.now() >= deadline) throw new Error('The controller did not confirm the requested XY zero. Execution was not requested.');
-        await new Promise(resolve => setTimeout(resolve, 25));
-      }
-      assertRunContext(context);
-    }
     uploadStarted = true;
-    await step(api.uploadGcode(toolpath.gcode, sdFile, { fresh: true }), 'Uploading…', 'Uploaded and verified');
+    await step(api.uploadGcode(gcode, sdFile, { fresh: true }), 'Uploading…', 'Uploaded and verified');
     uploadVerified = true;
     assertRunContext(context);
-    preparation = await recordJob(context, { gcode: toolpath.gcode, sdFile, toolpathName, camSnapshot }, head);
+    preparation = await recordJob(context, { gcode, sdFile, toolpathName, camSnapshot }, head);
     assertRunContext(context);
     if (camSnapshot) {
+      if (dispatch.requireStartedSheet) await recordNativeRun(camSnapshot, false, true);
       nativePreparation = await prepareNativeRun(camSnapshot, context.executionId);
     }
     assertRunContext(context);
@@ -399,13 +374,10 @@ async function startProgram(setXYZero: boolean) {
     assertRunContext(context);
     useCamMachine.setState({ ...(camSnapshot && { runReview: 'requested' as const }), runRecord: executionReference(record) });
     runningJobName.value = toolpathName;
-    rememberExecutionProgram(sdFile, toolpath.gcode);
+    rememberExecutionProgram(sdFile, gcode);
     startRequested = true;
-    await step(api.runFile(sdFile), 'Starting job…', 'Job started');
-    if (preparation.original?.record) {
-      retireExecutionFiles(context.host, [preparation.original.record.sdFile], context.demo);
-      if (interruptedJob.value && sameJobExecution(interruptedJob.value.record, preparation.original.record)) interruptedJob.value = null;
-    }
+    await step(api.runFile(sdFile), 'Starting job…', dispatch.startedMessage);
+    dispatch.onStarted(preparation.original?.record);
   } catch (error) {
     if (!startRequested) {
       if (error instanceof NativePreparationFailure) nativePreparation = error.receipt;
@@ -420,7 +392,7 @@ async function startProgram(setXYZero: boolean) {
       }
       if (ownsPreparation(context)) {
         if (camSnapshot && rollbackError) retainFailedPreparation(context, camSnapshot, errorText(rollbackError ?? error));
-        else useCamMachine.setState({ runSnapshot: previousSnapshot });
+        else dispatch.restoreSetup();
       }
     }
     throw error;
@@ -428,6 +400,71 @@ async function startProgram(setXYZero: boolean) {
     if (ownsPreparation(context)) useCamMachine.setState({ preparingRun: false, preparingExecutionId: null });
     if (!startRequested) void cleanupRetiredExecutionFiles(api, { demo: context.demo }).catch(() => {});
   }
+}
+
+async function startProgram(setXYZero: boolean) {
+  const api = getCncApi();
+  const { toolpath, toolpathName } = useStore.getState();
+  if (!toolpath?.gcode) throw new Error('No toolpath loaded');
+  if (isManufacturingLocked()) throw new Error('Review or dismiss the original machine job before starting another program.');
+  assertInsideTravel();
+  const context = captureRunContext(api),
+    pendingZero = api.currentZero?.value,
+    awaitingXYReport =
+      !!pendingZero && (Math.abs(pendingZero.x - context.setup.wco.x) > 0.01 || Math.abs(pendingZero.y - context.setup.wco.y) > 0.01),
+    previousSnapshot = useCamMachine.getState().runSnapshot;
+  const camSnapshot = pinManufacturingRun(toolpath.gcode);
+  await dispatchExecution(context, {
+    gcode: toolpath.gcode,
+    sdFile: executionJobFileName(context.executionId),
+    toolpathName,
+    camSnapshot,
+    startedMessage: 'Job started',
+    async confirmSetup() {
+      let head: JobRecordHead | null;
+      try {
+        head = await readJobRecordHead(context.host, context.demo);
+      } catch (error) {
+        if (camSnapshot) throw error;
+        head = null;
+      }
+      assertRunContext(context, awaitingXYReport);
+      const unreviewed = head?.stored?.camSnapshot ? head.stored : head?.record?.camSnapshot ? head.record : null;
+      if (unreviewed) {
+        useCamMachine.setState({ preparingRun: false, preparingExecutionId: null });
+        await showRecordedNativeRun(api, unreviewed, context.demo);
+        throw new Error('Review the original machine setup before starting another program.');
+      }
+      const confirmed = await confirmedXYZero(api, () => assertRunContext(context, awaitingXYReport));
+      // Only a zero already awaiting its status report may replace the captured XY.
+      if (awaitingXYReport) assertEffectiveXYZero(pendingZero, confirmed.wco);
+      context.setup.wco = confirmed.wco;
+      if (setXYZero) {
+        assertRunContext(context);
+        const { x, y } = context.setup.toolpathOffset;
+        await step(api.setWorkspaceXYZero(x, y), 'Setting XY zero…', `XY zero set to ${x.toFixed(2)}, ${y.toFixed(2)}`);
+        // G10's acknowledgement is not a position report. Wait for the actual effective WCO;
+        // an optimistic UI zero must never become the recovery receipt's machine zero.
+        const wco = await reportedXYZero(api, { x, y }, () => {
+          if (sessionChanged(context))
+            throw new Error('The machine or session changed while setting XY zero. Execution was not requested.');
+          const status = idleStatus(api);
+          if (!status) throw new Error('The controller activity changed while setting XY zero. Execution was not requested.');
+          if (Math.abs(status.wco.z - context.setup.wco.z) > 0.01)
+            throw new Error('Z zero changed while setting XY zero. Execution was not requested.');
+        });
+        if (!wco) throw new Error('The controller did not confirm the requested XY zero. Execution was not requested.');
+        context.setup.wco = wco;
+      }
+      return head;
+    },
+    onStarted(replaced) {
+      if (!replaced) return;
+      retireExecutionFiles(context.host, [replaced.sdFile], context.demo);
+      if (interruptedJob.value && sameJobExecution(interruptedJob.value.record, replaced)) interruptedJob.value = null;
+    },
+    restoreSetup: () => useCamMachine.setState({ runSnapshot: previousSnapshot }),
+  });
 }
 
 /**
@@ -505,74 +542,36 @@ export async function runResume(job: InterruptedJob, line: number) {
     stockHeight: job.record.stockHeight,
     toolDiameter: job.record.toolDiameter,
   });
-  const sdFile = executionJobFileName(context.executionId, true);
-  let startRequested = false,
-    uploadStarted = false,
-    uploadVerified = false,
-    preparation: Preparation | null = null,
-    activated = false,
-    nativePreparation: NativePreparationReceipt | null = null;
-  useCamMachine.setState({ preparingRun: true, preparingExecutionId: context.executionId, runPreparationError: null });
-  try {
-    applyRecord(api, { ...job.record, gcode: resume.gcode, toolpathName: name }, { machineState: false });
-    context.resumeReference = useCamMachine.getState().runRecord;
-    const head = await readJobRecordHead(context.host, context.demo);
-    const durableResume = !!(job.record.executionId || job.record.camSnapshot);
-    if (
-      head.stored?.execution === 'prepared' ||
-      head.record?.execution === 'finished' ||
-      (head.stored && (!head.record || !sameJobExecution(head.stored, job.record))) ||
-      (durableResume && (!head.stored || !head.record || !sameJobExecution(head.record, job.record)))
-    )
-      throw new ReceiptConflict('The interrupted execution receipt was removed, replaced, or still needs preparation review.');
-    assertRunContext(context);
-    uploadStarted = true;
-    await step(api.uploadGcode(resume.gcode, sdFile, { fresh: true }), 'Uploading…', 'Uploaded and verified');
-    uploadVerified = true;
-    assertRunContext(context);
-    preparation = await recordJob(context, { gcode: resume.gcode, sdFile, toolpathName: name, camSnapshot: job.record.camSnapshot }, head);
-    assertRunContext(context);
-    if (job.record.camSnapshot) {
-      await recordNativeRun(job.record.camSnapshot, false, true);
-      nativePreparation = await prepareNativeRun(job.record.camSnapshot, context.executionId);
-    }
-    assertRunContext(context);
-    const record = await activateReceipt(context, preparation);
-    activated = true;
-    assertRunContext(context);
-    useCamMachine.setState({ ...(job.record.camSnapshot && { runReview: 'requested' as const }), runRecord: executionReference(record) });
-    runningJobName.value = name;
-    rememberExecutionProgram(sdFile, resume.gcode);
-    startRequested = true;
-    await step(api.runFile(sdFile), 'Starting job…', 'Job resumed: Resume once the bit is clear');
-    retireExecutionFiles(context.host, [job.record.sdFile], context.demo);
-    if (interruptedJob.value && sameExecutionReference(interruptedJob.value.record, job.record)) interruptedJob.value = null;
-  } catch (error) {
-    if (!startRequested) {
-      if (error instanceof NativePreparationFailure) nativePreparation = error.receipt;
-      if (uploadStarted) retireExecutionFiles(context.host, [sdFile], context.demo, { pendingUpload: !uploadVerified });
-      let rollbackError: unknown;
-      try {
-        if (nativePreparation && !(await rollbackNativePreparation(nativePreparation)))
-          throw new Error('The original physical preparation could not be released.');
-        if (preparation) await restoreRecoveryRecord(context, preparation, activated ? 'requested' : 'prepared');
-      } catch (failure) {
-        rollbackError = failure;
-      }
-      if (ownsPreparation(context)) {
-        if (job.record.camSnapshot && rollbackError)
-          retainFailedPreparation(context, job.record.camSnapshot, errorText(rollbackError ?? error));
-        else {
-          useStore.setState(previousView);
-          useCamMachine.setState(previousSetup);
-        }
-      }
-    }
-    throw error;
-  } finally {
-    if (ownsPreparation(context)) useCamMachine.setState({ preparingRun: false, preparingExecutionId: null });
-    if (!startRequested) void cleanupRetiredExecutionFiles(api, { demo: context.demo }).catch(() => {});
-  }
+  await dispatchExecution(context, {
+    gcode: resume.gcode,
+    sdFile: executionJobFileName(context.executionId, true),
+    toolpathName: name,
+    camSnapshot: job.record.camSnapshot,
+    requireStartedSheet: true,
+    startedMessage: 'Job resumed: Resume once the bit is clear',
+    async confirmSetup() {
+      applyRecord(api, { ...job.record, gcode: resume.gcode, toolpathName: name }, { machineState: false });
+      context.resumeReference = useCamMachine.getState().runRecord;
+      const head = await readJobRecordHead(context.host, context.demo);
+      const durableResume = !!(job.record.executionId || job.record.camSnapshot);
+      if (
+        head.stored?.execution === 'prepared' ||
+        head.record?.execution === 'finished' ||
+        (head.stored && (!head.record || !sameJobExecution(head.stored, job.record))) ||
+        (durableResume && (!head.stored || !head.record || !sameJobExecution(head.record, job.record)))
+      )
+        throw new ReceiptConflict('The interrupted execution receipt was removed, replaced, or still needs preparation review.');
+      return head;
+    },
+    onStarted() {
+      retireExecutionFiles(context.host, [job.record.sdFile], context.demo);
+      if (interruptedJob.value && sameExecutionReference(interruptedJob.value.record, job.record)) interruptedJob.value = null;
+    },
+    restoreSetup() {
+      useStore.setState(previousView);
+      useCamMachine.setState(previousSetup);
+    },
+  });
 }
 
 export async function runMacro(macro: Macro) {

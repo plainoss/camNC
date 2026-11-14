@@ -2,7 +2,6 @@ import {
   boardBits,
   boardWork,
   camBoard,
-  camBoardParts,
   holdOptionsOf,
   holdsOnParts,
   jobHoldClashes,
@@ -144,7 +143,6 @@ export interface PlanResult {
    */
   timeline?: {
     step: number;
-    after: string;
     kind: 'board' | 'pivot' | 'loose' | 'pocket';
     what: string;
     /** The board part's id, for a part (names can repeat). */
@@ -251,7 +249,7 @@ export function planBoard(
     else
       problem ??= `No room for two ⌀${diameter} dowel pins clear of the parts: make the board bigger, or re-align with the camera instead.`;
   }
-  const { cam, partIds } = camBoardParts(spec, settings, progress.step(sideA));
+  const cam = camBoard(spec, settings, progress.step(sideA));
   progress.done(sideA);
   // A cut line past the board's edge: the moves round it that leave the board are said once, as that.
   const pastEdge = (board.cutouts ?? []).filter(c => cutoutPastBoard([c.outline], { w: board.w, h: board.h }));
@@ -317,10 +315,7 @@ export function planBoard(
   }
   // The hold check runs on the board as laid out, before it's turned to lie like the stock on the bed.
   progress.done(postB);
-  // With the board part each operation cuts: two parts of the same name are held, or come loose, each on its own.
-  const { cam: flat, partIds: flatIds } = board.rotationDeg
-    ? camBoardParts({ ...spec, rotationDeg: 0 }, settings, progress.step(unturned))
-    : { cam, partIds };
+  const flat = board.rotationDeg ? camBoard({ ...spec, rotationDeg: 0 }, settings, progress.step(unturned)) : cam;
   progress.done(unturned);
   const holding = (cam.holding ?? []).map(h => ({
     id: h.id,
@@ -348,7 +343,7 @@ export function planBoard(
         ].map(h => ({ x: h.x, y: h.y })),
       }
     : {};
-  plan = { ...plan, ...stability(flat, flatIds, spec, settings), ...clashes, ...(release.length && { release }) };
+  plan = { ...plan, ...stability(flat, spec, settings), ...clashes, ...(release.length && { release }) };
   if (cutLine.dropped() || releaseCutLine.dropped()) plan = withCutLineProblem(plan, pastEdge);
   progress.done(holds - kHoldCheckShare * work.parts);
   // A skin (or the layer on the tape) holds every part until the end.
@@ -362,7 +357,7 @@ export function planBoard(
   if (!usesTabs(board.holdDown)) return plan;
   return {
     ...plan,
-    hold: holdCheck(flat, { ...board, partIds: flatIds }, holdOptionsOf(spec, settings)),
+    hold: holdCheck(flat, board, holdOptionsOf(spec, settings)),
     holding,
     skin: board.skin ?? kDefaultSkin,
   };
@@ -385,24 +380,14 @@ function withCutLineProblem(plan: PlanResult, past: BoardCutout[]): PlanResult {
  * Does everything stay put during the job? What comes loose at which step (stock with too few holds, parts cut free
  * with nothing holding them, tabs or skins a pocket cuts away). On the board as laid out (not turned on the bed).
  */
-function stability(
-  flat: PartCam,
-  partIds: readonly (string | undefined)[],
-  spec: BoardSpec,
-  settings: Partial<CamSettings>
-): Pick<PlanResult, 'timeline'> {
+function stability(flat: PartCam, spec: BoardSpec, settings: Partial<CamSettings>): Pick<PlanResult, 'timeline'> {
   if (spec.holdDown === 'fixture-tape') return {};
   const how = (ev: { what: string; id?: string }) => flat.holding?.find(h => (ev.id ? h.id === ev.id : h.name === ev.what))?.how;
   // Nothing holds the parts, as the user chose: say so, don't block.
   const watched = spec.holdDown === 'none';
-  const after = (op: string) => {
-    const [, part] = op.match(/^(.+): [^:]*$/) ?? [];
-    return part ? `the outline of ${part}` : op;
-  };
+  const after = ({ name, owner }: Operation) => (owner ? `the outline of ${owner.name}` : name);
   // With no fixture at all, the one note about the board says it: not one more per piece of stock.
-  const events = holdTimeline(flat, { ...spec, partIds }, holdOptionsOf(spec, settings)).filter(
-    ev => spec.holdPoints?.length || ev.kind !== 'pivot'
-  );
+  const events = holdTimeline(flat, spec, holdOptionsOf(spec, settings)).filter(ev => spec.holdPoints?.length || ev.kind !== 'pivot');
   const timeline = events.map(ev => {
     // What can turn or lift is the user's call (tape, a hand on it): said, never blocked. A part with nothing holding it
     // and a pocket through its tabs or skin aren't.
@@ -423,7 +408,7 @@ function stability(
       };
     const message =
       ev.kind === 'pivot'
-        ? `After cutting ${after(ev.after)}, a piece of the board ${
+        ? `After cutting ${after(flat.operations[ev.step])}, a piece of the board ${
             (ev.holds ?? 0) >= 3
               ? `has ${ev.holds} screws or clamps, but all to one side of it`
               : `is held by ${ev.holds === 0 ? 'no' : `only ${ev.holds}`} screw${ev.holds === 1 ? '' : 's'} or clamp${ev.holds === 1 ? '' : 's'}`
@@ -631,10 +616,10 @@ function undersideOf(source: BoardPartSource, instanceId: string, board: BoardRe
     : f;
 }
 
-/** "left: Pocket 2 z=3.5" -> "left · Pocket 4.5 deep" (board programs prefix the part). */
-const label = (name: string, top: number, title?: string) => {
-  const split = name.lastIndexOf(': ');
-  const [prefix, op] = split > 0 && split + 2 < name.length ? [name.slice(0, split), name.slice(split + 2)] : [undefined, name];
+/** "left: Pocket 2 z=3.5" -> "left · Pocket 4.5 deep" (board programs prefix the operation's owner). */
+const label = ({ name, owner, title }: Operation, top: number) => {
+  const prefix = owner && name.startsWith(`${owner.name}: `) ? owner.name : undefined;
+  const op = prefix ? name.slice(prefix.length + 2) : name;
   const z = op.match(/z=([\d.]+)/);
   const text = title
     ? title[0].toUpperCase() + title.slice(1)
@@ -737,7 +722,7 @@ function opSummaries(cam: PartCam, partTop: number): OpSummary[] {
     return {
       name: op.name,
       // The title's depths are from the part's top; a thicker stock (allowance) doesn't change them.
-      label: label(op.name, partTop, op.title),
+      label: label(op, partTop),
       kind: op.kind,
       tool: {
         number: op.tool.number,

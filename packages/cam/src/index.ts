@@ -110,7 +110,6 @@ export type { HoldOptions, PartHold, TabHold, HoldEvent } from './hold';
 export type { OnProgress } from './progress';
 export {
   camBoard,
-  camBoardParts,
   boardBits,
   holdOptionsOf,
   holdsOnParts,
