@@ -1,5 +1,6 @@
 import {
   cadCuts,
+  designStepLabel,
   isCadPart,
   isSpatialRemoval,
   regionInteriorPoint,
@@ -245,7 +246,7 @@ export function LinearPatternDialog({
     onOk();
   };
   const picked = target ? document.parts.find(candidate => candidate.id === target) : undefined;
-  const name = picked && (picked.remove ? (picked.extrudeName ?? `Extrude · ${picked.name}`) : picked.name);
+  const name = picked && (picked.remove ? (designStepLabel(document, `${picked.id}:extrude`) ?? picked.name) : picked.name);
   const label = type === 'feature' ? 'Features to pattern' : 'Entities to pattern';
   const unsupported = 'Not available yet';
   return (

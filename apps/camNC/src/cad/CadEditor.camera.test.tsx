@@ -43,7 +43,7 @@ it.each([1200, 375, 320])(
     };
     const before = marker();
     const saved = structuredClone(state.current!);
-    await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Sketch ·/ }));
+    await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Sketch( ·| \d)/ }));
     await settled();
     const drawing = screen.getByTestId('cad-drawing');
     const point = new DOMPoint(0, 0).matrixTransform((drawing as unknown as SVGGraphicsElement).getScreenCTM()!);

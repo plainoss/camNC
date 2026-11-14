@@ -31,7 +31,7 @@ async function openSketch(source: CadDocument) {
       <CadEditor document={source} startIn3D={false} onDraftChange={change} onFinish={() => {}} onCancel={() => {}} />
     </div>
   );
-  const dialog = await screen.findByRole('dialog', { name: /^Sketch · / });
+  const dialog = await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ });
   await settled();
   await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
   await waitFor(() => expect(within(dialog).getByRole('button', { name: /Finish sketch/ })).toHaveProperty('disabled', false));
@@ -49,7 +49,7 @@ it('confirms a sketch not yet extruded with Shift+E and extrudes all of its regi
   const { latest } = await openSketch({ ...createCadDocument(), parts: [shelf] });
   await userEvent.keyboard(extrudeKeys);
   const extrude = await screen.findByRole('dialog', { name: 'Extrude · Shelf' });
-  expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull();
+  expect(screen.queryByRole('dialog', { name: /^Sketch( · | \d)/ })).toBeNull();
   // Split in two, the sketch isn't one outline: from the open sketch, it starts with both regions, not none.
   expect(sketchRegions(latest().parts[0]!.sketch, CAD_CHORD_TOLERANCE)).toHaveLength(2);
   await waitFor(() => expect(latest().parts[0]!.regions).toHaveLength(2));
@@ -64,8 +64,8 @@ it('starts another extrude of an extruded sketch with Shift+E, even with a drawi
   await userEvent.keyboard('g');
   await waitFor(() => expect(canvas.classList.contains('cad-tool-rectangle')).toBe(true));
   await userEvent.keyboard(extrudeKeys);
-  const extrude = await screen.findByRole('dialog', { name: /^Extrude · / });
-  expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull();
+  const extrude = await screen.findByRole('dialog', { name: /^Extrude( · | \d)/ });
+  expect(screen.queryByRole('dialog', { name: /^Sketch( · | \d)/ })).toBeNull();
   await waitFor(() => expect(latest().parts).toHaveLength(2));
   const made = latest().parts[1]!;
   expect(made.sketchOf).toBe(plate.id);
@@ -74,7 +74,7 @@ it('starts another extrude of an extruded sketch with Shift+E, even with a drawi
   await userEvent.click(within(extrude).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(latest().parts).toHaveLength(1));
   expect(latest().parts[0]!.sketch).toEqual(plate.sketch);
-  expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull();
+  expect(screen.queryByRole('dialog', { name: /^Sketch( · | \d)/ })).toBeNull();
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
 }, 30_000);
 
@@ -86,8 +86,8 @@ it('types Shift+E into a dimension being edited instead of extruding', async () 
   await userEvent.keyboard(extrudeKeys);
   expect(input).toHaveValue('#wE');
   await settled();
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
-  expect(screen.queryByRole('dialog', { name: /^Extrude · / })).toBeNull();
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
+  expect(screen.queryByRole('dialog', { name: /^Extrude( · | \d)/ })).toBeNull();
 }, 30_000);
 
 it('lists Shift+E in the open sketch’s shortcuts', async () => {

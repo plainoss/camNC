@@ -70,7 +70,7 @@ it('leaves no history step when a sketch is cancelled, and still offers to resto
   const { seen, latest, thickness, undo, redoButton } = await studioWithCommittedDepth();
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Sketch/ }));
   await userEvent.click(within(screen.getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Top/ }));
-  const dialog = await screen.findByRole('dialog', { name: /^Sketch · / });
+  const dialog = await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ });
   await settled();
   const canvas = screen.getByTestId('cad-canvas') as unknown as SVGSVGElement;
   vi.spyOn(canvas, 'setPointerCapture').mockImplementation(() => {});

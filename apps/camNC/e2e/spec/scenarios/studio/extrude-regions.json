@@ -167,7 +167,7 @@
         "expect": {
           "focus": "input",
           "studio": {
-            "dialog": "Extrude \u00b7 Part 1"
+            "dialog": "Extrude 1"
           }
         }
       },
@@ -296,7 +296,7 @@
       {
         "spec": "14 select"
       },
-      "featureeye Sketch \u00b7 Part 1",
+      "featureeye Sketch 1",
       {
         "spec": "15 command"
       },

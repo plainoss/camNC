@@ -39,12 +39,12 @@ async function extrudeFromSketch(sketch: (sketch: CadSketch) => CadSketch) {
       <CadEditor document={source} startIn3D={false} onDraftChange={change} onFinish={() => {}} onCancel={() => {}} />
     </div>
   );
-  const sketchDialog = await screen.findByRole('dialog', { name: /^Sketch · / });
+  const sketchDialog = await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ });
   await settled();
   await waitFor(() => expect(within(sketchDialog).getByRole('button', { name: /Finish sketch/ })).toHaveProperty('disabled', false));
   (screen.getByTestId('cad-canvas') as unknown as SVGSVGElement).focus();
   await userEvent.keyboard('{Shift>}E{/Shift}');
-  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 1' });
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude 1' });
   await settled();
   return { dialog, latest: () => change.mock.calls.at(-1)?.[0] ?? source };
 }
@@ -68,7 +68,7 @@ it('extrudes a rectangle and a frame beside it with Shift+E, each a part, the fr
   // The view shows the two parts OK makes.
   await waitFor(() => expect(viewport().instanceIds).toHaveLength(2));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Part 1' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude 1' })).toBeNull());
   await waitFor(() => expect(latest().parts).toHaveLength(2));
   const profiles = latest().parts.map(part => evaluateCadPart(part).part!);
   const area = (points: { x: number; y: number }[]) => Math.abs(polygonArea(points));
@@ -103,7 +103,7 @@ it('keeps a part hidden in the preview of shapes apart hidden once OK makes it',
   fireEvent.keyDown(screen.getByTestId('workspace-3d'), { key: 'y', code: 'KeyY' });
   await waitFor(() => expect(viewport().instanceIds).toEqual([first]));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Part 1' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude 1' })).toBeNull());
   await waitFor(() => expect(latest().parts.map(part => part.id)).toEqual([first, made]));
   await settled();
   expect(viewport().instanceIds).toEqual([first]);

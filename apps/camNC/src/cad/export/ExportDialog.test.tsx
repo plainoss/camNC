@@ -48,7 +48,7 @@ it('exports a sketch from its row as DXF in the design’s unit, or as SVG in an
   const document = { ...createPlateDocument({ width: 120, height: 80, thickness: 18 }), lengthUnit: 'in' as const };
   const onAction = setup(document);
   const files = captureDownloads();
-  const row = screen.getByRole('button', { name: /^Sketch · / });
+  const row = screen.getByRole('button', { name: /^Sketch( · | \d)/ });
   const rowName = 'Sketch · Plate';
 
   fireEvent.contextMenu(row, { clientX: 10, clientY: 10 });
@@ -81,7 +81,7 @@ it('exports a sketch from its row as DXF in the design’s unit, or as SVG in an
 
 it('offers export only on sketch rows', async () => {
   setup(createPlateDocument({ width: 120, height: 80, thickness: 18 }));
-  fireEvent.contextMenu(screen.getByRole('button', { name: /^Extrude · / }), { clientX: 10, clientY: 10 });
+  fireEvent.contextMenu(screen.getByRole('button', { name: /^Extrude( · | \d)/ }), { clientX: 10, clientY: 10 });
   expect(screen.getByRole('menuitem', { name: 'Roll to here' })).toBeTruthy();
   expect(screen.queryByRole('menuitem', { name: 'Export as DXF/SVG…' })).toBeNull();
 });
@@ -93,7 +93,7 @@ it('refuses a sketch export with only construction curves, and downloads nothing
   const sketch = { ...part!.sketch, entities: part!.sketch.entities.map(entity => ({ ...entity, construction: true })) };
   setup({ ...plate, parts: [{ ...part!, sketch }] });
   const files = captureDownloads();
-  fireEvent.contextMenu(screen.getByRole('button', { name: /^Sketch · / }), { clientX: 10, clientY: 10 });
+  fireEvent.contextMenu(screen.getByRole('button', { name: /^Sketch( · | \d)/ }), { clientX: 10, clientY: 10 });
   await userEvent.click(screen.getByRole('menuitem', { name: 'Export as DXF/SVG…' }));
   const dialog = screen.getByRole('dialog', { name: 'Export sketch' });
   expect(within(dialog).getByRole('alert').textContent).toMatch(/Include construction geometry/);
@@ -122,7 +122,7 @@ it('refuses to export an empty sketch', async () => {
   const empty = { ...createCadPart('Empty'), drawnOn: { on: { plane: 'top' as const }, offset: 0 } };
   setup({ ...document, parts: [...document.parts, empty] });
   const files = captureDownloads();
-  fireEvent.contextMenu(screen.getAllByRole('button', { name: /^Sketch · / }).at(-1)!, { clientX: 10, clientY: 10 });
+  fireEvent.contextMenu(screen.getAllByRole('button', { name: /^Sketch( · | \d)/ }).at(-1)!, { clientX: 10, clientY: 10 });
   await userEvent.click(screen.getByRole('menuitem', { name: 'Export as DXF/SVG…' }));
   const dialog = screen.getByRole('dialog', { name: 'Export sketch' });
   expect(within(dialog).getByRole<HTMLInputElement>('textbox', { name: 'File name' }).value).toBe('Sketch · Empty');

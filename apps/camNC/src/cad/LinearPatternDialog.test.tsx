@@ -42,7 +42,7 @@ it('patterns a picked Remove along a picked edge, positive along it, Distance ap
   expect((screen.getByRole('textbox', { name: 'Instance count' }) as HTMLInputElement).value).toBe('2');
   fireEvent.change(screen.getByRole('combobox', { name: 'Pattern type' }), { target: { value: 'feature' } });
   rerender(view({ partId: 'pocket', seq: 1 }));
-  await waitFor(() => expect(screen.getByRole('group', { name: 'Features to pattern' }).textContent).toMatch(/Extrude · Part 2/));
+  await waitFor(() => expect(screen.getByRole('group', { name: 'Features to pattern' }).textContent).toMatch(/Extrude 2/));
   fireEvent.click(screen.getByRole('group', { name: 'Direction' }));
   // The edge found from its far end still points along +x.
   picker!({ partId: document.parts[0]!.id, point: [50, 0, 10], normal: [0, 0, 1], edge: { a: [100, 0, 10], b: [0, 0, 10] } });

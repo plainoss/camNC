@@ -64,7 +64,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
     const since = await settledSnapshot(page);
     if (verb === 'viewpick') {
       // With a sketch open the pick is on its drawing, as a person picks an edge or places a dimension there.
-      if (await page.getByRole('dialog', { name: /^Sketch ·/ }).isVisible()) await base.step(`click ${parseSketchPick(rest).join(',')}`);
+      if (await page.getByRole('dialog', { name: /^Sketch( ·| \d)/ }).isVisible()) await base.step(`click ${parseSketchPick(rest).join(',')}`);
       else await viewPick(page, rest);
     }
     else if (verb === 'featureeye') {

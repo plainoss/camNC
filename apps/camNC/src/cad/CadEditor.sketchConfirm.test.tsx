@@ -37,7 +37,7 @@ async function plate(select: (sketch: CadDocument['parts'][number]['sketch']) =>
       <CadEditor document={source} startIn3D={false} onDraftChange={change} onFinish={vi.fn()} onCancel={() => {}} />
     </div>
   );
-  const dialog = await screen.findByRole('dialog', { name: /^Sketch · / });
+  const dialog = await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ });
   await checked();
   return {
     canvas: screen.getByTestId('cad-canvas'),

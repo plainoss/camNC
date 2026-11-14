@@ -61,7 +61,7 @@ it('makes a plane offset from a base plane, sketches on it, and what’s drawn o
     expect(latest().parts.at(-1)!.drawnOn).toMatchObject({ on: { plane: 'top' }, offset: 120, datum: latest().planes![0]!.id })
   );
   // Nothing drawn yet, the sketch is cancelled and goes again.
-  await userEvent.click(within(await screen.findByRole('dialog', { name: /^Sketch · / })).getByRole('button', { name: 'Cancel' }));
+  await userEvent.click(within(await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ })).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(latest().parts).toHaveLength(1));
 });
 

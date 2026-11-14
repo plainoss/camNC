@@ -23,7 +23,7 @@ async function openSketch(source = createPlateDocument({ width: 120, height: 80,
       <CadEditor document={source} startIn3D={false} onDraftChange={change} onFinish={finish} onCancel={() => {}} />
     </div>
   );
-  const dialog = await screen.findByRole('dialog', { name: /^Sketch · / });
+  const dialog = await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ });
   await settled();
   // Initial geometric validation also gates confirmation, independently of the editor's busy attribute.
   await waitFor(() => expect(screen.queryByText(/^Checking sketch/)).toBeNull(), { timeout: 20_000 });
@@ -47,7 +47,7 @@ it.each([
     expect(confirm).toHaveAttribute('aria-keyshortcuts', 'Control+Enter Meta+Enter');
     await userEvent.keyboard(keys);
     await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
-    expect(screen.queryByRole('dialog', { name: /^Sketch · / })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: /^Sketch( · | \d)/ })).toBeNull();
     expect(latest().parts[0]!.sketch).toEqual(sketch);
     expect(finish).not.toHaveBeenCalled();
     // The lazy workspace can mount after the toolbar; wait for it before checking keyboard handoff (#474).
@@ -55,7 +55,7 @@ it.each([
     await waitFor(() => expect(document.activeElement).toBe(workspace));
     // Do not focus the workspace here: the confirmation must hand it the keyboard itself.
     await userEvent.keyboard('{Shift>}e{/Shift}');
-    await screen.findByRole('dialog', { name: /^Extrude · / });
+    await screen.findByRole('dialog', { name: /^Extrude( · | \d)/ });
   },
   30_000
 );
@@ -63,11 +63,11 @@ it.each([
 it('keeps plain Enter, repeated keys and composing keys from confirming the sketch', async () => {
   const { canvas, dialog } = await openSketch();
   await userEvent.keyboard('{Enter}');
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   fireEvent.keyDown(canvas, { key: 'Enter', ctrlKey: true, repeat: true });
   fireEvent.keyDown(canvas, { key: 'Enter', metaKey: true, isComposing: true, keyCode: 229 });
   await settled();
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   expect(screen.queryByTestId('workspace-3d')).toBeNull();
   await userEvent.keyboard(confirmKeys);
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
@@ -84,7 +84,7 @@ it('keeps an empty sketch open with the same disabled reason as its green check'
   expect(confirm).toHaveAttribute('aria-description', reason);
   await userEvent.keyboard(confirmKeys);
   await settled();
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   expect(confirm).toHaveAttribute('title', reason);
   expect(screen.queryByTestId('workspace-3d')).toBeNull();
 }, 30_000);
@@ -98,7 +98,7 @@ it('keeps an incomplete drawing command open until it is completed or cancelled'
   const confirm = within(dialog).getByRole('button', { name: /Finish sketch/ });
   expect(confirm).toHaveProperty('disabled', true);
   await userEvent.keyboard(confirmKeys);
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   expect(canvas.classList.contains('cad-tool-rectangle')).toBe(true);
   await userEvent.keyboard('{Escape}');
   await waitFor(() => expect(confirm).toHaveProperty('disabled', false));
@@ -125,7 +125,7 @@ it('retains an invalid dimension for correction when the confirmation shortcut i
   await userEvent.fill(input, '1,000');
   await userEvent.keyboard(confirmKeys);
   await waitFor(() => expect(screen.getAllByText(/Ambiguous comma group/).length).toBeGreaterThan(0));
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   expect(input).toHaveValue('1,000');
   expect(document.activeElement).toBe(input);
   expect(latest().parts[0]!.sketch.constraints.find(constraint => constraint.label === 'Width')).toMatchObject({ value: 120 });
@@ -140,7 +140,7 @@ it('preserves native Space on Show constraints and confirms from that focused ch
   await userEvent.keyboard(' ');
   expect(checkbox).toBeChecked();
   expect(document.activeElement).toBe(checkbox);
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   await userEvent.keyboard(confirmKeys);
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
   await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('workspace-3d')));
@@ -152,14 +152,14 @@ it('leaves confirmation keys with open tool search instead of closing the sketch
   const search = await screen.findByRole('combobox', { name: 'Search tools' });
   await waitFor(() => expect(document.activeElement).toBe(search));
   await userEvent.keyboard(confirmKeys);
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   expect(screen.getByRole('combobox', { name: 'Search tools' })).toBe(search);
   expect(document.activeElement).toBe(search);
   await userEvent.fill(search, 'Line');
   await screen.findByRole('option', { name: 'Line L' });
   await userEvent.keyboard(confirmKeys);
   await waitFor(() => expect(screen.queryByRole('combobox', { name: 'Search tools' })).toBeNull());
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   expect(screen.getByRole('button', { name: 'Line (L)' })).toHaveAttribute('aria-pressed', 'true');
 }, 30_000);
 
@@ -215,10 +215,10 @@ it('does not confirm during a held selection gesture or defer it until pointer r
   // Geometry is valid: only the in-progress pointer gesture prevents this request from confirming.
   expect(within(dialog).getByRole('button', { name: /Finish sketch/ })).toHaveProperty('disabled', false);
   await act(async () => userEvent.keyboard(confirmKeys));
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   fireEvent.pointerUp(canvas, pointer);
   await settled();
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(dialog);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(dialog);
   await userEvent.keyboard(confirmKeys);
   await screen.findByRole('toolbar', { name: 'Part Studio toolbar' });
 }, 30_000);

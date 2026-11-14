@@ -88,7 +88,7 @@ async function find(page, { name, role }) {
 
 async function setUp(adapter, page, step) {
   if (step.startsWith('tab ')) await page.getByRole('dialog').getByRole('tab', { name: step.slice(4), exact: true }).click();
-  else if (step === 'cancelsketch') await page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: 'Cancel', exact: true }).click();
+  else if (step === 'cancelsketch') await page.getByRole('dialog', { name: /^Sketch( ·| \d)/ }).getByRole('button', { name: 'Cancel', exact: true }).click();
   else if (step === 'partmenu') await page.getByRole('list', { name: 'Parts', exact: true }).getByRole('listitem').first().getByRole('button').first().click({ button: 'right' });
   else await adapter.step(step);
   await adapter.settle();

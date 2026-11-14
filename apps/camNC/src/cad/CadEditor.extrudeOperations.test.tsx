@@ -24,8 +24,8 @@ async function studio(withLaterCut = true) {
   );
   await settled();
   const features = await screen.findByRole('region', { name: 'Features' });
-  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude · Part 3/ }));
-  const dialog = await screen.findByRole('dialog', { name: 'Extrude · Part 3' });
+  await userEvent.dblClick(within(features).getByRole('button', { name: /Extrude 2/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Extrude 2' });
   return { source, latest: () => change.mock.calls.at(-1)?.[0] ?? source, dialog, features };
 }
 const settled = () =>
@@ -57,8 +57,8 @@ it('changes an earlier New to Add with its later cut intact and editable extent 
   await typeField(dialog, 'Offset', '-200');
   expect(latest().parts[1]!.drawnOn!.offset).toBe(-200);
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Part 3' })).toBeNull());
-  expect(within(features).getByRole('button', { name: /Extrude · Part 3/ }).textContent).toMatch(/add to Part 2/);
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude 2' })).toBeNull());
+  expect(within(features).getByRole('button', { name: /Extrude 2/ }).textContent).toMatch(/add to Part 2/);
   expect(latest().partCuts).toEqual(source.partCuts);
 });
 
@@ -84,7 +84,7 @@ it('removes from a default plane, edits its depth and offset, and restores the o
   const z = Array.from(model.meshes[0]!.positions).filter((_, i) => i % 3 === 2);
   expect(Math.min(...z)).toBeCloseTo(-178, 3);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude · Part 3' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude 2' })).toBeNull());
   expect(latest().parts[1]!.remove).toBeUndefined();
   expect(latest().parts[1]!.thickness).toBe(source.parts[1]!.thickness);
   expect(latest().parts[1]!.drawnOn!.offset).toBe(-202);

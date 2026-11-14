@@ -24,8 +24,8 @@ it('ends a sketch tool with Escape and keeps the Part Studio sketch open', async
   );
   await waitFor(() => expect(document.querySelector('.cad-editor')).toHaveAttribute('aria-busy', 'false'), { timeout: 20_000 });
   await settled();
-  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Sketch ·/ }));
-  const sketch = await screen.findByRole('dialog', { name: /^Sketch · / });
+  await userEvent.dblClick(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /^Sketch( ·| \d)/ }));
+  const sketch = await screen.findByRole('dialog', { name: /^Sketch( · | \d)/ });
   await settled();
   const canvas = screen.getByTestId('cad-canvas');
   canvas.focus();
@@ -34,6 +34,6 @@ it('ends a sketch tool with Escape and keeps the Part Studio sketch open', async
   await userEvent.keyboard('{Escape}');
   await waitFor(() => expect(canvas.getAttribute('class')).toContain('cad-tool-select'));
   await settled();
-  expect(screen.getByRole('dialog', { name: /^Sketch · / })).toBe(sketch);
+  expect(screen.getByRole('dialog', { name: /^Sketch( · | \d)/ })).toBe(sketch);
   expect(screen.getByTestId('cad-canvas')).toBe(canvas);
 });

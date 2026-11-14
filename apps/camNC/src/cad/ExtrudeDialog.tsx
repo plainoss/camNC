@@ -23,6 +23,7 @@ import {
   sketchOwnerId,
   sketchRegions,
   sketchStepLabel,
+  designStepLabel,
   splitApartRegions,
   type CadDocument,
   type CadPart,
@@ -224,16 +225,17 @@ export function ExtrudeDialog({
   // The regions of the parts it made too are the feature's as well.
   const alsoMade = document.parts.flatMap(p => (p.extrudedWith === part.id ? (p.regions ?? []) : []));
   const regionCount = operation === 'remove' && !part.regions ? null : part.regions ? part.regions.length + alsoMade.length : null;
+  const sketchName = designStepLabel(document, `${owner.id}:sketch`) ?? sketchStepLabel(owner);
   const selection =
     part.faceProfile && part.drawnOn
       ? drawnOnName(document, part.drawnOn.on)
       : regionCount === null
-        ? sketchStepLabel(owner)
+        ? sketchName
         : regionCount === 0
           ? 'No region picked yet'
           : regionCount === 1
-            ? `A region of ${sketchStepLabel(owner)}`
-            : `${regionCount} regions of ${sketchStepLabel(owner)}`;
+            ? `A region of ${sketchName}`
+            : `${regionCount} regions of ${sketchName}`;
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';
@@ -281,7 +283,7 @@ export function ExtrudeDialog({
   };
   return (
     <FeatureDialog
-      title={part.extrudeName ?? `Extrude · ${part.name}`}
+      title={designStepLabel(document, `${part.id}:extrude`) ?? part.extrudeName ?? `Extrude · ${part.name}`}
       okDisabled={!thicknessValid || !!depthError || !!profileError || !!stepProblem || !!removeError}
       onOk={onOk}
       onCancel={onCancel}>

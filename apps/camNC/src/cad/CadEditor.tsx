@@ -240,7 +240,7 @@ import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane } from './basePlanes';
 import { planesToggled } from './planesShortcut';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
-import { trimCadFolders, type DesignStep } from '@wbcnc/cad';
+import { designStepLabel, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import type { PartEdge } from './partEdges';
 import { drawingMatrix, straightOn, type SketchTurn } from './sketchOrbit';
 import { useEditorCameras } from './studioCamera';
@@ -1639,8 +1639,8 @@ export function CadEditor({
               : replacePart(documentRef.current, partId, current => ({
                   ...current,
                   // The features keep the names they had: renaming a part never renames them.
-                  sketchName: current.sketchName ?? `Sketch · ${current.name}`,
-                  extrudeName: current.extrudeName ?? `Extrude · ${current.name}`,
+                  sketchName: current.sketchName ?? designStepLabel(documentRef.current, `${partId}:sketch`),
+                  extrudeName: current.extrudeName ?? designStepLabel(documentRef.current, `${partId}:extrude`),
                   name,
                 }))
           )
@@ -1953,7 +1953,7 @@ export function CadEditor({
             <StudioSketchDialog
               key={`${doc.id}:${part.sketch.id}`}
               editor={root}
-              title={part.sketchName ?? `Sketch · ${part.name}`}
+              title={designStepLabel(doc, `${part.id}:sketch`) ?? `Sketch · ${part.name}`}
               plane={part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'Top plane'}
               disabled={!sketchCanFinish}
               checking={busy || solving}

@@ -177,7 +177,7 @@ export async function createAdapter(page, url) {
   const flatView = async () => {
     await page.getByRole('toolbar', { name: /^(Part Studio|Sketch) toolbar$/ }).first().waitFor();
     if (await studioToolbar.isVisible())
-      await page.getByRole('region', { name: 'Features' }).getByRole('button', { name: /Sketch ·/ }).first().dblclick();
+      await page.getByRole('region', { name: 'Features' }).getByRole('button', { name: /^Sketch( · | \d)/ }).first().dblclick();
     // A part shown in 3D, as after a face sketch, goes back to its drawing.
     const drawing = page.getByRole('group', { name: 'Show' }).getByRole('button', { name: 'Drawing', exact: true });
     if ((await drawing.isVisible()) && (await drawing.getAttribute('aria-pressed')) !== 'true') await drawing.click();
@@ -189,13 +189,13 @@ export async function createAdapter(page, url) {
   };
   /** Closes the open sketch back to the studio with its dialog's tick. */
   const closeSketch = async () => {
-    await page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: /Finish sketch/ }).click();
+    await page.getByRole('dialog', { name: /^Sketch( ·| \d)/ }).getByRole('button', { name: /Finish sketch/ }).click();
     await studioToolbar.waitFor();
   };
   /** Back to the Part Studio from an open sketch; anywhere else, such as the Plan stage, says what needed it. */
   const toStudio = async what => {
     if (await studioToolbar.isVisible()) return;
-    if (!(await page.getByRole('dialog', { name: /^Sketch ·/ }).isVisible()))
+    if (!(await page.getByRole('dialog', { name: /^Sketch( ·| \d)/ }).isVisible()))
       throw new Error(`${what} needs the Part Studio, and this page is not in it. A render can use --view page here.`);
     await closeSketch();
   };
@@ -204,15 +204,15 @@ export async function createAdapter(page, url) {
    * extruded is left as it is, since Extrude would start another extrude of it.
    */
   const extrudeSketch = async () => {
-    const extrude = page.getByRole('dialog', { name: /^Extrude ·/ });
-    // Each step's label, without the value shown under it.
-    const rows = await page.getByRole('region', { name: 'Features' }).locator('button > span:not([aria-hidden])').allTextContents();
-    const named = kind => rows.flatMap(text => (text.startsWith(`${kind} · `) ? [text.slice(kind.length + 3)] : []));
-    const extruded = new Set(named('Extrude'));
-    const unextruded = named('Sketch').find(name => !extruded.has(name));
-    if (!(await extrude.isVisible()) && unextruded !== undefined) {
+    const extrude = page.getByRole('dialog', { name: /^Extrude( ·| \d)/ });
+    // The sketch rows are listed in part order, one for each part with a sketch of its own.
+    const design = await readDesign();
+    const sketched = (design?.parts ?? []).filter(part => !part.sketchOf && !part.faceProfile);
+    const index = sketched.findIndex(part => part.extrude === false);
+    if (!(await extrude.isVisible()) && index >= 0) {
       // With nothing selected a confirmed sketch's Extrude starts with no region picked.
-      await page.getByRole('region', { name: 'Features' }).getByRole('button', { name: new RegExp(`^Sketch · ${unextruded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).first().click();
+      const rows = page.getByRole('region', { name: 'Features' }).getByRole('button', { name: /^Sketch( · | \d)/ });
+      await rows.nth(index).click();
       await page.keyboard.press('Shift+E');
       await extrude.waitFor({ timeout: 3000 }).catch(() => {});
     }
@@ -542,7 +542,7 @@ export async function createAdapter(page, url) {
       case 'goto': {
         // Leaving the design takes the sketch along as a part, as Extrude makes one of it.
         // A sketch that can't be finished stays open, for leaving to say why.
-        const finishSketch = page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: /Finish sketch/ });
+        const finishSketch = page.getByRole('dialog', { name: /^Sketch( ·| \d)/ }).getByRole('button', { name: /Finish sketch/ });
         if (/Boards|Plan|Machine/.test(rest) && (await finishSketch.isVisible()) && (await finishSketch.isEnabled())) {
           await closeSketch();
           await extrudeSketch();
@@ -601,7 +601,7 @@ export async function createAdapter(page, url) {
       case 'cancel':
         // Cancelling the sketch returns to the studio, and cancelling there leaves the design.
         if (!(await studioToolbar.isVisible())) {
-          await page.getByRole('dialog', { name: /^Sketch ·/ }).getByRole('button', { name: 'Cancel', exact: true }).click();
+          await page.getByRole('dialog', { name: /^Sketch( ·| \d)/ }).getByRole('button', { name: 'Cancel', exact: true }).click();
           await studioToolbar.waitFor();
         }
         await studioToolbar.getByRole('button', { name: 'Cancel', exact: true }).click();
