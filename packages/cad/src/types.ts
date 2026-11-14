@@ -324,6 +324,11 @@ export interface CadPart {
    */
   addTo?: string;
   /**
+   * Extrude → Add with Merge with all: a part of its own that joins, with them, every earlier part it runs into, as a
+   * Boolean › Union of them would. It has no `addTo`; running into none, it stays a part of its own.
+   */
+  mergeAll?: true;
+  /**
    * Extrude → Remove: the picked regions, or every closed region but what's left of the face, are cut into the board
    * the sketch is drawn on, this deep. A plane-based extrusion removes its volume from earlier bodies, optionally
    * limited to `targets`. The step isn't a part itself.

@@ -17,7 +17,7 @@ import { evaluateCadPart, polygonArea } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import { occupiedToolBoxes } from './occupiedToolBoxes';
 import { certifiedToolProfile } from './certifiedToolProfile';
-import { unionOf } from './unionParts';
+import { mergedWithAll, unionOf } from './unionParts';
 import type { CadDiagnostic, CadDocument, CadPart, CadPartCut, CadPlacement, CadPoint, EvaluatedCadCut, EvaluatedCadPart } from './types';
 
 const conjugate = ([x, y, z, w]: readonly number[]) => [-x!, -y!, -z!, w!];
@@ -297,6 +297,17 @@ export function applyPartCuts(
     target.shape = shape;
     relieved.set(target, partName);
   };
+  // An Add with Merge with all joins the parts it runs into before any step cuts them.
+  for (const source of document.parts) {
+    const merged = mergedWithAll(document, source);
+    const host = merged && targets.get(merged.hostId)?.[0];
+    if (!merged || !host) continue;
+    if ('refused' in merged.made) diagnostics.push({ code: 'merge-all-unresolved', severity: 'warning', message: merged.made.refused });
+    else {
+      host.shape = merged.made.part;
+      before.set(merged.hostId, merged.made.part);
+    }
+  }
   for (const step of document.partCuts ?? []) {
     let made = 0,
       refused = false;
@@ -660,15 +671,21 @@ export function withPartCuts(given: CadDocument, part: EvaluatedCadPart): Evalua
       (step.split &&
         joinedCutReferences(document, step.tools).some(({ reference }) => cadPartReferenceOwner(document, reference)?.id === part.partId))
   );
-  if (!steps.length && !document.parts.some(candidate => candidate.remove)) return part;
+  // The parts an Add with Merge with all joins into this one are its material too.
+  const merged = document.parts.flatMap(candidate => {
+    const merge = mergedWithAll(document, candidate);
+    return merge?.hostId === part.partId && 'part' in merge.made ? merge.joined : [];
+  });
+  if (!steps.length && !merged.length && !document.parts.some(candidate => candidate.remove)) return part;
   const toolIds = [
-    ...new Set(
-      steps.flatMap(step =>
+    ...new Set([
+      ...steps.flatMap(step =>
         joinedCutReferences(document, [...step.targets, ...step.tools]).map(
           ({ reference }) => cadPartReferenceOwner(document, reference)?.id
         )
-      )
-    ),
+      ),
+      ...merged,
+    ]),
   ].filter(id => id !== part.partId);
   const tools = toolIds.flatMap(id => {
     const source = document.parts.find(candidate => candidate.id === id);

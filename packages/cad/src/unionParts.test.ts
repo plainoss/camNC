@@ -96,3 +96,17 @@ it('intersects two boards drawn on one plane into what they share, as high as th
   const parts = cadPartsToCut(solved.document, solved.parts);
   expect(parts.map(entry => [entry.part.name, entry.part.thickness, volume(entry.part)])).toEqual([['Part 1', 10, 16_000]]);
 });
+
+it('merges an Add with Merge with all into every board it runs into, and stays its own part when it runs into none', async () => {
+  const left = board('Part 1', 30, 30, 10);
+  const right = { ...board('Part 2', 30, 30, 10), placement: undefined };
+  right.sketch = addRectangle(createCadPart('x').sketch, { x: 70, y: 0, width: 30, height: 30 });
+  const bar = { ...board('Bar', 100, 10, 5), mergeAll: true as const };
+  const document: CadDocument = { ...createCadDocument(), version: 7, parts: [left, right, bar] };
+  const solved = await solveCadDocument(document);
+  const parts = cadPartsToCut(solved.document, solved.parts);
+  expect(parts.map(entry => [entry.part.name, entry.part.thickness, volume(entry.part)])).toEqual([['Part 1', 10, 20_000]]);
+  expect(consumedTools(document)).toEqual(new Set(['Part 2', 'Bar']));
+  const apart = { ...document, parts: [left, { ...bar, drawnOn: { on: { plane: 'top' as const }, offset: 20 } }] };
+  expect(consumedTools(apart)).toEqual(new Set());
+});

@@ -350,5 +350,143 @@
         }
       }
     ]
+  },
+  {
+    "id": "studio/extrude/add-merge-with-all",
+    "title": "A bar running into two blocks stays New when picked, and Add with Merge with all joins it and both blocks into one part",
+    "evidence": "design automatic Add only for one part run into; Merge with all joins every part an Add runs into",
+    "steps": [
+      "dialogcancel",
+      {
+        "spec": "1 view"
+      },
+      "view top",
+      {
+        "spec": "2 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "3 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "4 command"
+      },
+      "key g",
+      {
+        "spec": "5 draw"
+      },
+      "rect 0,0 30,30",
+      {
+        "spec": "6 draw"
+      },
+      "rect 70,0 100,30",
+      {
+        "spec": "7 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "8 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "9 pick"
+      },
+      "viewpick 15,15,0",
+      {
+        "spec": "10 pick"
+      },
+      "viewpick 85,15,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "regions": 2
+            }
+          }
+        }
+      },
+      {
+        "spec": "11 field"
+      },
+      "dialogfill Thickness = 10",
+      "key Enter",
+      {
+        "spec": "12 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 2
+          }
+        }
+      },
+      {
+        "spec": "13 select"
+      },
+      "selectfeature Top",
+      {
+        "spec": "14 command"
+      },
+      "key Shift+s",
+      {
+        "spec": "15 command"
+      },
+      "key g",
+      {
+        "spec": "16 draw"
+      },
+      "rect 0,0 100,10",
+      {
+        "spec": "17 confirm"
+      },
+      "closesketch",
+      {
+        "spec": "18 command"
+      },
+      "key Shift+e",
+      {
+        "spec": "19 pick"
+      },
+      "viewpick 50,5,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "box": "Sketch to extrude",
+              "regions": 1
+            }
+          }
+        }
+      },
+      {
+        "spec": "20 field"
+      },
+      "dialogtab Add",
+      {
+        "spec": "21 field"
+      },
+      "dialogcheck Merge with all = true",
+      {
+        "spec": "22 field"
+      },
+      "dialogfill Thickness = 5",
+      "key Enter",
+      {
+        "spec": "23 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1,
+            "partIssues": []
+          }
+        }
+      }
+    ]
   }
 ]

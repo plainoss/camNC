@@ -1,6 +1,6 @@
 import type { CadDocument } from './types';
 import { isJoinedBody } from './extrudeSteps';
-import { unionOf } from './unionParts';
+import { mergedWithAll, unionOf } from './unionParts';
 
 /** The parts used up as tools by "cut parts" steps that don't keep them: they cut, but aren't parts of their own. */
 export function consumedTools(document: CadDocument): Set<string> {
@@ -17,6 +17,11 @@ export function consumedTools(document: CadDocument): Set<string> {
       )
       .flatMap(step => step.tools.filter(tool => !tool.includes(':')))
   );
+  // An Add merged with all it runs into is part of the first of them, and so are the others.
+  for (const part of document.parts) {
+    const merged = mergedWithAll(document, part);
+    if (merged && 'part' in merged.made) for (const id of merged.joined) consumed.add(id);
+  }
   // Consuming a host also uses up the active Add material that belongs to it.
   for (const part of document.parts) if (part.addTo && consumed.has(part.addTo) && isJoinedBody(document, part)) consumed.add(part.id);
   return consumed;

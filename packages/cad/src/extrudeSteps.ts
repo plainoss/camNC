@@ -342,7 +342,13 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
 
   const changed =
     parts.length !== document.parts.length || parts.some((part, index) => JSON.stringify(part) !== JSON.stringify(document.parts[index]));
-  if (!changed) return document;
+  if (!changed) {
+    // An edit that needs a newer reader, or no longer needs the exact one it named, as switching Merge with all does.
+    const required = cadDocumentVersion(document);
+    return required > document.version || (document.version >= 5 && required !== document.version)
+      ? { ...document, version: required }
+      : document;
+  }
   return { ...document, parts, version: cadDocumentVersion({ ...document, parts }) };
 }
 

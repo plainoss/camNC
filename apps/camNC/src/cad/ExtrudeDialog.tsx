@@ -10,6 +10,7 @@ import {
   extrudeStepProblem,
   isCadPart,
   isCadBody,
+  overlappedParts,
   partIsBuiltOn,
   removalRegions,
   removeSupport,
@@ -117,7 +118,7 @@ export function ExtrudeDialog({
       setUpTo(on, datum);
     });
   };
-  const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo !== undefined ? 'add' : 'new';
+  const operation: ExtrudeOperation = part.remove ? 'remove' : part.addTo !== undefined || part.mergeAll ? 'add' : 'new';
   const owner = document.parts.find(candidate => candidate.id === sketchOwnerId(part)) ?? part;
   // The parts an Add can join: those made from the same sketch, of regions picked from it, which it adds regions to, and
   // any other part, which it's joined to as a body of its own. The part its sketch is drawn on comes first.
@@ -165,6 +166,7 @@ export function ExtrudeDialog({
       changePart(current, part.id, p => {
         const made: CadPart = { ...p };
         delete made.addTo;
+        delete made.mergeAll;
         delete made.remove;
         delete made.regions;
         const own = sketchRegions(p.sketch, CAD_CHORD_TOLERANCE).map(region => region.id);
@@ -183,8 +185,10 @@ export function ExtrudeDialog({
           if (regions?.length || nonePicked(p)) made.regions = regions ?? [];
         } else if (next === 'add') {
           const into = mergeable[0]!;
-          // A solid face names the profile, not the body to join: that scope must be picked explicitly.
-          made.addTo = p.faceProfile ? '' : into.id;
+          // A solid face names the profile, not the body to join: that scope must be picked explicitly, as it must when
+          // the regions run into more than one part.
+          const touched = p.faceProfile ? [] : overlappedParts(current, p.id);
+          made.addTo = p.faceProfile || touched.length > 1 ? '' : (touched[0] ?? into.id);
           if (sharesSketch(into, p)) made.regions = (keptRegions(p, own) ?? []).filter(id => !into.regions!.includes(id));
           else {
             const regions = keptRegions(p, own);
@@ -309,7 +313,23 @@ export function ExtrudeDialog({
       )}
       {operation === 'add' ? (
         <>
-          <label className="cad-number-field">
+          {/* On, it joins every part it runs into, with no scope to pick. */}
+          <label>
+            <input
+              type="checkbox"
+              checked={!!part.mergeAll}
+              onChange={event =>
+                onChange(current =>
+                  changePart(current, part.id, p => {
+                    const { addTo: _addTo, mergeAll: _mergeAll, ...rest } = p;
+                    return event.target.checked ? { ...rest, mergeAll: true } : { ...rest, addTo: '' };
+                  })
+                )
+              }
+            />
+            Merge with all
+          </label>
+          <label className="cad-number-field" hidden={!!part.mergeAll}>
             Merge scope
             <select
               value={part.addTo}

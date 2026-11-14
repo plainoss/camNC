@@ -1,6 +1,7 @@
 import { addLine, createCadPart } from './document';
 import { cadDrawnOnSupports, effectivePlacement, resolveDrawnPlacements } from './drawnOn';
 import { isJoinedBody } from './extrudeSteps';
+import { overlappedParts } from './partOverlap';
 import { evaluateCadFeatures } from './features';
 import { CAD_CHORD_TOLERANCE, evaluateCadPart, pointInPolygon } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
@@ -126,4 +127,25 @@ function unite(document: CadDocument, step: CadPartCut): { part: EvaluatedCadPar
     inputs.push({ shape, source, at });
   }
   return unitedPart(inputs[0]!, inputs.slice(1), step.operation === 'intersect' ? 'intersect' : 'union');
+}
+
+/**
+ * What an Extrude › Add with Merge with all makes: the union of every earlier part it runs into with it, in the place of
+ * the first of them, as a Boolean › Union step of them would. Null when it runs into none, so it stays a part of its own.
+ */
+export function mergedWithAll(
+  document: CadDocument,
+  part: CadPart
+): { hostId: string; joined: string[]; made: { part: EvaluatedCadPart } | { refused: string } } | null {
+  if (!part.mergeAll || part.suppressed || part.extrude === false) return null;
+  const touched = overlappedParts(document, part.id);
+  if (!touched.length) return null;
+  const step: CadPartCut = {
+    id: `${part.id}:merge-all`,
+    targets: [touched[0]!],
+    tools: [...touched.slice(1), part.id],
+    clearance: 0,
+    operation: 'union',
+  };
+  return { hostId: touched[0]!, joined: step.tools, made: unionOf(document, step) };
 }
