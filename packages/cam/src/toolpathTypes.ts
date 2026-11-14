@@ -186,11 +186,17 @@ export interface Operation {
   warnings?: string[];
   /** Pause (M0) after this operation with this message, the spindle off and the bit up (e.g. "take the part out"). */
   pauseAfter?: string;
-  /** The part this operation frees or cuts the tabs of: named in the pause marker (`pauseMarker`) for the machine view. */
-  part?: string;
+  /**
+   * On a board: the part or carving this operation cuts, whose name `name` starts with ("<owner>: <operation>"). The
+   * id tells two of the same name apart. In a program that frees parts, the pause marker (`pauseMarker`) names it.
+   */
+  owner?: { name: string; id?: string };
   /** The final lap left to the cut-free program, and a point in the cleared kerf to reach it from. */
   finishAtRelease?: { loop: Vec3[]; approach: Vec3 };
 }
+
+/** What an operation cuts: its owner on a board, the operation itself in a program for one part. */
+export const ownerOf = (op: Operation): NonNullable<Operation['owner']> => op.owner ?? { name: op.name };
 
 /** The piece a through hole's cut would leave in its middle. */
 export interface HoleMiddle {

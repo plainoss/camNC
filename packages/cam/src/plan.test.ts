@@ -155,6 +155,26 @@ describe('planBoard', () => {
     expect(plan.hold?.every(hold => hold.ok)).toBe(true);
   });
 
+  it('labels each operation with what it cuts, a part or a carving, also when the name holds a colon', () => {
+    const profile = profileFeatures({ thickness: 18, outline: rect(0, 0, 120, 80), holes: [] });
+    const plan = planBoard(
+      board({
+        holdDown: 'skin',
+        parts: [{ id: 'one', partId: 'plate', name: 'Box: side', x: 100, y: 20, rotated: false }],
+        carvings: [
+          { id: 'c', name: 'Sign', region: [rect(20, 20, 30, 12)], tool: { number: 2, diameter: 6, shape: 'v', angle: 60 }, maxDepth: 2 },
+        ],
+      }),
+      {},
+      source(profile)
+    );
+    expect([...plan.ops, ...plan.release!.flatMap(p => p.ops)].map(op => [op.name, op.label])).toEqual([
+      ['Sign: V-carve', 'Sign · V-carve, up to 2.0 deep'],
+      ['Box: side: Outline 1', 'Box: side · Outline: rough + final pass'],
+      ['Box: side: Cut free', 'Box: side · Cut free'],
+    ]);
+  });
+
   it('measures side B from the stock’s new top when the stock is thicker than the part', () => {
     const profile = profileFeatures({
       thickness: 18,

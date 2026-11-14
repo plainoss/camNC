@@ -1,6 +1,7 @@
 import type { TurnedOver } from './flip';
 import { maxOf, minOf, type Vec3 } from './geom';
 import type { Operation, Pass, PartCam } from './toolpaths';
+import { ownerOf } from './toolpathTypes';
 import { releaseMetadata } from './releaseMetadata';
 
 /** One tab to cut free in a guided tab removal program. */
@@ -38,7 +39,8 @@ export function tabRemovalProgram(
     const deepest = minOf(op.passes.flatMap(p => p.pts.map(q => q[2])));
     const final = op.passes.filter(p => Math.abs(minOf(p.pts.map(q => q[2])) - deepest) < 1e-6).at(-1);
     if (!final) continue;
-    const part = op.name.includes(': ') ? op.name.split(': ')[0] : op.name;
+    const owner = ownerOf(op);
+    const part = owner.name;
     const xs = final.pts.map(q => q[0]),
       ys = final.pts.map(q => q[1]);
     const box = { x0: minOf(xs), y0: minOf(ys), x1: maxOf(xs), y1: maxOf(ys) };
@@ -70,7 +72,7 @@ export function tabRemovalProgram(
         feature: 'outline',
         tool: op.tool,
         passes: [pass],
-        part,
+        owner,
       });
     }
     if (opts.perPart && passes.length)
@@ -81,7 +83,7 @@ export function tabRemovalProgram(
         tool: op.tool,
         passes,
         pauseAfter: `Take out ${part}, then continue`,
-        part,
+        owner,
       });
   }
   const released: PartCam = { ...cam, ...releaseMetadata(cam, turned), holding: undefined, operations, warnings: [] };

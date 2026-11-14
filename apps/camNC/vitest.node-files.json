@@ -2,6 +2,7 @@
   "src/test/routeFiles.test.ts",
   "src/cad/assemblyModel.copyTransforms.test.ts",
   "src/cad/studioGeometry.test.ts",
+  "src/cad/sketchHandleDrags.test.ts",
   "src/cad/studioGeometry.woodworking.test.ts",
   "src/cad/studioReferenceGeometry.test.ts",
   "src/cad/studioNormalView.test.ts",

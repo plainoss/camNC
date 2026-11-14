@@ -41,6 +41,14 @@ export function projectSketchPoint(point: CadPoint, drawing: SVGGraphicsElement 
   return { x: p.x, y: p.y };
 }
 
+/** The sketch point under a pointer, or null while the drawing is not laid out. */
+export function sketchPointAtClient(event: { clientX: number; clientY: number }, drawing: SVGGraphicsElement | null): CadPoint | null {
+  const matrix = drawing?.getScreenCTM();
+  if (!matrix) return null;
+  const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+  return { x: p.x, y: -p.y };
+}
+
 /** Focus must not scroll a narrow viewport and shift the drawing. */
 export function focusSketchCanvas(canvas: SVGSVGElement | null) {
   canvas?.focus({ preventScroll: true });
