@@ -41,6 +41,7 @@
   "e2e/spec/lint.test.mjs",
   "e2e/spec/names.test.mjs",
   "e2e/spec/studioPick.test.mjs",
+  "e2e/spec/studioLists.test.mjs",
   "e2e/spec/shots.test.mjs",
   "e2e/spec/harness.test.mjs",
   "src/cam/model/modelLightRig.test.ts"

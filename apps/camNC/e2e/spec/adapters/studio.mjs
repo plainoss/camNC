@@ -2,6 +2,7 @@ import { createAdapter as sketchAdapter } from './sketch.mjs';
 import path from 'node:path';
 import process from 'node:process';
 import { settledSnapshot } from '../settle.mjs';
+import { readFeatures, readParts } from './studioLists.mjs';
 import { exportStep, extrudeRegions, parseSketchPick, saveDesign, studioCamera, studioPlanes, viewPick } from './studioPick.mjs';
 import { checkStudio, studioContent, studioState } from './studioModel.mjs';
 
@@ -54,7 +55,7 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
         flipped: await sectionDialog.getByRole('button', { name: 'Flip plane', exact: true }).getAttribute('aria-pressed') === 'true',
       } : {}),
     };
-    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, section, dialog: dialogName, extrudeRegions: await extrudeRegions(page), planes: await studioPlanes(page), camera: await studioCamera(page) };
+    return { ...studioState(document), content: studioContent(document), listedParts, partIssues, workspacePartCount, dialogSelections, measurements, section, dialog: dialogName, extrudeRegions: await extrudeRegions(page), planes: await studioPlanes(page), camera: await studioCamera(page), features: await readFeatures(page), parts: await readParts(page) };
   };
   const step = async text => {
     const [verb] = text.split(' '), rest = text.slice(verb.length).trim();

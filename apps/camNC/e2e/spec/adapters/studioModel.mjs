@@ -1,3 +1,4 @@
+import { checkRows } from './studioLists.mjs';
 import { angleBetween } from './studioPick.mjs';
 
 /** Source-document expectations shared by browser workflows and small adapter tests. */
@@ -65,6 +66,8 @@ export function checkStudio(expected, actual, checkpoints = new Map()) {
       // Only the fields a scenario names, so a check of the region count doesn't depend on the sketch's label.
       if (wanted === null || !actual.extrudeRegions) equal(key, wanted, actual.extrudeRegions ?? null);
       else for (const [field, value] of Object.entries(wanted)) equal(`${key}/${field}`, value, actual.extrudeRegions[field]);
+    } else if (key === 'features' || key === 'parts') {
+      failures.push(...checkRows(key, wanted, actual[key]));
     } else if (key === 'planes') {
       // Per plane, only the named fields: `view` (drawn in the 3D view) and `list` (its row shown or hidden).
       for (const [name, fields] of Object.entries(wanted)) for (const [field, value] of Object.entries(fields)) equal(`${key}/${name}/${field}`, value, actual.planes?.[name]?.[field]);

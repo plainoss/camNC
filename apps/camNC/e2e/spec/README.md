@@ -249,6 +249,12 @@ The `studio` expectations check source variables, thicknesses, patterns, offsets
 
 `planes` checks the origin and the Top, Front and Right planes by name: `view` (the 3D view draws its label, or the
 origin's dot) and `list` (`shown` or `hidden` by its Feature list eye), as in `{ "planes": { "Top": { "view": false } } }`.
+`features` checks the Feature list's rows below its default geometry, in order: each is a name, or `{ "name", "state" }`
+where `state` lists what the row shows, any of `suppressed`, `hidden`, `rolled back` and `error` (`[]` for none). `parts`
+checks the Parts list the same way, each a name or `{ "name", "hidden" }`. Both fail on a missing or extra row, so they
+also check the count. `dialog` is the open dialog's title, or null for none. Together with `extrudeRegions` and
+`dialogSelections` they describe a workflow's end state next to its geometry.
+
 `camera` checks the 3D view's camera: `view` is the named view it matches within 1° (`front`, `back`, `left`, `right`,
 `top`, `bottom`, `iso`, or null), and `direction` a direction it looks along, within `degrees` (1 by default).
 
