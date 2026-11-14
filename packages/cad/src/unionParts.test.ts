@@ -88,3 +88,11 @@ it('changes nothing and uses up no tools when it can’t join them: copies, cuts
     ['Part 2', 30],
   ]);
 });
+
+it('intersects two boards drawn on one plane into what they share, as high as the lower', async () => {
+  const document = union([board('Part 1', 100, 40, 10), board('Part 2', 40, 80, 30)]);
+  document.partCuts = [{ ...document.partCuts![0]!, operation: 'intersect' }];
+  const solved = await solveCadDocument(document);
+  const parts = cadPartsToCut(solved.document, solved.parts);
+  expect(parts.map(entry => [entry.part.name, entry.part.thickness, volume(entry.part)])).toEqual([['Part 1', 10, 16_000]]);
+});

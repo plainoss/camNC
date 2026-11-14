@@ -38,7 +38,7 @@ it('opens on Union with nothing picked, joins the picked parts into the first, a
   await waitFor(() => expect(onSave).toHaveBeenCalledWith({ operation: 'union', targets: ['one'], tools: ['two'], consumeTools: true }));
 });
 
-it('subtracts tools from targets, and says Intersect is not supported yet', async () => {
+it('subtracts tools from targets, and intersects at least two parts', async () => {
   const onSave = vi.fn();
   const view = (pick: { partId: string; seq: number } | null) => (
     <BooleanDialog document={design()} pick={pick} onSave={onSave} onClose={() => {}} />

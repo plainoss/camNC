@@ -9,7 +9,11 @@ export function consumedTools(document: CadDocument): Set<string> {
       // Split joints cut both boards; consuming either one would discard half of the joint.
       // A union that can't join its parts leaves them as they are.
       .filter(
-        step => step.consumeTools && !step.split && !step.suppressed && (step.operation !== 'union' || 'part' in unionOf(document, step))
+        step =>
+          step.consumeTools &&
+          !step.split &&
+          !step.suppressed &&
+          (step.operation === 'subtract' || !step.operation || 'part' in unionOf(document, step))
       )
       .flatMap(step => step.tools.filter(tool => !tool.includes(':')))
   );

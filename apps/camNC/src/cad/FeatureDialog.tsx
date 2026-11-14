@@ -31,7 +31,7 @@ export function FeatureDialog({
   onCancel: () => void;
   /** Puts the keyboard in its first field on opening. A sketch's dialog leaves it on the drawing. */
   autoFocus?: boolean;
-  /** Enter on a Parts list row accepts it, for a dialog whose parts are picked there, rather than picking that part again. */
+  /** Enter on a Parts list row or in the 3D view accepts it, for a dialog whose parts are picked there. */
   acceptFromPartsList?: boolean;
   className?: string;
   children: ReactNode;
@@ -48,14 +48,16 @@ export function FeatureDialog({
     void fieldsSettled().then(() => {
       if (!latest.current.okDisabled) latest.current.onOk();
     });
-  // A part just picked into it from the Parts list keeps the keyboard on its row: Enter there accepts the dialog rather
-  // than picking the part again, as it does in the view.
+  // A part just picked into it from the Parts list or the view keeps the keyboard there: Enter there accepts the dialog
+  // rather than picking the part again.
   useEffect(() => {
     if (!acceptFromPartsList) return;
     const accept = (event: KeyboardEvent) => {
-      const row =
-        event.target instanceof HTMLButtonElement && event.target.closest('.cad-part-list') && event.target.hasAttribute('aria-pressed');
-      if (event.key !== 'Enter' || event.isComposing || !row) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      const row = target instanceof HTMLButtonElement && target.closest('.cad-part-list') && target.hasAttribute('aria-pressed');
+      // The 3D view itself, not one of its buttons or fields.
+      const view = target?.matches('[data-testid="workspace-3d"], [data-testid="workspace-3d"] canvas');
+      if (event.key !== 'Enter' || event.isComposing || !(row || view)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       ok();

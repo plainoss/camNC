@@ -28,8 +28,8 @@ const kOperations: { id: CadBooleanOperation; label: string }[] = [
 ];
 
 /**
- * One Boolean step: Union joins the parts in Tools into the first of them; Subtract cuts the Tools out of the Targets;
- * Intersect keeps what the Tools share. A new one starts with nothing picked; parts are picked into the active box by
+ * One Boolean step: Union joins the parts in Tools into the one made first; Subtract cuts the Tools out of the Targets;
+ * Intersect keeps only what the Tools share, in the place of the one made first. A new one starts with nothing picked; parts are picked into the active box by
  * clicking them in the view or the parts list. Not kept, the tools are used up.
  */
 export function BooleanDialog({
@@ -79,9 +79,11 @@ export function BooleanDialog({
       return { change: { operation, tools, targets, consumeTools } };
     }
     if (tools.length < 2) return { error: 'Pick at least two parts.' };
-    if (operation === 'intersect') return { error: 'Intersect isn’t supported yet.' };
-    return { change: { operation, targets: tools.slice(0, 1), tools: tools.slice(1), consumeTools } };
-  }, [operation, tools, targets, keepTools]);
+    // The part made keeps the place and name of the one made first.
+    const order = (id: string) => document.parts.findIndex(part => part.id === id);
+    const [first, ...rest] = [...tools].sort((a, b) => order(a) - order(b));
+    return { change: { operation, targets: [first!], tools: rest, consumeTools } };
+  }, [operation, tools, targets, keepTools, document.parts]);
   const [featureId] = useState(() => step?.id ?? newCadId());
   const candidate = useMemo(() => {
     if ('error' in result) return null;

@@ -306,11 +306,7 @@ export function applyPartCuts(
       if (!said.has(message)) diagnostics.push({ code, severity: 'warning', message });
       said.add(message);
     };
-    if (step.operation === 'intersect') {
-      warn('Boolean › Intersect isn’t supported yet, so this step changes nothing.', 'boolean-unsupported');
-      continue;
-    }
-    if (step.operation === 'union') {
+    if (step.operation === 'union' || step.operation === 'intersect') {
       // The tools join the first target, in its place; kept, they stay parts of their own too.
       const joined = unionOf(document, step);
       const host = targets.get(step.targets[0]!)?.[0];

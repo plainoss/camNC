@@ -34,7 +34,11 @@ export interface UnionInput {
  * the highest, and stepped down from the top where only lower ones were. It joins plain boards drawn on one plane and
  * extruded the same way from it; anything else is refused with the reason, as joining it needs a solid of another kind.
  */
-export function unitedPart(host: UnionInput, tools: readonly UnionInput[]): { part: EvaluatedCadPart } | { refused: string } {
+export function unitedPart(
+  host: UnionInput,
+  tools: readonly UnionInput[],
+  operation: 'union' | 'intersect' = 'union'
+): { part: EvaluatedCadPart } | { refused: string } {
   const all = [host, ...tools];
   for (const { shape, source } of all) {
     if (shape.holes.length || shape.cuts?.length) return { refused: `${shape.name} has holes or cuts, which a union can't keep yet.` };
@@ -56,14 +60,15 @@ export function unitedPart(host: UnionInput, tools: readonly UnionInput[]): { pa
       const b = outline[(i + 1) % outline.length]!;
       sketch = addLine(sketch, { x1: a.x, y1: a.y, x2: b.x, y2: b.y });
     });
-  const height = Math.max(...all.map(({ shape }) => shape.thickness));
+  // An intersection keeps only what every board shares, as high as the lowest of them.
+  const height = (operation === 'union' ? Math.max : Math.min)(...all.map(({ shape }) => shape.thickness));
   const regions: string[] = [];
   const cuts: CadCut[] = [];
   for (const region of sketchRegions(sketch, CAD_CHORD_TOLERANCE)) {
     const inside = regionInteriorPoint(region.points);
     if (!inside) continue;
     const covering = all.filter((_, i) => pointInPolygon(inside, outlines[i]!));
-    if (!covering.length) continue;
+    if (!covering.length || (operation === 'intersect' && covering.length < all.length)) continue;
     regions.push(region.id);
     const step = height - Math.max(...covering.map(({ shape }) => shape.thickness));
     if (step >= kMinStep) cuts.push({ type: 'cut', id: `union:${region.id}`, sketchId: sketch.id, regionId: region.id, depth: step });
@@ -120,5 +125,5 @@ function unite(document: CadDocument, step: CadPartCut): { part: EvaluatedCadPar
     if (!shape || !at) return { refused: `${source.name} isn't built, so it can't be joined.` };
     inputs.push({ shape, source, at });
   }
-  return unitedPart(inputs[0]!, inputs.slice(1));
+  return unitedPart(inputs[0]!, inputs.slice(1), step.operation === 'intersect' ? 'intersect' : 'union');
 }

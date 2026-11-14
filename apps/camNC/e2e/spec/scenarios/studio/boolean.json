@@ -158,5 +158,109 @@
         }
       }
     ]
+  },
+  {
+    "id": "studio/boolean/intersect-two-boards",
+    "title": "Boolean \u203a Intersect keeps only the block two overlapping boards share, as high as the lower one",
+    "evidence": "design Boolean Intersect of plain boards drawn on one plane, picked in the view and accepted with Enter",
+    "steps": [
+      "dialogcancel",
+      "view top",
+      "selectfeature Top",
+      "key Shift+s",
+      "key g",
+      "rect 0,0 100,40",
+      "closesketch",
+      "key Shift+e",
+      "viewpick 50,30,0",
+      "dialogfill Thickness = 10",
+      "key Enter",
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1
+          }
+        }
+      },
+      "selectfeature Top",
+      "key Shift+s",
+      "key g",
+      "rect 0,0 40,80",
+      "closesketch",
+      "key Shift+e",
+      "viewpick 20,60,0",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "box": "Regions to add",
+              "regions": 1
+            }
+          }
+        }
+      },
+      "dialogtab New",
+      "dialogfill Thickness = 30",
+      "key Enter",
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 2
+          }
+        }
+      },
+      {
+        "spec": "1 command"
+      },
+      "studiotool Boolean",
+      {
+        "spec": "2 field"
+      },
+      "dialogtab Intersect",
+      {
+        "spec": "3 pick"
+      },
+      "viewpick 20,60,30",
+      {
+        "spec": "4 pick"
+      },
+      "viewpick 80,20,10",
+      {
+        "expect": {
+          "studio": {
+            "dialogSelections": {
+              "Tools": ["Part 2", "Part 1"]
+            }
+          }
+        }
+      },
+      {
+        "spec": "5 field"
+      },
+      "dialogcheck Keep tools = false",
+      {
+        "spec": "6 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1,
+            "listedParts": [
+              {
+                "name": "Part 1",
+                "thickness": 10
+              }
+            ],
+            "partIssues": []
+          }
+        }
+      }
+    ]
   }
 ]

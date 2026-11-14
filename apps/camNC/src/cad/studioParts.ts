@@ -18,11 +18,11 @@ export function builtStudioParts(document: CadDocument): CadPart[] {
 export function listedStudioParts(document: CadDocument, dialog?: StudioDialog | null): CadPart[] {
   if (isBlankDesign(document)) return [];
   const built = builtStudioParts(unpickedExtrudePreview(document, dialog?.kind === 'extrude' ? dialog.partId : null));
-  // A Boolean › Union's part is as thick as the part it makes, once it can join them.
+  // A Boolean › Union's or Intersect's part is as thick as the part it makes, once it can make it.
   const joined = new Map<string, number>();
   const active = activeDesign(document);
   for (const step of active.partCuts ?? []) {
-    const made = step.operation === 'union' ? unionOf(active, step) : null;
+    const made = step.operation === 'union' || step.operation === 'intersect' ? unionOf(active, step) : null;
     if (made && 'part' in made) joined.set(made.part.partId, made.part.thickness);
   }
   return joined.size ? built.map(part => (joined.has(part.id) ? { ...part, thickness: joined.get(part.id)! } : part)) : built;
