@@ -21,7 +21,7 @@
       "programs": [
         {
           "file": "board-neighbor-open-pocket.nc",
-          "sha256": "f87d7a96596d145cf67353f134c44cfb691dcafd6b7d0de173fc90e431e91881",
+          "sha256": "ee7ad4fd652fd5e41d01ea60da41540bada82a4b15df8cc5b7a334e9eafe9c76",
           "bytes": 1294,
           "operations": 1,
           "passes": 2,
@@ -30,7 +30,7 @@
           ],
           "setup": {
             "schemaVersion": 1,
-            "planFingerprint": "cam-plan-v1-844fa02e6559c31a",
+            "planFingerprint": "cam-plan-v1-d58b923919ad7a8d",
             "programName": "board-neighbor-open-pocket",
             "units": "mm",
             "origin": {

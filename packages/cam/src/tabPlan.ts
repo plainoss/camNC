@@ -3,6 +3,7 @@ import type { TurnedOver } from './flip';
 import { maxOf, minOf, type Vec3 } from './geom';
 import { holdState, layerAcross, tabWhole } from './hold';
 import { releaseMetadata } from './releaseMetadata';
+import { ownerOf } from './toolpathTypes';
 import {
   DEFAULT_TABS,
   throughCuts,
@@ -54,7 +55,7 @@ export function planTabs(
       part.id,
       throughCuts(part.features, { ...settings, stockTop }).map(op => ({
         ...op,
-        name: `${part.name}: ${op.name}`,
+        owner: { name: part.name, id: part.id },
         passes: op.passes.map(p => ({ ...p, pts: p.pts.map(q => partToBoard(part, q)) })),
       })),
     ])
@@ -477,7 +478,8 @@ export function freePartsProgram(
     if (op.feature !== 'outline') continue;
     const final = op.passes.at(-1);
     if (!final || minOf(final.pts.map(q => q[2])) <= opts.finalZ + 1e-6) continue;
-    const name = op.name.replace(/: [^:]*$/, '');
+    const owner = ownerOf(op);
+    const { name } = owner;
     // Turned over after side B, the skin is on top now: from the new top through it, as far past it as finalZ goes below
     // the bottom. Mirrored, the path runs the other way round: reversed, the bit cuts the same way as before.
     const skin = minOf(final.pts.map(q => q[2]));
@@ -501,7 +503,8 @@ export function freePartsProgram(
       tool: op.tool,
       // Through the skin once: finalZ already goes past the bottom, a second lap at the same depth cuts nothing.
       passes,
-      ...(pause && { pauseAfter: `Take out ${name}, then continue`, part: name }),
+      owner,
+      ...(pause && { pauseAfter: `Take out ${name}, then continue` }),
     });
     const xs = pts.map(q => q[0]),
       ys = pts.map(q => q[1]);

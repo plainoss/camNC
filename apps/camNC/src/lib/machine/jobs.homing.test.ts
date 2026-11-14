@@ -179,6 +179,20 @@ describe('zeroAndRun', () => {
     expect(h.api.uploadGcode).not.toHaveBeenCalled();
     h.api.host.value = 'homing-test';
   });
+
+  it.each([
+    ['a job that appeared', { job: { file: '/sd/other.gcode' } }, 'controller activity changed while setting XY zero'],
+    ['a changed Z zero', { wco: { x: 0, y: 0, z: 5 } }, 'Z zero changed while setting XY zero'],
+  ])('rejects %s while waiting for the zero report, before upload or dispatch', async (_name, report, message) => {
+    h.api.status.value!.wco = { x: 0, y: 0, z: 0 };
+    h.api.setWorkspaceXYZero.mockImplementation(async () => {
+      Object.assign(h.api.status.value!, report);
+    });
+    await expect(zeroAndRun()).rejects.toThrow(message);
+    expect(h.api.uploadGcode).not.toHaveBeenCalled();
+    expect(h.api.runFile).not.toHaveBeenCalled();
+    expect(useCamMachine.getState().preparingRun).toBe(false);
+  });
 });
 
 describe('real coordinate-table reads and delayed effective-offset reports', () => {

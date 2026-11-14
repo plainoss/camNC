@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { camBoardParts, type BoardSpec } from './board';
+import { camBoard, type BoardSpec } from './board';
 import type { PartFeatures } from './features';
 import { holdCheck, holdTimeline } from './hold';
+import { tabRemovalProgram } from './tabRemoval';
 import { DEFAULT_TABS } from './toolpaths';
 
 const rect = (x0: number, y0: number, x1: number, y1: number) => [
@@ -30,10 +31,10 @@ const spec = (parts: BoardSpec['parts'], w: number, h: number): BoardSpec => ({
   tabs: DEFAULT_TABS,
   parts,
 });
-/** The hold check of the board's program, with the board part each operation cuts. */
+/** The hold check of the board's program: each operation knows the board part it cuts. */
 const holdsOf = (board: BoardSpec) => {
-  const { cam, partIds } = camBoardParts(board, {});
-  return { cam, partIds, holds: holdCheck(cam, { ...board, partIds }) };
+  const cam = camBoard(board, {});
+  return { cam, holds: holdCheck(cam, board) };
 };
 /** Every tab lies on this part's own outline: within its rectangle on the board, give or take the bit. */
 const within = (tabs: { at: { x: number; y: number } }[], r: { x: number; y: number; w: number; h: number }) =>
@@ -51,7 +52,7 @@ describe('which board part each tab hold is for, when names repeat', () => {
       400,
       400
     );
-    const { cam, partIds, holds } = holdsOf(board);
+    const { cam, holds } = holdsOf(board);
     // One outline each, each with its own id.
     expect(holds.map(h => h.id).sort()).toEqual(['big', 'small']);
     const small_ = holds.find(h => h.id === 'small')!;
@@ -59,7 +60,7 @@ describe('which board part each tab hold is for, when names repeat', () => {
     // The outer part's tabs are on its outer edge, not on the hole the small part sits in.
     const big_ = holds.find(h => h.id === 'big')!;
     expect(big_.tabs.every(({ at }) => at.x < 100 || at.x > 300 || at.y < 100 || at.y > 300)).toBe(true);
-    const loose = holdTimeline(cam, { ...board, partIds }).filter(e => e.kind === 'loose');
+    const loose = holdTimeline(cam, board).filter(e => e.kind === 'loose');
     expect(loose.every(e => e.id === 'small' || e.id === 'big')).toBe(true);
   });
 
@@ -97,17 +98,29 @@ describe('which board part each tab hold is for, when names repeat', () => {
     for (const h of holds) expect(within(h.tabs, at[h.id as keyof typeof at])).toBe(true);
   });
 
-  it('without the ids, only names: no guess', () => {
-    const p = features([rect(0, 0, 200, 100)]);
+  it('every operation of a board program names its part, whatever the name holds', () => {
+    const p = features([rect(0, 0, 200, 100)], [rect(40, 30, 80, 70)]);
     const board = spec(
       [
-        { id: 'a', name: 'Side', features: p, size: [200, 100, 8], x: 30, y: 30, rotated: false },
-        { id: 'b', name: 'Side', features: p, size: [200, 100, 8], x: 30, y: 150, rotated: false },
+        { id: 'a', name: 'Box: side', features: p, size: [200, 100, 8], x: 30, y: 30, rotated: false },
+        { id: 'b', name: 'Box: side', features: p, size: [200, 100, 8], x: 30, y: 150, rotated: false },
       ],
       260,
       280
     );
-    const { cam } = camBoardParts(board, {});
-    expect(holdCheck(cam, board).map(h => h.id)).toEqual([undefined, undefined]);
+    const { cam, holds } = holdsOf(board);
+    for (const op of cam.operations) {
+      expect(op.owner?.name).toBe('Box: side');
+      expect(op.name.startsWith('Box: side: ')).toBe(true);
+    }
+    expect(new Set(cam.operations.map(op => op.owner?.id))).toEqual(new Set(['a', 'b']));
+    expect(holds.map(h => [h.part, h.id]).sort()).toEqual([
+      ['Box: side', 'a'],
+      ['Box: side', 'b'],
+    ]);
+    // The program that cuts the tabs names the same part.
+    const { tabs, cam: removal } = tabRemovalProgram(cam, { feed: 600, plungeFeed: 300 });
+    expect(new Set(tabs.map(t => t.part))).toEqual(new Set(['Box: side']));
+    expect(new Set(removal.operations.map(op => op.owner?.id))).toEqual(new Set(['a', 'b']));
   });
 });

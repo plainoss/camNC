@@ -241,6 +241,7 @@ export function carvingOperations(
 ): Operation[] {
   const s: CamSettings = { ...DEFAULT_SETTINGS, ...settings };
   const tool = carving.tool;
+  const owner = { name: carving.name, id: carving.id };
   validateTool(tool, 'carving.tool');
   if (tool.shape !== 'v') throw new CamInputError([{ field: 'carving.tool', message: 'must be a V-bit' }]);
   validatePaths(carving.region, 'carving');
@@ -376,7 +377,7 @@ export function carvingOperations(
     }
     if (clearTool) {
       const clear = pocketOperation(`${carving.name}: clear flat bottoms`, flat, stockTop, floorZ, clearTool, s);
-      operations.push({ ...clear, title: 'clear flat bottoms', feature: 'pocket' });
+      operations.push({ ...clear, title: 'clear flat bottoms', feature: 'pocket', owner });
     }
   }
   skipTo(estimate.walls + estimate.floor);
@@ -391,6 +392,7 @@ export function carvingOperations(
       tool,
       plungeFeed: plunge,
       passes,
+      owner,
       ...(warnings.length && { warnings }),
     });
   return operations;

@@ -1,6 +1,6 @@
 (camNC CAM)
 (board-neighbor-open-pocket)
-(Plan: cam-plan-v1-844fa02e6559c31a)
+(Plan: cam-plan-v1-d58b923919ad7a8d)
 (Post: fluidnc. Safe Z17. Retract Z14)
 (Planned bounds: X38..102 Y33..39 Z6..12)
 (Stock: 140 x 120 x 12 mm)

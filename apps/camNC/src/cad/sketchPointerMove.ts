@@ -1,10 +1,8 @@
 import { numeric } from './cadEditorShared';
-import { parseCircularPatternParameters } from './circularPatternParameters';
-import { CAD_GEOMETRY_TOLERANCE, visibleSketchPointIds, withDimensionPlacement } from '@wbcnc/cad';
+import { visibleSketchPointIds, withDimensionPlacement } from '@wbcnc/cad';
 import { type PointerEvent } from 'react';
 import { transitionDimensionWorkflow } from '@wbcnc/cad-editor/dimensionWorkflow';
 import { transitionDrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
-import { parseTransformParameters } from './transformParameters';
 import { transitionSketchContextPress } from '@wbcnc/cad-editor/sketchContext';
 import { pickSketchPoint, pickSketchSnap } from '@wbcnc/cad-editor/picking';
 import { type CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
@@ -14,6 +12,8 @@ import { cutRegionAt, cutRegions, topRegions } from './cutRegions';
 import { snapLabels } from './editorHelpers';
 import { drawingMatrix, edgeOn, straightOn, turnedBy } from './sketchOrbit';
 import type { SketchEditorInput } from './sketchEditorInput';
+import { cancelHandleDrag, moveHandleDrag } from './sketchHandleDrags';
+import { sketchPointAtClient } from './sketchViewport';
 
 // The sketch canvas pointer-move and pointer-up handlers, split out of CadEditor. They read the editor through SketchEditorInput.
 export function sketchPointerMove(editor: SketchEditorInput, event: PointerEvent<SVGSVGElement>) {
@@ -21,8 +21,6 @@ export function sketchPointerMove(editor: SketchEditorInput, event: PointerEvent
     annotationDrag,
     boxGesture,
     centerArcSweep,
-    chamferDrag,
-    circularDrag,
     contextPress,
     dimensionFlow,
     dimensionSelection,
@@ -30,160 +28,43 @@ export function sketchPointerMove(editor: SketchEditorInput, event: PointerEvent
     drag,
     drawingGesture,
     drawingGroup,
+    handleDrag,
     inference,
     lastDrawingHint,
     lastSnap,
-    lengthText,
-    lengthUnit,
     markerScale,
     modification,
     pan,
-    patternDrag,
     pending,
     placingDimension,
     pointAt,
     polygonCountGesture,
     polygonTool,
     projectPoint,
-    setChamferDistances,
-    setCircularParameters,
     setCursor,
     setDimensionFlow,
     setDocument,
     setDrawingCue,
     setHoveredModifyCurve,
     setHoveredPoint,
-    setLinearParameters,
     setModifyTarget,
     setPolygonSides,
     setSelectionBox,
     setSketchTurn,
-    setSlotWidth,
     setSnapCue,
-    setTransformParameters,
     setView,
-    shownSketch,
     sketch,
     sketchBackdrop,
     sketchTurn,
-    slotDrag,
     snap,
     solveDrag,
     svg,
     tool,
-    transformDrag,
   } = editor;
-  if (slotDrag.current) {
-    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-    if (!matrix) return;
-    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
-      center = slotDrag.current.center;
-    setSlotWidth(lengthText(Math.round(2 * Math.hypot(raw.x - center.x, -raw.y - center.y) * 1e6) / 1e6));
-    return;
-  }
-  if (circularDrag.current) {
-    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-    if (!matrix) return;
-    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
-      point = { x: raw.x, y: -raw.y },
-      gesture = circularDrag.current,
-      parsed = parseCircularPatternParameters(gesture.parameters, lengthUnit);
-    if (!parsed.ok) return;
-    const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
-    if (gesture.kind === 'center')
-      setCircularParameters({
-        ...gesture.parameters,
-        centerX: lengthText(parsed.center.x + point.x - gesture.start.x),
-        centerY: lengthText(parsed.center.y + point.y - gesture.start.y),
-      });
-    else {
-      const a = Math.atan2(point.y - parsed.center.y, point.x - parsed.center.x);
-      gesture.sweep += Math.atan2(Math.sin(a - gesture.last), Math.cos(a - gesture.last));
-      gesture.last = a;
-      setCircularParameters({
-        ...gesture.parameters,
-        closed: false,
-        angle: text(Math.max(-359.999999, Math.min(359.999999, (gesture.sweep * 180) / Math.PI))),
-      });
-    }
-    return;
-  }
-  if (patternDrag.current) {
-    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-    if (!matrix) return;
-    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()),
-      { index, anchor, parameters } = patternDrag.current;
-    const x = raw.x - anchor.x,
-      y = -raw.y - anchor.y,
-      spacing = lengthText(Math.round(Math.hypot(x, y) * 1e6) / 1e6),
-      angle = String(Math.round(((Math.atan2(y, x) * 180) / Math.PI) * 1e6) / 1e6);
-    setLinearParameters({
-      ...parameters,
-      ...(index === 0 ? { spacingX: spacing, angleX: angle } : { spacingY: spacing, angleY: angle }),
-    });
-    return;
-  }
-
-  if (transformDrag.current) {
-    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-    if (!matrix) return;
-    const raw = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-    let point = { x: raw.x, y: -raw.y };
-    const { kind, start, parameters } = transformDrag.current,
-      parsed = parseTransformParameters(parameters, lengthUnit);
-    if (!parsed.ok) return;
-    const text = (n: number) => String(Math.round(n * 1e6) / 1e6);
-    const center = { x: parsed.pivot.x + parsed.translation.x, y: parsed.pivot.y + parsed.translation.y };
-    if (kind === 'translate')
-      setTransformParameters({
-        ...parameters,
-        dx: lengthText(parsed.translation.x + point.x - start.x),
-        dy: lengthText(parsed.translation.y + point.y - start.y),
-      });
-    if (kind === 'rotate') {
-      const delta = Math.atan2(point.y - center.y, point.x - center.x) - Math.atan2(start.y - center.y, start.x - center.x);
-      setTransformParameters({ ...parameters, angle: text(parsed.angle + (delta * 180) / Math.PI) });
-    }
-    if (kind === 'scale') {
-      const initial = Math.hypot(start.x - center.x, start.y - center.y);
-      if (initial > CAD_GEOMETRY_TOLERANCE)
-        setTransformParameters({
-          ...parameters,
-          scale: text(Math.max(0.001, (parsed.scale * Math.hypot(point.x - center.x, point.y - center.y)) / initial)),
-        });
-    }
-    if (kind === 'pivot') {
-      const snap = pickSketchPoint(shownSketch!, { x: event.clientX, y: event.clientY }, { project: projectPoint });
-      if (snap) point = snap.point;
-      const r = (parsed.angle * Math.PI) / 180,
-        worldDx = point.x - start.x,
-        worldDy = point.y - start.y;
-      const x = parsed.pivot.x + (Math.cos(r) * worldDx + Math.sin(r) * worldDy) / parsed.scale,
-        y = parsed.pivot.y + (-Math.sin(r) * worldDx + Math.cos(r) * worldDy) / parsed.scale;
-      const dx = parsed.pivot.x - x,
-        dy = parsed.pivot.y - y,
-        c = parsed.scale * Math.cos(r),
-        s = parsed.scale * Math.sin(r);
-      setTransformParameters({
-        ...parameters,
-        pivotX: lengthText(x),
-        pivotY: lengthText(y),
-        dx: lengthText(parsed.translation.x + (1 - c) * dx + s * dy),
-        dy: lengthText(parsed.translation.y - s * dx + (1 - c) * dy),
-      });
-    }
-    return;
-  }
-
-  if (chamferDrag.current) {
-    const matrix = (drawingGroup.current ?? svg.current)?.getScreenCTM();
-    if (!matrix) return;
-    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-    const { side, origin, direction } = chamferDrag.current;
-    const distance = Math.max(0.001, (point.x - origin.x) * direction.x + (-point.y - origin.y) * direction.y);
-    setChamferDistances(previous =>
-      previous.map((value, index) => (index === side ? lengthText(Math.round(distance * 1000) / 1000) : value))
-    );
+  const handle = handleDrag.current;
+  if (handle) {
+    const point = sketchPointAtClient(event, drawingGroup.current ?? svg.current);
+    if (point) moveHandleDrag(editor, handle, point, event);
     return;
   }
 
@@ -358,72 +239,41 @@ export function sketchPointerEnd(editor: SketchEditorInput, cancel = false, even
     addShape,
     annotationDrag,
     boxGesture,
-    chamferDrag,
-    circularDrag,
     commit,
     contextPress,
     documentRef,
     drag,
     drawingGesture,
     faceSketch,
+    handleDrag,
     markerScale,
     openContext,
     pan,
     part,
-    patternDrag,
     pendingSnaps,
     pointAt,
     requestSketchCheck,
     restoreCanvasKeyboard,
     selected,
     setBusy,
-    setChamferDistances,
-    setCircularParameters,
     setCursor,
     setDocument,
     setDrawingCue,
     setLineContinuation,
-    setLinearParameters,
     setPending,
     setRegionField,
     setSelected,
     setSelectedConstraints,
     setSelectionBox,
-    setSlotWidth,
     setSnapCue,
-    setTransformParameters,
     sketch,
-    slotDrag,
     solveDrag,
     svg,
     tool,
-    transformDrag,
   } = editor;
-  if (slotDrag.current) {
-    if (cancel) setSlotWidth(slotDrag.current.width);
-    slotDrag.current = null;
-    return;
-  }
-  if (circularDrag.current) {
-    if (cancel) setCircularParameters(circularDrag.current.parameters);
-    circularDrag.current = null;
-    return;
-  }
-  if (patternDrag.current) {
-    if (cancel) setLinearParameters(patternDrag.current.parameters);
-    patternDrag.current = null;
-    return;
-  }
-
-  if (transformDrag.current) {
-    if (cancel) setTransformParameters(transformDrag.current.parameters);
-    transformDrag.current = null;
-    return;
-  }
-
-  if (chamferDrag.current) {
-    if (cancel) setChamferDistances(chamferDrag.current.previous);
-    chamferDrag.current = null;
+  if (handleDrag.current) {
+    if (cancel) cancelHandleDrag(editor, handleDrag.current);
+    handleDrag.current = null;
     return;
   }
 

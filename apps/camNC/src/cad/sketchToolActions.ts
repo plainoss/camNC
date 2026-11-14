@@ -35,11 +35,10 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
   const {
     boxGesture,
     chain,
-    chamferDrag,
-    circularDrag,
     contextPress,
     contextualArc,
     drawingGesture,
+    handleDrag,
     hoveredReferences,
     lastDrawingHint,
     lengthText,
@@ -48,7 +47,6 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
     newCurveCommand,
     newDimensionCommand,
     patternCommandId,
-    patternDrag,
     pending,
     pendingSnaps,
     selected,
@@ -89,14 +87,12 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
     setTransformParameters,
     setUsingEdges,
     sketch,
-    slotDrag,
     svg,
     tangentAxis,
     tool,
-    transformDrag,
     transformSelectionCenter,
   } = editor;
-  slotDrag.current = null;
+  handleDrag.current = null;
   // Choosing any tool, Select included, ends Use.
   setUsingEdges(false);
   if (next === 'slot') {
@@ -104,8 +100,6 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
     setSlotChain(false);
     setSharedSlotWidth(undefined);
   }
-  circularDrag.current = null;
-  patternDrag.current = null;
   setPatternEditId(null);
   setPatternNotice('');
   if (next === 'circularPattern') {
@@ -118,7 +112,6 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
   }
 
   setContextMenu(null);
-  transformDrag.current = null;
   setTransformNotice('');
   if (next === 'transform') setTransformParameters(initialTransformParameters(transformSelectionCenter(selected), lengthUnit));
   contextPress.current = { phase: 'idle' };
@@ -131,7 +124,6 @@ export function chooseSketchTool(editor: SketchEditorInput, next: Tool) {
   setFilletEditing(false);
   setSplitFirst(null);
   setSplitNotice('');
-  chamferDrag.current = null;
   setConicEditing(null);
   setModification(idleModificationWorkflow());
   setHoveredModifyCurve(null);
