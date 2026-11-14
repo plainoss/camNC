@@ -131,6 +131,7 @@ export default function WorkspaceView({
   onPickPoint?: (pick: {
     partId: string;
     point: [number, number, number];
+    surfacePoint?: [number, number, number];
     normal: [number, number, number];
     copy: boolean;
     edge?: { a: [number, number, number]; b: [number, number, number] };
@@ -474,6 +475,7 @@ export default function WorkspaceView({
             return onPickPoint({
               partId,
               point: pick.point as [number, number, number],
+              ...(pick.surfacePoint && { surfacePoint: pick.surfacePoint as [number, number, number] }),
               normal: pick.normal as [number, number, number],
               copy: !!model.instances[index]!.copyId,
               ...(pick.edge && { edge: pick.edge }),

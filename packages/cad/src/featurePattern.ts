@@ -32,7 +32,7 @@ export function patternedRemoval(
   along: Vec3 | null
 ): CadFeature[] {
   const pattern = step.pattern;
-  if (!pattern || pattern.suppressed || pattern.circular || pattern.count < 2 || !along) return [];
+  if (!pattern || pattern.suppressed || pattern.circular || !along) return [];
   const local = board.placement ? rotateVector(conjugate(board.placement.rotation), along) : along;
   if (Math.abs(local[2]) > 1e-6) return [];
   // An underside sketch is seen from below, so its x runs the other way.
@@ -44,37 +44,47 @@ export function patternedRemoval(
   const ids = new Set(face.sketch.entities.map(entity => entity.id));
   const regions = regionsOf(face.sketch);
   const made: CadFeature[] = [];
-  for (let k = 1; k < pattern.count; k++) {
-    if (pattern.excluded?.includes(k)) continue;
-    const dx = (underside ? -1 : 1) * local[0] * pattern.spacing * k,
-      dy = local[1] * pattern.spacing * k,
-      suffix = `~${k}`;
-    const sketch = {
-      ...face.sketch,
-      id: `${face.sketch.id}${suffix}`,
-      entities: face.sketch.entities.map(entity => movedEntity(entity, ids, suffix, dx, dy)),
-      constraints: [],
-    };
-    const moved = regionsOf(sketch);
-    const instance: CadFeature[] = [{ ...face, id: `${face.id}${suffix}`, sketch }];
-    for (const cut of cuts) {
-      const region = regions.find(candidate => candidate.id === cut.regionId);
-      const inside = region && regionInteriorPoint(region.points);
-      if (!region || !inside) continue;
-      const at = { x: inside.x + dx, y: inside.y + dy };
-      const area = Math.abs(polygonArea(region.points));
-      const match = moved.find(
-        candidate =>
-          pointInPolygon(at, candidate.points) && Math.abs(Math.abs(polygonArea(candidate.points)) - area) < 1e-6 * Math.max(1, area)
-      );
-      // Off the board, the instance isn't cut at all, rather than in part.
-      if (!match) {
-        instance.length = 0;
-        break;
+  // A second direction makes a grid; centred, a row runs to both sides of the original.
+  const second = pattern.second;
+  const secondLocal = second && (board.placement ? rotateVector(conjugate(board.placement.rotation), second.vector) : second.vector);
+  if (secondLocal && Math.abs(secondLocal[2]) > 1e-6) return [];
+  const rows = second && second.count > 1 ? second.count : 1;
+  const from = (count: number, centered?: true) => (centered ? (count - 1) / 2 : 0);
+  for (let row = 0; row < rows; row++)
+    for (let k = 0; k < pattern.count; k++) {
+      const a = (k - from(pattern.count, pattern.centered)) * pattern.spacing,
+        b = second ? (row - from(rows, second.centered)) * second.spacing : 0;
+      if ((a === 0 && b === 0) || (row === 0 && pattern.excluded?.includes(k))) continue;
+      if (pattern.skipped?.some(([i, j]) => i === k && j === row)) continue;
+      const dx = (underside ? -1 : 1) * (local[0] * a + (secondLocal?.[0] ?? 0) * b),
+        dy = local[1] * a + (secondLocal?.[1] ?? 0) * b,
+        suffix = row ? `~${k}.${row}` : `~${k}`;
+      const sketch = {
+        ...face.sketch,
+        id: `${face.sketch.id}${suffix}`,
+        entities: face.sketch.entities.map(entity => movedEntity(entity, ids, suffix, dx, dy)),
+        constraints: [],
+      };
+      const moved = regionsOf(sketch);
+      const instance: CadFeature[] = [{ ...face, id: `${face.id}${suffix}`, sketch }];
+      for (const cut of cuts) {
+        const region = regions.find(candidate => candidate.id === cut.regionId);
+        const inside = region && regionInteriorPoint(region.points);
+        if (!region || !inside) continue;
+        const at = { x: inside.x + dx, y: inside.y + dy };
+        const area = Math.abs(polygonArea(region.points));
+        const match = moved.find(
+          candidate =>
+            pointInPolygon(at, candidate.points) && Math.abs(Math.abs(polygonArea(candidate.points)) - area) < 1e-6 * Math.max(1, area)
+        );
+        // Off the board, the instance isn't cut at all, rather than in part.
+        if (!match) {
+          instance.length = 0;
+          break;
+        }
+        instance.push({ ...cut, id: `${cut.id}${suffix}`, sketchId: sketch.id, regionId: match.id });
       }
-      instance.push({ ...cut, id: `${cut.id}${suffix}`, sketchId: sketch.id, regionId: match.id });
+      made.push(...instance);
     }
-    made.push(...instance);
-  }
   return made;
 }

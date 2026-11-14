@@ -149,5 +149,122 @@
         }
       }
     ]
+  },
+  {
+    "id": "studio/pattern/remove-pocket-grid-skip",
+    "title": "A pocket is repeated in a 3 by 2 grid along two picked edges with Linear pattern, with one instance skipped by clicking it",
+    "evidence": "design feature pattern with a second direction and an instance skipped in the view",
+    "steps": [
+      "dialogcancel",
+      "view top",
+      "selectfeature Top",
+      "key Shift+s",
+      "key g",
+      "rect 0,0 100,40",
+      "closesketch",
+      "key Shift+e",
+      "viewpick 50,30,0",
+      "dialogfill Thickness = 10",
+      "key Enter",
+      "key Enter",
+      "key Shift+s",
+      "viewpick 60,30,10",
+      "key c",
+      "circle 20,20 5",
+      "closesketch",
+      "key Shift+e",
+      "viewpick 20,20,10",
+      {
+        "expect": {
+          "studio": {
+            "extrudeRegions": {
+              "box": "Regions to add",
+              "regions": 1
+            }
+          }
+        }
+      },
+      "dialogtab Remove",
+      "dialogfill Cut depth = 5",
+      "key Enter",
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1
+          }
+        }
+      },
+      {
+        "spec": "1 command"
+      },
+      "studiotool Linear pattern",
+      {
+        "spec": "2 field"
+      },
+      "dialogselect Pattern type = Feature pattern",
+      {
+        "spec": "3 select"
+      },
+      "selectfeature Extrude \u00b7 Part 2",
+      {
+        "spec": "4 select"
+      },
+      "dialogfocus Direction",
+      {
+        "spec": "5 pick"
+      },
+      "viewpick 50,0,10",
+      {
+        "spec": "6 field"
+      },
+      "dialogfill Distance = 30",
+      "key Enter",
+      {
+        "spec": "7 field"
+      },
+      "dialogfill Instance count = 3",
+      "key Enter",
+      {
+        "spec": "8 field"
+      },
+      "dialogcheck Second direction = true",
+      {
+        "spec": "9 pick"
+      },
+      "viewpick 0,20,10",
+      {
+        "spec": "10 field"
+      },
+      "dialogfill Second distance = 12",
+      "key Enter",
+      {
+        "spec": "11 field"
+      },
+      "dialogfill Second instance count = 2",
+      "key Enter",
+      {
+        "spec": "12 field"
+      },
+      "dialogcheck Skip instances = true",
+      {
+        "spec": "13 pick"
+      },
+      "viewpick 80,32,10",
+      {
+        "spec": "14 confirm"
+      },
+      "key Enter",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "workspacePartCount": 1,
+            "partIssues": []
+          }
+        }
+      }
+    ]
   }
 ]

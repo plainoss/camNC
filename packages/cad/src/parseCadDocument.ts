@@ -170,6 +170,22 @@ export function parseCadDocument(input: unknown): CadDocument {
         !(Array.isArray(vector) && vector.length === 3 && vector.every(Number.isFinite) && Math.hypot(...vector) > 0)
       )
         throw new Error('Invalid CAD pattern vector');
+      const { second, skipped, centered } = p.pattern ?? {};
+      const unit = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite) && Math.hypot(...(v as number[])) > 0;
+      if (
+        (centered !== undefined && centered !== true) ||
+        (second !== undefined &&
+          (!second ||
+            !unit(second.vector) ||
+            !Number.isInteger(second.count) ||
+            second.count < 1 ||
+            second.count > 200 ||
+            !Number.isFinite(second.spacing) ||
+            (second.centered !== undefined && second.centered !== true))) ||
+        (skipped !== undefined &&
+          (!Array.isArray(skipped) || skipped.some(at => !Array.isArray(at) || at.length !== 2 || !at.every(Number.isInteger))))
+      )
+        throw new Error('Invalid CAD pattern grid');
       const { id, axis, count, spacing, countExpression, spacingExpression } = p.pattern ?? ({} as NonNullable<CadPart['pattern']>);
       if (
         typeof id !== 'string' ||

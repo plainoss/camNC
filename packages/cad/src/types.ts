@@ -467,6 +467,19 @@ export interface CadPartPattern {
   excluded?: number[];
   /** Turns copies about a line in assembly space instead of spacing them in a row. */
   circular?: CadCircularPartPattern;
+  /** The row laid out to both sides of the original rather than after it. A Remove's feature pattern only, for now. */
+  centered?: true;
+  /** A second direction, making a grid: count × second count instances. A Remove's feature pattern only, for now. */
+  second?: {
+    vector: [number, number, number];
+    count: number;
+    spacing: number;
+    spacingExpression?: string;
+    countExpression?: string;
+    centered?: true;
+  };
+  /** Grid positions left out, as [along the first direction, along the second], counting the original as [0, 0]. */
+  skipped?: [number, number][];
 }
 export interface CadCircularPartPattern {
   /** A point on the picked axis, in assembly space. The picked line stays where it was picked. */

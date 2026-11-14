@@ -239,6 +239,33 @@ describe('Extrude → Remove', () => {
     ]);
   });
 
+  it('lays a feature pattern out as a grid with a second direction, leaving out skipped instances', () => {
+    const { board, pocket } = onBoard(sketch => addCircle(sketch, { x: 20, y: 20, radius: 5 }));
+    const pattern = {
+      id: 'p1',
+      axis: 'x' as const,
+      vector: [1, 0, 0] as [number, number, number],
+      count: 3,
+      spacing: 30,
+      second: { vector: [0, 1, 0] as [number, number, number], count: 2, spacing: 12 },
+      skipped: [[2, 1]] as [number, number][],
+    };
+    const document = resolveExtrudeSteps(design(board, { ...pocket, remove: { depth: 5 }, pattern }));
+    const evaluated = evaluateCadDocument(document);
+    const [cut] = cadPartsToCut(document, evaluated.parts);
+    const centre = (outline: { x: number; y: number }[]) =>
+      [outline.reduce((sum, p) => sum + p.x, 0) / outline.length, outline.reduce((sum, p) => sum + p.y, 0) / outline.length].map(
+        Math.round
+      );
+    expect(cut!.part.cuts!.map(c => centre(c.outline)).sort((a, b) => a[1]! - b[1]! || a[0]! - b[0]!)).toEqual([
+      [20, 20],
+      [50, 20],
+      [80, 20],
+      [20, 32],
+      [50, 32],
+    ]);
+  });
+
   it('cuts a shape drawn on a board’s top into it, keeping the sketch as its own step', () => {
     const { board, pocket } = onBoard(sketch => addRectangle(sketch, { x: 50, y: 30, width: 40, height: 20 }));
     const document = resolveExtrudeSteps(design(board, { ...pocket, remove: { depth: 6 } }));

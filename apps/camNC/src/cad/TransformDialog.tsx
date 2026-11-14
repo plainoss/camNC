@@ -36,6 +36,8 @@ const kKindPicks: Partial<Record<TransformKind, PickEnd[]>> = { mate: ['from', '
 export interface CadConnectorPick {
   partId: string;
   point: [number, number, number];
+  /** Where the click landed on the face, before snapping to its corners or middle. */
+  surfacePoint?: [number, number, number];
   /** The way the face picked looks: a connector's axis. */
   normal: [number, number, number];
   /** Picked on a copy of the part rather than the part itself. */
