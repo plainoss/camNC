@@ -45,3 +45,23 @@ it.each([238, 190])('keeps the Features count on one line beside an operable fol
   expect(onChange).not.toHaveBeenCalled();
   expect(JSON.stringify(document)).toBe(before);
 });
+
+it('counts the default geometry with the features: a new design is Features (4), a plate Features (6)', () => {
+  const plate = createPlateDocument({ width: 120, height: 80, thickness: 18 });
+  const list = (document: typeof plate) => (
+    <FeatureList
+      document={document}
+      selectedPartId={null}
+      onSelect={() => {}}
+      onAction={() => {}}
+      onRename={() => {}}
+      onChange={() => {}}
+      onPickPlane={() => {}}
+      onToggleShown={() => {}}
+    />
+  );
+  const { rerender } = render(list({ ...plate, parts: [] }));
+  expect(screen.getByRole('heading', { name: /^Features \(/ }).textContent).toMatch(/^Features \(4\)/);
+  rerender(list(plate));
+  expect(screen.getByRole('heading', { name: /^Features \(/ }).textContent).toMatch(/^Features \(6\)/);
+});

@@ -217,11 +217,13 @@ export function FeatureList({
     stepDrop.drop?.error && stepDrop.drop.onto === rowKey && 'cad-feature-drop-refused',
   ];
   const brokenCount = entries.filter(entry => entry.kind === 'step' && entry.step.broken).length;
+  // The count takes in the default geometry listed above the features: the origin, when shown, and the base planes.
+  const defaultRows = onPickPlane || onToggleShown ? (onToggleShown ? 1 : 0) + kBasePlanes.length : 0;
   return (
     <section className="cad-studio-features" aria-label="Features" tabIndex={-1}>
       <div className="cad-panel-heading">
         <h2>
-          Features ({entries.filter(entry => entry.kind !== 'folder').length})
+          Features ({defaultRows + entries.filter(entry => entry.kind !== 'folder').length})
           {brokenCount > 0 && (
             <span
               className="cad-feature-error-badge"
