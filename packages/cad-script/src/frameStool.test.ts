@@ -124,12 +124,16 @@ describe('frame stool pattern', { timeout: 90_000 }, () => {
     expect(failures.some(c => c.check.includes('lamination is bonded'))).toBe(true);
   });
 
-  it('keeps every allowed rail stock sound', async () => {
-    for (const board of ['16mm', '22mm']) {
+  // One test per stock: together they solve for over a minute without an event-loop turn, which starves Vitest's
+  // worker RPC past its 60 s deadline and fails the run with every test passing.
+  it.each(['16mm', '22mm'])(
+    'keeps the allowed %s rail stock sound',
+    async board => {
       const thick = await editCad(null, frameStool({ board }));
       expect(thick.report.errors).toEqual([]);
-    }
-  }, 180_000);
+    },
+    90_000
+  );
 
   it('refuses a loose mortise and a stance edited past the pattern bound', () => {
     expect(failing(withVariable(reloaded, 'fit', '1mm'), plan).some(c => c.check.includes('glue line'))).toBe(true);

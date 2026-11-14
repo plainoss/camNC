@@ -1,3 +1,4 @@
+import { setImmediate } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { parseCadDocument, setCadVariable, type CadDocument } from '@wbcnc/cad';
 import { editCad, type CadEditResult } from './edit';
@@ -77,6 +78,9 @@ describe.each([
     expect(result.scriptError).toBeUndefined();
     expect(failed(result, id)).toEqual([]);
     expect(addedUnplannedFurniturePieces(original, result.document)).toEqual([]);
+    // The rebuild and the check of the edited reload each solve for over half a minute: an event-loop turn between them
+    // keeps Vitest's worker RPC inside its 60 s deadline (see testSetup.ts).
+    await setImmediate();
 
     const reloaded = parseCadDocument(JSON.parse(JSON.stringify(result.document)));
     const [name, expression] = variable;
