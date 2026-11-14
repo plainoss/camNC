@@ -121,5 +121,54 @@
         }
       }
     ]
+  },
+  {
+    "id": "studio/view/shortcut-list-tabs",
+    "title": "Shift+/ opens the keyboard shortcut list on General, its Part Studio tab lists the studio's keys, and Escape closes it",
+    "evidence": "design keyboard shortcut list with tabs, search and a key legend",
+    "steps": [
+      "dialogcancel",
+      "selectfeature Top",
+      "key Shift+s",
+      "rect 0,0 60,40",
+      "closesketch",
+      "key Shift+e",
+      "viewpick 30,20,0",
+      "dialogconfirm",
+      {
+        "spec": "1 command"
+      },
+      "key Shift+Slash",
+      {
+        "expect": {
+          "studio": {
+            "dialog": "Keyboard shortcuts"
+          }
+        }
+      },
+      {
+        "spec": "2 select"
+      },
+      "dialogtab Part Studio",
+      {
+        "spec": "3 cancel"
+      },
+      "key Escape",
+      {
+        "expect": {
+          "studio": {
+            "dialog": null,
+            "features": [
+              {
+                "name": "Sketch 1",
+                "state": ["hidden"]
+              },
+              "Extrude 1"
+            ],
+            "parts": ["Part 1"]
+          }
+        }
+      }
+    ]
   }
 ]

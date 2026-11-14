@@ -22,6 +22,8 @@ export async function createAdapter(page, url, { baseDir = process.env.INIT_CWD 
     return (await getJob(jobId))?.design?.draft ?? null;
   });
   const read = async () => {
+    // A modal dialog playing its closing animation still hides the page from accessibility queries: let it finish.
+    await page.locator('[role="dialog"][data-state="closed"]').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
     const document = await readDocument();
     const dialog = page.getByRole('dialog');
     const parts = page.getByRole('list', { name: 'Parts', exact: true });

@@ -223,7 +223,7 @@ import { PartsList } from './PartsList';
 import { toggledKey } from './toggledKey';
 import { usePointPicker } from './pointPicker';
 import { ShortcutList } from './ShortcutList';
-import { sketchShortcuts, studioShortcuts, studioSketchShortcuts } from './shortcuts';
+import { sketchShortcutTabs, studioShortcuts } from './shortcuts';
 import { sketchSearchCommands } from './sketchSearchCommands';
 import { toggleFixed } from './sketchFix';
 import { hasOutline, isSingleLine, replacePart } from './editorHelpers';
@@ -238,7 +238,7 @@ import type { CadEditorProps } from './CadEditor.types';
 export type { CadEditorController, CadEditorProps } from './CadEditor.types';
 import { useProfileSelection } from './useProfileSelection';
 import { basePlaneViews, pickedPlane } from './basePlanes';
-import { planesToggled } from './planesShortcut';
+import { studioKeyActions } from './studioKeyActions';
 import type { ViewRequest } from '@/cam/model/ModelViewport';
 import { designStepLabel, trimCadFolders, type DesignStep } from '@wbcnc/cad';
 import type { PartEdge } from './partEdges';
@@ -1144,7 +1144,7 @@ export function CadEditor({
         toggleCommandSearch,
         toggleConstruction,
         toggleFix,
-        togglePlanes: () => setFeatureVisibility(shown => planesToggled(shown, documentRef.current, featureShown)),
+        ...studioKeyActions(documentRef, featureShown, setFeatureVisibility, setRolledTo),
       },
       event
     );
@@ -2700,7 +2700,8 @@ export function CadEditor({
             />
           )}
           <ShortcutList
-            sections={studioSession ? (showWorkspace ? studioShortcuts : studioSketchShortcuts) : sketchShortcuts}
+            tabs={studioSession ? studioShortcuts : sketchShortcutTabs}
+            initial={studioSession && showWorkspace ? 'General' : 'Sketch'}
             open={shortcutsOpen}
             onOpenChange={setShortcutsOpen}
           />

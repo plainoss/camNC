@@ -272,16 +272,16 @@ workflow that needs an extra click fails even when the result is right:
 pnpm --silent --filter @wbcnc/camNC spec:lint path/to/scenarios.json
 ```
 
-| Kind      | Allowed input (exactly one)                                                                                                      |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `pick`    | `viewpick`                                                                                                                       |
-| `select`  | `selectfeature`, `featureeye`, `featuremenu`, `menuitem`, `dialogfocus`, `selectpart` or `click` (a context menu is two selects) |
-| `command` | `studiotool`, `key` or `tool`                                                                                                    |
-| `draw`    | `rect`, `circle`, `line` or `arc`                                                                                                |
-| `field`   | `dialogfill`, `dialogselect`, `dialogcheck`, `dialogtab` or `field`, then optionally `key Enter`                                 |
-| `confirm` | `dialogconfirm`, `closesketch` or `key Enter`                                                                                    |
-| `cancel`  | `dialogcancel` or `key Escape`                                                                                                   |
-| `view`    | `view`, or one view shortcut key: `F`, `N`, `Shift+1`…`Shift+7`                                                                  |
+| Kind      | Allowed input (exactly one)                                                                                                                                       |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pick`    | `viewpick`                                                                                                                                                        |
+| `select`  | `selectfeature`, `featureeye`, `featuremenu`, `menuitem`, `dialogfocus`, `dialogtab` (a tab in a dialog), `selectpart` or `click` (a context menu is two selects) |
+| `command` | `studiotool`, `key` or `tool`                                                                                                                                     |
+| `draw`    | `rect`, `circle`, `line` or `arc`                                                                                                                                 |
+| `field`   | `dialogfill`, `dialogselect`, `dialogcheck`, `dialogtab` or `field`, then optionally `key Enter`                                                                  |
+| `confirm` | `dialogconfirm`, `closesketch` or `key Enter`                                                                                                                     |
+| `cancel`  | `dialogcancel` or `key Escape`                                                                                                                                    |
+| `view`    | `view`, or one view shortcut key: `F`, `N`, `Shift+1`…`Shift+7`                                                                                                   |
 
 Expectations, `frame`, `shot`, `checkpoint`, `exportstep` and `savedesign` are free; steps before the first marker are
 setup. `spec:names <table.md>` checks that the accessible names in a Markdown table (columns `camNC accessible name`,

@@ -44,6 +44,10 @@ export type CadEditorKeyDownInput = SketchEditorInput & {
   studioCommand: (command: StudioCommand) => void;
   /** P: hides every plane, or shows them all again. */
   togglePlanes: () => void;
+  /** Shift+H: hides every sketch, or shows them all again. */
+  toggleSketches: () => void;
+  /** The up and down arrows: the rollback bar one step up or down. */
+  moveRollback: (by: -1 | 1) => void;
   studioSession: boolean;
   toggleCommandSearch: () => void;
   toggleConstruction: () => void;
@@ -131,6 +135,8 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     toggleConstruction,
     toggleFix,
     togglePlanes,
+    toggleSketches,
+    moveRollback,
     tool,
     transformSelectionCenter,
     usingEdges,
@@ -196,6 +202,16 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
       if (!event.repeat) togglePlanes();
       return;
     }
+    if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === 'h') {
+      event.preventDefault();
+      if (!event.repeat) toggleSketches();
+      return;
+    }
+    if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      moveRollback(event.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
     // N looks straight at the picked plane or face, or the selected part's sketch plane; again, from its other side.
     if (!event.shiftKey && event.key.toLowerCase() === 'n') {
       const request = studioNormalView(documentRef.current, selectedPlane, selectedFace, part);
@@ -219,6 +235,20 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     event.preventDefault();
     // A held key, as Shift+E pressed in a sketch closing into this Extrude, doesn't start another.
     if (!event.repeat && !busy && part && (partHasOutline || part.extrude === false)) studioCommand('extrude');
+    return;
+  }
+  // Shift+F rounds edges with Fillet, as in the reference.
+  if (
+    studioSession &&
+    showWorkspace &&
+    event.shiftKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    event.key.toLowerCase() === 'f'
+  ) {
+    event.preventDefault();
+    if (!event.repeat && !busy) studioCommand('fillet');
     return;
   }
   // Shift+S starts a sketch, on the plane or face picked if there is one, as in the reference.

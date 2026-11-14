@@ -183,7 +183,21 @@ it('lists confirmation for an open studio sketch and omits it from the workspace
   await userEvent.keyboard('?');
   const studioList = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
   expect(within(studioList).queryByText('Confirm sketch')).toBeNull();
-  expect(within(within(studioList).getByRole('region', { name: 'Part Studio' })).getByText('Extrude')).toBeDefined();
+  // The studio's list opens on General, with a tab for each part of the app.
+  expect(within(studioList).getByRole('tab', { name: 'General' }).getAttribute('aria-selected')).toBe('true');
+  expect(within(within(studioList).getByRole('region', { name: 'General' })).getByText('Shift+/')).toBeDefined();
+  await userEvent.click(within(studioList).getByRole('tab', { name: 'Part Studio' }));
+  const partStudio = within(studioList).getByRole('region', { name: 'Part Studio' });
+  for (const [label, key] of [
+    ['Extrude', 'Shift+E'],
+    ['Fillet', 'Shift+F'],
+    ['Hide/show sketches', 'Shift+H'],
+    ['Move rollback bar', '↑ ↓'],
+    ['Sketch', 'Shift+S'],
+  ])
+    expect(within(partStudio).getByText(label).nextElementSibling?.textContent).toBe(key);
+  await userEvent.type(within(studioList).getByRole('searchbox', { name: 'Search shortcuts' }), 'fit');
+  expect(within(within(studioList).getByRole('region', { name: 'Search results' })).getAllByText('Zoom to fit').length).toBeGreaterThan(0);
 }, 30_000);
 
 it('creates and applies a variable still being typed in a dimension before confirming', async () => {
