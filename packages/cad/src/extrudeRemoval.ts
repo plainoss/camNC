@@ -130,7 +130,8 @@ export function applyExtrudeRemovals(
         ...prepared,
         partCuts: [{ id: `remove-${step.id}`, tools: tools.map(tool => tool.id), targets: targets.map(target => target.id), clearance: 0 }],
       },
-      [...parts.filter(part => part.partId !== step.id), ...profiles]
+      [...parts.filter(part => part.partId !== step.id), ...profiles],
+      { merges: false }
     );
     for (const problem of cut.diagnostics) {
       // Skipped bones leave a valid square corner; only an unsupported intersection blocks the feature.

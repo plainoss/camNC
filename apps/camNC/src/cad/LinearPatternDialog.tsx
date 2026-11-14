@@ -120,9 +120,13 @@ export function LinearPatternDialog({
     const step = target ? document.parts.find(candidate => candidate.id === target) : undefined;
     const on = step?.drawnOn?.on;
     if (!step || !on || !('partId' in on) || !vector || !('pattern' in settings)) return null;
-    const rotation = resolveDrawnPlacements(document).document.parts.find(candidate => candidate.id === on.partId)?.placement?.rotation;
+    const placement = resolveDrawnPlacements(document).document.parts.find(candidate => candidate.id === on.partId)?.placement;
+    const rotation = placement?.rotation;
     const local = (v: Vec3) => (rotation ? rotateVector([-rotation[0]!, -rotation[1]!, -rotation[2]!, rotation[3]!], v) : v);
-    const region = sketchRegions(step.sketch, CAD_CHORD_TOLERANCE)[0];
+    // The click, in the view's space, as the board's own x and y.
+    const clicked = placement ? local(point.map((value, axis) => value - placement.position[axis]!) as Vec3) : point;
+    const regions = sketchRegions(step.sketch, CAD_CHORD_TOLERANCE);
+    const region = regions.find(candidate => step.regions?.includes(candidate.id)) ?? regions[0];
     const seed = region && regionInteriorPoint(region.points);
     if (!seed) return null;
     const flip = on.face === 'underside' ? -1 : 1;
@@ -132,12 +136,12 @@ export function LinearPatternDialog({
     let best: { at: [number, number]; distance: number } | null = null;
     for (let j = 0; j < rows; j++)
       for (let i = 0; i < count; i++) {
-        const a = (i - (first ? (count - 1) / 2 : 0)) * spacing,
-          b = second ? (j - (second.centered ? (rows - 1) / 2 : 0)) * second.spacing : 0;
+        const a = (i - (first ? Math.floor((count - 1) / 2) : 0)) * spacing,
+          b = second ? (j - (second.centered ? Math.floor((rows - 1) / 2) : 0)) * second.spacing : 0;
         if (a === 0 && b === 0) continue;
         const x = flip * seed.x + d1[0] * a + d2[0] * b,
           y = seed.y + d1[1] * a + d2[1] * b;
-        const distance = Math.hypot(x - point[0], y - point[1]);
+        const distance = Math.hypot(x - clicked[0], y - clicked[1]);
         if (!best || distance < best.distance) best = { at: [i, j], distance };
       }
     const reach = Math.min(Math.abs(spacing) || Infinity, second ? Math.abs(second.spacing) || Infinity : Infinity) / 2;
@@ -181,6 +185,9 @@ export function LinearPatternDialog({
       };
     }
     if (count.value * (second?.count ?? 1) < 2) return { error: 'Use at least two instances.' };
+    // Skipped positions the grid no longer has, or the original's, are left out.
+    const seed = [centered ? Math.floor((count.value - 1) / 2) : 0, second?.centered ? Math.floor(((second?.count ?? 1) - 1) / 2) : 0];
+    const kept = skipped.filter(([i, j]) => i < count.value && j < (second?.count ?? 1) && !(i === seed[0] && j === seed[1]));
     return {
       pattern: {
         axis: 'x' as const,
@@ -190,7 +197,7 @@ export function LinearPatternDialog({
         ...(count.expression && { countExpression: count.expression }),
         ...(centered && { centered: true as const }),
         ...(second && { second }),
-        ...(skipOn && skipped.length && { skipped }),
+        ...(skipOn && kept.length && { skipped: kept }),
       },
     };
   }, [

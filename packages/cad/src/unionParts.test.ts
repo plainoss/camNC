@@ -110,3 +110,22 @@ it('merges an Add with Merge with all into every board it runs into, and stays i
   const apart = { ...document, parts: [left, { ...bar, drawnOn: { on: { plane: 'top' as const }, offset: 20 } }] };
   expect(consumedTools(apart)).toEqual(new Set());
 });
+
+it('leaves chained merges, and merges into a part another step uses, apart rather than losing material', async () => {
+  const left = board('Part 1', 30, 30, 10);
+  const right = board('Part 2', 30, 30, 10);
+  right.sketch = addRectangle(createCadPart('x').sketch, { x: 70, y: 0, width: 30, height: 30 });
+  const bar = { ...board('Bar', 100, 10, 5), mergeAll: true as const };
+  const stub = { ...board('Stub', 10, 30, 5), mergeAll: true as const };
+  const chained: CadDocument = { ...createCadDocument(), version: 7, parts: [left, right, bar, stub] };
+  expect(consumedTools(chained)).toEqual(new Set());
+  const solved = await solveCadDocument(chained);
+  expect(solved.diagnostics.some(d => d.code === 'merge-all-unresolved')).toBe(true);
+  expect(
+    cadPartsToCut(solved.document, solved.parts)
+      .map(entry => entry.part.name)
+      .sort()
+  ).toEqual(['Bar', 'Part 1', 'Part 2', 'Stub']);
+  const ordered: CadDocument = { ...createCadDocument(), version: 7, operationOrder: [], parts: [left, right, bar] };
+  expect(consumedTools(ordered)).toEqual(new Set());
+});

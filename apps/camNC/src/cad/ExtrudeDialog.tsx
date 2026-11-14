@@ -188,7 +188,8 @@ export function ExtrudeDialog({
           // A solid face names the profile, not the body to join: that scope must be picked explicitly, as it must when
           // the regions run into more than one part.
           const touched = p.faceProfile ? [] : overlappedParts(current, p.id);
-          made.addTo = p.faceProfile || touched.length > 1 ? '' : (touched[0] ?? into.id);
+          const only = touched.length === 1 ? mergeable.find(candidate => candidate.id === touched[0]) : undefined;
+          made.addTo = p.faceProfile || touched.length > 1 ? '' : (only?.id ?? into.id);
           if (sharesSketch(into, p)) made.regions = (keptRegions(p, own) ?? []).filter(id => !into.regions!.includes(id));
           else {
             const regions = keptRegions(p, own);

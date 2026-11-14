@@ -478,7 +478,10 @@ export interface CadPartPattern {
     countExpression?: string;
     centered?: true;
   };
-  /** Grid positions left out, as [along the first direction, along the second], counting the original as [0, 0]. */
+  /**
+   * Grid positions left out, as [along the first direction, along the second], counting from 0 at the first instance of
+   * each row: the original, or the first before it when centred.
+   */
   skipped?: [number, number][];
 }
 export interface CadCircularPartPattern {

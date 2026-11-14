@@ -181,6 +181,8 @@ export function parseCadDocument(input: unknown): CadDocument {
             second.count < 1 ||
             second.count > 200 ||
             !Number.isFinite(second.spacing) ||
+            (second.spacingExpression !== undefined && typeof second.spacingExpression !== 'string') ||
+            (second.countExpression !== undefined && typeof second.countExpression !== 'string') ||
             (second.centered !== undefined && second.centered !== true))) ||
         (skipped !== undefined &&
           (!Array.isArray(skipped) || skipped.some(at => !Array.isArray(at) || at.length !== 2 || !at.every(Number.isInteger))))

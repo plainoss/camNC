@@ -258,7 +258,7 @@ function toolOutlineCut(
 export function applyPartCuts(
   given: CadDocument,
   parts: readonly EvaluatedCadPart[],
-  options: { occupiedTools?: boolean } = {}
+  options: { occupiedTools?: boolean; merges?: boolean } = {}
 ): { parts: EvaluatedCadPart[]; diagnostics: CadDiagnostic[] } {
   const document = physicalJoinedCopies(activeDesign(given));
   const diagnostics: CadDiagnostic[] = [];
@@ -298,7 +298,8 @@ export function applyPartCuts(
     relieved.set(target, partName);
   };
   // An Add with Merge with all joins the parts it runs into before any step cuts them.
-  for (const source of document.parts) {
+  // A removal's own cut leaves them to the design's.
+  for (const source of options.merges === false ? [] : document.parts) {
     const merged = mergedWithAll(document, source);
     const host = merged && targets.get(merged.hostId)?.[0];
     if (!merged || !host) continue;

@@ -79,11 +79,13 @@ export function BooleanDialog({
       return { change: { operation, tools, targets, consumeTools } };
     }
     if (tools.length < 2) return { error: 'Pick at least two parts.' };
-    // The part made keeps the place and name of the one made first.
+    // The part made keeps the place and name of the one made first; a saved step keeps the part it made.
     const order = (id: string) => document.parts.findIndex(part => part.id === id);
-    const [first, ...rest] = [...tools].sort((a, b) => order(a) - order(b));
+    const kept = step?.operation === operation && tools.includes(step.targets[0]!) ? step.targets[0] : undefined;
+    const sorted = [...tools].sort((a, b) => order(a) - order(b));
+    const [first, ...rest] = kept ? [kept, ...sorted.filter(id => id !== kept)] : sorted;
     return { change: { operation, targets: [first!], tools: rest, consumeTools } };
-  }, [operation, tools, targets, keepTools, document.parts]);
+  }, [operation, tools, targets, keepTools, document.parts, step]);
   const [featureId] = useState(() => step?.id ?? newCadId());
   const candidate = useMemo(() => {
     if ('error' in result) return null;

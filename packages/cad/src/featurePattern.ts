@@ -49,7 +49,8 @@ export function patternedRemoval(
   const secondLocal = second && (board.placement ? rotateVector(conjugate(board.placement.rotation), second.vector) : second.vector);
   if (secondLocal && Math.abs(secondLocal[2]) > 1e-6) return [];
   const rows = second && second.count > 1 ? second.count : 1;
-  const from = (count: number, centered?: true) => (centered ? (count - 1) / 2 : 0);
+  // Centred, the original is the middle instance, or the one before the middle of an even count.
+  const from = (count: number, centered?: true) => (centered ? Math.floor((count - 1) / 2) : 0);
   for (let row = 0; row < rows; row++)
     for (let k = 0; k < pattern.count; k++) {
       const a = (k - from(pattern.count, pattern.centered)) * pattern.spacing,

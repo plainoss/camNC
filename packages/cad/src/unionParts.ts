@@ -42,7 +42,8 @@ export function unitedPart(
 ): { part: EvaluatedCadPart } | { refused: string } {
   const all = [host, ...tools];
   for (const { shape, source } of all) {
-    if (shape.holes.length || shape.cuts?.length) return { refused: `${shape.name} has holes or cuts, which a union can't keep yet.` };
+    if (shape.holes.length || shape.cuts?.length)
+      return { refused: `${shape.name} has holes or cuts, which a union or intersection can't keep yet.` };
     if (source.drawnOn?.inward || source.symmetric || source.thin) return { refused: `${shape.name} isn't extruded up from its sketch.` };
   }
   // Every outline in the first part's sketch coordinates, on its sketch plane.
@@ -110,12 +111,25 @@ function unite(document: CadDocument, step: CadPartCut): { part: EvaluatedCadPar
     if (document.parts.some(other => other.addTo === part.id && isJoinedBody(document, other)))
       return { refused: `${part.name} has a body added to it, which a union can't join yet.` };
   }
-  // Other steps' cuts in these parts would be lost: the union joins the parts as their own sketches make them.
-  const cutByOthers = (document.partCuts ?? []).some(
-    other => other.id !== step.id && !other.suppressed && joined.some(part => other.targets.some(id => id.split(':')[0] === part.id))
+  // Other steps' cuts in these parts would be lost, and parts other steps use or join can't be joined here too: the union
+  // joins the parts as their own sketches make them.
+  const usedByOthers = (document.partCuts ?? []).some(
+    other =>
+      other.id !== step.id &&
+      !other.suppressed &&
+      joined.some(part => [...other.targets, ...other.tools].some(id => id.split(':')[0] === part.id))
   );
-  if (cutByOthers || joined.some(part => part.features?.some(feature => feature.type === 'cut')))
-    return { refused: 'A part this union joins has cuts or pockets, which a union can’t keep yet.' };
+  if (usedByOthers || joined.some(part => part.features?.some(feature => feature.type === 'cut')))
+    return { refused: 'A part this union joins has cuts or pockets, or another step uses it, which a union can’t keep yet.' };
+  // Nor can it join a part an Add with Merge with all makes or joins, other than the one this step is.
+  const merging = document.parts.filter(
+    other => other.mergeAll && !other.suppressed && other.extrude !== false && `${other.id}:merge-all` !== step.id
+  );
+  if (
+    joined.some(part => part.mergeAll && `${part.id}:merge-all` !== step.id) ||
+    merging.some(other => joined.some(part => overlappedParts(document, other.id).includes(part.id)))
+  )
+    return { refused: 'A part this joins is joined by an Add with Merge with all too, which can’t be combined yet.' };
   // Placed as drawn, whether or not the document given has been solved.
   const placed = resolveDrawnPlacements(document).document;
   const supports = cadDrawnOnSupports(placed);
@@ -140,6 +154,12 @@ export function mergedWithAll(
   if (!part.mergeAll || part.suppressed || part.extrude === false) return null;
   const touched = overlappedParts(document, part.id);
   if (!touched.length) return null;
+  if (document.operationOrder !== undefined)
+    return {
+      hostId: touched[0]!,
+      joined: [],
+      made: { refused: 'Merge with all isn’t available in a design with ordered operations yet.' },
+    };
   const step: CadPartCut = {
     id: `${part.id}:merge-all`,
     targets: [touched[0]!],
