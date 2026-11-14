@@ -21,13 +21,13 @@ import type { DimensionWorkflow, DimensionWorkflowEvent } from '@wbcnc/cad-edito
 import type { DrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
 import type { CreationValues } from './creationValues';
 import type { LinearPatternParameters } from './linearPatternParameters';
-import type { TransformParameters, TransformDragKind } from './transformParameters';
+import type { TransformParameters } from './transformParameters';
 import type { SketchContext, SketchContextPress, SketchContextTarget } from '@wbcnc/cad-editor/sketchContext';
 import type { CadSnapResult } from '@wbcnc/cad-editor/picking';
 import type { CadDrawingInference } from '@wbcnc/cad-editor/drawingInference';
 import type { InferredLineAxis } from './lineInference';
 import type { CadSelectionBox } from './boxSelection';
-import type { AnnotationGesture, BoxGesture, ChainAnchor, DragGesture } from './editorGestures';
+import type { AnnotationGesture, BoxGesture, ChainAnchor, DragGesture, HandleDrag } from './editorGestures';
 import type { CutRegion } from './cutRegions';
 import type { SketchTool } from './sketchTools';
 import type { ModificationWorkflow } from '@wbcnc/cad-editor/modificationWorkflow';
@@ -57,7 +57,6 @@ export type SketchEditorInput = {
   centerArcSweep: RefObject<{ last: number; sweep: number } | null>;
   chain: ChainAnchor | null;
   chamferDistances: string[];
-  chamferDrag: RefObject<{ side: number; origin: CadPoint; direction: CadPoint; previous: string[] } | null>;
   chamferPreview:
     | { ok: true; sketch: CadSketch; cornerPointIds: string[]; lineIds: string[]; dimensionIds: [string, string] }
     | { ok: false; message: string; cornerPointIds: string[] }
@@ -65,13 +64,6 @@ export type SketchEditorInput = {
   chamferSelection: { ok: true; cornerPointIds: string[] } | { message: string; ok: false; cornerPointIds: string[] } | null;
   changeSketch: (next: CadSketch) => void;
   chooseTool: (next: Tool) => void;
-  circularDrag: RefObject<{
-    kind: 'center' | 'sweep';
-    start: CadPoint;
-    parameters: CircularPatternParameters;
-    last: number;
-    sweep: number;
-  } | null>;
   commit: (next: CadDocument) => void;
   conicEditing: string | null;
   constraintMode: ConstraintCommandTool | null;
@@ -103,6 +95,7 @@ export type SketchEditorInput = {
   fixGeometry: (targets: string[]) => void;
   fixMode: boolean;
   height: string;
+  handleDrag: RefObject<HandleDrag | null>;
   hoveredReferences: RefObject<string[]>;
   inference: RefObject<'horizontal' | 'vertical' | 'tangent' | null>;
   lastDrawingHint: RefObject<CadDrawingInference | null>;
@@ -140,7 +133,6 @@ export type SketchEditorInput = {
   part: CadPart;
   partEdges: PartEdge[];
   patternCommandId: RefObject<string>;
-  patternDrag: RefObject<{ index: number; anchor: CadPoint; parameters: LinearPatternParameters } | null>;
   patternEditId: string | null;
   pending: Point[];
   pendingSnaps: RefObject<(CadDrawingInference | null)[]>;
@@ -216,7 +208,6 @@ export type SketchEditorInput = {
   sketch: CadSketch;
   sketchBackdrop: ReturnType<typeof useFaceSketchCamera> | ReturnType<typeof sketchBackdropView>;
   sketchTurn: SketchTurn;
-  slotDrag: RefObject<{ center: CadPoint; width: string } | null>;
   snap: boolean;
   solveDrag: (moving: DragGesture) => Promise<void>;
   solving: boolean;
@@ -225,7 +216,6 @@ export type SketchEditorInput = {
   takeEdges: (keys?: string[]) => void;
   tangentAxis: RefObject<InferredLineAxis | null>;
   tool: SketchTool;
-  transformDrag: RefObject<{ kind: TransformDragKind; start: CadPoint; parameters: TransformParameters } | null>;
   transformSelectionCenter: (ids: readonly string[]) => { x: number; y: number };
   usingEdges: boolean;
   variableScope: Readonly<Record<string, { value: number; kind: CadVariableKind }>>;
