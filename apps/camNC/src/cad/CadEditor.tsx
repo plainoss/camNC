@@ -208,7 +208,7 @@ import { associatedEntityIds } from '@wbcnc/cad-editor/inlineConstraintLayout';
 import { StudioToolbar, type StudioCommand } from './StudioToolbar';
 import { StudioCommandSearch } from './StudioCommandSearch';
 import type { PatternOpening } from './partPatternKind';
-import { featureRowParts, selectStudioFeature } from './studioFeatureSelection';
+import { featureRowParts, picksFeatureRows, selectStudioFeature } from './studioFeatureSelection';
 import { startExtrude } from './studioExtrude';
 import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioParts } from './studioParts';
 import { applyFramed } from './insertFraming';
@@ -1635,7 +1635,7 @@ export function CadEditor({
     setSelectedPlane(picked => (picked === plane ? null : plane));
   };
   const studioCommand = (command: StudioCommand, initialPatternKind?: PatternOpening): void => {
-    if (command === 'linearPattern') return studioCommand('pattern', 'linearPattern');
+    if (command === 'linearPattern') return openFeature('pattern', (part ?? builtParts[0] ?? doc.parts[0]!).id, undefined, 'linearPattern');
     setStudioRefusal(null);
     if (command === 'sketch') {
       closeDialog();
@@ -1966,7 +1966,7 @@ export function CadEditor({
               onSelect={selectStudioFeature(doc, profiles.pickSketch, {
                 sketch: setSketchRowPicked,
                 face: () => setSelectedFace(null),
-                part: partPicking ? cutSelection.pickForCut : cutSelection.selectPart,
+                part: picksFeatureRows(dialog) ? cutSelection.pickForCut : cutSelection.selectPart,
                 entities: () => setSelected([]),
               })}
               onAction={featureAction}

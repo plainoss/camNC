@@ -205,6 +205,40 @@ describe('Extrude → Remove', () => {
     expect(cadCuts(off.parts[0]!)).toHaveLength(1);
   });
 
+  it('repeats a dado running off the board, along +x on the underside too, and skips an instance off the board', () => {
+    const pattern = (count: number) => ({
+      id: 'p1',
+      axis: 'x' as const,
+      vector: [1, 0, 0] as [number, number, number],
+      count,
+      spacing: 30,
+    });
+    const centres = (document: CadDocument) => {
+      const evaluated = evaluateCadDocument(document);
+      expect(evaluated.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+      const [board] = cadPartsToCut(document, evaluated.parts);
+      return board!.part.cuts!.map(cut =>
+        Math.round((Math.min(...cut.outline.map(p => p.x)) + Math.max(...cut.outline.map(p => p.x))) / 2)
+      );
+    };
+    const dado = onBoard(sketch => addRectangle(sketch, { x: 20, y: -10, width: 10, height: 120 }));
+    const found = removalRegions(design(dado.board, { ...dado.pocket, remove: { depth: 5 } }), { ...dado.pocket, remove: { depth: 5 } });
+    if ('error' in found) throw new Error(found.error);
+    const groove = found.regions.find(
+      region => Math.min(...region.points.map(p => p.x)) > 19 && Math.max(...region.points.map(p => p.x)) < 31
+    )!;
+    const grooves = { ...dado.pocket, regions: [groove.id], remove: { depth: 5 }, pattern: pattern(3) };
+    expect(centres(resolveExtrudeSteps(design(dado.board, grooves)))).toEqual([25, 55, 85]);
+    // An underside sketch's x runs the other way, so x = -100 is 100 along the board.
+    const below = onBoard(sketch => addCircle(sketch, { x: -100, y: 50, radius: 5 }), 'underside');
+    const flipped = centres(resolveExtrudeSteps(design(below.board, { ...below.pocket, remove: { depth: 5 }, pattern: pattern(2) })));
+    expect(flipped.map(Math.abs).sort((a, b) => a - b)).toEqual([100, 130]);
+    const edge = onBoard(sketch => addCircle(sketch, { x: 150, y: 50, radius: 5 }));
+    expect(centres(resolveExtrudeSteps(design(edge.board, { ...edge.pocket, remove: { depth: 5 }, pattern: pattern(3) })))).toEqual([
+      150, 180,
+    ]);
+  });
+
   it('cuts a shape drawn on a board’s top into it, keeping the sketch as its own step', () => {
     const { board, pocket } = onBoard(sketch => addRectangle(sketch, { x: 50, y: 30, width: 40, height: 20 }));
     const document = resolveExtrudeSteps(design(board, { ...pocket, remove: { depth: 6 } }));

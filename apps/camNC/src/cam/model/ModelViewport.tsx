@@ -354,7 +354,7 @@ export function ModelViewport({
               index: near.index,
               point,
               surfacePoint: point,
-              normal: [0, 0, 1],
+              normal: near.normal,
               edge: near.edge,
             };
             return onPickFace ? onPickFace(face) : onSelect(mesh.partId, near.index, face);

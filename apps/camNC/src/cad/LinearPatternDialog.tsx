@@ -1,4 +1,13 @@
-import { isCadPart, setPartPattern, type CadDocument, type CadPart, type CadValueScope } from '@wbcnc/cad';
+import {
+  cadCuts,
+  isCadPart,
+  isSpatialRemoval,
+  resolveExtrudeSteps,
+  setPartPattern,
+  type CadDocument,
+  type CadPart,
+  type CadValueScope,
+} from '@wbcnc/cad';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CadValueInput } from './CadValueInput';
 import { useDesignUnits } from './designUnits';
@@ -12,8 +21,15 @@ type Vec3 = [number, number, number];
 type PatternType = 'part' | 'feature';
 type Box = 'entities' | 'direction';
 
-/** What a Linear pattern repeats: a part, as copies of it, or an Extrude → Remove, as its cuts again along the board. */
-const takes = (type: PatternType, part: CadPart | undefined) => !!part && (type === 'feature' ? !!part.remove : isCadPart(part));
+/**
+ * What a Linear pattern repeats: a part, as copies of it, or an Extrude → Remove drawn on a board's face, as its cuts
+ * again along the board.
+ */
+const takes = (type: PatternType, part: CadPart | undefined) =>
+  !!part &&
+  (type === 'feature'
+    ? !!part.remove && !isSpatialRemoval(part) && !!part.drawnOn && 'partId' in part.drawnOn.on && !part.drawnOn.on.copyId
+    : isCadPart(part));
 
 /**
  * The Linear pattern dialog: a Part pattern repeats the part picked into Entities to pattern, a Feature pattern the
@@ -44,6 +60,7 @@ export function LinearPatternDialog({
 }) {
   const { parseCadValue, lengthText } = useDesignUnits();
   const existing = part.pattern && !part.pattern.circular ? part.pattern : undefined;
+  const suppressed = !!existing?.suppressed;
   const [type, setType] = useState<PatternType>(part.remove ? 'feature' : 'part');
   const [target, setTarget] = useState<string | null>(existing ? part.id : null);
   const [vector, setVector] = useState<Vec3 | null>(existing?.vector ?? null);
@@ -98,8 +115,11 @@ export function LinearPatternDialog({
     };
   }, [distanceText, countText, variables, parseCadValue]);
   const draft = useMemo(
-    () => (target && vector && 'pattern' in settings ? setPartPattern(document, target, { ...settings.pattern, vector }) : null),
-    [document, target, vector, settings]
+    () =>
+      target && vector && 'pattern' in settings
+        ? setPartPattern(document, target, { ...settings.pattern, vector, ...(suppressed && { suppressed: true as const }) })
+        : null,
+    [document, target, vector, settings, suppressed]
   );
   useDialogPreview(draft, onPreview);
   const accept = () => {
@@ -113,6 +133,13 @@ export function LinearPatternDialog({
           ? settings.error
           : null;
     if (problem || !draft) return setError(problem ?? null);
+    // Each instance of a feature pattern cuts the board as the feature does; one off the board, or out of its face, doesn't.
+    if (type === 'feature' && 'pattern' in settings && !suppressed) {
+      const resolved = resolveExtrudeSteps(draft).parts.flatMap(part => cadCuts(part).filter(cut => cut.removedBy === target));
+      const own = resolved.filter(cut => !cut.id.includes('~')).length;
+      if (resolved.length < own * settings.pattern.count)
+        return setError('Some instances would fall off the board or out of its face. Change the distance, count or direction.');
+    }
     onChange(() => draft);
     onOk();
   };

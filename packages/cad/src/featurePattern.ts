@@ -1,9 +1,9 @@
-import { CAD_CHORD_TOLERANCE, pointInPolygon, polygonArea } from './geometry';
+import { faceIsUnderside, flipUnderside } from './featureModel';
+import { CAD_CHORD_TOLERANCE, evaluateCadPart, pointInPolygon, polygonArea } from './geometry';
 import { rotateVector, type Vec3 } from './placement';
 import { regionInteriorPoint, sketchRegions } from './sketchRegions';
-import type { CadCut, CadEntity, CadFaceSketch, CadFeature, CadPart, CadPartPattern, CadPlacement } from './types';
+import type { CadCut, CadEntity, CadFaceSketch, CadFeature, CadPart } from './types';
 
-const kAxes: Record<CadPartPattern['axis'], Vec3> = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
 const conjugate = ([x, y, z, w]: readonly number[]) => [-x!, -y!, -z!, w!];
 
 /** A sketch entity moved by (dx, dy), its IDs, and the IDs it uses, followed by `suffix`. */
@@ -20,26 +20,33 @@ function movedEntity(entity: CadEntity, ids: ReadonlySet<string>, suffix: string
 
 /**
  * A Remove step's cuts repeated as its linear feature pattern lays them out: each instance its face sketch moved along
- * the pattern's direction in the board's own x and y, and the same regions cut as deep. A direction out of the face's
- * plane, or a circular pattern, repeats nothing.
+ * `along`, a world direction, in the board's own plane, and the same regions cut as deep. Regions are found with the
+ * board's outline closing them, as the board's own cuts are, so a dado running off an edge repeats too. An instance
+ * whose region isn't wholly on the board, a direction out of the face's plane, or a circular pattern, isn't cut.
  */
 export function patternedRemoval(
   step: CadPart,
-  board: { placement?: CadPlacement },
+  board: CadPart,
   face: CadFaceSketch,
-  cuts: readonly CadCut[]
+  cuts: readonly CadCut[],
+  along: Vec3 | null
 ): CadFeature[] {
   const pattern = step.pattern;
-  if (!pattern || pattern.suppressed || pattern.circular || pattern.count < 2) return [];
-  const world = pattern.vector ?? kAxes[pattern.axis];
-  const local = board.placement ? rotateVector(conjugate(board.placement.rotation), world) : world;
+  if (!pattern || pattern.suppressed || pattern.circular || pattern.count < 2 || !along) return [];
+  const local = board.placement ? rotateVector(conjugate(board.placement.rotation), along) : along;
   if (Math.abs(local[2]) > 1e-6) return [];
+  // An underside sketch is seen from below, so its x runs the other way.
+  const underside = faceIsUnderside(board, face.on);
+  const outline = evaluateCadPart(board).part?.outline;
+  if (!outline) return [];
+  const boundary = { id: `${board.id}:outline`, points: underside ? flipUnderside(outline) : outline };
+  const regionsOf = (sketch: CadFaceSketch['sketch']) => sketchRegions(sketch, CAD_CHORD_TOLERANCE, { boundary });
   const ids = new Set(face.sketch.entities.map(entity => entity.id));
-  const regions = sketchRegions(face.sketch, CAD_CHORD_TOLERANCE);
+  const regions = regionsOf(face.sketch);
   const made: CadFeature[] = [];
   for (let k = 1; k < pattern.count; k++) {
     if (pattern.excluded?.includes(k)) continue;
-    const dx = local[0] * pattern.spacing * k,
+    const dx = (underside ? -1 : 1) * local[0] * pattern.spacing * k,
       dy = local[1] * pattern.spacing * k,
       suffix = `~${k}`;
     const sketch = {
@@ -48,8 +55,8 @@ export function patternedRemoval(
       entities: face.sketch.entities.map(entity => movedEntity(entity, ids, suffix, dx, dy)),
       constraints: [],
     };
-    const moved = sketchRegions(sketch, CAD_CHORD_TOLERANCE);
-    made.push({ ...face, id: `${face.id}${suffix}`, sketch });
+    const moved = regionsOf(sketch);
+    const instance: CadFeature[] = [{ ...face, id: `${face.id}${suffix}`, sketch }];
     for (const cut of cuts) {
       const region = regions.find(candidate => candidate.id === cut.regionId);
       const inside = region && regionInteriorPoint(region.points);
@@ -60,8 +67,14 @@ export function patternedRemoval(
         candidate =>
           pointInPolygon(at, candidate.points) && Math.abs(Math.abs(polygonArea(candidate.points)) - area) < 1e-6 * Math.max(1, area)
       );
-      if (match) made.push({ ...cut, id: `${cut.id}${suffix}`, sketchId: sketch.id, regionId: match.id });
+      // Off the board, the instance isn't cut at all, rather than in part.
+      if (!match) {
+        instance.length = 0;
+        break;
+      }
+      instance.push({ ...cut, id: `${cut.id}${suffix}`, sketchId: sketch.id, regionId: match.id });
     }
+    made.push(...instance);
   }
   return made;
 }

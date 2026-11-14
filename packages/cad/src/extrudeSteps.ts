@@ -1,5 +1,6 @@
 import { faceRemovalDepth } from './faceRemovalDepth';
 import { resolveDrawnPlacements } from './drawnOn';
+import { cadDirectionVector } from './directions';
 import { cadDocumentVersion } from './documentVersion';
 import { applyExtrudeRemovals, isSpatialRemoval } from './extrudeRemoval';
 import { entityPointIds, newCadId } from './document';
@@ -288,8 +289,13 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
 
   const resolved = { ...document, parts };
   let placements: CadDocument | null = null;
-  const boardPlacement = (id: string) =>
-    (placements ??= resolveDrawnPlacements(resolved).document).parts.find(part => part.id === id)?.placement;
+  const placedDocument = () => (placements ??= resolveDrawnPlacements(resolved).document);
+  const placedBoard = (board: CadPart) => ({ ...board, placement: placedDocument().parts.find(part => part.id === board.id)?.placement });
+  // Along a picked plane or face, an edge, or an axis, as a part pattern is.
+  const patternAlong = (pattern: NonNullable<CadPart['pattern']>): [number, number, number] | null =>
+    pattern.direction
+      ? cadDirectionVector(placedDocument(), pattern.direction)
+      : (pattern.vector ?? (pattern.axis === 'x' ? [1, 0, 0] : pattern.axis === 'y' ? [0, 1, 0] : [0, 0, 1]));
   for (const step of parts) {
     // A suppressed Remove cuts nothing, and nor does a sketch not extruded.
     if (!step.remove || step.suppressed || step.extrude === false || isSpatialRemoval(step)) continue;
@@ -314,8 +320,7 @@ export function resolveExtrudeSteps(document: CadDocument): CadDocument {
       })
     );
     // A feature pattern of the Remove cuts it again at each of its instances.
-    const placed = step.pattern && boardPlacement(support.board.id);
-    const repeated = step.pattern ? patternedRemoval(step, { placement: placed || undefined }, face, cuts) : [];
+    const repeated = step.pattern ? patternedRemoval(step, placedBoard(support.board), face, cuts, patternAlong(step.pattern)) : [];
     removed.set(support.board.id, [...(removed.get(support.board.id) ?? []), face, ...cuts, ...repeated]);
   }
   parts = parts.map(part => {
