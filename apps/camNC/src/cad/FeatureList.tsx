@@ -49,14 +49,34 @@ function Eye({ name, shown, onToggle }: { name: string; shown: boolean; onToggle
 
 /** A row of the list: a design variable, a plane made to sketch on, or a step of how the design is built. */
 export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'plane'; id: string } | { kind: 'step'; step: DesignStep };
-export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete' | 'newSketch' | 'export';
+export type FeatureAction =
+  | 'edit'
+  | 'editSketch'
+  | 'rename'
+  | 'suppress'
+  | 'rollTo'
+  | 'rollToEnd'
+  | 'delete'
+  | 'newSketch'
+  | 'export'
+  | 'addToFolder'
+  | 'toggleShown'
+  | 'unavailable';
 
-/** What each row's menu offers, and why an item isn't there for it. */
+/** A menu item the reference offers that camNC has nothing behind yet: listed, but greyed with the reason. */
+const unavailable = (label: string) => ({ action: 'unavailable' as const, label, disabled: true, title: 'Not available yet' });
+
+/** What each row's menu offers, in the reference's order, and why an item isn't there for it. */
 function menuItems(
   entry: FeatureEntry,
-  rolledBack = false,
-  sketchName = 'sketch'
-): { action: FeatureAction; label: string; disabled?: boolean }[] {
+  {
+    rolledBack = false,
+    last = false,
+    sketchName = 'sketch',
+    shown = true,
+    folders = false,
+  }: { rolledBack?: boolean; last?: boolean; sketchName?: string; shown?: boolean; folders?: boolean } = {}
+): { action: FeatureAction; label: string; disabled?: boolean; title?: string }[] {
   if (entry.kind === 'variable' || entry.kind === 'plane')
     return [
       ...(entry.kind === 'plane' ? [{ action: 'newSketch' as const, label: 'New sketch' }] : []),
@@ -64,20 +84,45 @@ function menuItems(
       { action: 'delete', label: 'Delete' },
     ];
   const { kind } = entry.step;
+  const sketch = kind === 'sketch' || kind === 'faceSketch';
+  const rename = kind === 'sketch' || kind === 'extrude' ? [{ action: 'rename' as const, label: 'Rename' }] : [];
+  const folder = { action: 'addToFolder' as const, label: 'Add selection to folder…', disabled: !folders };
+  const suppress = sketch
+    ? { action: 'unavailable' as const, label: 'Suppress', disabled: true, title: 'A sketch is suppressed with the extrude made from it.' }
+    : { action: 'suppress' as const, label: entry.step.suppressed ? 'Unsuppress' : 'Suppress', disabled: kind === 'move' };
+  const remove = { action: 'delete' as const, label: 'Delete', disabled: kind === 'faceSketch' || kind === 'copy' };
+  // A step past the bar can only be named, grouped, switched off, rolled to or deleted until the design reaches it.
+  if (rolledBack)
+    return [
+      ...rename,
+      folder,
+      suppress,
+      unavailable('Dynamic suppression'),
+      unavailable('Add comment'),
+      { action: 'rollTo', label: 'Roll to here' },
+      { action: 'rollToEnd', label: 'Roll to end' },
+      remove,
+    ];
   return [
-    ...(kind === 'sketch' || kind === 'extrude' ? [{ action: 'rename' as const, label: 'Rename' }] : []),
+    ...rename,
     { action: 'edit', label: 'Edit…' },
     // Named for the sketch it opens, as Edit Sketch 1….
     ...(kind === 'extrude' ? [{ action: 'editSketch' as const, label: `Edit ${sketchName}…` }] : []),
-    // Sketches aren't suppressed on their own: their extrude is.
-    ...(kind === 'sketch' || kind === 'faceSketch' || kind === 'move'
-      ? []
-      : [{ action: 'suppress' as const, label: entry.step.suppressed ? 'Unsuppress' : 'Suppress' }]),
-    { action: 'rollTo', label: 'Roll to here' },
-    ...(kind === 'sketch' || kind === 'faceSketch' ? [{ action: 'export' as const, label: 'Export as DXF/SVG…' }] : []),
-    // A step past the bar also takes the design back to its end, as the reference's menu does.
-    ...(rolledBack ? [{ action: 'rollToEnd' as const, label: 'Roll to end' }] : []),
-    { action: 'delete', label: 'Delete', disabled: kind === 'faceSketch' || kind === 'copy' },
+    ...(sketch ? [unavailable('Copy sketch')] : []),
+    unavailable('Show dimensions'),
+    folder,
+    ...(kind === 'sketch' ? [{ action: 'toggleShown' as const, label: shown ? 'Hide' : 'Show' }] : []),
+    ...(sketch ? [unavailable(`Create Drawing of ${entry.step.label}…`), { action: 'export' as const, label: 'Export as DXF/SVG…' }] : []),
+    suppress,
+    unavailable('Dynamic suppression'),
+    unavailable('Add comment'),
+    unavailable('Zoom to selection'),
+    ...(sketch ? [unavailable('View normal to')] : []),
+    unavailable('Show dependencies…'),
+    // The last step has nothing after it to roll back from.
+    ...(sketch || !last ? [{ action: 'rollTo' as const, label: 'Roll to here' }] : []),
+    sketch ? unavailable('Edit sketch appearance…') : unavailable('Add appearance to feature…'),
+    remove,
   ];
 }
 
@@ -551,21 +596,27 @@ export function FeatureList({
               items[(at + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
             }
           }}>
-          {menuItems(
-            menu.entry,
-            rollbackAt >= 0 && entries.findIndex(entry => key(entry) === key(menu.entry)) > rollbackAt,
-            sketchOf(menu.entry)
-          ).map(item => (
+          {menuItems(menu.entry, {
+            rolledBack: rollbackAt >= 0 && entries.findIndex(entry => key(entry) === key(menu.entry)) > rollbackAt,
+            last: key(entries.at(-1)!) === key(menu.entry),
+            sketchName: sketchOf(menu.entry),
+            shown: !visibilityId(menu.entry) || shown?.(visibilityId(menu.entry)!) !== false,
+            folders: !!onChange,
+          }).map(item => (
             <button
-              key={item.action}
+              key={item.label}
               type="button"
               role="menuitem"
               aria-disabled={item.disabled || undefined}
+              title={item.disabled ? item.title : undefined}
               onClick={() => {
                 if (item.disabled) return;
                 const { entry } = menu;
                 setMenu(null);
                 if (item.action === 'rename' && entry.kind === 'step') setRenaming(entry.step.id);
+                // A new folder takes the row's part, which right-clicking it selected.
+                else if (item.action === 'addToFolder') folders.newFolder();
+                else if (item.action === 'toggleShown') onToggleShown?.(visibilityId(entry)!);
                 else onAction(entry, item.action);
               }}>
               {item.label}

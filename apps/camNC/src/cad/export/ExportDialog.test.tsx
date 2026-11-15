@@ -82,7 +82,7 @@ it('exports a sketch from its row as DXF in the design’s unit, or as SVG in an
 it('offers export only on sketch rows', async () => {
   setup(createPlateDocument({ width: 120, height: 80, thickness: 18 }));
   fireEvent.contextMenu(screen.getByRole('button', { name: /^Extrude( · | \d)/ }), { clientX: 10, clientY: 10 });
-  expect(screen.getByRole('menuitem', { name: 'Roll to here' })).toBeTruthy();
+  expect(screen.getByRole('menuitem', { name: 'Suppress' })).toBeTruthy();
   expect(screen.queryByRole('menuitem', { name: 'Export as DXF/SVG…' })).toBeNull();
 });
 

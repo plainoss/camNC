@@ -19,6 +19,8 @@ import type { CadConnectorPick } from './PartFeatureDialogs';
 
 type Picked = { partId: string; corner: string };
 
+const kUnsupported = 'Not available yet';
+
 /**
  * The sketch corner a picked edge stands on: an edge through a part's thickness is where two of its sides meet. A top or
  * bottom edge can't be rounded with a straight bit, so it says so.
@@ -156,6 +158,19 @@ export function FilletDialog({
       okDisabled={!picked.length}
       onOk={save}
       onCancel={onCancel}>
+      <div className="cad-feature-tabs" role="tablist" aria-label="Fillet type">
+        {['Edge', 'Full round'].map(choice => (
+          <button
+            key={choice}
+            type="button"
+            role="tab"
+            aria-selected={choice === 'Edge'}
+            disabled={choice !== 'Edge'}
+            title={choice === 'Edge' ? undefined : kUnsupported}>
+            {choice}
+          </button>
+        ))}
+      </div>
       <div className="cad-feature-selection" data-active="">
         <small>Entities to fillet</small>
         {/* Rounded previews replace the original edges, so each selection also needs an explicit removal control. */}
@@ -183,12 +198,38 @@ export function FilletDialog({
           </ul>
         )}
       </div>
+      {/* An edge through the board meets its neighbours at a sharp corner, so there's no tangent chain to carry on along. */}
+      <label title={kUnsupported}>
+        <input type="checkbox" checked disabled readOnly />
+        Tangent propagation
+      </label>
+      <label className="cad-number-field">
+        Measurement
+        <select value="radius" disabled title={kUnsupported}>
+          <option value="radius">Radius</option>
+          <option value="distance">Control distance</option>
+        </select>
+      </label>
       <label className="cad-number-field">
         Radius
         <span>
           <CadValueInput bare aria-label="Radius" value={radiusText} onChange={event => setRadiusText(event.target.value)} />
         </span>
         {lengthUnit}
+      </label>
+      {['Asymmetric', 'Partial fillet', 'Variable fillet'].map(option => (
+        <label key={option} title={kUnsupported}>
+          <input type="checkbox" disabled />
+          {option}
+        </label>
+      ))}
+      <label title={kUnsupported}>
+        <input type="checkbox" checked disabled readOnly />
+        Allow edge overflow
+      </label>
+      <label title={kUnsupported}>
+        <input type="checkbox" disabled />
+        Smooth fillet corners
       </label>
       {(error ?? refusal) && (
         <p role="alert" className="cad-thickness-error">

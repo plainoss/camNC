@@ -531,7 +531,23 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
     within(menu)
       .getAllByRole('menuitem')
       .map(item => item.textContent)
-  ).toEqual(['Rename', 'Edit…', 'Edit Sketch · Plate…', 'Suppress', 'Roll to here', 'Delete']);
+  ).toEqual([
+    'Rename',
+    'Edit…',
+    'Edit Sketch · Plate…',
+    'Show dimensions',
+    'Add selection to folder…',
+    'Suppress',
+    'Dynamic suppression',
+    'Add comment',
+    'Zoom to selection',
+    'Show dependencies…',
+    'Add appearance to feature…',
+    'Delete',
+  ]);
+  // What camNC has no feature for yet is listed but greyed, with the reason.
+  expect(within(menu).getByRole('menuitem', { name: 'Add comment' }).getAttribute('aria-disabled')).toBe('true');
+  expect(within(menu).getByRole('menuitem', { name: 'Add comment' }).getAttribute('title')).toBe('Not available yet');
   // An extrude can be suppressed, as any step but a sketch.
   expect(within(menu).getByRole('menuitem', { name: 'Suppress' }).getAttribute('aria-disabled')).toBeNull();
   await userEvent.click(within(menu).getByRole('menuitem', { name: 'Rename' }));
