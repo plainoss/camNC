@@ -139,7 +139,7 @@ it('searches the studio’s own commands with Alt+C outside a sketch', async () 
   const options = within(screen.getByRole('listbox', { name: 'Tools' })).getAllByRole('option');
   expect(options.map(option => option.textContent)).toEqual(['Plane']);
   await userEvent.keyboard('{Enter}');
-  expect(await screen.findByRole('dialog', { name: 'Plane' })).toBeDefined();
+  expect(await screen.findByRole('dialog', { name: /^Plane \d/ })).toBeDefined();
 });
 
 it('shows parts shaded with their edges, and offers shaded only or translucent', async () => {

@@ -254,7 +254,11 @@ it('flags the features drawn on a part once that part is suppressed', async () =
   fireEvent.contextMenu(within(features).getByRole('button', { name: new RegExp(`Extrude · ${base.name}`) }));
   await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Suppress' }));
   const boss = within(features).getByRole('button', { name: /Extrude · Boss/ });
-  await waitFor(() => expect(within(boss).getByRole('img', { name: 'Error' }).getAttribute('title')).toMatch(/which is suppressed/));
+  await waitFor(() =>
+    expect(within(boss).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(
+      'Extrude · Boss did not regenerate properly: Select face or sketch region to extrude. 1 missing selection'
+    )
+  );
   expect(within(features).getByRole('status', { name: '2 with errors' })).toBeDefined();
 });
 

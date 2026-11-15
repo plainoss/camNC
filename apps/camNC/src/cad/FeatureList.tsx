@@ -220,7 +220,7 @@ export function FeatureList({
   });
   /** What hovering a broken row says, as the reference does: the feature by its name, then why. */
   const brokenMessage = (step: DesignStep) =>
-    step.kind === 'sketch' ? `${step.label} ${step.broken}` : `${step.label} did not regenerate properly: ${step.broken}`;
+    step.broken === 'is not fully defined' ? `${step.label} ${step.broken}` : `${step.label} did not regenerate properly: ${step.broken}`;
   const [selectedEntry, setSelectedEntry] = useState<string | null>(initialSelection ?? null);
   const folders = useFolderControls({ document, onChange, onRollTo, selectedPartId });
   const select = (entry: FeatureEntry) => {

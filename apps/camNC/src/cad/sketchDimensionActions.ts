@@ -30,7 +30,6 @@ export async function placeSketchDimension(editor: SketchEditorInput, placed: Ca
     setDimension,
     setMessage,
     setSelectedConstraints,
-    svg,
   } = editor;
   if (!part || busy || preparingDimension.current) return;
   const source = documentRef.current;

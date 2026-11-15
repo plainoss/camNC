@@ -10,7 +10,7 @@ import { copyOperationPrefix } from './copyTransforms';
 import { partCutInputErrors } from './partCutInputs';
 import { partCutLabel, partCutVariableErrors } from './partCutVariables';
 import { cadVariableScope } from './variables';
-import { missingRegionProblem } from './regionProfile';
+import { missingRegionMessage, missingRegionProblem } from './regionProfile';
 
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
@@ -119,7 +119,16 @@ export function designSteps(document: CadDocument): DesignStep[] {
         : null;
     // An Extrude whose picked regions an edit of its sketch took away waits for them to be picked again.
     const regions = step.kind === 'extrude' && part && !own ? missingRegionProblem(part) : null;
-    const reason = (step.kind === 'sketch' || step.kind === 'extrude') && own ? own : (regions ?? onFace);
+    // A sketch or extrude that lost what it stands on is missing its picks, and says so as the reference does.
+    const lost =
+      own && part
+        ? step.kind === 'sketch'
+          ? 'Select a sketch plane. 1 missing selection'
+          : step.kind === 'extrude'
+            ? missingRegionMessage((part.regions?.length || 1) + (part.remove || part.addTo ? 1 : 0))
+            : null
+        : null;
+    const reason = lost ?? regions ?? onFace;
     // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
     const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;
     // A Fillet step that can't round some of its corners leaves them sharp, and says so on its row. A part that's

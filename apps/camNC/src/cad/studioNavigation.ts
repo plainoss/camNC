@@ -22,6 +22,7 @@ import type { ApartPartIds } from './apartExtrudePreview';
 import type { Tool, View } from './cadEditorShared';
 import type { CadEditorProps } from './CadEditor.types';
 import { drawnOnName } from './drawnOnName';
+import { keepStepNames } from './keepStepNames';
 import { featureLeadId, hasOutline, ownsItsSketch, replacePart, withoutExtrude, withoutPartsMadeWith } from './editorHelpers';
 import type { faceSketchHost } from './faceSketchHost';
 import type { FeatureAction, FeatureEntry } from './FeatureList';
@@ -339,19 +340,20 @@ export function studioFeatureAction(editor: StudioNavigationInput, entry: Featur
   if (action === 'rollToEnd') return setRolledTo(null);
   if (action !== 'delete') return;
   if (feature) closeDialog();
-  if (step.kind === 'fillet') return commit(removeEdgeFillet(current, step.partId, step.id));
-  if (step.kind === 'move') return commit(replacePart(current, step.partId, ({ moved: _moved, ...p }) => p));
+  const commitKept = (next: CadDocument) => commit(keepStepNames(current, next));
+  if (step.kind === 'fillet') return commitKept(removeEdgeFillet(current, step.partId, step.id));
+  if (step.kind === 'move') return commitKept(replacePart(current, step.partId, ({ moved: _moved, ...p }) => p));
   // In the studio a sketch stands on its own, as in the reference: deleting its Extrude leaves the sketch.
   if (step.kind === 'extrude' && studioSession && ownsItsSketch(current, step.partId))
-    commit(replacePart(withoutPartsMadeWith(current, step.partId), step.partId, withoutExtrude));
+    commitKept(replacePart(withoutPartsMadeWith(current, step.partId), step.partId, withoutExtrude));
   else if (step.kind === 'sketch' || step.kind === 'extrude') {
     // A part is its sketch pushed out, so deleting either deletes the part, and the parts its extrude made with it.
     const parts = withoutPartsMadeWith(current, step.partId).parts.filter(candidate => candidate.id !== step.partId);
-    commit(withFeatureVersion({ ...current, parts }));
+    commitKept(withFeatureVersion({ ...current, parts }));
     setPartId(parts[0]?.id ?? '');
-  } else if (step.kind === 'pattern') commit(setPartPattern(current, step.partId, null));
-  else if (step.kind === 'partCut' && step.partCutId) commit(removePartCut(current, step.partCutId));
-  else if (step.kind === 'cut' && step.cutId) commit(removeCadFeature(current, step.partId, step.cutId));
+  } else if (step.kind === 'pattern') commitKept(setPartPattern(current, step.partId, null));
+  else if (step.kind === 'partCut' && step.partCutId) commitKept(removePartCut(current, step.partCutId));
+  else if (step.kind === 'cut' && step.cutId) commitKept(removeCadFeature(current, step.partId, step.cutId));
 }
 
 export function openStudioTransform(editor: StudioNavigationInput, partId: string, copyId?: string, move?: boolean) {
