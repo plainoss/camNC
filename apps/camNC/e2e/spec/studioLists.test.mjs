@@ -18,6 +18,12 @@ describe('Part Studio end state', () => {
     expect(checkStudio({ features: ['Sketch 1', { name: 'Extrude 1', state: [] }, 'Sketch 2'] }, actual)).toEqual(['studio/features/Extrude 1/state: wanted [], got ["suppressed"]']);
     expect(checkStudio({ features: [] }, { features: null })).toHaveLength(1);
   });
+  it('checks a row\'s hover message where one is named', () => {
+    const broken = { ...actual, features: [{ name: 'Extrude 1', state: ['error'], message: 'Extrude 1 did not regenerate properly: X' }] };
+    expect(checkStudio({ features: [{ name: 'Extrude 1', message: 'Extrude 1 did not regenerate properly: X' }] }, broken)).toEqual([]);
+    expect(checkStudio({ features: [{ name: 'Extrude 1', message: 'Something else' }] }, broken)).toHaveLength(1);
+    expect(checkStudio({ features: [{ name: 'Extrude 1', message: null }] }, broken)).toHaveLength(1);
+  });
   it('checks the Parts list rows, their count and hidden parts', () => {
     expect(checkStudio({ parts: ['Part 1', { name: 'Part 2', hidden: true }] }, actual)).toEqual([]);
     expect(checkStudio({ parts: ['Part 1'] }, actual)).toHaveLength(1);

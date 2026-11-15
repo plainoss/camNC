@@ -59,6 +59,9 @@ export function checkRows(label, wanted, actual) {
       if (row.state && JSON.stringify([...row.state].sort()) !== JSON.stringify([...got.state].sort()))
         failures.push(`studio/${label}/${row.name}/state: wanted ${JSON.stringify(row.state)}, got ${JSON.stringify(got.state)}`);
       if ('hidden' in row && row.hidden !== got.hidden) failures.push(`studio/${label}/${row.name}/hidden: wanted ${row.hidden}, got ${got.hidden}`);
+      // A broken row's hover text, exactly; `null` wants none.
+      if ('message' in row && (row.message ?? null) !== (got.message ?? null))
+        failures.push(`studio/${label}/${row.name}/message: wanted ${JSON.stringify(row.message)}, got ${JSON.stringify(got.message ?? null)}`);
     }
   return failures;
 }
