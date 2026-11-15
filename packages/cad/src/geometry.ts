@@ -1,3 +1,4 @@
+import { withMirrorJoins } from './mirrorJoins';
 import { slotIssue } from './slot';
 import { linearPatternIssue } from './pattern';
 import { constraintEntityIds, entityPointIds, originId } from './document';
@@ -443,6 +444,11 @@ export function cadThinLine(part: CadPart): { a: CadPoint; b: CadPoint; id: stri
 }
 
 export function evaluateCadPart(part: CadPart): { part?: EvaluatedCadPart; diagnostics: CadDiagnostic[] } {
+  // Mirror › Add steps come after everything else on the part: what's made, rounded, is joined with its mirror image.
+  if (part.mirrorJoins?.length) {
+    const { mirrorJoins: _joins, ...plain } = part;
+    return withMirrorJoins(part, evaluateCadPart(plain));
+  }
   // Fillet steps round the part's corners where it's made, leaving its sketch as drawn.
   if (part.fillets?.length) {
     const filleted = withEdgeFillets(part);

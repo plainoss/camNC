@@ -18,6 +18,8 @@ export function sketchPlaneName(document: CadDocument, drawnOn: CadDrawnOn | und
   const plane = datum && document.planes?.find(candidate => candidate.id === datum)?.name;
   if (plane) return plane;
   if ('plane' in on) return `${on.plane[0]!.toUpperCase()}${on.plane.slice(1)} plane`;
+  // A copy's face is told apart from the part's own by the copy's name.
+  if (on.copyId) return drawnOnName(document, on);
   const part = document.parts.find(candidate => candidate.id === on.partId);
   const made = designStepLabel(document, `${part?.extrudedWith ?? on.partId}:extrude`);
   return made ? `Face of ${made}` : drawnOnName(document, on);

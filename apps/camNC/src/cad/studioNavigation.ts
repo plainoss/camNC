@@ -251,6 +251,7 @@ export function openDesignStep(editor: StudioNavigationInput, step: DesignStep) 
     return openStudioFeature(editor, documentRef.current.parts.find(p => p.id === step.partId)?.hole ? 'hole' : 'extrude', step.partId);
   if (studioSession && step.kind === 'move') return openStudioTransform(editor, step.partId, undefined, true);
   if (studioSession && step.kind === 'fillet') return openDialog({ kind: 'fillet', partId: step.partId, filletId: step.id });
+  if (studioSession && step.kind === 'mirror') return openDialog({ kind: 'mirror', partId: step.partId, joinId: step.id });
   if (studioSession && step.kind === 'copy') {
     const copy = documentRef.current.parts.find(candidate => candidate.id === step.partId)?.copies?.find(c => c.id === step.copyId);
     if (copy?.offset) return openStudioTransform(editor, step.partId, copy.id);
@@ -342,6 +343,14 @@ export function studioFeatureAction(editor: StudioNavigationInput, entry: Featur
   if (feature) closeDialog();
   const commitKept = (next: CadDocument) => commit(keepStepNames(current, next));
   if (step.kind === 'fillet') return commitKept(removeEdgeFillet(current, step.partId, step.id));
+  if (step.kind === 'mirror')
+    return commitKept(
+      replacePart(current, step.partId, part => {
+        const { mirrorJoins, ...rest } = part;
+        const left = mirrorJoins?.filter(join => join.id !== step.id);
+        return left?.length ? { ...rest, mirrorJoins: left } : rest;
+      })
+    );
   if (step.kind === 'move') return commitKept(replacePart(current, step.partId, ({ moved: _moved, ...p }) => p));
   // In the studio a sketch stands on its own, as in the reference: deleting its Extrude leaves the sketch.
   if (step.kind === 'extrude' && studioSession && ownsItsSketch(current, step.partId))

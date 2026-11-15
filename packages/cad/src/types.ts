@@ -344,6 +344,8 @@ export interface CadPart {
    * itself keeps its sharp corners; the part is rounded where it's made.
    */
   fillets?: CadEdgeFillet[];
+  /** Mirror › Add steps, after its fillets: the part joined with its own mirror image across a plane or a face. */
+  mirrorJoins?: CadMirrorJoin[];
   /** Regions Extrude → Add steps join to this part. The design writes it from those steps; it's never edited. */
   addedRegions?: string[];
   /** Where the part sits in the assembly. Unplaced parts are laid out side by side. It never changes the part's own shape. */
@@ -407,6 +409,19 @@ export interface CadPlacement {
  * Another of the same part. A mirrored copy is its mirror image across the sketch's y axis, as a left side is of a right
  * one: it's cut as a part of its own, since turning the part over doesn't make it.
  */
+/**
+ * A Mirror › Add step: the part and its mirror image across a plane, a part's face or a plane made to sketch on (`datum`),
+ * made one part. The plane must stand across the part's sketch plane. `line` is where it crosses that sketch plane, in
+ * the sketch's own coordinates, worked out as the design is laid out: a point on it and its unit normal.
+ */
+export interface CadMirrorJoin {
+  id: string;
+  across: CadDrawnOn['on'];
+  datum?: string;
+  suppressed?: true;
+  line?: { x: number; y: number; nx: number; ny: number };
+}
+
 export interface CadPartCopy {
   id: string;
   /**

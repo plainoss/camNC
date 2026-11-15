@@ -1,3 +1,4 @@
+import { evaluateCadPart } from './geometry';
 import { edgeFilletProblems } from './edgeFillets';
 import { resolveExtrudeSteps } from './extrudeSteps';
 import { cadFaceSketches, faceIsUnderside } from './featureModel';
@@ -15,7 +16,7 @@ import { missingRegionMessage, missingRegionProblem } from './regionProfile';
 /** One step of how the design is built, in the order it applies. */
 export interface DesignStep {
   id: string;
-  kind: 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'copy' | 'pattern' | 'partCut';
+  kind: 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'mirror' | 'copy' | 'pattern' | 'partCut';
   label: string;
   /** A short reading of the step's main value, such as a thickness or depth. */
   detail?: string;
@@ -77,15 +78,29 @@ const kDefaultPartName = /^Part \d+$/;
 function numberedSteps(document: CadDocument, steps: DesignStep[]): DesignStep[] {
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const counts = new Map<string, number>();
+  // A name kept from before, as when an earlier step was deleted, isn't given again.
+  const taken = new Set(steps.map(step => step.label));
   return steps.map(step => {
-    if (step.kind !== 'sketch' && step.kind !== 'extrude' && step.kind !== 'fillet') return step;
+    if (step.kind !== 'sketch' && step.kind !== 'extrude' && step.kind !== 'fillet' && step.kind !== 'mirror') return step;
     const part = byId.get(step.partId);
-    const noun = step.kind === 'sketch' ? 'Sketch' : step.kind === 'fillet' ? 'Fillet' : part?.hole ? 'Hole' : 'Extrude';
-    const n = (counts.get(noun) ?? 0) + 1;
-    counts.set(noun, n);
+    const noun =
+      step.kind === 'sketch'
+        ? 'Sketch'
+        : step.kind === 'fillet'
+          ? 'Fillet'
+          : step.kind === 'mirror'
+            ? 'Mirror'
+            : part?.hole
+              ? 'Hole'
+              : 'Extrude';
     const own = step.kind === 'sketch' ? part?.sketchName : step.kind === 'extrude' ? part?.extrudeName : undefined;
+    let n = (counts.get(noun) ?? 0) + 1;
+    if (!own) while (taken.has(`${noun} ${n}`)) n++;
+    counts.set(noun, n);
     // A fillet has no name of its own, so it's always numbered.
-    return part && !own && (step.kind === 'fillet' || kDefaultPartName.test(part.name)) ? { ...step, label: `${noun} ${n}` } : step;
+    return part && !own && (step.kind === 'fillet' || step.kind === 'mirror' || kDefaultPartName.test(part.name))
+      ? { ...step, label: `${noun} ${n}` }
+      : step;
   });
 }
 
@@ -120,14 +135,18 @@ export function designSteps(document: CadDocument): DesignStep[] {
     // An Extrude whose picked regions an edit of its sketch took away waits for them to be picked again.
     const regions = step.kind === 'extrude' && part && !own ? missingRegionProblem(part) : null;
     // A sketch or extrude that lost what it stands on is missing its picks, and says so as the reference does.
+    // The face it's drawn on gone takes its picked regions with it; a part it adds to or removes from gone is one more.
+    const faceLost = !!own && own.startsWith('It’s drawn on');
+    const hostLost = !!part && (faceLost || !!own?.startsWith('It adds')) && !!(part.remove || part.addTo);
+    const missing = (faceLost ? part?.regions?.length || 1 : 0) + (hostLost ? 1 : 0);
     const lost =
-      own && part
-        ? step.kind === 'sketch'
-          ? 'Select a sketch plane. 1 missing selection'
-          : step.kind === 'extrude'
-            ? missingRegionMessage((part.regions?.length || 1) + (part.remove || part.addTo ? 1 : 0))
-            : null
-        : null;
+      step.kind === 'sketch' && faceLost
+        ? 'Select a sketch plane. 1 missing selection'
+        : step.kind === 'extrude' && missing
+          ? missingRegionMessage(missing)
+          : step.kind === 'sketch' || step.kind === 'extrude'
+            ? own
+            : null;
     const reason = lost ?? regions ?? onFace;
     // A Cut parts step whose typed values can't be followed keeps its last good ones, and says why on its row.
     const values = step.kind === 'partCut' ? partCutProblems.get(step.id) : undefined;
@@ -137,6 +156,12 @@ export function designSteps(document: CadDocument): DesignStep[] {
       step.kind === 'fillet' && part && !step.suppressed && !part.suppressed && !masked.has(part.id)
         ? edgeFilletProblems(part).find(problem => problem.filletId === step.id)?.message
         : undefined;
+    // A Mirror › Add that can't join the part with its mirror image leaves the part as it was.
+    const unmirrored =
+      step.kind === 'mirror' && part && !step.suppressed
+        ? evaluateCadPart(part).diagnostics.find(d => d.code === 'mirror-unresolved' && d.entityIds?.includes(step.id))?.message
+        : undefined;
+    if (unmirrored) return { ...step, broken: unmirrored };
     return reason || values || sharp ? { ...step, broken: reason || values || sharp } : step;
   });
 }
@@ -307,6 +332,8 @@ function listedSteps(document: CadDocument): DesignStep[] {
           partId: part.id,
           suppressed: !!fillet.suppressed,
         });
+      for (const join of part.mirrorJoins ?? [])
+        steps.push({ id: join.id, kind: 'mirror', label: `Mirror · ${part.name}`, partId: part.id, suppressed: !!join.suppressed });
       (part.copies ?? []).forEach((copy, index) => {
         if (!copy.pattern)
           steps.push({

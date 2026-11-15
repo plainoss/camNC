@@ -80,7 +80,7 @@ describe('studio toolbar overflow', () => {
   it('keeps a command that needs a selection disabled inside the More menu', async () => {
     const { onCommand } = setup(500, { mirror: 'Select a part to mirror first' });
     await userEvent.click(await screen.findByRole('button', { name: /^More/ }));
-    const mirror = within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Mirror' });
+    const mirror = within(await screen.findByRole('menu')).getByRole('menuitem', { name: /^Mirror \d/ });
     expect(mirror).toHaveAttribute('aria-disabled', 'true');
     // The browser driver refuses to click an aria-disabled element, so dispatch the click a pointer would.
     fireEvent.click(mirror);

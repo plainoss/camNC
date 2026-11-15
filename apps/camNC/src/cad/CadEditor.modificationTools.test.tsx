@@ -176,11 +176,11 @@ describe('modification tools through real pointer and keyboard input', () => {
     const { click, latest } = await setup(source);
     await click(80, 60);
     const chooseMirror = async () => {
-      const mirror = screen.queryByRole('button', { name: 'Mirror' });
+      const mirror = screen.queryByRole('button', { name: /^Mirror \d/ });
       if (mirror) await userEvent.click(mirror);
       else {
         await userEvent.keyboard('s');
-        await userEvent.click(screen.getByRole('button', { name: 'Mirror' }));
+        await userEvent.click(screen.getByRole('button', { name: /^Mirror \d/ }));
       }
     };
     await chooseMirror();

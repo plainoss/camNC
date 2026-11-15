@@ -9,6 +9,7 @@ const kIcons: Record<DesignStep['kind'], string> = {
   faceSketch: '✎',
   cut: '⌴',
   fillet: '◜',
+  mirror: '⧎',
   copy: '⧉',
   pattern: '⋯',
   partCut: '⊟',

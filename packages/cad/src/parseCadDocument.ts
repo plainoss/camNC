@@ -240,6 +240,19 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (fillet.suppressed !== undefined && typeof fillet.suppressed !== 'boolean') throw new Error('Invalid CAD fillet');
       }
     }
+    if (p.mirrorJoins !== undefined) {
+      if (!Array.isArray(p.mirrorJoins) || !p.mirrorJoins.length) throw new Error('Invalid CAD mirror');
+      for (const join of p.mirrorJoins) {
+        if (!join || typeof join !== 'object' || !join.across || typeof join.across !== 'object') throw new Error('Invalid CAD mirror');
+        addId(join.id);
+        const across = join.across as Record<string, unknown>;
+        if ('plane' in across ? !['top', 'front', 'right'].includes(across.plane as string) : typeof across.partId !== 'string')
+          throw new Error('Invalid CAD mirror');
+        if (join.datum !== undefined && typeof join.datum !== 'string') throw new Error('Invalid CAD mirror');
+        if (join.suppressed !== undefined && typeof join.suppressed !== 'boolean') throw new Error('Invalid CAD mirror');
+        if (join.line !== undefined) for (const key of ['x', 'y', 'nx', 'ny'] as const) number(join.line[key]);
+      }
+    }
     if (p.drawnOn !== undefined) {
       const { on, offset, offsetExpression, inward } = p.drawnOn ?? ({} as NonNullable<CadPart['drawnOn']>);
       const face = on && typeof on === 'object' && 'face' in on ? on.face : undefined;

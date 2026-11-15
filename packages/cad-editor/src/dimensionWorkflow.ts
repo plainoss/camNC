@@ -44,7 +44,8 @@ function candidate(sketch: CadSketch, picking: PickingDimension, placement?: Cad
   const result = dimensionForSelection(sketch, picking.entityIds, { mode: picking.mode, placement, picks: pickHints });
   const selection = { mode: picking.mode, previewId: picking.previewId, entityIds: [...picking.entityIds], pickHints };
   if ('message' in result) return { state: { ...selection, phase: 'picking', message: result.message }, message: result.message };
-  const preview: CadDimension = { ...result.constraint, id: result.existingConstraintId ?? picking.previewId };
+  // A new dimension even where one already measures the same: placed, it's a reference one.
+  const preview: CadDimension = { ...result.constraint, id: picking.previewId };
   return {
     state: { ...selection, phase: 'placing', preview, existingConstraintId: result.existingConstraintId },
     message: 'Select another reference, or click empty space to place the dimension.',
@@ -92,10 +93,8 @@ export function transitionDimensionWorkflow(
   if (event.type === 'hover') return state.phase === 'placing' ? candidate(sketch, state, event.position) : { state };
   const resolved = candidate(sketch, state, event.position);
   if (resolved.state.phase !== 'placing') return resolved;
-  // A measurement already dimensioned gets a dimension of its own, which the sketch's check makes a reference one.
-  const preview = { ...resolved.state.preview, id: resolved.state.previewId };
   return {
     state: idleDimensionWorkflow(state.mode),
-    effect: { type: 'create', constraint: withDimensionPlacement(sketch, preview, event.position) },
+    effect: { type: 'create', constraint: withDimensionPlacement(sketch, resolved.state.preview, event.position) },
   };
 }

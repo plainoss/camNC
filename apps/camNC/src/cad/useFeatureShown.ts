@@ -12,14 +12,14 @@ export function useFeatureShown(
   visibility: Readonly<Record<string, boolean>>,
   shownDocument: CadDocument,
   pastRollback: ReadonlySet<string>,
-  broken?: Readonly<Record<string, string>>
+  unbuilt?: readonly string[]
 ): (id: string) => boolean {
   return useCallback(
     (id: string) => {
       if (pastRollback.has(id)) return false;
       if (id in visibility) return visibility[id]!;
-      return (id.endsWith(':sketch') && !!broken?.[id.slice(0, -':sketch'.length)]) || featureShownByDefault(shownDocument, id);
+      return (id.endsWith(':sketch') && !!unbuilt?.includes(id.slice(0, -':sketch'.length))) || featureShownByDefault(shownDocument, id);
     },
-    [visibility, shownDocument, pastRollback, broken]
+    [visibility, shownDocument, pastRollback, unbuilt]
   );
 }

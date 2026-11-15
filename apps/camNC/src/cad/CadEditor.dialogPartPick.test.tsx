@@ -40,7 +40,7 @@ async function open() {
 it('mirrors the part clicked once its part field is active, and keeps the dialog and the selection together until then', async () => {
   const { source, latest } = await open();
   await userEvent.click(await studioCommand(/^Mirror/));
-  const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
+  const dialog = await screen.findByRole('dialog', { name: /^Mirror \d/ });
   const field = within(dialog).getByRole('button', { name: 'Entities to mirror' });
   expect(field.textContent).toContain('Shelf');
   // While the plane is being picked, a part click doesn't take the selection away from the dialog's part.
@@ -69,7 +69,7 @@ it('mirrors the part clicked once its part field is active, and keeps the dialog
   await userEvent.click(within(geometry).getByRole('button', { name: /Top/ }));
   await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('top plane'));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Mirror' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Mirror \d/ })).toBeNull());
   expect(named(latest(), 'Bottom').copies).toHaveLength(1);
   expect(named(latest(), 'Bottom').copies![0]).toMatchObject({ mirrored: true, mirror: { across: { plane: 'top' } } });
   expect(named(latest(), 'Shelf').copies ?? []).toHaveLength(0);

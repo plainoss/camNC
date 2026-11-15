@@ -126,7 +126,7 @@ it.each(['Extrude', 'Transform'])('switches directly from %s to an earlier Mirro
   await userEvent.dblClick(within(features).getByRole('button', { name: new RegExp(`${kind} · Second`) }));
   await screen.findByRole('dialog', { name: new RegExp(`^${kind}`) });
   await userEvent.dblClick(within(features).getByRole('button', { name: /Mirrored copy · Plate 2/ }));
-  const mirror = await screen.findByRole('dialog', { name: 'Mirror' });
+  const mirror = await screen.findByRole('dialog', { name: /^Mirror \d/ });
   expect(screen.getAllByRole('dialog')).toHaveLength(1);
   await waitFor(() => expect(props().meshes).toHaveLength(2));
   await userEvent.click(within(mirror).getByRole('button', { name: 'Final' }));

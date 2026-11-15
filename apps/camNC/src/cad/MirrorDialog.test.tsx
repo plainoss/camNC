@@ -68,6 +68,8 @@ it.each([false, true])('blocks a copy face without persisted placement and permi
       onCancel={vi.fn()}
     />
   );
+  // A mirror image of its own, rather than joined to the plate it touches.
+  if (!editing) fireEvent.click(screen.getByRole('tab', { name: 'New' }));
   if (!editing) act(() => picked(across));
   expect(screen.getByRole('alert').textContent).toContain('cannot be placed');
   expect(preview.mock.calls.at(-1)?.[0]).toBeNull();
@@ -115,9 +117,40 @@ it('numbers a new mirror after the pattern copies, in the preview and as saved',
       onCancel={vi.fn()}
     />
   );
+  fireEvent.click(screen.getByRole('tab', { name: 'New' }));
   act(() => picked({ plane: 'right' }));
   await waitFor(() => expect(preview.mock.calls.at(-1)?.[0]?.parts[0]?.copies?.find(copy => !copy.pattern)?.number).toBe(4));
   fireEvent.click(screen.getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(save).toHaveBeenCalled());
   expect(save.mock.calls[0]?.[0].parts[0].copies.find((copy: { pattern?: string }) => !copy.pattern).number).toBe(4);
+});
+
+it('goes to Add when the mirror image touches the part, joining the two into one part', async () => {
+  const document = createPlateDocument({ width: 100, height: 60 });
+  const part = document.parts[0]!;
+  const preview = vi.fn<(document: CadDocument | null) => void>();
+  const save = vi.fn<(document: CadDocument) => void>();
+  let picked: (on: CadDrawnOn['on']) => void = () => {};
+  render(
+    <MirrorDialog
+      document={document}
+      partId={part.id}
+      pickPlane={callback => {
+        if (callback) picked = callback;
+      }}
+      onSave={save}
+      onPreview={preview}
+      onCancel={vi.fn()}
+    />
+  );
+  expect(screen.getByRole('dialog', { name: 'Mirror 1' })).toBeDefined();
+  act(() => picked({ plane: 'right' }));
+  // The plate sits against the Right plane, so its image touches it.
+  expect(screen.getByRole('tab', { name: 'Add' }).getAttribute('aria-selected')).toBe('true');
+  expect(screen.getByRole('button', { name: 'Mirror plane' }).textContent).toContain('Right plane');
+  await waitFor(() => expect(preview.mock.calls.at(-1)?.[0]?.parts[0]?.mirrorJoins).toHaveLength(1));
+  expect(preview.mock.calls.at(-1)?.[0]?.parts[0]?.copies ?? []).toHaveLength(0);
+  // New keeps it a mirror image of its own.
+  fireEvent.click(screen.getByRole('tab', { name: 'New' }));
+  await waitFor(() => expect(preview.mock.calls.at(-1)?.[0]?.parts[0]?.copies).toHaveLength(1));
 });

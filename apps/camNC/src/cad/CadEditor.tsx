@@ -320,7 +320,7 @@ export function CadEditor({
   const [creationValues, setCreationValues] = useState<CreationValues | null>(null);
   const dimensionMode = dimensionFlow.mode;
   const placingDimension = dimensionFlow.phase === 'placing';
-  const dimensionDraft = dimensionFlow.phase === 'placing' && !dimensionFlow.existingConstraintId ? dimensionFlow.preview : null;
+  const dimensionDraft = dimensionFlow.phase === 'placing' ? dimensionFlow.preview : null;
   const dimensionSelection = dimensionFlow.phase === 'idle' ? selected : dimensionFlow.entityIds;
   const [palette, setPalette] = useState(false);
   const [searchMode, setSearchMode] = useState(true);
@@ -330,7 +330,7 @@ export function CadEditor({
   };
   const [searchHighlight, setSearchHighlight] = useState<SearchCommand['id'] | null>(null);
   const [status, setStatus] = useState('Checking sketch…');
-  const [{ problems, sketchProblems, featureProblems }, setProblems] = useState(noSketchProblems);
+  const [{ problems, sketchProblems, featureProblems, unbuiltParts }, setProblems] = useState(noSketchProblems);
   const [inProgress, setInProgress] = useState(false);
   const [solving, setSolving] = useState(true);
   const [checkEpoch, setCheckEpoch] = useState(0);
@@ -1444,7 +1444,7 @@ export function CadEditor({
   // A tool used up by its cut isn't a part of its own any more.
   // A part whose extrude wasn't built isn't a part yet.
   const builtParts = studioSession
-    ? listedStudioParts(doc, dialog, rolledBack).filter(p => !featureProblems?.[p.id])
+    ? listedStudioParts(doc, dialog, rolledBack).filter(p => !unbuiltParts?.includes(p.id))
     : builtStudioParts(doc);
   const isolatePart = usePartIsolation(builtParts, cutSelection.selectedKey, hiddenParts, setHiddenParts);
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
@@ -1457,7 +1457,7 @@ export function CadEditor({
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
-  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, featureProblems);
+  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, unbuiltParts);
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>

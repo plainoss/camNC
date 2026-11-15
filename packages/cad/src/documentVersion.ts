@@ -5,7 +5,9 @@ export function cadDocumentVersion(document: CadDocument): CadDocument['version'
   // An older reader would cut where a Boolean joins.
   if (
     document.partCuts?.some(step => step?.operation !== undefined) ||
-    document.parts.some(part => part?.mergeAll || part?.pattern?.second || part?.pattern?.skipped || part?.pattern?.centered)
+    document.parts.some(
+      part => part?.mergeAll || part?.mirrorJoins?.length || part?.pattern?.second || part?.pattern?.skipped || part?.pattern?.centered
+    )
   )
     return 7;
   if (document.constructions?.length) return 6;

@@ -35,13 +35,14 @@ export function PlaneDialog({
   const { parseCadValue, lengthText, lengthUnit } = useDesignUnits();
   const plane = document.planes?.find(candidate => candidate.id === planeId);
   const [on, setOn] = useState<CadDrawnOn['on'] | null>(plane?.on ?? preselected ?? null);
-  const [offsetText, setOffsetText] = useState(() => {
-    if (!plane) return lengthText(25);
-    const typed = plane.offsetExpression && (plane.offset < 0 ? /^-\((.*)\)$/.exec(plane.offsetExpression)?.[1] : plane.offsetExpression);
-    return typed ?? lengthText(Math.abs(plane.offset));
-  });
-  // A negative offset is the plane moved the other way, shown as its distance with the normal flipped.
-  const [flipped, setFlipped] = useState(!!plane && plane.offset < 0);
+  // A negative offset is the plane moved the other way, shown as its distance with the normal flipped, unless it was
+  // typed as a negative value of its own, which is kept as typed.
+  const typed = plane?.offsetExpression;
+  const flippedTyped = typed && /^-\((.*)\)$/.exec(typed)?.[1];
+  const [flipped, setFlipped] = useState(!!plane && plane.offset < 0 && (!typed || !!flippedTyped));
+  const [offsetText, setOffsetText] = useState(() =>
+    !plane ? lengthText(25) : flippedTyped || typed || lengthText(plane.offset < 0 && !typed ? -plane.offset : plane.offset)
+  );
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pick = () => {

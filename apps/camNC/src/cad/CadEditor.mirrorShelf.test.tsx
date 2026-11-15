@@ -44,7 +44,7 @@ it.each([0, 1, 2])('mirrors the cabinet side using shelf %s’s narrow end face 
   const sideIndex = props().instanceIds!.indexOf(side.id);
   act(() => props().onSelect(side.id, sideIndex));
   await userEvent.click(await studioCommand(/^Mirror/));
-  const dialog = await screen.findByRole('dialog', { name: 'Mirror' });
+  const dialog = await screen.findByRole('dialog', { name: /^Mirror \d/ });
   const copyId = shelfIndex ? shelf.copies![shelfIndex - 1]!.id : undefined;
   const instance = copyId ? `${shelf.id}/${copyId}` : shelf.id;
   const index = props().instanceIds!.indexOf(instance);
@@ -68,7 +68,7 @@ it.each([0, 1, 2])('mirrors the cabinet side using shelf %s’s narrow end face 
     act(() => props().onPickFace!({ partId: shelf.id, index, point: [0, 600, shelfIndex * 300 + 9.5], normal: [0, 1, 0] }));
   }
   const plane = within(dialog).getByRole('button', { name: 'Mirror plane' });
-  await waitFor(() => expect(plane.textContent).toContain(shelfIndex ? `Part 1 ${shelfIndex + 1}` : 'Part 1'));
+  await waitFor(() => expect(plane.textContent).toContain(shelfIndex ? `Part 1 ${shelfIndex + 1}` : 'Face of Extrude 1'));
   expect(within(dialog).getByText('Part 2', { exact: true })).toBeTruthy();
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest.parts[1]!.copies).toHaveLength(1));

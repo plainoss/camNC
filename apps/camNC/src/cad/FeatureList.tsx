@@ -20,6 +20,7 @@ const kIcons: Record<DesignStep['kind'] | 'variable' | 'plane', string> = {
   faceSketch: '✎',
   cut: '⌴',
   fillet: '◜',
+  mirror: '⧎',
   copy: '⧉',
   pattern: '⋯',
   partCut: '⊟',

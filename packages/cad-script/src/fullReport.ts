@@ -85,7 +85,7 @@ export interface CadFullSketch {
 export interface CadFullFeature {
   /** The step's own ID in the document. */
   id: string;
-  kind: 'variable' | 'plane' | 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'copy' | 'pattern' | 'partCut';
+  kind: 'variable' | 'plane' | 'sketch' | 'extrude' | 'move' | 'faceSketch' | 'cut' | 'fillet' | 'mirror' | 'copy' | 'pattern' | 'partCut';
   /** As the feature list names it. */
   label: string;
   part?: string;
@@ -580,6 +580,17 @@ export async function fullCadReport(
           result: step.broken
             ? { corners: fillet.corners.length, rounded: fillet.corners.length - sharp, sharp, problem: step.broken }
             : { corners: fillet.corners.length },
+        };
+      }
+      if (step.kind === 'mirror') {
+        const join = part.mirrorJoins!.find(candidate => candidate.id === step.id)!;
+        return {
+          ...base,
+          settings: {
+            across: 'plane' in join.across ? `${join.across.plane} plane` : faceOn(join.across),
+            ...(join.datum && { datum: join.datum }),
+          },
+          result: step.broken ? { error: step.broken } : { joined: true },
         };
       }
       // Cut parts.

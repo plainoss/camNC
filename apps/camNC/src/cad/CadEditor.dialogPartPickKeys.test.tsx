@@ -77,7 +77,7 @@ it('cancels Transform with Escape after a click in the 3D view', async () => {
 
 it('fills the Mirror plane with the plane clicked after its part is picked', async () => {
   const { latest } = await retarget(/^Mirror/, /^Mirror$/, 'Entities to mirror');
-  const dialog = screen.getByRole('dialog', { name: 'Mirror' });
+  const dialog = screen.getByRole('dialog', { name: /^Mirror \d/ });
   const plane = within(dialog).getByRole('button', { name: 'Mirror plane' });
   // With the part taken, the mirror goes on to pick its plane.
   expect(plane).toHaveAttribute('data-active');

@@ -151,6 +151,7 @@ export function StudioDialogHost({
           key={dialogKey(dialog)}
           document={document}
           partId={dialog.partId}
+          joinId={dialog.joinId}
           copyId={dialog.copyId}
           onPreview={onPreview}
           partPicks={partPicks}

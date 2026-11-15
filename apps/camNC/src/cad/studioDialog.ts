@@ -20,7 +20,7 @@ export type StudioDialog =
   | StudioFeatureDialog
   /** A part being copied by a transform, the transformed copy being changed, or the part's own move. */
   | { kind: 'transform'; partId: string; copyId?: string; move?: boolean }
-  | { kind: 'mirror'; partId: string; copyId?: string }
+  | { kind: 'mirror'; partId: string; copyId?: string; joinId?: string }
   | { kind: 'fillet'; partId?: string; filletId?: string }
   | { kind: 'plane'; id?: string; preselected?: CadDrawnOn['on'] }
   /** A variable being added, or the one being changed. */
@@ -55,7 +55,7 @@ export function dialogKey(dialog: StudioDialog): string | null {
     case 'transform':
       return `${dialog.partId}:${dialog.copyId ?? 'new'}`;
     case 'mirror':
-      return dialog.copyId ?? dialog.partId;
+      return dialog.joinId ?? dialog.copyId ?? dialog.partId;
     case 'fillet':
       return dialog.filletId ?? 'new';
     case 'plane':
@@ -101,7 +101,7 @@ export function editedStepId(document: CadDocument, dialog: StudioDialog | null)
     case 'transform':
       return dialog.copyId ?? (dialog.move ? `${dialog.partId}:move` : null);
     case 'mirror':
-      return dialog.copyId ?? null;
+      return dialog.joinId ?? dialog.copyId ?? null;
     default:
       return null;
   }
