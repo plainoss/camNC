@@ -14,7 +14,10 @@ export const ALLOWED = {
   // `click x,y` is a pick on an open sketch's drawing, as `viewpick` is there.
   pick: { steps: ['viewpick', 'click'] },
   // A context menu is two selects: `featuremenu` (the right-click) and `menuitem` (the choice).
-  select: { steps: ['selectpart', 'selectfeature', 'featureeye', 'featuremenu', 'menuitem', 'dialogfocus', 'dialogtab', 'click'] },
+  // Double-clicking a row (`feature`) or a dimension label (`editdim`) selects it, and so does a dialog's choice list.
+  select: {
+    steps: ['selectpart', 'selectfeature', 'feature', 'featureeye', 'featuremenu', 'menuitem', 'dialogfocus', 'dialogtab', 'dialogselect', 'editdim', 'click'],
+  },
   command: { steps: ['studiotool', 'key', 'tool'] },
   draw: { steps: ['rect', 'circle', 'line', 'arc'] },
   field: { steps: ['dialogfill', 'dialogselect', 'dialogcheck', 'dialogtab', 'field'], then: ['key Enter'] },

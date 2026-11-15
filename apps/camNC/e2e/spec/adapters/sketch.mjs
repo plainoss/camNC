@@ -443,8 +443,15 @@ export async function createAdapter(page, url) {
         return;
       case 'selectdim':
       case 'editdim': {
-        const label = page.locator('[data-dimension]').first();
-        const box = await label.boundingBox();
+        // `editdim x,y` takes the dimension label nearest that point of the sketch; without one, the first label.
+        const labels = page.locator('[data-dimension]');
+        let box = await labels.first().boundingBox();
+        if (rest) {
+          const [px, py] = await moveTo(point(rest));
+          const boxes = (await Promise.all((await labels.all()).map(label => label.boundingBox()))).filter(Boolean);
+          const gap = b => Math.hypot(b.x + b.width / 2 - px, b.y + b.height / 2 - py);
+          box = boxes.reduce((best, b) => (gap(b) < gap(best) ? b : best), boxes[0]);
+        }
         const x = box.x + box.width / 2;
         const y = box.y + box.height / 2;
         await page.mouse.move(x, y, { steps: 3 });

@@ -18,7 +18,9 @@ export async function readFeatures(page) {
       if (item.classList.contains('cad-feature-hidden') || item.querySelector(':scope > button[aria-label="Show"]')) state.push('hidden');
       if (item.classList.contains('cad-feature-rolled-back')) state.push('rolled back');
       if (item.classList.contains('cad-feature-broken') || button?.querySelector('[role=img][aria-label="Error"]')) state.push('error');
-      return { name, ...(item.classList.contains('cad-folder-row') && { folder: true }), state };
+      // What hovering a broken row says, as its warning's tooltip.
+      const message = button?.querySelector('[role=img][aria-label="Error"]')?.getAttribute('title') ?? null;
+      return { name, ...(item.classList.contains('cad-folder-row') && { folder: true }), state, ...(message && { message }) };
     })
   );
 }
