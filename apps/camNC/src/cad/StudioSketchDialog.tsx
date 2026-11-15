@@ -111,3 +111,18 @@ export function StudioSketchDialog({
     </FeatureDialog>
   );
 }
+
+/** A new sketch waiting for its plane: a plane or a face picked in the view, or a plane in the feature list. */
+export function SketchPlaneDialog({ title, onCancel }: { title: string; onCancel: () => void }) {
+  return (
+    <FeatureDialog title={title} okLabel="✓ Finish sketch" okDisabled onOk={() => {}} onCancel={onCancel} autoFocus={false}>
+      <div className="cad-feature-selection" data-active="">
+        <small>Sketch plane</small>
+        <span />
+      </div>
+      <p className="cad-muted" role="status">
+        Select a sketch plane
+      </p>
+    </FeatureDialog>
+  );
+}

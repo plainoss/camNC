@@ -215,9 +215,9 @@ it('toggles base planes and requests named views and fit from workspace shortcut
   fireEvent.keyDown(workspace, { key: 'f', code: 'KeyF' });
   await waitFor(() => expect(props().viewRequest).toEqual({ name: 'fit', seq: 3 }));
   await userEvent.click(within(screen.getByRole('toolbar', { name: 'Part Studio toolbar' })).getByRole('button', { name: /Sketch/ }));
-  await screen.findByRole('dialog', { name: 'Sketch' });
+  await screen.findByRole('dialog', { name: /^Sketch \d/ });
   fireEvent.keyDown(workspace, { key: 'Escape', code: 'Escape' });
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Sketch \d/ })).toBeNull());
 });
 
 it('looks straight at the selected part’s sketch plane with N, and from behind with N again, and colours parts as the reference does', async () => {
@@ -750,11 +750,12 @@ it('opens a new design in the studio with no parts, and asks for the first sketc
   expect(screen.queryByText(/Not shown/)).toBeNull();
   // Sketch waits for its plane, picked in the view or the list.
   await userEvent.click(within(toolbar).getByRole('button', { name: /Sketch/ }));
-  const waiting = await screen.findByRole('dialog', { name: 'Sketch' });
-  expect(waiting.textContent).toMatch(/Pick a plane or a face/);
+  // Its row is listed straight away, and its plane field waits empty.
+  const waiting = await screen.findByRole('dialog', { name: 'Sketch 1' });
+  expect(waiting.textContent).toMatch(/Select a sketch plane/);
+  expect([...features.querySelectorAll('ol button')].map(row => row.textContent)).toEqual(['✎Sketch 1']);
   await userEvent.click(within(within(features).getByRole('list', { name: 'Default geometry' })).getByRole('button', { name: /Right/ }));
-  const sketch = await screen.findByRole('dialog', { name: 'Sketch 1' });
-  expect(sketch.textContent).toMatch(/right plane/);
+  await waitFor(() => expect(screen.getByRole('dialog', { name: 'Sketch 1' }).textContent).toMatch(/Right plane/));
   await waitFor(() => expect(change.mock.calls.at(-1)?.[0].parts).toHaveLength(1));
   expect(change.mock.calls.at(-1)![0].parts[0]!.drawnOn).toEqual({ on: { plane: 'right' }, offset: 0 });
 });
@@ -981,8 +982,7 @@ it('sketches on a base plane picked before Sketch or Shift+S, as on one picked a
   expect(screen.queryByRole('dialog', { name: /^Sketch( · | \d)/ })).toBeNull();
   screen.getByTestId('workspace-3d').focus();
   await userEvent.keyboard('{Shift>}S{/Shift}');
-  expect(await screen.findByRole('dialog', { name: 'Sketch' })).toBeDefined();
-  await userEvent.click(within(screen.getByRole('dialog', { name: 'Sketch' })).getByRole('button', { name: 'Cancel' }));
+  await userEvent.click(within(await screen.findByRole('dialog', { name: /^Sketch \d/ })).getByRole('button', { name: 'Cancel' }));
   await settled();
   expect(screen.queryByRole('dialog', { name: 'Sketch' })).toBeNull();
 });

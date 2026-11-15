@@ -68,5 +68,5 @@ export function useFeaturePreview({ document, enabled, blank, rolledTo, dialog, 
     (result: CadSolveResult) => withoutUnpickedProblem(withoutApartRegionProblem(result, extruding.current), extruding.current),
     []
   );
-  return { rollbackStep, userRollback, shownDocument, pastRollback, solveFeedback, apartIds };
+  return { rollbackStep, userRollback, rolledBack, shownDocument, pastRollback, solveFeedback, apartIds };
 }

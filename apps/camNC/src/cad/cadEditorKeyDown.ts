@@ -417,27 +417,23 @@ export function cadEditorKeyDown(editor: CadEditorKeyDownInput, event: KeyboardE
     toggleFix();
     return;
   }
-  // Normal, Pierce and Equal curvature have their keys reserved, so they never start the unshifted tool.
-  if (event.shiftKey && (key === 'k' || key === 'g' || key === 'u')) {
-    event.preventDefault();
-    setMessage(`The ${key === 'k' ? 'Normal' : key === 'g' ? 'Pierce' : 'Equal curvature'} constraint isn’t available yet.`);
-    return;
-  }
   const constraintKey =
     event.shiftKey && key === 'q'
       ? 'symmetric'
-      : event.shiftKey && key === 'o'
-        ? 'concentric'
-        : event.shiftKey && key === 'l'
-          ? 'perpendicular'
-          : !event.shiftKey
-            ? (
-                { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<
-                  string,
-                  ConstraintTool
-                >
-              )[key]
-            : undefined;
+      : event.shiftKey && (key === 'k' || key === 'g' || key === 'u')
+        ? ({ k: 'normal', g: 'pierce', u: 'curvature' } as const)[key]
+        : event.shiftKey && key === 'o'
+          ? 'concentric'
+          : event.shiftKey && key === 'l'
+            ? 'perpendicular'
+            : !event.shiftKey
+              ? (
+                  { h: 'horizontal', v: 'vertical', i: 'coincident', e: 'equal', b: 'parallel', t: 'tangent' } as Record<
+                    string,
+                    ConstraintTool
+                  >
+                )[key]
+              : undefined;
   if (constraintKey) {
     event.preventDefault();
     constrain(constraintKey);

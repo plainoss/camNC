@@ -1,4 +1,5 @@
-import { cadPartReference, cadPartReferenceName, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { cadPartReference, cadPartReferenceName, designStepLabel, designSteps, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
+import { isBlank } from './editorHelpers';
 
 const kPlaneNames = { top: 'the top plane', front: 'the front plane', right: 'the right plane' } as const;
 
@@ -7,4 +8,27 @@ export function drawnOnName(document: CadDocument, on: CadDrawnOn['on']): string
   if ('plane' in on) return kPlaneNames[on.plane];
   const support = cadPartReferenceName(document, cadPartReference(on.partId, on.copyId)) ?? 'a removed part';
   return on.face === 'top' ? `the top of ${support}` : on.face === 'underside' ? `the underside of ${support}` : `an edge of ${support}`;
+}
+
+/** The Sketch dialog's plane field: a plane by its name, or a face named for the feature that made it, as Face of Extrude 1. */
+export function sketchPlaneName(document: CadDocument, drawnOn: CadDrawnOn | undefined): string {
+  if (!drawnOn) return 'Top plane';
+  const { on, datum } = drawnOn;
+  const plane = datum && document.planes?.find(candidate => candidate.id === datum)?.name;
+  if (plane) return plane;
+  if ('plane' in on) return `${on.plane[0]!.toUpperCase()}${on.plane.slice(1)} plane`;
+  const part = document.parts.find(candidate => candidate.id === on.partId);
+  const made = designStepLabel(document, `${part?.extrudedWith ?? on.partId}:extrude`);
+  return made ? `Face of ${made}` : drawnOnName(document, on);
+}
+
+/**
+ * The name the next sketch takes: numbered after the sketches above where it goes, the rollback bar or the end. The
+ * blank part a new design opens with is the one it reuses.
+ */
+export function nextSketchLabel(document: CadDocument, rolledTo?: string | null): string {
+  if (document.parts.length === 1 && isBlank(document.parts[0]!)) return 'Sketch 1';
+  const steps = designSteps(document);
+  const at = rolledTo ? steps.findIndex(step => step.id === rolledTo) : -1;
+  return `Sketch ${(at < 0 ? steps : steps.slice(0, at + 1)).filter(step => step.kind === 'sketch').length + 1}`;
 }

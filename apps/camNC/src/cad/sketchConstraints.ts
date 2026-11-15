@@ -12,4 +12,7 @@ export const sketchConstraints: { id: ConstraintCommandTool; label: string; key?
   { id: 'perpendicular', label: 'Perpendicular', key: 'Shift+L' },
   { id: 'equal', label: 'Equal', key: 'E' },
   { id: 'tangent', label: 'Tangent', key: 'T' },
+  { id: 'normal', label: 'Normal', key: 'Shift+K' },
+  { id: 'pierce', label: 'Pierce', key: 'Shift+G' },
+  { id: 'curvature', label: 'Curvature', key: 'Shift+U' },
 ];

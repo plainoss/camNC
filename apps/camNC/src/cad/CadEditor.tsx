@@ -122,7 +122,7 @@ import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
 import { DesignStepsList } from './DesignStepsList';
 import { CadDrawnOnField } from './CadDrawnOnField';
-import { drawnOnName } from './drawnOnName';
+import { drawnOnName, nextSketchLabel, sketchPlaneName } from './drawnOnName';
 import { CadReliefField } from './CadReliefField';
 import { CadPartPatternField } from './CadPartPatternField';
 import { CadCopyNames } from './CadCopyNames';
@@ -194,8 +194,7 @@ import { builtStudioParts, disabledStudioCommands, isBlankDesign, listedStudioPa
 import { applyFramed } from './insertFraming';
 import { usePartCutSelection } from './usePartCutSelection';
 import { usePartIsolation } from './usePartIsolation';
-import { FeatureDialog } from './FeatureDialog';
-import { StudioSketchDialog } from './StudioSketchDialog';
+import { SketchPlaneDialog, StudioSketchDialog } from './StudioSketchDialog';
 import { openSketchFinishReason, sketchPendingFinishReason } from './sketchPendingFinishReason';
 import { PartsList } from './PartsList';
 import { toggledKey } from './toggledKey';
@@ -565,7 +564,7 @@ export function CadEditor({
   const extrusionDepth = useExtrudeDepth(doc, dialog?.kind === 'extrude' ? dialog.partId : undefined, next => commit(next));
   const studioPreview = useStudioPreview(doc, previewOwner(dialog));
   const [mateConnectors, setMateConnectors] = useState<{ from?: CadConnectorPick; to?: CadConnectorPick }>({});
-  const { rollbackStep, userRollback, shownDocument, pastRollback, solveFeedback, apartIds } = useFeaturePreview({
+  const { rollbackStep, userRollback, rolledBack, shownDocument, pastRollback, solveFeedback, apartIds } = useFeaturePreview({
     document:
       pointPicker.onPick && dialog?.kind === 'transform'
         ? doc
@@ -1442,7 +1441,7 @@ export function CadEditor({
   // The studio's Parts list shows each physical instance, with an eye to show or hide it in the view.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
-  const builtParts = studioSession ? listedStudioParts(doc, dialog, userRollback) : builtStudioParts(doc);
+  const builtParts = studioSession ? listedStudioParts(doc, dialog, rolledBack) : builtStudioParts(doc);
   const isolatePart = usePartIsolation(builtParts, cutSelection.selectedKey, hiddenParts, setHiddenParts);
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
   // An open sketch turned with its parts behind it, about the middle of the view.
@@ -1634,7 +1633,7 @@ export function CadEditor({
               onRollTo={showWorkspace ? setRolledTo : undefined}
               onHover={entry => setHoveredStepParts(entry?.kind === 'step' ? featureRowParts(doc, entry.step) : null)}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane, onNewSketch: newSketchOn })}
-              {...{ shown: featureShown, featureProblems }}
+              {...{ shown: featureShown, featureProblems, pending: choosingFace ? nextSketchLabel(doc, userRollback) : undefined }}
               onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}
             />
           )}
@@ -1826,7 +1825,7 @@ export function CadEditor({
               key={`${doc.id}:${part.sketch.id}`}
               editor={root}
               title={designStepLabel(doc, `${part.id}:sketch`) ?? `Sketch · ${part.name}`}
-              plane={part.drawnOn ? drawnOnName(doc, part.drawnOn.on) : 'Top plane'}
+              plane={sketchPlaneName(doc, part.drawnOn)}
               disabled={!sketchCanFinish}
               checking={busy || solving}
               reason={sketchFinishReason}
@@ -2013,20 +2012,7 @@ export function CadEditor({
                   if (on) setSelectedPlane(null);
                 }}>
                 {studioSession && choosingFace && (
-                  // A new sketch waits for its plane, as the reference's sketch dialog does: a plane or a face picked
-                  // in the view, or a plane in the feature list.
-                  <FeatureDialog
-                    title="Sketch"
-                    okLabel="Pick a plane or face first"
-                    okDisabled
-                    onOk={() => {}}
-                    onCancel={() => setChoosingFace(false)}
-                    autoFocus={false}>
-                    <div className="cad-feature-selection" data-active="">
-                      <small>Sketch plane</small>
-                      <span>Pick a plane or a face</span>
-                    </div>
-                  </FeatureDialog>
+                  <SketchPlaneDialog title={nextSketchLabel(doc, userRollback)} onCancel={() => setChoosingFace(false)} />
                 )}
                 {/* Cut parts sits in the view's own box, below the canvas bar. */}
                 {dialog?.kind === 'partCut' && stepDialog}

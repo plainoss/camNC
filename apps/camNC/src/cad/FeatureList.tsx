@@ -104,6 +104,7 @@ export function FeatureList({
   featureProblems,
   onNewSketch,
   onChange,
+  pending,
 }: {
   document: CadDocument;
   selectedPartId: string | null;
@@ -140,6 +141,8 @@ export function FeatureList({
   /** New sketch, from a base plane's right-click menu, as the reference's. */
   onNewSketch?: (plane: string) => void;
   onChange?: (document: CadDocument) => void;
+  /** A new feature's row while its dialog waits for a first pick, as Sketch 2 before its plane is picked. */
+  pending?: string;
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
@@ -503,6 +506,14 @@ export function FeatureList({
             </li>
           );
         })}
+        {pending && (
+          <li className="cad-feature-pending">
+            <button type="button">
+              <span aria-hidden="true">{kIcons.sketch}</span>
+              <span>{pending}</span>
+            </button>
+          </li>
+        )}
       </ol>
       {onRollTo && rollbackAt < 0 && (
         <RollbackBar stepId={null} stepIds={stepIds} onRollTo={onRollTo} onMenu={(x, y) => setBarMenu({ x, y })} />
