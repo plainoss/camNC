@@ -35,6 +35,8 @@ describe('Part Studio picks and region reads', () => {
   it('counts the regions an Extrude dialog lists', () => {
     expect(regionCount('No region picked yet')).toBe(0);
     expect(regionCount('A region of Sketch 1')).toBe(1);
+    expect(regionCount('Face of Sketch 1')).toBe(1);
+    expect(regionCount('3 faces of Sketch 1')).toBe(3);
     expect(regionCount('3 regions of Sketch 1')).toBe(3);
     expect(regionCount('Sketch 1')).toBeNull();
     expect(regionCount(null)).toBeNull();
