@@ -102,9 +102,6 @@ export class DepthBlendManager {
   /** Set the video source, remap parameters and/or runtime settings. Changes are detected by reference. */
   configure(config: Partial<DepthBlendConfig>) {
     Object.assign(this.desired, config);
-    // While stopped there is nothing to push, and a sync queued here would run ahead of the next start() and
-    // take its initialisation error.
-    if (!this.wanted) return;
     this.sync().catch(err => console.error('[DepthBlendManager] Failed to apply configuration:', err));
   }
 
@@ -113,7 +110,7 @@ export class DepthBlendManager {
     this.wanted = true;
     const request = ++this.request;
     try {
-      await this.sync();
+      await this.sync(true);
     } catch (err) {
       // A start() or stop() issued since then states the caller's newer intent: leave that one alone.
       if (this.request === request) this.wanted = false;
@@ -122,28 +119,29 @@ export class DepthBlendManager {
   }
 
   /** Stop processing. Never rejects, so it is safe to call without awaiting. */
-  stop() {
+  async stop() {
     this.wanted = false;
     this.request++;
-    return this.sync().catch(err => console.error('[DepthBlendManager] Failed to stop:', err));
+    if (!this.running) return;
+    // Not queued behind the sync in flight: frames are dropped and the worker stops at once, even while a new
+    // video source is still being opened.
+    this.running = false;
+    await this.connection?.proxy.stop().catch(err => console.error('[DepthBlendManager] Failed to stop:', err));
   }
 
-  private sync() {
-    const run = this.chain.then(() => this.reconcile());
+  private sync(mayInit = false) {
+    const run = this.chain.then(() => this.reconcile(mayInit));
     // A failed run must not block the runs queued behind it.
     this.chain = run.catch(() => {});
     return run;
   }
 
-  /** Bring the worker to the wanted state. Runs one at a time; `wanted` and `desired` can change at every await. */
-  private async reconcile() {
-    if (!this.wanted) {
-      if (this.running) {
-        this.running = false;
-        await this.connection?.proxy.stop();
-      }
-      return;
-    }
+  /** Bring the worker up to the wanted state. Runs one at a time; `wanted` and `desired` can change at every await. */
+  private async reconcile(mayInit: boolean) {
+    if (!this.wanted) return;
+    // Only start() initialises the worker, so a configure() queued behind a failing start does not repeat the
+    // attempt and take its error.
+    if (!this.applied && !mayInit) return;
 
     const { source, params } = this.desired;
     if (!source || !params) {

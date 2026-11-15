@@ -22,6 +22,8 @@ function setup() {
   let frameCallback: ((result: DepthFrameResult) => void) | null = null;
   // Each test may replace this to hold back or fail init.
   const init = { result: (): Promise<void> => Promise.resolve() };
+  // Likewise for a settings update.
+  const settingsUpdate = { result: (): Promise<void> => Promise.resolve() };
   const proxy: VideoPipelineWorkerAPI = {
     init: async (stream, cfg) => {
       const width = cfg.mode === 'none' ? 0 : cfg.params.outputSize[0];
@@ -40,6 +42,7 @@ function setup() {
     },
     updateSettings: async settings => {
       calls.push(`updateSettings:${settings.frameRateLimit}`);
+      await settingsUpdate.result();
     },
     replaceStream: async stream => {
       calls.push(`replaceStream:${streams.get(stream)}`);
@@ -54,13 +57,15 @@ function setup() {
       return stream;
     },
   });
-  const sendFrame = async () => {
+  /** A frame result, built ahead so that sending it needs no await. */
+  const makeFrame = async (): Promise<DepthFrameResult> => {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 2;
     canvas.getContext('2d')!.fillRect(0, 0, 2, 2);
-    frameCallback!({ mask: await createImageBitmap(canvas), bg: await createImageBitmap(canvas) });
+    return { mask: await createImageBitmap(canvas), bg: await createImageBitmap(canvas) };
   };
-  return { manager, calls, init, connect, sendFrame };
+  const sendFrame = (frame: DepthFrameResult) => frameCallback!(frame);
+  return { manager, calls, init, settingsUpdate, connect, makeFrame, sendFrame };
 }
 
 describe('DepthBlendManager', () => {
@@ -167,6 +172,23 @@ describe('DepthBlendManager', () => {
     expect(calls).toEqual(['init:cam:4', 'init:cam:4', 'updateSettings:2', 'start']);
   });
 
+  it('tries init once per start, not once per change queued behind it', async () => {
+    const { manager, calls, init, connect } = setup();
+    const pending = deferred();
+    init.result = () => pending.promise;
+    manager.configure({ source: 'cam', params: makeParams() });
+    const started = manager.start();
+    await vi.waitFor(() => expect(calls).toEqual(['init:cam:4']));
+    manager.configure({ settings: { frameRateLimit: 2 } });
+    manager.configure({ params: makeParams(8) });
+    pending.reject(new Error('no WebGPU'));
+    await expect(started).rejects.toThrow('no WebGPU');
+    await new Promise(resolve => setTimeout(resolve));
+    expect(calls).toEqual(['init:cam:4']);
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
   it('keeps a start issued after the one that fails', async () => {
     const { manager, calls, init } = setup();
     const pending = deferred();
@@ -208,19 +230,54 @@ describe('DepthBlendManager', () => {
     expect(console.error).toHaveBeenCalledWith('[DepthBlendManager] Failed to stop:', expect.any(Error));
   });
 
-  it('delivers frames while running and drops them once stopped', async () => {
-    const { manager, sendFrame } = setup();
+  it('delivers frames while running and drops them as soon as stop is called', async () => {
+    const { manager, calls, settingsUpdate, makeFrame, sendFrame } = setup();
     const received: DepthBlendTextures[] = [];
     manager.onTextures(textures => received.push(textures));
     manager.configure({ source: 'cam', params: makeParams() });
     await manager.start();
-    await sendFrame();
+    sendFrame(await makeFrame());
     expect(received).toHaveLength(1);
     expect(received[0]!.mask).not.toBeNull();
 
-    // Not awaited, as when the store disables depth blending.
+    // A settings update is still in flight when the store disables depth blending without awaiting.
+    const late = await makeFrame();
+    const pending = deferred();
+    settingsUpdate.result = () => pending.promise;
+    manager.configure({ settings: { frameRateLimit: 3 } });
+    await vi.waitFor(() => expect(calls).toContain('updateSettings:3'));
     void manager.stop();
-    await sendFrame();
+    expect(calls.at(-1)).toBe('stop');
+    sendFrame(late);
     expect(received).toHaveLength(1);
+    pending.resolve();
+  });
+
+  it('logs a failing update once without failing start', async () => {
+    const { manager, connect } = setup();
+    manager.configure({ source: 'cam', params: makeParams() });
+    await manager.start();
+    const updateParams = vi.fn(() => Promise.reject(new Error('worker busy')));
+    connect.mock.results[0]!.value.proxy.updateParams = updateParams;
+    manager.configure({ params: makeParams(8) });
+    await expect(manager.start()).resolves.toBeUndefined();
+    await manager.start();
+    expect(updateParams).toHaveBeenCalledTimes(1);
+    expect(console.error).toHaveBeenCalledWith('[DepthBlendManager] Failed to update params:', expect.any(Error));
+  });
+
+  it('terminates the worker on destroy and connects a new one on the next start', async () => {
+    const { manager, calls, connect, makeFrame, sendFrame } = setup();
+    const received: DepthBlendTextures[] = [];
+    manager.onTextures(textures => received.push(textures));
+    manager.configure({ source: 'cam', params: makeParams() });
+    await manager.start();
+    manager.destroy();
+    sendFrame(await makeFrame());
+    expect(received).toEqual([]);
+    expect(calls).toEqual(['init:cam:4', 'start', 'terminate']);
+    await manager.start();
+    expect(connect).toHaveBeenCalledTimes(2);
+    expect(calls).toEqual(['init:cam:4', 'start', 'terminate', 'init:cam:4', 'start']);
   });
 });

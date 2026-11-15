@@ -200,3 +200,25 @@ it('removes only what the folder owns and drops it from the folder', async () =>
   expect(withoutPart.scriptError).toBeUndefined();
   expect(withoutPart.document.folders!.map(folder => folder.partIds)).toEqual([[first!.id], []]);
 });
+
+it('takes found copies, steps and parts in a folder, and translates what a detached copy is given', async () => {
+  const start = await twoFolders();
+  const [first] = start.document.parts;
+  const detached = await editCad(start.document, d =>
+    d.existingFolder('Second', d => {
+      d.detachCopy(d.existingCopy('width'), 'Own').thickness('width / 10');
+    })
+  );
+  expect(detached.scriptError).toBeUndefined();
+  expect(detached.document.parts.find(part => part.name === 'Own')?.thicknessExpression).toBe('width_2 / 10');
+  const removed = await editCad(start.document, d =>
+    d.existingFolder('Second', d => {
+      d.removeCopy(d.existingCopy('width'));
+      d.removeStep(d.step('Extrude · width'));
+      d.removePart(d.part('width'));
+    })
+  );
+  expect(removed.scriptError).toBeUndefined();
+  expect(removed.document.parts.map(part => part.id)).toEqual([first!.id]);
+  expect(removed.document.folders!.map(folder => folder.partIds)).toEqual([[first!.id], []]);
+});
