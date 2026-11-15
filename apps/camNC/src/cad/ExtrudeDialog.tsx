@@ -59,6 +59,8 @@ type ExtrudeOperation = 'new' | 'add' | 'remove';
  * face, and which way it grows. Add joins its regions to a part made from the same sketch, and Remove cuts them into
  * the board the sketch is drawn on, as a pocket or a hole.
  */
+
+const kUnsupported = 'Not available yet';
 export function ExtrudeDialog({
   document,
   part,
@@ -234,8 +236,8 @@ export function ExtrudeDialog({
         : regionCount === 0
           ? 'No region picked yet'
           : regionCount === 1
-            ? `A region of ${sketchName}`
-            : `${regionCount} regions of ${sketchName}`;
+            ? `Face of ${sketchName}`
+            : `${regionCount} faces of ${sketchName}`;
   const board = operation === 'remove' ? removeSupport(document, part) : null;
   const spatialRemove = isSpatialRemoval(part);
   const solidControls = operation !== 'remove';
@@ -444,6 +446,9 @@ export function ExtrudeDialog({
             <button type="button" role="tab" aria-selected={!part.thin} onClick={() => setThin(null)}>
               Solid
             </button>
+            <button type="button" role="tab" aria-selected={false} disabled title={kUnsupported}>
+              Surface
+            </button>
             <button
               type="button"
               role="tab"
@@ -496,7 +501,19 @@ export function ExtrudeDialog({
                 setUpTo(null);
               }}>
               <option value="blind">Blind</option>
+              <option value="next" disabled>
+                Up to next
+              </option>
               <option value="upTo">Up to face</option>
+              <option value="part" disabled>
+                Up to part
+              </option>
+              <option value="vertex" disabled>
+                Up to vertex
+              </option>
+              <option value="through" disabled>
+                Through all
+              </option>
             </select>
           </label>
         )}
@@ -533,6 +550,21 @@ export function ExtrudeDialog({
             />
             Symmetric
           </label>
+        )}
+        {solidControls && !part.thin && part.drawnOn && (
+          <>
+            <label title={kUnsupported}>
+              <input type="checkbox" disabled />
+              Draft
+            </label>
+            {/* A symmetric extrude has both its ends set by the one depth. */}
+            {!part.symmetric && (
+              <label title={kUnsupported}>
+                <input type="checkbox" disabled />
+                Second end position
+              </label>
+            )}
+          </>
         )}
         {!part.upTo && !part.symmetric && part.drawnOn && !part.thin?.midPlane && (
           // The other way out of the sketch's plane, or into the face it's drawn on, for a thin board as for a solid one.

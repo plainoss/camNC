@@ -29,6 +29,8 @@ export function mirrorJoinProblem(part: CadPart, shape: EvaluatedCadPart, join: 
 
 function joinedWith(part: CadPart, shape: EvaluatedCadPart, join: CadMirrorJoin): { part: EvaluatedCadPart } | { refused: string } {
   if (!join.line) return { refused: 'Select a mirror plane that stands across the part. 1 missing selection' };
+  // Its pockets and cuts are made after the join, on one half only, so a part with them isn't mirrored yet.
+  if (part.features?.length) return { refused: 'Failed to mirror selections.' };
   const at = CAD_IDENTITY_PLACEMENT;
   const made = unitedPart({ shape, source: part, at }, [{ shape: mirrorImage(shape, { ...join, line: join.line }), source: part, at }]);
   return 'refused' in made ? { refused: 'Failed to mirror selections.' } : made;

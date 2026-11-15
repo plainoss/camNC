@@ -5,6 +5,7 @@ export function requiresInstanceEvaluation(document: CadDocument): boolean {
   return (
     document.operationOrder !== undefined ||
     !!document.partCuts?.length ||
-    document.parts.some(part => part.remove || part.features?.some(feature => feature.copyId))
+    // A Mirror › Add follows its plane as laid out, so a move needs the part made again.
+    document.parts.some(part => part.remove || part.mirrorJoins?.length || part.features?.some(feature => feature.copyId))
   );
 }

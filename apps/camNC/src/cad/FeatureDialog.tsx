@@ -57,7 +57,8 @@ export function FeatureDialog({
       // A row of the Parts list, or of the Feature list's planes and features, just picked for the dialog.
       const row =
         target instanceof HTMLButtonElement &&
-        ((target.closest('.cad-part-list') && target.hasAttribute('aria-pressed')) || !!target.closest('.cad-studio-features'));
+        !!(target.closest('.cad-part-list') || target.closest('.cad-studio-features')) &&
+        target.hasAttribute('aria-pressed');
       // The 3D view itself, not one of its buttons or fields.
       const view = target?.matches('[data-testid="workspace-3d"], [data-testid="workspace-3d"] canvas');
       if (event.key !== 'Enter' || event.isComposing || !(row || view)) return;
@@ -93,7 +94,17 @@ export function FeatureDialog({
         if (event.key === 'Escape') onCancel();
         // Enter applies a field's value and keeps the dialog open; Enter again, with nothing changed, accepts it, as in the
         // reference.
-        else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox') {
+        // Enter on a box just ticked accepts the dialog, as its value is already taken.
+        // A sketch's own dialog leaves plain Enter to its drawing tools.
+        else if (
+          event.key === 'Enter' &&
+          event.target instanceof HTMLInputElement &&
+          event.target.type === 'checkbox' &&
+          !className?.includes('cad-sketch-dialog')
+        ) {
+          event.preventDefault();
+          requestAnimationFrame(ok);
+        } else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox') {
           const input = event.target;
           if (lastEnter.current?.input === input && lastEnter.current.value === input.value) {
             lastEnter.current = null;

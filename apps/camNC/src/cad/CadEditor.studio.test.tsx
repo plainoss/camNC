@@ -867,7 +867,7 @@ it('extrudes a sketch already used again, as a new part of a region picked from 
   await settled();
   act(() => props().onPickRegion!(JSON.stringify([shelf, narrow])));
   await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow]));
-  expect(within(dialog).getByText('A region of Sketch · Shelf')).toBeDefined();
+  expect(within(dialog).getByText('Face of Sketch · Shelf')).toBeDefined();
   // The regions show in the view, the one picked marked.
   await waitFor(() =>
     expect(
@@ -910,7 +910,7 @@ it('picks a further region of the shared sketch in the view into the same extrud
   expect(latest().parts).toHaveLength(2);
   pickSketchRegion(wide);
   await waitFor(() => expect(latest().parts[1]!.regions).toEqual([narrow]));
-  expect(within(dialog).getByText('A region of Sketch · Shelf')).toBeDefined();
+  expect(within(dialog).getByText('Face of Sketch · Shelf')).toBeDefined();
 });
 
 const operation = (dialog: HTMLElement) => within(dialog).getByRole('tablist', { name: 'Extrude operation' });

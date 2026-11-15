@@ -197,8 +197,14 @@ function touchesItsImage(joined: CadDocument, partId: string, joinId: string): b
   const part = joined.parts.find(candidate => candidate.id === partId);
   const line = part?.mirrorJoins?.find(candidate => candidate.id === joinId)?.line;
   if (!part || !line) return false;
+  // As the part is made just before this mirror: with the ones before it, without it and those after.
+  const joins = part.mirrorJoins!;
+  const before = joins.slice(
+    0,
+    joins.findIndex(candidate => candidate.id === joinId)
+  );
   const { mirrorJoins: _joins, ...plain } = part as CadPart;
-  const outline = evaluateCadPart(plain).part?.outline ?? [];
+  const outline = evaluateCadPart(before.length ? { ...plain, mirrorJoins: before } : plain).part?.outline ?? [];
   const side = outline.map(p => (p.x - line.x) * line.nx + (p.y - line.y) * line.ny);
   return side.some(d => Math.abs(d) < 1e-6) || (side.some(d => d > 0) && side.some(d => d < 0));
 }
