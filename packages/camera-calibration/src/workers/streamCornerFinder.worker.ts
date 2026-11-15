@@ -16,7 +16,7 @@ export interface FrameCaptureEvent {
 
 export interface FrameRejectedEvent {
   corners?: Corner[];
-  result: 'blurry' | 'not_unique';
+  result: 'blurry' | 'not_unique' | 'not_found';
   fps: number;
 }
 
@@ -280,7 +280,7 @@ export class StreamCornerFinderWorker {
 
       if (!found) {
         this.onFrameProcessed!({
-          result: 'not_unique',
+          result: 'not_found',
           fps: this.currentFps,
         });
         return;

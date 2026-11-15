@@ -1,10 +1,10 @@
 import { ensureOpenCvIsLoaded } from '@wbcnc/load-opencv';
 import { Matrix3 } from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { initUndistortRectifyMapTyped, Matrix3x3 } from './rectifyMap';
-import { initUndistortRectifyMapCv } from './rectifyMapCv';
+import { calculateUndistortionMapsCached } from './rectifyMap';
+import { initUndistortRectifyMapCv, type Matrix3x3 } from './rectifyMapCv';
 
-describe('initUndistortRectifyMapTyped', () => {
+describe('calculateUndistortionMapsCached', () => {
   beforeAll(async () => {
     await ensureOpenCvIsLoaded();
   });
@@ -36,12 +36,27 @@ describe('initUndistortRectifyMapTyped', () => {
     const dist = [-0.25, 0.08, 0.001, -0.002, -0.01];
 
     const expected = initUndistortRectifyMapCv(K, dist, identity, newK, size);
-    const actual = initUndistortRectifyMapTyped(Kthree, dist, identity, newK, size);
+    const calibration = { calibration_matrix: Kthree, new_camera_matrix: newK, distortion_coefficients: dist };
+    const [mapX, mapY] = calculateUndistortionMapsCached(calibration, size.width, size.height);
 
     let maxDiff = 0;
     for (let i = 0; i < expected.map1.length; i++) {
-      maxDiff = Math.max(maxDiff, Math.abs(expected.map1[i] - actual.map1[i]), Math.abs(expected.map2[i] - actual.map2[i]));
+      maxDiff = Math.max(maxDiff, Math.abs(expected.map1[i] - mapX[i]), Math.abs(expected.map2[i] - mapY[i]));
     }
     expect(maxDiff).toBeLessThan(1e-3);
+  });
+
+  it('returns the cached maps until the calibration or the size changes', () => {
+    const calibration = {
+      calibration_matrix: new Matrix3().set(60, 0, 8, 0, 60, 6, 0, 0, 1),
+      new_camera_matrix: new Matrix3().set(60, 0, 8, 0, 60, 6, 0, 0, 1),
+      distortion_coefficients: [-0.1, 0, 0, 0],
+    };
+    const maps = calculateUndistortionMapsCached(calibration, 16, 12);
+    expect(maps[0]).toHaveLength(16 * 12);
+    expect(calculateUndistortionMapsCached(calibration, 16, 12)).toBe(maps);
+    const resized = calculateUndistortionMapsCached(calibration, 8, 12);
+    expect(resized[0]).toHaveLength(8 * 12);
+    expect(calculateUndistortionMapsCached({ ...calibration }, 8, 12)).not.toBe(resized);
   });
 });

@@ -1,84 +1,14 @@
 import { animated, useSpring } from '@react-spring/three';
 import { Edges, Line, PivotControls, Plane, Text } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
-import React, { Suspense, useEffect, useMemo, useRef } from 'react';
-import { Matrix4, Object3D, Vector2, Vector3 } from 'three';
-import { Line2, LineGeometry, LineMaterial } from 'three/addons';
-import {
-  useIsToolpathHovered,
-  useSetIsToolpathDragging,
-  useStore,
-  useToolDiameter,
-  useToolpathOpacity,
-  useMachineBounds,
-} from '../store/store';
+import React, { Suspense, useMemo, useRef } from 'react';
+import { Matrix4, Object3D, Vector3 } from 'three';
+import { useIsToolpathHovered, useSetIsToolpathDragging, useStore, useToolDiameter, useMachineBounds } from '../store/store';
 import { useCamMachine } from '@/cam/machine/camMachine';
 import { LineAxesHelper } from './LineAxesHelper';
 import { ToolpathCanvasPlane } from './ToolpathCanvasPlane';
-import { getZHeightColors } from './toolpathColors';
-
-/*
-function getTimeColors(toolpath: ParsedToolpath) {
-  const colors = new Array(toolpath.pathPoints.length * 3);
-  for (let i = 0; i < toolpath.pathPoints.length; i++) {
-    const color = getPlasmaColor(i / toolpath.pathPoints.length);
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-  }
-  return colors;
-}
-*/
 
 // Save z position above stock (live cam) plane.
 const kAboveStockZ = 500;
-
-// Using ToolpathCanvasPlane instead for now.
-export const Toolpaths: React.FC = () => {
-  const toolpath = useStore(s => s.toolpath);
-  const toolDiameter = useToolDiameter();
-  const toolpathOpacity = useToolpathOpacity();
-  const viewport = useThree(s => s.viewport);
-
-  const line2 = useMemo(() => {
-    if (!toolpath) return null;
-    const geom = new LineGeometry();
-    geom.setPositions(toolpath.pathPoints.flatMap(p => [p.x, p.y, -p.z]));
-    const mat = new LineMaterial({
-      color: 0xffffff,
-      vertexColors: true,
-      alphaToCoverage: false,
-      transparent: true,
-    });
-    mat.linewidth = toolDiameter;
-    mat.worldUnits = true;
-    mat.resolution = new Vector2(viewport.width, viewport.height);
-    const colors = getZHeightColors(toolpath);
-    // const colors = getTimeColors(toolpath);
-    geom.setColors(colors);
-
-    const line = new Line2(geom, mat);
-    line.computeLineDistances();
-
-    return line;
-  }, [toolpath, toolDiameter, viewport.width, viewport.height]);
-
-  useEffect(() => {
-    if (line2) {
-      const mat = line2.material as LineMaterial;
-      mat.transparent = toolpathOpacity < 1;
-      mat.opacity = toolpathOpacity;
-      mat.needsUpdate = true;
-    }
-  }, [line2, toolpathOpacity]);
-  if (!line2) return null;
-
-  return (
-    <>
-      <primitive object={line2} />
-    </>
-  );
-};
 
 const AnimatedPlane = animated(Plane);
 
@@ -186,7 +116,6 @@ export const GCodeVisualizer: React.FC = () => {
       <LineAxesHelper size={100} position-z={kAboveStockZ + 100} />
       <UseableMachineSpaceOutline />
       <ToolpathTransformControls>
-        {/* <Draggable onDragEnd={onDragEnd}> */}
         <group
           position-z={kAboveStockZ}
           onPointerMissed={e => e.type === 'click' && setIsToolpathSelected(false)}
@@ -197,12 +126,9 @@ export const GCodeVisualizer: React.FC = () => {
           onPointerEnter={() => setIsToolpathHovered(true)}
           onPointerLeave={() => setIsToolpathHovered(false)}>
           <ToolpathCanvasPlane />
-          {/* <Toolpaths /> */}
           <ToolpathBackgroundPlane />
-          {/* <ToolpathLineAxes /> */}
           <ToolpathPositionText />
         </group>
-        {/* </Draggable> */}
       </ToolpathTransformControls>
     </>
   );

@@ -1,5 +1,5 @@
-import { RemapStepParams } from '@/depth/remapPipeline';
-import type { Config, VideoPipelineWorkerAPI, WorkerSettings } from '@/depth/videoPipeline.worker';
+import type { RemapStepParams } from '@/depth/remapPipeline';
+import type { VideoPipelineWorkerAPI, WorkerSettings } from '@/depth/videoPipeline.worker';
 import { createVideoStreamProcessor, registerThreeJsTransferHandlers } from '@wbcnc/video-worker-utils';
 import * as Comlink from 'comlink';
 import * as THREE from 'three';
@@ -11,16 +11,51 @@ export interface DepthBlendTextures {
   bg: THREE.CanvasTexture | null;
 }
 
+type VideoSource = Parameters<typeof createVideoStreamProcessor>[0];
+type VideoStream = Awaited<ReturnType<typeof createVideoStreamProcessor>>;
+
+/** What the worker should be processing. The manager pushes whichever part differs from what the worker has. */
+export interface DepthBlendConfig {
+  source: VideoSource;
+  params: RemapStepParams;
+  settings: WorkerSettings;
+}
+
+export interface DepthBlendWorkerConnection {
+  proxy: VideoPipelineWorkerAPI;
+  terminate(): void;
+}
+
+export interface DepthBlendDeps {
+  connect(): DepthBlendWorkerConnection;
+  createStream(source: VideoSource): Promise<VideoStream>;
+}
+
+function connectWorker(): DepthBlendWorkerConnection {
+  const worker = new Worker(new URL('./videoPipeline.worker.ts', import.meta.url), { type: 'module' });
+  return {
+    proxy: Comlink.wrap<VideoPipelineWorkerAPI>(worker) as unknown as VideoPipelineWorkerAPI,
+    terminate: () => worker.terminate(),
+  };
+}
+
+function transferStream(stream: VideoStream) {
+  return Comlink.transfer(stream, [stream as unknown as Transferable]);
+}
+
+type Nullable<T> = { [K in keyof T]: T[K] | null };
+
 /**
- * Singleton manager for the depth blend worker and texture management.
- * Handles worker lifecycle, video processing, and texture updates.
+ * Owns the depth blend worker and the textures it produces.
+ *
+ * Callers state what they want (`configure`, `start`, `stop`); a single serialised `sync` brings the worker
+ * to that state, so a change made while the worker is still initialising is pushed once it is ready.
  */
 export class DepthBlendManager {
   private static instance: DepthBlendManager | null = null;
 
-  private worker: Worker | null = null;
-  private proxy: Comlink.Remote<VideoPipelineWorkerAPI> | null = null;
-  private localStream: ReadableStream<VideoFrame> | MediaStreamTrack | null = null;
+  private connection: DepthBlendWorkerConnection | null = null;
+  private localStream: VideoStream | null = null;
 
   // Texture management
   private maskTex: THREE.CanvasTexture | null = null;
@@ -28,19 +63,20 @@ export class DepthBlendManager {
   private prevMaskTex: THREE.CanvasTexture | null = null;
   private bgTex: THREE.CanvasTexture | null = null;
   private bgCanvas: HTMLCanvasElement | null = null;
-
-  // State
-  private isRunning = false;
-  // Whether the caller currently wants processing to run; start() may be pending on initialisation.
-  private shouldRun = false;
-  private isInitialized = false;
-  private initPromise: Promise<void> | null = null;
-  private currentVideoSource: any = null;
-  private currentParams: RemapStepParams | null = null;
   private onTextureUpdate: ((textures: DepthBlendTextures) => void) | null = null;
-  private pendingSettings: WorkerSettings | null = null;
 
-  private constructor() {}
+  // Whether the caller wants processing to run.
+  private wanted = false;
+  // Counts start()/stop() calls, so a failed start() only withdraws its own request.
+  private request = 0;
+  private desired: Nullable<DepthBlendConfig> = { source: null, params: null, settings: null };
+  // What the worker was last given; null until it is initialised.
+  private applied: Nullable<DepthBlendConfig> | null = null;
+  // Whether the worker loop was told to run; frames arriving while false are dropped.
+  private running = false;
+  private chain: Promise<void> = Promise.resolve();
+
+  constructor(private readonly deps: DepthBlendDeps = { connect: connectWorker, createStream: createVideoStreamProcessor }) {}
 
   static getInstance(): DepthBlendManager {
     if (typeof window === 'undefined') return null as unknown as DepthBlendManager;
@@ -48,12 +84,6 @@ export class DepthBlendManager {
       DepthBlendManager.instance = new DepthBlendManager();
     }
     return DepthBlendManager.instance;
-  }
-
-  private async initWorker() {
-    console.log('initialising depth blend worker');
-    this.worker = new Worker(new URL('./videoPipeline.worker.ts', import.meta.url), { type: 'module' });
-    this.proxy = Comlink.wrap<VideoPipelineWorkerAPI>(this.worker);
   }
 
   // Register a callback for texture updates. Returns an unsubscribe function.
@@ -69,149 +99,103 @@ export class DepthBlendManager {
     };
   }
 
-  // Set or replace the video source
-  async setVideoSource(videoSource: any) {
-    const oldSource = this.currentVideoSource;
-    this.currentVideoSource = videoSource;
-
-    // If already initialised swap the stream immediately.
-    if (this.isInitialized && oldSource !== videoSource) {
-      await this.replaceVideoSource(videoSource);
-    }
+  /** Set the video source, remap parameters and/or runtime settings. Changes are detected by reference. */
+  configure(config: Partial<DepthBlendConfig>) {
+    Object.assign(this.desired, config);
+    // While stopped there is nothing to push, and a sync queued here would run ahead of the next start() and
+    // take its initialisation error.
+    if (!this.wanted) return;
+    this.sync().catch(err => console.error('[DepthBlendManager] Failed to apply configuration:', err));
   }
 
-  // Update processing parameters
-  async setParams(params: RemapStepParams) {
-    const changed = JSON.stringify(this.currentParams) !== JSON.stringify(params);
-    this.currentParams = params;
-
-    // If already initialised push update to worker immediately.
-    if (this.isInitialized && changed) {
-      await this.updateParams(params);
-    }
-  }
-
-  /**
-   * Ensure the worker is fully initialised. Assumes both currentVideoSource and
-   * currentParams are already set.
-   */
-  private ensureInitialized() {
-    if (this.isInitialized) return Promise.resolve();
-    // Share a single initialisation between concurrent start() calls.
-    this.initPromise ??= this.doInitialize().finally(() => {
-      this.initPromise = null;
-    });
-    return this.initPromise;
-  }
-
-  private async doInitialize() {
-    if (!this.proxy) await this.initWorker();
-
-    if (!this.currentVideoSource || !this.currentParams) {
-      throw new Error('[DepthBlendManager] Cannot initialise without videoSource and params');
-    }
-
-    this.localStream = await createVideoStreamProcessor(this.currentVideoSource);
-    const cfg: Config = { mode: 'depth', params: this.currentParams };
-
-    await this.proxy!.init(Comlink.transfer(this.localStream as any, [this.localStream as any]), cfg);
-
-    // Apply any pending processing settings that were set before initialization completed
-    if (this.pendingSettings) {
-      try {
-        await this.proxy!.updateSettings(this.pendingSettings);
-      } catch (err) {
-        console.error('[DepthBlendManager] Failed to apply pending settings:', err);
-      }
-      this.pendingSettings = null;
-    }
-    this.isInitialized = true;
-  }
-
-  // Start processing. Rejects if initialisation fails (e.g. WebGPU unavailable).
+  /** Start processing. Rejects if initialisation fails (e.g. WebGPU unavailable); a later call tries again. */
   async start() {
-    this.shouldRun = true;
+    this.wanted = true;
+    const request = ++this.request;
     try {
-      await this.ensureInitialized();
+      await this.sync();
     } catch (err) {
-      this.shouldRun = false;
+      // A start() or stop() issued since then states the caller's newer intent: leave that one alone.
+      if (this.request === request) this.wanted = false;
       throw err;
     }
-
-    // stop() may have been called while initialising (e.g. during model download).
-    if (!this.shouldRun || this.isRunning) return;
-
-    this.isRunning = true;
-    await this.proxy!.start(Comlink.proxy(this.handleFrame.bind(this)));
   }
 
-  // Stop processing
-  async stop() {
-    this.shouldRun = false;
-    if (!this.proxy || !this.isRunning) return;
-
-    this.isRunning = false;
-
-    try {
-      await this.proxy.stop();
-    } catch (error) {
-      console.error('[DepthBlendManager] Failed to stop:', error);
-    }
+  /** Stop processing. Never rejects, so it is safe to call without awaiting. */
+  stop() {
+    this.wanted = false;
+    this.request++;
+    return this.sync().catch(err => console.error('[DepthBlendManager] Failed to stop:', err));
   }
 
-  /**
-   * Update processing parameters without restarting
-   */
-  async updateParams(params: RemapStepParams) {
-    if (!this.proxy || !this.isInitialized) return;
-
-    this.currentParams = params;
-
-    try {
-      await this.proxy.updateParams(params);
-    } catch (error) {
-      console.error('[DepthBlendManager] Failed to update params:', error);
-    }
+  private sync() {
+    const run = this.chain.then(() => this.reconcile());
+    // A failed run must not block the runs queued behind it.
+    this.chain = run.catch(() => {});
+    return run;
   }
 
-  /**
-   * Update runtime processing settings (fps limit, mask margins) without restart.
-   */
-  async setProcessingSettings(settings: WorkerSettings) {
-    if (!this.proxy || !this.isInitialized) {
-      // Worker not ready yet – store for later
-      this.pendingSettings = settings;
+  /** Bring the worker to the wanted state. Runs one at a time; `wanted` and `desired` can change at every await. */
+  private async reconcile() {
+    if (!this.wanted) {
+      if (this.running) {
+        this.running = false;
+        await this.connection?.proxy.stop();
+      }
       return;
     }
 
-    try {
-      await this.proxy.updateSettings(settings);
-    } catch (error) {
-      console.error('[DepthBlendManager] Failed to update settings:', error);
+    const { source, params } = this.desired;
+    if (!source || !params) {
+      throw new Error('[DepthBlendManager] Cannot initialise without videoSource and params');
     }
+
+    this.connection ??= this.deps.connect();
+    const { proxy } = this.connection;
+
+    if (!this.applied) {
+      console.log('initialising depth blend worker');
+      this.localStream = await this.deps.createStream(source);
+      await proxy.init(transferStream(this.localStream), { mode: 'depth', params });
+      this.applied = { source, params, settings: null };
+    }
+    await this.pushChanges(proxy, this.applied);
+
+    // stop() may have been called while initialising (e.g. during model download).
+    if (!this.wanted || this.running) return;
+    this.running = true;
+    await proxy.start(Comlink.proxy(this.handleFrame.bind(this)));
   }
 
   /**
-   * Replace video stream without restarting the worker
+   * Send the worker every part of `desired` it does not have yet. A failed push is logged and counts as
+   * applied, so it neither fails start() nor repeats on every sync.
    */
-  async replaceVideoSource(videoSource: any) {
-    if (!this.proxy || !this.isInitialized) return;
-
-    this.currentVideoSource = videoSource;
-
-    try {
-      // Cancel old stream
-      if (this.localStream instanceof ReadableStream) {
-        this.localStream.cancel().catch(() => {});
+  private async pushChanges(proxy: VideoPipelineWorkerAPI, applied: Nullable<DepthBlendConfig>) {
+    const { source } = this.desired;
+    if (source && source !== applied.source) {
+      applied.source = source;
+      try {
+        if (this.localStream instanceof ReadableStream) {
+          this.localStream.cancel().catch(() => {});
+        }
+        this.localStream = await this.deps.createStream(source);
+        await proxy.replaceStream(transferStream(this.localStream));
+      } catch (error) {
+        console.error('[DepthBlendManager] Failed to replace video source:', error);
       }
+    }
 
-      // Create new stream
-      this.localStream = await createVideoStreamProcessor(videoSource);
+    const { params } = this.desired;
+    if (params && params !== applied.params) {
+      applied.params = params;
+      await proxy.updateParams(params).catch(error => console.error('[DepthBlendManager] Failed to update params:', error));
+    }
 
-      // Replace in worker
-      await this.proxy.replaceStream(Comlink.transfer(this.localStream as any, [this.localStream as any]) as any);
-    } catch (error) {
-      console.error('[DepthBlendManager] Failed to replace video source:', error);
+    const { settings } = this.desired;
+    if (settings && settings !== applied.settings) {
+      applied.settings = settings;
+      await proxy.updateSettings(settings).catch(error => console.error('[DepthBlendManager] Failed to update settings:', error));
     }
   }
 
@@ -219,7 +203,7 @@ export class DepthBlendManager {
    * Handle frame results from worker
    */
   private handleFrame(result: { mask: ImageBitmap; bg: ImageBitmap }) {
-    if (!this.isRunning) return;
+    if (!this.running) return;
 
     // Ensure background canvas/texture exist (created once)
     if (!this.bgCanvas) {
@@ -276,28 +260,24 @@ export class DepthBlendManager {
    * Destroy the manager and clean up all resources
    */
   destroy() {
-    this.stop();
+    this.wanted = false;
+    this.request++;
+    this.running = false;
 
     // Dispose textures
     this.prevMaskTex?.dispose();
     this.prevMaskTex = null;
-    if (this.maskTex) {
-      this.maskTex.dispose();
-      this.maskTex = null;
-    }
-    if (this.bgTex) {
-      this.bgTex.dispose();
-      this.bgTex = null;
-    }
+    this.maskTex?.dispose();
+    this.maskTex = null;
+    this.bgTex?.dispose();
+    this.bgTex = null;
     this.bgCanvas = null;
 
-    if (this.worker) {
-      this.worker.terminate();
-      this.worker = null;
-    }
+    this.connection?.terminate();
+    this.connection = null;
+    this.applied = null;
 
-    this.proxy = null;
-    DepthBlendManager.instance = null;
+    if (DepthBlendManager.instance === this) DepthBlendManager.instance = null;
   }
 }
 
