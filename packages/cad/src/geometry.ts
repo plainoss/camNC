@@ -98,7 +98,15 @@ export function validateCadDocument(document: CadDocument): CadDiagnostic[] {
       if (e.type === 'line') {
         const a = entities.get(e.startId),
           b = entities.get(e.endId);
-        if (!isOwnedSplineHandle(e) && a?.type === 'point' && b?.type === 'point' && distance(a, b) < CAD_GEOMETRY_TOLERANCE)
+        // A sketch extruded by the regions picked in it can hold a line collapsed to a point, as by a dimension of zero:
+        // it bounds no region, and the extrude that wanted one says so.
+        if (
+          !part.regions &&
+          !isOwnedSplineHandle(e) &&
+          a?.type === 'point' &&
+          b?.type === 'point' &&
+          distance(a, b) < CAD_GEOMETRY_TOLERANCE
+        )
           error('zero-length', 'Remove or redraw this zero-length line.', [e.id]);
       }
       if (e.type === 'ellipse' && (!Number.isFinite(e.radius) || e.radius <= CAD_GEOMETRY_TOLERANCE))

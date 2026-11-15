@@ -53,15 +53,26 @@ export function sketchFeedback(result: CadSolveResult) {
     sketchProblems: [...new Set(issues.filter(d => !result.featuresEvaluated || PROFILE_CODES.has(d.code)).map(d => d.message))],
     conflictedConstraintIds: [...new Set(issues.flatMap(d => d.constraintIds ?? []))],
     /** Why each part, by id, wasn't built from its solved sketch: the first error building it reported. */
-    featureProblems: Object.fromEntries(
-      result.featuresEvaluated
-        ? issues
-            .filter(d => d.partId)
-            .reverse()
-            .map(d => [d.partId!, d.message])
-        : []
-    ) as Record<string, string>,
+    featureProblems: brokenFeatures(result, issues),
   };
+}
+
+/**
+ * Why each part, by id, wasn't built from its solved sketch: the first error building it reported. A part's sketch that
+ * isn't fully defined is said to be too (`<part>:sketch`), as what an edit left free is the first place to look.
+ */
+function brokenFeatures(result: CadSolveResult, issues: CadSolveResult['diagnostics']): Record<string, string> {
+  if (!result.featuresEvaluated) return {};
+  const broken: Record<string, string> = Object.fromEntries(
+    issues
+      .filter(d => d.partId)
+      .reverse()
+      .map(d => [d.partId!, d.message])
+  );
+  // A part's profile sketch comes first; its face sketches are its features' own.
+  const profiles = result.sketches.filter((s, i, all) => all.findIndex(other => other.partId === s.partId) === i);
+  for (const sketch of profiles) if (broken[sketch.partId] && sketch.dof > 0) broken[`${sketch.partId}:sketch`] = 'is not fully defined';
+  return broken;
 }
 
 /** What the last check of the sketches found, before there's been one or when one fails outright. */

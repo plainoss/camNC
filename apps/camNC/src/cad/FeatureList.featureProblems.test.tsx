@@ -33,9 +33,7 @@ it('marks an Extrude broken when its picked regions no longer touch, while its s
       .getByRole('button', { name: /Extrude · Plate/ })
       .closest('.cad-feature-broken')
   ).not.toBeNull();
-  expect(
-    within(features)
-      .getByRole('button', { name: /Sketch · Plate/ })
-      .closest('.cad-feature-broken')
-  ).toBeNull();
+  // The sketch closes: at most it says it isn't fully defined, never the extrude's problem.
+  const sketch = within(features).getByRole('button', { name: /Sketch · Plate/ });
+  expect(sketch.getAttribute('aria-description') ?? 'Sketch · Plate is not fully defined').toBe('Sketch · Plate is not fully defined');
 });

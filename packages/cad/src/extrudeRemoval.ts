@@ -1,3 +1,4 @@
+import { missingRegionMessage } from './regionProfile';
 import { applyPartCuts } from './cutParts';
 import { cadSketchFrame } from './usedEdges';
 import { cadDrawnOnSupports, effectivePlacement, resolveDrawnPlacements } from './drawnOn';
@@ -90,7 +91,7 @@ export function applyExtrudeRemovals(
     const wanted = step.regions ?? found.cut;
     const regions = found.regions.filter(region => wanted.includes(region.id));
     if (new Set(wanted).size !== regions.length) {
-      error('A region picked to remove is no longer in its sketch. Pick its regions again.');
+      error(missingRegionMessage(new Set(wanted).size - regions.length));
       continue;
     }
     const groups = regionGroups(regions);

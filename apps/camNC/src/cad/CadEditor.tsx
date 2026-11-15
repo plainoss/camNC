@@ -575,6 +575,7 @@ export function CadEditor({
     blank: blankDesign,
     rolledTo,
     dialog,
+    sketching: studioSession && !showWorkspace && part ? `${part.id}:sketch` : null,
     checks: { lastCheckedRevision, setCheckEpoch },
   });
   documentRef.current = doc;
@@ -1441,7 +1442,10 @@ export function CadEditor({
   // The studio's Parts list shows each physical instance, with an eye to show or hide it in the view.
   // The studio's parts: a sketch not yet extruded is a feature, not a part.
   // A tool used up by its cut isn't a part of its own any more.
-  const builtParts = studioSession ? listedStudioParts(doc, dialog, rolledBack) : builtStudioParts(doc);
+  // A part whose extrude wasn't built isn't a part yet.
+  const builtParts = studioSession
+    ? listedStudioParts(doc, dialog, rolledBack).filter(p => !featureProblems?.[p.id])
+    : builtStudioParts(doc);
   const isolatePart = usePartIsolation(builtParts, cutSelection.selectedKey, hiddenParts, setHiddenParts);
   const physicalPartCount = builtParts.reduce((count, p) => count + 1 + (p.copies?.length ?? 0), 0);
   // An open sketch turned with its parts behind it, about the middle of the view.
@@ -1453,7 +1457,7 @@ export function CadEditor({
   // Labels and points are turned back where they stand, to read and look the same from any side.
   const unturn = `matrix(${td / turnDet}, ${-tb / turnDet}, ${-tc / turnDet}, ${ta / turnDet}, 0, 0)`;
   const studioDisabled = disabledStudioCommands(part, partHasOutline, builtParts.length);
-  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback);
+  const featureShown = useFeatureShown(featureVisibility, shownDocument, pastRollback, featureProblems);
   const partsPanel = (
     <>
       <div className="cad-panel-heading" hidden={!!faceSketch}>

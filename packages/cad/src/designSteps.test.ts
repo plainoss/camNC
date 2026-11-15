@@ -71,9 +71,7 @@ describe('the design’s steps', () => {
     const opened = { ...part, sketch: { ...part.sketch, entities: part.sketch.entities.filter(entity => entity !== side) } };
     const steps = designSteps({ ...document, parts: [opened] });
     expect(steps.find(step => step.kind === 'sketch')?.broken).toBeUndefined();
-    expect(steps.find(step => step.kind === 'extrude')?.broken).toBe(
-      'A region picked for Plate is no longer in its sketch. Pick its regions again.'
-    );
+    expect(steps.find(step => step.kind === 'extrude')?.broken).toBe('Select face or sketch region to extrude. 1 missing selection');
     const boss = { ...createCadPart('Boss', 6), drawnOn: { on: { partId: part.id, face: 'top' as const }, offset: 0 } };
     const built = designSteps({ ...document, parts: [opened, boss] }).filter(step => step.partId === boss.id);
     expect(built.find(step => step.kind === 'extrude')?.broken).toBe('It’s drawn on a face of Plate, which can’t be built.');

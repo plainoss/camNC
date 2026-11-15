@@ -14,13 +14,7 @@ export function dimensionValueError(
     value <= CAD_GEOMETRY_TOLERANCE
   )
     return 'This dimension must be greater than zero.';
-  if (
-    !dimension.driven &&
-    dimension.sourceEntityId !== undefined &&
-    (dimension.type === 'distanceX' || dimension.type === 'distanceY') &&
-    Math.abs(value) <= CAD_GEOMETRY_TOLERANCE
-  )
-    return 'A line dimension must not be zero.';
+  // A line dimension of zero is taken: the line collapses to a point, and what's extruded from it says so.
   if (dimension.type === 'distance' && dimension.driven && value < 0) return 'A reference length must not be negative.';
   if (
     ['pointLineDistance', 'lineLineDistance', 'pointArcDistance', 'lineCircleDistance', 'circleCircleDistance'].includes(dimension.type) &&

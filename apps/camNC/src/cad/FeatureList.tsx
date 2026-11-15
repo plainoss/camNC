@@ -209,15 +209,18 @@ export function FeatureList({
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
-  const entries = folderFeatureEntries(document).map(entry =>
-    entry.kind === 'step' &&
-    entry.step.kind === 'extrude' &&
-    !entry.step.broken &&
-    !entry.step.suppressed &&
-    featureProblems?.[entry.step.partId]
-      ? { ...entry, step: { ...entry.step, broken: featureProblems[entry.step.partId] } }
-      : entry
-  );
+  const entries = folderFeatureEntries(document).map(entry => {
+    if (entry.kind !== 'step' || entry.step.broken || entry.step.suppressed) return entry;
+    // An extrude that wasn't built says why, and its sketch says when it isn't fully defined.
+    const problem =
+      entry.step.kind === 'extrude'
+        ? featureProblems?.[entry.step.partId]
+        : entry.step.kind === 'sketch' && featureProblems?.[entry.step.id];
+    return problem ? { ...entry, step: { ...entry.step, broken: problem } } : entry;
+  });
+  /** What hovering a broken row says, as the reference does: the feature by its name, then why. */
+  const brokenMessage = (step: DesignStep) =>
+    step.kind === 'sketch' ? `${step.label} ${step.broken}` : `${step.label} did not regenerate properly: ${step.broken}`;
   const [selectedEntry, setSelectedEntry] = useState<string | null>(initialSelection ?? null);
   const folders = useFolderControls({ document, onChange, onRollTo, selectedPartId });
   const select = (entry: FeatureEntry) => {
@@ -510,7 +513,7 @@ export function FeatureList({
                 aria-current={key(entry) === selectedEntry ? 'true' : undefined}
                 aria-pressed={entry.kind === 'plane' ? selectedPlane === entry.id : undefined}
                 aria-haspopup="menu"
-                aria-description={step?.broken}
+                aria-description={step?.broken && brokenMessage(step)}
                 onClick={() => {
                   // A plane is picked to sketch on, as a base plane is.
                   if (entry.kind === 'plane') onPickPlane?.(entry.id);
@@ -551,7 +554,7 @@ export function FeatureList({
                 <span>{label(entry)}</span>
                 {step?.detail && <small>{step.detail}</small>}
                 {step?.broken && (
-                  <span className="cad-feature-warning" role="img" aria-label="Error" title={step.broken}>
+                  <span className="cad-feature-warning" role="img" aria-label="Error" title={brokenMessage(step)}>
                     ⚠
                   </span>
                 )}

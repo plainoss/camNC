@@ -92,13 +92,10 @@ export function transitionDimensionWorkflow(
   if (event.type === 'hover') return state.phase === 'placing' ? candidate(sketch, state, event.position) : { state };
   const resolved = candidate(sketch, state, event.position);
   if (resolved.state.phase !== 'placing') return resolved;
-  if (resolved.state.existingConstraintId)
-    return {
-      state: idleDimensionWorkflow(state.mode),
-      effect: { type: 'edit-existing', constraintId: resolved.state.existingConstraintId },
-    };
+  // A measurement already dimensioned gets a dimension of its own, which the sketch's check makes a reference one.
+  const preview = { ...resolved.state.preview, id: resolved.state.previewId };
   return {
     state: idleDimensionWorkflow(state.mode),
-    effect: { type: 'create', constraint: withDimensionPlacement(sketch, resolved.state.preview, event.position) },
+    effect: { type: 'create', constraint: withDimensionPlacement(sketch, preview, event.position) },
   };
 }

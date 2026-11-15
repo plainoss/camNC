@@ -46,7 +46,12 @@ it('places a redundant new size as a read-only reference, keeps old drivers and 
   expect(reference).toMatchObject({ type: 'distanceX', value: 100, driven: true });
   expect(latest().constraints.filter(c => c.id !== reference.id)).toEqual(original.constraints);
   expect(latest().entities).toEqual(original.entities);
+  // Its value box opens with the length it measures, and Enter takes it as it is.
+  const measured = screen.getByRole('textbox', { name: /mm$/ });
+  expect((measured as HTMLInputElement).value).toBe('100');
+  await userEvent.keyboard('{Enter}');
   expect(screen.queryByRole('textbox', { name: /mm$/ })).toBeNull();
+  expect(latest().constraints.find(c => c.id === reference.id)).toMatchObject({ value: 100, driven: true });
   const label = screen.getByRole('button', { name: /^Reference .*: 100 mm$/ });
   await userEvent.dblClick(label);
   expect(screen.queryByRole('textbox', { name: /mm$/ })).toBeNull();
@@ -59,7 +64,7 @@ it('places a redundant new size as a read-only reference, keeps old drivers and 
   expect(latest().constraints).toContainEqual(reference);
 });
 
-it('rejects zero for a line-owned horizontal size while keeping the value editor and source intact', async () => {
+it('takes zero for a line-owned horizontal size, collapsing the line', async () => {
   const source = createPlateDocument({ width: 100, height: 60 }),
     change = vi.fn<(document: CadDocument) => void>();
   ids.push(source.id);
@@ -71,10 +76,11 @@ it('rejects zero for a line-owned horizontal size while keeping the value editor
   await checked();
   await userEvent.dblClick(screen.getByRole('button', { name: 'Edit Width: 100 mm' }));
   const input = screen.getByRole('textbox', { name: 'Width mm' });
+  await userEvent.clear(input);
   await userEvent.keyboard('0{Enter}');
-  expect(document.activeElement).toBe(input);
-  expect((input as HTMLInputElement).value).toBe('0');
-  expect(await screen.findByText('A line dimension must not be zero.')).toBeDefined();
-  const latest = change.mock.calls.at(-1)?.[0] ?? source;
-  expect(latest.parts[0]!.sketch.constraints.find(c => c.label === 'Width')).toMatchObject({ value: 100 });
+  await waitFor(() =>
+    expect((change.mock.calls.at(-1)?.[0] ?? source).parts[0]!.sketch.constraints.find(c => c.label === 'Width')).toMatchObject({
+      value: 0,
+    })
+  );
 });
