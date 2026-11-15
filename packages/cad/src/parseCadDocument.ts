@@ -240,6 +240,16 @@ export function parseCadDocument(input: unknown): CadDocument {
         if (fillet.suppressed !== undefined && typeof fillet.suppressed !== 'boolean') throw new Error('Invalid CAD fillet');
       }
     }
+    if (p.thinWall !== undefined) {
+      const wall = p.thinWall;
+      if (!wall || typeof wall !== 'object') throw new Error('Invalid CAD thin wall');
+      number(wall.thickness1);
+      number(wall.thickness2);
+      if (wall.thickness1 < 0 || wall.thickness2 < 0 || wall.thickness1 + wall.thickness2 <= 0) throw new Error('Invalid CAD thin wall');
+      for (const key of ['thickness1Expression', 'thickness2Expression'] as const)
+        if (wall[key] !== undefined && typeof wall[key] !== 'string') throw new Error('Invalid CAD thin wall');
+      if (wall.midPlane !== undefined && wall.midPlane !== true) throw new Error('Invalid CAD thin wall');
+    }
     if (p.mirrorJoins !== undefined) {
       if (!Array.isArray(p.mirrorJoins) || !p.mirrorJoins.length) throw new Error('Invalid CAD mirror');
       for (const join of p.mirrorJoins) {

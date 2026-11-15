@@ -358,6 +358,8 @@ export interface CadPart {
    * (to its right, walking the line from its start) or centred on it.
    */
   thin?: CadThinExtrude;
+  /** A thin extrude of a picked shape: walls around its outline, with no floor. Ignored when the part is a `thin` board. */
+  thinWall?: CadThinWall;
   /**
    * A bone in every inside corner, so a bit of this diameter cuts it fully and a part that fits into it goes all the
    * way in. The diameter is the design's bit: a bigger bit in the job can't reach into the bones.
@@ -374,6 +376,16 @@ export interface CadPart {
  * A part's sketch x and y, with its thickness as z, turned by `rotation` (a unit quaternion x, y, z, w) and then moved by
  * `position`, in mm.
  */
+export interface CadThinWall {
+  /** mm out from the shape's outline, or both ways around it when centred. */
+  thickness1: number;
+  thickness1Expression?: string;
+  /** mm in from the outline. */
+  thickness2: number;
+  thickness2Expression?: string;
+  /** Centred on the outline, Thickness 1 in all. */
+  midPlane?: true;
+}
 export interface CadThinExtrude {
   /** mm the board reaches from its plane or face. */
   depth: number;

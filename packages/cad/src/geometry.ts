@@ -1,3 +1,4 @@
+import { thinWallShape } from './thinWall';
 import { withMirrorJoins } from './mirrorJoins';
 import { slotIssue } from './slot';
 import { linearPatternIssue } from './pattern';
@@ -479,7 +480,10 @@ export function evaluateCadPart(part: CadPart): { part?: EvaluatedCadPart; diagn
       diagnostics: [],
     };
   }
-  if (part.regions) return regionProfile(part as CadPart & { regions: string[] });
+  if (part.regions) {
+    const made = regionProfile(part as CadPart & { regions: string[] });
+    return part.thinWall && made.part ? { ...made, part: thinWallShape(part, made.part) } : made;
+  }
   const diagnostics: CadDiagnostic[] = [];
   const error = (code: string, message: string, entityIds?: string[]) =>
     diagnostics.push({ code, message, severity: 'error', partId: part.id, entityIds });

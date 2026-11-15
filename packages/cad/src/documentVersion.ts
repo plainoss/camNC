@@ -6,7 +6,13 @@ export function cadDocumentVersion(document: CadDocument): CadDocument['version'
   if (
     document.partCuts?.some(step => step?.operation !== undefined) ||
     document.parts.some(
-      part => part?.mergeAll || part?.mirrorJoins?.length || part?.pattern?.second || part?.pattern?.skipped || part?.pattern?.centered
+      part =>
+        part?.mergeAll ||
+        part?.mirrorJoins?.length ||
+        part?.thinWall ||
+        part?.pattern?.second ||
+        part?.pattern?.skipped ||
+        part?.pattern?.centered
     )
   )
     return 7;
