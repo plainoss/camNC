@@ -35,30 +35,17 @@ import {
   sketchContextAction,
 } from './sketchModifyActions';
 import { cadFieldText, DesignUnitContext, useDesignUnits } from './designUnits';
-import { SketchSlotControls, SketchSlotWidthHandle } from './SketchSlotControls';
-import { previewSlot } from './slotPreview';
-import { SketchCircularPatternControls, SketchCircularPatternManipulator } from './SketchCircularPatternControls';
-import { initialCircularPatternParameters, circularPatternParameters, parseCircularPatternParameters } from './circularPatternParameters';
+import { SketchSlotWidthHandle } from './SketchSlotControls';
+import { useSketchCommandPreviews } from './useSketchCommandPreviews';
+import { SketchCommandControls } from './SketchCommandControls';
+import { SketchCircularPatternManipulator } from './SketchCircularPatternControls';
+import { initialCircularPatternParameters, circularPatternParameters } from './circularPatternParameters';
 import {
   withCadLengthUnit,
-  addBezier,
-  addConic,
   addConstraint,
-  addSpline,
   createCadPart,
   dimensionValueError,
   entityPointIds as curvePointIds,
-  filletLineCorners,
-  chamferLineCorners,
-  transformSketchEntities,
-  linearPatternSketchEntities,
-  circularPatternSketchEntities,
-  resolveChamferCorners,
-  extendSketchCurve,
-  mirrorSketchEntities,
-  offsetSketch,
-  resolveFilletCorners,
-  tessellateCurve,
   updateDimension,
   visibleSketchPointIds,
   withDimensionPlacement,
@@ -120,25 +107,16 @@ import {
 import { idleDrawingGesture, type DrawingGesture } from '@wbcnc/cad-editor/drawingGesture';
 import { advanceCreationValue, creationValueAnchor, creationValueAt, type CreationValues } from './creationValues';
 import { CreationValueControls } from './CreationValueControls';
-import {
-  SketchChamferForm,
-  SketchConicRhoForm,
-  SketchDimensionEditor,
-  SketchFilletForm,
-  SketchPolygonForm,
-  SketchShapeSizeForm,
-} from './SketchValueForms';
-import { SketchLinearPatternControls, SketchLinearPatternManipulator } from './SketchLinearPatternControls';
+import { SketchConicRhoForm, SketchDimensionEditor, SketchPolygonForm, SketchShapeSizeForm } from './SketchValueForms';
+import { SketchLinearPatternManipulator } from './SketchLinearPatternControls';
 import {
   initialLinearPatternParameters,
   linearPatternParameters,
-  parseLinearPatternParameters,
-  linearPatternAnchor,
   editablePatternSources,
   type LinearPatternParameters,
 } from './linearPatternParameters';
-import { SketchTransformControls, SketchTransformManipulator } from './SketchTransformControls';
-import { initialTransformParameters, parseTransformParameters, repositionTransformPivot } from './transformParameters';
+import { SketchTransformManipulator } from './SketchTransformControls';
+import { initialTransformParameters } from './transformParameters';
 import { SelectionReadout } from './SelectionReadout';
 import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
@@ -648,160 +626,54 @@ export function CadEditor({
       mounted.current = false;
     };
   }, []);
-  const filletSelection = useMemo(
-    () => (sketch && tool === 'fillet' ? resolveFilletCorners(sketch, selected) : null),
-    [sketch, tool, selected]
-  );
-  const filletPreview = useMemo(() => {
-    if (!sketch || !filletSelection?.ok) return null;
-    const radius = parseCadValue(filletRadius, { unit: 'mm', variables: variableScope });
-    return 'error' in radius
-      ? { ok: false as const, message: radius.error, cornerPointIds: filletSelection.cornerPointIds }
-      : filletLineCorners(sketch, { cornerPointIds: filletSelection.cornerPointIds, radius: radius.value });
-  }, [sketch, filletSelection, filletRadius, variableScope, parseCadValue]);
-  const chamferSelection = useMemo(
-    () => (sketch && tool === 'chamfer' ? resolveChamferCorners(sketch, selected) : null),
-    [sketch, tool, selected]
-  );
-  const chamferPreview = useMemo(() => {
-    if (!sketch || !chamferSelection?.ok) return null;
-    const values = chamferDistances.map(value => parseCadValue(value, { unit: 'mm', variables: variableScope }));
-    const error = values.find(value => 'error' in value);
-    return error && 'error' in error
-      ? { ok: false as const, message: error.error, cornerPointIds: chamferSelection.cornerPointIds }
-      : chamferLineCorners(sketch, {
-          cornerPointIds: chamferSelection.cornerPointIds,
-          distanceA: (values[0] as { value: number }).value,
-          distanceB: (values[1] as { value: number }).value,
-          selectedLineIds: selected,
-        });
-  }, [sketch, chamferSelection, chamferDistances, selected, variableScope, parseCadValue]);
-  const cornerPreview = tool === 'chamfer' ? chamferPreview : filletPreview;
-  const parsedTransform = useMemo(() => parseTransformParameters(transformParameters, lengthUnit), [transformParameters, lengthUnit]);
-  const transformPreview = useMemo(() => {
-    if (!sketch || tool !== 'transform' || !selected.length) return null;
-    return parsedTransform.ok ? transformSketchEntities(sketch, { ...parsedTransform, entityIds: selected }) : parsedTransform;
-  }, [sketch, tool, selected, parsedTransform]);
-  const parsedCircular = useMemo(() => parseCircularPatternParameters(circularParameters, lengthUnit), [circularParameters, lengthUnit]);
-  const parsedLinear = useMemo(
-    () => parseLinearPatternParameters(linearParameters, variableScope, lengthUnit),
-    [linearParameters, variableScope, lengthUnit]
-  );
-  const linearPreview = useMemo(() => {
-    if (!sketch || !selected.length) return null;
-    if (tool === 'circularPattern')
-      return parsedCircular.ok
-        ? circularPatternSketchEntities(sketch, {
-            ...parsedCircular,
-            entityIds: selected,
-            patternId: patternEditId ?? patternCommandId.current,
-            previewLimit: 9,
-          })
-        : parsedCircular;
-    if (tool !== 'linearPattern') return null;
-    return parsedLinear.ok
-      ? linearPatternSketchEntities(sketch, {
-          ...parsedLinear,
-          entityIds: selected,
-          patternId: patternEditId ?? patternCommandId.current,
-          previewLimit: 9,
-        })
-      : parsedLinear;
-  }, [sketch, tool, selected, patternEditId, parsedLinear, parsedCircular]);
-  const patternAnchor = useMemo(() => (sketch ? linearPatternAnchor(sketch, selected) : { x: 0, y: 0 }), [sketch, selected]);
-  const slotPreview = useMemo(
-    () =>
-      sketch && tool === 'slot' && selected.length
-        ? previewSlot(sketch, selected, slotWidth, slotChain, sharedSlotWidth, lengthUnit)
-        : null,
-    [sketch, tool, selected, slotWidth, slotChain, sharedSlotWidth, lengthUnit]
-  );
-  const slotWidthCircle = slotPreview?.ok
-    ? slotPreview.sketch.entities.find(
-        e =>
-          e.type === 'circle' &&
-          slotPreview.sketch.constraints.some(c => c.type === 'slot' && c.id === slotPreview.slotId && c.widthEntityId === e.id)
-      )
-    : undefined;
-  const slotWidthCenter =
-    slotWidthCircle?.type === 'circle' && slotPreview?.ok
-      ? slotPreview.sketch.entities.find(e => e.id === slotWidthCircle.centerId)
-      : undefined;
-  const shownSketch = slotPreview?.ok
-    ? slotPreview.sketch
-    : linearPreview?.ok
-      ? linearPreview.sketch
-      : transformPreview?.ok
-        ? transformPreview.sketch
-        : cornerPreview?.ok
-          ? cornerPreview.sketch
-          : sketch;
-  const annotationSketch = slotPreview?.ok
-    ? slotPreview.sketch
-    : linearPreview?.ok
-      ? linearPreview.sketch
-      : transformPreview?.ok
-        ? transformPreview.sketch
-        : sketch;
-  const offsetPreview = useMemo(() => {
-    if (!sketch || modification.phase !== 'offset' || !modification.entityIds.length) return null;
-    const parsed = parseCadValue(modification.text, { unit: 'mm', variables: variableScope });
-    return 'error' in parsed
-      ? { ok: false as const, message: parsed.error }
-      : offsetSketch(sketch, { entityIds: modification.entityIds, value: parsed.value });
-  }, [sketch, modification, variableScope, parseCadValue]);
-  const extendPreview = useMemo(
-    () =>
-      sketch && modification.phase === 'extend' && modification.entityId && modification.end && modifyTarget
-        ? extendSketchCurve(sketch, {
-            entityId: modification.entityId,
-            end: modification.end,
-            target: modifyTarget,
-            boundaryId: hoveredModifyCurve && hoveredModifyCurve !== modification.entityId ? hoveredModifyCurve : undefined,
-          })
-        : null,
-    [sketch, modification, modifyTarget, hoveredModifyCurve]
-  );
-  const mirrorPreview = useMemo(
-    () =>
-      sketch && modification.phase === 'mirror' && modification.picking === 'axis' && modification.entityIds.length && hoveredModifyCurve
-        ? mirrorSketchEntities(sketch, { entityIds: modification.entityIds, axisId: hoveredModifyCurve })
-        : null,
-    [sketch, modification, hoveredModifyCurve]
-  );
-  const modificationPreview = offsetPreview?.ok
-    ? offsetPreview
-    : extendPreview?.ok
-      ? extendPreview
-      : mirrorPreview?.ok
-        ? mirrorPreview
-        : null;
-  const curvePreview = useMemo(() => {
-    if (!sketch || !pending.length || !['conic', 'spline', 'bezier'].includes(tool)) return null;
-    const locations = [...pending];
-    if (Math.hypot(cursor.x - locations.at(-1)!.x, cursor.y - locations.at(-1)!.y) > 1e-7) locations.push(cursor);
-    if (locations.length < 2) return null;
-    try {
-      const parsedRho = parseCadValue(rho, { unit: 'scalar' });
-      if (tool === 'conic' && 'error' in parsedRho) return locations;
-      const preview =
-        tool === 'conic'
-          ? locations[2]
-            ? addConic(sketch, {
-                start: locations[0]!,
-                end: locations[1]!,
-                control: locations[2]!,
-                rho: 'value' in parsedRho ? parsedRho.value : 0.5,
-                construction,
-              })
-            : null
-          : (tool === 'spline' ? addSpline : addBezier)(sketch, { points: locations, construction });
-      const curve = preview?.entities.at(-1);
-      return curve && curve.type !== 'point' ? tessellateCurve(curve, pointsOf(preview!), 0.25 / markerScale) : locations;
-    } catch {
-      return locations;
-    }
-  }, [sketch, pending, cursor, tool, rho, construction, markerScale, parseCadValue]);
+  const {
+    filletSelection,
+    filletPreview,
+    chamferSelection,
+    chamferPreview,
+    cornerPreview,
+    parsedTransform,
+    transformPreview,
+    parsedCircular,
+    parsedLinear,
+    linearPreview,
+    patternAnchor,
+    slotPreview,
+    slotWidthCircle,
+    slotWidthCenter,
+    shownSketch,
+    annotationSketch,
+    offsetPreview,
+    extendPreview,
+    mirrorPreview,
+    modificationPreview,
+    curvePreview,
+  } = useSketchCommandPreviews({
+    sketch,
+    tool,
+    selected,
+    construction,
+    lengthUnit,
+    variableScope,
+    parseCadValue,
+    markerScale,
+    filletRadius,
+    chamferDistances,
+    transformParameters,
+    circularParameters,
+    linearParameters,
+    patternEditId,
+    patternCommandId,
+    slotWidth,
+    slotChain,
+    sharedSlotWidth,
+    modification,
+    modifyTarget,
+    hoveredModifyCurve,
+    pending,
+    cursor,
+    rho,
+  });
   useEffect(() => {
     focusSketchCanvas(svg.current);
     const release = acquireCadKeyboard();
@@ -2766,117 +2638,49 @@ export function CadEditor({
               onEscape={() => chooseTool('select')}
             />
           )}
-          {tool === 'slot' && selected.length > 0 && (
-            <SketchSlotControls
-              width={slotWidth}
-              onWidth={setSlotWidth}
-              chain={slotChain}
-              onChain={setSlotChain}
-              inputRef={slotWidthField}
-              onApply={acceptSlot}
-              onCancel={() => {
-                chooseTool('select');
-                setSelected([]);
-              }}
-              error={slotPreview && !slotPreview.ok ? slotPreview.message : undefined}
-            />
-          )}
-          {tool === 'circularPattern' && selected.length > 0 && (
-            <SketchCircularPatternControls
-              parameters={circularParameters}
-              onChange={setCircularParameters}
-              onApply={acceptCircularPattern}
-              onCancel={() => {
-                chooseTool('select');
-                setSelected([]);
-              }}
-              error={linearPreview && !linearPreview.ok ? linearPreview.message : undefined}
-              previewLimited={parsedCircular.ok && parsedCircular.count > 10}
-              releasedCount={linearPreview?.ok ? linearPreview.releasedConstraintIds.length : 0}
-              onField={(key, element) => {
-                if (element) circularFields.current[key] = element;
-                else delete circularFields.current[key];
-              }}
-            />
-          )}
-          {tool === 'linearPattern' && selected.length > 0 && (
-            <SketchLinearPatternControls
-              parameters={linearParameters}
-              onChange={setLinearParameters}
-              onApply={acceptLinearPattern}
-              onCancel={() => {
-                chooseTool('select');
-                setSelected([]);
-              }}
-              error={linearPreview && !linearPreview.ok ? linearPreview.message : undefined}
-              releasedCount={linearPreview?.ok ? linearPreview.releasedConstraintIds.length : 0}
-              previewLimited={parsedLinear.ok && parsedLinear.countX * parsedLinear.countY > 10}
-              onField={(key, element) => {
-                if (element) patternFields.current[key] = element;
-                else delete patternFields.current[key];
-              }}
-            />
-          )}
-          {patternNotice && (
-            <div className="cad-create-size" role="status">
-              {patternNotice}
-            </div>
-          )}
-          {tool === 'transform' && selected.length > 0 && (
-            <SketchTransformControls
-              parameters={transformParameters}
-              onChange={next => {
-                if (next.pivotX !== transformParameters.pivotX || next.pivotY !== transformParameters.pivotY) {
-                  const parsed = parseTransformParameters(next, lengthUnit);
-                  setTransformParameters(parsed.ok ? repositionTransformPivot(transformParameters, parsed.pivot, lengthUnit) : next);
-                } else setTransformParameters(next);
-              }}
-              onApply={acceptTransform}
-              onCancel={() => {
-                chooseTool('select');
-                setSelected([]);
-              }}
-              error={transformPreview && !transformPreview.ok ? transformPreview.message : undefined}
-              releasedCount={transformPreview?.ok ? transformPreview.releasedConstraintIds.length : 0}
-            />
-          )}
-          {transformNotice && (
-            <div className="cad-create-size" role="status">
-              {transformNotice}
-            </div>
-          )}
-          {tool === 'split' && splitNotice && (
-            <div className="cad-create-size" role="status">
-              {splitNotice}
-            </div>
-          )}
-          {tool === 'chamfer' && selected.length > 0 && (
-            <SketchChamferForm
-              distances={chamferDistances}
-              preview={chamferPreview}
-              selection={chamferSelection}
-              onDistances={setChamferDistances}
-              onApply={acceptChamfer}
-              onCancel={() => {
-                chooseTool('select');
-                setSelected([]);
-              }}
-            />
-          )}
-          {tool === 'fillet' && selected.length > 0 && (
-            <SketchFilletForm
-              inputRef={filletInput}
-              radius={filletRadius}
-              preview={filletPreview}
-              onRadius={setFilletRadius}
-              onFocus={() => setFilletEditing(true)}
-              onApply={acceptFillet}
-              onCancel={() => {
-                chooseTool('select');
-                setSelected([]);
-              }}
-            />
-          )}
+          <SketchCommandControls
+            tool={tool}
+            selected={selected}
+            lengthUnit={lengthUnit}
+            chooseTool={chooseTool}
+            setSelected={setSelected}
+            slotPreview={slotPreview}
+            linearPreview={linearPreview}
+            parsedCircular={parsedCircular}
+            parsedLinear={parsedLinear}
+            transformPreview={transformPreview}
+            chamferPreview={chamferPreview}
+            chamferSelection={chamferSelection}
+            filletPreview={filletPreview}
+            slotWidth={slotWidth}
+            setSlotWidth={setSlotWidth}
+            slotChain={slotChain}
+            setSlotChain={setSlotChain}
+            slotWidthField={slotWidthField}
+            acceptSlot={acceptSlot}
+            circularParameters={circularParameters}
+            setCircularParameters={setCircularParameters}
+            circularFields={circularFields}
+            acceptCircularPattern={acceptCircularPattern}
+            linearParameters={linearParameters}
+            setLinearParameters={setLinearParameters}
+            patternFields={patternFields}
+            acceptLinearPattern={acceptLinearPattern}
+            patternNotice={patternNotice}
+            transformParameters={transformParameters}
+            setTransformParameters={setTransformParameters}
+            acceptTransform={acceptTransform}
+            transformNotice={transformNotice}
+            splitNotice={splitNotice}
+            chamferDistances={chamferDistances}
+            setChamferDistances={setChamferDistances}
+            acceptChamfer={acceptChamfer}
+            filletInput={filletInput}
+            filletRadius={filletRadius}
+            setFilletRadius={setFilletRadius}
+            setFilletEditing={setFilletEditing}
+            acceptFillet={acceptFillet}
+          />
           {conicEditing && (
             <SketchConicRhoForm inputRef={rhoInput} rho={rho} onRho={setRho} onApply={applyConicRho} onClose={() => chooseTool('select')} />
           )}
