@@ -50,7 +50,7 @@ import {
 } from '@wbcnc/cad';
 import { combineExpressions, differenceExpression } from './linearExpression';
 import { inspectCadDocument, shortHandles, type CadExpectation, type CadInspection } from './inspect';
-import { CadScriptError, fail, resolveHandle, existingDesignEdit } from './editExisting';
+import { CadScriptError, fail, resolveHandle, existingDesignEdit, type EditContext, type ExistingScope } from './editExisting';
 import { runFolderScope } from './folderScope';
 import { declareScriptConstruction } from './constructionApi';
 
@@ -750,7 +750,7 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     },
   });
 
-  const existing = existingDesignEdit({
+  const existingContext: EditContext = {
     get: () => document,
     set: next => {
       document = next;
@@ -758,7 +758,8 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     part: partEdit,
     copy: copyHandle,
     measure,
-  });
+  };
+  const existing = existingDesignEdit(existingContext);
   const optionsOnPart = (partId: string, options?: { thickness?: Len; relief?: Len }) => {
     const edit = partEdit(partId);
     if (options?.thickness !== undefined) edit.thickness(options.thickness);
@@ -766,35 +767,20 @@ function createDesignEdit(start: CadDocument, expectations: Map<string, CadExpec
     return edit;
   };
   const { findPart: _findPart, cut: _cut, ...existingApi } = existing;
+  const folderContext = {
+    get: () => document,
+    set: (next: CadDocument) => {
+      document = next;
+      variablesDirty = true;
+    },
+    existing: (scope: ExistingScope) => existingDesignEdit(existingContext, scope),
+  };
   const edit: DesignEdit = {
     folder(name, script) {
-      return runFolderScope(
-        {
-          get: () => document,
-          set: next => {
-            document = next;
-            variablesDirty = true;
-          },
-        },
-        edit,
-        name,
-        script
-      );
+      return runFolderScope(folderContext, edit, name, script);
     },
     existingFolder(name, script) {
-      return runFolderScope(
-        {
-          get: () => document,
-          set: next => {
-            document = next;
-            variablesDirty = true;
-          },
-        },
-        edit,
-        name,
-        script,
-        true
-      );
+      return runFolderScope(folderContext, edit, name, script, true);
     },
     ...existingApi,
     construction(options) {

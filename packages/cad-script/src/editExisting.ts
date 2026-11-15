@@ -24,17 +24,41 @@ export const fail = (message: string): never => {
   throw new CadScriptError(message);
 };
 
-export function resolveHandle(ids: readonly string[], handle: string, what: string): string {
-  const exact = ids.find(id => id === handle);
-  if (exact) return exact;
-  const matches = ids.filter(id => id.startsWith(handle));
+/**
+ * The one item a script means: the only one with this name, else the one with exactly this ID, else the only one whose ID
+ * starts with it. `altId` is a second ID an item also answers to.
+ */
+export function resolveNamed<T extends { id: string }>(
+  items: readonly T[],
+  query: string,
+  what: string,
+  nameOf: (item: T) => string | undefined,
+  altId?: (item: T) => string
+): T {
+  const named = items.filter(item => nameOf(item) === query);
+  if (named.length > 1) return fail(`More than one ${what} is named ${query}. Use its handle.`);
+  if (named[0]) return named[0];
+  const ids = (item: T) => (altId ? [item.id, altId(item)] : [item.id]);
+  // A whole ID wins over the longer IDs it happens to begin.
+  const exact = items.filter(item => ids(item).includes(query));
+  if (exact.length === 1) return exact[0]!;
+  const matches = items.filter(item => ids(item).some(id => id.startsWith(query)));
   if (matches.length === 1) return matches[0]!;
   return fail(
-    matches.length ? `The handle ${handle} matches several ${what}. Use more of it.` : `There is no ${what} with the handle ${handle}.`
+    matches.length ? `The handle ${query} fits more than one ${what}. Use more of it.` : `There is no ${what} with the handle ${query}.`
   );
 }
 
-interface EditContext {
+export function resolveHandle(ids: readonly string[], handle: string, what: string): string {
+  return resolveNamed(
+    ids.map(id => ({ id })),
+    handle,
+    what,
+    () => undefined
+  ).id;
+}
+
+export interface EditContext {
   get(): CadDocument;
   set(document: CadDocument): void;
   part(id: string): PartEdit;
@@ -42,59 +66,46 @@ interface EditContext {
   measure(value: Len, what: string, unit?: 'mm' | 'scalar'): number;
 }
 
+/** The parts and steps a folder's script may find; the design itself has no scope and finds everything. */
+export interface ExistingScope {
+  parts(): CadPart[];
+  ownsStep(step: DesignStep): boolean;
+  label: string;
+}
+
 type ExistingApi = Pick<
   DesignEdit,
   'existingCopy' | 'detachCopy' | 'step' | 'removePart' | 'removeCopy' | 'removePattern' | 'removeStep' | 'removeVariable'
 >;
-export function existingDesignEdit(
-  ctx: EditContext
-): ExistingApi & { findPart(name: string): CadPart; cut(partId: string, handle: string): ExistingCutEdit } {
+export type ExistingEdit = ExistingApi & { findPart(name: string): CadPart; cut(partId: string, handle: string): ExistingCutEdit };
+
+export function existingDesignEdit(ctx: EditContext, scope?: ExistingScope): ExistingEdit {
   const save = (document: CadDocument) => ctx.set(trimCadFolders(document));
   const getPart = (id: string) => ctx.get().parts.find(part => part.id === id) ?? fail(`Part ${id} no longer exists.`);
   const replacePart = (id: string, update: (part: CadPart) => CadPart) =>
     save({ ...ctx.get(), parts: ctx.get().parts.map(part => (part.id === id ? update(part) : part)) });
-  const findPart = (name: string): CadPart => {
-    const matches = ctx.get().parts.filter(part => part.name === name);
-    if (matches.length > 1) return fail(`Several parts are named ${name}. Use a part handle.`);
-    if (matches[0]) return matches[0];
-    const id = resolveHandle(
-      ctx.get().parts.map(part => part.id),
+  const scopeParts = () => scope?.parts() ?? ctx.get().parts;
+  const within = scope ? ` in ${scope.label}` : '';
+  const findPart = (name: string): CadPart => resolveNamed(scopeParts(), name, `part${within}`, part => part.name);
+  const copies = (parts = ctx.get().parts) =>
+    parts.flatMap(part =>
+      (part.copies ?? []).map((copy, index) => ({ part, copy, name: cadCopyName(part, index), id: `${part.id}:${copy.id}` }))
+    );
+  const findCopy = (name: string) =>
+    resolveNamed(
+      copies(scopeParts()),
       name,
-      'part'
+      `copy${within}`,
+      copy => copy.name,
+      copy => copy.copy.id
     );
-    return getPart(id);
-  };
-  const copies = () =>
-    ctx
-      .get()
-      .parts.flatMap(part =>
-        (part.copies ?? []).map((copy, index) => ({ part, copy, name: cadCopyName(part, index), id: `${part.id}:${copy.id}` }))
-      );
-  const findCopy = (name: string) => {
-    const all = copies();
-    const names = all.filter(copy => copy.name === name);
-    if (names.length > 1) return fail(`Several copies are named ${name}. Use a copy handle.`);
-    if (names[0]) return names[0];
-    const exact = all.filter(copy => copy.id === name || copy.copy.id === name);
-    if (exact.length === 1) return exact[0]!;
-    const matched = all.filter(copy => copy.id.startsWith(name) || copy.copy.id.startsWith(name));
-    if (matched.length === 1) return matched[0]!;
-    return fail(
-      matched.length ? `The handle ${name} matches several copies. Use more of it.` : `There is no copy with the handle ${name}.`
-    );
-  };
-  const findStep = (name: string): DesignStep => {
-    const all = designSteps(ctx.get());
-    const named = all.filter(step => step.label === name);
-    if (named.length > 1) return fail(`Several steps are named ${name}. Use a step handle.`);
-    if (named[0]) return named[0];
-    const id = resolveHandle(
-      all.map(step => step.id),
+  const findStep = (name: string): DesignStep =>
+    resolveNamed(
+      designSteps(ctx.get()).filter(step => !scope || scope.ownsStep(step)),
       name,
-      'step'
+      `step${within}`,
+      step => step.label
     );
-    return all.find(step => step.id === id)!;
-  };
   const checked = (value: Len, what: string, positive = false, unit: 'mm' | 'scalar' = 'mm') => {
     const number = ctx.measure(value, what, unit);
     if (!Number.isFinite(number) || (positive ? number <= 0 : number < 0))
@@ -258,18 +269,7 @@ export function existingDesignEdit(
     },
     removeStep,
     removeVariable(name) {
-      const all = ctx.get().variables ?? [];
-      const variable =
-        all.find(variable => variable.name === name) ??
-        all.find(
-          variable =>
-            variable.id ===
-            resolveHandle(
-              all.map(variable => variable.id),
-              name,
-              'variable'
-            )
-        )!;
+      const variable = resolveNamed(ctx.get().variables ?? [], name, 'variable', variable => variable.name);
       const result = removeCadVariable(ctx.get(), variable.id);
       if ('error' in result) return fail(result.error);
       save(result.document);

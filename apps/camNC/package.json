@@ -58,7 +58,6 @@
     "@tauri-apps/plugin-http": "3.0.0-alpha.3",
     "@techstark/opencv-js": "catalog:",
     "@testing-library/jest-dom": "catalog:",
-    "@use-gesture/react": "catalog:",
     "@vitest/browser": "catalog:",
     "@wbcnc/cad": "workspace:*",
     "@wbcnc/cad-editor": "workspace:*",

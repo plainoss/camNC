@@ -107,8 +107,8 @@ describe('StreamCornerFinderWorker', () => {
     });
   });
 
-  it('should return null corners for an image without a chessboard', async () => {
-    await testWorkerWithImage(workerProxy, imgNoChessboard, 'not_unique');
+  it('reports not_found for an image without a chessboard', async () => {
+    await testWorkerWithImage(workerProxy, imgNoChessboard, 'not_found');
   });
 
   it('should detect blurry chessboard and return isBlurry true', async () => {

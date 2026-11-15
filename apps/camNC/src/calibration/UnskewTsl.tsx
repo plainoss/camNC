@@ -121,10 +121,6 @@ export function UnskewedVideoMesh({ ...props }: ThreeElements['mesh']) {
 // Add display name for debugging
 UnskewedVideoMesh.displayName = 'UnskewedVideoMesh';
 
-export function UnskewedVideoMeshWithLoading() {
-  return <UnskewedVideoMesh />;
-}
-
 // Main component
 function UnskewTsl() {
   // Handle missing calibration data - calibrationData is now passed through UnskewedVideoMesh
