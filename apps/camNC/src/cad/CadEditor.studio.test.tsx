@@ -531,7 +531,7 @@ it('lists variables with the steps, edits them in a dialog, and offers a menu on
     within(menu)
       .getAllByRole('menuitem')
       .map(item => item.textContent)
-  ).toEqual(['Rename', 'Edit…', 'Edit sketch…', 'Suppress', 'Roll to here', 'Delete']);
+  ).toEqual(['Rename', 'Edit…', 'Edit Sketch · Plate…', 'Suppress', 'Roll to here', 'Delete']);
   // An extrude can be suppressed, as any step but a sketch.
   expect(within(menu).getByRole('menuitem', { name: 'Suppress' }).getAttribute('aria-disabled')).toBeNull();
   await userEvent.click(within(menu).getByRole('menuitem', { name: 'Rename' }));

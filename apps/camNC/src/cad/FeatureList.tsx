@@ -52,7 +52,11 @@ export type FeatureEntry = { kind: 'variable'; id: string } | { kind: 'plane'; i
 export type FeatureAction = 'edit' | 'editSketch' | 'rename' | 'suppress' | 'rollTo' | 'rollToEnd' | 'delete' | 'newSketch' | 'export';
 
 /** What each row's menu offers, and why an item isn't there for it. */
-function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAction; label: string; disabled?: boolean }[] {
+function menuItems(
+  entry: FeatureEntry,
+  rolledBack = false,
+  sketchName = 'sketch'
+): { action: FeatureAction; label: string; disabled?: boolean }[] {
   if (entry.kind === 'variable' || entry.kind === 'plane')
     return [
       ...(entry.kind === 'plane' ? [{ action: 'newSketch' as const, label: 'New sketch' }] : []),
@@ -63,7 +67,8 @@ function menuItems(entry: FeatureEntry, rolledBack = false): { action: FeatureAc
   return [
     ...(kind === 'sketch' || kind === 'extrude' ? [{ action: 'rename' as const, label: 'Rename' }] : []),
     { action: 'edit', label: 'Edit…' },
-    ...(kind === 'extrude' ? [{ action: 'editSketch' as const, label: 'Edit sketch…' }] : []),
+    // Named for the sketch it opens, as Edit Sketch 1….
+    ...(kind === 'extrude' ? [{ action: 'editSketch' as const, label: `Edit ${sketchName}…` }] : []),
     // Sketches aren't suppressed on their own: their extrude is.
     ...(kind === 'sketch' || kind === 'faceSketch' || kind === 'move'
       ? []
@@ -181,6 +186,13 @@ export function FeatureList({
     entry.kind === 'plane' ? entry.id : entry.kind === 'step' && entry.step.kind === 'sketch' ? entry.step.id : null;
   const key = (entry: ListedFeatureEntry) => (entry.kind === 'step' ? entry.step.id : entry.id);
   const rollbackAt = rollback ? entries.findIndex(entry => key(entry) === rollback) : -1;
+  /** The name of the sketch an extrude row is made from, its own or the one it shares. */
+  const sketchOf = (entry: FeatureEntry) => {
+    if (entry.kind !== 'step') return undefined;
+    const owner = document.parts.find(part => part.id === entry.step.partId)?.sketchOf ?? entry.step.partId;
+    const row = entries.find(other => other.kind === 'step' && other.step.kind === 'sketch' && other.step.partId === owner);
+    return row?.kind === 'step' ? row.step.label : undefined;
+  };
   // With the bar movable it's always there: after the step it's rolled to, or at the end.
   const barAt = rollbackAt;
   const [barMenu, setBarMenu] = useState<{ x: number; y: number } | null>(null);
@@ -363,7 +375,11 @@ export function FeatureList({
                   }}
                   onKeyDown={event => {
                     event.stopPropagation();
-                    if (event.key === 'Enter') event.currentTarget.blur();
+                    // Ctrl+A selects the whole name on every platform, as Cmd+A does on a Mac.
+                    if (event.ctrlKey && !event.altKey && event.key.toLowerCase() === 'a') {
+                      event.preventDefault();
+                      event.currentTarget.select();
+                    } else if (event.key === 'Enter') event.currentTarget.blur();
                     else if (event.key === 'Escape') {
                       event.currentTarget.value = step.label;
                       event.currentTarget.blur();
@@ -524,7 +540,11 @@ export function FeatureList({
               items[(at + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
             }
           }}>
-          {menuItems(menu.entry, rollbackAt >= 0 && entries.findIndex(entry => key(entry) === key(menu.entry)) > rollbackAt).map(item => (
+          {menuItems(
+            menu.entry,
+            rollbackAt >= 0 && entries.findIndex(entry => key(entry) === key(menu.entry)) > rollbackAt,
+            sketchOf(menu.entry)
+          ).map(item => (
             <button
               key={item.action}
               type="button"

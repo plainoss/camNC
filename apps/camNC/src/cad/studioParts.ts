@@ -1,4 +1,4 @@
-import { activeDesign, consumedTools, isCadPart, unionOf, type CadDocument, type CadPart } from '@wbcnc/cad';
+import { activeDesign, consumedTools, isCadPart, rolledBackTo, unionOf, type CadDocument, type CadPart } from '@wbcnc/cad';
 import { isBlank } from './editorHelpers';
 import type { StudioDialog } from './studioDialog';
 import { unpickedExtrudePreview } from './unpickedExtrude';
@@ -13,10 +13,11 @@ export function builtStudioParts(document: CadDocument): CadPart[] {
 
 /**
  * The parts the studio's Parts list shows: a new design's untouched placeholder Part 1 is not one yet, nor is the part
- * of an open Extrude with no region picked.
+ * of an open Extrude with no region picked, nor one made only after the step the design is rolled back to.
  */
-export function listedStudioParts(document: CadDocument, dialog?: StudioDialog | null): CadPart[] {
+export function listedStudioParts(document: CadDocument, dialog?: StudioDialog | null, rolledTo?: string | null): CadPart[] {
   if (isBlankDesign(document)) return [];
+  if (rolledTo) document = rolledBackTo(document, rolledTo);
   const built = builtStudioParts(unpickedExtrudePreview(document, dialog?.kind === 'extrude' ? dialog.partId : null));
   // A Boolean › Union's or Intersect's part is as thick as the part it makes, once it can make it.
   const joined = new Map<string, number>();
