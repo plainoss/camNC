@@ -122,7 +122,7 @@ import { CadThicknessField } from './CadThicknessField';
 import { CadVariablesPanel } from './CadVariablesPanel';
 import { DesignStepsList } from './DesignStepsList';
 import { CadDrawnOnField } from './CadDrawnOnField';
-import { drawnOnName, nextSketchLabel, sketchPlaneName } from './drawnOnName';
+import { drawnOnName, nextSketchLabel, pendingRow, sketchPlaneName } from './drawnOnName';
 import { CadReliefField } from './CadReliefField';
 import { CadPartPatternField } from './CadPartPatternField';
 import { CadCopyNames } from './CadCopyNames';
@@ -1633,7 +1633,7 @@ export function CadEditor({
               onRollTo={showWorkspace ? setRolledTo : undefined}
               onHover={entry => setHoveredStepParts(entry?.kind === 'step' ? featureRowParts(doc, entry.step) : null)}
               {...(showWorkspace && { selectedPlane, onPickPlane: pickPlane, onNewSketch: newSketchOn })}
-              {...{ shown: featureShown, featureProblems, pending: choosingFace ? nextSketchLabel(doc, userRollback) : undefined }}
+              {...{ shown: featureShown, featureProblems, pending: pendingRow(doc, dialog, choosingFace, userRollback) }}
               onToggleShown={id => setFeatureVisibility(previous => ({ ...previous, [id]: !featureShown(id) }))}
             />
           )}

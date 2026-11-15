@@ -94,7 +94,7 @@
   {
    "id": "ce331f7c-f911-4451-89e1-d9eb787bda8b:extrude",
    "kind": "extrude",
-   "label": "Extrude · Part 1",
+   "label": "Extrude 1",
    "part": "Part 1",
    "settings": {
     "thickness": {

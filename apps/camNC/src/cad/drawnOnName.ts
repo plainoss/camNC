@@ -1,5 +1,6 @@
 import { cadPartReference, cadPartReferenceName, designStepLabel, designSteps, type CadDocument, type CadDrawnOn } from '@wbcnc/cad';
 import { isBlank } from './editorHelpers';
+import type { StudioDialog } from './studioDialog';
 
 const kPlaneNames = { top: 'the top plane', front: 'the front plane', right: 'the right plane' } as const;
 
@@ -31,4 +32,16 @@ export function nextSketchLabel(document: CadDocument, rolledTo?: string | null)
   const steps = designSteps(document);
   const at = rolledTo ? steps.findIndex(step => step.id === rolledTo) : -1;
   return `Sketch ${(at < 0 ? steps : steps.slice(0, at + 1)).filter(step => step.kind === 'sketch').length + 1}`;
+}
+
+/** The name a new Fillet takes, numbered after every fillet in the design, as Fillet 2. */
+export function nextFilletLabel(document: CadDocument): string {
+  return `Fillet ${designSteps(document).filter(step => step.kind === 'fillet').length + 1}`;
+}
+
+/** The row of a feature whose dialog is open before it's made: a sketch waiting for its plane, or a new Fillet. */
+export function pendingRow(document: CadDocument, dialog: StudioDialog | null, choosingPlane: boolean, rolledTo: string | null) {
+  if (choosingPlane) return { kind: 'sketch' as const, label: nextSketchLabel(document, rolledTo) };
+  if (dialog?.kind === 'fillet' && !dialog.filletId) return { kind: 'fillet' as const, label: nextFilletLabel(document) };
+  return undefined;
 }

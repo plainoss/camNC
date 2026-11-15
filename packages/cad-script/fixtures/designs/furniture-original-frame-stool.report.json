@@ -53,7 +53,7 @@
   {
    "id": "1277014e-7f61-41ec-85f5-8d67f37bbb5a:sketch",
    "kind": "sketch",
-   "label": "Sketch · Part 1",
+   "label": "Sketch 1",
    "part": "Part 1",
    "settings": {
     "on": "the top plane"
@@ -68,7 +68,7 @@
   {
    "id": "1277014e-7f61-41ec-85f5-8d67f37bbb5a:extrude",
    "kind": "extrude",
-   "label": "Extrude · Part 1",
+   "label": "Extrude 1",
    "part": "Part 1",
    "settings": {
     "thickness": {

@@ -32,7 +32,7 @@ it('rounds the edges through a part picked in the view, and refuses a top edge',
   await screen.findByTestId('workspace-3d', undefined, { timeout: 10_000 });
   const props = () => vi.mocked(ModelViewport).mock.calls.at(-1)![0];
   await userEvent.click(await studioCommand(/^Fillet/));
-  const dialog = await screen.findByRole('dialog', { name: 'Fillet' });
+  const dialog = await screen.findByRole('dialog', { name: /^Fillet \d/ });
   const click = (a: [number, number, number], b: [number, number, number]) =>
     act(() => props().onSelect(source.parts[0]!.id, 0, { point: a, normal: [1, 0, 0], edge: { a, b } } as never));
   // An edge along the top can't be rounded with a straight bit.
@@ -41,12 +41,12 @@ it('rounds the edges through a part picked in the view, and refuses a top edge',
   // The edges through the board at two corners.
   await click([100, 60, 0], [100, 60, 18]);
   await click([0, 0, 18], [0, 0, 0]);
-  expect(within(dialog).getByText(/2 edges of Plate/)).toBeDefined();
+  expect(within(dialog).getAllByText('Edge of Extrude · Plate')).toHaveLength(2);
   await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Radius' }));
   await userEvent.type(within(dialog).getByRole('textbox', { name: 'Radius' }), '10');
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(latest().parts[0]!.fillets).toMatchObject([{ radius: 10 }]));
   expect(latest().parts[0]!.fillets![0]!.corners).toHaveLength(2);
   expect(Math.abs(polygonArea(evaluateCadPart(latest().parts[0]!).part!.outline))).toBeCloseTo(6000 - 2 * (100 - 25 * Math.PI), 0);
-  expect(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Fillet · Plate/ })).toBeDefined();
+  expect(within(screen.getByRole('region', { name: 'Features' })).getByRole('button', { name: /Fillet 1/ })).toBeDefined();
 });

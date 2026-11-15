@@ -141,8 +141,8 @@ export function FeatureList({
   /** New sketch, from a base plane's right-click menu, as the reference's. */
   onNewSketch?: (plane: string) => void;
   onChange?: (document: CadDocument) => void;
-  /** A new feature's row while its dialog waits for a first pick, as Sketch 2 before its plane is picked. */
-  pending?: string;
+  /** A new feature's row while its dialog is open and it isn't made yet, as Sketch 2 before its plane is picked. */
+  pending?: { kind: 'sketch' | 'fillet'; label: string };
 }) {
   const { formatLength, lengthUnit } = useDesignUnits();
   const { scope } = cadVariableValues(document);
@@ -509,8 +509,8 @@ export function FeatureList({
         {pending && (
           <li className="cad-feature-pending">
             <button type="button">
-              <span aria-hidden="true">{kIcons.sketch}</span>
-              <span>{pending}</span>
+              <span aria-hidden="true">{kIcons[pending.kind]}</span>
+              <span>{pending.label}</span>
             </button>
           </li>
         )}

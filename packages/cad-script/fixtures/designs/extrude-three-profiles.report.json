@@ -46,7 +46,7 @@
   {
    "id": "ce5cb7ce-ceb6-4675-907b-362125fb0da1:sketch",
    "kind": "sketch",
-   "label": "Sketch · Part 1",
+   "label": "Sketch 1",
    "part": "Part 1",
    "settings": {
     "on": "the front plane"
@@ -61,7 +61,7 @@
   {
    "id": "ce5cb7ce-ceb6-4675-907b-362125fb0da1:extrude",
    "kind": "extrude",
-   "label": "Extrude · Part 1",
+   "label": "Extrude 1",
    "part": "Part 1",
    "settings": {
     "thickness": {
@@ -98,7 +98,7 @@
   {
    "id": "055606ff-87d1-45cb-b541-7a8f9505f664",
    "kind": "fillet",
-   "label": "Fillet · Part 1",
+   "label": "Fillet 1",
    "part": "Part 1",
    "settings": {
     "corners": 4,
@@ -113,7 +113,7 @@
   {
    "id": "93185efe-9a70-47dd-ae63-a1cc2962df92:sketch",
    "kind": "sketch",
-   "label": "Sketch · Part 2",
+   "label": "Sketch 2",
    "part": "Part 2",
    "settings": {
     "on": "Part 1's top (-y)"
@@ -128,7 +128,7 @@
   {
    "id": "93185efe-9a70-47dd-ae63-a1cc2962df92:extrude",
    "kind": "extrude",
-   "label": "Extrude · Part 2",
+   "label": "Extrude 2",
    "part": "Part 2",
    "settings": {
     "thickness": {

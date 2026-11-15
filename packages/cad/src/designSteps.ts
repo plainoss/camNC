@@ -78,13 +78,14 @@ function numberedSteps(document: CadDocument, steps: DesignStep[]): DesignStep[]
   const byId = new Map(document.parts.map(part => [part.id, part]));
   const counts = new Map<string, number>();
   return steps.map(step => {
-    if (step.kind !== 'sketch' && step.kind !== 'extrude') return step;
+    if (step.kind !== 'sketch' && step.kind !== 'extrude' && step.kind !== 'fillet') return step;
     const part = byId.get(step.partId);
-    const noun = step.kind === 'sketch' ? 'Sketch' : part?.hole ? 'Hole' : 'Extrude';
+    const noun = step.kind === 'sketch' ? 'Sketch' : step.kind === 'fillet' ? 'Fillet' : part?.hole ? 'Hole' : 'Extrude';
     const n = (counts.get(noun) ?? 0) + 1;
     counts.set(noun, n);
-    const own = step.kind === 'sketch' ? part?.sketchName : part?.extrudeName;
-    return part && !own && kDefaultPartName.test(part.name) ? { ...step, label: `${noun} ${n}` } : step;
+    const own = step.kind === 'sketch' ? part?.sketchName : step.kind === 'extrude' ? part?.extrudeName : undefined;
+    // A fillet has no name of its own, so it's always numbered.
+    return part && !own && (step.kind === 'fillet' || kDefaultPartName.test(part.name)) ? { ...step, label: `${noun} ${n}` } : step;
   });
 }
 
