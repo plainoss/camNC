@@ -21,7 +21,11 @@
         "public/licenses/**",
         "package.json",
         "e2e/cad/check-distribution.mjs",
-        "$TURBO_ROOT$/LICENSE"
+        "$TURBO_ROOT$/LICENSE",
+        "$TURBO_ROOT$/packages/cad/licenses/**",
+        "$TURBO_ROOT$/packages/cad/THIRD_PARTY_NOTICES.md",
+        "$TURBO_ROOT$/packages/cam/licenses/**",
+        "$TURBO_ROOT$/packages/cam/THIRD_PARTY_NOTICES.md"
       ]
     },
     "test:browser": {

@@ -1,3 +1,5 @@
 # These licenses have pinned checksums; preserve their upstream bytes on every platform.
 packages/cad/licenses/*.txt -text
 apps/camNC/public/licenses/planegcs/*.txt -text
+packages/cam/licenses/*.txt -text
+apps/camNC/public/licenses/occt-import-js/*.txt -text
