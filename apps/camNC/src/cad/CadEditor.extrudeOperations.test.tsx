@@ -54,7 +54,7 @@ it('changes an earlier New to Add with its later cut intact and editable extent 
   expect(within(dialog).getByRole('button', { name: 'Flip direction' })).toBeDefined();
   await typeField(dialog, 'Thickness', '30');
   expect(latest().parts[1]!.thickness).toBe(30);
-  await typeField(dialog, 'Offset', '-200');
+  await typeField(dialog, 'Starting offset', '-200');
   expect(latest().parts[1]!.drawnOn!.offset).toBe(-200);
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Extrude 2' })).toBeNull());
@@ -72,7 +72,7 @@ it('removes from a default plane, edits its depth and offset, and restores the o
   expect(within(dialog).getByRole('button', { name: 'Flip direction' })).toBeDefined();
   await typeField(dialog, 'Cut depth', '25');
   expect(latest().parts[1]!.remove!.depth).toBe(25);
-  await typeField(dialog, 'Offset', '-203');
+  await typeField(dialog, 'Starting offset', '-203');
   expect(latest().parts[1]!.drawnOn!.offset).toBe(-203);
   const evaluated = evaluateCadDocument(latest());
   expect(evaluated.diagnostics.filter(problem => problem.severity === 'error')).toEqual([]);
