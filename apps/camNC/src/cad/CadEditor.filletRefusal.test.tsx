@@ -72,14 +72,18 @@ it('keeps a fillet whose radius uses up a side, and marks its row', async () => 
   await waitFor(() => expect(change.mock.calls.at(-1)?.[0].parts[0]!.fillets).toMatchObject([{ id: 'fillet', radius: 125 }]));
   await settled();
   const step = within(features).getByRole('button', { name: /^Fillet 1/ });
-  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(`Fillet 1 did not regenerate properly: ${message}`);
+  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(
+    'Fillet 1 did not regenerate properly: Failed to fillet selections.'
+  );
 }, 30_000);
 
 it('marks the Fillet row and the part when the sketch shrinks under its radius', async () => {
   await open(design(50, 30));
   const features = screen.getByRole('region', { name: 'Features' });
   const step = within(features).getByRole('button', { name: /^Fillet 1/ });
-  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(`Fillet 1 did not regenerate properly: ${message}`);
+  expect(within(step).getByRole('img', { name: 'Error' }).getAttribute('title')).toBe(
+    'Fillet 1 did not regenerate properly: Failed to fillet selections.'
+  );
   expect(within(features).getByRole('status', { name: '1 with errors' })).toBeDefined();
   const parts = within(screen.getByRole('list', { name: 'Parts' }));
   expect(within(parts.getByRole('button', { name: /^▱?\s*Part 1/ })).getByRole('img', { name: message })).toBeDefined();

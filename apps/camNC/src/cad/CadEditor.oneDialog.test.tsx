@@ -49,7 +49,7 @@ it('replaces an open Fillet dialog with the Transform started next, and the othe
 });
 
 it.each([
-  [/^Mirror/, 'Mirror'],
+  [/^Mirror/, /^Mirror \d/],
   [/^Fillet/, /^Fillet \d/],
 ] as const)('holds Done back while the %s dialog is open', async (command, name) => {
   const { done } = await studio();

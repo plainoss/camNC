@@ -67,7 +67,7 @@ it('mirrors the part clicked once its part field is active, and keeps the dialog
   await userEvent.click(within(dialog).getByRole('button', { name: 'Mirror plane' }));
   const geometry = within(screen.getByRole('region', { name: 'Features' })).getByRole('list', { name: 'Default geometry' });
   await userEvent.click(within(geometry).getByRole('button', { name: /Top/ }));
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('top plane'));
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Mirror plane' }).textContent).toContain('Top plane'));
   await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Mirror \d/ })).toBeNull());
   expect(named(latest(), 'Bottom').copies).toHaveLength(1);

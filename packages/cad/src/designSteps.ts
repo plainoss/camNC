@@ -154,7 +154,10 @@ export function designSteps(document: CadDocument): DesignStep[] {
     // switched off, itself or by its folder, isn't made, so neither is its fillet.
     const sharp =
       step.kind === 'fillet' && part && !step.suppressed && !part.suppressed && !masked.has(part.id)
-        ? edgeFilletProblems(part).find(problem => problem.filletId === step.id)?.message
+        ? edgeFilletProblems(part).some(problem => problem.filletId === step.id)
+          ? // As the reference says it; the Fillet dialog and the part say which corners and why.
+            'Failed to fillet selections.'
+          : undefined
         : undefined;
     // A Mirror › Add that can't join the part with its mirror image leaves the part as it was.
     const unmirrored =

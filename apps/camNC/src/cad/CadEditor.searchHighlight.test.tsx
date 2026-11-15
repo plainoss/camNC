@@ -94,8 +94,8 @@ it('moves the toolbar highlight with keyboard and pointer results, clearing it f
   const { unchanged } = await setup();
   const input = await search('r');
   const extrude = studioToolbar().getByRole('button', { name: 'Extrude' });
-  const mirror = studioToolbar().getByRole('button', { name: /^Mirror \d/ });
-  await userEvent.hover(screen.getByRole('option', { name: /^Mirror \d/ }));
+  const mirror = studioToolbar().getByRole('button', { name: 'Mirror' });
+  await userEvent.hover(screen.getByRole('option', { name: 'Mirror' }));
   expect(mirror).toHaveAttribute('data-command-highlight', 'true');
   expect(extrude).not.toHaveAttribute('data-command-highlight');
   expect(document.activeElement).toBe(input);

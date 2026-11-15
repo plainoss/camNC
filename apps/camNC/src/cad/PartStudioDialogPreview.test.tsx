@@ -45,8 +45,9 @@ it('previews a mirror as soon as its plane is picked', async () => {
   render(<MirrorDialog document={document} partId={document.parts[0]!.id} pickPlane={pickPlane} {...handlers} />);
   pickPlane.mock.calls.at(-1)![0]({ plane: 'front' });
   await waitFor(() =>
-    expect(handlers.onPreview.mock.calls.at(-1)?.[0]?.parts[0]?.copies).toEqual([
-      expect.objectContaining({ mirror: { across: { plane: 'front' } } }),
+    // The plate stands on the Front plane, so its image joins it.
+    expect(handlers.onPreview.mock.calls.at(-1)?.[0]?.parts[0]?.mirrorJoins).toEqual([
+      expect.objectContaining({ across: { plane: 'front' } }),
     ])
   );
   expect(handlers.onSave).not.toHaveBeenCalled();

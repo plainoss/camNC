@@ -98,7 +98,7 @@
     "corners": 3,
     "rounded": 1,
     "sharp": 2,
-    "problem": "A fillet on Part 1 can’t be made at 2 of its 3 corners: This radius would consume an entire adjacent line. Choose a smaller radius."
+    "problem": "Failed to fillet selections."
    }
   }
  ],
