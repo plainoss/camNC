@@ -35,6 +35,7 @@ import { CadThicknessField } from './CadThicknessField';
 import { FeatureDialog } from './FeatureDialog';
 import { CadValueInput } from './CadValueInput';
 import { drawnOnName } from './drawnOnName';
+import { ThinWallFields } from './ThinWallFields';
 
 interface PartDialogProps {
   document: CadDocument;
@@ -270,6 +271,17 @@ export function ExtrudeDialog({
       })
     );
   };
+  /** Walls around the picked shape, picked again, or back to a solid. */
+  const setThinWall = (on: boolean) => {
+    if (!on) setThin(null);
+    if (on === !!part.thinWall) return;
+    onChange(document =>
+      changePart(document, part.id, p => {
+        const { thinWall: _wall, ...next } = p;
+        return on ? { ...next, regions: [], thinWall: { thickness1: 5, thickness2: 0 } } : next;
+      })
+    );
+  };
   /** Takes the typed depth, or says why not. Whether it was taken. */
   const applyDepth = (text = depthText, preview = false) => {
     const parsed = parseCadValue(text, { unit: 'mm', variables });
@@ -443,7 +455,7 @@ export function ExtrudeDialog({
         {operation === 'new' && part.drawnOn && (
           // Solid pushes the sketch's face out by the thickness; Thin stands a board on a line drawn edge-on.
           <div className="cad-feature-tabs" role="tablist" aria-label="Extrude type">
-            <button type="button" role="tab" aria-selected={!part.thin} onClick={() => setThin(null)}>
+            <button type="button" role="tab" aria-selected={!part.thin && !part.thinWall} onClick={() => setThinWall(false)}>
               Solid
             </button>
             <button type="button" role="tab" aria-selected={false} disabled title={kUnsupported}>
@@ -452,8 +464,10 @@ export function ExtrudeDialog({
             <button
               type="button"
               role="tab"
-              aria-selected={!!part.thin}
+              aria-selected={!!part.thin || !!part.thinWall}
               onClick={() => {
+                // A shape picked in the sketch gets walls around it; a sketch of one line, a board standing on it.
+                if (part.regions) return setThinWall(true);
                 const parsed = parseCadValue(depthText, { unit: 'mm', variables });
                 setThin({ depth: 'error' in parsed || parsed.value <= 0 ? 100 : parsed.value, midPlane: true });
               }}>
@@ -474,6 +488,13 @@ export function ExtrudeDialog({
               </button>
             )}
           </div>
+        )}
+        {operation === 'new' && part.thinWall && (
+          <ThinWallFields
+            wall={part.thinWall}
+            variables={variables}
+            onChange={change => onChange(document => changePart(document, part.id, change))}
+          />
         )}
         {/* Nothing picked yet isn't a problem, only what to do next. */}
         {profileError && !part.faceProfile && part.regions?.length === 0 ? (
